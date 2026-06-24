@@ -1,12 +1,11 @@
 'use client';
-import { use } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import Dashboard from '@/components/dashboard/Dashboard';
 
-export default function ClientDashboard({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params);
+export default function ClientDashboard({ params }: { params: { slug: string } }) {
+  const { slug } = params;
   const { user, loading } = useAuth();
   const router = useRouter();
 
