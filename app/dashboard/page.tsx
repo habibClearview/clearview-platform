@@ -15,7 +15,7 @@ export default function DashboardIndex() {
 
     if (profile.role === 'coach') {
       // Coach sees client list - for now redirect to first client
-      supabase.from('clients').select('slug').eq('is_active', true).limit(1).single()
+      supabase.from('clients').select('slug').eq('archived', false).limit(1).single()
         .then(({ data }) => {
           if (data) router.push(`/dashboard/${data.slug}`);
         });
