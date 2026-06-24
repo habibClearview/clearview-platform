@@ -9,6 +9,33 @@ import {
   fmt, fmtFull, pct, MONTHS,
   type CONASInputs, type PlanLine, type SpendingRequest, type BusinessUnit,
 } from '@/lib/conas-engine'
+import type { UserRole } from '@/lib/auth/types'
+import { roleLabel } from '@/lib/auth/types'
+import UserManagement from '@/components/auth/UserManagement'
+
+// ── Permissions prop ──────────────────────────────────────────
+export interface DashboardPermissions {
+  role: UserRole
+  fullName: string
+  userId?: string
+  clientId?: string
+  canSeeAllUnits: boolean
+  canEditPlan: boolean
+  canLockPlan: boolean
+  canApprove: boolean
+  canSubmitRequest: boolean
+  canEnterActuals: boolean
+  assignedUnitIds: string[]
+  onSignOut: () => void
+}
+
+const FULL_PERMISSIONS: DashboardPermissions = {
+  role: 'ceo', fullName: 'CEO', userId: '', clientId: 'conas',
+  canSeeAllUnits: true, canEditPlan: true, canLockPlan: true,
+  canApprove: true, canSubmitRequest: true, canEnterActuals: true,
+  assignedUnitIds: [], onSignOut: () => {},
+}
+
 
 // ── Design tokens ───────────────────────────────────────────
 const C = {
@@ -168,30 +195,49 @@ function exportToPrint(title: string) {
 }
 
 // ── MAIN COMPONENT ──────────────────────────────────────────
-export default function CONASDashboard(){
-  const [inputs,setInputs]  = useState<CONASInputs>(defaultCONASInputs)
+export default function CONASDashboard({
+  inputs: inputsProp,
+  onInputsChange,
+  permissions: permProp,
+}: {
+  inputs?: CONASInputs
+  onInputsChange?: (inputs: CONASInputs) => void
+  permissions?: DashboardPermissions
+}) {
+  const P = permProp || FULL_PERMISSIONS
+  const [inputs,setInputsLocal]  = useState<CONASInputs>(inputsProp || defaultCONASInputs)
+  // Sync from external prop changes
+  const activeInputs = inputsProp || inputs
+  function setInputs(newInputs: CONASInputs) {
+    setInputsLocal(newInputs)
+    onInputsChange?.(newInputs)
+  }
   const [view,setView]      = useState('overview')
   const [planUnit,setPlanUnit] = useState('shop_1')
   const [unitPLView,setUnitPLView] = useState('fge')
   const [showActual,setShowActual] = useState(false)
   const [spendForm,setSpendForm] = useState({show:false,desc:'',unitId:'fge',category:'direct_opex' as PlanLine['category'],month:0,amount:0,requester:'Finance Manager'})
 
-  const result = useMemo(()=>runCONASModel(inputs),[inputs])
-  const months = useMemo(()=>buildMonthLabels(inputs.global.modelStartDate),[inputs.global.modelStartDate])
-  const cc = inputs.global.currency
+  const result = useMemo(()=>runCONASModel(activeInputs),[activeInputs])
+  const months = useMemo(()=>buildMonthLabels(activeInputs.global.modelStartDate),[activeInputs.global.modelStartDate])
+  const cc = activeInputs.global.currency
   const {unitPL,con,cf,bs,metrics,allocUnits,subUnitsByParent} = result
 
-  const season = inputs.seasons[0]
+  const season = activeInputs.seasons[0]
   const planLocked = season?.planLocked||false
-  const pending = inputs.spendingRequests.filter(r=>r.status==='pending')
+  const pending = activeInputs.spendingRequests.filter(r=>r.status==='pending')
 
   // All units including virtual parent consolidations
-  const allActiveUnits = inputs.units.filter(u=>u.active)
+  const allActiveUnits = activeInputs.units.filter(u=>u.active)
   const topUnits = allActiveUnits.filter(u=>!u.parentId)
   const shopUnits = allActiveUnits.filter(u=>u.parentId==='input_centres')
 
   // ── Update helpers ────────────────────────────────────────
-  const upd = useCallback((fn:(p:CONASInputs)=>CONASInputs)=>setInputs(fn),[])
+  const upd = useCallback((fn:(p:CONASInputs)=>CONASInputs)=>{
+    const next = fn(activeInputs)
+    setInputs(next)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[activeInputs])
   const setG = (f:string,v:unknown)=>upd(p=>({...p,global:{...p.global,[f]:v}}))
 
   function setPlanVal(uid:string,lid:string,m:number,v:number){
@@ -256,7 +302,7 @@ export default function CONASDashboard(){
         )}
         <div style={{background:planLocked?'#E8F6F8':'#F0F8FF',border:`1px solid ${planLocked?C.teal:C.cyan}`,borderRadius:8,padding:'0.75rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <span style={{fontWeight:700,color:planLocked?C.teal:C.navy}}>{planLocked?`🔒 Season plan locked`:'🔓 Season plan open — unit heads can edit'}</span>
-          <button style={{...addBtn(true),borderColor:planLocked?C.teal:C.cyan,color:planLocked?C.teal:C.cyan}} onClick={toggleLock}>{planLocked?'Unlock Plan':'Lock Season Plan'}</button>
+          {P.canLockPlan && <button style={{...addBtn(true),borderColor:planLocked?C.teal:C.cyan,color:planLocked?C.teal:C.cyan}} onClick={toggleLock}>{planLocked?'Unlock Plan':'Lock Season Plan'}</button>}
         </div>
 
         <div style={kpiGrid}>
@@ -707,7 +753,7 @@ export default function CONASDashboard(){
         <div style={card}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.75rem'}}>
             <div style={secH}>Submit a Spending Request</div>
-            <button style={addBtn()} onClick={()=>setSpendForm(s=>({...s,show:!s.show}))}>{spendForm.show?'Cancel':'+ New Request'}</button>
+            {P.canSubmitRequest && <button style={addBtn()} onClick={()=>setSpendForm(s=>({...s,show:!s.show}))}>{spendForm.show?'Cancel':'+ New Request'}</button>}
           </div>
           {spendForm.show&&(
             <div style={{background:'#F4F8FC',borderRadius:6,padding:'1rem',border:`1px solid ${C.border}`}}>
@@ -750,10 +796,10 @@ export default function CONASDashboard(){
                   <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.amber,marginLeft:'1rem',whiteSpace:'nowrap'}}>{fmtFull(r.amount,cc)}</div>
                 </div>
                 <input style={{...inp,marginBottom:'0.5rem',fontSize:'0.8rem'}} placeholder="CEO note (required if declining)" value={note[r.id]||''} onChange={e=>setNote(n=>({...n,[r.id]:e.target.value}))}/>
-                <div style={{display:'flex',gap:'0.6rem'}}>
+                {P.canApprove && <div style={{display:'flex',gap:'0.6rem'}}>
                   <button style={{fontSize:'0.78rem',fontWeight:600,padding:'0.4rem 0.9rem',border:'none',borderRadius:4,background:C.green,color:C.white,cursor:'pointer'}} onClick={()=>resolveRequest(r.id,true,note[r.id]||'')}>✓ Approve — post to P&L & Cash</button>
                   <button style={{fontSize:'0.78rem',fontWeight:600,padding:'0.4rem 0.9rem',border:'none',borderRadius:4,background:C.red,color:C.white,cursor:'pointer'}} onClick={()=>{if(!note[r.id]){alert('Add a note explaining why this is declined.');return}resolveRequest(r.id,false,note[r.id])}}>✕ Decline</button>
-                </div>
+                </div>}
               </div>
             ))}
           </div>
@@ -891,6 +937,29 @@ export default function CONASDashboard(){
     )
   }
 
+  // ── TEAM TAB ────────────────────────────────────────────
+  function TeamTab() {
+    if (!P.canSeeAllUnits) {
+      return (
+        <div style={{...card, textAlign:'center', color:C.slate, padding:'2.5rem'}}>
+          Team management is available to the CEO and Finance Manager only.
+        </div>
+      )
+    }
+    // We need the client_id — for now derive from the clientId prop or use a placeholder
+    // The CEO's client_id comes from their user profile loaded at login
+    return (
+      <div style={card}>
+        <UserManagement
+          currentUserId={P.userId || ''}
+          currentRole={P.role}
+          clientId={P.clientId || 'conas'}
+          clientName={activeInputs.global.businessName}
+        />
+      </div>
+    )
+  }
+
   // ── RENDER ───────────────────────────────────────────────
   const tabs:[string,string][]=[
     ['overview','Overview'],
@@ -900,6 +969,7 @@ export default function CONASDashboard(){
     ['cashflow','Cash Flow'],
     ['balancesheet','Balance Sheet'],
     ['scenarios','Scenarios'],
+    ['team','Team'],
     ['settings','Settings'],
   ]
 
@@ -909,17 +979,25 @@ export default function CONASDashboard(){
         <div style={{maxWidth:1440,margin:'0 auto',padding:'1.25rem 1.5rem',display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
           <div>
             <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>CANVAS COACH — CLEARVIEW PLANNER</div>
-            <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:C.white,margin:'0.1rem 0 0.15rem'}}>{inputs.global.businessName}</h1>
+            <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:C.white,margin:'0.1rem 0 0.15rem'}}>{activeInputs.global.businessName}</h1>
             <div style={{fontSize:'0.76rem',color:'rgba(255,255,255,0.6)'}}>
-              {metrics.scenarioLabel} · {metrics.fgeCount} FGEs · {inputs.global.currency} · {new Date(inputs.global.modelStartDate).toLocaleString('en-GB',{month:'long',year:'numeric'})}
+              {metrics.scenarioLabel} · {metrics.fgeCount} FGEs · {activeInputs.global.currency} · {new Date(inputs.global.modelStartDate).toLocaleString('en-GB',{month:'long',year:'numeric'})}
               {planLocked&&<span style={{marginLeft:8,color:C.teal}}>· 🔒 Locked</span>}
               {pending.length>0&&<span style={{marginLeft:8,color:C.amber}}>· ⏳ {pending.length} pending</span>}
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginTop:'0.4rem'}}>
+              <span style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.cyan,border:`1px solid rgba(0,180,216,0.4)`,borderRadius:4,padding:'0.18rem 0.5rem'}}>
+                {roleLabel(P.role)} — {P.fullName}
+              </span>
+              <button onClick={P.onSignOut} style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid rgba(255,255,255,0.25)`,borderRadius:4,color:'rgba(255,255,255,0.6)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>
+                Sign out
+              </button>
             </div>
           </div>
           <div style={{background:'rgba(0,180,216,0.12)',border:`1px solid rgba(0,180,216,0.3)`,borderRadius:8,padding:'0.72rem 1rem',minWidth:210}}>
             <div style={{fontFamily:'monospace',fontSize:'0.6rem',color:C.cyan,letterSpacing:'0.1em',marginBottom:'0.28rem'}}>ACTIVE SCENARIO</div>
             <select style={{width:'100%',background:'transparent',border:'none',color:C.white,fontSize:'0.85rem',fontWeight:700,cursor:'pointer',outline:'none'}}
-              value={inputs.global.activeScenarioId} onChange={e=>setG('activeScenarioId',e.target.value)}>
+              value={activeInputs.global.activeScenarioId} onChange={e=>setG('activeScenarioId',e.target.value)}>
               {inputs.scenarios.map(s=><option key={s.id} value={s.id} style={{background:C.navy}}>{s.label}</option>)}
             </select>
             <div style={{marginTop:'0.35rem',fontSize:'0.67rem',color:'rgba(255,255,255,0.5)'}}>Revenue: {fmt(metrics.totalRevenue,cc)} · EBITDA: {fmt(metrics.totalEBITDA,cc)}</div>
@@ -940,6 +1018,7 @@ export default function CONASDashboard(){
         {view==='balancesheet' &&<BalanceSheetTab/>}
         {view==='scenarios'    &&<ScenariosTab/>}
         {view==='settings'     &&<SettingsTab/>}
+        {view==='team'         &&<TeamTab/>}
       </main>
       <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.67rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>
         Canvas Coach · Clearview Planner · {inputs.global.businessName} · habibonifade.com
