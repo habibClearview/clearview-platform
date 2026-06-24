@@ -1,23 +1,15 @@
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import './globals.css';
-import { AuthProvider } from '@/components/auth/AuthProvider';
-
-const inter = Inter({ subsets: ['latin'] });
+import type { Metadata } from 'next'
+import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Clearview — Canvas Coach',
-  description: 'Financial Planning Platform',
-};
+  title: 'Clearview Planner — Canvas Coach',
+  description: 'Live financial planning infrastructure for GtCV engagements',
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
-        <AuthProvider>
-          {children}
-        </AuthProvider>
-      </body>
+      <body>{children}</body>
     </html>
-  );
+  )
 }
