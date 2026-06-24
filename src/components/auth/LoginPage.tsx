@@ -6,14 +6,74 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     setLoading(true);
     setError('');
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-    if (authError) setError(authError.message);
-    setLoading(false);
+    setStatus('Authenticating...');
+
+    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    
+    if (authError) {
+      setError(authError.message);
+      setStatus('');
+      setLoading(false);
+      return;
+    }
+
+    setStatus('Authenticated. Loading profile...');
+
+    // Manually fetch profile to test
+    if (data.user) {
+      const { data: profileData, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profileError) {
+        setStatus('');
+        setError('Profile error: ' + profileError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (!profileData) {
+        setStatus('');
+        setError('No profile found for this user.');
+        setLoading(false);
+        return;
+      }
+
+      setStatus('Profile loaded. Role: ' + profileData.role + '. Finding client...');
+
+      // Now find client
+      const { data: clientData, error: clientError } = await supabase
+        .from('clients')
+        .select('slug')
+        .eq('archived', false)
+        .limit(1)
+        .maybeSingle();
+
+      if (clientError) {
+        setStatus('');
+        setError('Client error: ' + clientError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (!clientData) {
+        setStatus('');
+        setError('No client found. Check RLS policies.');
+        setLoading(false);
+        return;
+      }
+
+      setStatus('Redirecting to ' + clientData.slug + '...');
+      window.location.href = '/dashboard/' + clientData.slug;
+    }
   };
 
   return (
@@ -48,6 +108,10 @@ export default function LoginPage() {
 
           {error && (
             <p className="text-sm text-red-600 bg-red-50 rounded px-3 py-2">{error}</p>
+          )}
+
+          {status && (
+            <p className="text-sm text-blue-600 bg-blue-50 rounded px-3 py-2">{status}</p>
           )}
 
           <button
