@@ -2,6 +2,8 @@
 'use client'
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import AnalyticsView from '@/components/analytics/AnalyticsView'
+import { buildDebtSchedule } from '@/lib/analytics-engine'
 
 const MONTHS_HORIZON = 24
 const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -305,6 +307,7 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
   const [selMonth,setSelMonth]=useState(0)
   const [actuals,setActuals]=useState(savedActuals||{})
   const [saving,setSaving]=useState(false)
+  const [savedAssessments,setSavedAssessments]=useState(null)
   const [activeSection,setActiveSection]=useState('actuals')
 
   // Debt obligations state
@@ -678,6 +681,8 @@ export default function WonderlandDashboard(){
             if(scen?.config_data)setOverrides({...defaultOverrides(),...scen.config_data})
             const debt=cfg.find(r=>r.config_type==='debt_obligations')
             if(debt?.config_data)setDebtObligations(debt.config_data)
+            const assess=cfg.find(r=>r.config_type==='coach_assessments')
+            if(assess?.config_data)setSavedAssessments(assess.config_data)
           }
           if(acts){
             const actObj={}
@@ -705,7 +710,7 @@ export default function WonderlandDashboard(){
 
   const {consolidated:con,metrics}=result
 
-  const navItems=[['overview','Overview'],['units','Business Units'],['planning','Planning & Actuals'],['opcashflow','Operational Cashflow'],['cashflow','Cash Flow Statement'],['workingcapital','Working Capital'],['balancesheet','Balance Sheet'],['fges','FGE Roster'],['scenarios','Scenario Builder']]
+  const navItems=[['overview','Overview'],['units','Business Units'],['planning','Planning & Actuals'],['analytics','Analytics'],['opcashflow','Operational Cashflow'],['cashflow','Cash Flow Statement'],['workingcapital','Working Capital'],['balancesheet','Balance Sheet'],['fges','FGE Roster'],['scenarios','Scenario Builder']]
 
   return(
     <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif",background:CC.cream,color:CC.navy,minHeight:'100vh'}}>
@@ -817,6 +822,19 @@ export default function WonderlandDashboard(){
             </div>
           </div>
         )}
+
+        {view==='analytics'&&<AnalyticsView
+          result={result}
+          debtObligations={debtObligations}
+          monthLabels={monthLabels}
+          cc={cc}
+          clientName="Wonderland Farm Services"
+          savedAssessments={savedAssessments}
+          onSaveAssessments={async(assess)=>{
+            setSavedAssessments(assess)
+            try{await supabase.from('model_config').upsert({client_id:'client_wonderland',config_type:'coach_assessments',config_data:assess,updated_at:new Date().toISOString()},{onConflict:'client_id,config_type'})}catch(e){}
+          }}
+        />}
 
         {view==='scenarios'&&<ScenarioBuilder config={config} overrides={overrides} result={result} baseResult={baseResult} onApply={persist} monthLabels={monthLabels} cc={cc}/>}
 
