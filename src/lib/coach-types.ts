@@ -1,924 +1,540 @@
 // ============================================================
-// COACH PLATFORM TYPES — v2
-// Two engagement modes: canvas (full GtCV) | financial (Clearview only)
+// IKORE CANVAS TYPES — Clearview Platform
+// Canvas Coach | habibonifade.com
 // ============================================================
 
-export type ClientType =
-  | 'crop_aggregator'
-  | 'livestock_aggregator'
-  | 'farmer_group_enterprise'
-  | 'service_lsp'
+export type CanvasRole = 'super_coach' | 'co_implementer' | 'ceo' | 'finance_manager' | 'team_member' | 'ignite_funder'
 
-export type EngagementMode = 'canvas' | 'financial'
+export type GateStatus =
+  | 'locked'
+  | 'not_started'
+  | 'in_progress'
+  | 'evidence_submitted'
+  | 'ceo_signed'
+  | 'coach_authorised'
 
-export type ProgrammeType = 'donor_programme' | 'direct_client' | 'blended'
+export type EvidenceStatus = 'not_started' | 'in_progress' | 'submitted' | 'accepted' | 'queried'
+export type EvidenceType = 'document' | 'interview' | 'observation' | 'financial_data' | 'other'
+export type HypothesisStatus = 'holding' | 'confirmed' | 'rejected'
+export type AssumptionRisk = 'high' | 'medium' | 'low'
+export type ActorInfluence = 'high' | 'medium' | 'low'
 
-export type DPStatus = '○' | '◐' | '✓' | '⚠'
+// ─── PHASE IDENTIFIERS ───────────────────────────────────────
+export type PhaseId = 'setup' | 'phase0' | 'dp01' | 'dp02' | 'dp03' | 'dp04' | 'dp05' | 'dp06' | 'dp07' | 'dp08' | 'dp09' | 'handover'
 
-export type EngagementStatus =
-  | 'setup' | 'phase_0'
-  | 'dp01' | 'dp02' | 'dp03' | 'dp04' | 'dp05'
-  | 'dp06' | 'dp07' | 'dp08' | 'dp09'
-  | 'complete' | 'paused'
-
-// ── Five-layer Decision Component ────────────────────────────
-export interface DecisionComponent {
-  id: string              // e.g. 'dp01_1_1'
-  number: string          // e.g. '1.1'
+// ─── COMPONENT (5-LAYER) ─────────────────────────────────────
+export interface CanvasComponent {
+  id: string
+  number: number
   title: string
-  whatItIs: string
-  whyItMatters: string
-  coachGuidance: string
-  actionTrigger: string
-  signalToLookFor: string
-  // Evidence recorded during engagement
-  status: DPStatus
-  evidenceRecorded: string
-  coachNotes: string
-  ceoSignedOff: boolean
-  ceoSignedOffAt: string
-  ceoSignedOffBy: string
+  what_it_is: string
+  why_it_matters: string
+  action_trigger: string
+  signal_to_look_for: string
+  coach_guidance: string // hidden from client
 }
 
+// ─── DECISION POINT ──────────────────────────────────────────
 export interface DecisionPoint {
-  id: string              // 'phase_0' | 'dp01' … 'dp09'
-  label: string
-  coreQuestion: string
-  commitment: string
-  components: DecisionComponent[]
-  // DP-level sign-off
-  status: DPStatus
-  completedAt: string
-  ceoSignedOff: boolean
-  ceoSignedOffAt: string
-  sessionTime: string     // e.g. '3–4 hrs'
-  outputRequired: string
+  id: PhaseId
+  number: string
+  zone: string
+  core_question: string
+  good_answer: string
+  weak_answer: string
+  why_it_matters_for_ikore: string
+  session_time: string
+  components: CanvasComponent[]
 }
 
-// ── Timesheet ────────────────────────────────────────────────
-export interface TimesheetEntry {
-  id: string
-  coImplementerId: string
-  date: string            // ISO date
-  clientId: string
-  dpId: string            // which DP or 'general'
-  hours: number           // to 0.5
+// ─── EVIDENCE ENTRY ──────────────────────────────────────────
+export interface EvidenceEntry {
+  id: string          // E-001, E-002
+  date: string
+  phase: PhaseId
+  type: EvidenceType
   description: string
-  status: 'draft' | 'submitted' | 'approved' | 'rejected'
-  submittedAt: string
-  approvedAt: string
-  rejectionNote: string
+  url: string
+  uploaded_by: string
+  status: EvidenceStatus
+  linked_component?: string
 }
 
-// ── Invoice ──────────────────────────────────────────────────
-export interface Invoice {
+// ─── INTERVIEW ───────────────────────────────────────────────
+export interface InterviewCapture {
+  id: string          // INT-001
+  date: string
+  phase: PhaseId
+  respondent: string
+  role: string
+  organisation: string
+  interviewer: string
+  key_quotes: string
+  observations: string
+  follow_up: string
+  evidence_ref: string
+}
+
+// ─── HYPOTHESIS ──────────────────────────────────────────────
+export interface Hypothesis {
+  id: string          // HYP-001
+  phase: PhaseId
+  date_formed: string
+  hypothesis: string
+  evidence_for: string
+  evidence_against: string
+  status: HypothesisStatus
+  decision_made: string
+}
+
+// ─── CANVAS DECISION RECORD ──────────────────────────────────
+export interface CanvasDecision {
+  id: string          // CDR-001
+  date: string
+  phase: PhaseId
+  decision: string
+  made_by: string
+  evidence_ref: string
+  authorised_by: string
+}
+
+// ─── ASSUMPTION ──────────────────────────────────────────────
+export interface Assumption {
   id: string
-  coImplementerId: string
-  invoiceNumber: string
-  periodStart: string
-  periodEnd: string
-  timesheetIds: string[]
-  totalHours: number
-  ratePerDay: number
-  totalAmount: number
-  currency: string
-  expenses: {description: string; amount: number}[]
-  status: 'draft' | 'submitted' | 'approved' | 'paid'
-  submittedAt: string
-  approvedAt: string
-  paidAt: string
-  notes: string
+  assumption: string
+  source: string
+  risk: AssumptionRisk
+  how_to_test: string
+  outcome: string
 }
 
-// ── Co-implementer ───────────────────────────────────────────
-export interface CoImplementer {
+// ─── STAKEHOLDER ─────────────────────────────────────────────
+export interface Stakeholder {
+  id: string
+  actor: string
+  role: string
+  influence: ActorInfluence
+  relationship: string
+  action_needed: string
+}
+
+// ─── DATA GAP ────────────────────────────────────────────────
+export interface DataGap {
+  id: string
+  data_needed: string
+  why_it_matters: string
+  how_to_get: string
+  responsible: string
+  status: string
+}
+
+// ─── READINESS QUESTION ──────────────────────────────────────
+export interface ReadinessQuestion {
+  id: string
+  question: string
+  answer: boolean | null
+}
+
+// ─── PILOT OBSERVATION ───────────────────────────────────────
+export interface PilotObservation {
+  id: string
+  phase: PhaseId
+  iteration: 1 | 2
+  date: string
+  client_name: string
+  service_delivered: string
+  went_well: string
+  did_not_work: string
+  client_feedback: string
+  adjustments_made: string
+  evidence_ref: string
+}
+
+// ─── HANDOVER TEST ───────────────────────────────────────────
+export interface HandoverTest {
+  id: string
+  number: number
+  test: string
+  status: 'yes' | 'no' | 'partial' | 'not_assessed'
+  evidence: string
+  ceo_confirmed: boolean
+  ceo_confirmed_date: string
+}
+
+// ─── GATE SIGN-OFF ───────────────────────────────────────────
+export interface GateSignOff {
+  phase: PhaseId
+  status: GateStatus
+  ceo_signed: boolean
+  ceo_name: string
+  ceo_date: string
+  coach_authorised: boolean
+  coach_note: string
+  coach_date: string
+}
+
+// ─── COMPONENT EVIDENCE ──────────────────────────────────────
+export interface ComponentEvidence {
+  component_id: string
+  description: string
+  url: string
+  evidence_ref: string
+  status: EvidenceStatus
+}
+
+// ─── ENGAGEMENT TEAM MEMBER ──────────────────────────────────
+export interface TeamMember {
   id: string
   name: string
+  role: string
+  organisation: string
   email: string
-  phone: string
-  country: string
-  specialisation: string
-  ratePerDay: number
-  currency: string
-  programmeIds: string[]
-  clientIds: string[]
-  active: boolean
+  notify: boolean
+}
+
+// ─── NOTIFICATION SETTINGS ───────────────────────────────────
+export interface NotificationSettings {
+  enabled: boolean
+  recipients: {
+    name: string
+    email: string
+    role: string
+    notify_gate_signed: boolean
+    notify_gate_authorised: boolean
+    notify_evidence_submitted: boolean
+    notify_dp_complete: boolean
+  }[]
+}
+
+// ─── DIAGNOSTIC SCORE ────────────────────────────────────────
+export interface DiagnosticScore {
+  point: 'baseline' | 'midpoint' | 'final'
+  date: string
+  scores: Record<string, number>  // fit test id → score 1-5
+  total: number
   notes: string
 }
 
-// ── Programme ────────────────────────────────────────────────
-export interface Programme {
-  id: string
-  name: string
-  type: ProgrammeType
+// ─── FULL ENGAGEMENT STATE ───────────────────────────────────
+export interface CanvasEngagementState {
+  // Setup
+  engagement_title: string
+  client_name: string
+  programme: string
   funder: string
-  country: string
-  startDate: string
-  endDate: string
-  notes: string
-  clientIds: string[]
-  coImplementerIds: string[]
-  funderEmail: string     // for funder invite
-  funderInvited: boolean
-}
-
-// ── Client ───────────────────────────────────────────────────
-export interface EngagementClient {
-  id: string
-  name: string
-  slug: string
-  type: ClientType
-  engagementMode: EngagementMode
-  programmeId: string
-  country: string
+  lead_consultant: string
+  start_date: string
+  target_handover_date: string
+  version: string
   sector: string
-  contactName: string
-  contactEmail: string
-  contactPhone: string
-  status: EngagementStatus
-  clearviewActive: boolean
-  ceoInvited: boolean
-  ceoInvitedAt: string
-  notes: string
-  startDate: string
-  expectedClose: string
-  // Canvas engagement fields
-  canvas: DecisionPoint[]
-  // Financial headline (from Clearview)
-  financialHeadline?: {
-    revenue: number; ebitda: number; cash: number
-    currency: string; lastUpdated: string
+  registered_address: string
+  file_links: { label: string; url: string }[]
+  team: TeamMember[]
+  notifications: NotificationSettings
+
+  // Pre-engagement diagnostic
+  diagnostic_q1: string
+  diagnostic_q2: string
+  diagnostic_q3: string
+  diagnostic_signed_ceo: boolean
+  diagnostic_signed_ceo_name: string
+  diagnostic_signed_ceo_date: string
+  diagnostic_signed_coach: boolean
+  diagnostic_signed_coach_date: string
+
+  // Phase 0 tools
+  assumptions: Assumption[]
+  stakeholders: Stakeholder[]
+  data_gaps: DataGap[]
+  readiness_answers: ReadinessQuestion[]
+  commitment_signed: boolean
+  commitment_signed_date: string
+
+  // Per-phase evidence and tracking
+  component_evidence: Record<string, ComponentEvidence>  // component_id → evidence
+  gate_signoffs: Record<PhaseId, GateSignOff>
+
+  // Evidence library
+  evidence_library: EvidenceEntry[]
+
+  // Interviews
+  interviews: InterviewCapture[]
+
+  // Hypotheses
+  hypotheses: Hypothesis[]
+
+  // Canvas decision record
+  decisions: CanvasDecision[]
+
+  // Pilot observations
+  pilot_observations: PilotObservation[]
+
+  // Handover
+  handover_tests: HandoverTest[]
+
+  // Commercial readiness diagnostic
+  diagnostic_scores: DiagnosticScore[]
+}
+
+// ─── DEFAULT STATE ───────────────────────────────────────────
+export const DEFAULT_HANDOVER_TESTS: HandoverTest[] = [
+  { id: 'ht1', number: 1, test: 'Ikore can describe its paying customer clearly without consultant prompting', status: 'not_assessed', evidence: '', ceo_confirmed: false, ceo_confirmed_date: '' },
+  { id: 'ht2', number: 2, test: 'Ikore can state its price and justify it without consultant prompting', status: 'not_assessed', evidence: '', ceo_confirmed: false, ceo_confirmed_date: '' },
+  { id: 'ht3', number: 3, test: 'Ikore has booked at least one paying client independently', status: 'not_assessed', evidence: '', ceo_confirmed: false, ceo_confirmed_date: '' },
+  { id: 'ht4', number: 4, test: 'Ikore has presented its commercial model to its leadership without consultant present', status: 'not_assessed', evidence: '', ceo_confirmed: false, ceo_confirmed_date: '' },
+  { id: 'ht5', number: 5, test: 'Ikore has a documented 12-month plan that does not depend on grant funding', status: 'not_assessed', evidence: '', ceo_confirmed: false, ceo_confirmed_date: '' },
+]
+
+export const DEFAULT_READINESS_QUESTIONS: ReadinessQuestion[] = [
+  { id: 'rq1', question: 'We know who our paying customers are (not just beneficiaries)', answer: null },
+  { id: 'rq2', question: 'We have had direct conversations with at least 3 potential paying customers in the last 6 months', answer: null },
+  { id: 'rq3', question: 'We can describe what problem we solve for a paying customer in one sentence', answer: null },
+  { id: 'rq4', question: 'We have a price for at least one service', answer: null },
+  { id: 'rq5', question: 'We know what it costs us to deliver our main service', answer: null },
+  { id: 'rq6', question: 'We have at least one staff member who can lead business development', answer: null },
+  { id: 'rq7', question: 'Our leadership team supports moving towards commercial revenue', answer: null },
+  { id: 'rq8', question: 'We have time allocated for commercial viability work in the next 6 months', answer: null },
+  { id: 'rq9', question: 'We are willing to test our services with real paying clients during this engagement', answer: null },
+  { id: 'rq10', question: 'We understand that the goal is financial independence, not more grant funding', answer: null },
+]
+
+// ─── CANVAS DATA — ALL 9 DECISION POINTS ─────────────────────
+export const CANVAS_DECISION_POINTS: DecisionPoint[] = [
+  {
+    id: 'dp01',
+    number: 'DP01',
+    zone: 'Zone 01 — Service Reality Audit',
+    core_question: 'Which of our current services could a paying customer actually buy?',
+    good_answer: 'Ikore can name 2 to 3 specific services, describe exactly who would pay for each, and explain why that person has the money and the reason to pay.',
+    weak_answer: 'Ikore lists everything it currently does, including donor-funded activities, without distinguishing what a paying customer would value.',
+    why_it_matters_for_ikore: 'Most LSPs have a mix of grant-logic services and market-logic services. This Decision Point separates them so you only invest commercial energy in services with real revenue potential.',
+    session_time: '3 to 4 hours across two sessions',
+    components: [
+      { id: 'dp01_c1', number: 1, title: 'Service Inventory', what_it_is: 'A complete list of everything Ikore currently does, funded and unfunded.', why_it_matters: 'You cannot separate grant-logic from market-logic without first seeing everything on the table.', action_trigger: 'List every service or activity Ikore delivers. Include donor-funded work, fee-based work, and informal support you give for free.', signal_to_look_for: 'A list of 8 to 15 activities covering the full range of what Ikore does. Nothing left off because it seems too small.', coach_guidance: 'Push for completeness. Clients typically under-list informal services. Ask: what do you do that you are not paid for? What do people call you about?' },
+      { id: 'dp01_c2', number: 2, title: 'Grant Logic vs Market Logic Sort', what_it_is: 'Each service is classified as grant-logic (exists because a donor pays for it) or market-logic (someone with budget authority would buy it).', why_it_matters: 'This is the most important sort in the engagement. It prevents energy being spent on services that cannot survive without subsidy.', action_trigger: 'For each service on your inventory, answer: if the donor stopped funding this tomorrow, would someone pay for it? Mark it grant-logic or market-logic.', signal_to_look_for: 'At least 2 services clearly in the market-logic column. If everything is grant-logic, that is critical information, not a failure.', coach_guidance: 'Expect resistance on this step. Clients emotionally attach to donor-funded work. Hold the line: the test is simple — would someone pay for it without being told to?' },
+      { id: 'dp01_c3', number: 3, title: 'Service Delivery Evidence', what_it_is: 'For each market-logic service, what evidence exists that it has been delivered and that someone valued it?', why_it_matters: 'Services that have been delivered to real people with real problems are much closer to commercial than services that exist on paper.', action_trigger: 'For each market-logic service, find at least one piece of evidence: a report, a client record, a photo, a receipt, a testimonial.', signal_to_look_for: 'Evidence exists and can be retrieved. Services with no evidence need to be treated as hypothetical at this stage.', coach_guidance: 'Do not let clients count donor reports as evidence of service value. The question is whether the service receiver found it valuable, not whether the donor was satisfied.' },
+      { id: 'dp01_c4', number: 4, title: 'Cost of Delivery', what_it_is: 'What does it actually cost Ikore to deliver each market-logic service once?', why_it_matters: 'You cannot price a service without knowing its cost. Most LSPs significantly underestimate because they exclude staff time and overhead.', action_trigger: 'For your top 2 market-logic services, estimate the direct cost of one delivery: staff time, materials, transport, any other variable cost.', signal_to_look_for: 'A number, even a rough one. The act of calculating surfaces assumptions that need testing.', coach_guidance: 'Full cost allocation comes in DP04. At this stage a directional estimate is enough. Push for staff time to be included — it is almost always excluded.' },
+      { id: 'dp01_c5', number: 5, title: 'Service Readiness Assessment', what_it_is: 'How ready is each market-logic service for a real commercial transaction right now?', why_it_matters: 'Some services need significant development before they can be sold. Others are ready now. This shapes the engagement timeline.', action_trigger: 'Rate each market-logic service on readiness: Ready now (can be sold this month), Nearly ready (needs 1 to 2 months of development), Early stage (needs 3+ months).', signal_to_look_for: 'At least one service rated Ready now or Nearly ready. This becomes the pilot service in DP07.', coach_guidance: 'If nothing is rated ready, the engagement timeline needs to be recalibrated. Flag this to the programme manager before proceeding.' },
+      { id: 'dp01_c6', number: 6, title: 'Competitor and Substitute Map', what_it_is: 'Who else provides similar services to similar customers? What do customers do if Ikore does not exist?', why_it_matters: 'Understanding competition prevents pricing too high and helps identify Ikore\'s real differentiation.', action_trigger: 'Name at least 3 other organisations or individuals who provide services similar to Ikore\'s top market-logic service. What do they charge?', signal_to_look_for: 'Real names, not categories. "Other NGOs" is not an answer. Specific organisations with known price points.', coach_guidance: 'Clients often say they have no competition. This is never true. Ask: what does the customer do if they cannot reach Ikore? That is the substitute.' },
+      { id: 'dp01_c7', number: 7, title: 'Internal Capability Audit', what_it_is: 'Does Ikore have the staff skills, systems, and physical capacity to deliver the market-logic services at commercial volume?', why_it_matters: 'A service can have strong market demand but fail commercially because the organisation cannot scale delivery.', action_trigger: 'For your top market-logic service, list the capability requirements: skills needed, staff available, equipment needed, equipment available.', signal_to_look_for: 'Gaps are identified honestly. A capability gap is not a reason to drop the service, but it must be planned for.', coach_guidance: 'This step often surfaces HR sensitivities. Keep the conversation factual: what does delivery require, what does the organisation have?' },
+      { id: 'dp01_c8', number: 8, title: 'Short-List of Commercial Services', what_it_is: 'From the full inventory, a short-list of 2 to 3 services that will be taken forward into the canvas.', why_it_matters: 'Focus is critical. Trying to commercialise everything produces nothing. The short-list is the foundation of the whole engagement.', action_trigger: 'Agree your short-list with your team. Write a one-sentence description of each service: what it is, who it is for, and what it costs.', signal_to_look_for: 'Short-list agreed and documented. Every team member can state the same 2 to 3 services without prompting.', coach_guidance: 'The short-list must be agreed collectively, not imposed by the CEO. Disagreement at this stage is critical information about internal alignment.' },
+      { id: 'dp01_c9', number: 9, title: 'DP01 Summary and Commitment', what_it_is: 'A written summary of what was decided in DP01, signed by the CEO as the basis for proceeding to DP02.', why_it_matters: 'The summary creates a documented starting point that cannot be revised later without a formal decision record.', action_trigger: 'Write a one-page summary: what services are on the short-list, why, and what was learned about services that were not selected.', signal_to_look_for: 'Summary is specific, not generic. It describes Ikore\'s actual services, not a template.', coach_guidance: 'Review the summary before CEO sign-off. If it could apply to any LSP, it is not specific enough. Push for Ikore-specific language.' },
+    ]
+  },
+  {
+    id: 'dp02',
+    number: 'DP02',
+    zone: 'Zone 02 — Customer and Problem Clarity',
+    core_question: 'Who will pay for our services, and what problem are we solving for them?',
+    good_answer: 'Ikore can name a specific type of organisation or individual, describe the problem they experience in their own words, and confirm they have budget authority to purchase the solution.',
+    weak_answer: 'Ikore describes a beneficiary population rather than a paying customer, or describes the problem in terms of what Ikore wants to solve rather than what the customer experiences.',
+    why_it_matters_for_ikore: 'The single most common failure in LSP commercialisation is designing services for beneficiaries rather than for paying customers. This Decision Point ensures Ikore designs for the actor with budget authority.',
+    session_time: '4 to 5 hours including customer visits',
+    components: [
+      { id: 'dp02_c1', number: 1, title: 'Beneficiary vs Paying Customer Distinction', what_it_is: 'A clear separation between who benefits from Ikore\'s services and who has the authority and motivation to pay for them.', why_it_matters: 'Conflating beneficiaries and customers produces services that are valued but not paid for.', action_trigger: 'For each short-listed service, ask: who benefits? Then ask separately: who would write the cheque? These may be different people or organisations.', signal_to_look_for: 'Ikore can name a paying customer who is distinct from the beneficiary, or confirm they are the same and explain why.', coach_guidance: 'This is often the most uncomfortable step. Clients resist the idea that the person who benefits is not the person who pays. Hold this distinction firmly.' },
+      { id: 'dp02_c2', number: 2, title: 'Customer Profile', what_it_is: 'A detailed description of the paying customer: type of organisation, size, location, decision-making structure, budget cycle.', why_it_matters: 'A vague customer description produces vague service design. The more specific the profile, the more targeted the service.', action_trigger: 'Write a one-paragraph profile of your ideal paying customer. Include: type of organisation, size (staff or budget), where they operate, who makes purchasing decisions.', signal_to_look_for: 'Profile is specific enough that Ikore could name 5 real organisations that match it right now.', coach_guidance: 'Test the profile by asking: can you name 5 organisations that match this description? If not, it is too vague.' },
+      { id: 'dp02_c3', number: 3, title: 'Problem Statement', what_it_is: 'A description of the problem the paying customer experiences, in their own words, not Ikore\'s.', why_it_matters: 'Services designed around the provider\'s perception of the problem frequently miss what the customer actually needs.', action_trigger: 'Write the customer\'s problem in the first person: "We struggle with..." or "We cannot..." Use language a customer would use, not sector jargon.', signal_to_look_for: 'A problem statement that a real customer would read and say "yes, that is our problem."', coach_guidance: 'The problem statement must come from customer conversations, not from Ikore\'s assumptions. If Ikore has not yet spoken to customers, this step cannot be completed honestly.' },
+      { id: 'dp02_c4', number: 4, title: 'Budget Authority Confirmation', what_it_is: 'Evidence that the paying customer has the financial authority and motivation to purchase the service.', why_it_matters: 'A customer who values the service but has no budget or no authority to spend is not a commercial customer.', action_trigger: 'For your paying customer profile: confirm they have a budget line that could cover this service, and identify who in their organisation has authority to approve the purchase.', signal_to_look_for: 'A specific budget source (operating budget, programme budget, government line item) and a named decision-maker role.', coach_guidance: 'This often requires direct customer conversations. If Ikore cannot confirm budget authority from existing knowledge, it must be verified in customer visits.' },
+      { id: 'dp02_c5', number: 5, title: 'Customer Validation Plan', what_it_is: 'A plan for direct conversations with at least 3 potential paying customers before DP02 closes.', why_it_matters: 'Every assumption made so far must be tested with real people. Desk research and internal discussion are not sufficient.', action_trigger: 'Identify 3 to 5 real organisations matching your customer profile. Plan brief conversations: who will you speak to, what will you ask, when will it happen?', signal_to_look_for: 'Named organisations, named contacts where possible, a date for the first conversation within 2 weeks.', coach_guidance: 'The lead consultant attends at least one customer validation conversation. Ensure this is scheduled before DP02 closes.' },
+      { id: 'dp02_c6', number: 6, title: 'Customer Validation Results', what_it_is: 'What was learned from the customer validation conversations.', why_it_matters: 'Validation either confirms the customer profile and problem statement, or reveals adjustments needed before proceeding.', action_trigger: 'After completing validation conversations, record: what confirmed your assumptions, what surprised you, what you need to change in your customer profile or problem statement.', signal_to_look_for: 'At least one direct quote from a customer that validates (or challenges) the problem statement.', coach_guidance: 'Do not let clients summarise validation conversations without direct quotes. Paraphrased validation is unreliable.' },
+      { id: 'dp02_c7', number: 7, title: 'Revised Customer Profile', what_it_is: 'The customer profile updated based on what was learned in validation conversations.', why_it_matters: 'The profile that enters DP03 must reflect real customer intelligence, not assumptions.', action_trigger: 'Revise your customer profile based on validation findings. Note what changed and why.', signal_to_look_for: 'The revised profile is more specific than the original. At least one thing changed based on customer feedback.', coach_guidance: 'If nothing changed after customer conversations, either the conversations were too shallow or the client is not updating honestly. Probe both possibilities.' },
+      { id: 'dp02_c8', number: 8, title: 'Problem Prioritisation', what_it_is: 'Of all the problems the customer experiences, which one does Ikore\'s service address most directly?', why_it_matters: 'Customers have many problems. Ikore must address the one that creates the strongest motivation to pay.', action_trigger: 'From your customer conversations, list the top 3 problems the customer mentioned. Rank them by urgency and budget motivation. Confirm which one Ikore\'s service addresses.', signal_to_look_for: 'A clear first-ranked problem with evidence from customer conversations, and confirmation that Ikore\'s service addresses it directly.', coach_guidance: 'The ranked problem list should come from customers, not from Ikore\'s priorities. If they do not match, this is a design question that must be resolved before proceeding.' },
+      { id: 'dp02_c9', number: 9, title: 'DP02 Summary and Commitment', what_it_is: 'A written summary of the validated customer profile and problem statement, signed by the CEO.', why_it_matters: 'This summary becomes the foundation for DP03 value proposition design. It cannot be changed without a formal decision record.', action_trigger: 'Write a one-page summary: who your paying customer is, what problem they have, and what you learned from validation conversations.', signal_to_look_for: 'Summary includes at least two direct customer quotes. Customer profile includes the name of at least one real organisation.', coach_guidance: 'Review before CEO sign-off. The summary must reflect what was actually learned, not what Ikore hoped to learn.' },
+    ]
+  },
+  {
+    id: 'dp03',
+    number: 'DP03',
+    zone: 'Zone 03 — Value Proposition Architecture',
+    core_question: 'Why would this specific customer choose our service over any alternative?',
+    good_answer: 'Ikore can articulate a clear, specific reason why their paying customer would choose them, grounded in the customer\'s problem and budget motivation, not in Ikore\'s capabilities or values.',
+    weak_answer: 'Ikore describes its mission, experience, or technical capacity as its value proposition without connecting these to the customer\'s specific problem.',
+    why_it_matters_for_ikore: 'A strong value proposition is the foundation of all pricing, marketing, and sales activity. Without it, Ikore cannot explain to a customer why they should pay.',
+    session_time: '3 to 4 hours',
+    components: [
+      { id: 'dp03_c1', number: 1, title: 'Customer Gain and Pain Map', what_it_is: 'A structured map of what the paying customer is trying to achieve (gains) and what is getting in their way (pains).', why_it_matters: 'Value propositions that address real pains and enable real gains are far more compelling than capability statements.', action_trigger: 'List the top 3 gains your customer wants and the top 3 pains they experience. Use language from your customer validation conversations.', signal_to_look_for: 'Gains and pains are described in customer language, not Ikore\'s language. At least one should be surprising or non-obvious.', coach_guidance: 'Pull directly from validation conversation notes. If the list reads like it was written in a workshop without customer input, it is probably not accurate.' },
+      { id: 'dp03_c2', number: 2, title: 'Value Proposition Statement', what_it_is: 'A single sentence that states who the service is for, what it does, and why it is different from alternatives.', why_it_matters: 'A clear value proposition statement is the anchor for all messaging, pricing, and service design decisions.', action_trigger: 'Write your value proposition: "For [customer profile], Ikore provides [service] that [specific outcome], unlike [alternative] which [limitation]."', signal_to_look_for: 'The statement could not apply to any other LSP. Every element is specific to Ikore\'s customer, service, and context.', coach_guidance: 'Test by substituting another LSP\'s name. If the statement still works, it is too generic. Push for specificity at every word.' },
+      { id: 'dp03_c3', number: 3, title: 'Evidence of Value', what_it_is: 'Concrete evidence that Ikore has delivered the stated value to a paying or near-paying customer before.', why_it_matters: 'An asserted value proposition is weaker than a demonstrated one. Evidence transforms a claim into a proof point.', action_trigger: 'Find 1 to 2 examples of Ikore delivering this value: a case study, a client testimonial, a measurable outcome. Link to your Evidence Library.', signal_to_look_for: 'At least one piece of evidence that references a real client and a real outcome, with a number or specific result.', coach_guidance: 'Donor reports count only if they include client-level outcome data. Organisation-level reports are not evidence of individual client value.' },
+      { id: 'dp03_c4', number: 4, title: 'Differentiation from Alternatives', what_it_is: 'A clear explanation of what makes Ikore\'s service different from what the customer can access from competitors or substitutes.', why_it_matters: 'Differentiation is the commercial justification for the price Ikore wants to charge. Without it, the customer has no reason to choose Ikore over a cheaper alternative.', action_trigger: 'For each competitor you identified in DP01, write one sentence explaining why a customer would choose Ikore over them.', signal_to_look_for: 'Differentiation is based on something real: a specific capability, a location advantage, a relationship, a track record. Not values or mission.', coach_guidance: '"We care more" and "We are more experienced" are not differentiators unless they translate into a specific, verifiable outcome the customer cares about.' },
+      { id: 'dp03_c5', number: 5, title: 'Service Bundle Design', what_it_is: 'The service described as a concrete package: what is included, what is not included, and in what format it is delivered.', why_it_matters: 'An undefined service cannot be priced, sold, or consistently delivered. A bundle makes the service tangible to the customer.', action_trigger: 'Write a one-paragraph service description as if it were a product on a shelf: what the customer gets, how it is delivered, how long it takes, what they need to provide.', signal_to_look_for: 'Description is specific enough that two different staff members would deliver the same service without further guidance.', coach_guidance: 'Push for process clarity. Vague descriptions ("we provide advisory support") hide ambiguity that will cause problems in delivery and pricing.' },
+      { id: 'dp03_c6', number: 6, title: 'Willingness to Pay Test', what_it_is: 'A direct test of whether the customer is willing to pay for the service at a price that covers Ikore\'s costs.', why_it_matters: 'Willingness to pay cannot be assumed. It must be tested with real customers before service design is finalised.', action_trigger: 'In your next customer conversation, tell them the service and ask: "What would this be worth to your organisation?" Note their answer verbatim.', signal_to_look_for: 'At least one customer has named a figure or confirmed they have budget. Even a qualified "yes, if the price is right" is valuable.', coach_guidance: 'Do not ask "would you pay for this?" Ask "what would this be worth to you?" The second question gets a more honest answer.' },
+      { id: 'dp03_c7', number: 7, title: 'Service Tiers', what_it_is: 'At least two versions of the service at different price points and scope levels.', why_it_matters: 'Tiering allows Ikore to serve customers with different budgets and needs, and provides an upsell pathway.', action_trigger: 'Define an Entry tier (minimum viable service, lowest price) and a Standard tier (full service, full price). Describe what is included in each.', signal_to_look_for: 'Two tiers with clear differences in scope and clear price difference. Not the same service with a different label.', coach_guidance: 'A Premium tier can be added in DP04 once costing is complete. For now, Entry and Standard are sufficient.' },
+      { id: 'dp03_c8', number: 8, title: 'Customer Outcome Statement', what_it_is: 'A measurable statement of what the customer can expect to achieve after receiving Ikore\'s service.', why_it_matters: 'Outcome statements are the most powerful sales tool an LSP has. They transform a service description into a promise.', action_trigger: 'Write an outcome statement for each service tier: "After completing [service], your organisation will be able to [specific, measurable outcome]."', signal_to_look_for: 'Outcomes are specific and verifiable. "You will be better able to manage your finances" is not an outcome. "You will have a 12-month cash flow projection signed off by your board" is.', coach_guidance: 'Connect outcome statements to the customer\'s problem statement from DP02. The outcome should directly address the priority problem.' },
+      { id: 'dp03_c9', number: 9, title: 'DP03 Summary and Commitment', what_it_is: 'A written summary of the agreed value proposition, service bundle, and tiers, signed by the CEO.', why_it_matters: 'This summary enters DP04 as the basis for pricing. It cannot be changed without a formal decision record.', action_trigger: 'Write a one-page summary: value proposition statement, service bundle description, tiers, willingness-to-pay evidence.', signal_to_look_for: 'Summary is specific, evidence-based, and agreed by the team. CEO sign-off confirms readiness to proceed to pricing.', coach_guidance: 'Review against the customer profile from DP02. The value proposition must speak directly to the customer who was validated there.' },
+    ]
+  },
+  {
+    id: 'dp04',
+    number: 'DP04',
+    zone: 'Zone 04 — Commercial Viability Model',
+    core_question: 'Can we deliver this service at a price the customer will pay and a volume that sustains the organisation?',
+    good_answer: 'Ikore has a financial model showing cost of delivery, a price at or above cost-recovery, a break-even volume, and a 36-month projection with realistic assumptions.',
+    weak_answer: 'Ikore has a budget or a donor report but no model that connects price, volume, and cost to produce a break-even calculation.',
+    why_it_matters_for_ikore: 'Commercial viability is the point of the entire engagement. Without a working financial model, all the design work in DP01-03 remains theoretical.',
+    session_time: '5 to 6 hours including model build',
+    components: [
+      { id: 'dp04_c1', number: 1, title: 'Full Cost of Delivery', what_it_is: 'The total cost of delivering one unit of each service, including direct costs, staff time, overhead allocation, and depreciation.', why_it_matters: 'Pricing below full cost produces a service that destroys value every time it is delivered.', action_trigger: 'For each service tier, calculate: direct materials, staff hours at cost, transport, overhead share (minimum 20% of direct costs). Sum these to a cost per delivery.', signal_to_look_for: 'A number that includes staff time. A cost figure without staff time is incomplete.', coach_guidance: 'Use the Clearview financial model for this calculation. The model handles overhead allocation automatically once inputs are entered.' },
+      { id: 'dp04_c2', number: 2, title: 'Pricing Decision', what_it_is: 'The price for each service tier, set above cost of delivery and within the willingness-to-pay range confirmed in DP03.', why_it_matters: 'Price is the mechanism that converts value into revenue. It must be defensible to the customer and sustainable for Ikore.', action_trigger: 'Set a price for each tier. Check: is the price above your full cost of delivery? Is it within the range a customer indicated they would pay?', signal_to_look_for: 'Price per tier confirmed, margin calculated (price minus cost), margin is positive.', coach_guidance: 'If the margin is negative, there are three options: reduce cost, increase price, or drop the tier. All three need to be discussed before proceeding.' },
+      { id: 'dp04_c3', number: 3, title: 'Break-Even Volume', what_it_is: 'The minimum number of service deliveries per month or per year needed for Ikore\'s revenue to cover its total costs.', why_it_matters: 'Break-even volume tells Ikore whether the commercial model is achievable given the size of the market.', action_trigger: 'Using your financial model, calculate: how many service deliveries per month are needed to cover all costs? Is this achievable in the market?', signal_to_look_for: 'A specific number, and a judgment about whether the market can support that volume.', coach_guidance: 'If break-even volume exceeds apparent market size, the model is not viable. This must be addressed before CEO sign-off.' },
+      { id: 'dp04_c4', number: 4, title: '36-Month Revenue Projection', what_it_is: 'A month-by-month projection of revenue, costs, and surplus or deficit over 36 months, with clearly stated assumptions.', why_it_matters: 'A 36-month view reveals the trajectory: when does Ikore break even, when does it generate surplus, and what are the critical risk points?', action_trigger: 'Build the 36-month projection in the Clearview financial model. State your assumptions: how many clients per month, price, growth rate.', signal_to_look_for: 'Projection shows break-even within 18 months. If it does not, the assumptions or the model need to be revisited.', coach_guidance: 'Check that assumptions are conservative, not optimistic. A projection that assumes 100% capacity utilisation from month one is not credible.' },
+      { id: 'dp04_c5', number: 5, title: 'Funding Gap Analysis', what_it_is: 'The difference between projected commercial revenue and total costs during the transition period, and how that gap will be funded.', why_it_matters: 'Most organisations cannot go from zero commercial revenue to full cost recovery immediately. The gap must be planned for, not ignored.', action_trigger: 'Calculate your funding gap for each of the first 12 months. Identify possible sources: remaining grant funding, bridge finance, cost reductions.', signal_to_look_for: 'Gap is quantified and a credible funding source is identified for each month. Gaps without a funding source are risks that must be flagged.', coach_guidance: 'Do not allow clients to assume the gap will be covered by "new grants." That is grant logic, not commercial planning.' },
+      { id: 'dp04_c6', number: 6, title: 'Scenario Analysis', what_it_is: 'Three versions of the financial model: Conservative (70% of assumed volume), Base (assumed volume), Optimistic (130% of assumed volume).', why_it_matters: 'Single-scenario models are fragile. Scenario analysis reveals the range of outcomes and the conditions under which the model fails.', action_trigger: 'Run the Conservative, Base, and Optimistic scenarios in your financial model. In which scenario does the model break even? In which does it fail?', signal_to_look_for: 'The model survives in at least the Base scenario. If it only survives in Optimistic, the model is too fragile to proceed.', coach_guidance: 'Use the Clearview scenarios function. Ensure Conservative uses 70% volume, not 70% price. Price changes affect margin differently to volume changes.' },
+      { id: 'dp04_c7', number: 7, title: 'Capital Requirements', what_it_is: 'Any upfront investment needed to deliver the service at commercial volume: equipment, systems, training, working capital.', why_it_matters: 'Some services require investment before they can generate revenue. This investment must be planned and funded.', action_trigger: 'List any capital investment needed to scale delivery to break-even volume. Estimate the cost. Identify whether it will be funded by grant, loan, or equity.', signal_to_look_for: 'Capital requirements are quantified and a funding source is identified. Unfunded capital requirements are blockers.', coach_guidance: 'Include working capital (cash needed to cover costs before revenue is received). This is frequently underestimated.' },
+      { id: 'dp04_c8', number: 8, title: 'Financial Model Review', what_it_is: 'A review of the full financial model by the CEO and Finance Manager, confirming it is accurate and understood.', why_it_matters: 'A financial model that only the consultant understands is not a commercial viability model. The leadership must own it.', action_trigger: 'Present the financial model to your CEO and Finance Manager. Ask them to explain the break-even calculation back to you without prompting.', signal_to_look_for: 'CEO and Finance Manager can explain: what the break-even volume is, what would change it, and what the key assumptions are.', coach_guidance: 'The presentation test is the most important indicator of whether the engagement has achieved ownership transfer. Do not skip it.' },
+      { id: 'dp04_c9', number: 9, title: 'DP04 Summary and Commitment', what_it_is: 'A written summary of the commercial viability model: cost, price, break-even, projection, and scenarios, signed by the CEO.', why_it_matters: 'CEO sign-off on the financial model confirms that the organisation is committing to a commercially viable service, not just a donor-fundable one.', action_trigger: 'Produce a one-page summary of the financial model findings. CEO signs to confirm the model is understood and accepted as the basis for market entry.', signal_to_look_for: 'Summary is specific. Includes the break-even number, the price, and the conservative scenario outcome.', coach_guidance: 'Do not allow a summary that says "see attached model." The one-pager must stand alone as a readable summary.' },
+    ]
+  },
+  {
+    id: 'dp05',
+    number: 'DP05',
+    zone: 'Zone 05 — Market Entry Design',
+    core_question: 'How will we reach and convert our first paying customers?',
+    good_answer: 'Ikore has a specific plan for reaching the first 5 paying customers: which channels, what message, what sequence of contact, and who is responsible.',
+    weak_answer: 'Ikore describes broad outreach activities (workshops, social media, networking) without a specific conversion plan or responsibility assignment.',
+    why_it_matters_for_ikore: 'Market entry is where commercial models succeed or fail. Without a specific, assigned plan, the financial model remains theoretical.',
+    session_time: '3 to 4 hours',
+    components: [
+      { id: 'dp05_c1', number: 1, title: 'Customer Segmentation', what_it_is: 'The paying customer base divided into 2 to 3 segments by size, need, or readiness to buy.', why_it_matters: 'Different customer segments need different messages and different channels. Treating all customers the same produces mediocre results with all of them.', action_trigger: 'Divide your paying customers into 2 to 3 segments. Name each segment, describe it in one sentence, and estimate how many organisations fit it.', signal_to_look_for: 'Segments are based on observable differences in need or budget, not demographic proxies.', coach_guidance: 'Segment by purchasing behaviour and problem intensity, not by size alone. A large organisation with a small budget is not a priority segment.' },
+      { id: 'dp05_c2', number: 2, title: 'Channel Map', what_it_is: 'The specific routes through which Ikore will reach each customer segment: relationships, referrals, events, direct outreach, intermediaries.', why_it_matters: 'Channels determine reach. Choosing the wrong channel wastes resources on customers who cannot be converted.', action_trigger: 'For your priority segment, list the 3 most effective channels to reach them. For each channel, name who controls it and how Ikore accesses it.', signal_to_look_for: 'Channels are specific and accessible. "Social media" is not a channel. "WhatsApp broadcast to 47 agrodealer contacts managed by [name]" is a channel.', coach_guidance: 'The best channel is almost always a warm relationship. Identify who in Ikore\'s network has credibility with the priority segment.' },
+      { id: 'dp05_c3', number: 3, title: 'Outreach Message', what_it_is: 'The specific message Ikore will use when approaching a potential customer for the first time.', why_it_matters: 'First contact messages that open with Ikore\'s needs ("we need clients") or Ikore\'s capabilities ("we can provide training") are less effective than messages that open with the customer\'s problem.', action_trigger: 'Write a first-contact message of no more than 5 sentences. Open with the customer\'s problem. Describe the outcome, not the service. End with a specific call to action.', signal_to_look_for: 'Message opens with the customer\'s world, not Ikore\'s. Call to action is specific (a meeting, a call, a proposal request).', coach_guidance: 'Test the message by reading it from the customer\'s perspective. Would they respond? What objection would they raise first?' },
+      { id: 'dp05_c4', number: 4, title: 'Sales Process Map', what_it_is: 'The sequence of steps from first contact to signed agreement, with timing and responsibility for each step.', why_it_matters: 'Without a defined sales process, leads are lost and conversion rates are low.', action_trigger: 'Map your sales process: first contact → qualifying conversation → proposal → negotiation → agreement. Assign a responsible person and a timeframe to each step.', signal_to_look_for: 'Each step has a named responsible person. Total process time from first contact to agreement is estimated and realistic.', coach_guidance: 'Most LSP sales processes are informal and undocumented. The act of mapping it surfaces gaps and ambiguities that can be resolved before they cost Ikore a sale.' },
+      { id: 'dp05_c5', number: 5, title: 'First 5 Customers Plan', what_it_is: 'A specific plan to acquire the first 5 paying customers: who they are, how they will be reached, and by when.', why_it_matters: 'The first 5 customers are the foundation of Ikore\'s commercial track record. They are the reference clients for all subsequent sales.', action_trigger: 'Name 5 real organisations that could be Ikore\'s first paying customers. For each: what is the entry point, who will make the approach, and by what date?', signal_to_look_for: 'Five real names, not five types of organisation. Each has a named entry point and a responsible person.', coach_guidance: 'The first 5 should include at least 2 from the pilot cohort in DP07. This creates continuity between the pilot and commercial launch.' },
+      { id: 'dp05_c6', number: 6, title: 'Pricing and Proposal Template', what_it_is: 'A standard proposal template that Ikore can send to a prospective customer, including service description, tiers, price, and outcome commitment.', why_it_matters: 'A standard template speeds up the sales process and ensures consistent messaging.', action_trigger: 'Draft a one-page proposal template: service description, what is included in each tier, price per tier, outcome commitment, and payment terms.', signal_to_look_for: 'Template is professional and readable. Any staff member could send it without modification.', coach_guidance: 'The template should reflect the value proposition from DP03, not introduce new claims. Consistency across customer touchpoints builds credibility.' },
+      { id: 'dp05_c7', number: 7, title: 'A/B Test Design', what_it_is: 'A simple test of two different approaches to a customer segment: different message, different channel, or different tier lead.', why_it_matters: 'Market entry assumptions are frequently wrong. Testing two approaches simultaneously produces learning at twice the speed.', action_trigger: 'Design one A/B test: what are you testing, what is version A, what is version B, how will you measure which performs better, and when will you review results?', signal_to_look_for: 'One specific variable is being tested. Success metrics are defined before the test begins.', coach_guidance: 'Keep A/B tests simple. Testing more than one variable at a time produces uninterpretable results.' },
+      { id: 'dp05_c8', number: 8, title: 'Business Development Responsibility', what_it_is: 'A named person in Ikore with specific business development responsibilities and time allocated to commercial work.', why_it_matters: 'Organisations without a designated business development person rarely convert leads to clients.', action_trigger: 'Name the person (or role) responsible for business development at Ikore. What percentage of their time is allocated to commercial work? What are their targets?', signal_to_look_for: 'Named person, percentage of time allocated (minimum 20%), and at least one measurable target.', coach_guidance: 'The business development person need not have a commercial background. They need time, a clear process (from DP05), and accountability.' },
+      { id: 'dp05_c9', number: 9, title: 'DP05 Summary and Commitment', what_it_is: 'A written summary of the market entry plan, signed by the CEO.', why_it_matters: 'CEO sign-off commits the organisation to implementing the plan, not just agreeing it in a workshop.', action_trigger: 'Write a one-page summary: priority segment, channels, first 5 customers, business development responsibility, A/B test.', signal_to_look_for: 'Summary is specific and assigns responsibility. It would survive scrutiny from the programme funder.', coach_guidance: 'Review against the financial model from DP04. The volume of customers in the market entry plan must be consistent with the break-even volume.' },
+    ]
+  },
+  {
+    id: 'dp06',
+    number: 'DP06',
+    zone: 'Zone 06 — Organisational Identity and Partner Architecture',
+    core_question: 'How does Ikore present itself commercially, and who are the partners that strengthen our market position?',
+    good_answer: 'Ikore has a commercial identity statement, a professional service profile, and at least one partnership agreement that expands reach or credibility.',
+    weak_answer: 'Ikore describes its development sector identity (mission, beneficiaries, donor relationships) rather than a commercial identity that would resonate with paying customers.',
+    why_it_matters_for_ikore: 'Commercial identity is the first thing a paying customer evaluates. If Ikore presents as a grant-funded NGO, paying customers will not take it seriously as a service provider.',
+    session_time: '3 to 4 hours',
+    components: [
+      { id: 'dp06_c1', number: 1, title: 'Commercial Identity Statement', what_it_is: 'A one-paragraph description of Ikore as a commercial service provider, written for a paying customer audience.', why_it_matters: 'Most LSPs have a donor-facing identity and no commercial identity. This component builds the commercial version.', action_trigger: 'Write a one-paragraph description of Ikore that opens with the customer it serves, the problem it solves, and the result it delivers. No mission language, no donor references.', signal_to_look_for: 'Statement is written for a paying customer, not a donor. Could appear on a commercial website without modification.', coach_guidance: 'Test by reading it as a potential customer. Does it make you want to enquire? If not, revise until it does.' },
+      { id: 'dp06_c2', number: 2, title: 'Service Profile Documents', what_it_is: 'A one-page professional profile for each service tier, suitable for sharing with potential customers.', why_it_matters: 'Service profiles are the primary sales document. They must be professional, specific, and customer-facing.', action_trigger: 'Produce a one-page profile for your Entry tier service. Include: what it is, who it is for, what is included, what the customer will achieve, and the price.', signal_to_look_for: 'Profile is professional, specific, and could be shared as-is with a potential customer.', coach_guidance: 'Avoid formatting that looks like a donor report. Use a service provider layout: clear heading, bullet points for inclusions, bold outcome statement, clear price.' },
+      { id: 'dp06_c3', number: 3, title: 'Track Record Documentation', what_it_is: 'A documented record of Ikore\'s most relevant commercial or near-commercial experience.', why_it_matters: 'Paying customers need evidence that Ikore can deliver. Track record documentation makes implicit experience explicit.', action_trigger: 'Document 3 to 5 past engagements in a standard format: client type, service delivered, outcome achieved, timeframe.', signal_to_look_for: 'Each record is specific: named outcome, timeframe, measurable result where available.', coach_guidance: 'Donor-funded work counts if it involved real service delivery to real clients. The test is whether the client received value, not how Ikore was paid.' },
+      { id: 'dp06_c4', number: 4, title: 'Partner Identification', what_it_is: 'Identification of organisations whose partnership would expand Ikore\'s reach, credibility, or capability.', why_it_matters: 'Partners multiply market access without proportional increases in cost.', action_trigger: 'Name 3 to 5 organisations that could be strategic partners. For each: what does Ikore get from the partnership, and what does the partner get from Ikore?', signal_to_look_for: 'Partnerships are reciprocal. If Ikore gets everything and the partner gets nothing, it is not a partnership.', coach_guidance: 'Focus on partners who already have access to Ikore\'s priority customer segment. Distribution partnerships are often more valuable than capability partnerships at this stage.' },
+      { id: 'dp06_c5', number: 5, title: 'Partnership Agreements', what_it_is: 'At least one formal or semi-formal partnership agreement with an organisation from the partner identification list.', why_it_matters: 'An identified partner who has not committed to anything is not a partner.', action_trigger: 'Initiate a partnership conversation with your highest-priority partner. Agree the terms in writing, even if informally. Document what was agreed.', signal_to_look_for: 'Written record of what was agreed, even if it is an email confirmation. Named contacts on both sides.', coach_guidance: 'Do not wait for a formal MOU. A confirming email from the partner contact is sufficient evidence at this stage.' },
+      { id: 'dp06_c6', number: 6, title: 'Digital and Offline Presence', what_it_is: 'An assessment of Ikore\'s current digital and offline presence, and a plan to make it consistent with the commercial identity.', why_it_matters: 'A potential customer who searches for Ikore online will form an impression before any human contact. That impression must match the commercial identity.', action_trigger: 'Review Ikore\'s website, social media, and any printed materials. Note what is inconsistent with the commercial identity statement from DP06 Component 1.', signal_to_look_for: 'A list of specific inconsistencies and a plan to address them.', coach_guidance: 'This step does not require a full rebrand. Small, specific changes (updating the website header, adding a services page) can make a significant difference.' },
+      { id: 'dp06_c7', number: 7, title: 'Referral System', what_it_is: 'A simple system for asking satisfied customers to refer Ikore to other potential customers.', why_it_matters: 'Referrals are the most cost-effective customer acquisition channel for LSPs at this stage.', action_trigger: 'Design a referral ask: when will Ikore ask for a referral, what will they say, and what (if anything) will they offer the referrer?', signal_to_look_for: 'A specific moment in the service delivery where a referral ask is natural, and a scripted way of making it.', coach_guidance: 'The best time to ask for a referral is immediately after a successful delivery, while the client\'s satisfaction is highest.' },
+      { id: 'dp06_c8', number: 8, title: 'Commercial Readiness Baseline', what_it_is: 'The first run of the Commercial Readiness Diagnostic (Zone 09), establishing the baseline score before pilots begin.', why_it_matters: 'The baseline score documents Ikore\'s starting point and enables measurement of progress at mid-point and handover.', action_trigger: 'Complete the Commercial Readiness Diagnostic. Record the score for each of the six fit tests. Note the total score.', signal_to_look_for: 'Scores recorded for all six tests. A low baseline score is expected and is not a failure. It is information.', coach_guidance: 'Administer the diagnostic jointly with the CEO. Discuss each score before recording it. The conversation is as valuable as the number.' },
+      { id: 'dp06_c9', number: 9, title: 'DP06 Summary and Commitment', what_it_is: 'A written summary of commercial identity, service profiles, track record, and partnerships, signed by the CEO.', why_it_matters: 'CEO sign-off confirms that Ikore accepts its commercial identity and is ready to present it to the market.', action_trigger: 'Write a one-page summary: commercial identity statement, key partnerships, track record highlights, presence improvements planned.', signal_to_look_for: 'Summary reads as a commercial brief, not a donor report. Could be shared with an investor.', coach_guidance: 'This summary can become the basis for Ikore\'s commercial pitch deck in future. Invest time in making it strong.' },
+    ]
+  },
+  {
+    id: 'dp07',
+    number: 'DP07',
+    zone: 'Zone 07 — Pilot: Iteration 1',
+    core_question: 'Did our service work with real clients, and what did we learn?',
+    good_answer: 'Ikore has delivered the service to at least 2 paying or near-paying clients, collected structured feedback, and made at least one design change based on that feedback.',
+    weak_answer: 'Ikore has delivered the service in a workshop or training setting with donor-funded participants rather than real paying clients.',
+    why_it_matters_for_ikore: 'A pilot with real clients producing real revenue is the most important milestone in the engagement. It proves the model works in practice, not just on paper.',
+    session_time: '3 days on-site with lead consultant',
+    components: [
+      { id: 'dp07_c1', number: 1, title: 'Pilot Client Selection', what_it_is: 'Selection of 2 to 3 real clients for Iteration 1, drawn from the First 5 Customers Plan in DP05.', why_it_matters: 'Pilot clients must be real: they must pay (even a nominal amount) or have committed to pay. Rehearsal clients do not count.', action_trigger: 'Confirm your 2 to 3 pilot clients. For each: have they agreed to pay? What amount? What date does the pilot begin?', signal_to_look_for: 'Named clients, confirmed commitment, at least a nominal payment agreed.', coach_guidance: 'The lead consultant must be present for at least one pilot delivery in Iteration 1. Schedule this before the pilot begins.' },
+      { id: 'dp07_c2', number: 2, title: 'Pilot Delivery Plan', what_it_is: 'A detailed plan for delivering the service to each pilot client: who does what, when, and what materials are needed.', why_it_matters: 'Unplanned pilot deliveries produce inconsistent experiences that are hard to learn from.', action_trigger: 'Write a delivery plan for each pilot client: date, location, who from Ikore attends, what materials are needed, what the client needs to prepare.', signal_to_look_for: 'Plan is specific enough that it could be handed to a staff member who was not involved in design.', coach_guidance: 'Use the service bundle description from DP03. The pilot must deliver exactly what was described there, not a modified version.' },
+      { id: 'dp07_c3', number: 3, title: 'Pilot Delivery', what_it_is: 'The actual delivery of the service to the pilot clients.', why_it_matters: 'Delivery is where theory meets practice. Every challenge encountered in delivery is valuable design information.', action_trigger: 'Deliver the service to your pilot clients as planned. The lead consultant observes and notes what works and what does not.', signal_to_look_for: 'Service delivered to all planned pilot clients within the agreed timeframe.', coach_guidance: 'During delivery, take notes on: what the client responded to positively, what confused them, what took longer than expected, what was missing.' },
+      { id: 'dp07_c4', number: 4, title: 'Client Feedback Collection', what_it_is: 'Structured feedback from each pilot client immediately after delivery.', why_it_matters: 'Feedback collected immediately is more accurate than feedback collected weeks later.', action_trigger: 'After each pilot delivery, ask the client 4 questions: What was most useful? What was least useful? What would you change? Would you recommend this to another organisation?', signal_to_look_for: 'Written feedback, captured verbatim or in direct summary, for each pilot client.', coach_guidance: 'Conduct the feedback conversation yourself in Iteration 1. Model the feedback approach so Ikore can replicate it in Iteration 2.' },
+      { id: 'dp07_c5', number: 5, title: 'Iteration 1 Debrief', what_it_is: 'A structured debrief with the Ikore team after all Iteration 1 deliveries are complete.', why_it_matters: 'Learning from Iteration 1 must be captured collectively before Iteration 2 begins.', action_trigger: 'Hold a team debrief. Discuss: what worked well, what did not work, what surprised us, what we will change for Iteration 2.', signal_to_look_for: 'At least 3 specific changes agreed for Iteration 2. Changes are based on evidence, not preference.', coach_guidance: 'Facilitate the debrief but resist the temptation to provide all the answers. Push the team to identify their own learning.' },
+      { id: 'dp07_c6', number: 6, title: 'Revenue Confirmation', what_it_is: 'Confirmation that payment was received from pilot clients, or documentation of why payment was deferred.', why_it_matters: 'A pilot that was delivered but not paid for is a free service, not a commercial transaction.', action_trigger: 'Confirm: did each pilot client pay? If not, why not, and when will they pay? Record the amount received.', signal_to_look_for: 'At least one payment received or formally committed with a specific date.', coach_guidance: 'If no pilot client paid, this is a critical warning signal. The willingness-to-pay evidence from DP03 must be revisited.' },
+      { id: 'dp07_c7', number: 7, title: 'Service Adjustments', what_it_is: 'Specific changes to the service design, delivery process, or materials based on Iteration 1 feedback.', why_it_matters: 'An unchanged service after Iteration 1 suggests the feedback was not taken seriously.', action_trigger: 'Document the changes you are making for Iteration 2: what is changing, why, and what you expect the effect to be.', signal_to_look_for: 'At least one substantive change to service content or delivery process. Cosmetic changes (font, colour) do not count.', coach_guidance: 'Changes should be testable in Iteration 2. Frame each change as a hypothesis: "We believe [change] will produce [effect] because [reason from feedback]."' },
+      { id: 'dp07_c8', number: 8, title: 'Mid-Point Commercial Readiness Diagnostic', what_it_is: 'The second run of the Commercial Readiness Diagnostic, measuring progress since the baseline in DP06.', why_it_matters: 'The mid-point score provides evidence of commercial development progress for the funder and for Ikore\'s own planning.', action_trigger: 'Complete the Commercial Readiness Diagnostic again. Compare scores to the baseline from DP06. Note what changed and why.', signal_to_look_for: 'Scores have improved on at least 3 of the 6 fit tests. Score improvement is supported by evidence.', coach_guidance: 'Do not adjust scores to show improvement without evidence. Accurate scoring is more valuable than a favourable result.' },
+      { id: 'dp07_c9', number: 9, title: 'DP07 Summary and Commitment', what_it_is: 'A written summary of Iteration 1: what was delivered, what was learned, what changes are planned for Iteration 2, signed by the CEO.', why_it_matters: 'CEO sign-off confirms that the organisation is committing to Iteration 2 with the agreed changes.', action_trigger: 'Write a one-page summary: pilot clients, revenue received, key learning, changes planned.', signal_to_look_for: 'Summary is specific. Mentions actual clients, actual revenue, actual changes. Not "we delivered training and it went well."', coach_guidance: 'This summary is a key piece of evidence for the funder. It demonstrates that the engagement is producing real commercial activity, not just planning.' },
+    ]
+  },
+  {
+    id: 'dp08',
+    number: 'DP08',
+    zone: 'Zone 07 — Pilot: Iteration 2 and Commercial Handover',
+    core_question: 'Can Ikore lead the service independently, and is the commercial model ready to scale?',
+    good_answer: 'Ikore has delivered Iteration 2 with Ikore leading, the lead consultant observing. Ikore can present the commercial model independently. At least one client has renewed or referred.',
+    weak_answer: 'Iteration 2 was led by the consultant with Ikore observing, or Ikore cannot explain the commercial model without prompting.',
+    why_it_matters_for_ikore: 'The engagement only succeeds if Ikore owns the model. DP08 is the transfer point: Ikore leads, consultant steps back.',
+    session_time: '3 days on-site with lead consultant',
+    components: [
+      { id: 'dp08_c1', number: 1, title: 'Iteration 2 Client Selection', what_it_is: 'Selection of 2 to 3 clients for Iteration 2, which may be the same clients as Iteration 1 or new clients.', why_it_matters: 'Iteration 2 clients must be selected with the service adjustments in mind. New clients test whether the adjusted service works beyond the founding cohort.', action_trigger: 'Confirm your Iteration 2 clients. Include at least one new client not in Iteration 1.', signal_to_look_for: 'Named clients confirmed. At least one is new to Ikore.', coach_guidance: 'Including a new client tests the adjusted service with someone who has no prior relationship with Ikore. This is a stronger test of commercial viability.' },
+      { id: 'dp08_c2', number: 2, title: 'Ikore-Led Delivery', what_it_is: 'Iteration 2 is led by Ikore staff, with the lead consultant observing and coaching from the side.', why_it_matters: 'The transfer from consultant to Ikore is the defining moment of the engagement. If Ikore cannot lead Iteration 2, handover cannot happen.', action_trigger: 'Assign an Ikore staff member to lead each Iteration 2 delivery. The consultant observes and gives feedback only. The client deals with the Ikore lead.', signal_to_look_for: 'Ikore lead manages the full session without consultant intervention. Consultant provides debrief after, not direction during.', coach_guidance: 'Resist the temptation to intervene during delivery even if things go imperfectly. The imperfections are the learning. Debrief thoroughly after.' },
+      { id: 'dp08_c3', number: 3, title: 'Client Feedback — Iteration 2', what_it_is: 'Structured feedback from Iteration 2 clients, collected by Ikore staff (not the consultant).', why_it_matters: 'Ikore collecting its own feedback is part of the independence test.', action_trigger: 'Ikore staff conduct the feedback conversation using the same 4 questions from DP07. Document responses verbatim.', signal_to_look_for: 'Feedback collected by Ikore without consultant involvement. Written record exists.', coach_guidance: 'Review the feedback records before the debrief. If they are thin or generic, it suggests the feedback conversations were not conducted properly.' },
+      { id: 'dp08_c4', number: 4, title: 'Renewal and Referral Evidence', what_it_is: 'Evidence that at least one Iteration 1 or Iteration 2 client has renewed (agreed to a second service) or referred Ikore to another potential client.', why_it_matters: 'Renewal and referral are the strongest indicators of commercial viability. They demonstrate value without coaching input.', action_trigger: 'Document any renewals or referrals received. If none yet, note what steps are being taken to generate them.', signal_to_look_for: 'At least one renewal or referral documented. If neither exists, this is a warning signal for the commercial model.', coach_guidance: 'A referral conversation that has not yet converted still counts as evidence. Document the conversation, not just the conversion.' },
+      { id: 'dp08_c5', number: 5, title: 'Commercial Model Presentation', what_it_is: 'Ikore presents its full commercial model to its leadership team without consultant prompting.', why_it_matters: 'This is one of the five independence tests. If Ikore cannot present the model, the engagement has not yet achieved its goal.', action_trigger: 'Organise a commercial model presentation by the CEO and Finance Manager to Ikore\'s board or leadership. The consultant attends but does not present.', signal_to_look_for: 'Presentation covers: target customer, service offer, price, break-even, 36-month projection, and scale pathway. Questions from the board are answered without consultant intervention.', coach_guidance: 'Prepare the Ikore team thoroughly before the presentation. The goal is success, not a test of unpreparedness.' },
+      { id: 'dp08_c6', number: 6, title: 'Scale Pathway Design', what_it_is: 'A plan for growing commercial revenue beyond the founding client cohort.', why_it_matters: 'A scale pathway demonstrates that commercial viability is not dependent on the programme or the consultant.', action_trigger: 'Describe the scale pathway: which customer segment will be expanded, through which channels, at what investment, over what timeframe.', signal_to_look_for: 'Pathway identifies at least 2 new customer segments or channels beyond the founding cohort.', coach_guidance: 'The scale pathway must be grounded in evidence from the pilot. Aspirational pathways without evidence are not credible.' },
+      { id: 'dp08_c7', number: 7, title: 'Financial Model Update', what_it_is: 'The financial model updated with actual pilot revenue data and revised assumptions based on Iteration 1 and 2 experience.', why_it_matters: 'A model built on assumptions is a plan. A model updated with actuals is an evidence base.', action_trigger: 'Update the Clearview financial model with actual revenue from pilots. Revise the 36-month projection based on what you now know.', signal_to_look_for: 'Model reflects actual pilot revenue. At least 2 assumptions have been revised based on experience.', coach_guidance: 'If actual pilot revenue is significantly below the original model, the break-even calculation must be revisited before handover.' },
+      { id: 'dp08_c8', number: 8, title: 'Handover Preparation', what_it_is: 'Preparation of all materials Ikore will need to continue commercial operations independently after the engagement closes.', why_it_matters: 'Handover is not an event; it is a prepared state. Materials produced here become Ikore\'s operational toolkit.', action_trigger: 'Compile: commercial identity statement, service profiles, pricing, sales process map, proposal template, financial model, customer records. Confirm all are in Ikore\'s control.', signal_to_look_for: 'All materials are in Ikore\'s file system, not the consultant\'s. Ikore staff know where everything is.', coach_guidance: 'Test by asking an Ikore staff member to find a specific document without your help. If they cannot, the materials are not yet owned.' },
+      { id: 'dp08_c9', number: 9, title: 'DP08 Summary and Commitment', what_it_is: 'A written summary of Iteration 2 and commercial handover readiness, signed by the CEO.', why_it_matters: 'CEO sign-off signals readiness to proceed to DP09 final commercial readiness assessment.', action_trigger: 'Write a one-page summary: Iteration 2 outcomes, independence test results so far, commercial model status, readiness for handover.', signal_to_look_for: 'Summary is honest about what is ready and what is not. It identifies any remaining risks before handover.', coach_guidance: 'Do not allow an optimistic summary that obscures real gaps. The DP09 final diagnostic will reveal them anyway.' },
+    ]
+  },
+  {
+    id: 'dp09',
+    number: 'DP09',
+    zone: 'Zone 09 — Commercial Readiness Diagnostic',
+    core_question: 'Is Ikore ready to operate commercially without programme support?',
+    good_answer: 'Ikore scores 4 or above on at least 5 of the 6 fit tests in the final Commercial Readiness Diagnostic, and all 5 independence tests are confirmed.',
+    weak_answer: 'Ikore scores well on the diagnostic because scores were inflated or because the criteria were relaxed, rather than because commercial capability was genuinely built.',
+    why_it_matters_for_ikore: 'The final diagnostic is the evidence base for the engagement\'s outcome. It demonstrates to Ignite that Ikore has genuinely built commercial capability, not just participated in a programme.',
+    session_time: '4 to 5 hours including final presentation',
+    components: [
+      { id: 'dp09_c1', number: 1, title: 'Final Commercial Readiness Diagnostic', what_it_is: 'The third and final run of the six fit tests, measuring Ikore\'s commercial readiness at engagement close.', why_it_matters: 'The three-point diagnostic (baseline, mid-point, final) shows the trajectory of commercial development, not just an endpoint score.', action_trigger: 'Complete the Commercial Readiness Diagnostic for the final time. Score each fit test honestly based on evidence, not aspiration.', signal_to_look_for: 'Total score is 4 or above on at least 5 tests. Score has improved since mid-point.', coach_guidance: 'Review scores against the evidence library. Every score must be supported by a specific evidence reference.' },
+      { id: 'dp09_c2', number: 2, title: 'Independence Tests Completion', what_it_is: 'Final confirmation of all 5 independence tests from the Handover Record (Tab 10).', why_it_matters: 'Independence tests are the most direct measure of whether the engagement succeeded.', action_trigger: 'Confirm the status of all 5 independence tests. For any test marked Partial or No, document the plan for completing it.', signal_to_look_for: 'At least 4 of 5 tests marked Yes. Test 4 (unassisted commercial model presentation) must be Yes.', coach_guidance: 'Test 4 is non-negotiable. An engagement cannot close with Ikore unable to present its own model.' },
+      { id: 'dp09_c3', number: 3, title: 'Revenue Achieved vs Target', what_it_is: 'Comparison of actual commercial revenue generated during the engagement against the target in the financial model.', why_it_matters: 'Revenue against target is the most objective measure of commercial progress.', action_trigger: 'State the revenue target from the financial model and the actual revenue achieved. Calculate the percentage achievement.', signal_to_look_for: 'Achievement above 60% of target. Below 50% requires explanation and a revised post-engagement plan.', coach_guidance: 'Do not allow the target to be revised downward at this stage to improve the achievement percentage. The original target stands.' },
+      { id: 'dp09_c4', number: 4, title: 'Customer Count vs Target', what_it_is: 'The number of paying customers acquired during the engagement versus the target.', why_it_matters: 'Revenue from one large customer is less robust than revenue from multiple customers. Customer count measures market reach.', action_trigger: 'State the customer count target and the actual number of paying customers acquired.', signal_to_look_for: 'At least 4 paying customers, including at least 2 from Iteration 2. Customer diversity across segments preferred.', coach_guidance: 'If all customers are from the same organisation or sector, commercial resilience is limited. Note this as a post-engagement risk.' },
+      { id: 'dp09_c5', number: 5, title: 'Post-Engagement Commercial Plan', what_it_is: 'Ikore\'s plan for commercial operations for the 12 months after the engagement closes, without programme support.', why_it_matters: 'A post-engagement plan demonstrates that Ikore has internalised the commercial logic, not just participated in a funded programme.', action_trigger: 'Write a 12-month commercial plan: revenue targets by quarter, customers to pursue, services to develop, investment required, risk mitigation.', signal_to_look_for: 'Plan does not mention donor funding as a revenue source. Targets are consistent with what was demonstrated in pilots.', coach_guidance: 'Review the plan for grant logic. Any target that requires a new donor to be found is grant logic, not commercial logic.' },
+      { id: 'dp09_c6', number: 6, title: 'Funder Reporting Package', what_it_is: 'A complete reporting package for Ignite: commercial readiness diagnostic progression, revenue achieved, customer count, key learning, post-engagement plan.', why_it_matters: 'The funder reporting package is the formal output of the engagement. It must be evidence-based and specific.', action_trigger: 'Compile the reporting package using the Clearview platform. Include: diagnostic scores (baseline, mid-point, final), pilot evidence, revenue data, independence test results, post-engagement plan.', signal_to_look_for: 'Package is complete, specific, and generated from the platform\'s evidence library. Not a narrative report with no data.', coach_guidance: 'The Clearview platform generates this report automatically from the evidence entered. Ensure all evidence is entered before generating the report.' },
+      { id: 'dp09_c7', number: 7, title: 'Final Commercial Model Presentation', what_it_is: 'Ikore presents its complete commercial model to Ignite and any other stakeholders, without the consultant.', why_it_matters: 'The final presentation is the culmination of the engagement. Ikore demonstrates full commercial ownership in front of the funder.', action_trigger: 'Organise a final presentation. Ikore presents alone. Consultant and funder attend as audience.', signal_to_look_for: 'Ikore presents confidently for at least 30 minutes and answers questions from the funder without consultant support.', coach_guidance: 'Prepare rigorously but do not present. Your job at the final presentation is to watch and take notes. The success of the presentation is the success of the engagement.' },
+      { id: 'dp09_c8', number: 8, title: 'Engagement Learning Record', what_it_is: 'A record of the key learning from the engagement for the Canvas Coach practice: what worked, what would be done differently, what tools need to be updated.', why_it_matters: 'Institutional learning from every engagement strengthens the methodology for the next one.', action_trigger: 'Write a one-page learning record: 3 things that worked well, 3 things to improve, 1 tool or framework that needs updating.', signal_to_look_for: 'Learning is specific to this engagement, not generic. At least one improvement relates to Ikore\'s specific context.', coach_guidance: 'This record is for the Canvas Coach practice, not for Ikore or Ignite. Be honest about what did not work, including your own delivery.' },
+      { id: 'dp09_c9', number: 9, title: 'Formal Handover and Engagement Close', what_it_is: 'The formal close of the engagement, with CEO sign-off confirming Ikore has received everything needed for independent commercial operation.', why_it_matters: 'A formal close creates a clear boundary between the engagement and independence. It prevents ongoing dependency.', action_trigger: 'Complete the Handover Record (Tab 10) in full. CEO signs to confirm all independence tests are complete and all materials are in Ikore\'s possession.', signal_to_look_for: 'Handover Record fully completed and CEO signed. Date of engagement close documented.', coach_guidance: 'The engagement closes when the Handover Record is signed. Not when the final payment is made, not when the funder report is submitted. When Ikore confirms independence.' },
+    ]
+  },
+]
+
+// ─── FIT TESTS FOR COMMERCIAL READINESS DIAGNOSTIC ──────────
+export const FIT_TESTS = [
+  { id: 'ft01', number: '01', name: 'Problem–Provider Fit', description: 'Does Ikore have the right to own this problem in this market?' },
+  { id: 'ft02', number: '02', name: 'Problem–Solution Fit', description: 'Does the service solve the problem as the client experiences it?' },
+  { id: 'ft03', number: '03', name: 'Solution–Problem Owner Fit', description: 'Is the solution designed for the actor with budget, not just the beneficiary?' },
+  { id: 'ft04', number: '04', name: 'Solution–Pilot Fit', description: 'Can this be tested meaningfully within the engagement timeline?' },
+  { id: 'ft05', number: '05', name: 'Solution–Market Fit', description: 'Is there demonstrated willingness to pay at a cost-recovery price?' },
+  { id: 'ft06', number: '06', name: 'Solution–Scale Channel Fit', description: 'Are there channels to reach beyond the founding clients independently?' },
+]
+
+// ─── HELPER: initial gate signoffs ───────────────────────────
+export function initialGateSignoffs(): Record<PhaseId, GateSignOff> {
+  const phases: PhaseId[] = ['setup', 'phase0', 'dp01', 'dp02', 'dp03', 'dp04', 'dp05', 'dp06', 'dp07', 'dp08', 'dp09', 'handover']
+  const result: Record<string, GateSignOff> = {}
+  phases.forEach((p, i) => {
+    result[p] = {
+      phase: p,
+      status: i === 0 ? 'not_started' : 'locked',
+      ceo_signed: false, ceo_name: '', ceo_date: '',
+      coach_authorised: false, coach_note: '', coach_date: '',
+    }
+  })
+  return result as Record<PhaseId, GateSignOff>
+}
+
+// ─── HELPER: get phase label ──────────────────────────────────
+export function getPhaseLabel(id: PhaseId): string {
+  const map: Record<PhaseId, string> = {
+    setup: 'Setup', phase0: 'Phase 0', dp01: 'DP01', dp02: 'DP02',
+    dp03: 'DP03', dp04: 'DP04', dp05: 'DP05', dp06: 'DP06',
+    dp07: 'DP07', dp08: 'DP08', dp09: 'DP09', handover: 'Handover',
   }
+  return map[id]
 }
 
-// ── Coach state ───────────────────────────────────────────────
-export interface CoachState {
-  programmes: Programme[]
-  clients: EngagementClient[]
-  coImplementers: CoImplementer[]
-  timesheets: TimesheetEntry[]
-  invoices: Invoice[]
+export function getPhaseOrder(): PhaseId[] {
+  return ['setup', 'phase0', 'dp01', 'dp02', 'dp03', 'dp04', 'dp05', 'dp06', 'dp07', 'dp08', 'dp09', 'handover']
 }
 
-// ============================================================
-// REFERENCE DATA
-// ============================================================
-export const CLIENT_TYPE_LABELS: Record<ClientType, string> = {
-  crop_aggregator: 'Crop Aggregator with Input',
-  livestock_aggregator: 'Livestock Aggregator',
-  farmer_group_enterprise: 'Farmer Group Enterprise',
-  service_lsp: 'Service LSP',
-}
-
-export const CLIENT_TYPE_COLORS: Record<ClientType, string> = {
-  crop_aggregator: '#1A7A4A',
-  livestock_aggregator: '#B8860B',
-  farmer_group_enterprise: '#1B2A4A',
-  service_lsp: '#00B4D8',
-}
-
-export function statusLabel(s: EngagementStatus): string {
-  if (s === 'setup') return 'Setting Up'
-  if (s === 'complete') return 'Complete'
-  if (s === 'paused') return 'Paused'
-  if (s === 'phase_0') return 'Phase 0'
-  return s.toUpperCase().replace('_','-')
-}
-
-export function statusColor(s: EngagementStatus): string {
-  if (s === 'complete') return '#1A7A4A'
-  if (s === 'paused') return '#8B2E2E'
-  if (s === 'setup') return '#4A5A6A'
-  return '#00B4D8'
-}
-
-// ============================================================
-// FULL GTCV CANVAS — all 9 DPs with all 9 components each
-// Five layers per component drawn from the handbook and workbook
-// ============================================================
-export function buildEmptyCanvas(): DecisionPoint[] {
-  function comp(id: string, num: string, title: string,
-    what: string, why: string, coach: string, action: string, signal: string
-  ): DecisionComponent {
-    return { id, number: num, title,
-      whatItIs: what, whyItMatters: why, coachGuidance: coach,
-      actionTrigger: action, signalToLookFor: signal,
-      status: '○', evidenceRecorded: '', coachNotes: '',
-      ceoSignedOff: false, ceoSignedOffAt: '', ceoSignedOffBy: '' }
-  }
-
-  return [
-    // ── PHASE 0 ────────────────────────────────────────────
-    {
-      id: 'phase_0', label: 'Phase 0 — Assumption Clearing',
-      coreQuestion: 'What are we actually operating on — and which of these assumptions have commercial validity?',
-      commitment: 'Continue / Pause / Kill decision on every activity. Hypotheses with named problem owners proceed to canvas.',
-      sessionTime: '2–3 hrs', outputRequired: 'Continue/Pause/Kill table with every activity classified and hypotheses shortlisted.',
-      status: '○', completedAt: '', ceoSignedOff: false, ceoSignedOffAt: '',
-      components: [
-        comp('p0_1','P0.1','Assumption Dump Canvas',
-          'A structured exercise to make every implicit belief explicit before any analysis begins.',
-          'Organisations operate on assumptions they have never written down. The longer the assumption has been held, the harder it is to see.',
-          'Ask the team to list every activity. For each one: the claimed problem, the supposed customer, who pays, what evidence exists, and what would make the assumption obviously wrong. That last column is the most valuable.',
-          'The team produces a completed Assumption Dump Canvas — one row per activity, all five columns filled in, including the disconfirmation column.',
-          'The team pauses on the disconfirmation column. The pause is the signal that honest thinking is happening.'),
-        comp('p0_2','P0.2','Problem-Owner-Budget Matrix',
-          'Tests whether each problem is commercially real by tracing ownership and budget.',
-          'Commercial problems have owners with budgets. Development problems have beneficiaries without budgets. Most organisations have never separated these two categories.',
-          'Apply three questions: Who owns this problem? What is the cost of not solving it? Who controls the budget to solve it? Any problem without a named budget holder is paused.',
-          'The team produces a completed matrix — every problem assessed against all three questions. Problems without a budget holder are marked Pause.',
-          'At least one problem the team believed was commercial turns out not to have a budget holder. That discovery is the purpose of this tool.'),
-        comp('p0_3','P0.3','Hypothesis Shortlist Board',
-          'Ranks surviving problems to prevent exploring everything simultaneously.',
-          'Organisations that pursue twelve half-developed hypotheses produce twelve half-developed services. Concentration on three is what makes the canvas work.',
-          'Score each surviving problem on Urgency, Ownership Clarity, Willingness to Pay, and Access — each on a 1–5 scale with anchored definitions. Only the top three to five move forward.',
-          'The team produces a scored shortlist. Every score is anchored to a specific definition — not an impression.',
-          'Disagreement between team members on scores. Disagreement is more valuable than consensus at this stage.'),
-        comp('p0_4','P0.4','Signal vs Story Board',
-          'Separates what the organisation has directly observed from what it believes.',
-          'Signals are things witnessed or measured. Stories are interpretations. Most grant-funded organisations have a great deal of story and very little signal.',
-          'For each shortlisted problem, separate the evidence into Signal (directly witnessed, measured, documented) and Story (inferred, assumed, interpreted). Add a fifth column: what would we need to see to confirm this is real?',
-          'The team produces a Signal vs Story Board for each shortlisted problem, with at least one specific validation question per problem.',
-          'The team acknowledges that evidence they called strong is actually story. That acknowledgment is the point of the exercise.'),
-        comp('p0_5','P0.5','Continue / Pause / Kill Table',
-          'Forces a decision on every activity. Nothing is allowed to remain in hopeful ambiguity.',
-          'Every activity the organisation continues costs staff time and leadership attention. Clarity about what to stop is as important as clarity about what to build.',
-          'Every activity must land in Continue, Pause, or Kill. Pause requires a specific question attached — what evidence would change its status? Kill means stop now and redirect resources.',
-          'The team produces a completed Continue/Pause/Kill table. Every activity has a classification and every Pause has a specific question.',
-          'Staff who have built careers around activities marked Kill accept the classification without the coach defending it. That acceptance is the signal.'),
-      ]
-    },
-
-    // ── DP01 ────────────────────────────────────────────────
-    {
-      id: 'dp01', label: 'DP01 — Service Reality Audit',
-      coreQuestion: 'What does the organisation actually deliver — and what exists only because the grant made it possible?',
-      commitment: 'Service Inventory with grant-logic / market-logic classification. Stop / Pause / Redesign Register. Hidden Cost Map.',
-      sessionTime: '3–4 hrs', outputRequired: 'Category A services with full cost per unit, delivery standard defined, and prior evidence documented.',
-      status: '○', completedAt: '', ceoSignedOff: false, ceoSignedOffAt: '',
-      components: [
-        comp('dp01_1','1.1','Service Inventory',
-          'A complete, honest list of every service the organisation currently delivers — nothing added, nothing omitted.',
-          'LSPs list aspirational services alongside real ones. What they hope to deliver gets mixed with what they actually deliver.',
-          'Ask the Leadership Team to list every service from memory first. Then open the last 12 months of donor reports, invoices, and activity logs. What appears in reports but not on the memory list reveals what the organisation does but does not identify with.',
-          'The organisation produces a written Service Inventory — one row per service, with three columns: service name, evidence of delivery in the last 12 months, and the name of the person responsible for delivery.',
-          'The Leadership Team debates which services belong on the list. Services they agree on immediately are real. Services that require negotiation are revealing something.'),
-        comp('dp01_2','1.2','Grant-Logic vs Market-Logic Classification',
-          'Separates services that exist because a donor funded them from those with genuine market demand.',
-          'Every dollar spent on a grant-logic service in the commercial transition is a dollar not spent on building the commercial model.',
-          'For each service: if the grant funding ended tomorrow, would a specific organisation pay to continue receiving it? Category A = plausible yes. Category B = no or another donor only.',
-          'Each service is classified as Category A or Category B with a one-sentence rationale. Classification is done by the full team, not by the coach.',
-          'Fewer than 20% of services are Category A. This is normal. Most organisations are surprised by how few services have a genuine commercial pathway in their current form.'),
-        comp('dp01_3','1.3','Full Cost per Unit',
-          'Calculates the real cost of delivering each Category A service once, at an acceptable quality standard.',
-          'Most grant-funded organisations have never costed a specific service in isolation. Without a floor price, any price set is guesswork.',
-          'Bottom-up costing: staff time at realistic daily rate including overhead allocation, direct costs, travel and logistics, quality assurance time. Do not use programme budget allocations as a proxy.',
-          'The organisation produces a cost-per-unit figure for each Category A service. This is the floor price below which no commercial price can be set.',
-          'The floor price is higher than the team expected. Almost always. That discovery is the point — it shapes every pricing decision that follows.'),
-        comp('dp01_4','1.4','Service Coherence Test',
-          'Tests whether each Category A service is specific enough, proven enough, and costed enough to be priced and sold.',
-          'A service that cannot be described precisely in one sentence, has not been delivered before, or has no cost figure is not yet canvas-ready.',
-          'Five questions for each Category A service: Can we describe it precisely? Have we delivered it before? Do we know the full cost? Can we name the customer type? Is there any prior evidence of value from a non-donor actor?',
-          'Each Category A service is assessed against all five questions. Services failing two or more questions are reclassified as Category B pending development.',
-          'The team identifies exactly what is missing for each reclassified service. Specificity about the gap is what makes it actionable.'),
-        comp('dp01_5','1.5','Delivery Proof Check',
-          'Requires tangible evidence of delivery capability — not descriptions or intentions.',
-          'A service that has been proposed but never delivered is theoretical. The canvas builds on real capability only.',
-          'Three proofs required: evidence of delivery (report, participant list, output document), evidence of quality (specific feedback from a recipient), evidence of consistency (more than one delivery with similar outcomes).',
-          'The organisation produces documented proof for each Category A service against all three dimensions.',
-          'For any proof that does not yet exist, the team identifies what one delivery would be needed to generate it — and plans that delivery before the canvas continues.'),
-        comp('dp01_6','1.6','Hidden Cost Map',
-          'Surfaces costs that have been absorbed into programme budgets and are invisible in the organisation\'s own accounting.',
-          'Hidden costs are what make commercial models unviable at prices that seemed reasonable. They include management oversight, quality review, reporting, and organisational overhead.',
-          'Ask the delivery team — not just leadership — to map every input that goes into a single delivery. Compare this to what the finance team thinks a delivery costs. The gap is the hidden cost.',
-          'The organisation produces a Hidden Cost Map showing the gap between perceived and actual cost per delivery.',
-          'At least one significant cost category that was previously untracked is identified. The team agrees it must be included in the floor price.'),
-        comp('dp01_7','1.7','Stop / Pause / Redesign Register',
-          'Records the specific services that will not continue in their current form, with clear rationale and next step.',
-          'Services that are not on the Register keep consuming resources. The Register makes the decision visible and permanent.',
-          'Every Category B service must appear on the Register in one of three columns: Stop (no commercial pathway, redirect resources now), Pause (specific evidence needed before deciding), Redesign (market-logic version possible with defined changes).',
-          'The Register is produced, reviewed by the full Leadership Team, and signed off. Every entry has a rationale and a named next step.',
-          'The Leadership Team is willing to share the Register with their board. That willingness is the signal that the decisions are genuine.'),
-        comp('dp01_8','1.8','Pricing Signal Baseline',
-          'Records any evidence from the market about what similar services cost or what customers have paid for adjacent services.',
-          'Without a market pricing signal, the floor price has no external reference. The signal tells the organisation whether the floor price is within the range the market will bear.',
-          'Document any prior payment for a service similar to the Category A services — whether by this organisation or by a competitor. Include prices paid for adjacent services that solve a related problem.',
-          'The organisation produces a Pricing Signal Baseline — a list of comparable services and their known prices or price ranges.',
-          'At least one comparable exists. If none exists, the organisation identifies how it will generate a pricing signal before DP04.'),
-        comp('dp01_9','1.9','DP01 Decision Record',
-          'The formal record of what the organisation has decided at DP01 and what it is committing to carry forward.',
-          'A Decision Point that is worked through but not formally recorded produces no accountability. The record is what makes the commitment real.',
-          'The team produces a one-page Decision Record: services confirmed as Category A with cost and evidence, services on the Stop/Pause/Redesign Register, and a clear statement of what will and will not be developed commercially.',
-          'The Decision Record is produced, reviewed, and signed by the Executive Director or CEO before DP02 opens.',
-          'The CEO signs without immediately qualifying the decision. A clean signature is the signal that the decision has been genuinely made.'),
-      ]
-    },
-
-    // ── DP02 ────────────────────────────────────────────────
-    {
-      id: 'dp02', label: 'DP02 — Customer & Problem Clarity',
-      coreQuestion: 'Who specifically will pay for this, for what specific problem — and how do we know?',
-      commitment: 'Named customer segments with documented problem urgency, budget holder identified, Three-Stage Adoption Test™ applied.',
-      sessionTime: '4–6 hrs', outputRequired: 'Named customer segment, problem statement in customer\'s words, commercial signal evidence from 5+ validation conversations, adoption stage profile.',
-      status: '○', completedAt: '', ceoSignedOff: false, ceoSignedOffAt: '',
-      components: [
-        comp('dp02_1','2.1','Customer Hypothesis',
-          'The initial, explicit statement of who the paying customer is — before any validation has occurred.',
-          'An untested customer hypothesis is an assumption. Writing it down explicitly makes it testable rather than unexamined.',
-          'For each Category A service: write a specific customer hypothesis — a named type of organisation, the problem they have, why they would pay, and what evidence you have so far. This is the hypothesis to be tested, not a conclusion.',
-          'The team produces a written customer hypothesis for each Category A service, with the assumption clearly distinguished from the evidence.',
-          'The team finds it harder to write the hypothesis than expected. That difficulty reveals how much of their customer understanding is story rather than evidence.'),
-        comp('dp02_2','2.2','Commercial Structure Identification',
-          'Identifies which commercial structure applies — B2B, B2C, B2G, B2D, B2B2C, or other — because each requires a different validation approach.',
-          'The wrong commercial structure produces the wrong validation approach. An organisation that validates with beneficiaries when the structure is B2B will conclude demand exists when no commercial demand has been confirmed.',
-          'Apply the Commercial Structures Reference™ to each service. Identify the paying actor, the decision-making process, and the budget authority. Confirm this with the problem-owner-budget analysis from Phase 0.',
-          'Each Category A service has a confirmed commercial structure with the paying actor named and the decision-making process described.',
-          'The commercial structure for at least one service turns out to be different from what the team assumed. That correction is the purpose of this component.'),
-        comp('dp02_3','2.3','Three-Stage Adoption Test™ — Willing',
-          'Tests whether potential customers are willing — whether they express genuine interest in the problem being solved.',
-          'Willingness is the entry condition. Without it, no further test is relevant. But willingness alone never pays for a service.',
-          'Conduct initial outreach conversations focused on whether the potential customer acknowledges the problem as real and significant. Record verbatim responses. Do not pitch the service — listen for whether they describe the problem unprompted.',
-          'The team documents at least three conversations where the potential customer described the problem in their own words without prompting from the team.',
-          'The language potential customers use to describe the problem is different from the language the organisation used to describe it. That difference is the raw material for the value proposition.'),
-        comp('dp02_4','2.4','Three-Stage Adoption Test™ — Able',
-          'Tests whether willing customers have the financial means and organisational authority to pay.',
-          'Many customers are willing but not able — grant-funded entities in austerity, companies with frozen budgets, individuals without purchasing authority. Ability is not visible from the outside without asking.',
-          'Ask directly about budget: "Have you spent money on this type of need in the past?" and "Is there a budget line for this?" Identify whether the person you are speaking to controls the budget or needs to refer.',
-          'The team documents evidence of budget existence and decision authority for at least three potential customers who passed the Willing stage.',
-          'At least one customer who seemed like a strong prospect is Unable — the budget holder is someone else, or the budget does not exist in the current cycle. That discovery prevents building a commercial model aimed at the wrong actor.'),
-        comp('dp02_5','2.5','Three-Stage Adoption Test™ — Prioritised',
-          'Tests whether able customers have allocated or protected budget for this problem in the current financial period.',
-          'A customer who is willing and able but has twelve other priorities will not pay. Prioritisation is the commercial signal that separates a genuine pipeline from a polite conversation.',
-          'Ask: "Is this problem on your active agenda right now?" Evidence of prioritisation: they have allocated time to it, raised it at senior level, or connected it to a current organisational pressure. Urgency language is the signal.',
-          'The team documents at least one customer who has actively allocated budget or time to this problem in the current financial period.',
-          'The Prioritised customer uses urgency language — names a deadline, a competitive pressure, or a financial consequence — without being prompted. That unprompted urgency is the strongest commercial signal available.'),
-        comp('dp02_6','2.6','Validation Conversation Protocol',
-          'The structured approach to conducting validation conversations that generate evidence rather than polite agreement.',
-          'Unstructured conversations produce impressions. Structured conversations produce evidence. The protocol ensures every conversation generates comparable, documented data.',
-          'Brief the team on the six signal dimensions: problem description, prior attempts, budget, decision authority, commitment, and urgency. Train the team to record verbatim, ask about behaviour not preference, allow silence, and not pitch during the conversation.',
-          'The team conducts a minimum of five validation conversations using the protocol. Each conversation is documented in the Interview Capture format with verbatim responses recorded.',
-          'At least three of five conversations produce strong signal on budget and decision authority. Fewer than three means the hypothesis needs to be refined before building the commercial model.'),
-        comp('dp02_7','2.7','Customer Profile',
-          'A detailed description of the validated paying customer — not a category but a named type with documented characteristics.',
-          'A commercial model designed for "agricultural organisations" is designed for no one. A commercial model designed for "private agri-input companies in the $500K–$5M revenue range with a commercial director who controls a training budget" is designed for someone specific.',
-          'From the validation conversations, build a customer profile: type of organisation, size range, geography, the specific role of the budget holder, the problem they own, what they have spent on adjacent services, and what they read and attend.',
-          'The team produces a written customer profile for each validated customer segment — specific enough that a new team member could identify a qualified prospect from the description alone.',
-          'A team member who was not in the validation conversations reads the profile and correctly identifies a qualified prospect from their own network. That is the test of specificity.'),
-        comp('dp02_8','2.8','Problem Statement',
-          'The problem described in the customer\'s exact words — not the organisation\'s interpretation.',
-          'The language the customer uses to describe their problem is the raw material of the value proposition. Paraphrasing loses the precision that makes a value proposition land.',
-          'Extract the exact phrases customers used in the validation conversations to describe their problem. Do not summarise or interpret. The problem statement is a direct quotation — or a composite of direct quotations from multiple customers describing the same problem.',
-          'The team produces a problem statement for each validated customer segment, written entirely in the customer\'s language, with the source conversations cited.',
-          'When the problem statement is read back to a validation conversation contact, they say "yes, that is exactly it" without asking for clarification. That confirmation is the standard.'),
-        comp('dp02_9','2.9','DP02 Decision Record & Adoption Stage Profile',
-          'The formal record of the validated customer and their position on the Three-Stage Adoption Test™.',
-          'The adoption stage profile tells the organisation where the most important commercial work needs to happen. It shapes every downstream Decision Point.',
-          'Produce the Decision Record: named customer segment, problem statement in their words, commercial signal evidence summary, and the adoption stage profile — where validated customers sit on Willing/Able/Prioritised and what would move them to the next stage.',
-          'The Decision Record is produced and signed by the CEO before DP03 opens.',
-          'The CEO can describe the customer type, their problem, and their adoption stage in a two-minute conversation with someone unfamiliar with the engagement. That fluency is the handover test.'),
-      ]
-    },
-
-    // ── DP03 ────────────────────────────────────────────────
-    {
-      id: 'dp03', label: 'DP03 — Value Proposition Architecture',
-      coreQuestion: 'Why does this service matter to this specific client — and can we prove it?',
-      commitment: 'A client-tested value proposition for each priority service, revised after real client feedback.',
-      sessionTime: '3–4 hrs', outputRequired: 'Tested value proposition per service with four components documented, differentiation argument with proof.',
-      status: '○', completedAt: '', ceoSignedOff: false, ceoSignedOffAt: '',
-      components: [
-        comp('dp03_1','3.1','Capability Statement',
-          'A precise description of what the organisation can reliably deliver — specific enough that a customer could hold the organisation accountable to it.',
-          'Vague capability statements are not commitments. A commercial relationship is built on commitments.',
-          'Write a one-sentence capability statement per Category A service: service type, delivery format, recipient, and what it produces. Apply the accountability test: if the customer hired you based on this and delivery did not match, would they have grounds to complain?',
-          'The team produces a capability statement for each service that passes the accountability test.',
-          'A team member who was not involved in writing the statement reads it and correctly describes what a delivery looks like. That is the specificity standard.'),
-        comp('dp03_2','3.2','Problem Connection',
-          'Links the capability to the customer\'s problem using the customer\'s own language from the DP02 validation conversations.',
-          'A value proposition that uses the organisation\'s language is marketing. One that uses the customer\'s language is understanding. Customers respond to the latter.',
-          'Return to the verbatim notes from DP02. Extract the exact phrases. Write the problem connection using those phrases — not a summary of them. Add the consequence framing: what is happening right now, in measurable terms, because this problem exists?',
-          'The team produces a problem connection statement built entirely from verbatim customer language, with a consequence framing that names a measurable impact.',
-          'When the problem connection is read to a validation contact, they lean forward. That physical signal is the standard.'),
-        comp('dp03_3','3.3','Outcome Definition',
-          'The measurable result the customer gets from working with the organisation — not an output but an outcome.',
-          'Output is what is delivered. Outcome is what changes. Commercial decisions are made on outcomes, not outputs.',
-          'Identify the measurable outcome from prior delivery evidence. Express it in the terms the customer uses to measure their own performance. If no outcome data exists yet, design the pilot specifically to generate it.',
-          'The team produces an outcome statement per service, expressed in the customer\'s performance metrics, with prior evidence cited or pilot evidence plan documented.',
-          'The outcome statement is specific enough that a customer could use it in a board presentation. That is the test.'),
-        comp('dp03_4','3.4','Differentiation Argument',
-          'The specific, provable reason why this customer should choose this organisation over every alternative.',
-          'A differentiation claim that cannot be proved destroys credibility rather than building it.',
-          'Identify the differentiation type — capability, context, or access. Write the claim. Apply the proof test: if the customer asked to see the proof, could it be produced? Revise until the answer is yes.',
-          'The team produces a differentiation argument for each service that passes the proof test.',
-          'The differentiation argument survives a sceptical question from a new contact who has no prior relationship with the organisation.'),
-        comp('dp03_5','3.5','Value Proposition Assembly',
-          'Combines the four components into a two to three sentence statement that is immediately compelling to the validated customer.',
-          'A value proposition that sounds like marketing has not been built from customer evidence. One that sounds like a direct answer to the customer\'s problem has been.',
-          'Combine: capability + problem (customer\'s words) + outcome (measurable) + differentiation (provable). Write two to three sentences. Read aloud. If it sounds like a brochure, rebuild it from the components.',
-          'The team produces a complete value proposition per service — two to three sentences, built from the four components, readable in under 30 seconds.',
-          'A member of the target customer type reads the proposition and asks about pricing. That question is the signal that the proposition is working.'),
-        comp('dp03_6','3.6','Value Proposition Testing',
-          'Tests the value proposition with real potential customers before it is used in the market.',
-          'A value proposition tested only internally reflects what the organisation thinks is compelling. One tested with customers reflects what actually compels.',
-          'Share the draft proposition with two or three validation conversation contacts. Ask: does this describe what you need? Does this sound like something you would pay for? Use their responses to refine.',
-          'The value proposition is tested with at least two potential customers and revised based on their feedback. The revision is documented.',
-          'The revised proposition is shorter and more specific than the original. That compression is the evidence that it has been genuinely refined, not just endorsed.'),
-        comp('dp03_7','3.7','Alternative Comparison',
-          'Explicitly positions the service against what the customer would do if they did not buy — including doing nothing.',
-          'Every customer has an alternative. An organisation that does not know the alternative cannot price against it or differentiate from it.',
-          'Identify the customer\'s realistic alternatives: a competitor, an internal solution, doing nothing, a workaround. For each alternative, document the cost (financial, time, quality) and where the organisation\'s offer is superior.',
-          'The team produces an alternative comparison document for each service, used internally to prepare for pricing and objection handling.',
-          'The team can articulate the alternative comparison in a client conversation without referring to the document.'),
-        comp('dp03_8','3.8','Value Proposition by Segment',
-          'Adapts the value proposition for each validated customer segment, since different segments have different problems and different language.',
-          'A value proposition written for one segment and applied to all segments produces weak results with all of them.',
-          'For each validated customer segment, revise the value proposition to reflect the specific problem language, outcome priorities, and differentiation points that matter most to that segment.',
-          'The team produces a distinct value proposition per customer segment — different enough to reflect genuine segment differences, consistent enough to be recognisably the same service.',
-          'A team member can identify which segment a given customer belongs to from their first question about the service.'),
-        comp('dp03_9','3.9','DP03 Decision Record',
-          'The formal record of the tested and validated value proposition for each service.',
-          'A value proposition that is designed but not formally adopted will drift. The Decision Record makes it the organisation\'s official commercial positioning.',
-          'Produce the Decision Record: final value proposition per service, the customer testing evidence, and any outstanding refinements. CEO signs off before DP04 opens.',
-          'The Decision Record is produced and signed by the CEO.',
-          'The CEO presents the value proposition in a real stakeholder meeting without preparation support. That presentation is the final test.'),
-      ]
-    },
-
-    // ── DP04 ────────────────────────────────────────────────
-    {
-      id: 'dp04', label: 'DP04 — Commercial Viability Model',
-      coreQuestion: 'Does this service sustain us — and can we prove it with numbers that hold?',
-      commitment: 'Working financial model in Clearview. Price floor calculated. Two pricing tiers minimum. Break-even confirmed.',
-      sessionTime: '4–5 hrs', outputRequired: 'Tiered pricing structure, break-even calculation, working financial model that non-technical staff can run.',
-      status: '○', completedAt: '', ceoSignedOff: false, ceoSignedOffAt: '',
-      components: [
-        comp('dp04_1','4.1','Full Cost Structure',
-          'A complete breakdown of the cost of delivering each service once, covering all five cost categories.',
-          'The single most common commercial failure is setting prices without knowing costs. The cost structure is the foundation of every financial decision that follows.',
-          'Five categories: Direct Labour (all staff time at realistic daily rates including overhead allocation), Direct Materials, Travel & Logistics, Quality Assurance, Overhead Allocation. Use bottom-up costing — not budget allocations.',
-          'The team produces a completed cost structure table for each Category A service, with every cost category populated and a total cost per unit calculated.',
-          'The cost per unit is higher than the team expected. Almost always. That discovery is the purpose of this component.'),
-        comp('dp04_2','4.2','Floor Price',
-          'The minimum price at which the organisation breaks even on a single delivery of the service.',
-          'Any price below the floor price generates a loss. The floor price is the constraint that every pricing decision must respect.',
-          'Sum all five cost categories for a single delivery. This is the floor price. Compare it to the pricing signals from DP02. If the floor price is above the range customers indicated, identify the response: reduce cost, reframe value, or find a different segment.',
-          'The team produces a documented floor price for each service, compared to the DP02 pricing signals, with a clear response if there is a gap.',
-          'The team does not adjust the cost estimate to make the floor price fit a price they have already decided on. The sequence must be: calculate cost, then set price.'),
-        comp('dp04_3','4.3','Pricing Tiers',
-          'A structured pricing model with at least two tiers — Entry and Standard — designed to reduce barriers to the first transaction while generating sustainable revenue.',
-          'A single price leaves revenue on the table from customers who would pay more and excludes customers who would buy a lower-cost version.',
-          'Design Entry tier (minimum viable version, first-time customers, fixed fee) and Standard tier (core service plus additional components, main revenue tier, must cover floor price plus margin). Design Premium tier if evidence of demand exists.',
-          'The team produces a tiered pricing structure with documented rationale for each tier — what is included, who it is for, and why the price is set where it is.',
-          'The Standard tier price covers the full floor price plus a margin contribution toward fixed costs. Any tier priced below the floor price is a loss on every sale.'),
-        comp('dp04_4','4.4','Break-Even Calculation',
-          'The number of deliveries required per period for the organisation to cover all its fixed costs from commercial revenue.',
-          'An organisation that does not know its break-even is not running a commercial model — it is running a programme with a price attached.',
-          'Formula: Fixed costs ÷ (Standard tier price − direct cost per delivery) = number of deliveries required per year. Ask: is this achievable given current capacity? Is the market large enough?',
-          'The team produces a documented break-even calculation and a realistic assessment of whether the volume required is achievable.',
-          'A non-technical staff member updates the break-even calculation when one input changes and explains what the new figure means for their pricing decision. That is the usability standard.'),
-        comp('dp04_5','4.5','Financial Model Build',
-          'A working spreadsheet that the organisation\'s own staff can run, update, and use to make real pricing decisions.',
-          'A financial model built by the consultant and filed by the organisation is a document. One built by the organisation\'s own staff is a tool.',
-          'Build the model in Clearview — or in a spreadsheet linked from this record. Five sections: cost structure, pricing tiers, break-even calculation, 12-month revenue projection, scenario analysis. The model must be updatable by a non-builder in under 10 minutes.',
-          'The financial model is built and linked from this Decision Point. A non-builder updates an input and recalculates the break-even in under 10 minutes.',
-          'The non-technical staff member says "I can do this." That statement is the DP04 completion signal specified in the handbook.'),
-        comp('dp04_6','4.6','Scenario Analysis',
-          'Tests the financial model under three scenarios: conservative, base case, and optimistic — to understand the risk envelope.',
-          'An organisation that has only modelled the base case does not know how fragile or resilient its commercial model is.',
-          'Run three scenarios in the financial model: conservative (−20% revenue, +10% costs), base case, optimistic (+20% revenue, −5% costs). Document what happens to break-even under each scenario.',
-          'The team produces a scenario analysis table showing break-even volume under all three scenarios.',
-          'The team can describe what specific combination of conditions would make the model unviable — and has a response plan for that scenario.'),
-        comp('dp04_7','4.7','Capital Structure Review',
-          'Reviews the organisation\'s current capital structure — grants, loans, equity — and its implications for the commercial model.',
-          'Recoverable grants and loans create repayment obligations that affect cash flow. An organisation that does not account for these in its financial model will appear viable when it is not.',
-          'Document all funding obligations: recoverable grants, bank loans, repayment schedules, interest rates. Build these into the financial model\'s cash flow. Confirm that commercial revenue can service these obligations at break-even volume.',
-          'The capital structure is documented and reflected in the Clearview financial model, with repayment obligations visible in the cash flow statement.',
-          'The cash flow statement shows the organisation can service all funding obligations at the break-even volume. If it cannot, the pricing or volume target must be adjusted.'),
-        comp('dp04_8','4.8','Grant Dependency Ratio Target',
-          'Sets a measurable target for reducing dependence on grant income over the engagement timeline.',
-          'Without a quantified target, the transition from grant to commercial is aspirational rather than managed.',
-          'Set a twelve-month target: commercial fee income as a percentage of total income. Recommended minimum: 30% by month 18. Build this target into the financial model as a tracking metric.',
-          'The team sets a documented grant dependency ratio target, agrees the timeline, and confirms it is reflected in the financial model.',
-          'The Leadership Team refers to the ratio target when making a staffing or service development decision. That reference is the signal that the target is owned.'),
-        comp('dp04_9','4.9','DP04 Decision Record',
-          'The formal record of the commercial model — floor price, pricing tiers, break-even, and the financial model link.',
-          'A commercial model that is agreed in a session but not formally recorded will drift under pricing pressure from the first difficult customer conversation.',
-          'Produce the Decision Record: floor price per service, pricing tiers with rationale, break-even calculation, financial model link, and grant dependency ratio target. CEO signs before DP05 opens.',
-          'The Decision Record is produced and signed by the CEO.',
-          'The CEO presents the pricing structure to a real potential customer and defends the Standard tier price without discounting. That conversation is the final test.'),
-      ]
-    },
-
-    // ── DP05 ────────────────────────────────────────────────
-    {
-      id: 'dp05', label: 'DP05 — Market Entry Design',
-      coreQuestion: 'How do we reach the right clients, with the right message, through the right channels — and in what order?',
-      commitment: 'Segmented outreach plan. A/B tested messaging. Pipeline Tracker with minimum 10 priority organisations.',
-      sessionTime: '3–4 hrs', outputRequired: 'Prioritised customer pipeline, tested outreach message, three client-facing materials.',
-      status: '○', completedAt: '', ceoSignedOff: false, ceoSignedOffAt: '',
-      components: [
-        comp('dp05_1','5.1','Segment Prioritisation',
-          'Ranks validated customer segments against four criteria to identify the primary entry segment.',
-          'An organisation that pursues all segments simultaneously produces shallow engagement everywhere. Concentration on the highest-scoring segment first is what produces the first commercial client.',
-          'Score each segment on Problem Urgency, Budget Clarity, Access, and Scalability — each 1–5 with anchored definitions. The highest-scoring segment is the primary entry target.',
-          'The team produces a scored segment prioritisation table and identifies the primary entry segment with a one-sentence rationale.',
-          'The team can explain why they are not leading with a segment that seems larger or more exciting. That explanation reveals whether the prioritisation is evidence-based.'),
-        comp('dp05_2','5.2','Warm Introduction Mapping',
-          'Inventories every existing relationship that could produce a warm introduction to a qualified potential customer.',
-          'Warm introductions convert to meetings at 60–80%. Cold outreach converts at 3–8%. The warm introduction map is the most valuable commercial asset most organisations have never inventoried.',
-          'For the primary entry segment: who on the team knows someone at a target organisation? Who has attended an event with target organisation representatives? Who has a prior working relationship that could open a commercial conversation?',
-          'The team produces a warm introduction map — specific names, specific relationships, specific ask, specific owner, and specific timeline for each.',
-          'At least one introduction exists that the team had not previously thought of as a commercial asset. That discovery is the point of the exercise.'),
-        comp('dp05_3','5.3','Outreach Message',
-          'A direct outreach message built from the value proposition — specific, outcome-focused, and testable.',
-          'Generic outreach produces near-zero conversion. A message built from the customer\'s problem language and a specific outcome claim produces a response rate worth building on.',
-          'Write the message: subject line (customer\'s problem in their words), opening two sentences (problem + consequence), and call to action (specific meeting request). Test with 15 contacts before scaling.',
-          'The team produces a tested outreach message with a documented open rate and response rate from the test cohort.',
-          'The response rate from the test exceeds 15%. If it does not, the message is revised and retested before scaling.'),
-        comp('dp05_4','5.4','Message Testing',
-          'Tests the outreach message with a small cohort before committing to scaled outreach.',
-          'An untested message sent to 200 contacts that produces zero responses has consumed the goodwill of 200 people who will not engage again.',
-          'Three tests: subject line test (three versions, 15 contacts each, measure open rate), response rate test (measure response to opening sentences), meeting conversion test (measure percentage of respondents who agree to meet).',
-          'The team produces documented test results for each of the three tests, with the winning message identified and the revision rationale documented.',
-          'Meeting conversion rate exceeds 30% of respondents. If not, the offer or targeting is revised before scaling.'),
-        comp('dp05_5','5.5','Pipeline Tracker',
-          'A five-stage tracker of every qualified potential customer — identified, contacted, met, proposal sent, closed.',
-          'Without a pipeline, the organisation cannot distinguish between a slow market and a broken process. The pipeline makes the bottleneck visible.',
-          'Build a pipeline for the primary segment with a minimum of 10 qualified contacts across the five stages. Assign a relationship owner to each contact. Set a follow-up schedule.',
-          'The team produces a pipeline with at least 10 qualified contacts, each assigned to an owner, each with a next action and a timeline.',
-          'The pipeline is reviewed weekly. Contacts that have not moved in two weeks have a documented reason. That discipline is the signal that the pipeline is being managed actively.'),
-        comp('dp05_6','5.6','Client-Facing Materials',
-          'Three essential materials for the outreach and conversion process: one-page service description, case study or evidence summary, pricing menu.',
-          'Outreach without materials is a conversation that cannot be followed up. Materials without a tested message are produced before they are needed.',
-          'Produce: (1) one-page service description — uses the value proposition language, describes what the customer receives; (2) case study or evidence summary — one completed engagement or pilot described in outcome terms; (3) pricing menu — entry and standard tiers with what each includes.',
-          'The three materials are produced, reviewed against the value proposition language, and ready to send.',
-          'A potential customer reads the one-page description and asks a specific question about their own situation. That question is the signal that the description is specific enough.'),
-        comp('dp05_7','5.7','Channel Architecture',
-          'Maps the channels through which the service will reach customers beyond the first cohort of warm introductions.',
-          'Warm introductions cannot scale indefinitely. The channel architecture identifies the institutional routes that extend reach without requiring new warm relationships for every client.',
-          'Identify three channel types: referral partners (existing contacts who can introduce qualified prospects), sector associations (institutional channels that reach the target segment), peer organisations (complementary organisations whose clients overlap with the target segment).',
-          'The team produces a channel architecture with at least three channels identified, each with a named contact, an activation step, and a conversion rate estimate.',
-          'At least one channel has an existing relationship that can be activated immediately. The team does not need to build the relationship from scratch.'),
-        comp('dp05_8','5.8','Market Entry Launch Date',
-          'A specific, committed date on which the first commercial outreach will occur — not a target range but a named date.',
-          'Without a launch date, market entry is perpetually two weeks away. The date creates the accountability that converts preparation into action.',
-          'Set a specific Market Entry Launch Date. Define what will happen on that date: who will make the first outreach, to which contact, using which message, through which channel. Document it.',
-          'The team commits to a Market Entry Launch Date in writing and can describe exactly what will happen on that date without prompting.',
-          'The team refers to the launch date in subsequent sessions as the anchor for all preparation activities. That reference is the signal that the commitment is real.'),
-        comp('dp05_9','5.9','DP05 Decision Record',
-          'The formal record of the market entry plan — primary segment, pipeline, message, materials, and launch date.',
-          'A market entry plan that is agreed but not formally recorded will be reinterpreted under the pressure of the first difficult outreach conversation.',
-          'Produce the Decision Record: primary entry segment rationale, pipeline status, tested message, three materials, channel architecture, and launch date. CEO signs before DP06 opens.',
-          'The Decision Record is produced and signed by the CEO.',
-          'The CEO names the launch date in a conversation with a board member or funder. That public commitment is the final test.'),
-      ]
-    },
-
-    // ── DP06 ────────────────────────────────────────────────
-    {
-      id: 'dp06', label: 'DP06 — Identity & Partner Architecture',
-      coreQuestion: 'Who are we as a Service Provider — and who stands alongside us?',
-      commitment: 'Commercial Identity Statement — two sentences. Partner map with every partner categorised.',
-      sessionTime: '2–3 hrs', outputRequired: 'Commercial identity statement, positioning evidence, partner map with reinforcing/undermining assessment.',
-      status: '○', completedAt: '', ceoSignedOff: false, ceoSignedOffAt: '',
-      components: [
-        comp('dp06_1','6.1','Commercial Identity Type',
-          'Identifies which of the four commercial identity types applies: specialist advisory firm, training and capacity provider, research and intelligence provider, or systems and tools provider.',
-          'The identity type determines how the organisation positions itself, what evidence base it builds, and what pricing structure it uses. The wrong identity type sends a confusing signal to the market.',
-          'Present the four identity types with their characteristics. The team selects the primary identity type and a secondary if applicable. The primary must be specific enough to exclude some customer types — an identity that includes everyone includes no one.',
-          'The team identifies their primary commercial identity type with a one-sentence rationale explaining why it fits the validated customer and service.',
-          'The team finds it difficult to choose between two types. That difficulty is productive — it reveals where the positioning is not yet clear.'),
-        comp('dp06_2','6.2','Commercial Identity Statement',
-          'A one-paragraph description of the organisation\'s commercial identity — who it is, what it does, for whom, and what makes it the right choice.',
-          'The commercial identity statement is used in direct outreach, on the commercial-facing profile, and in partner conversations. Without it, every commercial interaction starts from scratch.',
-          'Write the statement for the target customer — not for a general audience. One paragraph. Uses the customer\'s language. Describes the problem being solved, the type of organisation being served, and the specific capability being offered.',
-          'The team produces a commercial identity statement that passes the customer-language test and the specificity test.',
-          'The Leadership Team uses the statement spontaneously when introducing the organisation to a new contact — without prompting and without defaulting to the grant-funded history.'),
-        comp('dp06_3','6.3','Development vs Commercial Identity Separation',
-          'Deliberately separates the commercial identity from the development identity so each is presented in the appropriate context.',
-          'An organisation that presents its development identity in commercial contexts creates cognitive dissonance. The development and commercial identities can coexist — but they cannot be used interchangeably.',
-          'Identify which materials, profiles, and events are commercial-facing and which are development-facing. Agree the rule: in commercial contexts, lead with the commercial identity. In development contexts, lead with the development identity.',
-          'The team produces a written separation protocol — which identity is used in which context, with specific examples.',
-          'The commercial-facing website page or profile does not include donor programme logos. That omission is the signal that the separation has been made.'),
-        comp('dp06_4','6.4','Positioning Evidence',
-          'Identifies the two or three pieces of evidence that most powerfully support the commercial identity.',
-          'An identity claim without evidence is aspiration. With evidence, it is positioning.',
-          'Identify the evidence: prior client outcomes, sector recognition, proprietary methodology, track record in a specific context. Each piece must be independently verifiable by a potential customer.',
-          'The team produces a positioning evidence list — two or three specific pieces of evidence, each described in one sentence, each independently verifiable.',
-          'A potential customer reads the positioning evidence and asks a follow-up question about methodology or track record. That question confirms the evidence is credible.'),
-        comp('dp06_5','6.5','Partner Map',
-          'Maps every current partnership against its effect on the commercial identity — reinforcing, undermining, or neutral.',
-          'Every partnership sends a signal. An organisation that does not manage its partnership signals is allowing others to define its commercial identity.',
-          'List all current partnerships. For each: assess whether it reinforces, undermines, or is neutral to the commercial identity. For undermining partnerships, identify whether they can be repositioned or should be reduced in visibility.',
-          'The team produces a completed partner map with an assessment for each partnership and a specific action for each undermining partnership.',
-          'The team takes action on at least one undermining partnership before the end of the engagement. Action may be reducing visibility rather than ending the relationship.'),
-        comp('dp06_6','6.6','Referral Partner Identification',
-          'Identifies the specific organisations that could send qualified referrals to the organisation — and initiates those relationships.',
-          'Referral partnerships are the highest-converting channel available. They must be built from the first client, not after the commercial model is running.',
-          'Identify three to five organisations whose clients overlap with the target segment and whose own offering is complementary rather than competitive. For each, identify the specific person to approach and the specific value exchange.',
-          'The team produces a referral partner target list with named contacts and a plan to initiate each relationship within the engagement timeline.',
-          'At least one referral partner has been approached and has agreed in principle to make introductions. That agreement is the signal.'),
-        comp('dp06_7','6.7','Endorsement and Association',
-          'Identifies which sector associations, professional bodies, or institutional relationships would lend credibility to the commercial identity.',
-          'Credibility that comes from association is faster to build than credibility that comes from track record alone — especially in markets where the organisation is not yet known commercially.',
-          'Identify two to three associations or bodies whose membership would signal credibility to the target customer. For each, assess whether membership, speaking opportunities, or partnership agreements are the right entry point.',
-          'The team produces an endorsement target list with a specific entry point and timeline for each.',
-          'The team attends or speaks at one sector event before the end of the engagement in their commercial identity capacity.'),
-        comp('dp06_8','6.8','Co-Delivery Partner Assessment',
-          'Identifies whether a co-delivery partner is needed to fill a capability gap in the current service model.',
-          'A co-delivery partner fills a gap. A co-delivery partner for a capability the organisation already has dilutes rather than strengthens.',
-          'For each Category A service, identify whether the full delivery requires a capability the organisation does not currently have. If yes, identify the co-delivery partner type and assess whether the partnership is genuinely needed or whether the capability should be built internally.',
-          'The team produces a co-delivery partner assessment — for each service, either "no partner required" with rationale, or a specific partner profile and a plan to identify a named partner.',
-          'The team can describe their co-delivery partner as filling a specific gap, not as validating the engagement.'),
-        comp('dp06_9','6.9','DP06 Decision Record',
-          'The formal record of the commercial identity and partner architecture.',
-          'A commercial identity agreed in a session but not formally adopted will be overridden by the development identity in the first difficult commercial conversation.',
-          'Produce the Decision Record: commercial identity statement, positioning evidence, partner map with actions, referral partner targets, and the development vs commercial separation protocol. CEO signs before DP07 opens.',
-          'The Decision Record is produced and signed by the CEO.',
-          'The CEO uses the commercial identity statement in a real context before the end of the engagement. That use is the final test.'),
-      ]
-    },
-
-    // ── DP07 ────────────────────────────────────────────────
-    {
-      id: 'dp07', label: 'DP07 — Pilot & Learn Architecture',
-      coreQuestion: 'Does the commercial model work under real conditions — and what do we know now that we did not before?',
-      commitment: 'Four real client engagements across two iterations. Iteration comparison document. Commercial model revised.',
-      sessionTime: '8–12 hrs', outputRequired: 'Two completed pilot records, two payments, two debrief records, revision list, scale readiness verdict.',
-      status: '○', completedAt: '', ceoSignedOff: false, ceoSignedOffAt: '',
-      components: [
-        comp('dp07_1','7.1','Pilot Architecture Design',
-          'Defines what the pilot is testing, what confirming and disconfirming evidence looks like, and what the revision boundaries are between iterations.',
-          'An undesigned pilot produces activity. A designed pilot produces evidence. The design decisions made here determine what the pilots can produce.',
-          'Document: specific assumptions being tested, confirming evidence standard per assumption, disconfirming evidence standard, client selection criteria for each iteration, observation framework, revision boundaries.',
-          'The team produces a pilot architecture document agreed by all delivery team members before the first client is approached.',
-          'The team can describe what a failed pilot looks like — what specific evidence would require a return to a previous Decision Point. That clarity is the signal that the architecture is genuine.'),
-        comp('dp07_2','7.2','Iteration 1 Client Selection',
-          'Identifies the right client for Iteration 1 — the one who will test the model most rigorously, not the one most likely to give positive feedback.',
-          'A pilot client selected for their willingness to support the organisation produces misleading evidence. The right client tests the model.',
-          'Apply three criteria: genuine problem ownership (budget holder confirmed, not just an interested staff member), written commitment (not verbal), adequate complexity (will push back and give honest feedback).',
-          'The team identifies the Iteration 1 client, confirms all three criteria are met, and secures a written commitment before the session is scheduled.',
-          'The Iteration 1 client is not the most convenient contact. The deliberate choice of a more challenging client is the signal that the architecture is being applied.'),
-        comp('dp07_3','7.3','Iteration 1 Delivery',
-          'The first live commercial engagement — planned, delivered, and debriefed using the observation framework.',
-          'The first commercial engagement is always imperfect. The standard is not perfection — it is that the engagement produces a payment and a specific revision list.',
-          'Complete the pre-engagement checklist. Assign the observer role. Run the internal debrief immediately after. Run the client debrief within 48 hours. Document verbatim responses against all five debrief dimensions.',
-          'The team produces: a completed engagement, a payment or formal payment commitment, a documented internal debrief, a documented client debrief, and a specific revision list.',
-          'The revision list contains three to five specific changes, each with a clear rationale from the evidence. A list of more than ten items suggests fundamental redesign is needed before Iteration 2.'),
-        comp('dp07_4','7.4','Revision Process',
-          'The structured review that converts Iteration 1 evidence into specific, bounded revisions for Iteration 2.',
-          'Unstructured revision produces changes based on what the coach thinks should be different rather than what the evidence says needs to change.',
-          'Three-step process: synthesise the evidence, diagnose the root cause of each gap, make bounded revisions addressing root causes only. Complete within one week of the Iteration 1 debrief.',
-          'The team produces a revision document: three to five changes, each with the evidence source cited, the root cause identified, and the specific change described.',
-          'The revisions address root causes, not symptoms. A revision that changes a word in the value proposition when the root cause is a misidentified customer is a symptom fix.'),
-        comp('dp07_5','7.5','Iteration 2 Client Selection',
-          'Identifies the right client for Iteration 2 — different from Iteration 1 in at least one significant dimension.',
-          'Iteration 2 tests whether the model works beyond the warmest entry point. If both iterations use the same type of relationship, the evidence does not confirm repeatability.',
-          'The Iteration 2 client must differ from Iteration 1 in at least one significant way: different contact source, different sub-segment, or different scale of engagement. The organisation\'s staff lead all client interactions in Iteration 2 — the coach is not in the lead.',
-          'The team identifies the Iteration 2 client with the significant difference documented, and confirms the organisation will lead all interactions.',
-          'The organisation\'s staff manage the entire Iteration 2 engagement without requesting coach support at any stage.'),
-        comp('dp07_6','7.6','Iteration 2 Delivery',
-          'The second live commercial engagement — led by the organisation\'s staff, with the coach in an observer role only.',
-          'Iteration 2 is the independence test. The coach\'s absence from the lead is not optional — it is the purpose of the second iteration.',
-          'Run Iteration 2 with the revised model. Organisation staff lead all interactions. Complete the observation framework, internal debrief, and client debrief using the same protocol as Iteration 1.',
-          'The team produces: a completed engagement, a payment, a documented internal debrief, and a documented client debrief.',
-          'The organisation\'s staff do not request coach support during or immediately after the Iteration 2 session. That independence is the signal.'),
-        comp('dp07_7','7.7','Comparative Evidence Analysis',
-          'A structured comparison of Iteration 1 and Iteration 2 evidence to identify what improved, what remained constant, and what still needs work.',
-          'Without a comparison, the two iterations produce two separate data points rather than an evidence progression.',
-          'Compare across all five debrief dimensions: which elements were consistent across both clients (confirming), which improved from Iteration 1 to Iteration 2 (validating the revision), which remained problematic (requiring further development).',
-          'The team produces a comparative evidence analysis document — a side-by-side comparison of both iterations with a clear assessment of what the evidence shows.',
-          'The team can articulate what they know now that they did not know before the pilots. That articulation is the handbook\'s definition of DP07 completion.'),
-        comp('dp07_8','7.8','Commercial Readiness Diagnostic — Final Reading',
-          'The third and final reading of the Commercial Readiness Diagnostic, taken after both pilot iterations are complete.',
-          'The final reading measures how far the organisation has moved across the full canvas journey and quantifies the evidence generated.',
-          'Score all six fit tests using the 0–3 scale. Compare to baseline and mid-point readings. Document the movement at each stage and the specific evidence that drove each score.',
-          'The team produces the final Diagnostic reading with all six scores and the movement documented.',
-          'The final reading is above 12 out of 18. If not, identify which fit tests are still below 2 and what specific work is needed before the scale decision.'),
-        comp('dp07_9','7.9','Scale Readiness Verdict',
-          'The formal verdict on whether the commercial model is ready to scale — Verdict 01 (ready), 02 (ready with revisions), or 03 (return to design).',
-          'The verdict is the output that determines what happens next. It must be based on evidence, not on optimism.',
-          'Issue one of three verdicts: Verdict 01 — both iterations produced payment, consistent problem confirmation, price acceptance without resistance. Verdict 02 — payments received but specific gaps need bounded revisions. Verdict 03 — fundamental problem identified requiring return to a specific Decision Point.',
-          'The team produces a written scale readiness verdict with the specific evidence cited for the verdict.',
-          'Verdict 03 is not treated as a failure. It is treated as the pilot working correctly — surfacing a problem at the cheapest possible point rather than after scaling.'),
-      ]
-    },
-
-    // ── DP08 ────────────────────────────────────────────────
-    {
-      id: 'dp08', label: 'DP08 — Scale & Expansion Pathway',
-      coreQuestion: 'What does growth look like from here — and what do we need to make it real?',
-      commitment: 'Scale Pathway Commitment Document. 36-month revenue projection. Resource requirements map.',
-      sessionTime: '3–4 hrs', outputRequired: 'Named, sequenced, owned scale pathway with at least two expansion segments and independent channel logic.',
-      status: '○', completedAt: '', ceoSignedOff: false, ceoSignedOffAt: '',
-      components: [
-        comp('dp08_1','8.1','Founding Cohort Conversion',
-          'Converts the warm relationships already in the pipeline to paying clients — the first stage of the scale pathway.',
-          'The founding cohort exists already. The scale pathway begins not with new relationships but with converting existing ones.',
-          'List every qualified contact in the current pipeline who has not yet paid. For each: assign a relationship owner, identify the next action, set a timeline, and confirm whether this is the right entry point for the commercial offer.',
-          'The team produces a founding cohort conversion plan — named contacts, owners, next actions, and timelines.',
-          'At least two founding cohort contacts convert to paying clients within 60 days of the scale pathway being activated.'),
-        comp('dp08_2','8.2','Referral Expansion',
-          'Uses satisfied pilot clients as the entry point to the next tier of customers — the highest-converting expansion channel.',
-          'A satisfied client who refers is worth fifteen cold outreach contacts in conversion terms. The referral ask must be systematic, not opportunistic.',
-          'Design the referral ask: when it is made (at the debrief or at the renewal conversation), what it asks for (a specific introduction to a named type of contact), and what follow-up looks like.',
-          'The team produces a referral expansion protocol — the specific ask, the timing, and the follow-up process — and applies it to both pilot clients.',
-          'At least one referral introduction is made within 90 days of DP08 being activated. The referral produces a qualified conversation.'),
-        comp('dp08_3','8.3','Channel Expansion',
-          'Identifies institutional channels — sector associations, professional bodies, training registries — that reach the target segment without warm introduction.',
-          'Warm introductions cannot scale indefinitely. Channel expansion is what converts a commercial model from a network business to a market business.',
-          'For each channel: name the organisation, describe the member profile and why it matches the target segment, identify the entry point (speaking, membership, partnership), name the relationship owner, and set a timeline.',
-          'The team produces a channel expansion plan with two to three specific channels, each with a named entry point, owner, and timeline.',
-          'At least one channel relationship is initiated within 60 days. Initiated means a conversation has occurred, not that a plan exists.'),
-        comp('dp08_4','8.4','Segment Expansion',
-          'Identifies adjacent customer segments that the service can reach with modest adaptation.',
-          'Adjacent segments often produce faster growth than the founding segment because the value proposition is already proven and the capability is already built.',
-          'Identify two adjacent segments — organisations with a related problem the service can address with adaptation. For each: describe the adaptation required, identify at least one pilot client in that segment, and assess whether evidence from one engagement would be sufficient to confirm viability.',
-          'The team produces a segment expansion plan with two adjacent segments, each with an adaptation description and a pilot client candidate.',
-          'The team does not pursue segment expansion before completing at least three engagements in the founding segment. Segment expansion is the second stage, not the first.'),
-        comp('dp08_5','8.5','36-Month Revenue Projection',
-          'A grounded projection of commercial revenue over 36 months, based on the scale pathway stages and confirmed conversion rates.',
-          'A projection built on assumptions produces a number. A projection built on evidence from the pilots produces a tool for managing the commercial transition.',
-          'Build the 36-month projection in the Clearview financial model. Base it on confirmed conversion rates from outreach testing and pilot evidence. Model three scenarios.',
-          'The 36-month projection is built, linked from this record, and based on documented assumptions with sources cited.',
-          'A non-technical staff member can update one assumption in the projection and explain what the change means for the organisation\'s hiring decision. That usability is the standard.'),
-        comp('dp08_6','8.6','Resource Requirements Map',
-          'Identifies the specific people, technology, and systems needed to deliver the commercial model at scale.',
-          'An organisation that scales revenue without scaling capacity produces declining quality. The resource map is what prevents that.',
-          'Map: what the current team can deliver at current capacity, what additional capacity is needed for each stage of the scale pathway, and at what revenue level each additional resource can be funded from commercial income.',
-          'The team produces a resource requirements map — current capacity ceiling, stage-by-stage additions, and funding trigger for each addition.',
-          'The CEO can describe the resource requirements map in a conversation with a potential investor or board member without preparation. That fluency is the test.'),
-        comp('dp08_7','8.7','Pipeline Requirement',
-          'Calculates the pipeline size needed to sustain the commercial model — and assesses whether current pipeline development is sufficient.',
-          'A pipeline smaller than three times annual delivery capacity means the organisation will reach a volume ceiling before its commercial model is self-sustaining.',
-          'Calculate: annual delivery capacity × 3 = minimum pipeline size at all times. Assess current pipeline against this requirement. Identify which channels need to be activated to maintain the required pipeline.',
-          'The team produces a documented pipeline requirement calculation and an assessment of the gap between current and required pipeline.',
-          'The team reviews the pipeline requirement monthly and adjusts channel activity when the pipeline falls below the required size.'),
-        comp('dp08_8','8.8','Independence Test',
-          'Confirms that the scale pathway can be executed without programme facilitation, coach introductions, or external support.',
-          'A scale pathway that depends on programme support to reach new clients is not independent. The test of independence is whether the pathway works in the absence of every form of external facilitation.',
-          'For each channel and segment in the scale pathway: confirm that the organisation has or can build the relationship, the capability, and the process needed to execute it without external support.',
-          'The team produces a documented independence assessment — for each pathway element, either confirmed independent or identified dependency with a plan to resolve it.',
-          'The team can execute the first 90 days of the scale pathway without any coach involvement. That execution is the test.'),
-        comp('dp08_9','8.9','DP08 Decision Record & Scale Pathway Commitment',
-          'The formal record of the scale pathway — the organisation\'s committed plan for reaching commercial sustainability independently.',
-          'A scale pathway agreed in a session but not formally committed will be the first thing abandoned when the engagement pressure is removed.',
-          'Produce the Scale Pathway Commitment Document: founding cohort conversion plan, referral expansion protocol, channel expansion plan, segment expansion plan, 36-month projection, resource map. CEO signs.',
-          'The Commitment Document is produced and signed by the CEO.',
-          'The CEO refers to the Commitment Document when making a commercial decision not anticipated during the engagement. That reference is the handbook\'s completion signal for DP08.'),
-      ]
-    },
-
-    // ── DP09 ────────────────────────────────────────────────
-    {
-      id: 'dp09', label: 'DP09 — Commercial Readiness Diagnostic',
-      coreQuestion: 'Where are we on the journey — and what does the evidence actually show?',
-      commitment: 'Commercial Readiness Diagnostic scored at three points. Investment Case Summary. Formal Handover Presentation delivered.',
-      sessionTime: '1–2 hrs × 3', outputRequired: 'Diagnostic scored at baseline, mid-point, and close. Investment Case Summary. Handover Presentation delivered without notes.',
-      status: '○', completedAt: '', ceoSignedOff: false, ceoSignedOffAt: '',
-      components: [
-        comp('dp09_1','9.1','Baseline Reading',
-          'The first reading of the Commercial Readiness Diagnostic — taken before Phase 0 begins. Measures the starting position.',
-          'Without a baseline reading, the final reading has no reference point. The progression from baseline to final is the quantified evidence of what the engagement produced.',
-          'Score all six fit tests: Problem-Provider Fit, Problem-Solution Fit, Solution-Customer Fit, Solution-Pilot Fit, Solution-Market Fit, Solution-Scale Fit. Use the 0–3 scale with documented anchors. Score independently first, then discuss.',
-          'The team produces and records the baseline Diagnostic reading with all six scores and the total.',
-          'The team\'s baseline score is lower than expected. That honest reading is what makes the final reading meaningful.'),
-        comp('dp09_2','9.2','Mid-Point Reading',
-          'The second reading — taken after DP01 through DP06 are complete. Identifies gaps before the pilots begin.',
-          'The mid-point reading is the quality gate before the pilots. An organisation that enters DP07 with Problem-Solution Fit or Solution-Customer Fit below 2 will produce activity, not evidence.',
-          'Repeat the six fit test scoring after completing DP01–DP06. For any test scoring 0 or 1, identify the specific Decision Point that needs to be revisited before the pilots begin.',
-          'The team produces the mid-point reading with all six scores, the movement from baseline documented, and a gap closure plan for any score below 2.',
-          'Problem-Solution Fit and Solution-Customer Fit both score 2 or above before DP07 opens. If either scores below 2, DP07 does not open.'),
-        comp('dp09_3','9.3','Final Reading',
-          'The third reading — taken after both pilot iterations are complete. Measures the full progression.',
-          'The final reading is the engagement\'s summary evidence — the quantification of how far the organisation has moved from assumption to evidence.',
-          'Repeat the six fit test scoring after completing DP07. Document the movement from mid-point to final. The final reading should show improvement on every test compared to mid-point.',
-          'The team produces the final reading with all six scores and the full progression from baseline to final documented.',
-          'The final reading is above 12 out of 18. If not, the scale readiness verdict is Verdict 02 or 03.'),
-        comp('dp09_4','9.4','Commercial Readiness Progression Report',
-          'A visual and narrative account of the full diagnostic progression — baseline to mid-point to final — with commentary on what drove each movement.',
-          'The progression report is the engagement\'s evidence of impact — used for funder reporting, board presentations, and investor conversations.',
-          'Produce a one-page progression report: the three readings displayed visually, a one-sentence explanation of the key movement at each stage, and the specific evidence behind each final-reading score.',
-          'The progression report is produced and can be shared with the programme funder as a progress document.',
-          'A programme funder reads the report and asks a follow-up question about the evidence behind a specific score. That question confirms the report is specific enough.'),
-        comp('dp09_5','9.5','Investment Case Summary',
-          'A concise, evidence-based summary of the commercial case for this organisation — written for an investor, a funder, or a strategic partner.',
-          'An investment case built on the canvas evidence is qualitatively different from a business plan. It describes what was tested, what the evidence showed, and what is now known to be true.',
-          'Produce a two-page Investment Case Summary: the commercial model in one paragraph, the pilot evidence (two payments, outcomes described), the scale pathway summary, and the 36-month revenue projection headline figures.',
-          'The Investment Case Summary is produced and linked from this Decision Point.',
-          'The CEO presents the Investment Case to a real potential investor or funder and receives a request for a follow-up meeting. That request is the standard.'),
-        comp('dp09_6','9.6','Handover Standard Assessment',
-          'Assesses whether the organisation meets all five elements of the handover standard before the engagement closes.',
-          'A handover that occurs before the standard is met leaves the organisation with a commercial model it cannot operate independently.',
-          'Assess all five elements: financial model independence, value proposition independence, outreach process independence, client management independence, commercial identity independence. Document gaps and close them before the formal handover.',
-          'The team produces a handover standard assessment with each element scored and any gaps identified with a closure plan.',
-          'Every element of the handover standard is met before the formal handover session is scheduled.'),
-        comp('dp09_7','9.7','Formal Handover Presentation',
-          'The organisation\'s Leadership Team presents the commercial model to the coach — as if the coach had never seen it before.',
-          'The handover presentation is the proof of ownership. An organisation that cannot present its own commercial model without notes or prompting does not yet own it.',
-          'The Leadership Team presents: the commercial model, the value proposition, the pricing structure, the scale pathway, and the 36-month projection — in a 30-minute presentation without notes or preparation support from the coach.',
-          'The Formal Handover Presentation is delivered. The coach observes and challenges with questions that the Leadership Team answers from their own knowledge.',
-          'The Leadership Team answers the coach\'s challenge questions without hesitation. That fluency is the completion signal.'),
-        comp('dp09_8','9.8','Handover Record',
-          'The formal record of what the organisation owns and can operate independently at the close of the engagement.',
-          'The Handover Record is the organisation\'s reference for the twelve months following the engagement. It documents what was built, what remains, and who is responsible.',
-          'Produce the Handover Record: what is owned and independently operable (five elements), remaining development priorities, responsible person for each priority, and the twelve-month review date.',
-          'The Handover Record is produced, reviewed, and signed by both the CEO and the coach at the final session.',
-          'The CEO can describe the contents of the Handover Record to a board member without referring to the document.'),
-        comp('dp09_9','9.9','Twelve-Month Review Commitment',
-          'A committed date for the twelve-month review of the commercial model — to assess whether it has held and what has changed.',
-          'Without a committed review date, the twelve-month check never happens. The model atrophies without anyone noticing.',
-          'Set a specific twelve-month review date. Agree the format: a two-hour session with the Leadership Team reviewing the five financial metrics, the pipeline health, and the grant dependency ratio against the targets set at DP08.',
-          'The twelve-month review date is set and confirmed by the CEO in writing.',
-          'The CEO adds the review date to their board calendar. That public commitment is the signal that it will happen.'),
-      ]
-    },
-  ]
-}
-
-// ── DEFAULT COACH STATE ───────────────────────────────────────
-export function defaultCoachState(): CoachState {
-  return {
-    programmes: [
-      {
-        id: 'csj', name: 'Palladium CSJ', type: 'donor_programme',
-        funder: 'FCDO', country: 'Uganda', startDate: '2025-01-01',
-        endDate: '2026-12-31', notes: 'CSJ/Wiigot Northern Uganda programme.',
-        clientIds: ['conas','wonderland','kenali','viester','konya'],
-        coImplementerIds: [], funderEmail: '', funderInvited: false,
-      },
-      {
-        id: 'ignite', name: 'Ignite', type: 'donor_programme',
-        funder: 'Ignite', country: 'Uganda', startDate: '2026-06-01',
-        endDate: '2027-05-31', notes: 'GtCV canvas delivery for LSP clients.',
-        clientIds: ['ikore'],
-        coImplementerIds: [], funderEmail: '', funderInvited: false,
-      },
-    ],
-    clients: [
-      {
-        id:'conas', name:'CONAS Agricultural Hub', slug:'conas',
-        type:'crop_aggregator', engagementMode:'financial',
-        programmeId:'csj', country:'Uganda', sector:'Agricultural Services',
-        contactName:'', contactEmail:'', contactPhone:'',
-        status:'dp04', clearviewActive:true, ceoInvited:false, ceoInvitedAt:'',
-        startDate:'2025-06-01', expectedClose:'2026-06-30',
-        notes:'Clearview live. Five input profit centres. 20 FGEs.',
-        canvas:[],
-      },
-      {
-        id:'wonderland', name:'Wonderland Farm Services', slug:'wonderland',
-        type:'crop_aggregator', engagementMode:'financial',
-        programmeId:'csj', country:'Uganda', sector:'Agricultural Services',
-        contactName:'Bernard', contactEmail:'', contactPhone:'',
-        status:'dp04', clearviewActive:true, ceoInvited:false, ceoInvitedAt:'',
-        startDate:'2025-06-01', expectedClose:'2026-06-30',
-        notes:'Bernard (CEO). Input business + FGE aggregation.',
-        canvas:[],
-      },
-      {
-        id:'kenali', name:'Kenali Group', slug:'kenali',
-        type:'livestock_aggregator', engagementMode:'financial',
-        programmeId:'csj', country:'Uganda', sector:'Livestock',
-        contactName:'Kenneth Opio', contactEmail:'', contactPhone:'',
-        status:'dp02', clearviewActive:false, ceoInvited:false, ceoInvitedAt:'',
-        startDate:'2025-06-01', expectedClose:'2026-12-31',
-        notes:'Kenneth Opio (MD). Goat aggregation.',
-        canvas:[],
-      },
-      {
-        id:'viester', name:'Viester Animal Breeding Farm', slug:'viester',
-        type:'livestock_aggregator', engagementMode:'financial',
-        programmeId:'csj', country:'Uganda', sector:'Livestock',
-        contactName:'Ogenrwoth Victor', contactEmail:'', contactPhone:'',
-        status:'dp02', clearviewActive:false, ceoInvited:false, ceoInvitedAt:'',
-        startDate:'2025-06-01', expectedClose:'2026-12-31',
-        notes:'Ogenrwoth Victor (Executive Director). Goat aggregation.',
-        canvas:[],
-      },
-      {
-        id:'konya', name:'Konya FGE', slug:'konya',
-        type:'farmer_group_enterprise', engagementMode:'financial',
-        programmeId:'csj', country:'Uganda', sector:'Agricultural Equipment',
-        contactName:'', contactEmail:'', contactPhone:'',
-        status:'dp01', clearviewActive:false, ceoInvited:false, ceoInvitedAt:'',
-        startDate:'2025-06-01', expectedClose:'2026-12-31',
-        notes:'Acholi region. Equipment-based FGE.',
-        canvas:[],
-      },
-      {
-        id:'ikore', name:'Ikore', slug:'ikore',
-        type:'service_lsp', engagementMode:'canvas',
-        programmeId:'ignite', country:'Uganda', sector:'Advisory Services',
-        contactName:'', contactEmail:'', contactPhone:'',
-        status:'setup', clearviewActive:false, ceoInvited:false, ceoInvitedAt:'',
-        startDate:'2026-06-01', expectedClose:'2027-05-31',
-        notes:'Ignite programme. Full GtCV canvas engagement.',
-        canvas: buildEmptyCanvas(),
-      },
-    ],
-    coImplementers: [],
-    timesheets: [],
-    invoices: [],
-  }
+export function isPhaseUnlocked(phaseId: PhaseId, signoffs: Record<PhaseId, GateSignOff>): boolean {
+  const order = getPhaseOrder()
+  const idx = order.indexOf(phaseId)
+  if (idx === 0) return true
+  const prev = order[idx - 1]
+  const prevGate = signoffs[prev]
+  return prevGate.ceo_signed || prevGate.coach_authorised || prevGate.status === 'not_started'
 }
