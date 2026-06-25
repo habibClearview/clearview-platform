@@ -1,13 +1,7 @@
 // @ts-nocheck
 'use client'
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-
-// ============================================================
-// CLEARVIEW — WONDERLAND FARM SERVICES
-// Ported from Clearview Planner artifact
-// Supabase persistence replacing window.storage
-// ============================================================
 
 const MONTHS_HORIZON = 24
 const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -31,609 +25,670 @@ function creditTermToMonths(creditTerm, cycleMonths) {
   return cycleMonths
 }
 
+// ─── DEBT SCHEDULE ENGINE ────────────────────────────────────
+function buildDebtSchedule(obligations, months) {
+  const schedules = {}
+  const totalInterest = Array(months).fill(0)
+  const totalPrincipal = Array(months).fill(0)
+  const totalRepayment = Array(months).fill(0)
+  const totalOutstanding = Array(months).fill(0)
+
+  ;(obligations || []).forEach(ob => {
+    const startIdx = Math.max(0, (ob.drawdownMonth || 1) - 1)
+    const monthlyRate = (ob.annualRate || 0) / 12
+    const tenor = ob.tenorMonths || 12
+    const grace = ob.gracePeriodMonths || 0
+    const freq = ob.frequency || 'monthly'
+    const seasonalMonths = ob.seasonalMonths || []
+
+    const interestByMonth = Array(months).fill(0)
+    const principalByMonth = Array(months).fill(0)
+    const balanceByMonth = Array(months).fill(0)
+
+    function isPrincipalMonth(modelMonth) {
+      const mss = modelMonth - (startIdx + 1)
+      if (mss < 0 || mss < grace) return false
+      const active = mss - grace + 1
+      if (freq === 'monthly') return true
+      if (freq === 'quarterly') return active % 3 === 1
+      if (freq === 'seasonal') return seasonalMonths.includes(modelMonth % 12 === 0 ? 12 : modelMonth % 12)
+      return true
+    }
+
+    let totalPP = 0
+    for (let m = startIdx; m < Math.min(startIdx + tenor, months); m++) {
+      if (isPrincipalMonth(m+1) && (m - startIdx) >= grace) totalPP++
+    }
+
+    let runningBalance = ob.principal || 0
+    let repayCount = 0
+
+    for (let m = startIdx; m < months; m++) {
+      if (runningBalance <= 0) { balanceByMonth[m] = 0; continue }
+      const modelMonth = m + 1
+      const mss = m - startIdx
+      const inGrace = mss < grace
+      const pastTenor = mss >= tenor
+      const interest = runningBalance * monthlyRate
+      interestByMonth[m] = interest
+      let principal = 0
+
+      if (!pastTenor && !inGrace) {
+        if (ob.repaymentType === 'bullet') {
+          if (mss === tenor - 1) principal = runningBalance
+        } else if (ob.repaymentType === 'equal_instalment') {
+          if (isPrincipalMonth(modelMonth)) {
+            const rem = totalPP - repayCount
+            if (rem > 0 && monthlyRate > 0) {
+              const emi = runningBalance * monthlyRate * Math.pow(1+monthlyRate,rem) / (Math.pow(1+monthlyRate,rem)-1)
+              principal = Math.min(Math.max(0, emi - interest), runningBalance)
+            } else { principal = Math.min(runningBalance / Math.max(1,rem), runningBalance) }
+            repayCount++
+          }
+        } else {
+          if (isPrincipalMonth(modelMonth)) {
+            principal = Math.min(runningBalance / Math.max(1, totalPP - repayCount), runningBalance)
+            repayCount++
+          }
+        }
+      }
+
+      principalByMonth[m] = principal
+      runningBalance = Math.max(0, runningBalance - principal)
+      balanceByMonth[m] = runningBalance
+    }
+
+    schedules[ob.id] = { ...ob, interestByMonth, principalByMonth, balanceByMonth,
+      totalInterestPaid: interestByMonth.reduce((a,b)=>a+b,0),
+      totalPrincipalPaid: principalByMonth.reduce((a,b)=>a+b,0) }
+
+    for (let m = 0; m < months; m++) {
+      totalInterest[m] += interestByMonth[m]
+      totalPrincipal[m] += principalByMonth[m]
+      totalRepayment[m] += interestByMonth[m] + principalByMonth[m]
+      totalOutstanding[m] += balanceByMonth[m]
+    }
+  })
+
+  return { schedules, totalInterest, totalPrincipal, totalRepayment, totalOutstanding }
+}
+
+// ─── WONDERLAND CONFIG ───────────────────────────────────────
 function wonderlandConfig() {
   return {
-    meta: {
-      businessName: 'Wonderland Farm Services',
-      ownerName: 'Bernard',
-      modelStartDate: '2026-06-01',
-      currency: 'UGX',
-      corporateTaxRate: 0.30,
-      costOfCapital: 0.10,
-      openingCashBeforeFinancing: 6_080_000,
-    },
+    meta: { businessName:'Wonderland Farm Services', ownerName:'Bernard', modelStartDate:'2026-06-01', currency:'UGX', corporateTaxRate:0.30, costOfCapital:0.10, openingCashBeforeFinancing:6_080_000 },
     units: [
-      { id: 'input_shop', name: 'Input Shop', color: '#8B5E3C', short: 'Shop' },
-      { id: 'fge', name: 'Farmer Group Enterprises (FGE)', color: '#5B7B3A', short: 'FGE' },
-      { id: 'extension', name: 'Extension Services', color: '#C99A3B', short: 'Extension' },
-      { id: 'farm', name: "Wonderland's Own Farm", color: '#6B6259', short: 'Farm' },
+      { id:'input_shop', name:'Input Shop', color:'#8B5E3C', short:'Shop' },
+      { id:'fge', name:'Farmer Group Enterprises (FGE)', color:'#5B7B3A', short:'FGE' },
+      { id:'extension', name:'Extension Services', color:'#C99A3B', short:'Extension' },
+      { id:'farm', name:"Wonderland's Own Farm", color:'#6B6259', short:'Farm' },
     ],
     productionLines: {
-      tomatoes: { name: 'Tomatoes', yieldPerUnit: 70, allocationUnit: 'acre', outputUnit: 'Crates', farmgateBuyPrice: 200_000, marketSellPrice: 200_000, inputCreditPricePerAllocationUnit: 830_000, cycleMonths: 4 },
-      onions: { name: 'Onions', yieldPerUnit: 10_000, allocationUnit: 'acre', outputUnit: 'kg', farmgateBuyPrice: 2_000, marketSellPrice: 2_000, inputCreditPricePerAllocationUnit: 945_000, cycleMonths: 5 },
+      tomatoes: { name:'Tomatoes', yieldPerUnit:70, allocationUnit:'acre', outputUnit:'Crates', farmgateBuyPrice:200_000, marketSellPrice:200_000, inputCreditPricePerAllocationUnit:830_000, cycleMonths:4 },
+      onions: { name:'Onions', yieldPerUnit:10_000, allocationUnit:'acre', outputUnit:'kg', farmgateBuyPrice:2_000, marketSellPrice:2_000, inputCreditPricePerAllocationUnit:945_000, cycleMonths:5 },
     },
     revenueStreams: [
-      { id: 'shop_seeds', unit: 'input_shop', name: 'Seeds & planting material', type: 'simple', monthlyAmount: 4_897_821, marginPct: 0.25, startMonth: 1, endMonth: null },
-      { id: 'shop_fert', unit: 'input_shop', name: 'Fertilisers & soil amendments', type: 'simple', monthlyAmount: 7_836_513, marginPct: 0.22, startMonth: 1, endMonth: null },
-      { id: 'shop_chem', unit: 'input_shop', name: 'Chemicals & pesticides', type: 'simple', monthlyAmount: 2_938_692, marginPct: 0.28, startMonth: 1, endMonth: null },
-      { id: 'shop_equip', unit: 'input_shop', name: 'Equipment & tools', type: 'simple', monthlyAmount: 1_959_128, marginPct: 0.20, startMonth: 1, endMonth: null },
-      { id: 'shop_consumables', unit: 'input_shop', name: 'Consumables & PPE', type: 'simple', monthlyAmount: 1_469_346, marginPct: 0.30, startMonth: 1, endMonth: null },
-      { id: 'ext_external', unit: 'extension', name: 'External extension clients', type: 'simple', monthlyAmount: 11 * 80_000, marginPct: 1.0, startMonth: 2, endMonth: null },
-      { id: 'ext_training', unit: 'extension', name: 'Training & advisory sessions', type: 'simple', monthlyAmount: 10 * 100_000, marginPct: 1.0, startMonth: 2, endMonth: null },
+      { id:'shop_seeds', unit:'input_shop', name:'Seeds & planting material', type:'simple', monthlyAmount:4_897_821, marginPct:0.25, startMonth:1, endMonth:null },
+      { id:'shop_fert', unit:'input_shop', name:'Fertilisers & soil amendments', type:'simple', monthlyAmount:7_836_513, marginPct:0.22, startMonth:1, endMonth:null },
+      { id:'shop_chem', unit:'input_shop', name:'Chemicals & pesticides', type:'simple', monthlyAmount:2_938_692, marginPct:0.28, startMonth:1, endMonth:null },
+      { id:'shop_equip', unit:'input_shop', name:'Equipment & tools', type:'simple', monthlyAmount:1_959_128, marginPct:0.20, startMonth:1, endMonth:null },
+      { id:'shop_consumables', unit:'input_shop', name:'Consumables & PPE', type:'simple', monthlyAmount:1_469_346, marginPct:0.30, startMonth:1, endMonth:null },
+      { id:'ext_external', unit:'extension', name:'External extension clients', type:'simple', monthlyAmount:11*80_000, marginPct:1.0, startMonth:2, endMonth:null },
+      { id:'ext_training', unit:'extension', name:'Training & advisory sessions', type:'simple', monthlyAmount:10*100_000, marginPct:1.0, startMonth:2, endMonth:null },
     ],
-    counterpartyGroupDefaults: {
-      relationshipType: 'input_credit_and_offtake',
-      linkedUnit: 'fge',
-      commissionPct: 0.10,
-      defaultCreditTerm: { value: 14, unit: 'weeks' },
-      inputSupplyMarginPct: 0.214,
-    },
+    counterpartyGroupDefaults: { relationshipType:'input_credit_and_offtake', linkedUnit:'fge', commissionPct:0.10, defaultCreditTerm:{value:14,unit:'weeks'}, inputSupplyMarginPct:0.214 },
     counterpartyGroups: buildWonderlandFgeRoster(),
     staff: [
-      { id: 's1', name: 'Project Coordinator', role: 'Project Coordinator', monthlyCost: 260_000, startMonth: 1, endMonth: null, timeSplit: { input_shop: 0, fge: 100, extension: 0, farm: 0, admin: 0 } },
-      { id: 's2', name: 'Accounts Assistant (Agg)', role: 'Accounts Assistant', monthlyCost: 240_000, startMonth: 1, endMonth: null, timeSplit: { input_shop: 20, fge: 60, extension: 0, farm: 0, admin: 20 } },
-      { id: 's3', name: 'Field Assistant 1', role: 'Field Assistant', monthlyCost: 550_000, startMonth: 1, endMonth: null, timeSplit: { input_shop: 0, fge: 70, extension: 30, farm: 0, admin: 0 } },
-      { id: 's4', name: 'Field Assistant 2', role: 'Field Assistant', monthlyCost: 550_000, startMonth: 1, endMonth: null, timeSplit: { input_shop: 0, fge: 70, extension: 30, farm: 0, admin: 0 } },
-      { id: 's5', name: 'Produce Marketing Cashier', role: 'Cashier', monthlyCost: 450_000, startMonth: 4, endMonth: null, timeSplit: { input_shop: 0, fge: 100, extension: 0, farm: 0, admin: 0 } },
-      { id: 's6', name: 'Produce Marketing Assistant', role: 'Marketing Assistant', monthlyCost: 500_000, startMonth: 4, endMonth: null, timeSplit: { input_shop: 0, fge: 100, extension: 0, farm: 0, admin: 0 } },
-      { id: 's7', name: 'Security 1', role: 'Security', monthlyCost: 350_000, startMonth: 4, endMonth: null, timeSplit: { input_shop: 40, fge: 60, extension: 0, farm: 0, admin: 0 } },
-      { id: 's8', name: 'Security 2', role: 'Security', monthlyCost: 350_000, startMonth: 4, endMonth: null, timeSplit: { input_shop: 40, fge: 60, extension: 0, farm: 0, admin: 0 } },
-      { id: 's9', name: 'Tricycle Operator', role: 'Tricycle Operator', monthlyCost: 400_000, startMonth: 4, endMonth: null, timeSplit: { input_shop: 50, fge: 50, extension: 0, farm: 0, admin: 0 } },
-      { id: 's10', name: 'Farm Manager', role: 'Farm Manager', monthlyCost: 400_000, startMonth: 1, endMonth: null, timeSplit: { input_shop: 0, fge: 0, extension: 0, farm: 100, admin: 0 } },
-      { id: 's11', name: 'Farm Labourers (x8)', role: 'Farm Labourer', monthlyCost: 2_400_000, startMonth: 1, endMonth: null, timeSplit: { input_shop: 0, fge: 0, extension: 0, farm: 100, admin: 0 } },
-      { id: 's12', name: 'Managing Director', role: 'Managing Director', monthlyCost: 650_000, startMonth: 1, endMonth: null, timeSplit: { input_shop: 0, fge: 0, extension: 0, farm: 0, admin: 100 } },
-      { id: 's13', name: 'Accounts Assistant (Central)', role: 'Accounts Assistant', monthlyCost: 550_000, startMonth: 1, endMonth: null, timeSplit: { input_shop: 0, fge: 0, extension: 0, farm: 0, admin: 100 } },
-      { id: 's14', name: 'Input Operations Assistant', role: 'Input Ops Assistant', monthlyCost: 400_000, startMonth: 1, endMonth: null, timeSplit: { input_shop: 60, fge: 0, extension: 0, farm: 0, admin: 40 } },
+      { id:'s1', name:'Project Coordinator', role:'Project Coordinator', monthlyCost:260_000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:100,extension:0,farm:0,admin:0} },
+      { id:'s2', name:'Accounts Assistant (Agg)', role:'Accounts Assistant', monthlyCost:240_000, startMonth:1, endMonth:null, timeSplit:{input_shop:20,fge:60,extension:0,farm:0,admin:20} },
+      { id:'s3', name:'Field Assistant 1', role:'Field Assistant', monthlyCost:550_000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:70,extension:30,farm:0,admin:0} },
+      { id:'s4', name:'Field Assistant 2', role:'Field Assistant', monthlyCost:550_000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:70,extension:30,farm:0,admin:0} },
+      { id:'s5', name:'Produce Marketing Cashier', role:'Cashier', monthlyCost:450_000, startMonth:4, endMonth:null, timeSplit:{input_shop:0,fge:100,extension:0,farm:0,admin:0} },
+      { id:'s6', name:'Produce Marketing Assistant', role:'Marketing Assistant', monthlyCost:500_000, startMonth:4, endMonth:null, timeSplit:{input_shop:0,fge:100,extension:0,farm:0,admin:0} },
+      { id:'s7', name:'Security 1', role:'Security', monthlyCost:350_000, startMonth:4, endMonth:null, timeSplit:{input_shop:40,fge:60,extension:0,farm:0,admin:0} },
+      { id:'s8', name:'Security 2', role:'Security', monthlyCost:350_000, startMonth:4, endMonth:null, timeSplit:{input_shop:40,fge:60,extension:0,farm:0,admin:0} },
+      { id:'s9', name:'Tricycle Operator', role:'Tricycle Operator', monthlyCost:400_000, startMonth:4, endMonth:null, timeSplit:{input_shop:50,fge:50,extension:0,farm:0,admin:0} },
+      { id:'s10', name:'Farm Manager', role:'Farm Manager', monthlyCost:400_000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:0,extension:0,farm:100,admin:0} },
+      { id:'s11', name:'Farm Labourers (x8)', role:'Farm Labourer', monthlyCost:2_400_000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:0,extension:0,farm:100,admin:0} },
+      { id:'s12', name:'Managing Director', role:'Managing Director', monthlyCost:650_000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:0,extension:0,farm:0,admin:100} },
+      { id:'s13', name:'Accounts Assistant (Central)', role:'Accounts Assistant', monthlyCost:550_000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:0,extension:0,farm:0,admin:100} },
+      { id:'s14', name:'Input Operations Assistant', role:'Input Ops Assistant', monthlyCost:400_000, startMonth:1, endMonth:null, timeSplit:{input_shop:60,fge:0,extension:0,farm:0,admin:40} },
     ],
     overheads: [
-      { id: 'oh1', name: 'Office Rent - Business', monthlyAmount: 500_000, unit: 'fge', startMonth: 1, endMonth: null },
-      { id: 'oh2', name: 'Fuel & Transport - FGE visits', monthlyAmount: 384_000, unit: 'fge', startMonth: 1, endMonth: null },
-      { id: 'oh3', name: 'Input Delivery Cost', monthlyAmount: 200_000, unit: 'input_shop', startMonth: 1, endMonth: null },
-      { id: 'oh4', name: 'R&M - Equipment', monthlyAmount: 300_000, unit: 'fge', startMonth: 1, endMonth: null },
-      { id: 'oh5', name: 'Farm Rent / Land Access', monthlyAmount: 50_000, unit: 'farm', startMonth: 1, endMonth: null },
-      { id: 'oh6', name: 'Irrigation - Own Farm', monthlyAmount: 30_000, unit: 'farm', startMonth: 1, endMonth: null },
-      { id: 'oh7', name: 'Farm Tools & Maintenance', monthlyAmount: 40_000, unit: 'farm', startMonth: 1, endMonth: null },
-      { id: 'oh8', name: 'Farm Staff Welfare', monthlyAmount: 40_000, unit: 'farm', startMonth: 1, endMonth: null },
-      { id: 'oh9', name: 'Office Running Costs', monthlyAmount: 580_000, unit: 'admin', startMonth: 1, endMonth: null },
-      { id: 'oh10', name: 'Communications & Data', monthlyAmount: 200_000, unit: 'admin', startMonth: 1, endMonth: null },
-      { id: 'oh11', name: 'Professional Fees', monthlyAmount: 100_000, unit: 'admin', startMonth: 1, endMonth: null },
+      { id:'oh1', name:'Office Rent - Business', monthlyAmount:500_000, unit:'fge', startMonth:1, endMonth:null },
+      { id:'oh2', name:'Fuel & Transport - FGE visits', monthlyAmount:384_000, unit:'fge', startMonth:1, endMonth:null },
+      { id:'oh3', name:'Input Delivery Cost', monthlyAmount:200_000, unit:'input_shop', startMonth:1, endMonth:null },
+      { id:'oh4', name:'R&M - Equipment', monthlyAmount:300_000, unit:'fge', startMonth:1, endMonth:null },
+      { id:'oh5', name:'Farm Rent / Land Access', monthlyAmount:50_000, unit:'farm', startMonth:1, endMonth:null },
+      { id:'oh6', name:'Irrigation - Own Farm', monthlyAmount:30_000, unit:'farm', startMonth:1, endMonth:null },
+      { id:'oh7', name:'Farm Tools & Maintenance', monthlyAmount:40_000, unit:'farm', startMonth:1, endMonth:null },
+      { id:'oh8', name:'Farm Staff Welfare', monthlyAmount:40_000, unit:'farm', startMonth:1, endMonth:null },
+      { id:'oh9', name:'Office Running Costs', monthlyAmount:580_000, unit:'admin', startMonth:1, endMonth:null },
+      { id:'oh10', name:'Communications & Data', monthlyAmount:200_000, unit:'admin', startMonth:1, endMonth:null },
+      { id:'oh11', name:'Professional Fees', monthlyAmount:100_000, unit:'admin', startMonth:1, endMonth:null },
     ],
     capitalStructure: {
-      shareholderContribution: 33_500_000,
+      shareholderContribution:33_500_000,
       grants: [
-        { id: 'csj_nonrepayable', name: 'CSJ Grant (Non-Repayable)', amount: 147_680_000, repayable: false },
-        { id: 'csj_recoverable', name: 'CSJ Grant (Recoverable)', amount: 62_320_000, repayable: true,
-          schedule: { instalments: [{ month: 3, amount: 10_000_000 },{ month: 4, amount: 10_000_000 },{ month: 5, amount: 42_320_000 }], deferralEnabled: true, deferredMonth: 5 },
-          defaultForgivenessPct: 0.33 },
+        { id:'csj_nonrepayable', name:'CSJ Grant (Non-Repayable)', amount:147_680_000, repayable:false },
+        { id:'csj_recoverable', name:'CSJ Grant (Recoverable)', amount:62_320_000, repayable:true, schedule:{instalments:[{month:3,amount:10_000_000},{month:4,amount:10_000_000},{month:5,amount:42_320_000}],deferralEnabled:true,deferredMonth:5}, defaultForgivenessPct:0.33 },
       ],
-      loans: [],
-      defaultAnnualInterestRate: 0.18,
-      defaultLoanTenorYears: 2,
+      loans:[],
+      defaultAnnualInterestRate:0.18,
+      defaultLoanTenorYears:2,
     },
     rollingFunds: [
-      { id: 'irrigation_kit_fund', name: 'Irrigation Kit Fund', assetCostPerNewMember: 8_000_000, contributionPerMember: { amount: 4_000_000, periods: 2, periodLengthSource: 'firstProductionLineCycle' }, openingFundBalance: 0, contributionSource: 'external', appliesTo: 'counterpartyGroups' },
+      { id:'irrigation_kit_fund', name:'Irrigation Kit Fund', assetCostPerNewMember:8_000_000, contributionPerMember:{amount:4_000_000,periods:2,periodLengthSource:'firstProductionLineCycle'}, openingFundBalance:0, contributionSource:'external', appliesTo:'counterpartyGroups' },
     ],
+    // Default debt obligations (empty -- populated via Planning tab UI)
+    debtObligations: [],
   }
 }
 
 function buildWonderlandFgeRoster() {
   const roster = []
-  for (let i = 1; i <= 10; i++) {
-    roster.push({ id: `fge_b1_${i}`, name: `FGE B1-${i}`, location: 'Batch 1 area', memberCount: 15, assetStatus: 'saving', recruitedMonth: 1, creditTerm: { value: 14, unit: 'weeks' }, allocationPeriods: [{ label: 'Season 1 (Cycle 1)', startMonth: 1, allocations: { tomatoes: 3, onions: 2 } }] })
-  }
-  for (let i = 1; i <= 10; i++) {
-    roster.push({ id: `fge_b2_${i}`, name: `FGE B2-${i}`, location: 'Batch 2 area', memberCount: 15, assetStatus: 'saving', recruitedMonth: 2, creditTerm: { value: 14, unit: 'weeks' }, allocationPeriods: [{ label: 'Season 1 (Cycle 1)', startMonth: 2, allocations: { tomatoes: 3, onions: 2 } }] })
-  }
+  for (let i=1;i<=10;i++) roster.push({ id:`fge_b1_${i}`, name:`FGE B1-${i}`, location:'Batch 1 area', memberCount:15, assetStatus:'saving', recruitedMonth:1, creditTerm:{value:14,unit:'weeks'}, allocationPeriods:[{label:'Season 1',startMonth:1,allocations:{tomatoes:3,onions:2}}] })
+  for (let i=1;i<=10;i++) roster.push({ id:`fge_b2_${i}`, name:`FGE B2-${i}`, location:'Batch 2 area', memberCount:15, assetStatus:'saving', recruitedMonth:2, creditTerm:{value:14,unit:'weeks'}, allocationPeriods:[{label:'Season 1',startMonth:2,allocations:{tomatoes:3,onions:2}}] })
   return roster
 }
 
-function currency(n, cc = 'UGX') {
-  const v = Math.round(n || 0)
-  const sign = v < 0 ? '-' : ''
-  return `${sign}${cc} ${Math.abs(v).toLocaleString('en-US')}`
+function currency(n,cc='UGX'){const v=Math.round(n||0);const sign=v<0?'-':'';return`${sign}${cc} ${Math.abs(v).toLocaleString('en-US')}`}
+function compactCurrency(n,cc='UGX'){const v=Math.round(n||0);const abs=Math.abs(v);const sign=v<0?'-':'';if(abs>=1_000_000_000)return`${sign}${cc} ${(abs/1_000_000_000).toFixed(1)}B`;if(abs>=1_000_000)return`${sign}${cc} ${(abs/1_000_000).toFixed(1)}M`;if(abs>=1_000)return`${sign}${cc} ${(abs/1_000).toFixed(0)}K`;return`${sign}${cc} ${abs}`}
+function pct(n){return`${(n*100).toFixed(1)}%`}
+function isActiveInMonth(s,e,m){if(m<(s||1))return false;if(e&&m>e)return false;return true}
+
+function applyScenario(config,scenario){
+  const ov=scenario?.overrides||{}
+  return{presetLabel:'Base Case',productionLineOverrides:ov.productionLineOverrides||{},marginMultiplier:ov.marginMultiplier??1,revenueStreamOverrides:ov.revenueStreamOverrides||{},aggregationModel:ov.aggregationModel??'commission',commissionPctOverride:ov.commissionPctOverride??null,globalCreditTermOverride:ov.creditTerm??null,grantForgivenessOverrides:ov.grantForgivenessOverrides||{},additionalStaff:ov.additionalStaff||[],additionalGroups:ov.additionalGroups||[],financingOverrides:ov.financingOverrides||{},rollingFundOverrides:ov.rollingFundOverrides||{}}
 }
 
-function compactCurrency(n, cc = 'UGX') {
-  const v = Math.round(n || 0)
-  const abs = Math.abs(v)
-  const sign = v < 0 ? '-' : ''
-  if (abs >= 1_000_000_000) return `${sign}${cc} ${(abs/1_000_000_000).toFixed(1)}B`
-  if (abs >= 1_000_000) return `${sign}${cc} ${(abs/1_000_000).toFixed(1)}M`
-  if (abs >= 1_000) return `${sign}${cc} ${(abs/1_000).toFixed(0)}K`
-  return `${sign}${cc} ${abs}`
-}
-
-function pct(n) { return `${(n*100).toFixed(1)}%` }
-
-function isActiveInMonth(startMonth, endMonth, month) {
-  if (month < (startMonth || 1)) return false
-  if (endMonth && month > endMonth) return false
-  return true
-}
-
-function applyScenario(config, scenario) {
-  const overrides = scenario?.overrides || {}
-  return {
-    presetLabel: 'Base Case',
-    productionLineOverrides: overrides.productionLineOverrides || {},
-    marginMultiplier: overrides.marginMultiplier ?? 1,
-    revenueStreamOverrides: overrides.revenueStreamOverrides || {},
-    aggregationModel: overrides.aggregationModel ?? 'commission',
-    commissionPctOverride: overrides.commissionPctOverride ?? null,
-    globalCreditTermOverride: overrides.creditTerm ?? null,
-    grantForgivenessOverrides: overrides.grantForgivenessOverrides || {},
-    additionalStaff: overrides.additionalStaff || [],
-    additionalGroups: overrides.additionalGroups || [],
-    financingOverrides: overrides.financingOverrides || {},
-    rollingFundOverrides: overrides.rollingFundOverrides || {},
-  }
-}
-
-function runModel(config, scenario) {
-  const s = applyScenario(config, scenario)
-  const months = MONTHS_HORIZON
-  const meta = config.meta
-
-  const unit = {}
-  config.units.forEach((u) => {
-    unit[u.id] = { revenue: Array(months).fill(0), revenueLines: {}, cogs: Array(months).fill(0), cogsLines: {}, directOpex: Array(months).fill(0), staffCost: Array(months).fill(0), adminAllocated: Array(months).fill(0) }
-  })
-
-  function addRevenue(unitId, lineName, monthIdx, amount) {
-    if (!unit[unitId] || monthIdx < 0 || monthIdx >= months || amount === 0) return
-    unit[unitId].revenue[monthIdx] += amount
-    unit[unitId].revenueLines[lineName] = unit[unitId].revenueLines[lineName] || Array(months).fill(0)
-    unit[unitId].revenueLines[lineName][monthIdx] += amount
-  }
-  function addCogs(unitId, lineName, monthIdx, amount) {
-    if (!unit[unitId] || monthIdx < 0 || monthIdx >= months || amount === 0) return
-    unit[unitId].cogs[monthIdx] += amount
-    unit[unitId].cogsLines[lineName] = unit[unitId].cogsLines[lineName] || Array(months).fill(0)
-    unit[unitId].cogsLines[lineName][monthIdx] += amount
-  }
-
-  ;(config.revenueStreams || []).forEach((stream) => {
-    const override = s.revenueStreamOverrides[stream.id] || {}
-    const monthlyAmount = override.monthlyAmount ?? stream.monthlyAmount
-    let marginPct = override.marginPct ?? stream.marginPct
-    if (override.marginPct === undefined) marginPct = marginPct * s.marginMultiplier
-    for (let m = 0; m < months; m++) {
-      if (!isActiveInMonth(stream.startMonth, stream.endMonth, m + 1)) continue
-      addRevenue(stream.unit, stream.name, m, monthlyAmount)
-      const cost = monthlyAmount - monthlyAmount * marginPct
-      if (cost !== 0) addCogs(stream.unit, `${stream.name} - Cost`, m, cost)
-    }
-  })
-
-  const groupDefaults = config.counterpartyGroupDefaults || {}
-  const allGroups = [...(config.counterpartyGroups || []), ...s.additionalGroups]
-  const creditAdvances = Array(months).fill(0)
-  const creditRepayments = Array(months).fill(0)
-  const productionLineTotals = {}
-
-  allGroups.forEach((group) => {
-    const relType = group.relationshipType || groupDefaults.relationshipType
-    const linkedUnit = group.linkedUnit || groupDefaults.linkedUnit
-    const commissionPct = s.commissionPctOverride ?? (group.commissionPct ?? groupDefaults.commissionPct ?? 0)
-    const creditTerm = s.globalCreditTermOverride || group.creditTerm || groupDefaults.defaultCreditTerm
-    ;(group.allocationPeriods || []).forEach((period) => {
-      const periodStart = period.startMonth
-      Object.entries(period.allocations || {}).forEach(([lineId, allocUnits]) => {
-        if (!allocUnits || allocUnits <= 0) return
-        const lineBase = config.productionLines[lineId]
-        if (!lineBase) return
-        const lineOverride = s.productionLineOverrides[lineId] || {}
-        const inputCreditPrice = lineOverride.inputCreditPricePerAllocationUnit ?? lineBase.inputCreditPricePerAllocationUnit
-        const farmgateBuyPrice = lineOverride.farmgateBuyPrice ?? lineBase.farmgateBuyPrice
-        const marketSellPrice = lineOverride.marketSellPrice ?? lineBase.marketSellPrice
-        const yieldMult = lineOverride.yieldMultiplier ?? 1
-        const effectiveYield = lineBase.yieldPerUnit * yieldMult
-        const cycleMonths = lineBase.cycleMonths
-        productionLineTotals[lineId] = productionLineTotals[lineId] || { volume: Array(months).fill(0) }
-
-        if (relType === 'input_credit_and_offtake') {
-          const advanceAmount = allocUnits * inputCreditPrice
-          const advanceMonthIdx = periodStart - 1
-          if (advanceMonthIdx >= 0 && advanceMonthIdx < months) {
-            creditAdvances[advanceMonthIdx] += advanceAmount
-            addRevenue(linkedUnit, `${lineBase.name} Input Supply Revenue`, advanceMonthIdx, advanceAmount)
-            const inputMarginPct = groupDefaults.inputSupplyMarginPct ?? 0.214
-            addCogs(linkedUnit, `${lineBase.name} Input Procurement Cost`, advanceMonthIdx, advanceAmount * (1 - inputMarginPct))
-          }
-          const harvestMonth = periodStart + cycleMonths - 1
-          const harvestMonthIdx = harvestMonth - 1
-          const termMonths = creditTermToMonths(creditTerm, cycleMonths)
-          let repaymentMonth = Math.round(periodStart - 1 + termMonths) + 1
-          repaymentMonth = Math.max(repaymentMonth, harvestMonth)
-          repaymentMonth = Math.min(repaymentMonth, months)
-          const repaymentMonthIdx = repaymentMonth - 1
-          if (repaymentMonthIdx >= 0 && repaymentMonthIdx < months && advanceMonthIdx >= 0 && advanceMonthIdx < months) {
-            creditRepayments[repaymentMonthIdx] += advanceAmount
-          }
-          const volume = allocUnits * effectiveYield
-          const farmgateValue = volume * farmgateBuyPrice
-          const marketValue = volume * marketSellPrice
-          if (harvestMonthIdx >= 0 && harvestMonthIdx < months) {
-            productionLineTotals[lineId].volume[harvestMonthIdx] += volume
-            if (s.aggregationModel === 'commission') {
-              addRevenue(linkedUnit, `${lineBase.name} Aggregation Commission`, harvestMonthIdx, farmgateValue * commissionPct)
-            } else if (s.aggregationModel === 'spread') {
-              addRevenue(linkedUnit, `${lineBase.name} Produce Sales`, harvestMonthIdx, marketValue)
-              addCogs(linkedUnit, `${lineBase.name} Produce Purchase Cost`, harvestMonthIdx, farmgateValue * (1 - commissionPct))
-            } else {
-              addRevenue(linkedUnit, `${lineBase.name} Aggregation Commission`, harvestMonthIdx, farmgateValue * commissionPct)
-              addRevenue(linkedUnit, `${lineBase.name} Produce Sales`, harvestMonthIdx, marketValue)
-              addCogs(linkedUnit, `${lineBase.name} Produce Purchase Cost`, harvestMonthIdx, farmgateValue * (1 - commissionPct))
-            }
-          }
+function runModel(config,scenario){
+  const s=applyScenario(config,scenario)
+  const months=MONTHS_HORIZON
+  const meta=config.meta
+  const unit={}
+  config.units.forEach(u=>{unit[u.id]={revenue:Array(months).fill(0),revenueLines:{},cogs:Array(months).fill(0),cogsLines:{},directOpex:Array(months).fill(0),staffCost:Array(months).fill(0),adminAllocated:Array(months).fill(0)}})
+  function addRevenue(uid,name,m,v){if(!unit[uid]||m<0||m>=months||v===0)return;unit[uid].revenue[m]+=v;unit[uid].revenueLines[name]=unit[uid].revenueLines[name]||Array(months).fill(0);unit[uid].revenueLines[name][m]+=v}
+  function addCogs(uid,name,m,v){if(!unit[uid]||m<0||m>=months||v===0)return;unit[uid].cogs[m]+=v;unit[uid].cogsLines[name]=unit[uid].cogsLines[name]||Array(months).fill(0);unit[uid].cogsLines[name][m]+=v}
+  ;(config.revenueStreams||[]).forEach(stream=>{const ov=s.revenueStreamOverrides[stream.id]||{};const ma=ov.monthlyAmount??stream.monthlyAmount;let mp=ov.marginPct??stream.marginPct;if(ov.marginPct===undefined)mp*=s.marginMultiplier;for(let m=0;m<months;m++){if(!isActiveInMonth(stream.startMonth,stream.endMonth,m+1))continue;addRevenue(stream.unit,stream.name,m,ma);const cost=ma-ma*mp;if(cost!==0)addCogs(stream.unit,`${stream.name} - Cost`,m,cost)}})
+  const gd=config.counterpartyGroupDefaults||{}
+  const allGroups=[...(config.counterpartyGroups||[]),...s.additionalGroups]
+  const creditAdvances=Array(months).fill(0),creditRepayments=Array(months).fill(0),productionLineTotals={}
+  allGroups.forEach(group=>{
+    const relType=group.relationshipType||gd.relationshipType,linkedUnit=group.linkedUnit||gd.linkedUnit,commissionPct=s.commissionPctOverride??(group.commissionPct??gd.commissionPct??0),creditTerm=s.globalCreditTermOverride||group.creditTerm||gd.defaultCreditTerm
+    ;(group.allocationPeriods||[]).forEach(period=>{
+      const ps=period.startMonth
+      Object.entries(period.allocations||{}).forEach(([lineId,allocUnits])=>{
+        if(!allocUnits||allocUnits<=0)return;const lb=config.productionLines[lineId];if(!lb)return
+        const lo=s.productionLineOverrides[lineId]||{},icp=lo.inputCreditPricePerAllocationUnit??lb.inputCreditPricePerAllocationUnit,fbp=lo.farmgateBuyPrice??lb.farmgateBuyPrice,msp=lo.marketSellPrice??lb.marketSellPrice,ym=lo.yieldMultiplier??1,ey=lb.yieldPerUnit*ym,cm=lb.cycleMonths
+        productionLineTotals[lineId]=productionLineTotals[lineId]||{volume:Array(months).fill(0)}
+        if(relType==='input_credit_and_offtake'){
+          const adv=allocUnits*icp,ai=ps-1
+          if(ai>=0&&ai<months){creditAdvances[ai]+=adv;addRevenue(linkedUnit,`${lb.name} Input Supply Revenue`,ai,adv);addCogs(linkedUnit,`${lb.name} Input Procurement Cost`,ai,adv*(1-(gd.inputSupplyMarginPct??0.214)))}
+          const hm=ps+cm-1,hi=hm-1,tm=creditTermToMonths(creditTerm,cm)
+          let rm=Math.round(ps-1+tm)+1;rm=Math.max(rm,hm);rm=Math.min(rm,months);const ri=rm-1
+          if(ri>=0&&ri<months&&ai>=0&&ai<months)creditRepayments[ri]+=adv
+          const vol=allocUnits*ey,fgv=vol*fbp,mkv=vol*msp
+          if(hi>=0&&hi<months){productionLineTotals[lineId].volume[hi]+=vol;if(s.aggregationModel==='commission'){addRevenue(linkedUnit,`${lb.name} Aggregation Commission`,hi,fgv*commissionPct)}else if(s.aggregationModel==='spread'){addRevenue(linkedUnit,`${lb.name} Produce Sales`,hi,mkv);addCogs(linkedUnit,`${lb.name} Produce Purchase Cost`,hi,fgv*(1-commissionPct))}else{addRevenue(linkedUnit,`${lb.name} Aggregation Commission`,hi,fgv*commissionPct);addRevenue(linkedUnit,`${lb.name} Produce Sales`,hi,mkv);addCogs(linkedUnit,`${lb.name} Produce Purchase Cost`,hi,fgv*(1-commissionPct))}}
         }
       })
     })
   })
-
-  const creditReceivables = Array(months).fill(0)
-  let cumAdv = 0, cumRep = 0
-  for (let m = 0; m < months; m++) {
-    cumAdv += creditAdvances[m]; cumRep += creditRepayments[m]
-    creditReceivables[m] = Math.max(0, cumAdv - cumRep)
-  }
-
-  const allStaff = [...(config.staff || []), ...s.additionalStaff]
-  const adminStaffCost = Array(months).fill(0)
-  const unitIds = config.units.map((u) => u.id)
-
-  allStaff.forEach((person) => {
-    const split = person.timeSplit || {}
-    const adminPct = split.admin || 0
-    for (let m = 0; m < months; m++) {
-      if (!isActiveInMonth(person.startMonth, person.endMonth, m + 1)) continue
-      unitIds.forEach((id) => { unit[id].staffCost[m] += person.monthlyCost * ((split[id] || 0) / 100) })
-      adminStaffCost[m] += person.monthlyCost * (adminPct / 100)
-    }
+  const creditReceivables=Array(months).fill(0);let ca=0,cr=0;for(let m=0;m<months;m++){ca+=creditAdvances[m];cr+=creditRepayments[m];creditReceivables[m]=Math.max(0,ca-cr)}
+  const allStaff=[...(config.staff||[]),...s.additionalStaff],adminStaffCost=Array(months).fill(0),unitIds=config.units.map(u=>u.id)
+  allStaff.forEach(p=>{const split=p.timeSplit||{};for(let m=0;m<months;m++){if(!isActiveInMonth(p.startMonth,p.endMonth,m+1))continue;unitIds.forEach(id=>{unit[id].staffCost[m]+=p.monthlyCost*((split[id]||0)/100)});adminStaffCost[m]+=p.monthlyCost*((split.admin||0)/100)}})
+  const adminOverheadCost=Array(months).fill(0)
+  ;(config.overheads||[]).forEach(ov=>{for(let m=0;m<months;m++){if(!isActiveInMonth(ov.startMonth,ov.endMonth,m+1))continue;if(ov.unit==='admin')adminOverheadCost[m]+=ov.monthlyAmount;else if(unit[ov.unit])unit[ov.unit].directOpex[m]+=ov.monthlyAmount}})
+  const totalAdminCost=Array(months).fill(0);for(let m=0;m<months;m++)totalAdminCost[m]=adminStaffCost[m]+adminOverheadCost[m]
+  for(let m=0;m<months;m++){const total=unitIds.reduce((s,id)=>s+unit[id].staffCost[m],0);unitIds.forEach(id=>{const share=total>0?unit[id].staffCost[m]/total:1/unitIds.length;unit[id].adminAllocated[m]=totalAdminCost[m]*share})}
+  unitIds.forEach(id=>{const u=unit[id];u.grossProfit=Array(months).fill(0);u.totalOpex=Array(months).fill(0);u.ebitda=Array(months).fill(0);for(let m=0;m<months;m++){u.grossProfit[m]=u.revenue[m]-u.cogs[m];u.totalOpex[m]=u.directOpex[m]+u.staffCost[m]+u.adminAllocated[m];u.ebitda[m]=u.grossProfit[m]-u.totalOpex[m]}})
+  const con={revenue:Array(months).fill(0),cogs:Array(months).fill(0),grossProfit:Array(months).fill(0),opex:Array(months).fill(0),ebitda:Array(months).fill(0),interest:Array(months).fill(0),nptBeforeTax:Array(months).fill(0),tax:Array(months).fill(0),nptAfterTax:Array(months).fill(0)}
+  for(let m=0;m<months;m++){unitIds.forEach(id=>{con.revenue[m]+=unit[id].revenue[m];con.cogs[m]+=unit[id].cogs[m];con.grossProfit[m]+=unit[id].grossProfit[m];con.opex[m]+=unit[id].totalOpex[m];con.ebitda[m]+=unit[id].ebitda[m]})}
+  const cap=config.capitalStructure||{},loans=[...(cap.loans||[])]
+  if(s.financingOverrides.bankLoan)loans.push({id:'scenario_loan',amount:s.financingOverrides.bankLoan,annualInterestRate:s.financingOverrides.annualInterestRate??cap.defaultAnnualInterestRate??0,tenorYears:s.financingOverrides.loanTenorYears??cap.defaultLoanTenorYears??1,startMonth:s.financingOverrides.loanStartMonth??1})
+  const loanInt=Array(months).fill(0),loanPrin=Array(months).fill(0),loanDraw=Array(months).fill(0),loanBals={}
+  loans.forEach(loan=>{const si=(loan.startMonth||1)-1;if(si>=0&&si<months)loanDraw[si]+=loan.amount;const mr=(loan.annualInterestRate||0)/12,tm=(loan.tenorYears||1)*12,mp=tm>0?loan.amount/tm:0;let bal=loan.amount;for(let m=si;m<months;m++){if(m<0||bal<=0)continue;loanInt[m]+=bal*mr;const p=Math.min(mp,bal);loanPrin[m]+=p;bal-=p};loanBals[loan.id]={amount:loan.amount,monthlyPrincipal:mp}})
+  for(let m=0;m<months;m++)con.interest[m]=loanInt[m]
+  const grants=cap.grants||[],grantRep=Array(months).fill(0),grantForg=Array(months).fill(0),grantInflow=Array(months).fill(0),grantState={}
+  grants.forEach(g=>{grantInflow[0]+=g.amount})
+  grants.forEach(grant=>{if(!grant.repayable){grantState[grant.id]={totalAmount:grant.amount,netRepayable:0,forgivenAmount:0,repayable:false};return}
+    const fp=s.grantForgivenessOverrides[grant.id]??grant.defaultForgivenessPct??0,nr=grant.amount*(1-fp),fa=grant.amount-nr;grantState[grant.id]={totalAmount:grant.amount,netRepayable:nr,forgivenAmount:fa,repayable:true,forgivenessPct:fp}
+    const sch=grant.schedule;if(sch){const ts=sch.instalments.reduce((s,i)=>s+i.amount,0);sch.instalments.forEach(inst=>{const share=ts>0?inst.amount/ts:0;const month=sch.deferralEnabled?sch.deferredMonth:inst.month;if(month>=1&&month<=months){grantRep[month-1]+=nr*share;grantForg[month-1]+=fa*share}})}})
+  for(let m=0;m<months;m++){con.nptBeforeTax[m]=con.ebitda[m]-con.interest[m];con.tax[m]=con.nptBeforeTax[m]>0?con.nptBeforeTax[m]*(meta.corporateTaxRate||0):0;con.nptAfterTax[m]=con.nptBeforeTax[m]-con.tax[m]+grantForg[m]}
+  con.grantForgivenessGain=grantForg;con.grantState=grantState
+  const rfResults={},wlOutTotal=Array(months).fill(0),wlRepTotal=Array(months).fill(0)
+  ;(config.rollingFunds||[]).forEach(fund=>{
+    const fo=s.rollingFundOverrides[fund.id]||{},cs=fo.contributionSource??fund.contributionSource??'external',wl=fo.wonderlandLoans||[]
+    const fc=Array(months).fill(0),fd=Array(months).fill(0),wlo=Array(months).fill(0),wlr=Array(months).fill(0)
+    if(fund.appliesTo==='counterpartyGroups'){;(config.counterpartyGroups||[]).forEach(group=>{const ri=Math.max(0,(group.recruitedMonth||1)-1);let pl=4;const fp=(group.allocationPeriods||[])[0];if(fp&&fund.contributionPerMember.periodLengthSource==='firstProductionLineCycle'){const lids=Object.keys(fp.allocations||[]);if(lids.length>0&&config.productionLines[lids[0]])pl=config.productionLines[lids[0]].cycleMonths}
+    for(let p=0;p<fund.contributionPerMember.periods;p++){const ci=ri+p*pl+(pl-1);if(ci>=0&&ci<months)fc[ci]+=fund.contributionPerMember.amount}})}
+    wl.forEach(loan=>{const li=Math.max(0,(loan.month||1)-1);if(li<months){wlo[li]+=loan.amount;fc[li]+=loan.amount};if(loan.repaymentMonth){const ri=Math.max(0,loan.repaymentMonth-1);if(ri<months){wlr[ri]+=loan.amount;fd[ri]+=loan.amount}}})
+    const fsm=[],nama=Array(months).fill(0);let rb=fund.openingFundBalance||0;const fb=Array(months).fill(0)
+    s.additionalGroups.forEach(g=>{const ri=Math.max(0,(g.recruitedMonth||1)-1);if(ri<months)nama[ri]+=fund.assetCostPerNewMember})
+    for(let m=0;m<months;m++){rb+=fc[m];rb-=fd[m];if(nama[m]>0){if(rb>=nama[m]){rb-=nama[m];fd[m]+=nama[m]}else{fsm.push({month:m+1,shortfall:nama[m]-rb});fd[m]+=rb;rb=0}};fb[m]=rb}
+    rfResults[fund.id]={name:fund.name,fundBalanceByMonth:fb,fundContributions:fc,fundDisbursements:fd,fundShortfallMonths:fsm,contributionSource:cs}
+    for(let m=0;m<months;m++){wlOutTotal[m]+=wlo[m];wlRepTotal[m]+=wlr[m]}
   })
-
-  const adminOverheadCost = Array(months).fill(0)
-  ;(config.overheads || []).forEach((ov) => {
-    for (let m = 0; m < months; m++) {
-      if (!isActiveInMonth(ov.startMonth, ov.endMonth, m + 1)) continue
-      if (ov.unit === 'admin') adminOverheadCost[m] += ov.monthlyAmount
-      else if (unit[ov.unit]) unit[ov.unit].directOpex[m] += ov.monthlyAmount
-    }
-  })
-
-  const totalAdminCost = Array(months).fill(0)
-  for (let m = 0; m < months; m++) totalAdminCost[m] = adminStaffCost[m] + adminOverheadCost[m]
-  for (let m = 0; m < months; m++) {
-    const totalOpStaffCost = unitIds.reduce((sum, id) => sum + unit[id].staffCost[m], 0)
-    unitIds.forEach((id) => {
-      const share = totalOpStaffCost > 0 ? unit[id].staffCost[m] / totalOpStaffCost : 1 / unitIds.length
-      unit[id].adminAllocated[m] = totalAdminCost[m] * share
-    })
-  }
-
-  unitIds.forEach((id) => {
-    const u = unit[id]
-    u.grossProfit = Array(months).fill(0)
-    u.totalOpex = Array(months).fill(0)
-    u.ebitda = Array(months).fill(0)
-    for (let m = 0; m < months; m++) {
-      u.grossProfit[m] = u.revenue[m] - u.cogs[m]
-      u.totalOpex[m] = u.directOpex[m] + u.staffCost[m] + u.adminAllocated[m]
-      u.ebitda[m] = u.grossProfit[m] - u.totalOpex[m]
-    }
-  })
-
-  const consolidated = { revenue: Array(months).fill(0), cogs: Array(months).fill(0), grossProfit: Array(months).fill(0), opex: Array(months).fill(0), ebitda: Array(months).fill(0), interest: Array(months).fill(0), nptBeforeTax: Array(months).fill(0), tax: Array(months).fill(0), nptAfterTax: Array(months).fill(0) }
-  for (let m = 0; m < months; m++) {
-    unitIds.forEach((id) => {
-      consolidated.revenue[m] += unit[id].revenue[m]
-      consolidated.cogs[m] += unit[id].cogs[m]
-      consolidated.grossProfit[m] += unit[id].grossProfit[m]
-      consolidated.opex[m] += unit[id].totalOpex[m]
-      consolidated.ebitda[m] += unit[id].ebitda[m]
-    })
-  }
-
-  const cap = config.capitalStructure || {}
-  const loans = [...(cap.loans || [])]
-  if (s.financingOverrides.bankLoan) {
-    loans.push({ id: 'scenario_loan', amount: s.financingOverrides.bankLoan, annualInterestRate: s.financingOverrides.annualInterestRate ?? cap.defaultAnnualInterestRate ?? 0, tenorYears: s.financingOverrides.loanTenorYears ?? cap.defaultLoanTenorYears ?? 1, startMonth: s.financingOverrides.loanStartMonth ?? 1 })
-  }
-
-  const loanInterestByMonth = Array(months).fill(0)
-  const loanPrincipalByMonth = Array(months).fill(0)
-  const loanDrawdownByMonth = Array(months).fill(0)
-  const loanBalances = {}
-
-  loans.forEach((loan) => {
-    const startIdx = (loan.startMonth || 1) - 1
-    if (startIdx >= 0 && startIdx < months) loanDrawdownByMonth[startIdx] += loan.amount
-    const monthlyRate = (loan.annualInterestRate || 0) / 12
-    const tenorMonths = (loan.tenorYears || 1) * 12
-    const monthlyPrincipal = tenorMonths > 0 ? loan.amount / tenorMonths : 0
-    let balance = loan.amount
-    for (let m = startIdx; m < months; m++) {
-      if (m < 0 || balance <= 0) continue
-      loanInterestByMonth[m] += balance * monthlyRate
-      const principal = Math.min(monthlyPrincipal, balance)
-      loanPrincipalByMonth[m] += principal
-      balance -= principal
-    }
-    loanBalances[loan.id] = { startIdx, amount: loan.amount, monthlyPrincipal, tenorMonths }
-  })
-
-  for (let m = 0; m < months; m++) consolidated.interest[m] = loanInterestByMonth[m]
-
-  const grants = cap.grants || []
-  const grantRepaymentByMonth = Array(months).fill(0)
-  const grantForgivenessGainByMonth = Array(months).fill(0)
-  const grantInflowByMonth = Array(months).fill(0)
-  const grantState = {}
-  grants.forEach((g) => { grantInflowByMonth[0] += g.amount })
-
-  grants.forEach((grant) => {
-    if (!grant.repayable) { grantState[grant.id] = { totalAmount: grant.amount, netRepayable: 0, forgivenAmount: 0, repayable: false }; return }
-    const forgivenessPct = s.grantForgivenessOverrides[grant.id] ?? grant.defaultForgivenessPct ?? 0
-    const netRepayable = grant.amount * (1 - forgivenessPct)
-    const forgivenAmount = grant.amount - netRepayable
-    grantState[grant.id] = { totalAmount: grant.amount, netRepayable, forgivenAmount, repayable: true, forgivenessPct }
-    const schedule = grant.schedule
-    if (schedule) {
-      const totalScheduled = schedule.instalments.reduce((sum, i) => sum + i.amount, 0)
-      schedule.instalments.forEach((inst) => {
-        const share = totalScheduled > 0 ? inst.amount / totalScheduled : 0
-        const month = schedule.deferralEnabled ? schedule.deferredMonth : inst.month
-        if (month >= 1 && month <= months) {
-          grantRepaymentByMonth[month-1] += netRepayable * share
-          grantForgivenessGainByMonth[month-1] += forgivenAmount * share
-        }
-      })
-    }
-  })
-
-  for (let m = 0; m < months; m++) {
-    consolidated.nptBeforeTax[m] = consolidated.ebitda[m] - consolidated.interest[m]
-    consolidated.tax[m] = consolidated.nptBeforeTax[m] > 0 ? consolidated.nptBeforeTax[m] * (meta.corporateTaxRate || 0) : 0
-    consolidated.nptAfterTax[m] = consolidated.nptBeforeTax[m] - consolidated.tax[m] + grantForgivenessGainByMonth[m]
-  }
-  consolidated.grantForgivenessGain = grantForgivenessGainByMonth
-  consolidated.grantState = grantState
-
-  const rollingFundResults = {}
-  const wonderlandLoanOutflowsTotal = Array(months).fill(0)
-  const wonderlandLoanRepaymentsTotal = Array(months).fill(0)
-
-  ;(config.rollingFunds || []).forEach((fund) => {
-    const fundOverride = s.rollingFundOverrides[fund.id] || {}
-    const contributionSource = fundOverride.contributionSource ?? fund.contributionSource ?? 'external'
-    const wonderlandLoans = fundOverride.wonderlandLoans || []
-    const fundContributions = Array(months).fill(0)
-    const fundDisbursements = Array(months).fill(0)
-    const wonderlandLoanOutflows = Array(months).fill(0)
-    const wonderlandLoanRepayments = Array(months).fill(0)
-
-    if (fund.appliesTo === 'counterpartyGroups') {
-      ;(config.counterpartyGroups || []).forEach((group) => {
-        const recruitMonthIdx = Math.max(0, (group.recruitedMonth || 1) - 1)
-        let periodLengthMonths = 4
-        const firstPeriod = (group.allocationPeriods || [])[0]
-        if (firstPeriod && fund.contributionPerMember.periodLengthSource === 'firstProductionLineCycle') {
-          const lineIds = Object.keys(firstPeriod.allocations || {})
-          if (lineIds.length > 0 && config.productionLines[lineIds[0]]) periodLengthMonths = config.productionLines[lineIds[0]].cycleMonths
-        }
-        for (let period = 0; period < fund.contributionPerMember.periods; period++) {
-          const contribMonthIdx = recruitMonthIdx + period * periodLengthMonths + (periodLengthMonths - 1)
-          if (contribMonthIdx >= 0 && contribMonthIdx < months) fundContributions[contribMonthIdx] += fund.contributionPerMember.amount
-        }
-      })
-    }
-
-    wonderlandLoans.forEach((loan) => {
-      const loanMonthIdx = Math.max(0, (loan.month || 1) - 1)
-      if (loanMonthIdx < months) { wonderlandLoanOutflows[loanMonthIdx] += loan.amount; fundContributions[loanMonthIdx] += loan.amount }
-      if (loan.repaymentMonth) {
-        const repayIdx = Math.max(0, loan.repaymentMonth - 1)
-        if (repayIdx < months) { wonderlandLoanRepayments[repayIdx] += loan.amount; fundDisbursements[repayIdx] += loan.amount }
-      }
-    })
-
-    const fundShortfallMonths = []
-    let runningFundBalance = fund.openingFundBalance || 0
-    const fundBalanceByMonth = Array(months).fill(0)
-
-    if (fund.appliesTo === 'counterpartyGroups') {
-      const newMemberAssetNeeds = Array(months).fill(0)
-      s.additionalGroups.forEach((group) => {
-        const recruitMonthIdx = Math.max(0, (group.recruitedMonth || 1) - 1)
-        if (recruitMonthIdx < months) newMemberAssetNeeds[recruitMonthIdx] += fund.assetCostPerNewMember
-      })
-      for (let m = 0; m < months; m++) {
-        runningFundBalance += fundContributions[m]
-        runningFundBalance -= fundDisbursements[m]
-        if (newMemberAssetNeeds[m] > 0) {
-          if (runningFundBalance >= newMemberAssetNeeds[m]) { runningFundBalance -= newMemberAssetNeeds[m]; fundDisbursements[m] += newMemberAssetNeeds[m] }
-          else { fundShortfallMonths.push({ month: m+1, shortfall: newMemberAssetNeeds[m] - runningFundBalance }); fundDisbursements[m] += runningFundBalance; runningFundBalance = 0 }
-        }
-        fundBalanceByMonth[m] = runningFundBalance
-      }
-    }
-
-    rollingFundResults[fund.id] = { name: fund.name, fundBalanceByMonth, fundContributions, fundDisbursements, fundShortfallMonths, contributionSource }
-    for (let m = 0; m < months; m++) { wonderlandLoanOutflowsTotal[m] += wonderlandLoanOutflows[m]; wonderlandLoanRepaymentsTotal[m] += wonderlandLoanRepayments[m] }
-  })
-
-  const cashFlow = { operatingCash: Array(months).fill(0), investingCash: Array(months).fill(0), financingCash: Array(months).fill(0), netChange: Array(months).fill(0), openingCash: Array(months).fill(0), closingCash: Array(months).fill(0), workingCapitalMovement: Array(months).fill(0) }
-
-  let prevReceivable = 0
-  for (let m = 0; m < months; m++) { cashFlow.workingCapitalMovement[m] = -(creditReceivables[m] - prevReceivable); prevReceivable = creditReceivables[m] }
-  for (let m = 0; m < months; m++) cashFlow.operatingCash[m] = consolidated.nptAfterTax[m] - grantForgivenessGainByMonth[m] + cashFlow.workingCapitalMovement[m]
-  for (let m = 0; m < months; m++) { cashFlow.investingCash[m] -= wonderlandLoanOutflowsTotal[m]; cashFlow.investingCash[m] += wonderlandLoanRepaymentsTotal[m] }
-
-  cashFlow.financingCash[0] += cap.shareholderContribution || 0
-  for (let m = 0; m < months; m++) {
-    cashFlow.financingCash[m] += grantInflowByMonth[m]
-    cashFlow.financingCash[m] -= grantRepaymentByMonth[m]
-    cashFlow.financingCash[m] += loanDrawdownByMonth[m]
-    cashFlow.financingCash[m] -= loanPrincipalByMonth[m]
-  }
-  for (let m = 0; m < months; m++) {
-    cashFlow.netChange[m] = cashFlow.operatingCash[m] + cashFlow.investingCash[m] + cashFlow.financingCash[m]
-    cashFlow.openingCash[m] = m === 0 ? meta.openingCashBeforeFinancing : cashFlow.closingCash[m-1]
-    cashFlow.closingCash[m] = cashFlow.openingCash[m] + cashFlow.netChange[m]
-  }
-
-  const balanceSheet = { loanToRollingFunds: Array(months).fill(0), cash: cashFlow.closingCash, creditReceivables, totalAssets: Array(months).fill(0), shareCapital: Array(months).fill(0), grantEquity: Array(months).fill(0), retainedEarnings: Array(months).fill(0), totalEquity: Array(months).fill(0), grantsOutstanding: Array(months).fill(0), loansOutstanding: Array(months).fill(0), totalLiabilities: Array(months).fill(0) }
-
-  let cumNPAT = 0, cumLoanToFund = 0
-  const cumGrantRepaid = {}
-  const cumGrantForgiven = {}
-  grants.forEach((g) => { cumGrantRepaid[g.id] = 0; cumGrantForgiven[g.id] = 0 })
-  const repayableGrants = grants.filter((g) => g.repayable)
-  const totalRepayableAmount = repayableGrants.reduce((sum, g) => sum + g.amount, 0)
-  const nonRepayableTotal = grants.filter((g) => !g.repayable).reduce((sum, g) => sum + g.amount, 0)
-  const loanBal2 = {}
-  loans.forEach((l) => { loanBal2[l.id] = l.amount })
-
-  for (let m = 0; m < months; m++) {
-    cumLoanToFund += wonderlandLoanOutflowsTotal[m] - wonderlandLoanRepaymentsTotal[m]
-    balanceSheet.loanToRollingFunds[m] = Math.max(0, cumLoanToFund)
-    cumNPAT += consolidated.nptAfterTax[m]
-    balanceSheet.retainedEarnings[m] = cumNPAT + (meta.openingCashBeforeFinancing || 0)
-    balanceSheet.shareCapital[m] = cap.shareholderContribution || 0
-    balanceSheet.grantEquity[m] = nonRepayableTotal
-    balanceSheet.totalEquity[m] = balanceSheet.shareCapital[m] + balanceSheet.grantEquity[m] + balanceSheet.retainedEarnings[m]
-    let grantsOutstanding = 0
-    repayableGrants.forEach((g) => {
-      const share = totalRepayableAmount > 0 ? g.amount / totalRepayableAmount : 0
-      cumGrantRepaid[g.id] += grantRepaymentByMonth[m] * share
-      cumGrantForgiven[g.id] += grantForgivenessGainByMonth[m] * share
-      grantsOutstanding += Math.max(0, g.amount - cumGrantRepaid[g.id] - cumGrantForgiven[g.id])
-    })
-    balanceSheet.grantsOutstanding[m] = grantsOutstanding
-    balanceSheet.loansOutstanding[m] = loans.length > 0 ? Object.values(loanBal2).reduce((s,v)=>s+Math.max(0,v),0) : 0
-    balanceSheet.totalAssets[m] = balanceSheet.loanToRollingFunds[m] + balanceSheet.cash[m] + balanceSheet.creditReceivables[m]
-    balanceSheet.totalLiabilities[m] = balanceSheet.grantsOutstanding[m] + balanceSheet.loansOutstanding[m]
-  }
-
-  const year1 = (arr) => arr.slice(0,12).reduce((a,b)=>a+b,0)
-  const year2 = (arr) => arr.slice(12,24).reduce((a,b)=>a+b,0)
-  const metrics = {
-    year1Revenue: year1(consolidated.revenue), year1GrossProfit: year1(consolidated.grossProfit), year1EBITDA: year1(consolidated.ebitda), year1NPAT: year1(consolidated.nptAfterTax),
-    year2Revenue: year2(consolidated.revenue), year2GrossProfit: year2(consolidated.grossProfit), year2EBITDA: year2(consolidated.ebitda), year2NPAT: year2(consolidated.nptAfterTax),
-    grossMarginY1: year1(consolidated.revenue) !== 0 ? year1(consolidated.grossProfit)/year1(consolidated.revenue) : 0,
-    netMarginY1: year1(consolidated.revenue) !== 0 ? year1(consolidated.nptAfterTax)/year1(consolidated.revenue) : 0,
-    maxWorkingCapitalRequirement: Math.max(...creditReceivables),
-    avgWorkingCapitalRequirement: creditReceivables.reduce((a,b)=>a+b,0)/months,
-    minCashBalance: Math.min(...cashFlow.closingCash),
-    minCashMonth: cashFlow.closingCash.indexOf(Math.min(...cashFlow.closingCash))+1,
-    totalCounterpartyGroups: allGroups.length,
-    grantState,
-  }
-
-  return { scenario: s, counterpartyGroups: allGroups, unit, consolidated, cashFlow, balanceSheet, workingCapitalRequirement: creditReceivables, creditReceivables, rollingFunds: rollingFundResults, productionLineTotals, metrics }
+  const cf={operatingCash:Array(months).fill(0),investingCash:Array(months).fill(0),financingCash:Array(months).fill(0),netChange:Array(months).fill(0),openingCash:Array(months).fill(0),closingCash:Array(months).fill(0),workingCapitalMovement:Array(months).fill(0)}
+  let pr=0;for(let m=0;m<months;m++){cf.workingCapitalMovement[m]=-(creditReceivables[m]-pr);pr=creditReceivables[m]}
+  for(let m=0;m<months;m++)cf.operatingCash[m]=con.nptAfterTax[m]-grantForg[m]+cf.workingCapitalMovement[m]
+  for(let m=0;m<months;m++){cf.investingCash[m]-=wlOutTotal[m];cf.investingCash[m]+=wlRepTotal[m]}
+  cf.financingCash[0]+=(cap.shareholderContribution||0)
+  for(let m=0;m<months;m++){cf.financingCash[m]+=grantInflow[m];cf.financingCash[m]-=grantRep[m];cf.financingCash[m]+=loanDraw[m];cf.financingCash[m]-=loanPrin[m]}
+  for(let m=0;m<months;m++){cf.netChange[m]=cf.operatingCash[m]+cf.investingCash[m]+cf.financingCash[m];cf.openingCash[m]=m===0?meta.openingCashBeforeFinancing:cf.closingCash[m-1];cf.closingCash[m]=cf.openingCash[m]+cf.netChange[m]}
+  const bs={loanToRollingFunds:Array(months).fill(0),cash:cf.closingCash,creditReceivables,totalAssets:Array(months).fill(0),shareCapital:Array(months).fill(0),grantEquity:Array(months).fill(0),retainedEarnings:Array(months).fill(0),totalEquity:Array(months).fill(0),grantsOutstanding:Array(months).fill(0),loansOutstanding:Array(months).fill(0),totalLiabilities:Array(months).fill(0)}
+  let cumNPAT=0,cumLTF=0,cgr={},cgf={};grants.forEach(g=>{cgr[g.id]=0;cgf[g.id]=0});const rg=grants.filter(g=>g.repayable),tra=rg.reduce((s,g)=>s+g.amount,0),nrt=grants.filter(g=>!g.repayable).reduce((s,g)=>s+g.amount,0),lb2={}
+  loans.forEach(l=>{lb2[l.id]=l.amount})
+  for(let m=0;m<months;m++){cumLTF+=wlOutTotal[m]-wlRepTotal[m];bs.loanToRollingFunds[m]=Math.max(0,cumLTF);cumNPAT+=con.nptAfterTax[m];bs.retainedEarnings[m]=cumNPAT+(meta.openingCashBeforeFinancing||0);bs.shareCapital[m]=cap.shareholderContribution||0;bs.grantEquity[m]=nrt;bs.totalEquity[m]=bs.shareCapital[m]+bs.grantEquity[m]+bs.retainedEarnings[m];let go=0;rg.forEach(g=>{const share=tra>0?g.amount/tra:0;cgr[g.id]+=grantRep[m]*share;cgf[g.id]+=grantForg[m]*share;go+=Math.max(0,g.amount-cgr[g.id]-cgf[g.id])});bs.grantsOutstanding[m]=go;bs.loansOutstanding[m]=loans.length>0?Object.values(lb2).reduce((s,v)=>s+Math.max(0,v),0):0;bs.totalAssets[m]=bs.loanToRollingFunds[m]+bs.cash[m]+bs.creditReceivables[m];bs.totalLiabilities[m]=bs.grantsOutstanding[m]+bs.loansOutstanding[m]}
+  const y1=arr=>arr.slice(0,12).reduce((a,b)=>a+b,0),y2=arr=>arr.slice(12,24).reduce((a,b)=>a+b,0)
+  const metrics={year1Revenue:y1(con.revenue),year1GrossProfit:y1(con.grossProfit),year1EBITDA:y1(con.ebitda),year1NPAT:y1(con.nptAfterTax),year2Revenue:y2(con.revenue),year2GrossProfit:y2(con.grossProfit),year2EBITDA:y2(con.ebitda),year2NPAT:y2(con.nptAfterTax),grossMarginY1:y1(con.revenue)!==0?y1(con.grossProfit)/y1(con.revenue):0,netMarginY1:y1(con.revenue)!==0?y1(con.nptAfterTax)/y1(con.revenue):0,maxWorkingCapitalRequirement:Math.max(...creditReceivables),avgWorkingCapitalRequirement:creditReceivables.reduce((a,b)=>a+b,0)/months,minCashBalance:Math.min(...cf.closingCash),minCashMonth:cf.closingCash.indexOf(Math.min(...cf.closingCash))+1,totalCounterpartyGroups:allGroups.length,grantState}
+  return{scenario:s,counterpartyGroups:allGroups,unit,consolidated:con,cashFlow:cf,balanceSheet:bs,workingCapitalRequirement:creditReceivables,creditReceivables,rollingFunds:rfResults,productionLineTotals,metrics}
 }
 
-// ─── UI ──────────────────────────────────────────────────────
-const CC = { navy:'#1B2A4A', cyan:'#00B4D8', cream:'#F8F4EE', white:'#FFFFFF', slate:'#4A5A6A', border:'#D8E0E8', teal:'#1A9DAA', red:'#C0392B', green:'#1A7A4A', amber:'#B8860B' }
+// ─── DESIGN TOKENS ───────────────────────────────────────────
+const CC={navy:'#1B2A4A',cyan:'#00B4D8',cream:'#F8F4EE',white:'#FFFFFF',slate:'#4A5A6A',border:'#D8E0E8',teal:'#1A9DAA',red:'#C0392B',green:'#1A7A4A',amber:'#B8860B',lightBg:'#F0F4F8'}
+const inp={width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${CC.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'inherit',background:'#F4F8FC',color:CC.navy,boxSizing:'border-box'}
+const lbl={display:'block',fontWeight:600,fontSize:'0.8rem',marginBottom:'0.22rem',color:CC.navy}
+const card={background:CC.white,border:`1px solid ${CC.border}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}
 
-function HeroCard({label,value,sub,color}){
+function HeroCard({label,value,sub,color}){return(<div style={{background:CC.white,border:`1px solid ${CC.border}`,borderRadius:6,padding:'1rem 1.1rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',letterSpacing:'0.1em',color:CC.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.35rem',fontWeight:700,color:color||CC.navy,marginBottom:'0.2rem'}}>{value}</div>{sub&&<div style={{fontSize:'0.74rem',color:CC.slate}}>{sub}</div>}</div>)}
+
+function MonthlyTable({title,rows,months,footnote}){return(<div style={{...card,padding:'1rem 1.1rem'}}>{title&&<div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,marginBottom:'0.8rem',color:CC.navy}}>{title}</div>}<div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.75rem',fontFamily:'monospace'}}><thead><tr><th style={{textAlign:'left',padding:'0.3rem 0.5rem',borderBottom:`1px solid ${CC.border}`,minWidth:180,fontFamily:"'Segoe UI',system-ui,sans-serif",fontSize:'0.78rem'}}></th>{months.map((m,i)=><th key={i} style={{textAlign:'right',padding:'0.3rem 0.5rem',color:CC.slate,fontWeight:500,borderBottom:`1px solid ${CC.border}`,whiteSpace:'nowrap'}}>{m}</th>)}</tr></thead><tbody>{rows.map((row,ri)=>(<tr key={ri} style={{background:row.highlight?'#EBF8FF':undefined}}><td style={{textAlign:'left',padding:'0.28rem 0.5rem',borderBottom:`1px solid #F0F4F8`,fontFamily:"'Segoe UI',system-ui,sans-serif",fontSize:'0.8rem',fontWeight:row.bold?700:400}}>{row.label}</td>{row.values.map((v,vi)=><td key={vi} style={{textAlign:'right',padding:'0.28rem 0.5rem',borderBottom:`1px solid #F0F4F8`,fontWeight:row.bold?700:400,color:v<0?CC.red:CC.navy,whiteSpace:'nowrap'}}>{compactCurrency(v,row.cc)}</td>)}</tr>))}</tbody></table></div>{footnote&&<div style={{marginTop:'0.6rem',fontSize:'0.74rem',color:CC.slate,lineHeight:1.4}}>{footnote}</div>}</div>)}
+
+function Flag({type,children}){const color=type==='warn'?CC.red:type==='ok'?CC.green:CC.amber;return(<div style={{display:'flex',alignItems:'flex-start',gap:'0.5rem',fontSize:'0.84rem',lineHeight:1.5,color:CC.white}}><span style={{width:8,height:8,borderRadius:'50%',background:color,marginTop:'0.45rem',flexShrink:0,display:'inline-block'}}/><span>{children}</span></div>)}
+
+function defaultOverrides(){return{aggregationModel:'commission',commissionPctOverride:0.10,grantForgivenessOverrides:{csj_recoverable:0.33},creditTerm:null,additionalStaff:[],additionalGroups:[],financingOverrides:{},rollingFundOverrides:{},productionLineOverrides:{}}}
+
+// ─── PLANNING & ACTUALS TAB ──────────────────────────────────
+function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveActuals,debtObligations,onSaveDebtObligations}){
+  const months=MONTHS_HORIZON
+  const [selMonth,setSelMonth]=useState(0)
+  const [actuals,setActuals]=useState(savedActuals||{})
+  const [saving,setSaving]=useState(false)
+  const [activeSection,setActiveSection]=useState('actuals')
+
+  // Debt obligations state
+  const [obligations,setObligations]=useState(debtObligations||[])
+  const debtSchedule=useMemo(()=>buildDebtSchedule(obligations,months),[obligations,months])
+
+  const unitIds=config.units.map(u=>u.id)
+  const selLabel=monthLabels[selMonth]
+
+  async function saveActuals(next){
+    setActuals(next)
+    setSaving(true)
+    try{
+      await supabase.from('monthly_actuals').upsert({client_id:'client_wonderland',month_index:selMonth,actuals_data:next[selMonth]||{},updated_at:new Date().toISOString()},{onConflict:'client_id,month_index'})
+      await onSaveActuals(next)
+    }catch(e){}
+    setSaving(false)
+  }
+
+  async function saveObligations(next){
+    setObligations(next)
+    try{
+      await supabase.from('model_config').upsert({client_id:'client_wonderland',config_type:'debt_obligations',config_data:next,updated_at:new Date().toISOString()},{onConflict:'client_id,config_type'})
+      await onSaveDebtObligations(next)
+    }catch(e){}
+  }
+
+  function setActualValue(unitId,lineType,value){
+    const next={...actuals,[selMonth]:{...(actuals[selMonth]||{}),[`${unitId}_${lineType}`]:Number(value)||0}}
+    setActuals(next)
+  }
+  function getActual(unitId,lineType){return actuals[selMonth]?.[`${unitId}_${lineType}`]??null}
+  function getPlan(unitId,lineType){
+    const u=result.unit[unitId]
+    if(lineType==='revenue')return u.revenue[selMonth]
+    if(lineType==='cogs')return u.cogs[selMonth]
+    if(lineType==='opex')return u.totalOpex[selMonth]
+    if(lineType==='ebitda')return u.ebitda[selMonth]
+    return 0
+  }
+
+  const sectionBtn=(id,label)=>(<button onClick={()=>setActiveSection(id)} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.45rem 0.9rem',border:`1px solid ${activeSection===id?CC.cyan:CC.border}`,borderRadius:4,background:activeSection===id?CC.cyan:CC.white,color:activeSection===id?CC.navy:CC.slate,cursor:'pointer',fontWeight:activeSection===id?700:400}}>{label}</button>)
+
   return(
-    <div style={{background:CC.white,border:`1px solid ${CC.border}`,borderRadius:6,padding:'1rem 1.1rem'}}>
-      <div style={{fontFamily:'monospace',fontSize:'0.65rem',letterSpacing:'0.1em',color:CC.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div>
-      <div style={{fontFamily:'Georgia,serif',fontSize:'1.35rem',fontWeight:700,color:color||CC.navy,marginBottom:'0.2rem'}}>{value}</div>
-      {sub&&<div style={{fontSize:'0.74rem',color:CC.slate}}>{sub}</div>}
-    </div>
-  )
-}
-
-function MonthlyTable({title,rows,months,footnote}){
-  return(
-    <div style={{background:CC.white,border:`1px solid ${CC.border}`,borderRadius:6,padding:'1rem 1.1rem',marginBottom:'1.25rem'}}>
-      {title&&<div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,marginBottom:'0.8rem',color:CC.navy}}>{title}</div>}
-      <div style={{overflowX:'auto'}}>
-        <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.75rem',fontFamily:'monospace'}}>
-          <thead><tr><th style={{textAlign:'left',padding:'0.3rem 0.5rem',borderBottom:`1px solid ${CC.border}`,minWidth:180,fontFamily:"'Segoe UI',system-ui,sans-serif",fontSize:'0.78rem'}}></th>
-            {months.map((m,i)=><th key={i} style={{textAlign:'right',padding:'0.3rem 0.5rem',color:CC.slate,fontWeight:500,borderBottom:`1px solid ${CC.border}`,whiteSpace:'nowrap'}}>{m}</th>)}
-          </tr></thead>
-          <tbody>{rows.map((row,ri)=>(
-            <tr key={ri} style={{background:row.highlight?'#EBF8FF':undefined}}>
-              <td style={{textAlign:'left',padding:'0.28rem 0.5rem',borderBottom:`1px solid #F0F4F8`,fontFamily:"'Segoe UI',system-ui,sans-serif",fontSize:'0.8rem',fontWeight:row.bold?700:400}}>{row.label}</td>
-              {row.values.map((v,vi)=><td key={vi} style={{textAlign:'right',padding:'0.28rem 0.5rem',borderBottom:`1px solid #F0F4F8`,fontWeight:row.bold?700:400,color:v<0?CC.red:CC.navy,whiteSpace:'nowrap'}}>{compactCurrency(v,row.cc)}</td>)}
-            </tr>
-          ))}</tbody>
-        </table>
+    <div>
+      <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
+        {sectionBtn('actuals','Plan vs Actuals')}
+        {sectionBtn('debt','Debt Schedule')}
+        {sectionBtn('summary','Summary')}
       </div>
-      {footnote&&<div style={{marginTop:'0.6rem',fontSize:'0.74rem',color:CC.slate,lineHeight:1.4}}>{footnote}</div>}
+
+      {activeSection==='actuals'&&(
+        <div>
+          {/* Month selector */}
+          <div style={card}>
+            <div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,marginBottom:'0.75rem',color:CC.navy}}>Select Month</div>
+            <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap'}}>
+              {monthLabels.map((ml,i)=>{
+                const hasData=actuals[i]&&Object.keys(actuals[i]).length>0
+                return(<button key={i} onClick={()=>setSelMonth(i)} style={{fontFamily:'monospace',fontSize:'0.7rem',padding:'0.35rem 0.65rem',border:`1px solid ${selMonth===i?CC.cyan:hasData?CC.green:CC.border}`,borderRadius:4,background:selMonth===i?CC.navy:hasData?'#E8F5EE':CC.white,color:selMonth===i?CC.white:hasData?CC.green:CC.slate,cursor:'pointer',fontWeight:selMonth===i?700:400}}>{ml}{hasData&&selMonth!==i?' ✓':''}</button>)
+              })}
+            </div>
+          </div>
+
+          {/* Actuals entry for selected month */}
+          <div style={card}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem',flexWrap:'wrap',gap:'0.5rem'}}>
+              <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:CC.navy}}>{selLabel} — Plan vs Actuals Entry</div>
+              <button onClick={()=>saveActuals(actuals)} style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,padding:'0.42rem 1rem',border:'none',borderRadius:4,background:CC.cyan,color:CC.navy,cursor:'pointer'}}>{saving?'Saving…':'Save Actuals'}</button>
+            </div>
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.8rem'}}>
+                <thead><tr style={{background:CC.navy,color:CC.white}}>
+                  {['Business Unit','Line','Plan','Actual','Variance','Var %'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:h==='Plan'||h==='Actual'||h==='Variance'||h==='Var %'?'right':'left',fontWeight:600,whiteSpace:'nowrap'}}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {config.units.map((u,ui)=>{
+                    const lines=['revenue','cogs','opex','ebitda']
+                    const lineLabels={revenue:'Revenue',cogs:'Cost of Sales',opex:'Operating Expenses',ebitda:'EBITDA'}
+                    return lines.map((line,li)=>{
+                      const plan=getPlan(u.id,line)
+                      const actual=getActual(u.id,line)
+                      const variance=actual!==null?actual-plan:null
+                      const varPct=actual!==null&&plan!==0?(actual-plan)/Math.abs(plan):null
+                      const isEbitda=line==='ebitda'
+                      return(<tr key={`${u.id}_${line}`} style={{background:(ui+li)%2===0?CC.cream:CC.white}}>
+                        <td style={{padding:'7px 10px',fontWeight:li===0?700:400,color:CC.navy}}>{li===0?u.name:''}</td>
+                        <td style={{padding:'7px 10px',color:CC.slate,fontSize:'0.78rem'}}>{lineLabels[line]}</td>
+                        <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace'}}>{compactCurrency(plan,cc)}</td>
+                        <td style={{padding:'4px 6px',textAlign:'right'}}>
+                          {line==='ebitda'?<span style={{fontFamily:'monospace',fontSize:'0.78rem',color:actual!==null?CC.navy:CC.slate}}>{actual!==null?compactCurrency(actual,cc):'auto'}</span>:(
+                            <input type="number" value={actual??''} onChange={e=>setActualValue(u.id,line,e.target.value)} placeholder="Enter actual" style={{...inp,width:130,textAlign:'right',padding:'0.28rem 0.4rem',fontSize:'0.78rem'}}/>
+                          )}
+                        </td>
+                        <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',color:variance===null?CC.slate:variance>=0?CC.green:CC.red,fontWeight:isEbitda?700:400}}>{variance!==null?compactCurrency(variance,cc):'—'}</td>
+                        <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.78rem',color:varPct===null?CC.slate:varPct>=0?CC.green:CC.red}}>{varPct!==null?pct(varPct):'—'}</td>
+                      </tr>)
+                    })
+                  })}
+                  {/* Consolidated row */}
+                  {['revenue','cogs','ebitda'].map(line=>{
+                    const plan=result.consolidated[line==='cogs'?'cogs':line==='ebitda'?'ebitda':'revenue'][selMonth]
+                    const actual=config.units.reduce((sum,u)=>{const v=getActual(u.id,line);return v!==null?sum+(v||0):null},0)
+                    const variance=actual!==null?actual-plan:null
+                    const varPct=actual!==null&&plan!==0?(actual-plan)/Math.abs(plan):null
+                    return(<tr key={`con_${line}`} style={{background:CC.navy}}>
+                      <td style={{padding:'7px 10px',fontWeight:700,color:CC.white}}>{line==='revenue'?'CONSOLIDATED':''}</td>
+                      <td style={{padding:'7px 10px',color:CC.cyan,fontWeight:600,fontSize:'0.78rem'}}>{line==='revenue'?'Total Revenue':line==='cogs'?'Total Cost of Sales':'Total EBITDA'}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',color:CC.white}}>{compactCurrency(plan,cc)}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',color:CC.white}}>{actual!==null?compactCurrency(actual,cc):'—'}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',color:variance===null?'rgba(255,255,255,0.5)':variance>=0?'#7DCEA0':CC.red,fontWeight:700}}>{variance!==null?compactCurrency(variance,cc):'—'}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.78rem',color:varPct===null?'rgba(255,255,255,0.5)':varPct>=0?'#7DCEA0':CC.red}}>{varPct!==null?pct(varPct):'—'}</td>
+                    </tr>)
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* 12-month actuals summary */}
+          <MonthlyTable title="Plan vs Actuals — Consolidated Revenue (all months entered)" rows={[
+            {label:'Plan Revenue',values:result.consolidated.revenue.slice(0,12),cc},
+            {label:'Actual Revenue',values:monthLabels.slice(0,12).map((_,i)=>{const v=config.units.reduce((s,u)=>s+(actuals[i]?.[`${u.id}_revenue`]??0),0);return v>0?v:null}).map(v=>v??0),cc},
+            {label:'Variance',values:monthLabels.slice(0,12).map((_,i)=>{const a=config.units.reduce((s,u)=>s+(actuals[i]?.[`${u.id}_revenue`]??0),0);return a>0?a-result.consolidated.revenue[i]:0}),highlight:true,cc},
+          ]} months={monthLabels.slice(0,12)}/>
+        </div>
+      )}
+
+      {activeSection==='debt'&&(
+        <div>
+          <div style={card}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+              <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:CC.navy}}>Debt and Grant Obligations</div>
+              <button onClick={()=>{const newOb={id:`ob_${Date.now()}`,name:'New Loan',lender:'',type:'commercial_loan',principal:0,annualRate:0.18,tenorMonths:24,repaymentType:'reducing_balance',frequency:'monthly',gracePeriodMonths:0,drawdownMonth:1,seasonalMonths:[]};const next=[...obligations,newOb];saveObligations(next)}} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.38rem 0.8rem',border:`1px solid ${CC.cyan}`,borderRadius:4,background:'transparent',color:CC.cyan,cursor:'pointer'}}>+ Add Obligation</button>
+            </div>
+            {obligations.length===0&&<p style={{color:CC.slate,fontSize:'0.85rem'}}>No debt obligations entered. Click above to add a loan, recoverable grant, or commercial obligation.</p>}
+            {obligations.map((ob,idx)=>(
+              <div key={ob.id} style={{border:`1px solid ${CC.border}`,borderRadius:6,padding:'1rem',marginBottom:'0.75rem',background:CC.lightBg}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'0.75rem',marginBottom:'0.75rem'}}>
+                  <div><label style={lbl}>Name</label><input style={inp} value={ob.name} onChange={e=>{const next=[...obligations];next[idx]={...next[idx],name:e.target.value};saveObligations(next)}}/></div>
+                  <div><label style={lbl}>Lender</label><input style={inp} value={ob.lender} onChange={e=>{const next=[...obligations];next[idx]={...next[idx],lender:e.target.value};saveObligations(next)}}/></div>
+                  <div><label style={lbl}>Type</label><select style={inp} value={ob.type} onChange={e=>{const next=[...obligations];next[idx]={...next[idx],type:e.target.value};saveObligations(next)}}><option value="commercial_loan">Commercial Loan</option><option value="recoverable_grant">Recoverable Grant</option><option value="non_recoverable_grant">Non-Recoverable Grant</option></select></div>
+                  <div><label style={lbl}>Principal (UGX)</label><input type="number" style={inp} value={ob.principal} onChange={e=>{const next=[...obligations];next[idx]={...next[idx],principal:Number(e.target.value)};saveObligations(next)}}/></div>
+                  <div><label style={lbl}>Annual Interest Rate (%)</label><input type="number" step="0.1" style={inp} value={(ob.annualRate||0)*100} onChange={e=>{const next=[...obligations];next[idx]={...next[idx],annualRate:Number(e.target.value)/100};saveObligations(next)}}/></div>
+                  <div><label style={lbl}>Tenor (months)</label><input type="number" style={inp} value={ob.tenorMonths} onChange={e=>{const next=[...obligations];next[idx]={...next[idx],tenorMonths:Number(e.target.value)};saveObligations(next)}}/></div>
+                  <div><label style={lbl}>Repayment Type</label><select style={inp} value={ob.repaymentType} onChange={e=>{const next=[...obligations];next[idx]={...next[idx],repaymentType:e.target.value};saveObligations(next)}}><option value="reducing_balance">Monthly Reducing Balance</option><option value="equal_instalment">Equal Instalment (EMI)</option><option value="bullet">Bullet (interest only, principal at end)</option><option value="grace_then_reducing">Grace Period then Reducing</option></select></div>
+                  <div><label style={lbl}>Frequency</label><select style={inp} value={ob.frequency} onChange={e=>{const next=[...obligations];next[idx]={...next[idx],frequency:e.target.value};saveObligations(next)}}><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="seasonal">Seasonal (post-harvest)</option></select></div>
+                  <div><label style={lbl}>Grace Period (months)</label><input type="number" style={inp} value={ob.gracePeriodMonths||0} onChange={e=>{const next=[...obligations];next[idx]={...next[idx],gracePeriodMonths:Number(e.target.value)};saveObligations(next)}}/></div>
+                  <div><label style={lbl}>Drawdown Month</label><input type="number" style={inp} value={ob.drawdownMonth||1} onChange={e=>{const next=[...obligations];next[idx]={...next[idx],drawdownMonth:Number(e.target.value)};saveObligations(next)}}/></div>
+                </div>
+                {ob.type!=='non_recoverable_grant'&&(()=>{
+                  const sch=debtSchedule.schedules[ob.id]
+                  if(!sch)return null
+                  return(<div style={{background:CC.white,borderRadius:5,padding:'0.75rem',fontSize:'0.8rem',display:'flex',gap:'2rem',flexWrap:'wrap'}}>
+                    <span>Total interest: <strong style={{color:CC.red}}>{compactCurrency(sch.totalInterestPaid,cc)}</strong></span>
+                    <span>Total repayment: <strong style={{color:CC.navy}}>{compactCurrency(sch.totalPrincipalPaid+sch.totalInterestPaid,cc)}</strong></span>
+                    <span>Outstanding M12: <strong>{compactCurrency(sch.balanceByMonth[11]||0,cc)}</strong></span>
+                  </div>)
+                })()}
+                <button onClick={()=>{const next=obligations.filter((_,i)=>i!==idx);saveObligations(next)}} style={{fontSize:'0.74rem',color:CC.red,background:'transparent',border:'none',cursor:'pointer',textDecoration:'underline',marginTop:'0.5rem'}}>Remove</button>
+              </div>
+            ))}
+          </div>
+
+          {obligations.length>0&&(
+            <>
+              <MonthlyTable title="Debt Service Schedule — Year 1 (monthly)" rows={[
+                {label:'Total Interest',values:debtSchedule.totalInterest.slice(0,12),cc},
+                {label:'Total Principal',values:debtSchedule.totalPrincipal.slice(0,12),cc},
+                {label:'Total Debt Service',values:debtSchedule.totalRepayment.slice(0,12),bold:true,highlight:true,cc},
+                {label:'Outstanding Balance',values:debtSchedule.totalOutstanding.slice(0,12),cc},
+              ]} months={monthLabels.slice(0,12)}/>
+              <MonthlyTable title="Debt Service Schedule — Year 2 (monthly)" rows={[
+                {label:'Total Interest',values:debtSchedule.totalInterest.slice(12,24),cc},
+                {label:'Total Principal',values:debtSchedule.totalPrincipal.slice(12,24),cc},
+                {label:'Total Debt Service',values:debtSchedule.totalRepayment.slice(12,24),bold:true,highlight:true,cc},
+                {label:'Outstanding Balance',values:debtSchedule.totalOutstanding.slice(12,24),cc},
+              ]} months={monthLabels.slice(12,24)}/>
+            </>
+          )}
+        </div>
+      )}
+
+      {activeSection==='summary'&&(
+        <div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
+            <HeroCard label="Months with Actuals" value={Object.keys(actuals).filter(k=>Object.keys(actuals[k]||{}).length>0).length} sub="of 24 months"/>
+            <HeroCard label="Total Debt Service Y1" value={compactCurrency(debtSchedule.totalRepayment.slice(0,12).reduce((a,b)=>a+b,0),cc)} sub="Interest + Principal"/>
+            <HeroCard label="Outstanding Balance M12" value={compactCurrency(debtSchedule.totalOutstanding[11]||0,cc)}/>
+            <HeroCard label="Obligations Entered" value={obligations.length}/>
+          </div>
+          <MonthlyTable title="Plan Revenue vs Actuals Revenue — Full 24 months" rows={[
+            {label:'Plan',values:result.consolidated.revenue,cc},
+            {label:'Actuals (entered months)',values:Array(24).fill(0).map((_,i)=>{const v=config.units.reduce((s,u)=>s+(actuals[i]?.[`${u.id}_revenue`]??0),0);return v}),cc},
+          ]} months={monthLabels}/>
+        </div>
+      )}
     </div>
   )
 }
 
-function Flag({type,children}){
-  const color=type==='warn'?CC.red:type==='ok'?CC.green:CC.amber
+// ─── OPERATIONAL CASHFLOW VIEW ────────────────────────────────
+function OperationalCashflowView({result,actuals,debtObligations,monthLabels,cc,config}){
+  const months=MONTHS_HORIZON
+  const debtSchedule=useMemo(()=>buildDebtSchedule(debtObligations||[],months),[debtObligations,months])
+
+  const moneyIn=Array(months).fill(0)
+  const moneyOut=Array(months).fill(0)
+
+  for(let m=0;m<months;m++){
+    // Money in: actual revenue if entered, else plan, adjusted for working capital
+    const planRev=result.consolidated.revenue[m]
+    const actualRev=config.units.reduce((s,u)=>s+(actuals[m]?.[`${u.id}_revenue`]??0),0)
+    const rev=actualRev>0?actualRev:planRev
+    const wcAdj=result.cashFlow.workingCapitalMovement[m]
+    moneyIn[m]=Math.max(0,rev+wcAdj)
+
+    // Money out: costs + debt service + grant repayments
+    const planCogs=result.consolidated.cogs[m]
+    const planOpex=result.consolidated.opex[m]
+    const actualCogs=config.units.reduce((s,u)=>s+(actuals[m]?.[`${u.id}_cogs`]??0),0)
+    const actualOpex=config.units.reduce((s,u)=>s+(actuals[m]?.[`${u.id}_opex`]??0),0)
+    const cogs=actualCogs>0?actualCogs:planCogs
+    const opex=actualOpex>0?actualOpex:planOpex
+    const debtService=debtSchedule.totalRepayment[m]
+    // Grant repayment from financing cashflow
+    const grantRepay=result.cashFlow.financingCash[m]<0?Math.abs(result.cashFlow.financingCash[m]):0
+    moneyOut[m]=cogs+opex+debtService+grantRepay
+  }
+
+  const net=moneyIn.map((v,i)=>v-moneyOut[i])
+  const cumulative=[];let cum=0;for(let m=0;m<months;m++){cum+=net[m];cumulative.push(cum)}
+
+  const pressureMonths=net.map((v,i)=>({month:monthLabels[i],value:v})).filter(x=>x.value<0)
+
   return(
-    <div style={{display:'flex',alignItems:'flex-start',gap:'0.5rem',fontSize:'0.84rem',lineHeight:1.5}}>
-      <span style={{width:8,height:8,borderRadius:'50%',background:color,marginTop:'0.45rem',flexShrink:0,display:'inline-block'}}/>
-      <span>{children}</span>
+    <div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
+        <HeroCard label="Y1 Total Money In" value={compactCurrency(moneyIn.slice(0,12).reduce((a,b)=>a+b,0),cc)}/>
+        <HeroCard label="Y1 Total Money Out" value={compactCurrency(moneyOut.slice(0,12).reduce((a,b)=>a+b,0),cc)}/>
+        <HeroCard label="Y1 Net Cash Position" value={compactCurrency(net.slice(0,12).reduce((a,b)=>a+b,0),cc)} color={net.slice(0,12).reduce((a,b)=>a+b,0)>=0?CC.green:CC.red}/>
+        <HeroCard label="Pressure Months (Y1)" value={pressureMonths.filter(x=>monthLabels.indexOf(x.month)<12).length} color={pressureMonths.filter(x=>monthLabels.indexOf(x.month)<12).length>0?CC.amber:CC.green} sub="Months where outflows exceed inflows"/>
+      </div>
+
+      {pressureMonths.length>0&&(
+        <div style={{background:CC.navy,borderRadius:8,padding:'1rem 1.25rem',marginBottom:'1.25rem'}}>
+          <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:CC.amber,marginBottom:'0.5rem'}}>CASHFLOW PRESSURE MONTHS</div>
+          {pressureMonths.map((pm,i)=><Flag key={i} type="warn">{pm.month}: outflows exceed inflows by {currency(Math.abs(pm.value),cc)}. Review cost timing or accelerate receivables collection.</Flag>)}
+        </div>
+      )}
+
+      <MonthlyTable title="Operational Cashflow — Year 1 (Money In vs Money Out)" rows={[
+        {label:'Money In (Revenue Collected)',values:moneyIn.slice(0,12),cc},
+        {label:'  Cost of Sales',values:result.consolidated.cogs.slice(0,12).map(v=>-v),cc},
+        {label:'  Operating Expenses',values:result.consolidated.opex.slice(0,12).map(v=>-v),cc},
+        {label:'  Debt Service (Interest + Principal)',values:debtSchedule.totalRepayment.slice(0,12).map(v=>-v),cc},
+        {label:'Money Out (Total)',values:moneyOut.slice(0,12).map(v=>-v),bold:true,cc},
+        {label:'Net Cash (In minus Out)',values:net.slice(0,12),bold:true,cc},
+        {label:'Cumulative Cash Position',values:cumulative.slice(0,12),bold:true,highlight:true,cc},
+      ]} months={monthLabels.slice(0,12)} footnote="Money In is adjusted for working capital timing (FGE credit extended vs collected). Uses actuals where entered, plan figures otherwise."/>
+
+      <MonthlyTable title="Operational Cashflow — Year 2" rows={[
+        {label:'Money In',values:moneyIn.slice(12,24),cc},
+        {label:'Money Out',values:moneyOut.slice(12,24).map(v=>-v),cc},
+        {label:'Net Cash',values:net.slice(12,24),bold:true,cc},
+        {label:'Cumulative Cash Position',values:cumulative.slice(12,24),bold:true,highlight:true,cc},
+      ]} months={monthLabels.slice(12,24)}/>
+
+      <div style={card}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,marginBottom:'0.75rem',color:CC.navy}}>Formal Cash Flow Statement vs Operational View</div>
+        <div style={{fontSize:'0.85rem',color:CC.slate,lineHeight:1.7}}>
+          <p style={{margin:'0 0 0.5rem'}}><strong style={{color:CC.navy}}>Operational Cashflow (this view)</strong> shows money actually moving in and out each month -- when revenue is collected, when costs are paid, when debt is serviced. It tells you whether you can meet your obligations next month.</p>
+          <p style={{margin:0}}><strong style={{color:CC.navy}}>Formal Cash Flow Statement (Cash Flow tab)</strong> follows accounting conventions -- operating, investing, and financing activities separated. Required for funder reporting and financial statements.</p>
+        </div>
+      </div>
     </div>
   )
 }
 
-function defaultOverrides(){
-  return { aggregationModel:'commission', commissionPctOverride:0.10, grantForgivenessOverrides:{csj_recoverable:0.33}, creditTerm:null, additionalStaff:[], additionalGroups:[], financingOverrides:{}, rollingFundOverrides:{}, productionLineOverrides:{} }
+// ─── SCENARIO BUILDER ────────────────────────────────────────
+function ScenarioBuilder({config,overrides,result,baseResult,onApply,monthLabels,cc}){
+  const [local,setLocal]=useState(overrides)
+  const liveResult=useMemo(()=>runModel(config,{overrides:local}),[config,local])
+  function update(f,v){setLocal(p=>({...p,[f]:v}))}
+  const m=liveResult.metrics,bm=baseResult.metrics,deltaEbitda=m.year1EBITDA-bm.year1EBITDA
+  return(
+    <div>
+      <div style={card}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,marginBottom:'1rem',color:CC.navy}}>Grant Negotiation</div>
+        {config.capitalStructure.grants.filter(g=>g.repayable).map(grant=>(
+          <div key={grant.id}>
+            <label style={lbl}>{grant.name} — Forgiveness %</label>
+            <div style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'0.5rem'}}>
+              <input type="range" min="0" max="100" step="1" value={(local.grantForgivenessOverrides[grant.id]??0)*100} onChange={e=>update('grantForgivenessOverrides',{...local.grantForgivenessOverrides,[grant.id]:Number(e.target.value)/100})} style={{flex:1,accentColor:CC.cyan}}/>
+              <span style={{fontFamily:'monospace',fontWeight:700,minWidth:'3.5rem'}}>{pct(local.grantForgivenessOverrides[grant.id]??0)}</span>
+            </div>
+            <div style={{fontSize:'0.78rem',color:CC.slate,marginBottom:'1rem'}}>Net repayable: {currency(grant.amount*(1-(local.grantForgivenessOverrides[grant.id]??0)),cc)}</div>
+          </div>
+        ))}
+      </div>
+      <div style={card}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,marginBottom:'1rem',color:CC.navy}}>Credit Terms & Aggregation</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'1rem'}}>
+          <div><label style={lbl}>Aggregation model</label><select style={inp} value={local.aggregationModel} onChange={e=>update('aggregationModel',e.target.value)}><option value="commission">Commission only</option><option value="spread">Spread only</option><option value="both">Both</option></select></div>
+          <div><label style={lbl}>Commission %</label><input type="number" style={inp} value={(local.commissionPctOverride??0.10)*100} onChange={e=>update('commissionPctOverride',Number(e.target.value)/100)}/></div>
+          <div><label style={lbl}>Bank loan (UGX)</label><input type="number" style={inp} value={(local.financingOverrides||{}).bankLoan??0} onChange={e=>update('financingOverrides',{...local.financingOverrides,bankLoan:Number(e.target.value)})}/></div>
+          <div><label style={lbl}>Interest rate (% annual)</label><input type="number" style={inp} value={((local.financingOverrides||{}).annualInterestRate??0.18)*100} onChange={e=>update('financingOverrides',{...local.financingOverrides,annualInterestRate:Number(e.target.value)/100})}/></div>
+        </div>
+      </div>
+      <div style={{background:CC.navy,borderRadius:8,padding:'1rem 1.25rem',marginBottom:'1.25rem'}}>
+        <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:CC.cyan,marginBottom:'0.5rem'}}>IMPACT VS BASE CASE</div>
+        <Flag type={deltaEbitda>=0?'ok':'warn'}>Year 1 EBITDA {deltaEbitda>=0?'improves':'worsens'} by {currency(Math.abs(deltaEbitda),cc)} — from {currency(bm.year1EBITDA,cc)} to {currency(m.year1EBITDA,cc)}.</Flag>
+        <div style={{marginTop:'0.4rem'}}><Flag type={m.minCashBalance>=0?'ok':'warn'}>Lowest cash: {currency(m.minCashBalance,cc)} at Month {m.minCashMonth}.</Flag></div>
+      </div>
+      <MonthlyTable title="Scenario vs Base Case — Year 1 Cash" rows={[{label:'This Scenario',values:liveResult.cashFlow.closingCash.slice(0,12),bold:true,cc},{label:'Base Case',values:baseResult.cashFlow.closingCash.slice(0,12),cc}]} months={monthLabels.slice(0,12)}/>
+      <button onClick={()=>onApply(local)} style={{fontFamily:'monospace',fontSize:'0.8rem',fontWeight:700,padding:'0.65rem 1.5rem',border:'none',borderRadius:4,background:CC.cyan,color:CC.navy,cursor:'pointer'}}>Apply as active scenario</button>
+    </div>
+  )
 }
 
+// ─── MAIN COMPONENT ──────────────────────────────────────────
 export default function WonderlandDashboard(){
-  const config = useMemo(()=>wonderlandConfig(),[])
-  const monthLabels = useMemo(()=>buildMonthLabels(config.meta.modelStartDate),[config])
-  const cc = config.meta.currency
+  const config=useMemo(()=>wonderlandConfig(),[])
+  const monthLabels=useMemo(()=>buildMonthLabels(config.meta.modelStartDate),[config])
+  const cc=config.meta.currency
 
-  const [overrides,setOverrides] = useState(defaultOverrides())
-  const [view,setView] = useState('overview')
-  const [activeUnit,setActiveUnit] = useState('fge')
-  const [loading,setLoading] = useState(true)
-  const [saving,setSaving] = useState(false)
+  const [overrides,setOverrides]=useState(defaultOverrides())
+  const [actuals,setActuals]=useState({})
+  const [debtObligations,setDebtObligations]=useState([])
+  const [view,setView]=useState('overview')
+  const [activeUnit,setActiveUnit]=useState('fge')
+  const [loading,setLoading]=useState(true)
+  const [saving,setSaving]=useState(false)
 
-  // Load saved overrides from Supabase
   useEffect(()=>{
     async function load(){
       try{
-        const {data:{user}} = await supabase.auth.getUser()
+        const {data:{user}}=await supabase.auth.getUser()
         if(user){
-          const {data} = await supabase.from('model_config').select('config_data').eq('client_id','client_wonderland').eq('config_type','scenario_overrides').single()
-          if(data?.config_data) setOverrides({...defaultOverrides(),...data.config_data})
+          const [{data:cfg},{data:acts}]=await Promise.all([
+            supabase.from('model_config').select('config_data,config_type').eq('client_id','client_wonderland'),
+            supabase.from('monthly_actuals').select('month_index,actuals_data').eq('client_id','client_wonderland')
+          ])
+          if(cfg){
+            const scen=cfg.find(r=>r.config_type==='scenario_overrides')
+            if(scen?.config_data)setOverrides({...defaultOverrides(),...scen.config_data})
+            const debt=cfg.find(r=>r.config_type==='debt_obligations')
+            if(debt?.config_data)setDebtObligations(debt.config_data)
+          }
+          if(acts){
+            const actObj={}
+            acts.forEach(row=>{actObj[row.month_index]=row.actuals_data})
+            setActuals(actObj)
+          }
         }
       }catch(e){}
-      finally{ setLoading(false) }
+      finally{setLoading(false)}
     }
     load()
   },[])
 
   async function persist(nextOverrides){
-    setOverrides(nextOverrides)
-    setSaving(true)
-    try{
-      await supabase.from('model_config').upsert({ client_id:'client_wonderland', config_type:'scenario_overrides', config_data:nextOverrides, updated_at:new Date().toISOString() },{ onConflict:'client_id,config_type' })
-    }catch(e){}
+    setOverrides(nextOverrides);setSaving(true)
+    try{await supabase.from('model_config').upsert({client_id:'client_wonderland',config_type:'scenario_overrides',config_data:nextOverrides,updated_at:new Date().toISOString()},{onConflict:'client_id,config_type'})}catch(e){}
     setSaving(false)
   }
 
-  const baseOverrides = useMemo(()=>({aggregationModel:'commission',commissionPctOverride:0.10,grantForgivenessOverrides:{csj_recoverable:0.33}}),[])
-  const result = useMemo(()=>runModel(config,{overrides}),[config,overrides])
-  const baseResult = useMemo(()=>runModel(config,{overrides:baseOverrides}),[config,baseOverrides])
+  const baseOverrides=useMemo(()=>({aggregationModel:'commission',commissionPctOverride:0.10,grantForgivenessOverrides:{csj_recoverable:0.33}}),[])
+  const result=useMemo(()=>runModel(config,{overrides}),[config,overrides])
+  const baseResult=useMemo(()=>runModel(config,{overrides:baseOverrides}),[config,baseOverrides])
 
-  if(loading) return <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif",padding:'3rem',color:CC.navy,background:CC.cream,minHeight:'100vh'}}>Loading Wonderland…</div>
+  if(loading)return<div style={{fontFamily:"'Segoe UI',system-ui,sans-serif",padding:'3rem',color:CC.navy,background:CC.cream,minHeight:'100vh'}}>Loading Wonderland…</div>
 
-  const {consolidated,metrics} = result
+  const {consolidated:con,metrics}=result
 
-  const navItems = [['overview','Overview'],['units','Business Units'],['cashflow','Cash Flow'],['workingcapital','Working Capital'],['balancesheet','Balance Sheet'],['fges','FGE Roster'],['scenarios','Scenario Builder']]
+  const navItems=[['overview','Overview'],['units','Business Units'],['planning','Planning & Actuals'],['opcashflow','Operational Cashflow'],['cashflow','Cash Flow Statement'],['workingcapital','Working Capital'],['balancesheet','Balance Sheet'],['fges','FGE Roster'],['scenarios','Scenario Builder']]
 
   return(
     <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif",background:CC.cream,color:CC.navy,minHeight:'100vh'}}>
       <header style={{background:CC.navy,borderBottom:`3px solid ${CC.cyan}`}}>
-        <div style={{maxWidth:1400,margin:'0 auto',padding:'1.25rem 1.5rem'}}>
+        <div style={{maxWidth:1500,margin:'0 auto',padding:'1.25rem 1.5rem'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem',marginBottom:'1rem'}}>
             <div>
-              <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.15em',color:CC.cyan,marginBottom:'0.25rem'}}>CANVAS COACH — CLEARVIEW PLANNER</div>
+              <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.15em',color:CC.cyan,marginBottom:'0.25rem'}}>CANVAS COACH — CLEARVIEW</div>
               <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:CC.white,margin:'0 0 0.18rem'}}>Wonderland Farm Services</h1>
               <div style={{fontSize:'0.77rem',color:'rgba(255,255,255,0.6)'}}>Multi-unit agri-aggregator · 24-month projection · {saving?'Saving…':'All data saved'}</div>
             </div>
@@ -651,7 +706,7 @@ export default function WonderlandDashboard(){
         </div>
       </header>
 
-      <main style={{maxWidth:1400,margin:'0 auto',padding:'1.5rem'}}>
+      <main style={{maxWidth:1500,margin:'0 auto',padding:'1.5rem'}}>
 
         {view==='overview'&&(
           <div>
@@ -659,216 +714,89 @@ export default function WonderlandDashboard(){
               <HeroCard label="Year 1 Revenue" value={compactCurrency(metrics.year1Revenue,cc)} sub={`Gross margin ${pct(metrics.grossMarginY1)}`}/>
               <HeroCard label="Year 1 EBITDA" value={compactCurrency(metrics.year1EBITDA,cc)} color={metrics.year1EBITDA>=0?CC.green:CC.red} sub={`Net profit ${compactCurrency(metrics.year1NPAT,cc)}`}/>
               <HeroCard label="Year 2 Revenue" value={compactCurrency(metrics.year2Revenue,cc)} sub={`EBITDA ${compactCurrency(metrics.year2EBITDA,cc)}`}/>
-              <HeroCard label="FGE Count" value={metrics.totalCounterpartyGroups}/>
-              <HeroCard label="Min Cash (24mo)" value={compactCurrency(metrics.minCashBalance,cc)} color={metrics.minCashBalance<0?CC.red:CC.navy} sub={`Month ${metrics.minCashMonth}`}/>
+              <HeroCard label="FGEs" value={metrics.totalCounterpartyGroups}/>
+              <HeroCard label="Min Cash" value={compactCurrency(metrics.minCashBalance,cc)} color={metrics.minCashBalance<0?CC.red:CC.navy} sub={`Month ${metrics.minCashMonth}`}/>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
-              {config.units.map((u)=>{
-                const ud=result.unit[u.id]
-                const y1Rev=ud.revenue.slice(0,12).reduce((a,b)=>a+b,0)
-                const y1Ebitda=ud.ebitda.slice(0,12).reduce((a,b)=>a+b,0)
-                return(<div key={u.id} style={{background:CC.white,border:`1px solid ${CC.border}`,borderTop:`4px solid ${u.color}`,borderRadius:6,padding:'1rem 1.1rem'}}>
-                  <div style={{fontWeight:700,fontSize:'0.88rem',marginBottom:'0.35rem'}}>{u.name}</div>
-                  <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:y1Ebitda>=0?CC.green:CC.red,marginBottom:'0.2rem'}}>{compactCurrency(y1Ebitda,cc)}</div>
-                  <div style={{fontSize:'0.74rem',color:CC.slate}}>Y1 EBITDA · Rev {compactCurrency(y1Rev,cc)}</div>
-                </div>)
-              })}
+              {config.units.map(u=>{const ud=result.unit[u.id];const y1Rev=ud.revenue.slice(0,12).reduce((a,b)=>a+b,0);const y1Ebitda=ud.ebitda.slice(0,12).reduce((a,b)=>a+b,0);return(<div key={u.id} style={{background:CC.white,border:`1px solid ${CC.border}`,borderTop:`4px solid ${u.color}`,borderRadius:6,padding:'1rem 1.1rem'}}><div style={{fontWeight:700,fontSize:'0.88rem',marginBottom:'0.35rem'}}>{u.name}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:y1Ebitda>=0?CC.green:CC.red,marginBottom:'0.2rem'}}>{compactCurrency(y1Ebitda,cc)}</div><div style={{fontSize:'0.74rem',color:CC.slate}}>Y1 EBITDA · Rev {compactCurrency(y1Rev,cc)}</div></div>)})}
             </div>
             <div style={{background:CC.navy,borderRadius:8,padding:'1rem 1.25rem',marginBottom:'1.5rem',display:'flex',flexDirection:'column',gap:'0.55rem'}}>
               <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:CC.cyan,marginBottom:'0.35rem'}}>READING THE PICTURE</div>
-              {metrics.minCashBalance<0?<Flag type="warn">Cash goes negative at {currency(metrics.minCashBalance,cc)} in Month {metrics.minCashMonth}.</Flag>:<Flag type="ok">Cash stays positive throughout — lowest point {currency(metrics.minCashBalance,cc)}.</Flag>}
-              {metrics.year1EBITDA<0?<Flag type="warn">Year 1 EBITDA is negative at {currency(metrics.year1EBITDA,cc)}.</Flag>:<Flag type="ok">Year 1 EBITDA positive at {currency(metrics.year1EBITDA,cc)} — gross margin {pct(metrics.grossMarginY1)}.</Flag>}
-              <Flag type="info">Average working capital tied in FGE input credit: {currency(metrics.avgWorkingCapitalRequirement,cc)}, peaking at {currency(metrics.maxWorkingCapitalRequirement,cc)}.</Flag>
+              {metrics.minCashBalance<0?<Flag type="warn">Cash goes negative at {currency(metrics.minCashBalance,cc)} in Month {metrics.minCashMonth}.</Flag>:<Flag type="ok">Cash stays positive — lowest {currency(metrics.minCashBalance,cc)}.</Flag>}
+              {metrics.year1EBITDA<0?<Flag type="warn">Year 1 EBITDA negative at {currency(metrics.year1EBITDA,cc)}.</Flag>:<Flag type="ok">Year 1 EBITDA positive at {currency(metrics.year1EBITDA,cc)} — gross margin {pct(metrics.grossMarginY1)}.</Flag>}
+              <Flag type="info">Average FGE input credit outstanding: {currency(metrics.avgWorkingCapitalRequirement,cc)}, peak {currency(metrics.maxWorkingCapitalRequirement,cc)}.</Flag>
             </div>
             <MonthlyTable title="Consolidated P&L — Year 1" rows={[
-              {label:'Revenue',values:consolidated.revenue.slice(0,12),cc},{label:'Cost of Sales',values:consolidated.cogs.slice(0,12),cc},
-              {label:'Gross Profit',values:consolidated.grossProfit.slice(0,12),bold:true,cc},{label:'Operating Expenses',values:consolidated.opex.slice(0,12),cc},
-              {label:'EBITDA',values:consolidated.ebitda.slice(0,12),bold:true,cc},{label:'Grant Forgiveness Gain',values:consolidated.grantForgivenessGain.slice(0,12),cc},
-              {label:'Net Profit After Tax',values:consolidated.nptAfterTax.slice(0,12),bold:true,highlight:true,cc},
+              {label:'Revenue',values:con.revenue.slice(0,12),cc},{label:'Cost of Sales',values:con.cogs.slice(0,12),cc},
+              {label:'Gross Profit',values:con.grossProfit.slice(0,12),bold:true,cc},{label:'Operating Expenses',values:con.opex.slice(0,12),cc},
+              {label:'EBITDA',values:con.ebitda.slice(0,12),bold:true,cc},{label:'Grant Forgiveness Gain',values:con.grantForgivenessGain.slice(0,12),cc},
+              {label:'Net Profit After Tax',values:con.nptAfterTax.slice(0,12),bold:true,highlight:true,cc},
             ]} months={monthLabels.slice(0,12)}/>
           </div>
         )}
 
-        {view==='units'&&(
-          <div>
+        {view==='units'&&(()=>{
+          const u=result.unit[activeUnit],unitMeta=config.units.find(x=>x.id===activeUnit)
+          const y1Rev=u.revenue.slice(0,12).reduce((a,b)=>a+b,0),y1GP=u.grossProfit.slice(0,12).reduce((a,b)=>a+b,0),y1Opex=u.totalOpex.slice(0,12).reduce((a,b)=>a+b,0),y1Ebitda=u.ebitda.slice(0,12).reduce((a,b)=>a+b,0)
+          return(<div>
             <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
-              {config.units.map((u)=><button key={u.id} onClick={()=>setActiveUnit(u.id)} style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.45rem 0.9rem',border:`2px solid ${activeUnit===u.id?u.color:CC.border}`,borderRadius:4,background:activeUnit===u.id?CC.navy:CC.white,color:activeUnit===u.id?CC.white:CC.slate,cursor:'pointer'}}>{u.short}</button>)}
+              {config.units.map(u=><button key={u.id} onClick={()=>setActiveUnit(u.id)} style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.45rem 0.9rem',border:`2px solid ${activeUnit===u.id?u.color:CC.border}`,borderRadius:4,background:activeUnit===u.id?CC.navy:CC.white,color:activeUnit===u.id?CC.white:CC.slate,cursor:'pointer'}}>{u.short}</button>)}
             </div>
-            {(()=>{
-              const u=result.unit[activeUnit]
-              const unitMeta=config.units.find(x=>x.id===activeUnit)
-              const y1Rev=u.revenue.slice(0,12).reduce((a,b)=>a+b,0)
-              const y1GP=u.grossProfit.slice(0,12).reduce((a,b)=>a+b,0)
-              const y1Opex=u.totalOpex.slice(0,12).reduce((a,b)=>a+b,0)
-              const y1Ebitda=u.ebitda.slice(0,12).reduce((a,b)=>a+b,0)
-              return(<>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
-                  <HeroCard label="Year 1 Revenue" value={compactCurrency(y1Rev,cc)}/>
-                  <HeroCard label="Year 1 Gross Profit" value={compactCurrency(y1GP,cc)} sub={y1Rev!==0?`Margin ${pct(y1GP/y1Rev)}`:''}/>
-                  <HeroCard label="Year 1 Opex" value={compactCurrency(y1Opex,cc)}/>
-                  <HeroCard label="Year 1 EBITDA" value={compactCurrency(y1Ebitda,cc)} color={y1Ebitda>=0?CC.green:CC.red}/>
-                </div>
-                {Object.keys(u.revenueLines).length>0&&<MonthlyTable title={`${unitMeta.name} — Revenue lines (Year 1)`} rows={Object.entries(u.revenueLines).map(([name,values])=>({label:name,values:values.slice(0,12),cc}))} months={monthLabels.slice(0,12)}/>}
-                <MonthlyTable title={`${unitMeta.name} — Full P&L (Year 1)`} rows={[
-                  {label:'Revenue',values:u.revenue.slice(0,12),cc},{label:'Cost of Sales',values:u.cogs.slice(0,12),cc},
-                  {label:'Gross Profit',values:u.grossProfit.slice(0,12),bold:true,cc},{label:'Staff Cost',values:u.staffCost.slice(0,12),cc},
-                  {label:'Admin Allocated',values:u.adminAllocated.slice(0,12),cc},{label:'Direct Opex',values:u.directOpex.slice(0,12),cc},
-                  {label:'EBITDA',values:u.ebitda.slice(0,12),bold:true,highlight:true,cc},
-                ]} months={monthLabels.slice(0,12)}/>
-              </>)
-            })()}
-          </div>
-        )}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
+              <HeroCard label="Year 1 Revenue" value={compactCurrency(y1Rev,cc)}/><HeroCard label="Year 1 Gross Profit" value={compactCurrency(y1GP,cc)} sub={y1Rev!==0?`Margin ${pct(y1GP/y1Rev)}`:''}/><HeroCard label="Year 1 Opex" value={compactCurrency(y1Opex,cc)}/><HeroCard label="Year 1 EBITDA" value={compactCurrency(y1Ebitda,cc)} color={y1Ebitda>=0?CC.green:CC.red}/>
+            </div>
+            {Object.keys(u.revenueLines).length>0&&<MonthlyTable title={`${unitMeta.name} — Revenue lines (Year 1)`} rows={Object.entries(u.revenueLines).map(([name,values])=>({label:name,values:values.slice(0,12),cc}))} months={monthLabels.slice(0,12)}/>}
+            <MonthlyTable title={`${unitMeta.name} — Full P&L (Year 1)`} rows={[{label:'Revenue',values:u.revenue.slice(0,12),cc},{label:'Cost of Sales',values:u.cogs.slice(0,12),cc},{label:'Gross Profit',values:u.grossProfit.slice(0,12),bold:true,cc},{label:'Staff Cost',values:u.staffCost.slice(0,12),cc},{label:'Admin Allocated',values:u.adminAllocated.slice(0,12),cc},{label:'Direct Opex',values:u.directOpex.slice(0,12),cc},{label:'EBITDA',values:u.ebitda.slice(0,12),bold:true,highlight:true,cc}]} months={monthLabels.slice(0,12)}/>
+          </div>)
+        })()}
+
+        {view==='planning'&&<PlanningActualsTab config={config} result={result} monthLabels={monthLabels} cc={cc} savedActuals={actuals} onSaveActuals={setActuals} debtObligations={debtObligations} onSaveDebtObligations={setDebtObligations}/>}
+
+        {view==='opcashflow'&&<OperationalCashflowView result={result} actuals={actuals} debtObligations={debtObligations} monthLabels={monthLabels} cc={cc} config={config}/>}
 
         {view==='cashflow'&&(
           <div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
-              <HeroCard label="Opening Cash" value={compactCurrency(result.cashFlow.openingCash[0],cc)}/>
-              <HeroCard label="Closing Cash M12" value={compactCurrency(result.cashFlow.closingCash[11],cc)}/>
-              <HeroCard label="Closing Cash M24" value={compactCurrency(result.cashFlow.closingCash[23],cc)}/>
-              <HeroCard label="Lowest Point" value={compactCurrency(Math.min(...result.cashFlow.closingCash),cc)} color={Math.min(...result.cashFlow.closingCash)<0?CC.red:CC.navy} sub={`Month ${result.cashFlow.closingCash.indexOf(Math.min(...result.cashFlow.closingCash))+1}`}/>
+              <HeroCard label="Opening Cash" value={compactCurrency(result.cashFlow.openingCash[0],cc)}/><HeroCard label="Closing Cash M12" value={compactCurrency(result.cashFlow.closingCash[11],cc)}/><HeroCard label="Closing Cash M24" value={compactCurrency(result.cashFlow.closingCash[23],cc)}/><HeroCard label="Lowest Point" value={compactCurrency(Math.min(...result.cashFlow.closingCash),cc)} color={Math.min(...result.cashFlow.closingCash)<0?CC.red:CC.navy} sub={`Month ${result.cashFlow.closingCash.indexOf(Math.min(...result.cashFlow.closingCash))+1}`}/>
             </div>
-            <MonthlyTable title="Cash Flow — Year 1" rows={[
-              {label:'Opening Cash',values:result.cashFlow.openingCash.slice(0,12),cc},{label:'Operating Cash Flow',values:result.cashFlow.operatingCash.slice(0,12),cc},
-              {label:'Investing Cash Flow',values:result.cashFlow.investingCash.slice(0,12),cc},{label:'Financing Cash Flow',values:result.cashFlow.financingCash.slice(0,12),cc},
-              {label:'Net Change',values:result.cashFlow.netChange.slice(0,12),bold:true,cc},{label:'Closing Cash',values:result.cashFlow.closingCash.slice(0,12),bold:true,highlight:true,cc},
-            ]} months={monthLabels.slice(0,12)}/>
-            <MonthlyTable title="Cash Flow — Year 2" rows={[
-              {label:'Opening Cash',values:result.cashFlow.openingCash.slice(12,24),cc},{label:'Operating Cash Flow',values:result.cashFlow.operatingCash.slice(12,24),cc},
-              {label:'Financing Cash Flow',values:result.cashFlow.financingCash.slice(12,24),cc},{label:'Net Change',values:result.cashFlow.netChange.slice(12,24),bold:true,cc},
-              {label:'Closing Cash',values:result.cashFlow.closingCash.slice(12,24),bold:true,highlight:true,cc},
-            ]} months={monthLabels.slice(12,24)}/>
+            <MonthlyTable title="Cash Flow Statement — Year 1" rows={[{label:'Opening Cash',values:result.cashFlow.openingCash.slice(0,12),cc},{label:'Operating Cash Flow',values:result.cashFlow.operatingCash.slice(0,12),cc},{label:'Investing Cash Flow',values:result.cashFlow.investingCash.slice(0,12),cc},{label:'Financing Cash Flow',values:result.cashFlow.financingCash.slice(0,12),cc},{label:'Net Change',values:result.cashFlow.netChange.slice(0,12),bold:true,cc},{label:'Closing Cash',values:result.cashFlow.closingCash.slice(0,12),bold:true,highlight:true,cc}]} months={monthLabels.slice(0,12)}/>
+            <MonthlyTable title="Cash Flow Statement — Year 2" rows={[{label:'Opening Cash',values:result.cashFlow.openingCash.slice(12,24),cc},{label:'Operating Cash Flow',values:result.cashFlow.operatingCash.slice(12,24),cc},{label:'Financing Cash Flow',values:result.cashFlow.financingCash.slice(12,24),cc},{label:'Net Change',values:result.cashFlow.netChange.slice(12,24),bold:true,cc},{label:'Closing Cash',values:result.cashFlow.closingCash.slice(12,24),bold:true,highlight:true,cc}]} months={monthLabels.slice(12,24)}/>
           </div>
         )}
 
         {view==='workingcapital'&&(
           <div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
-              <HeroCard label="Peak Working Capital" value={compactCurrency(metrics.maxWorkingCapitalRequirement,cc)} sub="FGE input credit peak"/>
-              <HeroCard label="Average Outstanding" value={compactCurrency(metrics.avgWorkingCapitalRequirement,cc)} sub="Across 24 months"/>
-              <HeroCard label="FGE Count" value={metrics.totalCounterpartyGroups}/>
+              <HeroCard label="Peak Working Capital" value={compactCurrency(metrics.maxWorkingCapitalRequirement,cc)}/><HeroCard label="Average Outstanding" value={compactCurrency(metrics.avgWorkingCapitalRequirement,cc)}/><HeroCard label="FGE Count" value={metrics.totalCounterpartyGroups}/>
             </div>
-            <MonthlyTable title="FGE Input Credit Outstanding — Year 1" rows={[
-              {label:'Input Credit Outstanding',values:result.creditReceivables.slice(0,12),bold:true,highlight:true,cc},
-              {label:'Working Capital Movement',values:result.cashFlow.workingCapitalMovement.slice(0,12),cc},
-            ]} months={monthLabels.slice(0,12)}/>
-            {Object.entries(result.rollingFunds).map(([fundId,fund])=>(
-              <MonthlyTable key={fundId} title={`${fund.name} — Year 1`} rows={[
-                {label:'Fund Balance',values:fund.fundBalanceByMonth.slice(0,12),bold:true,highlight:true,cc},
-                {label:'Contributions In',values:fund.fundContributions.slice(0,12),cc},
-                {label:'Disbursements Out',values:fund.fundDisbursements.slice(0,12),cc},
-              ]} months={monthLabels.slice(0,12)} footnote={fund.fundShortfallMonths.length>0?`Shortfall in: ${fund.fundShortfallMonths.map(s=>`Month ${s.month}`).join(', ')}`:'Rolling fund not a Wonderland asset — managed for FGE benefit.'}/>
-            ))}
+            <MonthlyTable title="FGE Input Credit Outstanding — Year 1" rows={[{label:'Input Credit Outstanding',values:result.creditReceivables.slice(0,12),bold:true,highlight:true,cc},{label:'Working Capital Movement',values:result.cashFlow.workingCapitalMovement.slice(0,12),cc}]} months={monthLabels.slice(0,12)}/>
+            {Object.entries(result.rollingFunds).map(([fid,fund])=>(<MonthlyTable key={fid} title={`${fund.name} — Year 1`} rows={[{label:'Fund Balance',values:fund.fundBalanceByMonth.slice(0,12),bold:true,highlight:true,cc},{label:'Contributions In',values:fund.fundContributions.slice(0,12),cc},{label:'Disbursements Out',values:fund.fundDisbursements.slice(0,12),cc}]} months={monthLabels.slice(0,12)} footnote={fund.fundShortfallMonths.length>0?`Shortfall in: ${fund.fundShortfallMonths.map(s=>`Month ${s.month}`).join(', ')}`:'Rolling fund managed for FGE benefit.'}/>))}
           </div>
         )}
 
         {view==='balancesheet'&&(
           <div>
-            <MonthlyTable title="Balance Sheet — Year 1" rows={[
-              {label:'Loan to Rolling Funds',values:result.balanceSheet.loanToRollingFunds.slice(0,12),cc},{label:'Cash & Bank',values:result.balanceSheet.cash.slice(0,12),cc},
-              {label:'FGE Input Receivables',values:result.balanceSheet.creditReceivables.slice(0,12),cc},{label:'Total Assets',values:result.balanceSheet.totalAssets.slice(0,12),bold:true,cc},
-              {label:'Share Capital',values:result.balanceSheet.shareCapital.slice(0,12),cc},{label:'Non-Repayable Grant (Equity)',values:result.balanceSheet.grantEquity.slice(0,12),cc},
-              {label:'Retained Earnings',values:result.balanceSheet.retainedEarnings.slice(0,12),cc},{label:'Total Equity',values:result.balanceSheet.totalEquity.slice(0,12),bold:true,cc},
-              {label:'Recoverable Grant Outstanding',values:result.balanceSheet.grantsOutstanding.slice(0,12),cc},{label:'Loans Outstanding',values:result.balanceSheet.loansOutstanding.slice(0,12),cc},
-              {label:'Total Liabilities',values:result.balanceSheet.totalLiabilities.slice(0,12),bold:true,highlight:true,cc},
-            ]} months={monthLabels.slice(0,12)} footnote="Total Assets = Total Equity + Total Liabilities in every month."/>
+            <MonthlyTable title="Balance Sheet — Year 1" rows={[{label:'Loan to Rolling Funds',values:result.balanceSheet.loanToRollingFunds.slice(0,12),cc},{label:'Cash & Bank',values:result.balanceSheet.cash.slice(0,12),cc},{label:'FGE Input Receivables',values:result.balanceSheet.creditReceivables.slice(0,12),cc},{label:'Total Assets',values:result.balanceSheet.totalAssets.slice(0,12),bold:true,cc},{label:'Share Capital',values:result.balanceSheet.shareCapital.slice(0,12),cc},{label:'Non-Repayable Grant (Equity)',values:result.balanceSheet.grantEquity.slice(0,12),cc},{label:'Retained Earnings',values:result.balanceSheet.retainedEarnings.slice(0,12),cc},{label:'Total Equity',values:result.balanceSheet.totalEquity.slice(0,12),bold:true,cc},{label:'Recoverable Grant Outstanding',values:result.balanceSheet.grantsOutstanding.slice(0,12),cc},{label:'Loans Outstanding',values:result.balanceSheet.loansOutstanding.slice(0,12),cc},{label:'Total Liabilities',values:result.balanceSheet.totalLiabilities.slice(0,12),bold:true,highlight:true,cc}]} months={monthLabels.slice(0,12)} footnote="Total Assets = Total Equity + Total Liabilities."/>
           </div>
         )}
 
         {view==='fges'&&(
-          <div style={{background:CC.white,border:`1px solid ${CC.border}`,borderRadius:8,padding:'1.25rem'}}>
+          <div style={card}>
             <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,marginBottom:'1rem'}}>FGE Roster ({config.counterpartyGroups.length} groups)</div>
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.8rem'}}>
-                <thead><tr style={{background:CC.navy,color:CC.white}}>{['Name','Location','Members','Recruited','Tomatoes (acres)','Onions (acres)','Credit Term','Asset Status'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
-                <tbody>{config.counterpartyGroups.map((g,i)=>{
-                  const period=(g.allocationPeriods||[])[0]
-                  return(<tr key={g.id} style={{background:i%2===0?CC.cream:CC.white}}>
-                    <td style={{padding:'7px 10px',fontWeight:600}}>{g.name}</td>
-                    <td style={{padding:'7px 10px'}}>{g.location}</td>
-                    <td style={{padding:'7px 10px'}}>{g.memberCount}</td>
-                    <td style={{padding:'7px 10px'}}>Month {g.recruitedMonth}</td>
-                    <td style={{padding:'7px 10px'}}>{period?.allocations?.tomatoes||0}</td>
-                    <td style={{padding:'7px 10px'}}>{period?.allocations?.onions||0}</td>
-                    <td style={{padding:'7px 10px'}}>{g.creditTerm.value} {g.creditTerm.unit}</td>
-                    <td style={{padding:'7px 10px',textTransform:'capitalize'}}>{g.assetStatus}</td>
-                  </tr>)
-                })}</tbody>
+                <thead><tr style={{background:CC.navy,color:CC.white}}>{['Name','Location','Members','Recruited','Tomatoes (ac)','Onions (ac)','Credit Term'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
+                <tbody>{config.counterpartyGroups.map((g,i)=>{const p=(g.allocationPeriods||[])[0];return(<tr key={g.id} style={{background:i%2===0?CC.cream:CC.white}}><td style={{padding:'7px 10px',fontWeight:600}}>{g.name}</td><td style={{padding:'7px 10px'}}>{g.location}</td><td style={{padding:'7px 10px'}}>{g.memberCount}</td><td style={{padding:'7px 10px'}}>M{g.recruitedMonth}</td><td style={{padding:'7px 10px'}}>{p?.allocations?.tomatoes||0}</td><td style={{padding:'7px 10px'}}>{p?.allocations?.onions||0}</td><td style={{padding:'7px 10px'}}>{g.creditTerm.value} {g.creditTerm.unit}</td></tr>)})}
+                </tbody>
               </table>
             </div>
           </div>
         )}
 
-        {view==='scenarios'&&(
-          <div>
-            <ScenarioBuilder config={config} overrides={overrides} result={result} baseResult={baseResult} onApply={persist} monthLabels={monthLabels} cc={cc}/>
-          </div>
-        )}
+        {view==='scenarios'&&<ScenarioBuilder config={config} overrides={overrides} result={result} baseResult={baseResult} onApply={persist} monthLabels={monthLabels} cc={cc}/>}
 
       </main>
       <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.67rem',color:CC.slate,borderTop:`1px solid ${CC.border}`}}>Canvas Coach · Clearview · Wonderland Farm Services · habibonifade.com</footer>
-    </div>
-  )
-}
-
-function ScenarioBuilder({config,overrides,result,baseResult,onApply,monthLabels,cc}){
-  const [local,setLocal] = useState(overrides)
-  const liveResult = useMemo(()=>runModel(config,{overrides:local}),[config,local])
-  function update(field,value){setLocal(p=>({...p,[field]:value}))}
-
-  const m=liveResult.metrics,bm=baseResult.metrics
-  const deltaEbitda=m.year1EBITDA-bm.year1EBITDA
-
-  const inp={width:'100%',padding:'0.45rem 0.6rem',border:`1px solid ${CC.border}`,borderRadius:4,fontSize:'0.85rem',fontFamily:'inherit',background:'#F4F8FC',color:CC.navy,boxSizing:'border-box'}
-  const lbl={display:'block',fontWeight:600,fontSize:'0.8rem',marginBottom:'0.22rem',color:CC.navy}
-  const card={background:CC.white,border:`1px solid ${CC.border}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}
-
-  return(
-    <div>
-      <div style={card}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,marginBottom:'1rem'}}>Grant Negotiation</div>
-        {config.capitalStructure.grants.filter(g=>g.repayable).map(grant=>(
-          <div key={grant.id}>
-            <label style={lbl}>{grant.name} — Forgiveness %</label>
-            <div style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'0.5rem'}}>
-              <input type="range" min="0" max="100" step="1" value={(local.grantForgivenessOverrides[grant.id]??0)*100} onChange={e=>update('grantForgivenessOverrides',{...local.grantForgivenessOverrides,[grant.id]:Number(e.target.value)/100})} style={{flex:1,accentColor:CC.cyan}}/>
-              <span style={{fontFamily:'monospace',fontWeight:700,minWidth:'3.5rem'}}>{pct(local.grantForgivenessOverrides[grant.id]??0)}</span>
-            </div>
-            <div style={{fontSize:'0.78rem',color:CC.slate,marginBottom:'1rem'}}>Net repayable: {currency(grant.amount*(1-(local.grantForgivenessOverrides[grant.id]??0)),cc)}</div>
-          </div>
-        ))}
-      </div>
-      <div style={card}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,marginBottom:'1rem'}}>Credit Terms & Model</div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'1rem'}}>
-          <div>
-            <label style={lbl}>Aggregation model</label>
-            <select style={inp} value={local.aggregationModel} onChange={e=>update('aggregationModel',e.target.value)}>
-              <option value="commission">Commission only</option>
-              <option value="spread">Spread only</option>
-              <option value="both">Both</option>
-            </select>
-          </div>
-          <div>
-            <label style={lbl}>Commission %</label>
-            <input type="number" style={inp} value={(local.commissionPctOverride??0.10)*100} onChange={e=>update('commissionPctOverride',Number(e.target.value)/100)}/>
-          </div>
-          <div>
-            <label style={lbl}>Bank loan (UGX)</label>
-            <input type="number" style={inp} value={(local.financingOverrides||{}).bankLoan??0} onChange={e=>update('financingOverrides',{...local.financingOverrides,bankLoan:Number(e.target.value)})}/>
-          </div>
-        </div>
-      </div>
-      <div style={{background:CC.navy,borderRadius:8,padding:'1rem 1.25rem',marginBottom:'1.25rem'}}>
-        <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:CC.cyan,marginBottom:'0.5rem'}}>IMPACT VS BASE CASE</div>
-        <Flag type={deltaEbitda>=0?'ok':'warn'}>Year 1 EBITDA {deltaEbitda>=0?'improves':'worsens'} by {currency(Math.abs(deltaEbitda),cc)}, from {currency(bm.year1EBITDA,cc)} to {currency(m.year1EBITDA,cc)}.</Flag>
-        <div style={{marginTop:'0.4rem'}}><Flag type={m.minCashBalance>=0?'ok':'warn'}>Lowest cash point: {currency(m.minCashBalance,cc)} at Month {m.minCashMonth}.</Flag></div>
-      </div>
-      <MonthlyTable title="Scenario vs Base Case — Year 1 Cash" rows={[
-        {label:'This Scenario',values:liveResult.cashFlow.closingCash.slice(0,12),bold:true,cc},
-        {label:'Base Case',values:baseResult.cashFlow.closingCash.slice(0,12),cc},
-      ]} months={monthLabels.slice(0,12)}/>
-      <button onClick={()=>onApply(local)} style={{fontFamily:'monospace',fontSize:'0.8rem',fontWeight:700,padding:'0.65rem 1.5rem',border:'none',borderRadius:4,background:CC.cyan,color:CC.navy,cursor:'pointer'}}>Apply as active scenario</button>
     </div>
   )
 }
