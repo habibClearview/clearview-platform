@@ -8,7 +8,7 @@ import {
   isPhaseUnlocked, initialGateSignoffs, EvidenceEntry, InterviewCapture,
   Hypothesis, CanvasDecision, Assumption, Stakeholder, DataGap,
   PilotObservation, HandoverTest, DiagnosticScore, TeamMember,
-} from '../lib/canvas-types'
+} from '@/lib/canvas-types'
 
 // ─── COLOURS ─────────────────────────────────────────────────
 const C = {
