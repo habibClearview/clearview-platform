@@ -12,117 +12,33 @@ export const MONTHS_HORIZON = 24
 
 // ─── TYPES ───────────────────────────────────────────────────
 
-export interface DebtObligation {
-  id: string
-  name: string
-  lender: string
-  type: 'commercial_loan' | 'recoverable_grant' | 'non_recoverable_grant'
-  principal: number
-  annualRate: number
-  tenorMonths: number
-  repaymentType: 'reducing_balance' | 'equal_instalment' | 'bullet' | 'grace_then_reducing'
-  frequency: 'monthly' | 'quarterly' | 'seasonal'
-  gracePeriodMonths: number
-  drawdownMonth: number
-  seasonalMonths: number[]
-  currency?: string
+>
+  totalInterest
+  totalPrincipal
+  totalRepayment
+  totalOutstanding
+  annualDebtServiceY1
+  annualDebtServiceY2
 }
 
-export interface DebtScheduleResult {
-  schedules: Record<string, {
-    id: string
-    name: string
-    lender: string
-    type: string
-    principal: number
-    interestByMonth: number[]
-    principalByMonth: number[]
-    balanceByMonth: number[]
-    totalInterestPaid: number
-    totalPrincipalPaid: number
-    annualDebtService: number
-  }>
-  totalInterest: number[]
-  totalPrincipal: number[]
-  totalRepayment: number[]
-  totalOutstanding: number[]
-  annualDebtServiceY1: number
-  annualDebtServiceY2: number
+[]
+  rationale
 }
-
-export interface ModelSnapshot {
-  // From runModel result
-  revenue: number[]
-  cogs: number[]
-  grossProfit: number[]
-  opex: number[]
-  ebitda: number[]
-  nptAfterTax: number[]
-  closingCash: number[]
-  creditReceivables: number[]
-  totalAssets: number[]
-  totalEquity: number[]
-  totalLiabilities: number[]
-  // Actuals overrides (optional)
-  actualRevenue?: (number | null)[]
-  actualCogs?: (number | null)[]
-  actualEbitda?: (number | null)[]
+[]
+  flags: { type: 'red' | 'amber' | 'green'; message }[]
 }
-
-export interface CreditRiskResult {
-  classification: 'Stable' | 'At Risk' | 'High Risk'
-  score: number // 0-100
-  dscr: number[] // Debt Service Coverage Ratio by month
-  dscrAvgY1: number
-  currentRatio: number[] // Current assets / current liabilities proxy
-  currentRatioAvgY1: number
-  revenueGrowthTrend: 'growing' | 'stable' | 'declining'
-  liquidityGapMonths: number[] // months where closing cash < 0
-  flags: { type: 'red' | 'amber' | 'green'; message: string }[]
-  rationale: string
+[]
+  flags: { type: 'red' | 'amber' | 'green'; message }[]
 }
-
-export interface GoingConcernResult {
-  overallRating: 'Strong' | 'Adequate' | 'Marginal' | 'Concern'
-  overallScore: number // 0-20
-  indicators: {
-    name: string
-    score: number // 0-4
-    rating: 'Strong' | 'Adequate' | 'Marginal' | 'Concern'
-    evidence: string
-  }[]
-  flags: { type: 'red' | 'amber' | 'green'; message: string }[]
-}
-
-export interface InvestmentReadinessResult {
-  overallScore: number // 0-30
-  tier: 'Investment Ready' | 'Near Ready' | 'Development Stage' | 'Pre-Investment'
-  dimensions: {
-    name: string
-    score: number // 0-5
-    maxScore: number
-    evidence: string
-    coachAssessment?: number // override score
-  }[]
-  flags: { type: 'red' | 'amber' | 'green'; message: string }[]
-}
-
-export interface OperationalCashflowResult {
-  moneyIn: number[]
-  moneyOut: number[]
-  net: number[]
-  cumulative: number[]
-  debtService: number[]
-  grantRepay: number[]
-  pressureMonths: { monthIdx: number; shortfall: number }[]
+[]
 }
 
 // ─── 1. DEBT SCHEDULE ────────────────────────────────────────
 
 export function buildDebtSchedule(
-  obligations: DebtObligation[],
-  months: number = MONTHS_HORIZON
-): DebtScheduleResult {
+  obligations,
+  months = MONTHS_HORIZON
+) {
   const schedules: Record<string, any> = {}
   const totalInterest = Array(months).fill(0)
   const totalPrincipal = Array(months).fill(0)
@@ -141,14 +57,14 @@ export function buildDebtSchedule(
     const principalByMonth = Array(months).fill(0)
     const balanceByMonth = Array(months).fill(0)
 
-    function isPrincipalMonth(modelMonth: number): boolean {
+    function isPrincipalMonth(modelMonth) {
       const mss = modelMonth - (startIdx + 1)
       if (mss < 0 || mss < grace) return false
       const active = mss - grace + 1
       if (freq === 'monthly') return true
       if (freq === 'quarterly') return active % 3 === 1
       if (freq === 'seasonal') {
-        const mo = modelMonth % 12 === 0 ? 12 : modelMonth % 12
+        const mo = modelMonth % 12 === 0 ? 12  % 12
         return seasonalMonths.includes(mo)
       }
       return true
@@ -214,7 +130,7 @@ export function buildDebtSchedule(
       balanceByMonth,
       totalInterestPaid,
       totalPrincipalPaid,
-      annualDebtService: annualDS,
+      annualDebtService,
     }
 
     for (let m = 0; m < months; m++) {
@@ -239,11 +155,11 @@ export function buildDebtSchedule(
 // ─── 2. OPERATIONAL CASHFLOW ─────────────────────────────────
 
 export function buildOperationalCashflow(
-  model: ModelSnapshot,
-  debtSchedule: DebtScheduleResult,
-  grantRepayByMonth: number[],
-  months: number = MONTHS_HORIZON
-): OperationalCashflowResult {
+  model,
+  debtSchedule,
+  grantRepayByMonth,
+  months = MONTHS_HORIZON
+) {
   const moneyIn = Array(months).fill(0)
   const moneyOut = Array(months).fill(0)
   const debtService = debtSchedule.totalRepayment
@@ -252,27 +168,27 @@ export function buildOperationalCashflow(
   for (let m = 0; m < months; m++) {
     // Cash collected = revenue recognised minus new credit extended plus credit repaid
     // This equals operating cashflow + tax + grant forgiveness (non-cash items reversed)
-    // Approximation: use EBITDA as operating cash proxy, then add financing inflows
-    const ebitda = (model.actualEbitda?.[m] != null ? model.actualEbitda[m] : null) ??
+    // Approximation EBITDA as operating cash proxy, then add financing inflows
+    const ebitda = (model.actualEbitda?.[m] != null ? model.actualEbitda[m] ) ??
                    (model.actualRevenue?.[m] != null
                      ? model.actualRevenue[m]! - (model.actualCogs?.[m] ?? model.cogs[m]) - model.opex[m]
                      : model.ebitda[m])
 
-    // Money in: EBITDA when positive (cash generating operations)
+    // Money in when positive (cash generating operations)
     moneyIn[m] = Math.max(0, ebitda)
 
-    // Money out: operating losses + debt service + grant repayments
-    const operatingLoss = ebitda < 0 ? Math.abs(ebitda) : 0
+    // Money out losses + debt service + grant repayments
+    const operatingLoss = ebitda < 0 ? Math.abs(ebitda) 
     moneyOut[m] = operatingLoss + debtService[m] + grantRepay[m]
   }
 
   const net = moneyIn.map((v, i) => v - moneyOut[i])
-  const cumulative: number[] = []
+  const cumulative = []
   let cum = 0
   for (let m = 0; m < months; m++) { cum += net[m]; cumulative.push(cum) }
 
   const pressureMonths = net
-    .map((v, i) => ({ monthIdx: i, shortfall: v }))
+    .map((v, i) => ({ monthIdx, shortfall }))
     .filter(x => x.shortfall < -50_000) // threshold to avoid rounding noise
 
   return { moneyIn, moneyOut, net, cumulative, debtService, grantRepay, pressureMonths }
@@ -281,26 +197,26 @@ export function buildOperationalCashflow(
 // ─── 3. CREDIT RISK DASHBOARD ────────────────────────────────
 
 export function buildCreditRiskAssessment(
-  model: ModelSnapshot,
-  debtSchedule: DebtScheduleResult,
-  coachOverride?: { classification?: string; note?: string }
-): CreditRiskResult {
+  model,
+  debtSchedule,
+  coachOverride?: { classification?: string; note? }
+) {
   const months = model.revenue.length
-  const flags: { type: 'red' | 'amber' | 'green'; message: string }[] = []
+  const flags: { type: 'red' | 'amber' | 'green'; message }[] = []
 
   // Debt Service Coverage Ratio = EBITDA / Total Debt Service
   // DSCR > 1.5 = Strong, 1.0-1.5 = Adequate, 0.5-1.0 = Weak, <0.5 = Critical
   const dscr = model.ebitda.map((e, m) => {
     const ds = debtSchedule.totalRepayment[m]
-    if (ds === 0) return e > 0 ? 3.0 : 0 // no debt -- strong if profitable
-    return ds > 0 ? e / ds : 0
+    if (ds === 0) return e > 0 ? 3.0  // no debt -- strong if profitable
+    return ds > 0 ? e / ds 
   })
   const dscrAvgY1 = dscr.slice(0, 12).reduce((a, b) => a + b, 0) / 12
 
   // Current ratio proxy = cash / (monthly debt service * 3) -- 3 months coverage
   const currentRatio = model.closingCash.map((cash, m) => {
     const monthlyDs = debtSchedule.totalRepayment[m]
-    if (monthlyDs === 0) return cash > 0 ? 3.0 : 0
+    if (monthlyDs === 0) return cash > 0 ? 3.0 
     return cash / (monthlyDs * 3)
   })
   const currentRatioAvgY1 = currentRatio.slice(0, 12).reduce((a, b) => a + b, 0) / 12
@@ -309,7 +225,7 @@ export function buildCreditRiskAssessment(
   const q1Rev = model.revenue.slice(0, 3).reduce((a, b) => a + b, 0)
   const q4Rev = model.revenue.slice(9, 12).reduce((a, b) => a + b, 0)
   const revenueGrowthTrend: 'growing' | 'stable' | 'declining' =
-    q4Rev > q1Rev * 1.05 ? 'growing' : q4Rev < q1Rev * 0.95 ? 'declining' : 'stable'
+    q4Rev > q1Rev * 1.05 ? 'growing'  < q1Rev * 0.95 ? 'declining' : 'stable'
 
   // Liquidity gap months
   const liquidityGapMonths = model.closingCash
@@ -359,11 +275,11 @@ export function buildCreditRiskAssessment(
 // ─── 4. GOING CONCERN ASSESSMENT ─────────────────────────────
 
 export function buildGoingConcernAssessment(
-  model: ModelSnapshot,
-  debtSchedule: DebtScheduleResult,
+  model,
+  debtSchedule,
   coachAssessments?: Record<string, number> // coach can override individual scores
-): GoingConcernResult {
-  const flags: { type: 'red' | 'amber' | 'green'; message: string }[] = []
+) {
+  const flags: { type: 'red' | 'amber' | 'green'; message }[] = []
 
   const y1Ebitda = model.ebitda.slice(0, 12).reduce((a, b) => a + b, 0)
   const y2Ebitda = model.ebitda.slice(12, 24).reduce((a, b) => a + b, 0)
@@ -373,7 +289,7 @@ export function buildGoingConcernAssessment(
   const dscrAvg = (() => {
     const vals = model.ebitda.slice(0, 12).map((e, m) => {
       const ds = debtSchedule.totalRepayment[m]
-      return ds > 0 ? e / ds : e > 0 ? 2 : 0
+      return ds > 0 ? e / ds  > 0 ? 2 
     })
     return vals.reduce((a, b) => a + b, 0) / 12
   })()
@@ -382,26 +298,26 @@ export function buildGoingConcernAssessment(
   const indicators = [
     {
       name: 'Debt Service Coverage',
-      raw: dscrAvg,
-      score: dscrAvg >= 1.5 ? 4 : dscrAvg >= 1.0 ? 3 : dscrAvg >= 0.5 ? 2 : dscrAvg > 0 ? 1 : 0,
-      evidence: `Average DSCR ${dscrAvg.toFixed(2)}x in Year 1. ${dscrAvg >= 1.5 ? 'Strong coverage.' : dscrAvg >= 1.0 ? 'Adequate but watch closely.' : 'Insufficient -- repayment risk is real.'}`,
+      raw,
+      score >= 1.5 ? 4  >= 1.0 ? 3  >= 0.5 ? 2  > 0 ? 1 ,
+      evidence: `Average DSCR ${dscrAvg.toFixed(2)}x in Year 1. ${dscrAvg >= 1.5 ? 'Strong coverage.'  >= 1.0 ? 'Adequate but watch closely.' : 'Insufficient -- repayment risk is real.'}`,
     },
     {
       name: 'Liquidity Position',
-      raw: minCash,
-      score: minCash >= 0 ? (model.closingCash[11] > model.closingCash[0] ? 4 : 3) : minCash > -10_000_000 ? 1 : 0,
+      raw,
+      score >= 0 ? (model.closingCash[11] > model.closingCash[0] ? 4 )  > -10_000_000 ? 1 ,
       evidence: `Minimum cash balance across 24 months: ${minCash.toLocaleString()} UGX. ${minCash >= 0 ? 'Positive throughout.' : 'Cash goes negative -- liquidity concern.'}`,
     },
     {
       name: 'Revenue Sustainability',
-      raw: y2Rev / Math.max(1, y1Rev),
-      score: y2Rev > y1Rev * 1.1 ? 4 : y2Rev > y1Rev * 0.95 ? 3 : y2Rev > y1Rev * 0.8 ? 2 : 1,
+      raw / Math.max(1, y1Rev),
+      score > y1Rev * 1.1 ? 4  > y1Rev * 0.95 ? 3  > y1Rev * 0.8 ? 2 ,
       evidence: `Year 2 revenue ${y2Rev > y1Rev ? 'grows' : 'declines'} vs Year 1 by ${Math.abs(((y2Rev - y1Rev) / Math.max(1, y1Rev)) * 100).toFixed(1)}%.`,
     },
     {
       name: 'Operational Profitability',
-      raw: y1Ebitda,
-      score: y1Ebitda > 0 && y2Ebitda > y1Ebitda ? 4 : y1Ebitda > 0 ? 3 : y1Ebitda > -5_000_000 ? 2 : 1,
+      raw,
+      score > 0 && y2Ebitda > y1Ebitda ? 4  > 0 ? 3  > -5_000_000 ? 2 ,
       evidence: `Year 1 EBITDA: ${y1Ebitda.toLocaleString()} UGX. Year 2 EBITDA: ${y2Ebitda.toLocaleString()} UGX.`,
     },
     {
@@ -419,7 +335,7 @@ export function buildGoingConcernAssessment(
   const scoredIndicators = indicators.map(ind => ({
     name: ind.name,
     score: ind.score,
-    maxScore: 4,
+    maxScore,
     rating: (ind.score >= 3 ? 'Strong' : ind.score >= 2 ? 'Adequate' : ind.score >= 1 ? 'Marginal' : 'Concern') as any,
     evidence: ind.evidence,
   }))
@@ -434,52 +350,52 @@ export function buildGoingConcernAssessment(
   else if (overallScore >= 7) flags.push({ type: 'amber', message: 'Marginal going concern position. Active monitoring and corrective action required.' })
   else flags.push({ type: 'red', message: 'Going concern in doubt. Immediate management intervention required.' })
 
-  return { overallRating, overallScore, indicators: scoredIndicators, flags }
+  return { overallRating, overallScore, indicators, flags }
 }
 
 // ─── 5. INVESTMENT READINESS SCORE ───────────────────────────
 
 export function buildInvestmentReadiness(
-  model: ModelSnapshot,
-  debtSchedule: DebtScheduleResult,
+  model,
+  debtSchedule,
   coachAssessments?: {
-    commercialModel?: number      // 0-5
-    managementCapability?: number // 0-5
-    marketEvidence?: number       // 0-5
-    governance?: number           // 0-5
+    commercialModel?      // 0-5
+    managementCapability? // 0-5
+    marketEvidence?       // 0-5
+    governance?           // 0-5
   }
-): InvestmentReadinessResult {
+) {
   const y1Rev = model.revenue.slice(0, 12).reduce((a, b) => a + b, 0)
   const y1Ebitda = model.ebitda.slice(0, 12).reduce((a, b) => a + b, 0)
-  const ebitdaMargin = y1Rev > 0 ? y1Ebitda / y1Rev : 0
+  const ebitdaMargin = y1Rev > 0 ? y1Ebitda / y1Rev 
   const dscrAvg = model.ebitda.slice(0, 12).map((e, m) => {
-    const ds = debtSchedule.totalRepayment[m]; return ds > 0 ? e / ds : e > 0 ? 2 : 0
+    const ds = debtSchedule.totalRepayment[m]; return ds > 0 ? e / ds  > 0 ? 2 
   }).reduce((a, b) => a + b, 0) / 12
-  const debtToEquity = model.totalEquity[11] > 0 ? model.totalLiabilities[11] / model.totalEquity[11] : 99
+  const debtToEquity = model.totalEquity[11] > 0 ? model.totalLiabilities[11] / model.totalEquity[11] 
 
   const dimensions = [
     {
       name: 'Financial Viability',
       score: Math.min(5, Math.max(0,
-        (ebitdaMargin >= 0.2 ? 2 : ebitdaMargin >= 0.05 ? 1 : 0) +
-        (y1Ebitda > 0 ? 1 : 0) +
-        (debtToEquity < 1 ? 2 : debtToEquity < 2 ? 1 : 0)
+        (ebitdaMargin >= 0.2 ? 2  >= 0.05 ? 1 ) +
+        (y1Ebitda > 0 ? 1 ) +
+        (debtToEquity < 1 ? 2  < 2 ? 1 )
       )),
-      maxScore: 5,
+      maxScore,
       evidence: `EBITDA margin ${(ebitdaMargin * 100).toFixed(1)}%. Debt-to-equity ${debtToEquity.toFixed(2)}x.`,
     },
     {
       name: 'Debt Serviceability',
       score: Math.min(5, Math.max(0, Math.round(
-        dscrAvg >= 2.0 ? 5 : dscrAvg >= 1.5 ? 4 : dscrAvg >= 1.0 ? 3 : dscrAvg >= 0.5 ? 2 : 1
+        dscrAvg >= 2.0 ? 5  >= 1.5 ? 4  >= 1.0 ? 3  >= 0.5 ? 2 
       ))),
-      maxScore: 5,
+      maxScore,
       evidence: `Average DSCR ${dscrAvg.toFixed(2)}x. Total debt service Y1: ${debtSchedule.annualDebtServiceY1.toLocaleString()} UGX.`,
     },
     {
       name: 'Commercial Model Clarity',
       score: coachAssessments?.commercialModel ?? 2,
-      maxScore: 5,
+      maxScore,
       evidence: coachAssessments?.commercialModel != null
         ? `Coach assessment: ${coachAssessments.commercialModel}/5.`
         : 'Pending coach assessment.',
@@ -488,7 +404,7 @@ export function buildInvestmentReadiness(
     {
       name: 'Management Capability',
       score: coachAssessments?.managementCapability ?? 2,
-      maxScore: 5,
+      maxScore,
       evidence: coachAssessments?.managementCapability != null
         ? `Coach assessment: ${coachAssessments.managementCapability}/5.`
         : 'Pending coach assessment.',
@@ -497,7 +413,7 @@ export function buildInvestmentReadiness(
     {
       name: 'Market Evidence',
       score: coachAssessments?.marketEvidence ?? 2,
-      maxScore: 5,
+      maxScore,
       evidence: coachAssessments?.marketEvidence != null
         ? `Coach assessment: ${coachAssessments.marketEvidence}/5.`
         : 'Pending coach assessment.',
@@ -506,7 +422,7 @@ export function buildInvestmentReadiness(
     {
       name: 'Governance & Record-Keeping',
       score: coachAssessments?.governance ?? 2,
-      maxScore: 5,
+      maxScore,
       evidence: coachAssessments?.governance != null
         ? `Coach assessment: ${coachAssessments.governance}/5.`
         : 'Pending coach assessment.',
@@ -521,7 +437,7 @@ export function buildInvestmentReadiness(
     overallScore >= 17 ? 'Near Ready' :
     overallScore >= 10 ? 'Development Stage' : 'Pre-Investment'
 
-  const flags: { type: 'red' | 'amber' | 'green'; message: string }[] = []
+  const flags: { type: 'red' | 'amber' | 'green'; message }[] = []
   if (tier === 'Investment Ready') flags.push({ type: 'green', message: `Score ${overallScore}/30. Organisation presents a credible investment case to financing partners.` })
   else if (tier === 'Near Ready') flags.push({ type: 'amber', message: `Score ${overallScore}/30. Close to investment ready. Address the lowest-scoring dimensions.` })
   else if (tier === 'Development Stage') flags.push({ type: 'amber', message: `Score ${overallScore}/30. Meaningful progress needed before approaching financing partners.` })
@@ -538,71 +454,60 @@ export function buildInvestmentReadiness(
 // ─── 6. CASHFLOW PROJECTION (6-MONTH ROLLING) ────────────────
 
 export function buildCashflowProjection(
-  model: ModelSnapshot,
-  debtSchedule: DebtScheduleResult,
-  grantRepayByMonth: number[],
-  startMonth: number = 0, // 0-based index into model arrays
-  horizonMonths: number = 6
+  model,
+  debtSchedule,
+  grantRepayByMonth,
+  startMonth = 0, // 0-based index into model arrays
+  horizonMonths = 6
 ): {
-  months: number[]
-  projectedCashIn: number[]
-  projectedCashOut: number[]
-  projectedNet: number[]
-  projectedClosingCash: number[]
-  gapMonths: { monthIdx: number; gap: number }[]
-  recommendedFacility: number
+  months
+  projectedCashIn
+  projectedCashOut
+  projectedNet
+  projectedClosingCash
+  gapMonths: { monthIdx: number; gap }[]
+  recommendedFacility
 } {
   const end = Math.min(startMonth + horizonMonths, model.revenue.length)
-  const months = Array.from({ length: end - startMonth }, (_, i) => startMonth + i)
+  const months = Array.from({ length - startMonth }, (_, i) => startMonth + i)
 
-  const projectedCashIn = months.map(m => Math.max(0, model.ebitda[m] > 0 ? model.ebitda[m] : 0))
+  const projectedCashIn = months.map(m => Math.max(0, model.ebitda[m] > 0 ? model.ebitda[m] ))
   const projectedCashOut = months.map(m =>
-    (model.ebitda[m] < 0 ? Math.abs(model.ebitda[m]) : 0) +
+    (model.ebitda[m] < 0 ? Math.abs(model.ebitda[m]) ) +
     debtSchedule.totalRepayment[m] +
     (grantRepayByMonth[m] || 0)
   )
   const projectedNet = months.map((m, i) => projectedCashIn[i] - projectedCashOut[i])
 
   const openingCash = model.closingCash[startMonth > 0 ? startMonth - 1 : 0] || 0
-  const projectedClosingCash: number[] = []
+  const projectedClosingCash = []
   let running = openingCash
   for (const net of projectedNet) { running += net; projectedClosingCash.push(running) }
 
   const gapMonths = projectedClosingCash
-    .map((v, i) => ({ monthIdx: months[i], gap: v }))
+    .map((v, i) => ({ monthIdx: months[i], gap }))
     .filter(x => x.gap < 0)
 
   const recommendedFacility = gapMonths.length > 0
     ? Math.abs(Math.min(...gapMonths.map(g => g.gap))) * 1.2 // 20% buffer
-    : 0
+    
 
   return { months, projectedCashIn, projectedCashOut, projectedNet, projectedClosingCash, gapMonths, recommendedFacility }
 }
 
 // ─── 7. CLOSE-OUT RECOMMENDATION (ToR deliverable) ──────────
 
-export interface CloseOutRecommendation {
-  viabilityRating: 'Viable' | 'Conditionally Viable' | 'At Risk' | 'Not Viable'
-  repaymentOutlook: 'On Track' | 'Watch' | 'At Risk' | 'Default Risk'
-  stabilityStatus: 'Stable' | 'At Risk' | 'High Risk'
-  immediateActions: string[]
-  nearTermActions: string[]
-  requiredFollowUp: string[]
-  exitRecommendation: string
-  coachNotes: string
-}
-
 export function buildCloseOutRecommendation(
-  creditRisk: CreditRiskResult,
-  goingConcern: GoingConcernResult,
-  investmentReadiness: InvestmentReadinessResult,
+  creditRisk,
+  goingConcern,
+  investmentReadiness,
   coachInputs?: {
-    immediateActions?: string[]
-    nearTermActions?: string[]
-    requiredFollowUp?: string[]
-    coachNotes?: string
+    immediateActions?
+    nearTermActions?
+    requiredFollowUp?
+    coachNotes?
   }
-): CloseOutRecommendation {
+) {
   const stabilityStatus = creditRisk.classification
 
   const viabilityRating: CloseOutRecommendation['viabilityRating'] =
@@ -616,29 +521,29 @@ export function buildCloseOutRecommendation(
     creditRisk.dscrAvgY1 >= 0.5 ? 'At Risk' : 'Default Risk'
 
   const immediateActions = coachInputs?.immediateActions || [
-    stabilityStatus === 'High Risk' ? 'Convene emergency management session to review cashflow and cost structure.' : null,
-    creditRisk.liquidityGapMonths.length > 0 ? 'Identify short-term liquidity facility to cover cash-negative months.' : null,
-    creditRisk.dscrAvgY1 < 1.0 ? 'Review and renegotiate repayment schedule with financing partners.' : null,
+    stabilityStatus === 'High Risk' ? 'Convene emergency management session to review cashflow and cost structure.' ,
+    creditRisk.liquidityGapMonths.length > 0 ? 'Identify short-term liquidity facility to cover cash-negative months.' ,
+    creditRisk.dscrAvgY1 < 1.0 ? 'Review and renegotiate repayment schedule with financing partners.' ,
   ].filter(Boolean) as string[]
 
   const nearTermActions = coachInputs?.nearTermActions || [
     'Implement monthly cashflow tracking discipline.',
     'Establish formal management accounts review process.',
-    investmentReadiness.overallScore < 17 ? 'Develop investment readiness improvement plan addressing key gaps.' : null,
+    investmentReadiness.overallScore < 17 ? 'Develop investment readiness improvement plan addressing key gaps.' ,
   ].filter(Boolean) as string[]
 
   const requiredFollowUp = coachInputs?.requiredFollowUp || [
     'Monthly cashflow review for 6 months post-CSJ.',
-    repaymentOutlook !== 'On Track' ? 'Quarterly financing partner engagement on repayment performance.' : null,
+    repaymentOutlook !== 'On Track' ? 'Quarterly financing partner engagement on repayment performance.' ,
     'Annual commercial readiness reassessment.',
   ].filter(Boolean) as string[]
 
   const exitRecommendation =
     viabilityRating === 'Viable'
       ? 'Business is viable for independent operation post-CSJ. Maintain monitoring rhythm.'
-      : viabilityRating === 'Conditionally Viable'
+       === 'Conditionally Viable'
       ? 'Business can exit with conditions. Specific actions must be completed before full programme exit.'
-      : viabilityRating === 'At Risk'
+       === 'At Risk'
       ? 'Exit with active support plan. Business needs structured follow-on support for at least 6 months.'
       : 'Do not exit without remediation plan. Business is not yet stable enough for independent operation.'
 
@@ -654,9 +559,9 @@ export function buildCloseOutRecommendation(
   }
 }
 
-// ─── HELPER: EXTRACT MODEL SNAPSHOT FROM runModel RESULT ─────
+// ─── HELPER MODEL SNAPSHOT FROM runModel RESULT ─────
 
-export function extractModelSnapshot(result: any): ModelSnapshot {
+export function extractModelSnapshot(result) {
   const con = result.consolidated
   const bs = result.balanceSheet
   const cf = result.cashFlow
@@ -675,10 +580,10 @@ export function extractModelSnapshot(result: any): ModelSnapshot {
   }
 }
 
-// ─── HELPER: EXTRACT GRANT REPAYMENTS FROM cashFlow ──────────
+// ─── HELPER GRANT REPAYMENTS FROM cashFlow ──────────
 
-export function extractGrantRepayments(cashFlow: any, months: number): number[] {
-  return Array.from({ length: months }, (_, m) =>
-    cashFlow.financingCash[m] < 0 ? Math.abs(cashFlow.financingCash[m]) : 0
+export function extractGrantRepayments(cashFlow, months) {
+  return Array.from({ length }, (_, m) =>
+    cashFlow.financingCash[m] < 0 ? Math.abs(cashFlow.financingCash[m]) 
   )
 }
