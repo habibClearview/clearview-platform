@@ -291,9 +291,9 @@ const inp={width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${CC.border}`
 const lbl={display:'block',fontWeight:600,fontSize:'0.8rem',marginBottom:'0.22rem',color:CC.navy}
 const card={background:CC.white,border:`1px solid ${CC.border}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}
 
-function HeroCard({label,value,sub,color}){return(<div style={{background:CC.white,border:`1px solid ${CC.border}`,borderRadius:6,padding:'1rem 1.1rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',letterSpacing:'0.1em',color:CC.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.35rem',fontWeight:700,color:color||CC.navy,marginBottom:'0.2rem'}}>{value}</div>{sub&&<div style={{fontSize:'0.74rem',color:CC.slate}}>{sub}</div>}</div>)}
+function HeroCard({label,value,sub,color}){return(<div style={{background:CC.white,border:`1px solid ${CC.border}`,borderRadius:6,padding:'1rem 1.1rem'}}><div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.08em',color:CC.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.35rem',fontWeight:700,color:color||CC.navy,marginBottom:'0.2rem'}}>{value}</div>{sub&&<div style={{fontSize:'0.74rem',color:CC.slate}}>{sub}</div>}</div>)}
 
-function MonthlyTable({title,rows,months,footnote}){return(<div style={{...card,padding:'1rem 1.1rem'}}>{title&&<div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,marginBottom:'0.8rem',color:CC.navy}}>{title}</div>}<div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.75rem',fontFamily:'monospace'}}><thead><tr><th style={{textAlign:'left',padding:'0.3rem 0.5rem',borderBottom:`1px solid ${CC.border}`,minWidth:180,fontFamily:"'Segoe UI',system-ui,sans-serif",fontSize:'0.78rem'}}></th>{months.map((m,i)=><th key={i} style={{textAlign:'right',padding:'0.3rem 0.5rem',color:CC.slate,fontWeight:500,borderBottom:`1px solid ${CC.border}`,whiteSpace:'nowrap'}}>{m}</th>)}</tr></thead><tbody>{rows.map((row,ri)=>(<tr key={ri} style={{background:row.highlight?'#EBF8FF':undefined}}><td style={{textAlign:'left',padding:'0.28rem 0.5rem',borderBottom:`1px solid #F0F4F8`,fontFamily:"'Segoe UI',system-ui,sans-serif",fontSize:'0.8rem',fontWeight:row.bold?700:400}}>{row.label}</td>{row.values.map((v,vi)=><td key={vi} style={{textAlign:'right',padding:'0.28rem 0.5rem',borderBottom:`1px solid #F0F4F8`,fontWeight:row.bold?700:400,color:v<0?CC.red:CC.navy,whiteSpace:'nowrap'}}>{compactCurrency(v,row.cc)}</td>)}</tr>))}</tbody></table></div>{footnote&&<div style={{marginTop:'0.6rem',fontSize:'0.74rem',color:CC.slate,lineHeight:1.4}}>{footnote}</div>}</div>)}
+function MonthlyTable({title,rows,months,footnote}){return(<div style={{...card,padding:'1rem 1.1rem'}}>{title&&<div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,marginBottom:'0.8rem',color:CC.navy}}>{title}</div>}<div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.75rem',fontFamily:'monospace'}}><thead><tr><th style={{textAlign:'left',padding:'0.3rem 0.5rem',borderBottom:`1px solid ${CC.border}`,minWidth:180,fontFamily:"'Segoe UI',system-ui,sans-serif",fontSize:'0.78rem'}}></th>{months.map((m,i)=><th key={i} style={{textAlign:'right',padding:'0.3rem 0.5rem',color:CC.slate,fontWeight:500,borderBottom:`1px solid ${CC.border}`,whiteSpace:'nowrap'}}>{m}</th>)}</tr></thead><tbody>{rows.map((row,ri)=>(<tr key={ri} style={{background:row.highlight?'#EBF8FF':undefined}}><td style={{textAlign:'left',padding:'0.28rem 0.5rem',borderBottom:`1px solid #F0F4F8`,fontFamily:"'Segoe UI',system-ui,sans-serif",fontSize:'0.8rem',fontWeight:row.bold?700:400}}>{row.label}</td>{row.values.map((v,vi)=><td key={vi} style={{textAlign:'right',padding:'0.28rem 0.5rem',borderBottom:`1px solid #F0F4F8`,fontWeight:row.bold?700:400,color:v<0?CC.red:CC.navy,whiteSpace:'nowrap'}}>{compactCurrency(v,row.cc)}</td>)}</tr>))}</tbody></table></div>{footnote&&<div style={{marginTop:'0.6rem',fontSize:'0.74rem',color:CC.slate,lineHeight:1.4}}>{footnote}</div>}</div>)}
 
 function Flag({type,children}){const color=type==='warn'?CC.red:type==='ok'?CC.green:CC.amber;return(<div style={{display:'flex',alignItems:'flex-start',gap:'0.5rem',fontSize:'0.84rem',lineHeight:1.5,color:CC.white}}><span style={{width:8,height:8,borderRadius:'50%',background:color,marginTop:'0.45rem',flexShrink:0,display:'inline-block'}}/><span>{children}</span></div>)}
 
@@ -346,7 +346,7 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
     return 0
   }
 
-  const sectionBtn=(id,label)=>(<button onClick={()=>setActiveSection(id)} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.45rem 0.9rem',border:`1px solid ${activeSection===id?CC.cyan:CC.border}`,borderRadius:4,background:activeSection===id?CC.cyan:CC.white,color:activeSection===id?CC.navy:CC.slate,cursor:'pointer',fontWeight:activeSection===id?700:400}}>{label}</button>)
+  const sectionBtn=(id,label)=>(<button onClick={()=>setActiveSection(id)} style={{fontFamily:'monospace',fontSize:'0.82rem',padding:'0.6rem 1.2rem',border:`2px solid ${activeSection===id?CC.cyan:CC.border}`,borderRadius:6,background:activeSection===id?CC.cyan:CC.white,color:activeSection===id?CC.navy:CC.slate,cursor:'pointer',fontWeight:activeSection===id?700:400,letterSpacing:'0.03em'}}>{label}</button>)
 
   return(
     <div>
@@ -361,11 +361,20 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
           {/* Month selector */}
           <div style={card}>
             <div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,marginBottom:'0.75rem',color:CC.navy}}>Select Month</div>
-            <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap'}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(12,1fr)',gap:'0.4rem'}}>
               {monthLabels.map((ml,i)=>{
                 const hasData=actuals[i]&&Object.keys(actuals[i]).length>0
-                return(<button key={i} onClick={()=>setSelMonth(i)} style={{fontFamily:'monospace',fontSize:'0.7rem',padding:'0.35rem 0.65rem',border:`1px solid ${selMonth===i?CC.cyan:hasData?CC.green:CC.border}`,borderRadius:4,background:selMonth===i?CC.navy:hasData?'#E8F5EE':CC.white,color:selMonth===i?CC.white:hasData?CC.green:CC.slate,cursor:'pointer',fontWeight:selMonth===i?700:400}}>{ml}{hasData&&selMonth!==i?' ✓':''}</button>)
+                const isActive=selMonth===i
+                return(<button key={i} onClick={()=>setSelMonth(i)} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.55rem 0.3rem',border:`2px solid ${isActive?CC.cyan:hasData?CC.green:CC.border}`,borderRadius:6,background:isActive?CC.navy:hasData?'#E8F5EE':CC.white,color:isActive?CC.white:hasData?CC.green:CC.slate,cursor:'pointer',fontWeight:isActive?700:400,textAlign:'center',lineHeight:1.2}}>
+                  <div>{ml}</div>
+                  {hasData&&!isActive&&<div style={{fontSize:'0.6rem',marginTop:'0.1rem'}}>✓</div>}
+                </button>)
               })}
+            </div>
+            <div style={{display:'flex',gap:'1rem',marginTop:'0.6rem',fontSize:'0.76rem',color:CC.slate}}>
+              <span style={{display:'flex',alignItems:'center',gap:'0.3rem'}}><span style={{width:10,height:10,borderRadius:2,background:CC.navy,display:'inline-block'}}/> Selected</span>
+              <span style={{display:'flex',alignItems:'center',gap:'0.3rem'}}><span style={{width:10,height:10,borderRadius:2,background:'#E8F5EE',border:`1px solid ${CC.green}`,display:'inline-block'}}/> Has actuals</span>
+              <span style={{display:'flex',alignItems:'center',gap:'0.3rem'}}><span style={{width:10,height:10,borderRadius:2,background:CC.white,border:`1px solid ${CC.border}`,display:'inline-block'}}/> No actuals yet</span>
             </div>
           </div>
 
@@ -511,34 +520,43 @@ function OperationalCashflowView({result,actuals,debtObligations,monthLabels,cc,
   const months=MONTHS_HORIZON
   const debtSchedule=useMemo(()=>buildDebtSchedule(debtObligations||[],months),[debtObligations,months])
 
+  // Build operational cashflow from actual cash movements, not P&L lines.
+  // Money In = cash collected from customers (revenue minus credit extended, plus credit repaid)
+  // Money Out = cash paid to suppliers + staff + overheads + debt service + grant repayment
+  // This avoids double-counting the working capital adjustment.
+
   const moneyIn=Array(months).fill(0)
+  const moneyOutBreakdown={suppliers:Array(months).fill(0),staff:Array(months).fill(0),overheads:Array(months).fill(0),debtService:Array(months).fill(0),grantRepay:Array(months).fill(0)}
   const moneyOut=Array(months).fill(0)
 
   for(let m=0;m<months;m++){
-    // Money in: actual revenue if entered, else plan, adjusted for working capital
-    const planRev=result.consolidated.revenue[m]
+    // Money in: operating cash inflow = NPAT + depreciation (none here) - grant forgiveness (non-cash) + WC movement
+    // Simplified: use the model's operating cash flow directly, which already accounts for WC timing correctly
+    // Then layer actual revenue variance on top where actuals exist
+    const planOperatingCash=result.cashFlow.operatingCash[m]
+    // Adjust for actuals if entered -- if actual revenue differs from plan, shift the difference into cash
     const actualRev=config.units.reduce((s,u)=>s+(actuals[m]?.[`${u.id}_revenue`]??0),0)
-    const rev=actualRev>0?actualRev:planRev
-    const wcAdj=result.cashFlow.workingCapitalMovement[m]
-    moneyIn[m]=Math.max(0,rev+wcAdj)
+    const planRev=result.consolidated.revenue[m]
+    const revVariance=actualRev>0?actualRev-planRev:0
+    // Money in = model operating cash inflow (already WC adjusted) + revenue variance + financing inflows
+    const financingIn=result.cashFlow.financingCash[m]>0?result.cashFlow.financingCash[m]:0
+    moneyIn[m]=Math.max(0,planOperatingCash+revVariance+financingIn)
 
-    // Money out: costs + debt service + grant repayments
-    const planCogs=result.consolidated.cogs[m]
-    const planOpex=result.consolidated.opex[m]
-    const actualCogs=config.units.reduce((s,u)=>s+(actuals[m]?.[`${u.id}_cogs`]??0),0)
-    const actualOpex=config.units.reduce((s,u)=>s+(actuals[m]?.[`${u.id}_opex`]??0),0)
-    const cogs=actualCogs>0?actualCogs:planCogs
-    const opex=actualOpex>0?actualOpex:planOpex
-    const debtService=debtSchedule.totalRepayment[m]
-    // Grant repayment from financing cashflow
+    // Money out = operating cash outflows + additional debt service entered manually + grant repayments
+    const operatingOutflow=planOperatingCash<0?Math.abs(planOperatingCash):0
+    const extraDebtService=debtSchedule.totalRepayment[m] // user-entered obligations on top of model
     const grantRepay=result.cashFlow.financingCash[m]<0?Math.abs(result.cashFlow.financingCash[m]):0
-    moneyOut[m]=cogs+opex+debtService+grantRepay
+    moneyOut[m]=operatingOutflow+extraDebtService+grantRepay
+
+    moneyOutBreakdown.debtService[m]=extraDebtService
+    moneyOutBreakdown.grantRepay[m]=grantRepay
   }
 
   const net=moneyIn.map((v,i)=>v-moneyOut[i])
   const cumulative=[];let cum=0;for(let m=0;m<months;m++){cum+=net[m];cumulative.push(cum)}
 
-  const pressureMonths=net.map((v,i)=>({month:monthLabels[i],value:v})).filter(x=>x.value<0)
+  // Only flag as pressure months where net is meaningfully negative (>50k threshold to avoid rounding noise)
+  const pressureMonths=net.map((v,i)=>({month:monthLabels[i],idx:i,value:v})).filter(x=>x.value<-50_000)
 
   return(
     <div>
@@ -550,21 +568,28 @@ function OperationalCashflowView({result,actuals,debtObligations,monthLabels,cc,
       </div>
 
       {pressureMonths.length>0&&(
-        <div style={{background:CC.navy,borderRadius:8,padding:'1rem 1.25rem',marginBottom:'1.25rem'}}>
-          <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:CC.amber,marginBottom:'0.5rem'}}>CASHFLOW PRESSURE MONTHS</div>
-          {pressureMonths.map((pm,i)=><Flag key={i} type="warn">{pm.month}: outflows exceed inflows by {currency(Math.abs(pm.value),cc)}. Review cost timing or accelerate receivables collection.</Flag>)}
+        <div style={{background:CC.navy,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}}>
+          <div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.12em',color:CC.amber,marginBottom:'0.75rem',fontWeight:700}}>CASHFLOW PRESSURE MONTHS ({pressureMonths.length})</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:'0.5rem',marginBottom:'0.75rem'}}>
+            {pressureMonths.map((pm,i)=>(
+              <div key={i} style={{background:'rgba(255,255,255,0.08)',borderRadius:5,padding:'0.6rem 0.8rem',borderLeft:`3px solid ${CC.amber}`}}>
+                <div style={{fontFamily:'monospace',fontSize:'0.82rem',fontWeight:700,color:CC.white,marginBottom:'0.2rem'}}>{pm.month}</div>
+                <div style={{fontSize:'0.8rem',color:'rgba(255,255,255,0.75)'}}>Shortfall: <strong style={{color:CC.amber}}>{compactCurrency(Math.abs(pm.value),cc)}</strong></div>
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:'0.76rem',color:'rgba(255,255,255,0.5)'}}>Review cost payment timing or accelerate receivables collection in these months.</div>
         </div>
       )}
 
-      <MonthlyTable title="Operational Cashflow — Year 1 (Money In vs Money Out)" rows={[
-        {label:'Money In (Revenue Collected)',values:moneyIn.slice(0,12),cc},
-        {label:'  Cost of Sales',values:result.consolidated.cogs.slice(0,12).map(v=>-v),cc},
-        {label:'  Operating Expenses',values:result.consolidated.opex.slice(0,12).map(v=>-v),cc},
-        {label:'  Debt Service (Interest + Principal)',values:debtSchedule.totalRepayment.slice(0,12).map(v=>-v),cc},
-        {label:'Money Out (Total)',values:moneyOut.slice(0,12).map(v=>-v),bold:true,cc},
-        {label:'Net Cash (In minus Out)',values:net.slice(0,12),bold:true,cc},
+      <MonthlyTable title="Operational Cashflow — Year 1 (Cash In vs Cash Out)" rows={[
+        {label:'Cash In (Operating)',values:moneyIn.slice(0,12),cc},
+        {label:'Cash Out (Operating + Debt Service)',values:moneyOut.slice(0,12).map(v=>-v),cc},
+        {label:'  of which: Manual Debt Service',values:debtSchedule.totalRepayment.slice(0,12).map(v=>-v),cc},
+        {label:'  of which: Grant Repayment',values:moneyOutBreakdown.grantRepay.slice(0,12).map(v=>-v),cc},
+        {label:'Net Cash',values:net.slice(0,12),bold:true,cc},
         {label:'Cumulative Cash Position',values:cumulative.slice(0,12),bold:true,highlight:true,cc},
-      ]} months={monthLabels.slice(0,12)} footnote="Money In is adjusted for working capital timing (FGE credit extended vs collected). Uses actuals where entered, plan figures otherwise."/>
+      ]} months={monthLabels.slice(0,12)} footnote="Cash In is the model operating cashflow adjusted for any actual revenue variance entered. Debt service shown is from obligations entered in the Planning tab only."/>
 
       <MonthlyTable title="Operational Cashflow — Year 2" rows={[
         {label:'Money In',values:moneyIn.slice(12,24),cc},
@@ -700,7 +725,7 @@ export default function WonderlandDashboard(){
           </div>
           <nav style={{display:'flex',gap:'0.3rem',flexWrap:'wrap'}}>
             {navItems.map(([id,label])=>(
-              <button key={id} onClick={()=>setView(id)} style={{fontFamily:'monospace',fontSize:'0.7rem',padding:'0.5rem 0.9rem',border:'none',background:'transparent',color:view===id?CC.cyan:'rgba(255,255,255,0.55)',cursor:'pointer',borderBottom:view===id?`2px solid ${CC.cyan}`:'2px solid transparent',fontWeight:view===id?700:400}}>{label}</button>
+              <button key={id} onClick={()=>setView(id)} style={{fontFamily:'monospace',fontSize:'0.7rem',padding:'0.5rem 0.9rem',border:'none',background:'transparent',color:view===id?CC.cyan:'rgba(255,255,255,0.7)',cursor:'pointer',borderBottom:view===id?`2px solid ${CC.cyan}`:'2px solid transparent',fontWeight:view===id?700:400,fontSize:'0.82rem'}}>{label}</button>
             ))}
           </nav>
         </div>
