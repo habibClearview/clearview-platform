@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import AnalyticsView from '@/components/analytics/AnalyticsView'
-import { buildDebtSchedule } from '@/lib/analytics-engine'
 
 const MONTHS_HORIZON = 24
 const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
