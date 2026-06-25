@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
-import CanvasDashboard from '@/components/canvas/CanvasDashboard'
-import type { CanvasRole } from '@/lib/canvas-types'
+import CanvasDashboard from '../../components/canvas/CanvasDashboard'
+import type { CanvasRole } from '../../lib/canvas-types'
 
 const ALLOWED_ROLES: CanvasRole[] = ['super_coach', 'ignite_funder']
 
