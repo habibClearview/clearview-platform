@@ -223,7 +223,7 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
 
   // Debt obligations state
   const [obligations,setObligations]=useState(debtObligations||[])
-  const debtSchedule=useMemo(()=>buildDebtSchedule(obligations,months),[obligations,months])
+  const debtSchedule=useMemo(()=>buildDebtSched(obligations,months),[obligations,months])
 
   const unitIds=config.units.map(u=>u.id)
   const selLabel=monthLabels[selMonth]
@@ -430,7 +430,7 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
 // ─── OPERATIONAL CASHFLOW VIEW ────────────────────────────────
 function OperationalCashflowView({result,actuals,debtObligations,monthLabels,cc,config}){
   const months=MONTHS_HORIZON
-  const debtSchedule=useMemo(()=>buildDebtSchedule(debtObligations||[],months),[debtObligations,months])
+  const debtSchedule=useMemo(()=>buildDebtSched(debtObligations||[],months),[debtObligations,months])
 
   // Build operational cashflow from actual cash movements, not P&L lines.
   // Money In = cash collected from customers (revenue minus credit extended, plus credit repaid)
