@@ -28,8 +28,10 @@ import UserManagement from '@/components/auth/UserManagement'
 export interface DashboardPermissions {
   role: UserRole
   fullName: string
+  userName?: string
   userId?: string
   clientId?: string
+  businessUnit?: string
   canSeeAllUnits: boolean
   canEditPlan: boolean
   canLockPlan: boolean
@@ -41,8 +43,8 @@ export interface DashboardPermissions {
 }
 
 const FULL_PERMISSIONS: DashboardPermissions = {
-  role: 'ceo', fullName: 'CEO', userId: '', clientId: 'conas',
-  canSeeAllUnits: true, canEditPlan: true, canLockPlan: true,
+  role: 'ceo', fullName: 'CEO', userName: 'CEO', userId: '', clientId: 'conas',
+  businessUnit: '', canSeeAllUnits: true, canEditPlan: true, canLockPlan: true,
   canApprove: true, canSubmitRequest: true, canEnterActuals: true,
   assignedUnitIds: [], onSignOut: () => {},
 }
@@ -1374,22 +1376,853 @@ export default function CONASDashboard({
     )
   }
 
+  // ── TEAM TAB ─────────────────────────────────────────────
   function TeamTab() {
-    if (!P.canSeeAllUnits) {
-      return (
-        <div style={{...card, textAlign:'center', color:C.slate, padding:'2.5rem'}}>
-          Team management is available to the CEO only.
-        </div>
-      )
+    const [teamMembers, setTeamMembers] = React.useState([])
+    const [loadingTeam, setLoadingTeam] = React.useState(true)
+    const [showInvite, setShowInvite] = React.useState(false)
+    const [inviteForm, setInviteForm] = React.useState({email:'', full_name:'', role:'unit_head', business_unit:''})
+    const [inviting, setInviting] = React.useState(false)
+    const [inviteMsg, setInviteMsg] = React.useState('')
+
+    const BUSINESS_UNITS = [
+      'Input Profit Centre 1',
+      'Input Profit Centre 2',
+      'Input Profit Centre 3',
+      'Input Profit Centre 4',
+      'Input Profit Centre 5',
+      'FGE Production and Marketing',
+      'Own Farm',
+      'Advisory Services',
+      'Customer Acquisition and Management',
+      'HQ Shared',
+    ]
+
+    const ROLES = [
+      {value:'ceo', label:'CEO'},
+      {value:'finance_manager', label:'Finance Manager'},
+      {value:'unit_head', label:'Unit Head'},
+      {value:'advisory_expert', label:'Advisory Expert'},
+    ]
+
+    React.useEffect(() => {
+      async function loadTeam() {
+        try {
+          const sb = getSupabase()
+          const { data } = await sb
+            .from('user_profiles')
+            .select('*')
+            .eq('client_id', CONAS_CLIENT_ID)
+            .order('created_at')
+          setTeamMembers(data || [])
+        } catch(e) {}
+        setLoadingTeam(false)
+      }
+      loadTeam()
+    }, [])
+
+    async function sendInvite() {
+      if (!inviteForm.email || !inviteForm.full_name || !inviteForm.business_unit) {
+        setInviteMsg('Please fill in all fields.')
+        return
+      }
+      setInviting(true)
+      setInviteMsg('')
+      try {
+        const sb = getSupabase()
+        const { data, error } = await sb.auth.admin.inviteUserByEmail(inviteForm.email)
+        if (error) throw error
+        await sb.from('user_profiles').upsert({
+          id: data.user.id,
+          client_id: CONAS_CLIENT_ID,
+          role: inviteForm.role,
+          full_name: inviteForm.full_name,
+          email: inviteForm.email,
+          business_unit: inviteForm.business_unit,
+          status: 'pending',
+          invited_at: new Date().toISOString(),
+        }, { onConflict: 'id' })
+        setTeamMembers(prev => [...prev, {
+          id: data.user.id,
+          full_name: inviteForm.full_name,
+          email: inviteForm.email,
+          role: inviteForm.role,
+          business_unit: inviteForm.business_unit,
+          status: 'pending',
+        }])
+        setInviteForm({email:'', full_name:'', role:'unit_head', business_unit:''})
+        setShowInvite(false)
+        setInviteMsg('Invite sent successfully.')
+      } catch(e) {
+        setInviteMsg(`Error: ${e.message}`)
+      }
+      setInviting(false)
     }
+
+    async function updateMember(id, updates) {
+      const sb = getSupabase()
+      await sb.from('user_profiles').update({...updates, updated_at: new Date().toISOString()}).eq('id', id)
+      setTeamMembers(prev => prev.map(m => m.id !== id ? m : {...m, ...updates}))
+    }
+
+    const roleLabel = (r) => ROLES.find(x => x.value === r)?.label || r
+    const statusColor = (s) => s === 'active' ? C.green : s === 'pending' ? C.amber : C.slate
+
+    if (!P.canSeeAllUnits) return (
+      <div style={{...card, textAlign:'center', color:C.slate, padding:'2.5rem'}}>
+        Team management is available to the CEO only.
+      </div>
+    )
+
     return (
-      <div style={card}>
-        <UserManagement
-          currentUserId={P.userId || ''}
-          currentRole={P.role}
-          clientId={P.clientId || 'conas'}
-          clientName={activeInputs.global.businessName}
-        />
+      <div>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.25rem'}}>
+          <div style={{fontFamily:'Georgia,serif', fontSize:'1.1rem', fontWeight:700, color:C.navy}}>CONAS Team</div>
+          <button style={{fontFamily:'monospace', fontSize:'0.72rem', padding:'0.38rem 0.8rem', border:`1px solid ${C.cyan}`, borderRadius:4, background:'transparent', color:C.cyan, cursor:'pointer'}} onClick={() => setShowInvite(!showInvite)}>
+            + Invite Team Member
+          </button>
+        </div>
+
+        {inviteMsg && <div style={{padding:'0.75rem 1rem', borderRadius:6, background: inviteMsg.startsWith('Error') ? '#FDF0EE' : '#D4EDDA', color: inviteMsg.startsWith('Error') ? C.red : C.green, marginBottom:'1rem', fontSize:'0.83rem'}}>{inviteMsg}</div>}
+
+        {showInvite && (
+          <div style={{...card, border:`1px solid ${C.cyan}`, marginBottom:'1.25rem'}}>
+            <div style={{fontWeight:700, color:C.navy, marginBottom:'1rem', fontSize:'0.9rem'}}>Invite New Team Member</div>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'1rem', marginBottom:'1rem'}}>
+              <div>
+                <label style={{display:'block', fontWeight:600, fontSize:'0.8rem', marginBottom:'0.22rem', color:C.navy}}>Full Name</label>
+                <input style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'inherit', background:'#F4F8FC', color:C.navy, boxSizing:'border-box'}}
+                  value={inviteForm.full_name} onChange={e => setInviteForm(f => ({...f, full_name: e.target.value}))} placeholder="Full name"/>
+              </div>
+              <div>
+                <label style={{display:'block', fontWeight:600, fontSize:'0.8rem', marginBottom:'0.22rem', color:C.navy}}>Email Address</label>
+                <input type="email" style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'inherit', background:'#F4F8FC', color:C.navy, boxSizing:'border-box'}}
+                  value={inviteForm.email} onChange={e => setInviteForm(f => ({...f, email: e.target.value}))} placeholder="email@example.com"/>
+              </div>
+              <div>
+                <label style={{display:'block', fontWeight:600, fontSize:'0.8rem', marginBottom:'0.22rem', color:C.navy}}>Role</label>
+                <select style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'inherit', background:'#F4F8FC', color:C.navy, boxSizing:'border-box'}}
+                  value={inviteForm.role} onChange={e => setInviteForm(f => ({...f, role: e.target.value}))}>
+                  {ROLES.filter(r => r.value !== 'ceo').map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{display:'block', fontWeight:600, fontSize:'0.8rem', marginBottom:'0.22rem', color:C.navy}}>Business Unit</label>
+                <select style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'inherit', background:'#F4F8FC', color:C.navy, boxSizing:'border-box'}}
+                  value={inviteForm.business_unit} onChange={e => setInviteForm(f => ({...f, business_unit: e.target.value}))}>
+                  <option value="">Select unit...</option>
+                  {BUSINESS_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{display:'flex', gap:'0.6rem'}}>
+              <button style={{fontFamily:'monospace', fontSize:'0.78rem', fontWeight:600, padding:'0.5rem 1.1rem', border:'none', borderRadius:4, background:C.cyan, color:C.navy, cursor:'pointer'}} onClick={sendInvite} disabled={inviting}>
+                {inviting ? 'Sending...' : 'Send Invite'}
+              </button>
+              <button style={{fontFamily:'monospace', fontSize:'0.72rem', padding:'0.38rem 0.8rem', border:`1px solid ${C.border}`, borderRadius:4, background:'transparent', color:C.slate, cursor:'pointer'}} onClick={() => setShowInvite(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {loadingTeam ? (
+          <div style={{color:C.slate, padding:'1.5rem', textAlign:'center', fontSize:'0.85rem'}}>Loading team...</div>
+        ) : teamMembers.length === 0 ? (
+          <div style={{...card, textAlign:'center', color:C.slate, padding:'2rem', fontSize:'0.85rem'}}>No team members yet. Invite your first team member above.</div>
+        ) : (
+          <div style={{overflowX:'auto'}}>
+            <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.82rem'}}>
+              <thead>
+                <tr style={{background:C.navy, color:C.white}}>
+                  {['Name','Email','Role','Business Unit','Status','Actions'].map(h => (
+                    <th key={h} style={{padding:'10px 12px', textAlign:'left', fontWeight:600, whiteSpace:'nowrap'}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {teamMembers.map((m, i) => (
+                  <tr key={m.id} style={{background: i % 2 === 0 ? C.cream : C.white}}>
+                    <td style={{padding:'9px 12px', fontWeight:600, color:C.navy}}>{m.full_name || '—'}</td>
+                    <td style={{padding:'9px 12px', color:C.slate, fontSize:'0.78rem'}}>{m.email || '—'}</td>
+                    <td style={{padding:'9px 12px'}}>
+                      <select style={{fontFamily:'monospace', fontSize:'0.7rem', padding:'0.2rem 0.3rem', border:`1px solid ${C.border}`, borderRadius:4, background:'transparent', cursor:'pointer'}}
+                        value={m.role} onChange={e => updateMember(m.id, {role: e.target.value})}>
+                        {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                      </select>
+                    </td>
+                    <td style={{padding:'9px 12px', color:C.slate, fontSize:'0.78rem'}}>{m.business_unit || '—'}</td>
+                    <td style={{padding:'9px 12px'}}>
+                      <span style={{fontFamily:'monospace', fontSize:'0.63rem', padding:'0.1rem 0.42rem', borderRadius:4, background:statusColor(m.status || 'active'), color:C.white}}>
+                        {m.status || 'active'}
+                      </span>
+                    </td>
+                    <td style={{padding:'9px 12px'}}>
+                      {m.status !== 'inactive' && m.role !== 'ceo' && (
+                        <button style={{fontFamily:'monospace', fontSize:'0.65rem', padding:'0.2rem 0.5rem', border:`1px solid ${C.red}`, borderRadius:3, background:'transparent', color:C.red, cursor:'pointer'}}
+                          onClick={() => updateMember(m.id, {status: 'inactive'})}>
+                          Deactivate
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── ACTUALS TAB ──────────────────────────────────────────
+  function ActualsTab() {
+    const BUSINESS_UNITS = [
+      'Input Profit Centre 1','Input Profit Centre 2','Input Profit Centre 3',
+      'Input Profit Centre 4','Input Profit Centre 5',
+      'FGE Production and Marketing','Own Farm','Advisory Services',
+      'Customer Acquisition and Management',
+    ]
+
+    const isCEO = P.role === 'ceo'
+    const isFM = P.role === 'finance_manager'
+    const isUnitHead = P.role === 'unit_head' || P.role === 'advisory_expert'
+
+    const visibleUnits = isCEO || isFM
+      ? BUSINESS_UNITS
+      : BUSINESS_UNITS.filter(u => u === P.businessUnit)
+
+    const [selUnit, setSelUnit] = React.useState(visibleUnits[0] || '')
+    const [selPeriod, setSelPeriod] = React.useState(() => {
+      const d = new Date()
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}-01`
+    })
+    const [actuals, setActuals] = React.useState(null)
+    const [loading, setLoading] = React.useState(false)
+    const [saving, setSaving] = React.useState(false)
+    const [allActuals, setAllActuals] = React.useState([])
+
+    const PERIOD_MONTHS = Array.from({length: 12}, (_, i) => {
+      const d = new Date(2026, i, 1)
+      return {
+        value: `2026-${String(i+1).padStart(2,'0')}-01`,
+        label: d.toLocaleString('en-GB', {month:'long', year:'numeric'})
+      }
+    })
+
+    const LINES = [
+      {key:'revenue_primary', label:'Primary Revenue', section:'revenue'},
+      {key:'revenue_secondary', label:'Secondary Revenue', section:'revenue'},
+      {key:'revenue_other', label:'Other Revenue', section:'revenue'},
+      {key:'cost_of_sales', label:'Cost of Sales', section:'costs'},
+      {key:'input_purchases', label:'Input Purchases', section:'costs'},
+      {key:'staff_cost', label:'Staff Cost', section:'costs'},
+      {key:'direct_operating_cost', label:'Direct Operating Cost', section:'costs'},
+      {key:'transport_cost', label:'Transport Cost', section:'costs'},
+      {key:'internal_transfer_in', label:'Internal Transfer In', section:'internal'},
+      {key:'internal_transfer_out', label:'Internal Transfer Out', section:'internal'},
+    ]
+
+    React.useEffect(() => {
+      if (!selUnit || !selPeriod) return
+      setLoading(true)
+      async function load() {
+        try {
+          const sb = getSupabase()
+          const { data } = await sb.from('unit_actuals')
+            .select('*')
+            .eq('client_id', CONAS_CLIENT_ID)
+            .eq('business_unit', selUnit)
+            .eq('period', selPeriod)
+            .maybeSingle()
+          setActuals(data || {business_unit: selUnit, period: selPeriod})
+        } catch(e) {}
+        setLoading(false)
+      }
+      load()
+    }, [selUnit, selPeriod])
+
+    React.useEffect(() => {
+      if (!isCEO && !isFM) return
+      async function loadAll() {
+        try {
+          const sb = getSupabase()
+          const { data } = await sb.from('unit_actuals')
+            .select('*')
+            .eq('client_id', CONAS_CLIENT_ID)
+            .eq('period', selPeriod)
+            .order('business_unit')
+          setAllActuals(data || [])
+        } catch(e) {}
+      }
+      loadAll()
+    }, [selPeriod])
+
+    function fmt(n) { return Number(n || 0).toLocaleString() }
+
+    async function save(submit = false) {
+      setSaving(true)
+      try {
+        const sb = getSupabase()
+        const payload = {
+          client_id: CONAS_CLIENT_ID,
+          business_unit: selUnit,
+          period: selPeriod,
+          ...actuals,
+          entered_by_name: P.userName || '',
+          entered_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          submitted: submit ? true : (actuals?.submitted || false),
+          submitted_at: submit ? new Date().toISOString() : (actuals?.submitted_at || null),
+        }
+        delete payload.id
+        const { data } = await sb.from('unit_actuals')
+          .upsert(payload, {onConflict: 'client_id,business_unit,period'})
+          .select().single()
+        setActuals(data)
+        if (isCEO || isFM) {
+          setAllActuals(prev => {
+            const existing = prev.findIndex(a => a.business_unit === selUnit)
+            if (existing >= 0) { const n = [...prev]; n[existing] = data; return n }
+            return [...prev, data]
+          })
+        }
+      } catch(e) {}
+      setSaving(false)
+    }
+
+    const totalRevenue = ['revenue_primary','revenue_secondary','revenue_other'].reduce((s,k) => s + Number(actuals?.[k] || 0), 0)
+    const totalCosts = ['cost_of_sales','input_purchases','staff_cost','direct_operating_cost','transport_cost'].reduce((s,k) => s + Number(actuals?.[k] || 0), 0)
+    const grossProfit = totalRevenue - totalCosts
+
+    return (
+      <div>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.25rem', flexWrap:'wrap', gap:'1rem'}}>
+          <div style={{fontFamily:'Georgia,serif', fontSize:'1.1rem', fontWeight:700, color:C.navy}}>Monthly Actuals</div>
+          <div style={{display:'flex', gap:'0.75rem', flexWrap:'wrap', alignItems:'center'}}>
+            {(isCEO || isFM) && (
+              <select style={{fontFamily:'monospace', fontSize:'0.75rem', padding:'0.38rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, background:C.white, color:C.navy}}
+                value={selUnit} onChange={e => setSelUnit(e.target.value)}>
+                {visibleUnits.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            )}
+            <select style={{fontFamily:'monospace', fontSize:'0.75rem', padding:'0.38rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, background:C.white, color:C.navy}}
+              value={selPeriod} onChange={e => setSelPeriod(e.target.value)}>
+              {PERIOD_MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Consolidated summary for CEO/FM */}
+        {(isCEO || isFM) && allActuals.length > 0 && (
+          <div style={{...card, marginBottom:'1.25rem'}}>
+            <div style={{fontWeight:700, color:C.navy, marginBottom:'0.75rem', fontSize:'0.88rem'}}>All Units — {PERIOD_MONTHS.find(m => m.value === selPeriod)?.label}</div>
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.78rem', fontFamily:'monospace'}}>
+                <thead>
+                  <tr style={{background:C.navy, color:C.white}}>
+                    {['Business Unit','Revenue','Costs','Gross Profit','Status'].map(h => (
+                      <th key={h} style={{padding:'8px 10px', textAlign:'left', fontWeight:600}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {allActuals.map((a, i) => {
+                    const rev = Number(a.revenue_primary||0) + Number(a.revenue_secondary||0) + Number(a.revenue_other||0)
+                    const costs = Number(a.cost_of_sales||0) + Number(a.input_purchases||0) + Number(a.staff_cost||0) + Number(a.direct_operating_cost||0) + Number(a.transport_cost||0)
+                    const gp = rev - costs
+                    return (
+                      <tr key={a.id} style={{background: i % 2 === 0 ? C.cream : C.white, cursor:'pointer'}} onClick={() => setSelUnit(a.business_unit)}>
+                        <td style={{padding:'8px 10px', fontWeight:600, color:C.navy}}>{a.business_unit}</td>
+                        <td style={{padding:'8px 10px', color:C.green}}>{fmt(rev)}</td>
+                        <td style={{padding:'8px 10px', color:C.red}}>{fmt(costs)}</td>
+                        <td style={{padding:'8px 10px', fontWeight:700, color: gp >= 0 ? C.green : C.red}}>{fmt(gp)}</td>
+                        <td style={{padding:'8px 10px'}}>
+                          <span style={{fontFamily:'monospace', fontSize:'0.63rem', padding:'0.1rem 0.42rem', borderRadius:4, background: a.submitted ? C.green : C.amber, color:C.white}}>
+                            {a.submitted ? 'Submitted' : 'Draft'}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Unit entry form */}
+        <div style={card}>
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem', flexWrap:'wrap', gap:'0.5rem'}}>
+            <div style={{fontWeight:700, color:C.navy, fontSize:'0.9rem'}}>{selUnit}</div>
+            {actuals?.submitted && (
+              <span style={{fontFamily:'monospace', fontSize:'0.65rem', padding:'0.15rem 0.5rem', borderRadius:4, background:C.green, color:C.white}}>Submitted</span>
+            )}
+          </div>
+
+          {loading ? (
+            <div style={{color:C.slate, padding:'1rem', fontSize:'0.83rem'}}>Loading...</div>
+          ) : (
+            <>
+              {['revenue','costs','internal'].map(section => (
+                <div key={section} style={{marginBottom:'1.25rem'}}>
+                  <div style={{fontFamily:'monospace', fontSize:'0.65rem', letterSpacing:'0.1em', color:C.cyan, textTransform:'uppercase', marginBottom:'0.6rem', borderBottom:`1px solid ${C.border}`, paddingBottom:'0.3rem'}}>
+                    {section === 'revenue' ? 'Revenue' : section === 'costs' ? 'Costs' : 'Internal Transfers'}
+                  </div>
+                  <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'0.75rem'}}>
+                    {LINES.filter(l => l.section === section).map(line => (
+                      <div key={line.key}>
+                        <label style={{display:'block', fontWeight:600, fontSize:'0.78rem', marginBottom:'0.22rem', color:C.navy}}>{line.label}</label>
+                        <input
+                          type="number"
+                          style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'monospace', background: actuals?.submitted ? '#F5F5F5' : '#F4F8FC', color:C.navy, boxSizing:'border-box'}}
+                          value={actuals?.[line.key] || ''}
+                          disabled={actuals?.submitted && !isCEO && !isFM}
+                          onChange={e => setActuals(a => ({...a, [line.key]: e.target.value}))}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              <div>
+                <label style={{display:'block', fontWeight:600, fontSize:'0.78rem', marginBottom:'0.22rem', color:C.navy}}>Notes</label>
+                <textarea
+                  style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'inherit', background:'#F4F8FC', color:C.navy, minHeight:60, resize:'vertical', boxSizing:'border-box'}}
+                  value={actuals?.notes || ''}
+                  onChange={e => setActuals(a => ({...a, notes: e.target.value}))}
+                  placeholder="Any notes on this period..."
+                />
+              </div>
+
+              <div style={{display:'flex', gap:'0.75rem', marginTop:'1rem', alignItems:'center', flexWrap:'wrap'}}>
+                <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap'}}>
+                  <div style={{fontFamily:'monospace', fontSize:'0.72rem', color:C.slate}}>Revenue: <strong style={{color:C.green}}>{fmt(totalRevenue)}</strong></div>
+                  <div style={{fontFamily:'monospace', fontSize:'0.72rem', color:C.slate}}>Costs: <strong style={{color:C.red}}>{fmt(totalCosts)}</strong></div>
+                  <div style={{fontFamily:'monospace', fontSize:'0.72rem', color:C.slate}}>Gross Profit: <strong style={{color: grossProfit >= 0 ? C.green : C.red}}>{fmt(grossProfit)}</strong></div>
+                </div>
+                <div style={{marginLeft:'auto', display:'flex', gap:'0.6rem'}}>
+                  <button style={{fontFamily:'monospace', fontSize:'0.72rem', padding:'0.38rem 0.8rem', border:`1px solid ${C.border}`, borderRadius:4, background:'transparent', color:C.slate, cursor:'pointer'}} onClick={() => save(false)} disabled={saving}>
+                    {saving ? 'Saving...' : 'Save Draft'}
+                  </button>
+                  {!actuals?.submitted && (
+                    <button style={{fontFamily:'monospace', fontSize:'0.78rem', fontWeight:600, padding:'0.5rem 1.1rem', border:'none', borderRadius:4, background:C.navy, color:C.white, cursor:'pointer'}} onClick={() => save(true)} disabled={saving}>
+                      Submit for Review
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // ── TIME RECORDS TAB ──────────────────────────────────────
+  function TimeRecordsTab() {
+    const isFM = P.role === 'finance_manager'
+    const isCEO = P.role === 'ceo'
+    const isStaff = !isFM && !isCEO
+
+    const BUSINESS_UNITS = [
+      'Input Profit Centre 1','Input Profit Centre 2','Input Profit Centre 3',
+      'Input Profit Centre 4','Input Profit Centre 5',
+      'FGE Production and Marketing','Own Farm','Advisory Services',
+      'Customer Acquisition and Management','HQ Shared',
+    ]
+
+    const [records, setRecords] = React.useState([])
+    const [loading, setLoading] = React.useState(true)
+    const [showForm, setShowForm] = React.useState(false)
+    const [form, setForm] = React.useState({
+      business_unit: P.businessUnit || '',
+      period: `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-01`,
+      total_days: '',
+      description: '',
+    })
+    const [saving, setSaving] = React.useState(false)
+
+    React.useEffect(() => {
+      async function load() {
+        try {
+          const sb = getSupabase()
+          let query = sb.from('staff_time_records').select('*').eq('client_id', CONAS_CLIENT_ID).order('created_at', {ascending:false})
+          if (isStaff) query = query.eq('submitted_by', P.userId)
+          const { data } = await query
+          setRecords(data || [])
+        } catch(e) {}
+        setLoading(false)
+      }
+      load()
+    }, [])
+
+    async function submit() {
+      if (!form.business_unit || !form.total_days || !form.period) return
+      setSaving(true)
+      try {
+        const sb = getSupabase()
+        const { data } = await sb.from('staff_time_records').insert([{
+          client_id: CONAS_CLIENT_ID,
+          submitted_by: P.userId,
+          submitted_by_name: P.userName || '',
+          business_unit: form.business_unit,
+          period: form.period,
+          total_days: Number(form.total_days),
+          description: form.description,
+          status: 'pending',
+        }]).select().single()
+        setRecords(prev => [data, ...prev])
+        setShowForm(false)
+        setForm({business_unit: P.businessUnit || '', period: form.period, total_days: '', description: ''})
+      } catch(e) {}
+      setSaving(false)
+    }
+
+    async function updateRecord(id, updates) {
+      const sb = getSupabase()
+      await sb.from('staff_time_records').update({...updates, updated_at:new Date().toISOString()}).eq('id', id)
+      setRecords(prev => prev.map(r => r.id !== id ? r : {...r, ...updates}))
+    }
+
+    const statusColor = (s) => s === 'approved' ? C.green : s === 'queried' ? C.amber : C.slate
+    const pending = records.filter(r => r.status === 'pending')
+
+    return (
+      <div>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.25rem'}}>
+          <div style={{fontFamily:'Georgia,serif', fontSize:'1.1rem', fontWeight:700, color:C.navy}}>
+            Staff Time Records {isFM && pending.length > 0 && <span style={{fontFamily:'monospace', fontSize:'0.72rem', color:C.amber, marginLeft:'0.5rem'}}>({pending.length} pending review)</span>}
+          </div>
+          {!isCEO && (
+            <button style={{fontFamily:'monospace', fontSize:'0.72rem', padding:'0.38rem 0.8rem', border:`1px solid ${C.cyan}`, borderRadius:4, background:'transparent', color:C.cyan, cursor:'pointer'}} onClick={() => setShowForm(!showForm)}>
+              + Submit Time Record
+            </button>
+          )}
+        </div>
+
+        {showForm && (
+          <div style={{...card, border:`1px solid ${C.cyan}`, marginBottom:'1.25rem'}}>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:'1rem', marginBottom:'1rem'}}>
+              <div>
+                <label style={{display:'block', fontWeight:600, fontSize:'0.8rem', marginBottom:'0.22rem', color:C.navy}}>Business Unit</label>
+                <select style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'inherit', background:'#F4F8FC', color:C.navy, boxSizing:'border-box'}}
+                  value={form.business_unit} onChange={e => setForm(f => ({...f, business_unit: e.target.value}))}>
+                  <option value="">Select...</option>
+                  {BUSINESS_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{display:'block', fontWeight:600, fontSize:'0.8rem', marginBottom:'0.22rem', color:C.navy}}>Period</label>
+                <select style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'inherit', background:'#F4F8FC', color:C.navy, boxSizing:'border-box'}}
+                  value={form.period} onChange={e => setForm(f => ({...f, period: e.target.value}))}>
+                  {Array.from({length:12}, (_,i) => {
+                    const d = new Date(2026, i, 1)
+                    const v = `2026-${String(i+1).padStart(2,'0')}-01`
+                    return <option key={v} value={v}>{d.toLocaleString('en-GB',{month:'long',year:'numeric'})}</option>
+                  })}
+                </select>
+              </div>
+              <div>
+                <label style={{display:'block', fontWeight:600, fontSize:'0.8rem', marginBottom:'0.22rem', color:C.navy}}>Days Worked on This Unit</label>
+                <input type="number" style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'monospace', background:'#F4F8FC', color:C.navy, boxSizing:'border-box'}}
+                  value={form.total_days} onChange={e => setForm(f => ({...f, total_days: e.target.value}))} placeholder="e.g. 18"/>
+              </div>
+            </div>
+            <div style={{marginBottom:'1rem'}}>
+              <label style={{display:'block', fontWeight:600, fontSize:'0.8rem', marginBottom:'0.22rem', color:C.navy}}>Description of Work Done</label>
+              <textarea style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'inherit', background:'#F4F8FC', color:C.navy, minHeight:60, resize:'vertical', boxSizing:'border-box'}}
+                value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))} placeholder="Briefly describe what you did this month for this unit..."/>
+            </div>
+            <div style={{display:'flex', gap:'0.6rem'}}>
+              <button style={{fontFamily:'monospace', fontSize:'0.78rem', fontWeight:600, padding:'0.5rem 1.1rem', border:'none', borderRadius:4, background:C.navy, color:C.white, cursor:'pointer'}} onClick={submit} disabled={saving}>
+                {saving ? 'Submitting...' : 'Submit Time Record'}
+              </button>
+              <button style={{fontFamily:'monospace', fontSize:'0.72rem', padding:'0.38rem 0.8rem', border:`1px solid ${C.border}`, borderRadius:4, background:'transparent', color:C.slate, cursor:'pointer'}} onClick={() => setShowForm(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <div style={{color:C.slate, padding:'1.5rem', fontSize:'0.83rem'}}>Loading...</div>
+        ) : records.length === 0 ? (
+          <div style={{...card, textAlign:'center', color:C.slate, padding:'2rem', fontSize:'0.85rem'}}>No time records yet.</div>
+        ) : (
+          <div style={{overflowX:'auto'}}>
+            <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.8rem'}}>
+              <thead>
+                <tr style={{background:C.navy, color:C.white}}>
+                  {['Submitted By','Business Unit','Period','Days','Description','Status', isFM ? 'Actions' : ''].filter(Boolean).map(h => (
+                    <th key={h} style={{padding:'9px 12px', textAlign:'left', fontWeight:600, whiteSpace:'nowrap'}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {records.map((r, i) => (
+                  <tr key={r.id} style={{background: i % 2 === 0 ? C.cream : C.white, verticalAlign:'top'}}>
+                    <td style={{padding:'9px 12px', color:C.navy, fontWeight:600}}>{r.submitted_by_name || '—'}</td>
+                    <td style={{padding:'9px 12px', color:C.slate, fontSize:'0.78rem'}}>{r.business_unit}</td>
+                    <td style={{padding:'9px 12px', fontFamily:'monospace', fontSize:'0.75rem'}}>{r.period?.split('-').slice(0,2).join('/')}</td>
+                    <td style={{padding:'9px 12px', fontFamily:'monospace', fontWeight:700}}>{r.total_days}</td>
+                    <td style={{padding:'9px 12px', color:C.slate, maxWidth:200, fontSize:'0.78rem'}}>{r.description}</td>
+                    <td style={{padding:'9px 12px'}}>
+                      <span style={{fontFamily:'monospace', fontSize:'0.63rem', padding:'0.1rem 0.42rem', borderRadius:4, background:statusColor(r.status), color:C.white}}>
+                        {r.status}
+                      </span>
+                      {r.fm_query && <div style={{fontSize:'0.72rem', color:C.amber, marginTop:'0.25rem'}}>Query: {r.fm_query}</div>}
+                    </td>
+                    {isFM && (
+                      <td style={{padding:'9px 12px'}}>
+                        {r.status === 'pending' && (
+                          <div style={{display:'flex', flexDirection:'column', gap:'0.35rem'}}>
+                            <button style={{fontFamily:'monospace', fontSize:'0.65rem', padding:'0.2rem 0.5rem', border:'none', borderRadius:3, background:C.green, color:C.white, cursor:'pointer'}}
+                              onClick={() => updateRecord(r.id, {status:'approved', fm_reviewed_at:new Date().toISOString()})}>
+                              Approve
+                            </button>
+                            <button style={{fontFamily:'monospace', fontSize:'0.65rem', padding:'0.2rem 0.5rem', border:`1px solid ${C.amber}`, borderRadius:3, background:'transparent', color:C.amber, cursor:'pointer'}}
+                              onClick={() => {
+                                const q = prompt('Enter your query for this time record:')
+                                if (q) updateRecord(r.id, {status:'queried', fm_query:q, fm_reviewed_at:new Date().toISOString()})
+                              }}>
+                              Query
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── SPEND REQUESTS TAB ────────────────────────────────────
+  function SpendRequestsTab() {
+    const isCEO = P.role === 'ceo'
+    const isFM = P.role === 'finance_manager'
+
+    const BUSINESS_UNITS = [
+      'Input Profit Centre 1','Input Profit Centre 2','Input Profit Centre 3',
+      'Input Profit Centre 4','Input Profit Centre 5',
+      'FGE Production and Marketing','Own Farm','Advisory Services',
+      'Customer Acquisition and Management','HQ Shared',
+    ]
+
+    const CATEGORIES = ['staff','inputs','transport','equipment','overhead','other']
+
+    const [requests, setRequests] = React.useState([])
+    const [loading, setLoading] = React.useState(true)
+    const [showForm, setShowForm] = React.useState(false)
+    const [form, setForm] = React.useState({
+      business_unit: P.businessUnit || '',
+      amount: '',
+      description: '',
+      category: 'other',
+      is_shared_cost: false,
+      period: `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-01`,
+    })
+    const [saving, setSaving] = React.useState(false)
+
+    React.useEffect(() => {
+      async function load() {
+        try {
+          const sb = getSupabase()
+          let query = sb.from('spend_requests').select('*').eq('client_id', CONAS_CLIENT_ID).order('created_at', {ascending:false})
+          if (!isCEO && !isFM) query = query.eq('requested_by', P.userId)
+          const { data } = await query
+          setRequests(data || [])
+        } catch(e) {}
+        setLoading(false)
+      }
+      load()
+    }, [])
+
+    async function submitRequest() {
+      if (!form.business_unit || !form.amount || !form.description) return
+      setSaving(true)
+      try {
+        const sb = getSupabase()
+        const { data } = await sb.from('spend_requests').insert([{
+          client_id: CONAS_CLIENT_ID,
+          requested_by: P.userId,
+          requested_by_name: P.userName || '',
+          business_unit: form.is_shared_cost ? 'HQ Shared' : form.business_unit,
+          amount: Number(form.amount),
+          currency: 'UGX',
+          description: form.description,
+          category: form.category,
+          is_shared_cost: form.is_shared_cost,
+          period: form.period,
+          status: 'pending_fm',
+        }]).select().single()
+        setRequests(prev => [data, ...prev])
+        setShowForm(false)
+      } catch(e) {}
+      setSaving(false)
+    }
+
+    async function fmForward(id) {
+      const sb = getSupabase()
+      const updates = {status:'pending_ceo', fm_reviewed_at:new Date().toISOString(), fm_reviewed_by:P.userId, updated_at:new Date().toISOString()}
+      await sb.from('spend_requests').update(updates).eq('id', id)
+      setRequests(prev => prev.map(r => r.id !== id ? r : {...r, ...updates}))
+    }
+
+    async function ceoDecide(id, approved) {
+      const sb = getSupabase()
+      const updates = {
+        status: approved ? 'approved' : 'declined',
+        ceo_decided_at: new Date().toISOString(),
+        ceo_decided_by: P.userId,
+        posted_to_actuals: approved,
+        posted_at: approved ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      }
+      await sb.from('spend_requests').update(updates).eq('id', id)
+      if (approved) {
+        const req = requests.find(r => r.id === id)
+        if (req) {
+          await sb.from('unit_actuals').upsert({
+            client_id: CONAS_CLIENT_ID,
+            business_unit: req.business_unit,
+            period: req.period || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-01`,
+            [req.category === 'staff' ? 'staff_cost' : req.category === 'inputs' ? 'input_purchases' : req.category === 'transport' ? 'transport_cost' : 'direct_operating_cost']:
+              sb.rpc ? req.amount : req.amount,
+            updated_at: new Date().toISOString(),
+          }, {onConflict:'client_id,business_unit,period'})
+        }
+      }
+      setRequests(prev => prev.map(r => r.id !== id ? r : {...r, ...updates}))
+    }
+
+    function fmt(n) { return Number(n || 0).toLocaleString() }
+
+    const statusColor = (s) => ({
+      pending_fm: C.slate, pending_ceo: C.amber, approved: C.green, declined: C.red
+    })[s] || C.slate
+
+    const statusLabel = (s) => ({
+      pending_fm: 'Pending FM Review', pending_ceo: 'Pending CEO Approval', approved: 'Approved', declined: 'Declined'
+    })[s] || s
+
+    const pendingCEO = requests.filter(r => r.status === 'pending_ceo')
+    const pendingFM = requests.filter(r => r.status === 'pending_fm')
+
+    return (
+      <div>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.25rem'}}>
+          <div style={{fontFamily:'Georgia,serif', fontSize:'1.1rem', fontWeight:700, color:C.navy}}>
+            Spend Requests
+            {isCEO && pendingCEO.length > 0 && <span style={{fontFamily:'monospace', fontSize:'0.72rem', color:C.amber, marginLeft:'0.5rem'}}>({pendingCEO.length} awaiting your approval)</span>}
+            {isFM && pendingFM.length > 0 && <span style={{fontFamily:'monospace', fontSize:'0.72rem', color:C.amber, marginLeft:'0.5rem'}}>({pendingFM.length} to review)</span>}
+          </div>
+          {!isCEO && (
+            <button style={{fontFamily:'monospace', fontSize:'0.72rem', padding:'0.38rem 0.8rem', border:`1px solid ${C.cyan}`, borderRadius:4, background:'transparent', color:C.cyan, cursor:'pointer'}} onClick={() => setShowForm(!showForm)}>
+              + New Request
+            </button>
+          )}
+        </div>
+
+        {showForm && (
+          <div style={{...card, border:`1px solid ${C.cyan}`, marginBottom:'1.25rem'}}>
+            <div style={{fontWeight:700, color:C.navy, marginBottom:'1rem', fontSize:'0.88rem'}}>New Spend Request</div>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:'1rem', marginBottom:'1rem'}}>
+              <div>
+                <label style={{display:'block', fontWeight:600, fontSize:'0.8rem', marginBottom:'0.22rem', color:C.navy}}>Business Unit</label>
+                <select style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'inherit', background:'#F4F8FC', color:C.navy, boxSizing:'border-box'}}
+                  value={form.business_unit} onChange={e => setForm(f => ({...f, business_unit: e.target.value}))}>
+                  <option value="">Select...</option>
+                  {BUSINESS_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{display:'block', fontWeight:600, fontSize:'0.8rem', marginBottom:'0.22rem', color:C.navy}}>Amount (UGX)</label>
+                <input type="number" style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'monospace', background:'#F4F8FC', color:C.navy, boxSizing:'border-box'}}
+                  value={form.amount} onChange={e => setForm(f => ({...f, amount: e.target.value}))} placeholder="0"/>
+              </div>
+              <div>
+                <label style={{display:'block', fontWeight:600, fontSize:'0.8rem', marginBottom:'0.22rem', color:C.navy}}>Category</label>
+                <select style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'inherit', background:'#F4F8FC', color:C.navy, boxSizing:'border-box'}}
+                  value={form.category} onChange={e => setForm(f => ({...f, category: e.target.value}))}>
+                  {CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase()+c.slice(1)}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{marginBottom:'1rem'}}>
+              <label style={{display:'block', fontWeight:600, fontSize:'0.8rem', marginBottom:'0.22rem', color:C.navy}}>Description</label>
+              <textarea style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'inherit', background:'#F4F8FC', color:C.navy, minHeight:60, resize:'vertical', boxSizing:'border-box'}}
+                value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))} placeholder="What is this spend for?"/>
+            </div>
+            <label style={{display:'flex', alignItems:'center', gap:'0.5rem', fontSize:'0.83rem', color:C.navy, marginBottom:'1rem', cursor:'pointer'}}>
+              <input type="checkbox" checked={form.is_shared_cost} onChange={e => setForm(f => ({...f, is_shared_cost: e.target.checked}))}/>
+              This is a shared/HQ cost (not specific to one unit)
+            </label>
+            <div style={{display:'flex', gap:'0.6rem'}}>
+              <button style={{fontFamily:'monospace', fontSize:'0.78rem', fontWeight:600, padding:'0.5rem 1.1rem', border:'none', borderRadius:4, background:C.navy, color:C.white, cursor:'pointer'}} onClick={submitRequest} disabled={saving}>
+                {saving ? 'Submitting...' : 'Submit Request'}
+              </button>
+              <button style={{fontFamily:'monospace', fontSize:'0.72rem', padding:'0.38rem 0.8rem', border:`1px solid ${C.border}`, borderRadius:4, background:'transparent', color:C.slate, cursor:'pointer'}} onClick={() => setShowForm(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <div style={{color:C.slate, padding:'1.5rem', fontSize:'0.83rem'}}>Loading...</div>
+        ) : requests.length === 0 ? (
+          <div style={{...card, textAlign:'center', color:C.slate, padding:'2rem', fontSize:'0.85rem'}}>No spend requests yet.</div>
+        ) : (
+          <div style={{overflowX:'auto'}}>
+            <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.8rem'}}>
+              <thead>
+                <tr style={{background:C.navy, color:C.white}}>
+                  {['Requested By','Unit','Category','Amount','Description','Status','Actions'].map(h => (
+                    <th key={h} style={{padding:'9px 12px', textAlign:'left', fontWeight:600, whiteSpace:'nowrap'}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {requests.map((r, i) => (
+                  <tr key={r.id} style={{background: i % 2 === 0 ? C.cream : C.white, verticalAlign:'top'}}>
+                    <td style={{padding:'9px 12px', fontWeight:600, color:C.navy, fontSize:'0.78rem'}}>{r.requested_by_name || '—'}</td>
+                    <td style={{padding:'9px 12px', color:C.slate, fontSize:'0.75rem'}}>{r.business_unit}</td>
+                    <td style={{padding:'9px 12px', fontFamily:'monospace', fontSize:'0.72rem'}}>{r.category}</td>
+                    <td style={{padding:'9px 12px', fontFamily:'monospace', fontWeight:700, color:C.navy}}>{fmt(r.amount)}</td>
+                    <td style={{padding:'9px 12px', color:C.slate, maxWidth:200, fontSize:'0.78rem'}}>{r.description}</td>
+                    <td style={{padding:'9px 12px'}}>
+                      <span style={{fontFamily:'monospace', fontSize:'0.63rem', padding:'0.1rem 0.42rem', borderRadius:4, background:statusColor(r.status), color:C.white, whiteSpace:'nowrap'}}>
+                        {statusLabel(r.status)}
+                      </span>
+                      {r.posted_to_actuals && <div style={{fontSize:'0.68rem', color:C.teal, marginTop:'0.2rem'}}>Posted to actuals</div>}
+                    </td>
+                    <td style={{padding:'9px 12px'}}>
+                      {isFM && r.status === 'pending_fm' && (
+                        <button style={{fontFamily:'monospace', fontSize:'0.65rem', padding:'0.2rem 0.5rem', border:'none', borderRadius:3, background:C.cyan, color:C.navy, cursor:'pointer', whiteSpace:'nowrap'}}
+                          onClick={() => fmForward(r.id)}>
+                          Forward to CEO
+                        </button>
+                      )}
+                      {isCEO && r.status === 'pending_ceo' && (
+                        <div style={{display:'flex', flexDirection:'column', gap:'0.35rem'}}>
+                          <button style={{fontFamily:'monospace', fontSize:'0.65rem', padding:'0.2rem 0.5rem', border:'none', borderRadius:3, background:C.green, color:C.white, cursor:'pointer'}}
+                            onClick={() => ceoDecide(r.id, true)}>
+                            Approve
+                          </button>
+                          <button style={{fontFamily:'monospace', fontSize:'0.65rem', padding:'0.2rem 0.5rem', border:'none', borderRadius:3, background:C.red, color:C.white, cursor:'pointer'}}
+                            onClick={() => ceoDecide(r.id, false)}>
+                            Decline
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     )
   }
@@ -1412,6 +2245,9 @@ export default function CONASDashboard({
     ['opcashflow','Operational Cashflow'],
     ['workingcapital','Working Capital'],
     ['approvals',`Approvals${pending.length>0?` (${pending.length})`:''}`],
+    ['actuals','Actuals'],
+    ['spends','Spend Requests'],
+    ['timerecords','Time Records'],
     ['cashflow','Cash Flow'],
     ['balancesheet','Balance Sheet'],
     ['scenarios','Scenarios'],
@@ -1469,6 +2305,9 @@ export default function CONASDashboard({
         {view==='cashflow'        &&<CashFlowTab/>}
         {view==='balancesheet'    &&<BalanceSheetTab/>}
         {view==='scenarios'       &&<ScenariosTab/>}
+        {view==='actuals'         &&<ActualsTab/>}
+        {view==='spends'           &&<SpendRequestsTab/>}
+        {view==='timerecords'      &&<TimeRecordsTab/>}
         {view==='team'            &&<TeamTab/>}
         {view==='settings'        &&<SettingsTab/>}
       </main>
