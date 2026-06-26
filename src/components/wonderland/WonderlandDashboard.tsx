@@ -234,7 +234,7 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
     setActuals(next)
     setSaving(true)
     try{
-      await supabase.from('monthly_actuals').upsert({client_id:'client_wonderland',month_index:selMonth,actuals_data:next[selMonth]||{},updated_at:new Date().toISOString()},{onConflict:'client_id,month_index'})
+      await supabase.from('monthly_actuals').upsert({client_id:'bcf0da0f-7263-4f71-b703-46c8aad03ec1',month_index:selMonth,actuals_data:next[selMonth]||{},updated_at:new Date().toISOString()},{onConflict:'client_id,month_index'})
       await onSaveActuals(next)
     }catch(e){}
     setSaving(false)
@@ -243,7 +243,7 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
   async function saveObligations(next){
     setObligations(next)
     try{
-      await supabase.from('model_config').upsert({client_id:'client_wonderland',config_type:'debt_obligations',config_data:next,updated_at:new Date().toISOString()},{onConflict:'client_id,config_type'})
+      await supabase.from('model_config').upsert({client_id:'bcf0da0f-7263-4f71-b703-46c8aad03ec1',config_type:'debt_obligations',config_data:next,updated_at:new Date().toISOString()},{onConflict:'client_id,config_type'})
       await onSaveDebtObligations(next)
     }catch(e){}
   }
@@ -941,8 +941,8 @@ export default function WonderlandDashboard(){
         const {data:{user}}=await supabase.auth.getUser()
         if(user){
           const [{data:cfg},{data:acts}]=await Promise.all([
-            supabase.from('model_config').select('config_data,config_type').eq('client_id','client_wonderland'),
-            supabase.from('monthly_actuals').select('month_index,actuals_data').eq('client_id','client_wonderland')
+            supabase.from('model_config').select('config_data,config_type').eq('client_id','bcf0da0f-7263-4f71-b703-46c8aad03ec1'),
+            supabase.from('monthly_actuals').select('month_index,actuals_data').eq('client_id','bcf0da0f-7263-4f71-b703-46c8aad03ec1')
           ])
           if(cfg){
             const scen=cfg.find(r=>r.config_type==='scenario_overrides')
@@ -966,7 +966,7 @@ export default function WonderlandDashboard(){
 
   async function persist(nextOverrides){
     setOverrides(nextOverrides);setSaving(true)
-    try{await supabase.from('model_config').upsert({client_id:'client_wonderland',config_type:'scenario_overrides',config_data:nextOverrides,updated_at:new Date().toISOString()},{onConflict:'client_id,config_type'})}catch(e){}
+    try{await supabase.from('model_config').upsert({client_id:'bcf0da0f-7263-4f71-b703-46c8aad03ec1',config_type:'scenario_overrides',config_data:nextOverrides,updated_at:new Date().toISOString()},{onConflict:'client_id,config_type'})}catch(e){}
     setSaving(false)
   }
 
@@ -1086,7 +1086,7 @@ export default function WonderlandDashboard(){
           savedAssessments={savedAssessments}
           onSaveAssessments={async(assess)=>{
             setSavedAssessments(assess)
-            try{await supabase.from('model_config').upsert({client_id:'client_wonderland',config_type:'coach_assessments',config_data:assess,updated_at:new Date().toISOString()},{onConflict:'client_id,config_type'})}catch(e){}
+            try{await supabase.from('model_config').upsert({client_id:'bcf0da0f-7263-4f71-b703-46c8aad03ec1',config_type:'coach_assessments',config_data:assess,updated_at:new Date().toISOString()},{onConflict:'client_id,config_type'})}catch(e){}
           }}
         />}
         {view==='analytics'&&!mounted&&<div style={{padding:'2rem',color:CC.slate}}>Loading analytics...</div>}
