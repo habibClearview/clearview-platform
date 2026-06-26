@@ -625,9 +625,9 @@ function InlineAnalytics({ result, debtObligations, monthLabels, cc, savedAssess
 
   const [assess, setAssess] = useState(savedAssessments || {
     commercialModel: 2, managementCapability: 2, marketEvidence: 2, governance: 2,
-    immediateActions: '', nearTermActions: '', followUp: '', coachNotes: '', activeSection: 'credit'
+    immediateActions: '', nearTermActions: '', followUp: '', coachNotes: '',
   })
-  const [activeSection, setActiveSection] = useState(assess.activeSection || 'credit')
+  const [activeSection, setActiveSection] = useState('summary')
 
   function updateAssess(field, value) {
     const next = { ...assess, [field]: value }
@@ -635,22 +635,24 @@ function InlineAnalytics({ result, debtObligations, monthLabels, cc, savedAssess
     onSaveAssessments && onSaveAssessments(next)
   }
 
-  // DSCR
+  // ── Calculations ──────────────────────────────────────────
   const dscr = con.ebitda.map((e, m) => {
     const ds = debtSched.totalRepayment[m]
     return ds > 0 ? e / ds : e > 0 ? 3 : 0
   })
   const dscrAvgY1 = dscr.slice(0,12).reduce((a,b)=>a+b,0) / 12
-
-  // Revenue trend
   const q1Rev = con.revenue.slice(0,3).reduce((a,b)=>a+b,0)
   const q4Rev = con.revenue.slice(9,12).reduce((a,b)=>a+b,0)
   const revTrend = q4Rev > q1Rev * 1.05 ? 'Growing' : q4Rev < q1Rev * 0.95 ? 'Declining' : 'Stable'
-
-  // Cash gaps
   const cashGaps = cf.closingCash.filter(v => v < 0).length
+  const y1Ebitda = con.ebitda.slice(0,12).reduce((a,b)=>a+b,0)
+  const y2Ebitda = con.ebitda.slice(12,24).reduce((a,b)=>a+b,0)
+  const y1Rev2 = con.revenue.slice(0,12).reduce((a,b)=>a+b,0)
+  const y2Rev2 = con.revenue.slice(12,24).reduce((a,b)=>a+b,0)
+  const minCash = Math.min(...cf.closingCash)
+  const ebitdaMargin = y1Rev2 > 0 ? y1Ebitda / y1Rev2 : 0
+  const deToEq = bs.totalEquity[11] > 0 ? bs.totalLiabilities[11] / bs.totalEquity[11] : 99
 
-  // Score
   let score = 50
   if (dscrAvgY1 >= 1.5) score += 30
   else if (dscrAvgY1 >= 1.0) score += 15
@@ -664,221 +666,105 @@ function InlineAnalytics({ result, debtObligations, monthLabels, cc, savedAssess
   const classification = score >= 65 ? 'Stable' : score >= 40 ? 'At Risk' : 'High Risk'
   const classColor = classification === 'Stable' ? CC.green : classification === 'At Risk' ? CC.amber : CC.red
 
-  // Going concern
-  const y1Ebitda = con.ebitda.slice(0,12).reduce((a,b)=>a+b,0)
-  const y2Ebitda = con.ebitda.slice(12,24).reduce((a,b)=>a+b,0)
-  const y1Rev2 = con.revenue.slice(0,12).reduce((a,b)=>a+b,0)
-  const y2Rev2 = con.revenue.slice(12,24).reduce((a,b)=>a+b,0)
-  const minCash = Math.min(...cf.closingCash)
-  const gcScore = Math.min(20, Math.max(0,
-    (dscrAvgY1 >= 1.5 ? 4 : dscrAvgY1 >= 1.0 ? 3 : dscrAvgY1 >= 0.5 ? 2 : 1) +
-    (minCash >= 0 ? 4 : minCash > -10_000_000 ? 1 : 0) +
-    (y2Rev2 > y1Rev2 * 1.05 ? 4 : y2Rev2 > y1Rev2 * 0.95 ? 3 : 2) +
-    (y1Ebitda > 0 && y2Ebitda > y1Ebitda ? 4 : y1Ebitda > 0 ? 3 : 2) +
-    2 // management default
-  ))
-  const gcRating = gcScore >= 17 ? 'Strong' : gcScore >= 12 ? 'Adequate' : gcScore >= 7 ? 'Marginal' : 'Concern'
-  const gcColor = gcRating === 'Strong' ? CC.green : gcRating === 'Adequate' ? CC.cyan : gcRating === 'Marginal' ? CC.amber : CC.red
+  const gcScore = Math.min(20,
+    (dscrAvgY1>=1.5?4:dscrAvgY1>=1.0?3:dscrAvgY1>=0.5?2:1) +
+    (minCash>=0?4:minCash>-10_000_000?1:0) +
+    (y2Rev2>y1Rev2*1.05?4:y2Rev2>y1Rev2*0.95?3:2) +
+    (y1Ebitda>0&&y2Ebitda>y1Ebitda?4:y1Ebitda>0?3:2) +
+    (assess.managementCapability||2)
+  )
+  const gcRating = gcScore>=17?'Strong':gcScore>=12?'Adequate':gcScore>=7?'Marginal':'Concern'
+  const gcColor = gcRating==='Strong'?CC.green:gcRating==='Adequate'?CC.cyan:gcRating==='Marginal'?CC.amber:CC.red
 
-  // Investment readiness
-  const ebitdaMargin = y1Rev2 > 0 ? y1Ebitda / y1Rev2 : 0
-  const deToEq = bs.totalEquity[11] > 0 ? bs.totalLiabilities[11] / bs.totalEquity[11] : 99
-  const irScore = Math.min(30, Math.max(0,
-    Math.min(5, (ebitdaMargin >= 0.2 ? 2 : ebitdaMargin >= 0.05 ? 1 : 0) + (y1Ebitda > 0 ? 1 : 0) + (deToEq < 1 ? 2 : deToEq < 2 ? 1 : 0)) +
-    Math.min(5, Math.round(dscrAvgY1 >= 2 ? 5 : dscrAvgY1 >= 1.5 ? 4 : dscrAvgY1 >= 1 ? 3 : dscrAvgY1 >= 0.5 ? 2 : 1)) +
-    2 + 2 + 2 + 2 // coach assessments default
-  ))
-  const irTier = irScore >= 24 ? 'Investment Ready' : irScore >= 17 ? 'Near Ready' : irScore >= 10 ? 'Development Stage' : 'Pre-Investment'
-  const irColor = irTier === 'Investment Ready' ? CC.green : irTier === 'Near Ready' ? CC.cyan : CC.amber
+  const irFinancial = Math.min(5,(ebitdaMargin>=0.2?2:ebitdaMargin>=0.05?1:0)+(y1Ebitda>0?1:0)+(deToEq<1?2:deToEq<2?1:0))
+  const irDebt = Math.min(5,Math.round(dscrAvgY1>=2?5:dscrAvgY1>=1.5?4:dscrAvgY1>=1?3:2))
+  const irScore = Math.min(30, irFinancial+irDebt+(assess.commercialModel||2)+(assess.managementCapability||2)+(assess.marketEvidence||2)+(assess.governance||2))
+  const irTier = irScore>=24?'Investment Ready':irScore>=17?'Near Ready':irScore>=10?'Development Stage':'Pre-Investment'
+  const irColor = irTier==='Investment Ready'?CC.green:irTier==='Near Ready'?CC.cyan:CC.amber
 
-  // 6-month projection
   const proj6 = Array.from({length:6},(_,i)=>i).map(i => ({
     monthLabel: monthLabels[i],
     cashIn: Math.max(0, con.ebitda[i]),
-    cashOut: (con.ebitda[i] < 0 ? Math.abs(con.ebitda[i]) : 0) + debtSched.totalRepayment[i],
-    net: con.ebitda[i] - debtSched.totalRepayment[i],
+    cashOut: (con.ebitda[i]<0?Math.abs(con.ebitda[i]):0)+debtSched.totalRepayment[i],
+    net: con.ebitda[i]-debtSched.totalRepayment[i],
     closing: 0,
   }))
-  let runCash = cf.closingCash[0] || 0
-  proj6.forEach(p => { runCash += p.net; p.closing = runCash })
-  const gaps6 = proj6.filter(p => p.closing < 0).length
+  let runCash = cf.closingCash[0]||0
+  proj6.forEach(p=>{runCash+=p.net;p.closing=runCash})
+  const gaps6 = proj6.filter(p=>p.closing<0).length
 
-  const KPI = ({label,value,sub,color}) => (
-    <div style={{background:CC.white,border:`1px solid ${CC.border}`,borderRadius:6,padding:'1rem'}}>
-      <div style={{fontFamily:'monospace',fontSize:'0.68rem',color:CC.slate,textTransform:'uppercase',marginBottom:'0.3rem'}}>{label}</div>
-      <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:color||CC.navy}}>{value}</div>
-      {sub&&<div style={{fontSize:'0.75rem',color:CC.slate,marginTop:'0.2rem'}}>{sub}</div>}
+  // ── Shared mini components ────────────────────────────────
+  const Badge = ({label,color}) => (
+    <span style={{fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,padding:'0.25rem 0.7rem',borderRadius:20,background:color,color:CC.white}}>{label}</span>
+  )
+  const ScoreBar = ({score:s,max,color}) => (
+    <div style={{background:'#E8ECF0',borderRadius:999,height:7}}>
+      <div style={{width:`${(s/max)*100}%`,height:'100%',background:color,borderRadius:999}}/>
     </div>
   )
+  const inp = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${CC.border}`,borderRadius:4,fontSize:'0.82rem',fontFamily:'inherit',background:'#F4F8FC',color:CC.navy,boxSizing:'border-box'}
+
+  const tabs = [['summary','Summary'],['credit','Credit Risk'],['going_concern','Going Concern'],['investment','Investment Readiness'],['projection','6-Month Projection'],['coach','Coach Assessment'],['close','Engagement Close']]
 
   return (
     <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
 
-      {/* Summary strip */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
-        <KPI label="Credit Risk" value={classification} color={classColor} sub={`Score ${score}/100`}/>
-        <KPI label="Going Concern" value={gcRating} color={gcColor} sub={`${gcScore}/20`}/>
-        <KPI label="Investment Readiness" value={irTier} color={irColor} sub={`${irScore}/30`}/>
-        <KPI label="Avg DSCR Y1" value={`${dscrAvgY1.toFixed(2)}x`} color={dscrAvgY1>=1.5?CC.green:dscrAvgY1>=1.0?CC.amber:CC.red} sub="Debt service coverage"/>
-        <KPI label="Cash Gaps" value={cashGaps} color={cashGaps===0?CC.green:CC.red} sub="Months cash negative"/>
-        <KPI label="6-Month Gaps" value={gaps6} color={gaps6===0?CC.green:CC.amber} sub="Projected shortfalls"/>
-      </div>
-
-      {/* Credit Risk */}
-      <div style={{...card,borderTop:`4px solid ${classColor}`}}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:CC.navy,marginBottom:'1rem'}}>Credit Risk Dashboard</div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'1rem',marginBottom:'1rem'}}>
-          <div style={{background:CC.lightBg,borderRadius:6,padding:'0.85rem'}}>
-            <div style={{fontFamily:'monospace',fontSize:'0.68rem',color:CC.slate,marginBottom:'0.3rem'}}>DSCR Y1</div>
-            <div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:dscrAvgY1>=1.5?CC.green:dscrAvgY1>=1.0?CC.amber:CC.red}}>{dscrAvgY1.toFixed(2)}x</div>
-            <div style={{fontSize:'0.75rem',color:CC.slate}}>{dscrAvgY1>=1.5?'Strong':dscrAvgY1>=1.0?'Adequate — monitor':'Weak — action needed'}</div>
-          </div>
-          <div style={{background:CC.lightBg,borderRadius:6,padding:'0.85rem'}}>
-            <div style={{fontFamily:'monospace',fontSize:'0.68rem',color:CC.slate,marginBottom:'0.3rem'}}>REVENUE TREND</div>
-            <div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:revTrend==='Growing'?CC.green:revTrend==='Stable'?CC.amber:CC.red}}>{revTrend}</div>
-            <div style={{fontSize:'0.75rem',color:CC.slate}}>Q1 vs Q4 Year 1</div>
-          </div>
-          <div style={{background:CC.lightBg,borderRadius:6,padding:'0.85rem'}}>
-            <div style={{fontFamily:'monospace',fontSize:'0.68rem',color:CC.slate,marginBottom:'0.3rem'}}>CASH-NEGATIVE MONTHS</div>
-            <div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:cashGaps===0?CC.green:CC.red}}>{cashGaps}</div>
-            <div style={{fontSize:'0.75rem',color:CC.slate}}>of 24 months</div>
-          </div>
-          <div style={{background:CC.lightBg,borderRadius:6,padding:'0.85rem'}}>
-            <div style={{fontFamily:'monospace',fontSize:'0.68rem',color:CC.slate,marginBottom:'0.3rem'}}>ANNUAL DEBT SERVICE Y1</div>
-            <div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:CC.navy}}>{compactCurrency(debtSched.annualY1,cc)}</div>
-            <div style={{fontSize:'0.75rem',color:CC.slate}}>Interest + principal</div>
-          </div>
-        </div>
-        <div style={{overflowX:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.76rem',fontFamily:'monospace'}}>
-            <thead><tr style={{background:CC.navy,color:CC.white}}>
-              <th style={{padding:'7px 10px',textAlign:'left',minWidth:160}}>Metric</th>
-              {monthLabels.slice(0,12).map(m=><th key={m} style={{padding:'7px 8px',textAlign:'right',whiteSpace:'nowrap'}}>{m}</th>)}
-            </tr></thead>
-            <tbody>
-              <tr style={{background:CC.cream}}><td style={{padding:'6px 10px',fontWeight:600}}>EBITDA</td>{con.ebitda.slice(0,12).map((v,i)=><td key={i} style={{padding:'6px 8px',textAlign:'right',color:v>=0?CC.green:CC.red}}>{compactCurrency(v,cc)}</td>)}</tr>
-              <tr><td style={{padding:'6px 10px',fontWeight:600}}>Debt Service</td>{debtSched.totalRepayment.slice(0,12).map((v,i)=><td key={i} style={{padding:'6px 8px',textAlign:'right'}}>{compactCurrency(v,cc)}</td>)}</tr>
-              <tr style={{background:CC.lightBg}}><td style={{padding:'6px 10px',fontWeight:700}}>DSCR</td>{dscr.slice(0,12).map((v,i)=><td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:v>=1.5?CC.green:v>=1.0?CC.amber:CC.red}}>{v.toFixed(2)}x</td>)}</tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Going Concern + Investment Readiness */}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1.25rem',marginBottom:'1.25rem'}}>
-        <div style={{...card,borderTop:`4px solid ${gcColor}`}}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:CC.navy,marginBottom:'0.75rem'}}>Going Concern</div>
-          <div style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'0.75rem'}}>
-            <div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:gcColor,lineHeight:1}}>{gcScore}</div>
-            <div><div style={{fontSize:'0.75rem',color:CC.slate}}>out of 20</div><span style={{fontFamily:'monospace',fontSize:'0.75rem',fontWeight:700,padding:'0.2rem 0.6rem',borderRadius:12,background:gcColor,color:CC.white}}>{gcRating}</span></div>
-          </div>
-          {[
-            ['Debt Service Coverage', dscrAvgY1>=1.5?4:dscrAvgY1>=1.0?3:dscrAvgY1>=0.5?2:1],
-            ['Liquidity Position', minCash>=0?4:minCash>-10_000_000?1:0],
-            ['Revenue Sustainability', y2Rev2>y1Rev2*1.05?4:y2Rev2>y1Rev2*0.95?3:2],
-            ['Operational Profitability', y1Ebitda>0&&y2Ebitda>y1Ebitda?4:y1Ebitda>0?3:2],
-            ['Management & Governance', 2],
-          ].map(([name,sc])=>(
-            <div key={name} style={{marginBottom:'0.6rem'}}>
-              <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.8rem',marginBottom:'0.2rem'}}>
-                <span style={{color:CC.navy}}>{name}</span>
-                <span style={{fontFamily:'monospace',fontWeight:700,color:CC.navy}}>{sc}/4</span>
-              </div>
-              <div style={{background:'#E8ECF0',borderRadius:999,height:6}}>
-                <div style={{width:`${(sc/4)*100}%`,height:'100%',background:sc>=3?CC.green:sc>=2?CC.amber:CC.red,borderRadius:999}}/>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{...card,borderTop:`4px solid ${irColor}`}}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:CC.navy,marginBottom:'0.75rem'}}>Investment Readiness</div>
-          <div style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'0.75rem'}}>
-            <div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:irColor,lineHeight:1}}>{irScore}</div>
-            <div><div style={{fontSize:'0.75rem',color:CC.slate}}>out of 30</div><span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,padding:'0.2rem 0.6rem',borderRadius:12,background:irColor,color:CC.white}}>{irTier}</span></div>
-          </div>
-          {[
-            ['Financial Viability', Math.min(5,(ebitdaMargin>=0.2?2:ebitdaMargin>=0.05?1:0)+(y1Ebitda>0?1:0)+(deToEq<1?2:deToEq<2?1:0))],
-            ['Debt Serviceability', Math.min(5,Math.round(dscrAvgY1>=2?5:dscrAvgY1>=1.5?4:dscrAvgY1>=1?3:2))],
-            ['Commercial Model Clarity', 2],
-            ['Management Capability', 2],
-            ['Market Evidence', 2],
-            ['Governance & Records', 2],
-          ].map(([name,sc])=>(
-            <div key={name} style={{marginBottom:'0.6rem'}}>
-              <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.8rem',marginBottom:'0.2rem'}}>
-                <span style={{color:CC.navy}}>{name}</span>
-                <span style={{fontFamily:'monospace',fontWeight:700,color:CC.navy}}>{sc}/5</span>
-              </div>
-              <div style={{background:'#E8ECF0',borderRadius:999,height:6}}>
-                <div style={{width:`${(sc/5)*100}%`,height:'100%',background:sc>=4?CC.green:sc>=3?CC.cyan:sc>=2?CC.amber:CC.red,borderRadius:999}}/>
-              </div>
-            </div>
-          ))}
-          <div style={{fontSize:'0.75rem',color:CC.slate,marginTop:'0.5rem',fontStyle:'italic'}}>Commercial model, management, market evidence, and governance scores require coach assessment input.</div>
-        </div>
-      </div>
-
-      {/* 6-month projection */}
-      <div style={{...card}}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:CC.navy,marginBottom:'1rem'}}>6-Month Cashflow Projection</div>
-        <div style={{overflowX:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.78rem',fontFamily:'monospace'}}>
-            <thead><tr style={{background:CC.navy,color:CC.white}}>
-              <th style={{padding:'7px 10px',textAlign:'left',minWidth:160}}>Line</th>
-              {proj6.map(p=><th key={p.monthLabel} style={{padding:'7px 8px',textAlign:'right',whiteSpace:'nowrap'}}>{p.monthLabel}</th>)}
-            </tr></thead>
-            <tbody>
-              <tr style={{background:CC.cream}}><td style={{padding:'6px 10px',fontWeight:600}}>Cash In (EBITDA)</td>{proj6.map((p,i)=><td key={i} style={{padding:'6px 8px',textAlign:'right',color:CC.green}}>{compactCurrency(p.cashIn,cc)}</td>)}</tr>
-              <tr><td style={{padding:'6px 10px',fontWeight:600}}>Cash Out</td>{proj6.map((p,i)=><td key={i} style={{padding:'6px 8px',textAlign:'right',color:CC.red}}>{compactCurrency(-p.cashOut,cc)}</td>)}</tr>
-              <tr style={{background:CC.lightBg}}><td style={{padding:'6px 10px',fontWeight:700}}>Net</td>{proj6.map((p,i)=><td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:p.net>=0?CC.green:CC.red}}>{compactCurrency(p.net,cc)}</td>)}</tr>
-              <tr style={{background:CC.navy}}><td style={{padding:'6px 10px',fontWeight:700,color:CC.white}}>Closing Cash</td>{proj6.map((p,i)=><td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:p.closing>=0?'#7DCEA0':CC.red}}>{compactCurrency(p.closing,cc)}</td>)}</tr>
-            </tbody>
-          </table>
-        </div>
-        {gaps6>0&&<div style={{background:'#FDF0EE',border:`1px solid ${CC.red}`,borderRadius:6,padding:'0.75rem',marginTop:'0.75rem',fontSize:'0.83rem',color:CC.red,fontWeight:600}}>⚠ {gaps6} month(s) in the next 6 months show a projected cash shortfall. Review debt service timing and revenue collection.</div>}
-        {gaps6===0&&<div style={{background:'#E8F5EE',border:`1px solid ${CC.green}`,borderRadius:6,padding:'0.75rem',marginTop:'0.75rem',fontSize:'0.83rem',color:CC.green,fontWeight:600}}>✓ No cashflow gaps projected in the next 6 months.</div>}
-      </div>
-
-      {/* Section tabs */}
-      <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',marginBottom:'1.5rem',borderBottom:`1px solid ${CC.border}`,paddingBottom:'0.75rem'}}>
-        {[['credit','Credit Risk'],['going_concern','Going Concern'],['investment','Investment Readiness'],['projection','6-Month Projection'],['coach','Coach Assessment'],['close','Engagement Close']].map(([id,label])=>(
+      {/* Tab navigation */}
+      <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',marginBottom:'1.5rem',borderBottom:`2px solid ${CC.border}`,paddingBottom:'0.75rem'}}>
+        {tabs.map(([id,label])=>(
           <button key={id} onClick={()=>setActiveSection(id)} style={{fontFamily:'monospace',fontSize:'0.78rem',padding:'0.5rem 1rem',border:`1px solid ${activeSection===id?CC.cyan:CC.border}`,borderRadius:5,background:activeSection===id?CC.cyan:CC.white,color:activeSection===id?CC.navy:CC.slate,cursor:'pointer',fontWeight:activeSection===id?700:400}}>{label}</button>
         ))}
       </div>
 
-      {/* Credit Risk section */}
+      {/* SUMMARY */}
+      {activeSection==='summary'&&(
+        <div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
+            {[['Credit Risk',classification,classColor,`Score ${score}/100`],['Going Concern',gcRating,gcColor,`${gcScore}/20`],['Investment Readiness',irTier,irColor,`${irScore}/30`],['Avg DSCR Y1',`${dscrAvgY1.toFixed(2)}x`,dscrAvgY1>=1.5?CC.green:dscrAvgY1>=1.0?CC.amber:CC.red,'Debt service coverage'],['Cash-Negative Months',cashGaps,cashGaps===0?CC.green:CC.red,'of 24 months'],['6-Month Gaps',gaps6,gaps6===0?CC.green:CC.amber,'Projected shortfalls']].map(([label,val,color,sub])=>(
+              <div key={label} style={{background:CC.white,border:`1px solid ${CC.border}`,borderRadius:6,padding:'1rem'}}>
+                <div style={{fontFamily:'monospace',fontSize:'0.68rem',color:CC.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div>
+                <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:typeof val==='string'&&val.length>4?color:CC.navy,marginBottom:'0.2rem'}}>{typeof val==='number'?val:<Badge label={val} color={color}/>}</div>
+                <div style={{fontSize:'0.75rem',color:CC.slate}}>{sub}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{background:CC.navy,borderRadius:8,padding:'1rem 1.25rem'}}>
+            <div style={{fontFamily:'monospace',fontSize:'0.68rem',letterSpacing:'0.12em',color:CC.cyan,marginBottom:'0.75rem'}}>READING THE PICTURE</div>
+            {[
+              [dscrAvgY1>=1.5?'green':dscrAvgY1>=1.0?'amber':'red', `Debt service coverage: DSCR ${dscrAvgY1.toFixed(2)}x average in Year 1. ${dscrAvgY1>=1.5?'Strong — business generates comfortable surplus over obligations.':dscrAvgY1>=1.0?'Adequate but watch closely — little room for a bad month.':'Weak — business is not generating enough to service obligations comfortably.'}`],
+              [cashGaps===0?'green':cashGaps<=2?'amber':'red', `Cash position: ${cashGaps===0?'Positive throughout 24 months — no liquidity gaps.':cashGaps<=2?`Negative in ${cashGaps} month(s) — manageable with short-term facility.`:`Negative in ${cashGaps} months — material liquidity risk.`}`],
+              [revTrend==='Growing'?'green':revTrend==='Stable'?'amber':'red', `Revenue trend: ${revTrend} from Q1 to Q4 Year 1.`],
+              [irScore>=17?'green':'amber', `Investment readiness: ${irTier} (${irScore}/30). ${irScore<17?'Address coach assessment dimensions to improve score.':'Presents a credible case to financing partners.'}`],
+            ].map(([type,msg],i)=>(
+              <div key={i} style={{display:'flex',gap:'0.6rem',marginBottom:'0.5rem',fontSize:'0.84rem',color:CC.white,lineHeight:1.5}}>
+                <span style={{width:8,height:8,borderRadius:'50%',background:type==='green'?CC.green:type==='amber'?CC.amber:CC.red,marginTop:'0.45rem',flexShrink:0,display:'inline-block'}}/>
+                <span>{msg}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* CREDIT RISK */}
       {activeSection==='credit'&&(
         <div>
           <div style={{...card,borderTop:`4px solid ${classColor}`}}>
-            <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:CC.navy,marginBottom:'1rem'}}>Credit Risk Dashboard</div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'1rem',marginBottom:'1rem'}}>
-              <div style={{background:CC.lightBg,borderRadius:6,padding:'0.85rem'}}>
-                <div style={{fontFamily:'monospace',fontSize:'0.68rem',color:CC.slate,marginBottom:'0.3rem'}}>DSCR Y1</div>
-                <div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:dscrAvgY1>=1.5?CC.green:dscrAvgY1>=1.0?CC.amber:CC.red}}>{dscrAvgY1.toFixed(2)}x</div>
-                <div style={{fontSize:'0.75rem',color:CC.slate}}>{dscrAvgY1>=1.5?'Strong':dscrAvgY1>=1.0?'Adequate — monitor':'Weak — action needed'}</div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1.25rem',flexWrap:'wrap',gap:'0.75rem'}}>
+              <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:CC.navy}}>Credit Risk Dashboard</div>
+              <div style={{display:'flex',alignItems:'center',gap:'1rem'}}>
+                <div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:classColor,lineHeight:1}}>{score}</div>
+                <div><div style={{fontSize:'0.75rem',color:CC.slate}}>out of 100</div><Badge label={classification} color={classColor}/></div>
               </div>
-              <div style={{background:CC.lightBg,borderRadius:6,padding:'0.85rem'}}>
-                <div style={{fontFamily:'monospace',fontSize:'0.68rem',color:CC.slate,marginBottom:'0.3rem'}}>REVENUE TREND</div>
-                <div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:revTrend==='Growing'?CC.green:revTrend==='Stable'?CC.amber:CC.red}}>{revTrend}</div>
-                <div style={{fontSize:'0.75rem',color:CC.slate}}>Q1 vs Q4 Year 1</div>
-              </div>
-              <div style={{background:CC.lightBg,borderRadius:6,padding:'0.85rem'}}>
-                <div style={{fontFamily:'monospace',fontSize:'0.68rem',color:CC.slate,marginBottom:'0.3rem'}}>CASH-NEGATIVE MONTHS</div>
-                <div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:cashGaps===0?CC.green:CC.red}}>{cashGaps}</div>
-                <div style={{fontSize:'0.75rem',color:CC.slate}}>of 24 months</div>
-              </div>
-              <div style={{background:CC.lightBg,borderRadius:6,padding:'0.85rem'}}>
-                <div style={{fontFamily:'monospace',fontSize:'0.68rem',color:CC.slate,marginBottom:'0.3rem'}}>ANNUAL DEBT SERVICE Y1</div>
-                <div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:CC.navy}}>{compactCurrency(debtSched.annualY1,cc)}</div>
-                <div style={{fontSize:'0.75rem',color:CC.slate}}>Interest + principal</div>
-              </div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'1rem',marginBottom:'1.25rem'}}>
+              <div style={{background:CC.lightBg,borderRadius:6,padding:'0.85rem'}}><div style={{fontFamily:'monospace',fontSize:'0.68rem',color:CC.slate,marginBottom:'0.3rem'}}>DSCR Y1 AVERAGE</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:dscrAvgY1>=1.5?CC.green:dscrAvgY1>=1.0?CC.amber:CC.red}}>{dscrAvgY1.toFixed(2)}x</div><div style={{fontSize:'0.75rem',color:CC.slate}}>{dscrAvgY1>=1.5?'Strong':dscrAvgY1>=1.0?'Adequate':'Weak'}</div></div>
+              <div style={{background:CC.lightBg,borderRadius:6,padding:'0.85rem'}}><div style={{fontFamily:'monospace',fontSize:'0.68rem',color:CC.slate,marginBottom:'0.3rem'}}>REVENUE TREND</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:revTrend==='Growing'?CC.green:revTrend==='Stable'?CC.amber:CC.red}}>{revTrend}</div><div style={{fontSize:'0.75rem',color:CC.slate}}>Q1 vs Q4 Year 1</div></div>
+              <div style={{background:CC.lightBg,borderRadius:6,padding:'0.85rem'}}><div style={{fontFamily:'monospace',fontSize:'0.68rem',color:CC.slate,marginBottom:'0.3rem'}}>CASH-NEGATIVE MONTHS</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:cashGaps===0?CC.green:CC.red}}>{cashGaps}</div><div style={{fontSize:'0.75rem',color:CC.slate}}>of 24 months</div></div>
+              <div style={{background:CC.lightBg,borderRadius:6,padding:'0.85rem'}}><div style={{fontFamily:'monospace',fontSize:'0.68rem',color:CC.slate,marginBottom:'0.3rem'}}>ANNUAL DEBT SERVICE Y1</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:CC.navy}}>{compactCurrency(debtSched.annualY1,cc)}</div><div style={{fontSize:'0.75rem',color:CC.slate}}>Interest + principal</div></div>
             </div>
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.76rem',fontFamily:'monospace'}}>
-                <thead><tr style={{background:CC.navy,color:CC.white}}>
-                  <th style={{padding:'7px 10px',textAlign:'left',minWidth:160}}>Metric</th>
-                  {monthLabels.slice(0,12).map(m=><th key={m} style={{padding:'7px 8px',textAlign:'right',whiteSpace:'nowrap'}}>{m}</th>)}
-                </tr></thead>
+                <thead><tr style={{background:CC.navy,color:CC.white}}><th style={{padding:'7px 10px',textAlign:'left',minWidth:140}}>Metric</th>{monthLabels.slice(0,12).map(m=><th key={m} style={{padding:'7px 8px',textAlign:'right',whiteSpace:'nowrap'}}>{m}</th>)}</tr></thead>
                 <tbody>
                   <tr style={{background:CC.cream}}><td style={{padding:'6px 10px',fontWeight:600}}>EBITDA</td>{con.ebitda.slice(0,12).map((v,i)=><td key={i} style={{padding:'6px 8px',textAlign:'right',color:v>=0?CC.green:CC.red}}>{compactCurrency(v,cc)}</td>)}</tr>
                   <tr><td style={{padding:'6px 10px',fontWeight:600}}>Debt Service</td>{debtSched.totalRepayment.slice(0,12).map((v,i)=><td key={i} style={{padding:'6px 8px',textAlign:'right'}}>{compactCurrency(v,cc)}</td>)}</tr>
@@ -890,76 +776,62 @@ function InlineAnalytics({ result, debtObligations, monthLabels, cc, savedAssess
         </div>
       )}
 
-      {/* Going Concern section */}
+      {/* GOING CONCERN */}
       {activeSection==='going_concern'&&(
         <div style={{...card,borderTop:`4px solid ${gcColor}`}}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:CC.navy,marginBottom:'1rem'}}>Going Concern Assessment</div>
-          <div style={{display:'flex',alignItems:'center',gap:'1.5rem',marginBottom:'1.5rem'}}>
-            <div style={{fontFamily:'Georgia,serif',fontSize:'3rem',fontWeight:700,color:gcColor,lineHeight:1}}>{gcScore}</div>
-            <div><div style={{fontSize:'0.8rem',color:CC.slate,marginBottom:'0.3rem'}}>out of 20</div><span style={{fontFamily:'monospace',fontSize:'0.82rem',fontWeight:700,padding:'0.3rem 0.8rem',borderRadius:12,background:gcColor,color:CC.white}}>{gcRating}</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1.25rem',flexWrap:'wrap',gap:'0.75rem'}}>
+            <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:CC.navy}}>Going Concern Assessment</div>
+            <div style={{display:'flex',alignItems:'center',gap:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:gcColor,lineHeight:1}}>{gcScore}</div><div><div style={{fontSize:'0.75rem',color:CC.slate}}>out of 20</div><Badge label={gcRating} color={gcColor}/></div></div>
           </div>
           {[
-            ['Debt Service Coverage', dscrAvgY1>=1.5?4:dscrAvgY1>=1.0?3:dscrAvgY1>=0.5?2:1, `DSCR ${dscrAvgY1.toFixed(2)}x`],
-            ['Liquidity Position', minCash>=0?4:minCash>-10_000_000?1:0, `Min cash: ${compactCurrency(minCash,cc)}`],
-            ['Revenue Sustainability', y2Rev2>y1Rev2*1.05?4:y2Rev2>y1Rev2*0.95?3:2, `Y2 vs Y1: ${((y2Rev2/Math.max(1,y1Rev2)-1)*100).toFixed(1)}%`],
-            ['Operational Profitability', y1Ebitda>0&&y2Ebitda>y1Ebitda?4:y1Ebitda>0?3:2, `Y1 EBITDA: ${compactCurrency(y1Ebitda,cc)}`],
-            ['Management & Governance', assess.managementCapability, 'Coach assessment'],
-          ].map(([name,sc,evidence])=>(
+            ['Debt Service Coverage', dscrAvgY1>=1.5?4:dscrAvgY1>=1.0?3:dscrAvgY1>=0.5?2:1, 4, `DSCR ${dscrAvgY1.toFixed(2)}x average`, null],
+            ['Liquidity Position', minCash>=0?4:minCash>-10_000_000?1:0, 4, `Minimum cash: ${compactCurrency(minCash,cc)}`, null],
+            ['Revenue Sustainability', y2Rev2>y1Rev2*1.05?4:y2Rev2>y1Rev2*0.95?3:2, 4, `Y2 vs Y1: ${((y2Rev2/Math.max(1,y1Rev2)-1)*100).toFixed(1)}%`, null],
+            ['Operational Profitability', y1Ebitda>0&&y2Ebitda>y1Ebitda?4:y1Ebitda>0?3:2, 4, `Y1 EBITDA: ${compactCurrency(y1Ebitda,cc)}`, null],
+            ['Management & Governance', assess.managementCapability||2, 4, 'Coach assessment', 'managementCapability'],
+          ].map(([name,sc,max,evidence,field])=>(
             <div key={name} style={{marginBottom:'1rem',paddingBottom:'1rem',borderBottom:`1px solid ${CC.border}`}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.3rem'}}>
-                <span style={{fontWeight:600,fontSize:'0.88rem',color:CC.navy}}>{name}</span>
-                <span style={{fontFamily:'monospace',fontWeight:700,color:sc>=3?CC.green:sc>=2?CC.amber:CC.red}}>{sc}/4</span>
-              </div>
-              <div style={{background:'#E8ECF0',borderRadius:999,height:7,marginBottom:'0.3rem'}}>
-                <div style={{width:`${(sc/4)*100}%`,height:'100%',background:sc>=3?CC.green:sc>=2?CC.amber:CC.red,borderRadius:999}}/>
-              </div>
-              <div style={{fontSize:'0.78rem',color:CC.slate}}>{evidence}</div>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}><span style={{fontWeight:600,fontSize:'0.88rem',color:CC.navy}}>{name}</span><span style={{fontFamily:'monospace',fontWeight:700,color:sc>=3?CC.green:sc>=2?CC.amber:CC.red}}>{sc}/{max}</span></div>
+              <ScoreBar score={sc} max={max} color={sc>=3?CC.green:sc>=2?CC.amber:CC.red}/>
+              <div style={{fontSize:'0.78rem',color:CC.slate,marginTop:'0.3rem',marginBottom:field?'0.4rem':'0'}}>{evidence}</div>
+              {field&&<input type="range" min="0" max={max} step="1" value={assess[field]||2} onChange={e=>updateAssess(field,Number(e.target.value))} style={{width:'100%',accentColor:CC.cyan}}/>}
             </div>
           ))}
         </div>
       )}
 
-      {/* Investment Readiness section */}
+      {/* INVESTMENT READINESS */}
       {activeSection==='investment'&&(
         <div style={{...card,borderTop:`4px solid ${irColor}`}}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:CC.navy,marginBottom:'1rem'}}>Investment Readiness Score</div>
-          <div style={{display:'flex',alignItems:'center',gap:'1.5rem',marginBottom:'1.5rem'}}>
-            <div style={{fontFamily:'Georgia,serif',fontSize:'3rem',fontWeight:700,color:irColor,lineHeight:1}}>{irScore}</div>
-            <div><div style={{fontSize:'0.8rem',color:CC.slate,marginBottom:'0.3rem'}}>out of 30</div><span style={{fontFamily:'monospace',fontSize:'0.82rem',fontWeight:700,padding:'0.3rem 0.8rem',borderRadius:12,background:irColor,color:CC.white}}>{irTier}</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1.25rem',flexWrap:'wrap',gap:'0.75rem'}}>
+            <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:CC.navy}}>Investment Readiness Score</div>
+            <div style={{display:'flex',alignItems:'center',gap:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:irColor,lineHeight:1}}>{irScore}</div><div><div style={{fontSize:'0.75rem',color:CC.slate}}>out of 30</div><Badge label={irTier} color={irColor}/></div></div>
           </div>
           {[
-            ['Financial Viability', Math.min(5,(ebitdaMargin>=0.2?2:ebitdaMargin>=0.05?1:0)+(y1Ebitda>0?1:0)+(deToEq<1?2:deToEq<2?1:0)), `EBITDA margin ${(ebitdaMargin*100).toFixed(1)}%`, false],
-            ['Debt Serviceability', Math.min(5,Math.round(dscrAvgY1>=2?5:dscrAvgY1>=1.5?4:dscrAvgY1>=1?3:2)), `DSCR ${dscrAvgY1.toFixed(2)}x`, false],
-            ['Commercial Model Clarity', assess.commercialModel, 'Coach assessment', 'commercialModel'],
-            ['Management Capability', assess.managementCapability, 'Coach assessment', 'managementCapability'],
-            ['Market Evidence', assess.marketEvidence, 'Coach assessment', 'marketEvidence'],
-            ['Governance & Records', assess.governance, 'Coach assessment', 'governance'],
-          ].map(([name,sc,evidence,field])=>(
+            ['Financial Viability', irFinancial, 5, `EBITDA margin ${(ebitdaMargin*100).toFixed(1)}%`, null],
+            ['Debt Serviceability', irDebt, 5, `DSCR ${dscrAvgY1.toFixed(2)}x`, null],
+            ['Commercial Model Clarity', assess.commercialModel||2, 5, 'Coach assessment', 'commercialModel'],
+            ['Management Capability', assess.managementCapability||2, 5, 'Coach assessment', 'managementCapability'],
+            ['Market Evidence', assess.marketEvidence||2, 5, 'Coach assessment', 'marketEvidence'],
+            ['Governance & Records', assess.governance||2, 5, 'Coach assessment', 'governance'],
+          ].map(([name,sc,max,evidence,field])=>(
             <div key={name} style={{marginBottom:'1rem',paddingBottom:'1rem',borderBottom:`1px solid ${CC.border}`}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.3rem'}}>
-                <span style={{fontWeight:600,fontSize:'0.88rem',color:CC.navy}}>{name}</span>
-                <span style={{fontFamily:'monospace',fontWeight:700,color:sc>=4?CC.green:sc>=3?CC.cyan:sc>=2?CC.amber:CC.red}}>{sc}/5</span>
-              </div>
-              <div style={{background:'#E8ECF0',borderRadius:999,height:7,marginBottom:'0.3rem'}}>
-                <div style={{width:`${(sc/5)*100}%`,height:'100%',background:sc>=4?CC.green:sc>=3?CC.cyan:sc>=2?CC.amber:CC.red,borderRadius:999}}/>
-              </div>
-              <div style={{fontSize:'0.78rem',color:CC.slate,marginBottom:field?'0.4rem':'0'}}>{evidence}</div>
-              {field&&<input type="range" min="0" max="5" step="1" value={sc} onChange={e=>updateAssess(field,Number(e.target.value))} style={{width:'100%',accentColor:CC.cyan}}/>}
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}><span style={{fontWeight:600,fontSize:'0.88rem',color:CC.navy}}>{name}</span><span style={{fontFamily:'monospace',fontWeight:700,color:sc>=4?CC.green:sc>=3?CC.cyan:sc>=2?CC.amber:CC.red}}>{sc}/{max}</span></div>
+              <ScoreBar score={sc} max={max} color={sc>=4?CC.green:sc>=3?CC.cyan:sc>=2?CC.amber:CC.red}/>
+              <div style={{fontSize:'0.78rem',color:CC.slate,marginTop:'0.3rem',marginBottom:field?'0.4rem':'0'}}>{evidence}</div>
+              {field&&<input type="range" min="0" max={max} step="1" value={assess[field]||2} onChange={e=>updateAssess(field,Number(e.target.value))} style={{width:'100%',accentColor:CC.cyan}}/>}
             </div>
           ))}
         </div>
       )}
 
-      {/* 6-Month Projection section */}
+      {/* 6-MONTH PROJECTION */}
       {activeSection==='projection'&&(
         <div style={card}>
           <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:CC.navy,marginBottom:'1rem'}}>6-Month Cashflow Projection</div>
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.78rem',fontFamily:'monospace'}}>
-              <thead><tr style={{background:CC.navy,color:CC.white}}>
-                <th style={{padding:'7px 10px',textAlign:'left',minWidth:160}}>Line</th>
-                {proj6.map(p=><th key={p.monthLabel} style={{padding:'7px 8px',textAlign:'right',whiteSpace:'nowrap'}}>{p.monthLabel}</th>)}
-              </tr></thead>
+              <thead><tr style={{background:CC.navy,color:CC.white}}><th style={{padding:'7px 10px',textAlign:'left',minWidth:140}}>Line</th>{proj6.map(p=><th key={p.monthLabel} style={{padding:'7px 8px',textAlign:'right',whiteSpace:'nowrap'}}>{p.monthLabel}</th>)}</tr></thead>
               <tbody>
                 <tr style={{background:CC.cream}}><td style={{padding:'6px 10px',fontWeight:600}}>Cash In</td>{proj6.map((p,i)=><td key={i} style={{padding:'6px 8px',textAlign:'right',color:CC.green}}>{compactCurrency(p.cashIn,cc)}</td>)}</tr>
                 <tr><td style={{padding:'6px 10px',fontWeight:600}}>Cash Out</td>{proj6.map((p,i)=><td key={i} style={{padding:'6px 8px',textAlign:'right',color:CC.red}}>{compactCurrency(-p.cashOut,cc)}</td>)}</tr>
@@ -968,103 +840,76 @@ function InlineAnalytics({ result, debtObligations, monthLabels, cc, savedAssess
               </tbody>
             </table>
           </div>
-          {gaps6>0&&<div style={{background:'#FDF0EE',border:`1px solid ${CC.red}`,borderRadius:6,padding:'0.75rem',marginTop:'0.75rem',fontSize:'0.83rem',color:CC.red,fontWeight:600}}>⚠ {gaps6} month(s) show a projected cash shortfall. Review debt service timing and revenue collection.</div>}
-          {gaps6===0&&<div style={{background:'#E8F5EE',border:`1px solid ${CC.green}`,borderRadius:6,padding:'0.75rem',marginTop:'0.75rem',fontSize:'0.83rem',color:CC.green,fontWeight:600}}>✓ No cashflow gaps projected in the next 6 months.</div>}
+          <div style={{marginTop:'0.75rem',fontSize:'0.83rem',fontWeight:600,padding:'0.75rem',borderRadius:6,background:gaps6===0?'#E8F5EE':'#FDF0EE',border:`1px solid ${gaps6===0?CC.green:CC.red}`,color:gaps6===0?CC.green:CC.red}}>
+            {gaps6===0?'✓ No cashflow gaps projected in the next 6 months.':`⚠ ${gaps6} month(s) show a projected cash shortfall.`}
+          </div>
         </div>
       )}
 
-      {/* Coach Assessment Inputs */}
+      {/* COACH ASSESSMENT */}
       {activeSection==='coach'&&(
         <div style={card}>
           <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:CC.navy,marginBottom:'0.5rem'}}>Coach Assessment Inputs</div>
-          <p style={{fontSize:'0.85rem',color:CC.slate,marginBottom:'1.5rem',lineHeight:1.6}}>These qualitative scores feed into Going Concern, Investment Readiness, and Engagement Close. They represent your assessment as the lead consultant -- what the financial model cannot capture on its own.</p>
+          <p style={{fontSize:'0.85rem',color:CC.slate,marginBottom:'1.5rem',lineHeight:1.6}}>Qualitative scores that feed into Going Concern, Investment Readiness, and Engagement Close. These represent your assessment as the lead consultant.</p>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:'1.25rem',marginBottom:'1.5rem'}}>
-            {[['Management & Governance','managementCapability',4,'0 — Concern','4 — Strong'],['Commercial Model Clarity','commercialModel',5,'0 — None','5 — Clear'],['Market Evidence','marketEvidence',5,'0 — None','5 — Strong'],['Governance & Record-Keeping','governance',5,'0 — Weak','5 — Strong']].map(([label,field,max,lo,hi])=>(
+            {[['Commercial Model Clarity','commercialModel',5],['Management Capability','managementCapability',4],['Market Evidence','marketEvidence',5],['Governance & Record-Keeping','governance',5]].map(([label,field,max])=>(
               <div key={field}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.3rem'}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}>
                   <label style={{fontWeight:600,fontSize:'0.85rem',color:CC.navy}}>{label}</label>
-                  <span style={{fontFamily:'monospace',fontWeight:700,fontSize:'0.9rem',color:CC.cyan}}>{assess[field]}/{max}</span>
+                  <span style={{fontFamily:'monospace',fontWeight:700,color:CC.cyan}}>{assess[field]||2}/{max}</span>
                 </div>
-                <input type="range" min="0" max={max} step="1" value={assess[field]} onChange={e=>updateAssess(field,Number(e.target.value))} style={{width:'100%',accentColor:CC.cyan,marginBottom:'0.2rem'}}/>
-                <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.72rem',color:CC.slate}}><span>{lo}</span><span>{hi}</span></div>
+                <input type="range" min="0" max={max} step="1" value={assess[field]||2} onChange={e=>updateAssess(field,Number(e.target.value))} style={{width:'100%',accentColor:CC.cyan,marginBottom:'0.2rem'}}/>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.72rem',color:CC.slate}}><span>0 — Weak</span><span>{max} — Strong</span></div>
               </div>
             ))}
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginBottom:'1rem'}}>
-            {[['Immediate Actions (30 days — one per line)','immediateActions'],['Near-Term Actions (60-90 days — one per line)','nearTermActions'],['Required Follow-Up (one per line)','followUp'],['Coach Notes','coachNotes']].map(([label,field])=>(
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem'}}>
+            {[['Immediate Actions (30 days)','immediateActions'],['Near-Term Actions (60-90 days)','nearTermActions'],['Required Follow-Up','followUp'],['Coach Notes','coachNotes']].map(([label,field])=>(
               <div key={field}>
                 <label style={{display:'block',fontWeight:600,fontSize:'0.82rem',marginBottom:'0.25rem',color:CC.navy}}>{label}</label>
-                <textarea value={assess[field]} onChange={e=>updateAssess(field,e.target.value)} style={{width:'100%',minHeight:80,padding:'0.42rem 0.6rem',border:`1px solid ${CC.border}`,borderRadius:4,fontSize:'0.82rem',fontFamily:'inherit',background:'#F4F8FC',color:CC.navy,boxSizing:'border-box',resize:'vertical'}} placeholder="Enter here..."/>
+                <textarea value={assess[field]||''} onChange={e=>updateAssess(field,e.target.value)} style={{...inp,minHeight:75,resize:'vertical'}} placeholder="One per line..."/>
               </div>
             ))}
           </div>
-          <div style={{background:'#E8F5EE',border:`1px solid ${CC.green}`,borderRadius:6,padding:'0.75rem',fontSize:'0.82rem',color:CC.navy}}>All inputs save automatically and appear in the Engagement Close tab.</div>
         </div>
       )}
 
-      {/* Engagement Close */}
+      {/* ENGAGEMENT CLOSE */}
       {activeSection==='close'&&(()=>{
         const viabilityRating = gcScore>=15&&score>=65?'Viable':gcScore>=10&&score>=40?'Conditionally Viable':gcScore>=7?'At Risk':'Not Viable'
         const repaymentOutlook = dscrAvgY1>=1.5&&cashGaps===0?'On Track':dscrAvgY1>=1.0?'Watch':dscrAvgY1>=0.5?'At Risk':'Default Risk'
         const viabilityColor = viabilityRating==='Viable'?CC.green:viabilityRating==='Conditionally Viable'?CC.cyan:viabilityRating==='At Risk'?CC.amber:CC.red
         const repayColor = repaymentOutlook==='On Track'?CC.green:repaymentOutlook==='Watch'?CC.amber:CC.red
-
-        const exitRec = viabilityRating==='Viable'
-          ? 'Business is viable for independent operation. Maintain agreed monitoring rhythm and schedule first independent review.'
-          : viabilityRating==='Conditionally Viable'
-          ? 'Business can close engagement with conditions. Specific actions below must be completed before the consultant fully exits.'
-          : viabilityRating==='At Risk'
-          ? 'Engagement close requires an active support plan. Business needs structured follow-on support for at least 6 months post-engagement.'
-          : 'Do not close without a remediation plan in place. Business is not yet stable enough for independent operation.'
-
-        const immediateActions = assess.immediateActions ? assess.immediateActions.split('\n').filter(Boolean) : [
-          cashGaps>0?'Identify short-term liquidity facility to cover cash-negative months.':null,
-          dscrAvgY1<1.0?'Review and renegotiate repayment schedule with financing partners.':null,
-          score<40?'Convene management session to review cashflow and cost structure.':null,
-        ].filter(Boolean)
-
-        const nearTermActions = assess.nearTermActions ? assess.nearTermActions.split('\n').filter(Boolean) : [
-          'Implement monthly cashflow tracking using Clearview.',
-          'Establish quarterly management accounts review process.',
-          irScore<17?'Develop investment readiness improvement plan.':null,
-        ].filter(Boolean)
-
-        const followUp = assess.followUp ? assess.followUp.split('\n').filter(Boolean) : [
-          'Monthly Clearview review for 6 months post-engagement.',
-          repaymentOutlook!=='On Track'?'Quarterly financing partner engagement on repayment performance.':null,
-          'Annual commercial readiness reassessment.',
-        ].filter(Boolean)
-
+        const exitRec = viabilityRating==='Viable'?'Business is viable for independent operation. Maintain agreed monitoring rhythm and schedule first independent review.':viabilityRating==='Conditionally Viable'?'Business can close engagement with conditions. Specific actions below must be completed before the consultant fully exits.':viabilityRating==='At Risk'?'Engagement close requires an active support plan. Business needs structured follow-on support for at least 6 months post-engagement.':'Do not close without a remediation plan in place. Business is not yet stable enough for independent operation.'
+        const immediateList = assess.immediateActions?assess.immediateActions.split('\n').filter(Boolean):[cashGaps>0?'Identify short-term liquidity facility to cover cash-negative months.':null,dscrAvgY1<1.0?'Review and renegotiate repayment schedule with financing partners.':null,score<40?'Convene management session to review cashflow and cost structure.':null].filter(Boolean)
+        const nearList = assess.nearTermActions?assess.nearTermActions.split('\n').filter(Boolean):['Implement monthly cashflow tracking using Clearview.','Establish quarterly management accounts review process.',irScore<17?'Develop investment readiness improvement plan.':null].filter(Boolean)
+        const followList = assess.followUp?assess.followUp.split('\n').filter(Boolean):['Monthly Clearview review for 6 months post-engagement.',repaymentOutlook!=='On Track'?'Quarterly financing partner engagement on repayment performance.':null,'Annual commercial readiness reassessment.'].filter(Boolean)
         return(
           <div>
             <div style={{...card,borderTop:`4px solid ${viabilityColor}`}}>
               <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:CC.navy,marginBottom:'1rem'}}>Engagement Close Assessment</div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'1rem',marginBottom:'1.25rem'}}>
-                {[['Viability',viabilityRating,viabilityColor],['Repayment Outlook',repaymentOutlook,repayColor],['Stability Status',classification,classColor],['Going Concern',gcRating,gcColor],['Investment Readiness',irTier,irColor]].map(([label,val,col])=>(
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:'1rem',marginBottom:'1.25rem'}}>
+                {[['Viability',viabilityRating,viabilityColor],['Repayment Outlook',repaymentOutlook,repayColor],['Stability',classification,classColor],['Going Concern',gcRating,gcColor],['Investment Readiness',irTier,irColor]].map(([label,val,col])=>(
                   <div key={label} style={{background:CC.lightBg,borderRadius:6,padding:'0.85rem'}}>
                     <div style={{fontFamily:'monospace',fontSize:'0.65rem',color:CC.slate,textTransform:'uppercase',marginBottom:'0.4rem'}}>{label}</div>
-                    <span style={{fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,padding:'0.22rem 0.6rem',borderRadius:12,background:col,color:CC.white}}>{val}</span>
+                    <Badge label={val} color={col}/>
                   </div>
                 ))}
               </div>
               <div style={{background:CC.cream,borderRadius:6,padding:'1rem',borderLeft:`4px solid ${CC.cyan}`,marginBottom:'1rem'}}>
-                <div style={{fontFamily:'monospace',fontSize:'0.7rem',color:CC.cyan,marginBottom:'0.4rem',fontWeight:700}}>ENGAGEMENT CLOSE RECOMMENDATION</div>
+                <div style={{fontFamily:'monospace',fontSize:'0.7rem',color:CC.cyan,marginBottom:'0.4rem',fontWeight:700}}>RECOMMENDATION</div>
                 <div style={{fontSize:'0.9rem',color:CC.navy,lineHeight:1.6}}>{exitRec}</div>
               </div>
-              {assess.coachNotes&&<div style={{background:'#FFF8E8',border:`1px solid ${CC.amber}`,borderRadius:6,padding:'0.85rem',marginBottom:'1rem'}}>
+              {assess.coachNotes&&<div style={{background:'#FFF8E8',border:`1px solid ${CC.amber}`,borderRadius:6,padding:'0.85rem'}}>
                 <div style={{fontFamily:'monospace',fontSize:'0.7rem',color:CC.amber,marginBottom:'0.3rem',fontWeight:700}}>COACH NOTES</div>
                 <div style={{fontSize:'0.85rem',color:CC.navy,lineHeight:1.6}}>{assess.coachNotes}</div>
               </div>}
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:'1.25rem'}}>
-              {[[CC.red,'Immediate Actions (30 days)',immediateActions],[CC.amber,'Near-Term Actions (60-90 days)',nearTermActions],[CC.cyan,'Required Follow-Up',followUp]].map(([col,title,actions])=>(
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:'1.25rem'}}>
+              {[[CC.red,'Immediate Actions (30 days)',immediateList],[CC.amber,'Near-Term Actions (60-90 days)',nearList],[CC.cyan,'Required Follow-Up',followList]].map(([col,title,actions])=>(
                 <div key={title} style={card}>
                   <div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:CC.navy,marginBottom:'0.75rem'}}>{title}</div>
-                  {actions.length>0?actions.map((a,i)=>(
-                    <div key={i} style={{display:'flex',gap:'0.5rem',fontSize:'0.85rem',color:CC.navy,marginBottom:'0.5rem',lineHeight:1.5}}>
-                      <span style={{color:col,fontWeight:700,flexShrink:0}}>→</span>{a}
-                    </div>
-                  )):<div style={{fontSize:'0.85rem',color:CC.slate,fontStyle:'italic'}}>No actions recorded. Add them in the Coach Assessment tab.</div>}
+                  {actions.length>0?actions.map((a,i)=><div key={i} style={{display:'flex',gap:'0.5rem',fontSize:'0.85rem',color:CC.navy,marginBottom:'0.5rem',lineHeight:1.5}}><span style={{color:col,fontWeight:700,flexShrink:0}}>→</span>{a}</div>):<div style={{fontSize:'0.85rem',color:CC.slate,fontStyle:'italic'}}>Add in Coach Assessment tab.</div>}
                 </div>
               ))}
             </div>
