@@ -378,15 +378,13 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
                   <div><label style={lbl}>Grace Period (months)</label><input type="number" style={inp} value={ob.gracePeriodMonths||0} onChange={e=>{const next=[...obligations];next[idx]={...next[idx],gracePeriodMonths:Number(e.target.value)};saveObligations(next)}}/></div>
                   <div><label style={lbl}>Drawdown Month</label><input type="number" style={inp} value={ob.drawdownMonth||1} onChange={e=>{const next=[...obligations];next[idx]={...next[idx],drawdownMonth:Number(e.target.value)};saveObligations(next)}}/></div>
                 </div>
-                {ob.type!=='non_recoverable_grant'&&(()=>{
-                  const sch=debtSchedule.schedules[ob.id]
-                  if(!sch)return null
-                  return(<div style={{background:CC.white,borderRadius:5,padding:'0.75rem',fontSize:'0.8rem',display:'flex',gap:'2rem',flexWrap:'wrap'}}>
-                    <span>Total interest: <strong style={{color:CC.red}}>{compactCurrency(sch.totalInterestPaid,cc)}</strong></span>
-                    <span>Total repayment: <strong style={{color:CC.navy}}>{compactCurrency(sch.totalPrincipalPaid+sch.totalInterestPaid,cc)}</strong></span>
-                    <span>Outstanding M12: <strong>{compactCurrency(sch.balanceByMonth[11]||0,cc)}</strong></span>
-                  </div>)
-                })()}
+                {ob.type!=='non_recoverable_grant'&&debtSchedule.schedules[ob.id]&&(
+                  <div style={{background:CC.white,borderRadius:5,padding:'0.75rem',fontSize:'0.8rem',display:'flex',gap:'2rem',flexWrap:'wrap'}}>
+                    <span>Total interest: <strong style={{color:CC.red}}>{compactCurrency(debtSchedule.schedules[ob.id].totalInterestPaid,cc)}</strong></span>
+                    <span>Total repayment: <strong style={{color:CC.navy}}>{compactCurrency(debtSchedule.schedules[ob.id].totalPrincipalPaid+debtSchedule.schedules[ob.id].totalInterestPaid,cc)}</strong></span>
+                    <span>Outstanding M12: <strong>{compactCurrency(debtSchedule.schedules[ob.id].balanceByMonth[11]||0,cc)}</strong></span>
+                  </div>
+                )}
                 <button onClick={()=>{const next=obligations.filter((_,i)=>i!==idx);saveObligations(next)}} style={{fontSize:'0.74rem',color:CC.red,background:'transparent',border:'none',cursor:'pointer',textDecoration:'underline',marginTop:'0.5rem'}}>Remove</button>
               </div>
             ))}
@@ -613,6 +611,49 @@ function buildDebtSched(obligations, months) {
   })
   return { totalInterest, totalPrincipal, totalRepayment, totalOutstanding,
     annualY1: totalRepayment.slice(0,12).reduce((a,b)=>a+b,0) }
+}
+
+function EngagementClose({score,classification,classColor,gcScore,gcRating,gcColor,irScore,irTier,irColor,dscrAvgY1,cashGaps,assess,cc}){
+  const viabilityRating=gcScore>=15&&score>=65?'Viable':gcScore>=10&&score>=40?'Conditionally Viable':gcScore>=7?'At Risk':'Not Viable'
+  const repaymentOutlook=dscrAvgY1>=1.5&&cashGaps===0?'On Track':dscrAvgY1>=1.0?'Watch':dscrAvgY1>=0.5?'At Risk':'Default Risk'
+  const viabilityColor=viabilityRating==='Viable'?CC.green:viabilityRating==='Conditionally Viable'?CC.cyan:viabilityRating==='At Risk'?CC.amber:CC.red
+  const repayColor=repaymentOutlook==='On Track'?CC.green:repaymentOutlook==='Watch'?CC.amber:CC.red
+  const exitRec=viabilityRating==='Viable'?'Business is viable for independent operation. Maintain agreed monitoring rhythm and schedule first independent review.':viabilityRating==='Conditionally Viable'?'Business can close engagement with conditions. Specific actions below must be completed before the consultant fully exits.':viabilityRating==='At Risk'?'Engagement close requires an active support plan. Business needs structured follow-on support for at least 6 months post-engagement.':'Do not close without a remediation plan in place. Business is not yet stable enough for independent operation.'
+  const immediateList=assess.immediateActions?assess.immediateActions.split('\n').filter(Boolean):[cashGaps>0?'Identify short-term liquidity facility to cover cash-negative months.':null,dscrAvgY1<1.0?'Review and renegotiate repayment schedule with financing partners.':null,score<40?'Convene management session to review cashflow and cost structure.':null].filter(Boolean)
+  const nearList=assess.nearTermActions?assess.nearTermActions.split('\n').filter(Boolean):['Implement monthly cashflow tracking using Clearview.','Establish quarterly management accounts review process.',irScore<17?'Develop investment readiness improvement plan.':null].filter(Boolean)
+  const followList=assess.followUp?assess.followUp.split('\n').filter(Boolean):['Monthly Clearview review for 6 months post-engagement.',repaymentOutlook!=='On Track'?'Quarterly financing partner engagement on repayment performance.':null,'Annual commercial readiness reassessment.'].filter(Boolean)
+  const cs={background:CC.white,border:`1px solid ${CC.border}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}
+  return(
+    <div>
+      <div style={{...cs,borderTop:`4px solid ${viabilityColor}`}}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:CC.navy,marginBottom:'1rem'}}>Engagement Close Assessment</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:'1rem',marginBottom:'1.25rem'}}>
+          {[['Viability',viabilityRating,viabilityColor],['Repayment Outlook',repaymentOutlook,repayColor],['Stability',classification,classColor],['Going Concern',gcRating,gcColor],['Investment Readiness',irTier,irColor]].map(([label,val,col])=>(
+            <div key={label} style={{background:CC.lightBg,borderRadius:6,padding:'0.85rem'}}>
+              <div style={{fontFamily:'monospace',fontSize:'0.65rem',color:CC.slate,textTransform:'uppercase',marginBottom:'0.4rem'}}>{label}</div>
+              <span style={{fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,padding:'0.25rem 0.7rem',borderRadius:20,background:col,color:CC.white}}>{val}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{background:CC.cream,borderRadius:6,padding:'1rem',borderLeft:`4px solid ${CC.cyan}`,marginBottom:'1rem'}}>
+          <div style={{fontFamily:'monospace',fontSize:'0.7rem',color:CC.cyan,marginBottom:'0.4rem',fontWeight:700}}>RECOMMENDATION</div>
+          <div style={{fontSize:'0.9rem',color:CC.navy,lineHeight:1.6}}>{exitRec}</div>
+        </div>
+        {assess.coachNotes&&<div style={{background:'#FFF8E8',border:`1px solid ${CC.amber}`,borderRadius:6,padding:'0.85rem'}}>
+          <div style={{fontFamily:'monospace',fontSize:'0.7rem',color:CC.amber,marginBottom:'0.3rem',fontWeight:700}}>COACH NOTES</div>
+          <div style={{fontSize:'0.85rem',color:CC.navy,lineHeight:1.6}}>{assess.coachNotes}</div>
+        </div>}
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:'1.25rem'}}>
+        {[[CC.red,'Immediate Actions (30 days)',immediateList],[CC.amber,'Near-Term Actions (60-90 days)',nearList],[CC.cyan,'Required Follow-Up',followList]].map(([col,title,actions])=>(
+          <div key={title} style={cs}>
+            <div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:CC.navy,marginBottom:'0.75rem'}}>{title}</div>
+            {actions.length>0?actions.map((a,i)=><div key={i} style={{display:'flex',gap:'0.5rem',fontSize:'0.85rem',color:CC.navy,marginBottom:'0.5rem',lineHeight:1.5}}><span style={{color:col,fontWeight:700,flexShrink:0}}>→</span>{a}</div>):<div style={{fontSize:'0.85rem',color:CC.slate,fontStyle:'italic'}}>Add in Coach Assessment tab.</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function InlineAnalytics({ result, debtObligations, monthLabels, cc, savedAssessments, onSaveAssessments }) {
@@ -875,48 +916,7 @@ function InlineAnalytics({ result, debtObligations, monthLabels, cc, savedAssess
       )}
 
       {/* ENGAGEMENT CLOSE */}
-      {activeSection==='close'&&(()=>{
-        const viabilityRating = gcScore>=15&&score>=65?'Viable':gcScore>=10&&score>=40?'Conditionally Viable':gcScore>=7?'At Risk':'Not Viable'
-        const repaymentOutlook = dscrAvgY1>=1.5&&cashGaps===0?'On Track':dscrAvgY1>=1.0?'Watch':dscrAvgY1>=0.5?'At Risk':'Default Risk'
-        const viabilityColor = viabilityRating==='Viable'?CC.green:viabilityRating==='Conditionally Viable'?CC.cyan:viabilityRating==='At Risk'?CC.amber:CC.red
-        const repayColor = repaymentOutlook==='On Track'?CC.green:repaymentOutlook==='Watch'?CC.amber:CC.red
-        const exitRec = viabilityRating==='Viable'?'Business is viable for independent operation. Maintain agreed monitoring rhythm and schedule first independent review.':viabilityRating==='Conditionally Viable'?'Business can close engagement with conditions. Specific actions below must be completed before the consultant fully exits.':viabilityRating==='At Risk'?'Engagement close requires an active support plan. Business needs structured follow-on support for at least 6 months post-engagement.':'Do not close without a remediation plan in place. Business is not yet stable enough for independent operation.'
-        const immediateList = assess.immediateActions?assess.immediateActions.split('\n').filter(Boolean):[cashGaps>0?'Identify short-term liquidity facility to cover cash-negative months.':null,dscrAvgY1<1.0?'Review and renegotiate repayment schedule with financing partners.':null,score<40?'Convene management session to review cashflow and cost structure.':null].filter(Boolean)
-        const nearList = assess.nearTermActions?assess.nearTermActions.split('\n').filter(Boolean):['Implement monthly cashflow tracking using Clearview.','Establish quarterly management accounts review process.',irScore<17?'Develop investment readiness improvement plan.':null].filter(Boolean)
-        const followList = assess.followUp?assess.followUp.split('\n').filter(Boolean):['Monthly Clearview review for 6 months post-engagement.',repaymentOutlook!=='On Track'?'Quarterly financing partner engagement on repayment performance.':null,'Annual commercial readiness reassessment.'].filter(Boolean)
-        return(
-          <div>
-            <div style={{...card,borderTop:`4px solid ${viabilityColor}`}}>
-              <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:CC.navy,marginBottom:'1rem'}}>Engagement Close Assessment</div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:'1rem',marginBottom:'1.25rem'}}>
-                {[['Viability',viabilityRating,viabilityColor],['Repayment Outlook',repaymentOutlook,repayColor],['Stability',classification,classColor],['Going Concern',gcRating,gcColor],['Investment Readiness',irTier,irColor]].map(([label,val,col])=>(
-                  <div key={label} style={{background:CC.lightBg,borderRadius:6,padding:'0.85rem'}}>
-                    <div style={{fontFamily:'monospace',fontSize:'0.65rem',color:CC.slate,textTransform:'uppercase',marginBottom:'0.4rem'}}>{label}</div>
-                    <Badge label={val} color={col}/>
-                  </div>
-                ))}
-              </div>
-              <div style={{background:CC.cream,borderRadius:6,padding:'1rem',borderLeft:`4px solid ${CC.cyan}`,marginBottom:'1rem'}}>
-                <div style={{fontFamily:'monospace',fontSize:'0.7rem',color:CC.cyan,marginBottom:'0.4rem',fontWeight:700}}>RECOMMENDATION</div>
-                <div style={{fontSize:'0.9rem',color:CC.navy,lineHeight:1.6}}>{exitRec}</div>
-              </div>
-              {assess.coachNotes&&<div style={{background:'#FFF8E8',border:`1px solid ${CC.amber}`,borderRadius:6,padding:'0.85rem'}}>
-                <div style={{fontFamily:'monospace',fontSize:'0.7rem',color:CC.amber,marginBottom:'0.3rem',fontWeight:700}}>COACH NOTES</div>
-                <div style={{fontSize:'0.85rem',color:CC.navy,lineHeight:1.6}}>{assess.coachNotes}</div>
-              </div>}
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:'1.25rem'}}>
-              {[[CC.red,'Immediate Actions (30 days)',immediateList],[CC.amber,'Near-Term Actions (60-90 days)',nearList],[CC.cyan,'Required Follow-Up',followList]].map(([col,title,actions])=>(
-                <div key={title} style={card}>
-                  <div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:CC.navy,marginBottom:'0.75rem'}}>{title}</div>
-                  {actions.length>0?actions.map((a,i)=><div key={i} style={{display:'flex',gap:'0.5rem',fontSize:'0.85rem',color:CC.navy,marginBottom:'0.5rem',lineHeight:1.5}}><span style={{color:col,fontWeight:700,flexShrink:0}}>→</span>{a}</div>):<div style={{fontSize:'0.85rem',color:CC.slate,fontStyle:'italic'}}>Add in Coach Assessment tab.</div>}
-                </div>
-              ))}
-            </div>
-          </div>
-        )
-      })()}
-    </div>
+      {activeSection==='close'&&<EngagementClose score={score} classification={classification} classColor={classColor} gcScore={gcScore} gcRating={gcRating} gcColor={gcColor} irScore={irScore} irTier={irTier} irColor={irColor} dscrAvgY1={dscrAvgY1} cashGaps={cashGaps} assess={assess} cc={cc}/>}
   )
 }
 
@@ -1032,10 +1032,8 @@ export default function WonderlandDashboard(){
           </div>
         )}
 
-        {view==='units'&&(()=>{
-          const u=result.unit[activeUnit],unitMeta=config.units.find(x=>x.id===activeUnit)
-          const y1Rev=u.revenue.slice(0,12).reduce((a,b)=>a+b,0),y1GP=u.grossProfit.slice(0,12).reduce((a,b)=>a+b,0),y1Opex=u.totalOpex.slice(0,12).reduce((a,b)=>a+b,0),y1Ebitda=u.ebitda.slice(0,12).reduce((a,b)=>a+b,0)
-          return(<div>
+        {view==='units'&&(
+<div>
             <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
               {config.units.map(u=><button key={u.id} onClick={()=>setActiveUnit(u.id)} style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.45rem 0.9rem',border:`2px solid ${activeUnit===u.id?u.color:CC.border}`,borderRadius:4,background:activeUnit===u.id?CC.navy:CC.white,color:activeUnit===u.id?CC.white:CC.slate,cursor:'pointer'}}>{u.short}</button>)}
             </div>
@@ -1044,8 +1042,8 @@ export default function WonderlandDashboard(){
             </div>
             {Object.keys(u.revenueLines).length>0&&<MonthlyTable title={`${unitMeta.name} — Revenue lines (Year 1)`} rows={Object.entries(u.revenueLines).map(([name,values])=>({label:name,values:values.slice(0,12),cc}))} months={monthLabels.slice(0,12)}/>}
             <MonthlyTable title={`${unitMeta.name} — Full P&L (Year 1)`} rows={[{label:'Revenue',values:u.revenue.slice(0,12),cc},{label:'Cost of Sales',values:u.cogs.slice(0,12),cc},{label:'Gross Profit',values:u.grossProfit.slice(0,12),bold:true,cc},{label:'Staff Cost',values:u.staffCost.slice(0,12),cc},{label:'Admin Allocated',values:u.adminAllocated.slice(0,12),cc},{label:'Direct Opex',values:u.directOpex.slice(0,12),cc},{label:'EBITDA',values:u.ebitda.slice(0,12),bold:true,highlight:true,cc}]} months={monthLabels.slice(0,12)}/>
-          </div>)
-        })()}
+          </div>
+        )}
 
         {view==='planning'&&<PlanningActualsTab config={config} result={result} monthLabels={monthLabels} cc={cc} savedActuals={actuals} onSaveActuals={setActuals} debtObligations={debtObligations} onSaveDebtObligations={setDebtObligations}/>}
 
