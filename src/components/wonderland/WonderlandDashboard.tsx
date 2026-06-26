@@ -1,7 +1,18 @@
 // @ts-nocheck
 'use client'
-import { useState, useMemo, useEffect, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { createClient } from '@supabase/supabase-js'
+
+const WONDERLAND_CLIENT_ID = 'bcf0da0f-7263-4f71-b703-46c8aad03ec1'
+
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  )
+}
+
+const supabase = getSupabase()
 
 const MONTHS_HORIZON = 24
 const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -234,7 +245,7 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
     setActuals(next)
     setSaving(true)
     try{
-      await supabase.from('monthly_actuals').upsert({client_id:'bcf0da0f-7263-4f71-b703-46c8aad03ec1',month_index:selMonth,actuals_data:next[selMonth]||{},updated_at:new Date().toISOString()},{onConflict:'client_id,month_index'})
+      await supabase.from('monthly_actuals').upsert({client_id:WONDERLAND_CLIENT_ID,month_index:selMonth,actuals_data:next[selMonth]||{},updated_at:new Date().toISOString()},{onConflict:'client_id,month_index'})
       await onSaveActuals(next)
     }catch(e){}
     setSaving(false)
@@ -243,7 +254,7 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
   async function saveObligations(next){
     setObligations(next)
     try{
-      await supabase.from('model_config').upsert({client_id:'bcf0da0f-7263-4f71-b703-46c8aad03ec1',config:{overrides,debtObligations:next,coachAssessments:savedAssessments,actuals},version:1,updated_at:new Date().toISOString(),updated_by:'dashboard'},{onConflict:'client_id'})
+      await supabase.from('model_config').upsert({client_id:WONDERLAND_CLIENT_ID,config:{overrides,debtObligations:next,coachAssessments:savedAssessments,actuals},version:1,updated_at:new Date().toISOString(),updated_by:'dashboard'},{onConflict:'client_id'})
       await onSaveDebtObligations(next)
     }catch(e){}
   }
@@ -938,27 +949,30 @@ export default function WonderlandDashboard(){
   useEffect(()=>{
     async function load(){
       try{
-        const {data:cfg}=await supabase
+        const sb = getSupabase()
+        const {data:cfg}=await sb
           .from('model_config')
           .select('config')
-          .eq('client_id','bcf0da0f-7263-4f71-b703-46c8aad03ec1')
-          .single()
+          .eq('client_id', WONDERLAND_CLIENT_ID)
+          .maybeSingle()
         if(cfg?.config){
-          const saved=cfg.config as Record<string,unknown>
-          if(saved.overrides)setOverrides({...defaultOverrides(),...saved.overrides as object})
-          if(saved.debtObligations)setDebtObligations(saved.debtObligations as [])
-          if(saved.coachAssessments)setSavedAssessments(saved.coachAssessments as Record<string,unknown>)
-          if(saved.actuals)setActuals(saved.actuals as Record<string,unknown>)
+          const saved=cfg.config
+          if(saved.overrides)setOverrides({...defaultOverrides(),...saved.overrides})
+          if(saved.debtObligations)setDebtObligations(saved.debtObligations)
+          if(saved.coachAssessments)setSavedAssessments(saved.coachAssessments)
+          if(saved.actuals)setActuals(saved.actuals)
         }
-      }catch(e){}
-      finally{setLoading(false)}
+      }catch(e){
+        console.error('Wonderland load error', e)
+      }
+      setLoading(false)
     }
     load()
   },[])
 
   async function persist(nextOverrides){
     setOverrides(nextOverrides);setSaving(true)
-    try{await supabase.from('model_config').upsert({client_id:'bcf0da0f-7263-4f71-b703-46c8aad03ec1',config:{overrides:nextOverrides,debtObligations,coachAssessments:savedAssessments,actuals},version:1,updated_at:new Date().toISOString(),updated_by:'dashboard'},{onConflict:'client_id'})}catch(e){}
+    try{await supabase.from('model_config').upsert({client_id:WONDERLAND_CLIENT_ID,config:{overrides:nextOverrides,debtObligations,coachAssessments:savedAssessments,actuals},version:1,updated_at:new Date().toISOString(),updated_by:'dashboard'},{onConflict:'client_id'})}catch(e){}
     setSaving(false)
   }
 
@@ -1078,7 +1092,7 @@ export default function WonderlandDashboard(){
           savedAssessments={savedAssessments}
           onSaveAssessments={async(assess)=>{
             setSavedAssessments(assess)
-            try{await supabase.from('model_config').upsert({client_id:'bcf0da0f-7263-4f71-b703-46c8aad03ec1',config:{overrides,debtObligations,coachAssessments:assess,actuals},version:1,updated_at:new Date().toISOString(),updated_by:'dashboard'},{onConflict:'client_id'})}catch(e){}
+            try{await supabase.from('model_config').upsert({client_id:WONDERLAND_CLIENT_ID,config:{overrides,debtObligations,coachAssessments:assess,actuals},version:1,updated_at:new Date().toISOString(),updated_by:'dashboard'},{onConflict:'client_id'})}catch(e){}
           }}
         />}
         {view==='analytics'&&!mounted&&<div style={{padding:'2rem',color:CC.slate}}>Loading analytics...</div>}
