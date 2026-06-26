@@ -667,14 +667,27 @@ function ScoreBar({score:s,max,color}){
   )
 }
 
-function InlineAnalytics({ result, debtObligations, monthLabels, cc, savedAssessments, onSaveAssessments }) {
-  const months = 24
-
-  // Guard against undefined result structure
-  if (!result || !result.consolidated || !result.balanceSheet || !result.cashFlow) {
-    return <div style={{padding:'2rem',color:'#4A5A6A'}}>Loading analytics...</div>
+function InlineAnalytics(props) {
+  const [error, setError] = useState(null)
+  if (error) {
+    return (
+      <div style={{background:'#FDF0EE',border:'1px solid #C0392B',borderRadius:8,padding:'1.5rem',fontFamily:'monospace',fontSize:'0.85rem',color:'#C0392B'}}>
+        <div style={{fontWeight:700,marginBottom:'0.5rem'}}>Analytics Error -- please share this with the developer:</div>
+        <div style={{background:'#fff',padding:'0.75rem',borderRadius:4,wordBreak:'break-all'}}>{error}</div>
+      </div>
+    )
   }
-  if (!result.consolidated.ebitda || !result.consolidated.revenue || !result.cashFlow.closingCash) {
+  try {
+    return <InlineAnalyticsInner {...props} />
+  } catch(e) {
+    setError(e && e.message ? e.message : String(e))
+    return null
+  }
+}
+
+function InlineAnalyticsInner({ result, debtObligations, monthLabels, cc, savedAssessments, onSaveAssessments }) {
+  const months = 24
+  if (!result || !result.consolidated || !result.balanceSheet || !result.cashFlow) {
     return <div style={{padding:'2rem',color:'#4A5A6A'}}>Loading analytics...</div>
   }
 
