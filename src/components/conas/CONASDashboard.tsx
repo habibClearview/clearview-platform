@@ -200,7 +200,7 @@ function ConasAnalyticsTab({result, coachAssessments, onSaveAssessments, months,
   const [activeSection, setActiveSection] = React.useState('summary')
   const debtSched = buildConasDebtSched([], months.length)
 
-  function updateAssess(field, value) {
+  function updateAssess(field: string, value: unknown) {
     const next = Object.assign({}, assess)
     next[field] = value
     setAssess(next)
