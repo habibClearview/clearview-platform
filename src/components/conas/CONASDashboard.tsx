@@ -1,5 +1,15 @@
 'use client'
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { createClient } from '@supabase/supabase-js'
+
+const CONAS_CLIENT_ID = '1556298e-5fa0-4d6a-ae86-da8c708ec6ee'
+
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine,
@@ -664,11 +674,50 @@ export default function CONASDashboard({
 }) {
   const P = permProp || FULL_PERMISSIONS
   const [inputs,setInputsLocal]  = useState<CONASInputs>(inputsProp || defaultCONASInputs)
+  const [loadingData, setLoadingData] = useState(true)
+  const saveTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
+
+  // Load saved config from Supabase on mount
+  useEffect(() => {
+    async function load() {
+      try {
+        const sb = getSupabase()
+        const { data } = await sb
+          .from('model_config')
+          .select('config')
+          .eq('client_id', CONAS_CLIENT_ID)
+          .single()
+        if (data?.config && Object.keys(data.config).length > 0) {
+          setInputsLocal(data.config as CONASInputs)
+        }
+      } catch {}
+      setLoadingData(false)
+    }
+    if (!inputsProp) load()
+    else setLoadingData(false)
+  }, [])
+
   const activeInputs = inputsProp || inputs
+
   function setInputs(newInputs: CONASInputs) {
     setInputsLocal(newInputs)
     onInputsChange?.(newInputs)
+    // Debounced save to Supabase
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      try {
+        const sb = getSupabase()
+        await sb.from('model_config').upsert({
+          client_id: CONAS_CLIENT_ID,
+          config: newInputs,
+          version: 1,
+          updated_by: 'dashboard',
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'client_id' })
+      } catch {}
+    }, 1000)
   }
+
   const [view,setView]      = useState('overview')
   const [planUnit,setPlanUnit] = useState('shop_1')
   const [unitPLView,setUnitPLView] = useState('fge')
@@ -1345,6 +1394,15 @@ export default function CONASDashboard({
   }
 
   // ── RENDER ───────────────────────────────────────────────
+  if (loadingData) return (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'#F8F4EE',fontFamily:"'Segoe UI',system-ui,sans-serif",color:'#1B2A4A'}}>
+      <div style={{textAlign:'center'}}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',marginBottom:'0.5rem'}}>CONAS Agricultural Hub</div>
+        <div style={{fontFamily:'monospace',fontSize:'0.8rem',color:'#4A5A6A'}}>Loading your data...</div>
+      </div>
+    </div>
+  )
+
   const tabs:[string,string][]=[
     ['overview','Overview'],
     ['unitpl','Unit P&L'],
