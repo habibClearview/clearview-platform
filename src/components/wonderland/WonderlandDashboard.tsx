@@ -656,6 +656,17 @@ function EngagementClose({score,classification,classColor,gcScore,gcRating,gcCol
   )
 }
 
+function Badge({label,color}){
+  return <span style={{fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,padding:'0.25rem 0.7rem',borderRadius:20,background:color,color:CC.white}}>{label}</span>
+}
+function ScoreBar({score:s,max,color}){
+  return(
+    <div style={{background:'#E8ECF0',borderRadius:999,height:7}}>
+      <div style={{width:`${(s/max)*100}%`,height:'100%',background:color,borderRadius:999}}/>
+    </div>
+  )
+}
+
 function InlineAnalytics({ result, debtObligations, monthLabels, cc, savedAssessments, onSaveAssessments }) {
   const months = 24
   const con = result.consolidated
@@ -734,17 +745,7 @@ function InlineAnalytics({ result, debtObligations, monthLabels, cc, savedAssess
   proj6.forEach(p=>{runCash+=p.net;p.closing=runCash})
   const gaps6 = proj6.filter(p=>p.closing<0).length
 
-  // ── Shared mini components ────────────────────────────────
-  const Badge = ({label,color}) => (
-    <span style={{fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,padding:'0.25rem 0.7rem',borderRadius:20,background:color,color:CC.white}}>{label}</span>
-  )
-  const ScoreBar = ({score:s,max,color}) => (
-    <div style={{background:'#E8ECF0',borderRadius:999,height:7}}>
-      <div style={{width:`${(s/max)*100}%`,height:'100%',background:color,borderRadius:999}}/>
-    </div>
-  )
   const inp = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${CC.border}`,borderRadius:4,fontSize:'0.82rem',fontFamily:'inherit',background:'#F4F8FC',color:CC.navy,boxSizing:'border-box'}
-
   const tabs = [['summary','Summary'],['credit','Credit Risk'],['going_concern','Going Concern'],['investment','Investment Readiness'],['projection','6-Month Projection'],['coach','Coach Assessment'],['close','Engagement Close']]
 
   return (
