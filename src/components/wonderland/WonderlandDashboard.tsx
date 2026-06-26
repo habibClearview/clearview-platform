@@ -218,6 +218,8 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
   const [selMonth,setSelMonth]=useState(0)
   const [actuals,setActuals]=useState(savedActuals||{})
   const [saving,setSaving]=useState(false)
+  const [mounted,setMounted]=useState(false)
+  useEffect(()=>{setMounted(true)},[]) // prevent SSR crash on analytics
   const [savedAssessments,setSavedAssessments]=useState(null)
   const [activeSection,setActiveSection]=useState('actuals')
 
@@ -1166,7 +1168,7 @@ export default function WonderlandDashboard(){
           </div>
         )}
 
-        {view==='analytics'&&<InlineAnalytics
+        {view==='analytics'&&mounted&&<InlineAnalytics
           result={result}
           debtObligations={debtObligations}
           monthLabels={monthLabels}
@@ -1177,6 +1179,7 @@ export default function WonderlandDashboard(){
             try{await supabase.from('model_config').upsert({client_id:'client_wonderland',config_type:'coach_assessments',config_data:assess,updated_at:new Date().toISOString()},{onConflict:'client_id,config_type'})}catch(e){}
           }}
         />}
+        {view==='analytics'&&!mounted&&<div style={{padding:'2rem',color:CC.slate}}>Loading analytics...</div>}
 
         {view==='scenarios'&&<ScenarioBuilder config={config} overrides={overrides} result={result} baseResult={baseResult} onApply={persist} monthLabels={monthLabels} cc={cc}/>}
 
