@@ -29,7 +29,7 @@ function creditTermToMonths(creditTerm, cycleMonths) {
 // ─── WONDERLAND CONFIG ───────────────────────────────────────
 function wonderlandConfig() {
   return {
-    meta: { businessName:'Wonderland Farm Services', ownerName:'Bernard', modelStartDate:'2026-06-01', currency:'UGX', corporateTaxRate:0.30, costOfCapital:0.10, openingCashBeforeFinancing:6_080_000 },
+    meta: { businessName:'Wonderland Farm Services', ownerName:'Bernard', modelStartDate:'2026-06-01', currency:'UGX', corporateTaxRate:0.30, costOfCapital:0.10, openingCashBeforeFinancing:6080000 },
     units: [
       { id:'input_shop', name:'Input Shop', color:'#8B5E3C', short:'Shop' },
       { id:'fge', name:'Farmer Group Enterprises (FGE)', color:'#5B7B3A', short:'FGE' },
@@ -37,61 +37,61 @@ function wonderlandConfig() {
       { id:'farm', name:"Wonderland's Own Farm", color:'#6B6259', short:'Farm' },
     ],
     productionLines: {
-      tomatoes: { name:'Tomatoes', yieldPerUnit:70, allocationUnit:'acre', outputUnit:'Crates', farmgateBuyPrice:200_000, marketSellPrice:200_000, inputCreditPricePerAllocationUnit:830_000, cycleMonths:4 },
-      onions: { name:'Onions', yieldPerUnit:10_000, allocationUnit:'acre', outputUnit:'kg', farmgateBuyPrice:2_000, marketSellPrice:2_000, inputCreditPricePerAllocationUnit:945_000, cycleMonths:5 },
+      tomatoes: { name:'Tomatoes', yieldPerUnit:70, allocationUnit:'acre', outputUnit:'Crates', farmgateBuyPrice:200000, marketSellPrice:200000, inputCreditPricePerAllocationUnit:830000, cycleMonths:4 },
+      onions: { name:'Onions', yieldPerUnit:10000, allocationUnit:'acre', outputUnit:'kg', farmgateBuyPrice:2000, marketSellPrice:2000, inputCreditPricePerAllocationUnit:945000, cycleMonths:5 },
     },
     revenueStreams: [
-      { id:'shop_seeds', unit:'input_shop', name:'Seeds & planting material', type:'simple', monthlyAmount:4_897_821, marginPct:0.25, startMonth:1, endMonth:null },
-      { id:'shop_fert', unit:'input_shop', name:'Fertilisers & soil amendments', type:'simple', monthlyAmount:7_836_513, marginPct:0.22, startMonth:1, endMonth:null },
-      { id:'shop_chem', unit:'input_shop', name:'Chemicals & pesticides', type:'simple', monthlyAmount:2_938_692, marginPct:0.28, startMonth:1, endMonth:null },
-      { id:'shop_equip', unit:'input_shop', name:'Equipment & tools', type:'simple', monthlyAmount:1_959_128, marginPct:0.20, startMonth:1, endMonth:null },
-      { id:'shop_consumables', unit:'input_shop', name:'Consumables & PPE', type:'simple', monthlyAmount:1_469_346, marginPct:0.30, startMonth:1, endMonth:null },
-      { id:'ext_external', unit:'extension', name:'External extension clients', type:'simple', monthlyAmount:11*80_000, marginPct:1.0, startMonth:2, endMonth:null },
-      { id:'ext_training', unit:'extension', name:'Training & advisory sessions', type:'simple', monthlyAmount:10*100_000, marginPct:1.0, startMonth:2, endMonth:null },
+      { id:'shop_seeds', unit:'input_shop', name:'Seeds & planting material', type:'simple', monthlyAmount:4897821, marginPct:0.25, startMonth:1, endMonth:null },
+      { id:'shop_fert', unit:'input_shop', name:'Fertilisers & soil amendments', type:'simple', monthlyAmount:7836513, marginPct:0.22, startMonth:1, endMonth:null },
+      { id:'shop_chem', unit:'input_shop', name:'Chemicals & pesticides', type:'simple', monthlyAmount:2938692, marginPct:0.28, startMonth:1, endMonth:null },
+      { id:'shop_equip', unit:'input_shop', name:'Equipment & tools', type:'simple', monthlyAmount:1959128, marginPct:0.20, startMonth:1, endMonth:null },
+      { id:'shop_consumables', unit:'input_shop', name:'Consumables & PPE', type:'simple', monthlyAmount:1469346, marginPct:0.30, startMonth:1, endMonth:null },
+      { id:'ext_external', unit:'extension', name:'External extension clients', type:'simple', monthlyAmount:11*80000, marginPct:1.0, startMonth:2, endMonth:null },
+      { id:'ext_training', unit:'extension', name:'Training & advisory sessions', type:'simple', monthlyAmount:10*100000, marginPct:1.0, startMonth:2, endMonth:null },
     ],
     counterpartyGroupDefaults: { relationshipType:'input_credit_and_offtake', linkedUnit:'fge', commissionPct:0.10, defaultCreditTerm:{value:14,unit:'weeks'}, inputSupplyMarginPct:0.214 },
     counterpartyGroups: buildWonderlandFgeRoster(),
     staff: [
-      { id:'s1', name:'Project Coordinator', role:'Project Coordinator', monthlyCost:260_000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:100,extension:0,farm:0,admin:0} },
-      { id:'s2', name:'Accounts Assistant (Agg)', role:'Accounts Assistant', monthlyCost:240_000, startMonth:1, endMonth:null, timeSplit:{input_shop:20,fge:60,extension:0,farm:0,admin:20} },
-      { id:'s3', name:'Field Assistant 1', role:'Field Assistant', monthlyCost:550_000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:70,extension:30,farm:0,admin:0} },
-      { id:'s4', name:'Field Assistant 2', role:'Field Assistant', monthlyCost:550_000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:70,extension:30,farm:0,admin:0} },
-      { id:'s5', name:'Produce Marketing Cashier', role:'Cashier', monthlyCost:450_000, startMonth:4, endMonth:null, timeSplit:{input_shop:0,fge:100,extension:0,farm:0,admin:0} },
-      { id:'s6', name:'Produce Marketing Assistant', role:'Marketing Assistant', monthlyCost:500_000, startMonth:4, endMonth:null, timeSplit:{input_shop:0,fge:100,extension:0,farm:0,admin:0} },
-      { id:'s7', name:'Security 1', role:'Security', monthlyCost:350_000, startMonth:4, endMonth:null, timeSplit:{input_shop:40,fge:60,extension:0,farm:0,admin:0} },
-      { id:'s8', name:'Security 2', role:'Security', monthlyCost:350_000, startMonth:4, endMonth:null, timeSplit:{input_shop:40,fge:60,extension:0,farm:0,admin:0} },
-      { id:'s9', name:'Tricycle Operator', role:'Tricycle Operator', monthlyCost:400_000, startMonth:4, endMonth:null, timeSplit:{input_shop:50,fge:50,extension:0,farm:0,admin:0} },
-      { id:'s10', name:'Farm Manager', role:'Farm Manager', monthlyCost:400_000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:0,extension:0,farm:100,admin:0} },
-      { id:'s11', name:'Farm Labourers (x8)', role:'Farm Labourer', monthlyCost:2_400_000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:0,extension:0,farm:100,admin:0} },
-      { id:'s12', name:'Managing Director', role:'Managing Director', monthlyCost:650_000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:0,extension:0,farm:0,admin:100} },
-      { id:'s13', name:'Accounts Assistant (Central)', role:'Accounts Assistant', monthlyCost:550_000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:0,extension:0,farm:0,admin:100} },
-      { id:'s14', name:'Input Operations Assistant', role:'Input Ops Assistant', monthlyCost:400_000, startMonth:1, endMonth:null, timeSplit:{input_shop:60,fge:0,extension:0,farm:0,admin:40} },
+      { id:'s1', name:'Project Coordinator', role:'Project Coordinator', monthlyCost:260000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:100,extension:0,farm:0,admin:0} },
+      { id:'s2', name:'Accounts Assistant (Agg)', role:'Accounts Assistant', monthlyCost:240000, startMonth:1, endMonth:null, timeSplit:{input_shop:20,fge:60,extension:0,farm:0,admin:20} },
+      { id:'s3', name:'Field Assistant 1', role:'Field Assistant', monthlyCost:550000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:70,extension:30,farm:0,admin:0} },
+      { id:'s4', name:'Field Assistant 2', role:'Field Assistant', monthlyCost:550000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:70,extension:30,farm:0,admin:0} },
+      { id:'s5', name:'Produce Marketing Cashier', role:'Cashier', monthlyCost:450000, startMonth:4, endMonth:null, timeSplit:{input_shop:0,fge:100,extension:0,farm:0,admin:0} },
+      { id:'s6', name:'Produce Marketing Assistant', role:'Marketing Assistant', monthlyCost:500000, startMonth:4, endMonth:null, timeSplit:{input_shop:0,fge:100,extension:0,farm:0,admin:0} },
+      { id:'s7', name:'Security 1', role:'Security', monthlyCost:350000, startMonth:4, endMonth:null, timeSplit:{input_shop:40,fge:60,extension:0,farm:0,admin:0} },
+      { id:'s8', name:'Security 2', role:'Security', monthlyCost:350000, startMonth:4, endMonth:null, timeSplit:{input_shop:40,fge:60,extension:0,farm:0,admin:0} },
+      { id:'s9', name:'Tricycle Operator', role:'Tricycle Operator', monthlyCost:400000, startMonth:4, endMonth:null, timeSplit:{input_shop:50,fge:50,extension:0,farm:0,admin:0} },
+      { id:'s10', name:'Farm Manager', role:'Farm Manager', monthlyCost:400000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:0,extension:0,farm:100,admin:0} },
+      { id:'s11', name:'Farm Labourers (x8)', role:'Farm Labourer', monthlyCost:2400000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:0,extension:0,farm:100,admin:0} },
+      { id:'s12', name:'Managing Director', role:'Managing Director', monthlyCost:650000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:0,extension:0,farm:0,admin:100} },
+      { id:'s13', name:'Accounts Assistant (Central)', role:'Accounts Assistant', monthlyCost:550000, startMonth:1, endMonth:null, timeSplit:{input_shop:0,fge:0,extension:0,farm:0,admin:100} },
+      { id:'s14', name:'Input Operations Assistant', role:'Input Ops Assistant', monthlyCost:400000, startMonth:1, endMonth:null, timeSplit:{input_shop:60,fge:0,extension:0,farm:0,admin:40} },
     ],
     overheads: [
-      { id:'oh1', name:'Office Rent - Business', monthlyAmount:500_000, unit:'fge', startMonth:1, endMonth:null },
-      { id:'oh2', name:'Fuel & Transport - FGE visits', monthlyAmount:384_000, unit:'fge', startMonth:1, endMonth:null },
-      { id:'oh3', name:'Input Delivery Cost', monthlyAmount:200_000, unit:'input_shop', startMonth:1, endMonth:null },
-      { id:'oh4', name:'R&M - Equipment', monthlyAmount:300_000, unit:'fge', startMonth:1, endMonth:null },
-      { id:'oh5', name:'Farm Rent / Land Access', monthlyAmount:50_000, unit:'farm', startMonth:1, endMonth:null },
-      { id:'oh6', name:'Irrigation - Own Farm', monthlyAmount:30_000, unit:'farm', startMonth:1, endMonth:null },
-      { id:'oh7', name:'Farm Tools & Maintenance', monthlyAmount:40_000, unit:'farm', startMonth:1, endMonth:null },
-      { id:'oh8', name:'Farm Staff Welfare', monthlyAmount:40_000, unit:'farm', startMonth:1, endMonth:null },
-      { id:'oh9', name:'Office Running Costs', monthlyAmount:580_000, unit:'admin', startMonth:1, endMonth:null },
-      { id:'oh10', name:'Communications & Data', monthlyAmount:200_000, unit:'admin', startMonth:1, endMonth:null },
-      { id:'oh11', name:'Professional Fees', monthlyAmount:100_000, unit:'admin', startMonth:1, endMonth:null },
+      { id:'oh1', name:'Office Rent - Business', monthlyAmount:500000, unit:'fge', startMonth:1, endMonth:null },
+      { id:'oh2', name:'Fuel & Transport - FGE visits', monthlyAmount:384000, unit:'fge', startMonth:1, endMonth:null },
+      { id:'oh3', name:'Input Delivery Cost', monthlyAmount:200000, unit:'input_shop', startMonth:1, endMonth:null },
+      { id:'oh4', name:'R&M - Equipment', monthlyAmount:300000, unit:'fge', startMonth:1, endMonth:null },
+      { id:'oh5', name:'Farm Rent / Land Access', monthlyAmount:50000, unit:'farm', startMonth:1, endMonth:null },
+      { id:'oh6', name:'Irrigation - Own Farm', monthlyAmount:30000, unit:'farm', startMonth:1, endMonth:null },
+      { id:'oh7', name:'Farm Tools & Maintenance', monthlyAmount:40000, unit:'farm', startMonth:1, endMonth:null },
+      { id:'oh8', name:'Farm Staff Welfare', monthlyAmount:40000, unit:'farm', startMonth:1, endMonth:null },
+      { id:'oh9', name:'Office Running Costs', monthlyAmount:580000, unit:'admin', startMonth:1, endMonth:null },
+      { id:'oh10', name:'Communications & Data', monthlyAmount:200000, unit:'admin', startMonth:1, endMonth:null },
+      { id:'oh11', name:'Professional Fees', monthlyAmount:100000, unit:'admin', startMonth:1, endMonth:null },
     ],
     capitalStructure: {
-      shareholderContribution:33_500_000,
+      shareholderContribution:33500000,
       grants: [
-        { id:'csj_nonrepayable', name:'CSJ Grant (Non-Repayable)', amount:147_680_000, repayable:false },
-        { id:'csj_recoverable', name:'CSJ Grant (Recoverable)', amount:62_320_000, repayable:true, schedule:{instalments:[{month:3,amount:10_000_000},{month:4,amount:10_000_000},{month:5,amount:42_320_000}],deferralEnabled:true,deferredMonth:5}, defaultForgivenessPct:0.33 },
+        { id:'csj_nonrepayable', name:'CSJ Grant (Non-Repayable)', amount:147680000, repayable:false },
+        { id:'csj_recoverable', name:'CSJ Grant (Recoverable)', amount:62320000, repayable:true, schedule:{instalments:[{month:3,amount:10000000},{month:4,amount:10000000},{month:5,amount:42320000}],deferralEnabled:true,deferredMonth:5}, defaultForgivenessPct:0.33 },
       ],
       loans:[],
       defaultAnnualInterestRate:0.18,
       defaultLoanTenorYears:2,
     },
     rollingFunds: [
-      { id:'irrigation_kit_fund', name:'Irrigation Kit Fund', assetCostPerNewMember:8_000_000, contributionPerMember:{amount:4_000_000,periods:2,periodLengthSource:'firstProductionLineCycle'}, openingFundBalance:0, contributionSource:'external', appliesTo:'counterpartyGroups' },
+      { id:'irrigation_kit_fund', name:'Irrigation Kit Fund', assetCostPerNewMember:8000000, contributionPerMember:{amount:4000000,periods:2,periodLengthSource:'firstProductionLineCycle'}, openingFundBalance:0, contributionSource:'external', appliesTo:'counterpartyGroups' },
     ],
     // Default debt obligations (empty -- populated via Planning tab UI)
     debtObligations: [],
@@ -106,7 +106,7 @@ function buildWonderlandFgeRoster() {
 }
 
 function currency(n,cc='UGX'){const v=Math.round(n||0);const sign=v<0?'-':'';return`${sign}${cc} ${Math.abs(v).toLocaleString('en-US')}`}
-function compactCurrency(n,cc='UGX'){const v=Math.round(n||0);const abs=Math.abs(v);const sign=v<0?'-':'';if(abs>=1_000_000_000)return`${sign}${cc} ${(abs/1_000_000_000).toFixed(1)}B`;if(abs>=1_000_000)return`${sign}${cc} ${(abs/1_000_000).toFixed(1)}M`;if(abs>=1_000)return`${sign}${cc} ${(abs/1_000).toFixed(0)}K`;return`${sign}${cc} ${abs}`}
+function compactCurrency(n,cc='UGX'){const v=Math.round(n||0);const abs=Math.abs(v);const sign=v<0?'-':'';if(abs>=1000000000)return`${sign}${cc} ${(abs/1000000000).toFixed(1)}B`;if(abs>=1000000)return`${sign}${cc} ${(abs/1000000).toFixed(1)}M`;if(abs>=1000)return`${sign}${cc} ${(abs/1000).toFixed(0)}K`;return`${sign}${cc} ${abs}`}
 function pct(n){return`${(n*100).toFixed(1)}%`}
 function isActiveInMonth(s,e,m){if(m<(s||1))return false;if(e&&m>e)return false;return true}
 
@@ -468,7 +468,7 @@ function OperationalCashflowView({result,actuals,debtObligations,monthLabels,cc,
   const cumulative=[];let cum=0;for(let m=0;m<months;m++){cum+=net[m];cumulative.push(cum)}
 
   // Only flag as pressure months where net is meaningfully negative (>50k threshold to avoid rounding noise)
-  const pressureMonths=net.map((v,i)=>({month:monthLabels[i],idx:i,value:v})).filter(x=>x.value<-50_000)
+  const pressureMonths=net.map((v,i)=>({month:monthLabels[i],idx:i,value:v})).filter(x=>x.value<-50000)
 
   return(
     <div>
@@ -720,7 +720,7 @@ function InlineAnalytics({ result, debtObligations, monthLabels, cc, savedAssess
 
   const gcScore = Math.min(20,
     (dscrAvgY1>=1.5?4:dscrAvgY1>=1.0?3:dscrAvgY1>=0.5?2:1) +
-    (minCash>=0?4:minCash>-10_000_000?1:0) +
+    (minCash>=0?4:minCash>-10000000?1:0) +
     (y2Rev2>y1Rev2*1.05?4:y2Rev2>y1Rev2*0.95?3:2) +
     (y1Ebitda>0&&y2Ebitda>y1Ebitda?4:y1Ebitda>0?3:2) +
     (assess.managementCapability||2)
@@ -827,7 +827,7 @@ function InlineAnalytics({ result, debtObligations, monthLabels, cc, savedAssess
           </div>
           {[
             ['Debt Service Coverage', dscrAvgY1>=1.5?4:dscrAvgY1>=1.0?3:dscrAvgY1>=0.5?2:1, 4, `DSCR ${dscrAvgY1.toFixed(2)}x average`, null],
-            ['Liquidity Position', minCash>=0?4:minCash>-10_000_000?1:0, 4, `Minimum cash: ${compactCurrency(minCash,cc)}`, null],
+            ['Liquidity Position', minCash>=0?4:minCash>-10000000?1:0, 4, `Minimum cash: ${compactCurrency(minCash,cc)}`, null],
             ['Revenue Sustainability', y2Rev2>y1Rev2*1.05?4:y2Rev2>y1Rev2*0.95?3:2, 4, `Y2 vs Y1: ${((y2Rev2/Math.max(1,y1Rev2)-1)*100).toFixed(1)}%`, null],
             ['Operational Profitability', y1Ebitda>0&&y2Ebitda>y1Ebitda?4:y1Ebitda>0?3:2, 4, `Y1 EBITDA: ${compactCurrency(y1Ebitda,cc)}`, null],
             ['Management & Governance', assess.managementCapability||2, 4, 'Coach assessment', 'managementCapability'],
