@@ -699,6 +699,41 @@ function InlineAnalyticsInner({ result, debtObligations, monthLabels, cc, savedA
 }
 
 
+function UnitsView({result, config, activeUnit, setActiveUnit, monthLabels, cc}) {
+  const unitData = result.unit[activeUnit]
+  const unitMeta = config.units.find(function(x){return x.id===activeUnit})
+  if (!unitData || !unitMeta) return null
+  const y1Rev = unitData.revenue.slice(0,12).reduce(function(a,b){return a+b},0)
+  const y1GP = unitData.grossProfit.slice(0,12).reduce(function(a,b){return a+b},0)
+  const y1Opex = unitData.totalOpex.slice(0,12).reduce(function(a,b){return a+b},0)
+  const y1Ebitda = unitData.ebitda.slice(0,12).reduce(function(a,b){return a+b},0)
+  return (
+    <div>
+      <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
+        {config.units.map(function(u){return(
+          <button key={u.id} onClick={function(){setActiveUnit(u.id)}} style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.45rem 0.9rem',border:'2px solid '+(activeUnit===u.id?u.color:CC.border),borderRadius:4,background:activeUnit===u.id?CC.navy:CC.white,color:activeUnit===u.id?CC.white:CC.slate,cursor:'pointer'}}>{u.short}</button>
+        )})}
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
+        <HeroCard label="Year 1 Revenue" value={compactCurrency(y1Rev,cc)}/>
+        <HeroCard label="Year 1 Gross Profit" value={compactCurrency(y1GP,cc)} sub={y1Rev!==0?'Margin '+pct(y1GP/y1Rev):''}/>
+        <HeroCard label="Year 1 Opex" value={compactCurrency(y1Opex,cc)}/>
+        <HeroCard label="Year 1 EBITDA" value={compactCurrency(y1Ebitda,cc)} color={y1Ebitda>=0?CC.green:CC.red}/>
+      </div>
+      {Object.keys(unitData.revenueLines).length>0&&<MonthlyTable title={unitMeta.name+' — Revenue lines (Year 1)'} rows={Object.entries(unitData.revenueLines).map(function(e){return{label:e[0],values:e[1].slice(0,12),cc}})} months={monthLabels.slice(0,12)}/>}
+      <MonthlyTable title={unitMeta.name+' — Full P&L (Year 1)'} rows={[
+        {label:'Revenue',values:unitData.revenue.slice(0,12),cc},
+        {label:'Cost of Sales',values:unitData.cogs.slice(0,12),cc},
+        {label:'Gross Profit',values:unitData.grossProfit.slice(0,12),bold:true,cc},
+        {label:'Staff Cost',values:unitData.staffCost.slice(0,12),cc},
+        {label:'Admin Allocated',values:unitData.adminAllocated.slice(0,12),cc},
+        {label:'Direct Opex',values:unitData.directOpex.slice(0,12),cc},
+        {label:'EBITDA',values:unitData.ebitda.slice(0,12),bold:true,highlight:true,cc},
+      ]} months={monthLabels.slice(0,12)}/>
+    </div>
+  )
+}
+
 export default function WonderlandDashboard(){
   const config=useMemo(()=>wonderlandConfig(),[])
   const monthLabels=useMemo(()=>buildMonthLabels(config.meta.modelStartDate),[config])
@@ -810,42 +845,7 @@ export default function WonderlandDashboard(){
           </div>
         )}
 
-        {view==='units'&&(
-          <div>
-            <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
-              {config.units.map(u=><button key={u.id} onClick={()=>setActiveUnit(u.id)} style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.45rem 0.9rem',border:'2px solid ' + (activeUnit===u.id?u.color:CC.border),borderRadius:4,background:activeUnit===u.id?CC.navy:CC.white,color:activeUnit===u.id?CC.white:CC.slate,cursor:'pointer'}}>{u.short}</button>)}
-            </div>
-            {(function(){
-              const unitData=result.unit[activeUnit]
-              const unitMeta=config.units.find(function(x){return x.id===activeUnit})
-              if(!unitData||!unitMeta)return null
-              const y1Rev=unitData.revenue.slice(0,12).reduce(function(a,b){return a+b},0)
-              const y1GP=unitData.grossProfit.slice(0,12).reduce(function(a,b){return a+b},0)
-              const y1Opex=unitData.totalOpex.slice(0,12).reduce(function(a,b){return a+b},0)
-              const y1Ebitda=unitData.ebitda.slice(0,12).reduce(function(a,b){return a+b},0)
-              return(
-                <div>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
-                    <HeroCard label="Year 1 Revenue" value={compactCurrency(y1Rev,cc)}/>
-                    <HeroCard label="Year 1 Gross Profit" value={compactCurrency(y1GP,cc)} sub={y1Rev!==0?'Margin ' + pct(y1GP/y1Rev):''}/>
-                    <HeroCard label="Year 1 Opex" value={compactCurrency(y1Opex,cc)}/>
-                    <HeroCard label="Year 1 EBITDA" value={compactCurrency(y1Ebitda,cc)} color={y1Ebitda>=0?CC.green:CC.red}/>
-                  </div>
-                  {Object.keys(unitData.revenueLines).length>0&&<MonthlyTable title={unitMeta.name + ' — Revenue lines (Year 1)'} rows={Object.entries(unitData.revenueLines).map(function(e){return{label:e[0],values:e[1].slice(0,12),cc}})} months={monthLabels.slice(0,12)}/>}
-                  <MonthlyTable title={unitMeta.name + ' — Full P&L (Year 1)'} rows={[
-                    {label:'Revenue',values:unitData.revenue.slice(0,12),cc},
-                    {label:'Cost of Sales',values:unitData.cogs.slice(0,12),cc},
-                    {label:'Gross Profit',values:unitData.grossProfit.slice(0,12),bold:true,cc},
-                    {label:'Staff Cost',values:unitData.staffCost.slice(0,12),cc},
-                    {label:'Admin Allocated',values:unitData.adminAllocated.slice(0,12),cc},
-                    {label:'Direct Opex',values:unitData.directOpex.slice(0,12),cc},
-                    {label:'EBITDA',values:unitData.ebitda.slice(0,12),bold:true,highlight:true,cc},
-                  ]} months={monthLabels.slice(0,12)}/>
-                </div>
-              )
-            })()}
-          </div>
-        )}
+        {view==='units'&&<UnitsView result={result} config={config} activeUnit={activeUnit} setActiveUnit={setActiveUnit} monthLabels={monthLabels} cc={cc}/>}
 
         {view==='planning'&&<PlanningActualsTab config={config} result={result} monthLabels={monthLabels} cc={cc} savedActuals={actuals} onSaveActuals={setActuals} debtObligations={debtObligations} onSaveDebtObligations={setDebtObligations}/>}
 
