@@ -146,9 +146,9 @@ function ConasEngagementClose({score,classification,classColor,gcScore,gcRating,
   const viabilityColor = viabilityRating==='Viable'?C.green:viabilityRating==='Conditionally Viable'?C.teal:viabilityRating==='At Risk'?C.amber:C.red
   const repayColor = repaymentOutlook==='On Track'?C.green:repaymentOutlook==='Watch'?C.amber:C.red
   const exitRec = viabilityRating==='Viable'?'Business is viable for independent operation. Maintain agreed monitoring rhythm.':viabilityRating==='Conditionally Viable'?'Business can close engagement with conditions. Specific actions below must be completed before the consultant fully exits.':viabilityRating==='At Risk'?'Engagement close requires an active support plan. Business needs structured follow-on support for at least 6 months post-engagement.':'Do not close without a remediation plan in place.'
-  const immediateList = assess.immediateActions?assess.immediateActions.split('\n').filter(Boolean):[cashGaps>0?'Identify short-term liquidity facility to cover cash-negative months.':null,dscrAvg<1.0?'Review and renegotiate repayment schedule with financing partners.':null,score<40?'Convene management session to review cashflow and cost structure.':null].filter(Boolean)
-  const nearList = assess.nearTermActions?assess.nearTermActions.split('\n').filter(Boolean):['Implement monthly cashflow tracking using Clearview.','Establish quarterly management accounts review process.',irScore<17?'Develop investment readiness improvement plan.':null].filter(Boolean)
-  const followList = assess.followUp?assess.followUp.split('\n').filter(Boolean):['Monthly Clearview review for 6 months post-engagement.','Annual commercial readiness reassessment.'].filter(Boolean)
+  const immediateList = assess.immediateActions?(assess.immediateActions as string).split('\n').filter(Boolean):[cashGaps>0?'Identify short-term liquidity facility to cover cash-negative months.':null,dscrAvg<1.0?'Review and renegotiate repayment schedule with financing partners.':null,score<40?'Convene management session to review cashflow and cost structure.':null].filter(Boolean)
+  const nearList = assess.nearTermActions?(assess.nearTermActions as string).split('\n').filter(Boolean):['Implement monthly cashflow tracking using Clearview.','Establish quarterly management accounts review process.',irScore<17?'Develop investment readiness improvement plan.':null].filter(Boolean)
+  const followList = assess.followUp?(assess.followUp as string).split('\n').filter(Boolean):['Monthly Clearview review for 6 months post-engagement.','Annual commercial readiness reassessment.'].filter(Boolean)
   const cs = {background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}
   return (
     <div>
@@ -168,9 +168,9 @@ function ConasEngagementClose({score,classification,classColor,gcScore,gcRating,
           <div style={{fontFamily:'monospace',fontSize:'0.7rem',color:C.cyan,marginBottom:'0.4rem',fontWeight:700}}>RECOMMENDATION</div>
           <div style={{fontSize:'0.9rem',color:C.navy,lineHeight:1.6}}>{exitRec}</div>
         </div>
-        {assess.coachNotes&&<div style={{background:'#FFF8E8',border:`1px solid ${C.amber}`,borderRadius:6,padding:'0.85rem'}}>
+        {(assess.coachNotes as string)&&<div style={{background:'#FFF8E8',border:`1px solid ${C.amber}`,borderRadius:6,padding:'0.85rem'}}>
           <div style={{fontFamily:'monospace',fontSize:'0.7rem',color:C.amber,marginBottom:'0.3rem',fontWeight:700}}>COACH NOTES</div>
-          <div style={{fontSize:'0.85rem',color:C.navy,lineHeight:1.6}}>{assess.coachNotes}</div>
+          <div style={{fontSize:'0.85rem',color:C.navy,lineHeight:1.6}}>{assess.coachNotes as string}</div>
         </div>}
       </div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:'1.25rem'}}>
@@ -341,7 +341,7 @@ function ConasAnalyticsTab({result, coachAssessments, onSaveAssessments, months,
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}><span style={{fontWeight:600,fontSize:'0.88rem',color:C.navy}}>{ind.name}</span><span style={{fontFamily:'monospace',fontWeight:700,color:ind.sc>=3?C.green:ind.sc>=2?C.amber:C.red}}>{ind.sc}/{ind.max}</span></div>
               <div style={{background:'#E8ECF0',borderRadius:999,height:7}}><div style={{width:''+(ind.sc/ind.max*100)+'%',height:'100%',background:ind.sc>=3?C.green:ind.sc>=2?C.amber:C.red,borderRadius:999}}/></div>
               <div style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.3rem'}}>{ind.ev}</div>
-              {ind.field&&<input type="range" min="0" max={ind.max} step="1" value={assess[ind.field]||2} onChange={function(e){updateAssess(ind.field,Number(e.target.value))}} style={{width:'100%',accentColor:C.cyan,marginTop:'0.4rem'}}/>}
+              {ind.field&&<input type="range" min="0" max={ind.max} step="1" value={(assess[ind.field] as number)||2} onChange={function(e){updateAssess(ind.field,Number(e.target.value))}} style={{width:'100%',accentColor:C.cyan,marginTop:'0.4rem'}}/>}
             </div>
           )})}
         </div>
@@ -365,7 +365,7 @@ function ConasAnalyticsTab({result, coachAssessments, onSaveAssessments, months,
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}><span style={{fontWeight:600,fontSize:'0.88rem',color:C.navy}}>{dim.name}</span><span style={{fontFamily:'monospace',fontWeight:700,color:dim.sc>=4?C.green:dim.sc>=3?C.teal:dim.sc>=2?C.amber:C.red}}>{dim.sc}/{dim.max}</span></div>
               <div style={{background:'#E8ECF0',borderRadius:999,height:7}}><div style={{width:''+(dim.sc/dim.max*100)+'%',height:'100%',background:dim.sc>=4?C.green:dim.sc>=3?C.teal:dim.sc>=2?C.amber:C.red,borderRadius:999}}/></div>
               <div style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.3rem'}}>{dim.ev}</div>
-              {dim.field&&<input type="range" min="0" max={dim.max} step="1" value={assess[dim.field]||2} onChange={function(e){updateAssess(dim.field,Number(e.target.value))}} style={{width:'100%',accentColor:C.cyan,marginTop:'0.4rem'}}/>}
+              {dim.field&&<input type="range" min="0" max={dim.max} step="1" value={(assess[dim.field] as number)||2} onChange={function(e){updateAssess(dim.field,Number(e.target.value))}} style={{width:'100%',accentColor:C.cyan,marginTop:'0.4rem'}}/>}
             </div>
           )})}
         </div>
@@ -382,7 +382,7 @@ function ConasAnalyticsTab({result, coachAssessments, onSaveAssessments, months,
                   <label style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{item.label}</label>
                   <span style={{fontFamily:'monospace',fontWeight:700,color:C.cyan}}>{assess[item.field]||2}/{item.max}</span>
                 </div>
-                <input type="range" min="0" max={item.max} step="1" value={assess[item.field]||2} onChange={function(e){updateAssess(item.field,Number(e.target.value))}} style={{width:'100%',accentColor:C.cyan,marginBottom:'0.2rem'}}/>
+                <input type="range" min="0" max={item.max} step="1" value={(assess[item.field] as number)||2} onChange={function(e){updateAssess(item.field,Number(e.target.value))}} style={{width:'100%',accentColor:C.cyan,marginBottom:'0.2rem'}}/>
               </div>
             )})}
           </div>
@@ -390,7 +390,7 @@ function ConasAnalyticsTab({result, coachAssessments, onSaveAssessments, months,
             {[{label:'Immediate Actions (30 days)',field:'immediateActions'},{label:'Near-Term Actions (60-90 days)',field:'nearTermActions'},{label:'Required Follow-Up',field:'followUp'},{label:'Coach Notes',field:'coachNotes'}].map(function(item){return(
               <div key={item.field}>
                 <label style={{display:'block',fontWeight:600,fontSize:'0.82rem',marginBottom:'0.25rem',color:C.navy}}>{item.label}</label>
-                <textarea value={assess[item.field]||''} onChange={function(e){updateAssess(item.field,e.target.value)}} style={{width:'100%',minHeight:75,padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.82rem',fontFamily:'inherit',background:'#F4F8FC',color:C.navy,boxSizing:'border-box',resize:'vertical'}} placeholder="One per line..."/>
+                <textarea value={(assess[item.field] as string)||''} onChange={function(e){updateAssess(item.field,e.target.value)}} style={{width:'100%',minHeight:75,padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.82rem',fontFamily:'inherit',background:'#F4F8FC',color:C.navy,boxSizing:'border-box',resize:'vertical'}} placeholder="One per line..."/>
               </div>
             )})}
           </div>
