@@ -90,7 +90,7 @@ function Flag({type,children}:{type:'warn'|'ok'|'info';children:React.ReactNode}
 // ============================================================
 
 // ── DEBT SCHEDULE ENGINE (same as Wonderland, standalone) ───
-function buildConasDebtSched(obligations, months) {
+function buildConasDebtSched(obligations: {drawdownMonth?:number;annualRate?:number;tenorMonths?:number;gracePeriodMonths?:number;principal?:number;repaymentType?:string}[], months: number) {
   months = months || 12
   const totalInterest = Array(months).fill(0)
   const totalPrincipal = Array(months).fill(0)
@@ -140,7 +140,7 @@ function buildConasDebtSched(obligations, months) {
 }
 
 // ── ENGAGEMENT CLOSE (CONAS version) ────────────────────────
-function ConasEngagementClose({score,classification,classColor,gcScore,gcRating,gcColor,irScore,irTier,irColor,dscrAvg,cashGaps,assess,cc}) {
+function ConasEngagementClose({score,classification,classColor,gcScore,gcRating,gcColor,irScore,irTier,irColor,dscrAvg,cashGaps,assess,cc}:{score:number;classification:string;classColor:string;gcScore:number;gcRating:string;gcColor:string;irScore:number;irTier:string;irColor:string;dscrAvg:number;cashGaps:number;assess:Record<string,unknown>;cc:string}) {
   const viabilityRating = gcScore>=15&&score>=65?'Viable':gcScore>=10&&score>=40?'Conditionally Viable':gcScore>=7?'At Risk':'Not Viable'
   const repaymentOutlook = dscrAvg>=1.5&&cashGaps===0?'On Track':dscrAvg>=1.0?'Watch':dscrAvg>=0.5?'At Risk':'Default Risk'
   const viabilityColor = viabilityRating==='Viable'?C.green:viabilityRating==='Conditionally Viable'?C.teal:viabilityRating==='At Risk'?C.amber:C.red
@@ -188,7 +188,7 @@ function ConasEngagementClose({score,classification,classColor,gcScore,gcRating,
 }
 
 // ── CONAS ANALYTICS TAB ──────────────────────────────────────
-function ConasAnalyticsTab({result, coachAssessments, onSaveAssessments, months, cc}) {
+function ConasAnalyticsTab({result, coachAssessments, onSaveAssessments, months, cc}:{result:ReturnType<typeof runCONASModel>;coachAssessments:Record<string,unknown>|null;onSaveAssessments:(a:Record<string,unknown>)=>void;months:string[];cc:string}) {
   const [assess, setAssess] = React.useState(coachAssessments || {
     commercialModel: 2, managementCapability: 2, marketEvidence: 2, governance: 2,
     immediateActions: '', nearTermActions: '', followUp: '', coachNotes: '',
@@ -256,7 +256,7 @@ function ConasAnalyticsTab({result, coachAssessments, onSaveAssessments, months,
   const inpStyle = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.82rem',fontFamily:'inherit',background:'#F4F8FC',color:C.navy,boxSizing:'border-box'}
   const tabList = [['summary','Summary'],['credit','Credit Risk'],['going_concern','Going Concern'],['investment','Investment Readiness'],['coach','Coach Assessment'],['close','Engagement Close']]
 
-  function Badge({label, color}) {
+  function Badge({label, color}:{label:string;color:string}) {
     return <span style={{fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,padding:'0.25rem 0.7rem',borderRadius:20,background:color,color:C.white}}>{label}</span>
   }
 
@@ -405,7 +405,7 @@ function ConasAnalyticsTab({result, coachAssessments, onSaveAssessments, months,
 }
 
 // ── CONAS OPERATIONAL CASHFLOW TAB ───────────────────────────
-function ConasOperationalCashflowTab({result, months, cc}) {
+function ConasOperationalCashflowTab({result, months, cc}:{result:ReturnType<typeof runCONASModel>;months:string[];cc:string}) {
   const con = result.con
   const cf = result.cf
   const m = months.length
@@ -473,7 +473,7 @@ function ConasOperationalCashflowTab({result, months, cc}) {
 }
 
 // ── CONAS WORKING CAPITAL TAB ────────────────────────────────
-function ConasWorkingCapitalTab({result, months, cc}) {
+function ConasWorkingCapitalTab({result, months, cc}:{result:ReturnType<typeof runCONASModel>;months:string[];cc:string}) {
   const m = months.length
   const irrigationByMonth = result.cf.irrigation || Array(m).fill(0)
   const totalIrrigation = irrigationByMonth.reduce(function(a,b){return a+b},0)
