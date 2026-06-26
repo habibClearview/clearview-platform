@@ -174,11 +174,15 @@ function ConasEngagementClose({score,classification,classColor,gcScore,gcRating,
         </div>}
       </div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:'1.25rem'}}>
-        {[[C.red,'Immediate Actions (30 days)',immediateList],[C.amber,'Near-Term Actions (60-90 days)',nearList],[C.cyan,'Required Follow-Up',followList]].map(function(item){
+        {([
+          [C.red,'Immediate Actions (30 days)',immediateList],
+          [C.amber,'Near-Term Actions (60-90 days)',nearList],
+          [C.cyan,'Required Follow-Up',followList],
+        ] as [string,string,(string|null|boolean)[]][]).map(function(item){
           return (
             <div key={item[1]} style={cs}>
               <div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}}>{item[1]}</div>
-              {item[2].length>0?item[2].map(function(a,i){return(<div key={i} style={{display:'flex',gap:'0.5rem',fontSize:'0.85rem',color:C.navy,marginBottom:'0.5rem',lineHeight:1.5}}><span style={{color:item[0],fontWeight:700,flexShrink:0}}>→</span>{a}</div>)}):<div style={{fontSize:'0.85rem',color:C.slate,fontStyle:'italic'}}>Add in Coach Assessment tab.</div>}
+              {item[2].filter(Boolean).length>0?item[2].filter(Boolean).map(function(a,i){return(<div key={i} style={{display:'flex',gap:'0.5rem',fontSize:'0.85rem',color:C.navy,marginBottom:'0.5rem',lineHeight:1.5}}><span style={{color:item[0],fontWeight:700,flexShrink:0}}>→</span>{a as string}</div>)}):<div style={{fontSize:'0.85rem',color:C.slate,fontStyle:'italic'}}>Add in Coach Assessment tab.</div>}
             </div>
           )
         })}
