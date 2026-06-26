@@ -669,10 +669,19 @@ function ScoreBar({score:s,max,color}){
 
 function InlineAnalytics({ result, debtObligations, monthLabels, cc, savedAssessments, onSaveAssessments }) {
   const months = 24
+
+  // Guard against undefined result structure
+  if (!result || !result.consolidated || !result.balanceSheet || !result.cashFlow) {
+    return <div style={{padding:'2rem',color:'#4A5A6A'}}>Loading analytics...</div>
+  }
+  if (!result.consolidated.ebitda || !result.consolidated.revenue || !result.cashFlow.closingCash) {
+    return <div style={{padding:'2rem',color:'#4A5A6A'}}>Loading analytics...</div>
+  }
+
   const con = result.consolidated
   const bs = result.balanceSheet
   const cf = result.cashFlow
-  const debtSched = useMemo(() => buildDebtSched(debtObligations, months), [debtObligations])
+  const debtSched = useMemo(() => buildDebtSched(debtObligations || [], months), [debtObligations])
 
   const [assess, setAssess] = useState(savedAssessments || {
     commercialModel: 2, managementCapability: 2, marketEvidence: 2, governance: 2,
@@ -699,9 +708,9 @@ function InlineAnalytics({ result, debtObligations, monthLabels, cc, savedAssess
   const y2Ebitda = con.ebitda.slice(12, 24).reduce(function(a, b) { return a + b }, 0)
   const y1Rev2 = con.revenue.slice(0, 12).reduce(function(a, b) { return a + b }, 0)
   const y2Rev2 = con.revenue.slice(12, 24).reduce(function(a, b) { return a + b }, 0)
-  const minCash = Math.min.apply(null, cf.closingCash)
+  const minCash = cf.closingCash.reduce(function(a, b) { return a < b ? a : b }, 0)
   const ebitdaMargin = y1Rev2 > 0 ? y1Ebitda / y1Rev2 : 0
-  const deToEq = bs.totalEquity[11] > 0 ? bs.totalLiabilities[11] / bs.totalEquity[11] : 99
+  const deToEq = (bs.totalEquity && bs.totalEquity.length > 11 && bs.totalEquity[11] > 0) ? (bs.totalLiabilities[11] || 0) / bs.totalEquity[11] : 99
 
   let score = 50
   if (dscrAvgY1 >= 1.5) { score += 30 }
