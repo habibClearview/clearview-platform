@@ -747,6 +747,9 @@ export default function WonderlandDashboard(){
   const [loading,setLoading]=useState(true)
   const [saving,setSaving]=useState(false)
 
+  const [mounted,setMounted]=useState(false)
+  const [savedAssessments,setSavedAssessments]=useState(null)
+  useEffect(()=>{setMounted(true)},[])
   useEffect(()=>{
     async function load(){
       try{
