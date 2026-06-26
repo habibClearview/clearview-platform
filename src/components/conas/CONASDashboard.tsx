@@ -136,7 +136,7 @@ function buildConasDebtSched(obligations: {drawdownMonth?:number;annualRate?:num
     }
   })
   return { totalInterest, totalPrincipal, totalRepayment, totalOutstanding,
-    annualY1: totalRepayment.reduce(function(a,b){return a+b},0) }
+    annualY1: totalRepayment.reduce(function(a:number,b:number){return a+b},0) }
 }
 
 // ── ENGAGEMENT CLOSE (CONAS version) ────────────────────────
@@ -213,17 +213,17 @@ function ConasAnalyticsTab({result, coachAssessments, onSaveAssessments, months,
   const m = months.length
 
   // Analytics calculations
-  const dscrVals = con.ebitda.map(function(e, i) {
+  const dscrVals = con.ebitda.map(function(e:number, i:number) {
     const ds = debtSched.totalRepayment[i]
     return ds > 0 ? e/ds : e > 0 ? 3 : 0
   })
-  const dscrAvg = dscrVals.reduce(function(a,b){return a+b},0) / m
-  const cashGaps = cf.close.filter(function(v){return v<0}).length
-  const y1Rev = con.rev.reduce(function(a,b){return a+b},0)
-  const y1Ebitda = con.ebitda.reduce(function(a,b){return a+b},0)
-  const minCash = cf.close.reduce(function(a,b){return a<b?a:b},0)
-  const q1Rev = con.rev.slice(0,3).reduce(function(a,b){return a+b},0)
-  const q4Rev = con.rev.slice(m-3,m).reduce(function(a,b){return a+b},0)
+  const dscrAvg = dscrVals.reduce(function(a:number,b:number){return a+b},0) / m
+  const cashGaps = cf.close.filter(function(v:number){return v<0}).length
+  const y1Rev = con.rev.reduce(function(a:number,b:number){return a+b},0)
+  const y1Ebitda = con.ebitda.reduce(function(a:number,b:number){return a+b},0)
+  const minCash = cf.close.reduce(function(a:number,b:number){return a<b?a:b},0)
+  const q1Rev = con.rev.slice(0,3).reduce(function(a:number,b:number){return a+b},0)
+  const q4Rev = con.rev.slice(m-3,m).reduce(function(a:number,b:number){return a+b},0)
   const revTrend = q4Rev > q1Rev*1.05 ? 'Growing' : q4Rev < q1Rev*0.95 ? 'Declining' : 'Stable'
 
   let score = 50
@@ -244,7 +244,7 @@ function ConasAnalyticsTab({result, coachAssessments, onSaveAssessments, months,
     (minCash>=0?4:minCash>-10000000?1:0) +
     3 + // revenue sustainability -- default adequate
     (y1Ebitda>0?3:2) +
-    (assess.managementCapability||2)
+    (Number(assess.managementCapability)||2)
   )
   const gcRating = gcScore>=17?'Strong':gcScore>=12?'Adequate':gcScore>=7?'Marginal':'Concern'
   const gcColor = gcRating==='Strong'?C.green:gcRating==='Adequate'?C.teal:gcRating==='Marginal'?C.amber:C.red
@@ -253,12 +253,12 @@ function ConasAnalyticsTab({result, coachAssessments, onSaveAssessments, months,
   const deToEq = (bs.totalEquity&&bs.totalEquity.length>0&&bs.totalEquity[bs.totalEquity.length-1]>0) ? (bs.totalLiabilities[bs.totalLiabilities.length-1]||0)/bs.totalEquity[bs.totalEquity.length-1] : 99
   const irFinancial = Math.min(5,(ebitdaMargin>=0.2?2:ebitdaMargin>=0.05?1:0)+(y1Ebitda>0?1:0)+(deToEq<1?2:deToEq<2?1:0))
   const irDebt = Math.min(5,Math.round(dscrAvg>=2?5:dscrAvg>=1.5?4:dscrAvg>=1?3:2))
-  const irScore = Math.min(30,irFinancial+irDebt+(assess.commercialModel||2)+(assess.managementCapability||2)+(assess.marketEvidence||2)+(assess.governance||2))
+  const irScore = Math.min(30,irFinancial+irDebt+(Number(assess.commercialModel)||2)+(Number(assess.managementCapability)||2)+(Number(assess.marketEvidence)||2)+(Number(assess.governance)||2))
   const irTier = irScore>=24?'Investment Ready':irScore>=17?'Near Ready':irScore>=10?'Development Stage':'Pre-Investment'
   const irColor = irTier==='Investment Ready'?C.green:irTier==='Near Ready'?C.teal:C.amber
 
   const inpStyle = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.82rem',fontFamily:'inherit',background:'#F4F8FC',color:C.navy,boxSizing:'border-box'}
-  const tabList = [['summary','Summary'],['credit','Credit Risk'],['going_concern','Going Concern'],['investment','Investment Readiness'],['coach','Coach Assessment'],['close','Engagement Close']]
+  const tabList:[string,string][] = [['summary','Summary'],['credit','Credit Risk'],['going_concern','Going Concern'],['investment','Investment Readiness'],['coach','Coach Assessment'],['close','Engagement Close']]
 
   function Badge({label, color}:{label:string;color:string}) {
     return <span style={{fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,padding:'0.25rem 0.7rem',borderRadius:20,background:color,color:C.white}}>{label}</span>
@@ -318,11 +318,11 @@ function ConasAnalyticsTab({result, coachAssessments, onSaveAssessments, months,
             <div style={{background:'#F0F4F8',borderRadius:6,padding:'0.85rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,marginBottom:'0.3rem'}}>SEASON EBITDA</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:y1Ebitda>=0?C.green:C.red}}>{fmt(y1Ebitda,cc)}</div></div>
           </div>
           <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.75rem',fontFamily:'monospace'}}>
-            <thead><tr style={{background:C.navy,color:C.white}}><th style={{padding:'7px 10px',textAlign:'left',minWidth:120}}>Metric</th>{months.map(function(m,i){return <th key={i} style={{padding:'7px 8px',textAlign:'right',whiteSpace:'nowrap'}}>{m}</th>})}</tr></thead>
+            <thead><tr style={{background:C.navy,color:C.white}}><th style={{padding:'7px 10px',textAlign:'left',minWidth:120}}>Metric</th>{months.map(function(m:string,i:number){return <th key={i} style={{padding:'7px 8px',textAlign:'right',whiteSpace:'nowrap'}}>{m}</th>})}</tr></thead>
             <tbody>
-              <tr style={{background:'#F8F4EE'}}><td style={{padding:'6px 10px',fontWeight:600}}>EBITDA</td>{con.ebitda.map(function(v,i){return <td key={i} style={{padding:'6px 8px',textAlign:'right',color:v>=0?C.green:C.red}}>{fmt(v,cc)}</td>})}</tr>
-              <tr><td style={{padding:'6px 10px',fontWeight:600}}>Debt Service</td>{debtSched.totalRepayment.map(function(v,i){return <td key={i} style={{padding:'6px 8px',textAlign:'right'}}>{fmt(v,cc)}</td>})}</tr>
-              <tr style={{background:'#F0F4F8'}}><td style={{padding:'6px 10px',fontWeight:700}}>DSCR</td>{dscrVals.map(function(v,i){return <td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:v>=1.5?C.green:v>=1.0?C.amber:C.red}}>{v.toFixed(2)}x</td>})}</tr>
+              <tr style={{background:'#F8F4EE'}}><td style={{padding:'6px 10px',fontWeight:600}}>EBITDA</td>{con.ebitda.map(function(v:number,i:number){return <td key={i} style={{padding:'6px 8px',textAlign:'right',color:v>=0?C.green:C.red}}>{fmt(v,cc)}</td>})}</tr>
+              <tr><td style={{padding:'6px 10px',fontWeight:600}}>Debt Service</td>{debtSched.totalRepayment.map(function(v:number,i:number){return <td key={i} style={{padding:'6px 8px',textAlign:'right'}}>{fmt(v,cc)}</td>})}</tr>
+              <tr style={{background:'#F0F4F8'}}><td style={{padding:'6px 10px',fontWeight:700}}>DSCR</td>{dscrVals.map(function(v:number,i:number){return <td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:v>=1.5?C.green:v>=1.0?C.amber:C.red}}>{v.toFixed(2)}x</td>})}</tr>
             </tbody>
           </table></div>
         </div>
@@ -339,13 +339,13 @@ function ConasAnalyticsTab({result, coachAssessments, onSaveAssessments, months,
             {name:'Liquidity Position',sc:minCash>=0?4:minCash>-10000000?1:0,max:4,ev:'Min cash: '+fmt(minCash,cc),field:null},
             {name:'Revenue Sustainability',sc:3,max:4,ev:'Season revenue trend: '+revTrend,field:null},
             {name:'Operational Profitability',sc:y1Ebitda>0?3:2,max:4,ev:'Season EBITDA: '+fmt(y1Ebitda,cc),field:null},
-            {name:'Management & Governance',sc:assess.managementCapability||2,max:4,ev:'Coach assessment',field:'managementCapability'},
+            {name:'Management & Governance',sc:Number(assess.managementCapability)||2,max:4,ev:'Coach assessment',field:'managementCapability'},
           ].map(function(ind){return(
             <div key={ind.name} style={{marginBottom:'1rem',paddingBottom:'1rem',borderBottom:`1px solid ${C.border}`}}>
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}><span style={{fontWeight:600,fontSize:'0.88rem',color:C.navy}}>{ind.name}</span><span style={{fontFamily:'monospace',fontWeight:700,color:ind.sc>=3?C.green:ind.sc>=2?C.amber:C.red}}>{ind.sc}/{ind.max}</span></div>
               <div style={{background:'#E8ECF0',borderRadius:999,height:7}}><div style={{width:''+(ind.sc/ind.max*100)+'%',height:'100%',background:ind.sc>=3?C.green:ind.sc>=2?C.amber:C.red,borderRadius:999}}/></div>
               <div style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.3rem'}}>{ind.ev}</div>
-              {ind.field&&<input type="range" min="0" max={ind.max} step="1" value={(assess[ind.field] as number)||2} onChange={function(e){updateAssess(ind.field,Number(e.target.value))}} style={{width:'100%',accentColor:C.cyan,marginTop:'0.4rem'}}/>}
+              {ind.field!=null&&<input type="range" min="0" max={ind.max} step="1" value={(assess[ind.field] as number)||2} onChange={function(e){updateAssess(ind.field,Number(e.target.value))}} style={{width:'100%',accentColor:C.cyan,marginTop:'0.4rem'}}/>}
             </div>
           )})}
         </div>
@@ -360,16 +360,16 @@ function ConasAnalyticsTab({result, coachAssessments, onSaveAssessments, months,
           {[
             {name:'Financial Viability',sc:irFinancial,max:5,ev:'EBITDA margin '+(ebitdaMargin*100).toFixed(1)+'%',field:null},
             {name:'Debt Serviceability',sc:irDebt,max:5,ev:'DSCR '+dscrAvg.toFixed(2)+'x',field:null},
-            {name:'Commercial Model Clarity',sc:assess.commercialModel||2,max:5,ev:'Coach assessment',field:'commercialModel'},
-            {name:'Management Capability',sc:assess.managementCapability||2,max:5,ev:'Coach assessment',field:'managementCapability'},
-            {name:'Market Evidence',sc:assess.marketEvidence||2,max:5,ev:'Coach assessment',field:'marketEvidence'},
-            {name:'Governance & Records',sc:assess.governance||2,max:5,ev:'Coach assessment',field:'governance'},
+            {name:'Commercial Model Clarity',sc:Number(assess.commercialModel)||2,max:5,ev:'Coach assessment',field:'commercialModel'},
+            {name:'Management Capability',sc:Number(assess.managementCapability)||2,max:5,ev:'Coach assessment',field:'managementCapability'},
+            {name:'Market Evidence',sc:Number(assess.marketEvidence)||2,max:5,ev:'Coach assessment',field:'marketEvidence'},
+            {name:'Governance & Records',sc:Number(assess.governance)||2,max:5,ev:'Coach assessment',field:'governance'},
           ].map(function(dim){return(
             <div key={dim.name} style={{marginBottom:'1rem',paddingBottom:'1rem',borderBottom:`1px solid ${C.border}`}}>
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}><span style={{fontWeight:600,fontSize:'0.88rem',color:C.navy}}>{dim.name}</span><span style={{fontFamily:'monospace',fontWeight:700,color:dim.sc>=4?C.green:dim.sc>=3?C.teal:dim.sc>=2?C.amber:C.red}}>{dim.sc}/{dim.max}</span></div>
               <div style={{background:'#E8ECF0',borderRadius:999,height:7}}><div style={{width:''+(dim.sc/dim.max*100)+'%',height:'100%',background:dim.sc>=4?C.green:dim.sc>=3?C.teal:dim.sc>=2?C.amber:C.red,borderRadius:999}}/></div>
               <div style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.3rem'}}>{dim.ev}</div>
-              {dim.field&&<input type="range" min="0" max={dim.max} step="1" value={(assess[dim.field] as number)||2} onChange={function(e){updateAssess(dim.field,Number(e.target.value))}} style={{width:'100%',accentColor:C.cyan,marginTop:'0.4rem'}}/>}
+              {dim.field!=null&&<input type="range" min="0" max={dim.max} step="1" value={(assess[dim.field] as number)||2} onChange={function(e){updateAssess(dim.field,Number(e.target.value))}} style={{width:'100%',accentColor:C.cyan,marginTop:'0.4rem'}}/>}
             </div>
           )})}
         </div>
@@ -384,7 +384,7 @@ function ConasAnalyticsTab({result, coachAssessments, onSaveAssessments, months,
               <div key={item.field}>
                 <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}>
                   <label style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{item.label}</label>
-                  <span style={{fontFamily:'monospace',fontWeight:700,color:C.cyan}}>{assess[item.field]||2}/{item.max}</span>
+                  <span style={{fontFamily:'monospace',fontWeight:700,color:C.cyan}}>{Number(assess[item.field])||2}/{item.max}</span>
                 </div>
                 <input type="range" min="0" max={item.max} step="1" value={(assess[item.field] as number)||2} onChange={function(e){updateAssess(item.field,Number(e.target.value))}} style={{width:'100%',accentColor:C.cyan,marginBottom:'0.2rem'}}/>
               </div>
@@ -423,19 +423,19 @@ function ConasOperationalCashflowTab({result, months, cc}:{result:ReturnType<typ
     moneyOut[i] = operatingLoss + (result.cf.irrigation[i]||0) + (result.cf.approvedSpend[i]||0)
   }
 
-  const net = moneyIn.map(function(v,i){return v - moneyOut[i]})
+  const net = moneyIn.map(function(v:number,i:number){return v - moneyOut[i]})
   const cumulative = []
   let cum = 0
   for (let i = 0; i < m; i++) { cum += net[i]; cumulative.push(cum) }
 
-  const pressureMonths = net.map(function(v,i){return{idx:i,label:months[i],value:v}}).filter(function(x){return x.value < -50000})
+  const pressureMonths = net.map(function(v:number,i:number){return{idx:i,label:months[i],value:v}}).filter(function(x){return x.value < -50000})
 
   return (
     <div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
-        <KPI label="Total Money In" value={fmt(moneyIn.reduce(function(a,b){return a+b},0),cc)}/>
-        <KPI label="Total Money Out" value={fmt(moneyOut.reduce(function(a,b){return a+b},0),cc)}/>
-        <KPI label="Net Cash Position" value={fmt(net.reduce(function(a,b){return a+b},0),cc)} color={net.reduce(function(a,b){return a+b},0)>=0?C.green:C.red}/>
+        <KPI label="Total Money In" value={fmt(moneyIn.reduce(function(a:number,b:number){return a+b},0),cc)}/>
+        <KPI label="Total Money Out" value={fmt(moneyOut.reduce(function(a:number,b:number){return a+b},0),cc)}/>
+        <KPI label="Net Cash Position" value={fmt(net.reduce(function(a:number,b:number){return a+b},0),cc)} color={net.reduce(function(a:number,b:number){return a+b},0)>=0?C.green:C.red}/>
         <KPI label="Pressure Months" value={String(pressureMonths.length)} color={pressureMonths.length>0?C.amber:C.green} sub="Months outflows exceed inflows"/>
       </div>
 
@@ -443,7 +443,7 @@ function ConasOperationalCashflowTab({result, months, cc}:{result:ReturnType<typ
         <div style={{background:C.navy,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}}>
           <div style={{fontFamily:'monospace',fontSize:'0.68rem',letterSpacing:'0.12em',color:C.amber,marginBottom:'0.75rem',fontWeight:700}}>CASHFLOW PRESSURE MONTHS ({pressureMonths.length})</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:'0.5rem',marginBottom:'0.75rem'}}>
-            {pressureMonths.map(function(pm,i){return(
+            {pressureMonths.map(function(pm:{idx:number;label:string;value:number},i:number){return(
               <div key={i} style={{background:'rgba(255,255,255,0.08)',borderRadius:5,padding:'0.6rem 0.8rem',borderLeft:`3px solid ${C.amber}`}}>
                 <div style={{fontFamily:'monospace',fontSize:'0.82rem',fontWeight:700,color:C.white,marginBottom:'0.2rem'}}>{pm.label}</div>
                 <div style={{fontSize:'0.8rem',color:'rgba(255,255,255,0.75)'}}>Shortfall: <strong style={{color:C.amber}}>{fmt(Math.abs(pm.value),cc)}</strong></div>
@@ -459,15 +459,15 @@ function ConasOperationalCashflowTab({result, months, cc}:{result:ReturnType<typ
         <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.75rem',fontFamily:'monospace'}}>
           <thead><tr style={{background:C.navy,color:C.white}}>
             <th style={{padding:'7px 10px',textAlign:'left',minWidth:160}}>Line</th>
-            {months.map(function(m,i){return <th key={i} style={{padding:'7px 8px',textAlign:'right',whiteSpace:'nowrap'}}>{m}</th>})}
+            {months.map(function(m:string,i:number){return <th key={i} style={{padding:'7px 8px',textAlign:'right',whiteSpace:'nowrap'}}>{m}</th>})}
           </tr></thead>
           <tbody>
-            <tr style={{background:'#F8F4EE'}}><td style={{padding:'6px 10px',fontWeight:600}}>Cash In (Operating)</td>{moneyIn.map(function(v,i){return <td key={i} style={{padding:'6px 8px',textAlign:'right',color:C.green}}>{fmt(v,cc)}</td>})}</tr>
-            <tr><td style={{padding:'6px 10px',fontWeight:600}}>Irrigation Outflows</td>{(result.cf.irrigation||Array(m).fill(0)).map(function(v,i){return <td key={i} style={{padding:'6px 8px',textAlign:'right',color:v>0?C.red:C.slate}}>{v>0?fmt(-v,cc):'—'}</td>})}</tr>
-            <tr><td style={{padding:'6px 10px',fontWeight:600}}>Approved Spending</td>{(result.cf.approvedSpend||Array(m).fill(0)).map(function(v,i){return <td key={i} style={{padding:'6px 8px',textAlign:'right',color:v>0?C.red:C.slate}}>{v>0?fmt(-v,cc):'—'}</td>})}</tr>
-            <tr style={{background:'#F0F4F8'}}><td style={{padding:'6px 10px',fontWeight:700}}>Cash Out (Total)</td>{moneyOut.map(function(v,i){return <td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:C.red}}>{fmt(-v,cc)}</td>})}</tr>
-            <tr style={{background:'#E8ECF0'}}><td style={{padding:'6px 10px',fontWeight:700}}>Net Cash</td>{net.map(function(v,i){return <td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:v>=0?C.green:C.red}}>{fmt(v,cc)}</td>})}</tr>
-            <tr style={{background:C.navy}}><td style={{padding:'6px 10px',fontWeight:700,color:C.white}}>Cumulative Position</td>{cumulative.map(function(v,i){return <td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:v>=0?'#7DCEA0':C.red}}>{fmt(v,cc)}</td>})}</tr>
+            <tr style={{background:'#F8F4EE'}}><td style={{padding:'6px 10px',fontWeight:600}}>Cash In (Operating)</td>{moneyIn.map(function(v:number,i:number){return <td key={i} style={{padding:'6px 8px',textAlign:'right',color:C.green}}>{fmt(v,cc)}</td>})}</tr>
+            <tr><td style={{padding:'6px 10px',fontWeight:600}}>Irrigation Outflows</td>{(result.cf.irrigation||Array(m).fill(0)).map(function(v:number,i:number){return <td key={i} style={{padding:'6px 8px',textAlign:'right',color:v>0?C.red:C.slate}}>{v>0?fmt(-v,cc):'—'}</td>})}</tr>
+            <tr><td style={{padding:'6px 10px',fontWeight:600}}>Approved Spending</td>{(result.cf.approvedSpend||Array(m).fill(0)).map(function(v:number,i:number){return <td key={i} style={{padding:'6px 8px',textAlign:'right',color:v>0?C.red:C.slate}}>{v>0?fmt(-v,cc):'—'}</td>})}</tr>
+            <tr style={{background:'#F0F4F8'}}><td style={{padding:'6px 10px',fontWeight:700}}>Cash Out (Total)</td>{moneyOut.map(function(v:number,i:number){return <td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:C.red}}>{fmt(-v,cc)}</td>})}</tr>
+            <tr style={{background:'#E8ECF0'}}><td style={{padding:'6px 10px',fontWeight:700}}>Net Cash</td>{net.map(function(v:number,i:number){return <td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:v>=0?C.green:C.red}}>{fmt(v,cc)}</td>})}</tr>
+            <tr style={{background:C.navy}}><td style={{padding:'6px 10px',fontWeight:700,color:C.white}}>Cumulative Position</td>{cumulative.map(function(v:number,i:number){return <td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:v>=0?'#7DCEA0':C.red}}>{fmt(v,cc)}</td>})}</tr>
           </tbody>
         </table></div>
         <div style={{marginTop:'0.75rem',fontSize:'0.78rem',color:C.slate,lineHeight:1.5}}>Cash In is operating EBITDA when positive. Cash Out includes operating losses, irrigation kit outflows, and approved spending requests. Approved spending requests post here automatically when approved by the CEO.</div>
@@ -480,7 +480,7 @@ function ConasOperationalCashflowTab({result, months, cc}:{result:ReturnType<typ
 function ConasWorkingCapitalTab({result, months, cc}:{result:ReturnType<typeof runCONASModel>;months:string[];cc:string}) {
   const m = months.length
   const irrigationByMonth = result.cf.irrigation || Array(m).fill(0)
-  const totalIrrigation = irrigationByMonth.reduce(function(a,b){return a+b},0)
+  const totalIrrigation = irrigationByMonth.reduce(function(a:number,b:number){return a+b},0)
   const fgeCount = result.metrics.fgeCount
 
   // FGE input credit outstanding -- advances in months 1-2, repaid at harvest months 4-5 and 9-10
@@ -496,7 +496,7 @@ function ConasWorkingCapitalTab({result, months, cc}:{result:ReturnType<typeof r
   }
 
   const peakCredit = Math.max.apply(null, inputCredit)
-  const avgCredit = inputCredit.reduce(function(a,b){return a+b},0) / m
+  const avgCredit = inputCredit.reduce(function(a:number,b:number){return a+b},0) / m
 
   return (
     <div>
@@ -528,11 +528,11 @@ function ConasWorkingCapitalTab({result, months, cc}:{result:ReturnType<typeof r
         <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.75rem',fontFamily:'monospace'}}>
           <thead><tr style={{background:C.navy,color:C.white}}>
             <th style={{padding:'7px 10px',textAlign:'left',minWidth:160}}>Line</th>
-            {months.map(function(mn,i){return <th key={i} style={{padding:'7px 8px',textAlign:'right',whiteSpace:'nowrap'}}>{mn}</th>})}
+            {months.map(function(mn:string,i:number){return <th key={i} style={{padding:'7px 8px',textAlign:'right',whiteSpace:'nowrap'}}>{mn}</th>})}
           </tr></thead>
           <tbody>
-            <tr style={{background:'#F8F4EE'}}><td style={{padding:'6px 10px',fontWeight:600}}>Kit Outflows</td>{irrigationByMonth.map(function(v,i){return <td key={i} style={{padding:'6px 8px',textAlign:'right',color:v>0?C.red:C.slate}}>{v>0?fmt(-v,cc):'—'}</td>})}</tr>
-            <tr style={{background:'#F0F4F8'}}><td style={{padding:'6px 10px',fontWeight:700}}>Closing Cash (after kits)</td>{result.cf.close.map(function(v,i){return <td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:v>=0?C.green:C.red}}>{fmt(v,cc)}</td>})}</tr>
+            <tr style={{background:'#F8F4EE'}}><td style={{padding:'6px 10px',fontWeight:600}}>Kit Outflows</td>{irrigationByMonth.map(function(v:number,i:number){return <td key={i} style={{padding:'6px 8px',textAlign:'right',color:v>0?C.red:C.slate}}>{v>0?fmt(-v,cc):'—'}</td>})}</tr>
+            <tr style={{background:'#F0F4F8'}}><td style={{padding:'6px 10px',fontWeight:700}}>Closing Cash (after kits)</td>{result.cf.close.map(function(v:number,i:number){return <td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:v>=0?C.green:C.red}}>{fmt(v,cc)}</td>})}</tr>
           </tbody>
         </table></div>
         <div style={{marginTop:'0.75rem',fontSize:'0.78rem',color:C.slate}}>Kits deployed: {Math.round(fgeCount/2)} in Month 1, {Math.ceil(fgeCount/2)} in Month 2. Total: {fmt(totalIrrigation,cc)}. Enter shareholder contribution or grant in Settings → Capital Structure to ensure cash stays positive.</div>
@@ -673,7 +673,7 @@ export default function CONASDashboard({
   const [planUnit,setPlanUnit] = useState('shop_1')
   const [unitPLView,setUnitPLView] = useState('fge')
   const [showActual,setShowActual] = useState(false)
-  const [coachAssessments,setCoachAssessments] = useState(null)
+  const [coachAssessments,setCoachAssessments] = useState<Record<string,unknown>|null>(null)
   const [spendForm,setSpendForm] = useState({show:false,desc:'',unitId:'fge',category:'direct_opex' as PlanLine['category'],month:0,amount:0,requester:'Finance Manager'})
 
   const result = useMemo(()=>runCONASModel(activeInputs),[activeInputs])
