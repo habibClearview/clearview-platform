@@ -1,16 +1,9 @@
 // @ts-nocheck
 'use client'
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
 
 const CONAS_CLIENT_ID = '1556298e-5fa0-4d6a-ae86-da8c708ec6ee'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-}
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine,
@@ -684,8 +677,7 @@ export default function CONASDashboard({
   useEffect(() => {
     async function load() {
       try {
-        const sb = getSupabase()
-        const { data } = await sb
+                const { data } = await sb
           .from('model_config')
           .select('config')
           .eq('client_id', CONAS_CLIENT_ID)
@@ -709,8 +701,7 @@ export default function CONASDashboard({
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
       try {
-        const sb = getSupabase()
-        await sb.from('model_config').upsert({
+                await supabase.from('model_config').upsert({
           client_id: CONAS_CLIENT_ID,
           config: newInputs,
           version: 1,
@@ -1377,8 +1368,30 @@ export default function CONASDashboard({
   }
 
 
+const TEAM_BUSINESS_UNITS = [
+  'Input Profit Centre 1','Input Profit Centre 2','Input Profit Centre 3',
+  'Input Profit Centre 4','Input Profit Centre 5',
+  'FGE Production and Marketing','Own Farm','Advisory Services',
+  'Customer Acquisition and Management','HQ Shared',
+]
+
+const TEAM_ROLES = [
+  {value:'ceo', label:'CEO'},
+  {value:'finance_manager', label:'Finance Manager'},
+  {value:'unit_head', label:'Unit Head'},
+  {value:'advisory_expert', label:'Advisory Expert'},
+]
+
+// ── SHARED CONSTANTS FOR WORKFLOW TABS ──────────────────────
+const ACTUALS_BUSINESS_UNITS = [
+  'Input Profit Centre 1','Input Profit Centre 2','Input Profit Centre 3',
+  'Input Profit Centre 4','Input Profit Centre 5',
+  'FGE Production and Marketing','Own Farm','Advisory Services',
+  'Customer Acquisition and Management',
+]
+
 // ── TEAM TAB ─────────────────────────────────────────────
-function TeamTab({P}:{P:any}) {
+function TeamTab({role,userId,userName,businessUnit,canSeeAllUnits}:{role:string;userId:string;userName:string;businessUnit:string;canSeeAllUnits:boolean}) {
   const [teamMembers, setTeamMembers] = React.useState([])
   const [loadingTeam, setLoadingTeam] = React.useState(true)
   const [showInvite, setShowInvite] = React.useState(false)
@@ -1386,31 +1399,12 @@ function TeamTab({P}:{P:any}) {
   const [inviting, setInviting] = React.useState(false)
   const [inviteMsg, setInviteMsg] = React.useState('')
 
-  const BUSINESS_UNITS = [
-    'Input Profit Centre 1',
-    'Input Profit Centre 2',
-    'Input Profit Centre 3',
-    'Input Profit Centre 4',
-    'Input Profit Centre 5',
-    'FGE Production and Marketing',
-    'Own Farm',
-    'Advisory Services',
-    'Customer Acquisition and Management',
-    'HQ Shared',
-  ]
-
-  const ROLES = [
-    {value:'ceo', label:'CEO'},
-    {value:'finance_manager', label:'Finance Manager'},
-    {value:'unit_head', label:'Unit Head'},
-    {value:'advisory_expert', label:'Advisory Expert'},
-  ]
+  // BUSINESS_UNITS and ROLES defined at module level as TEAM_BUSINESS_UNITS and TEAM_ROLES
 
   React.useEffect(() => {
     async function loadTeam() {
       try {
-        const sb = getSupabase()
-        const { data } = await sb
+                const { data } = await sb
           .from('user_profiles')
           .select('*')
           .eq('client_id', CONAS_CLIENT_ID)
@@ -1430,11 +1424,10 @@ function TeamTab({P}:{P:any}) {
     setInviting(true)
     setInviteMsg('')
     try {
-      const sb = getSupabase()
-      const { data, error } = await sb.auth.admin.inviteUserByEmail(inviteForm.email)
-      if (error) throw error
-      await sb.from('user_profiles').upsert({
-        id: data.user.id,
+      // Store as pending record -- email delivery via Edge Function (next build)
+      const pendingId = crypto.randomUUID()
+      await supabase.from('user_profiles').insert({
+        id: pendingId,
         client_id: CONAS_CLIENT_ID,
         role: inviteForm.role,
         full_name: inviteForm.full_name,
@@ -1442,9 +1435,9 @@ function TeamTab({P}:{P:any}) {
         business_unit: inviteForm.business_unit,
         status: 'pending',
         invited_at: new Date().toISOString(),
-      }, { onConflict: 'id' })
+      })
       setTeamMembers(prev => [...prev, {
-        id: data.user.id,
+        id: pendingId,
         full_name: inviteForm.full_name,
         email: inviteForm.email,
         role: inviteForm.role,
@@ -1453,7 +1446,7 @@ function TeamTab({P}:{P:any}) {
       }])
       setInviteForm({email:'', full_name:'', role:'unit_head', business_unit:''})
       setShowInvite(false)
-      setInviteMsg('Invite sent successfully.')
+      setInviteMsg('Team member saved. Email invite will be available in the next build.')
     } catch(e) {
       setInviteMsg(`Error: ${e.message}`)
     }
@@ -1461,15 +1454,14 @@ function TeamTab({P}:{P:any}) {
   }
 
   async function updateMember(id, updates) {
-    const sb = getSupabase()
-    await sb.from('user_profiles').update({...updates, updated_at: new Date().toISOString()}).eq('id', id)
+        await supabase.from('user_profiles').update({...updates, updated_at: new Date().toISOString()}).eq('id', id)
     setTeamMembers(prev => prev.map(m => m.id !== id ? m : {...m, ...updates}))
   }
 
-  const roleLabel = (r) => ROLES.find(x => x.value === r)?.label || r
+  const roleLabel = (r) => TEAM_ROLES.find(x => x.value === r)?.label || r
   const statusColor = (s) => s === 'active' ? C.green : s === 'pending' ? C.amber : C.slate
 
-  if (!P.canSeeAllUnits) return (
+  if (!canSeeAllUnits) return (
     <div style={{...card, textAlign:'center', color:C.slate, padding:'2.5rem'}}>
       Team management is available to the CEO only.
     </div>
@@ -1504,7 +1496,7 @@ function TeamTab({P}:{P:any}) {
               <label style={{display:'block', fontWeight:600, fontSize:'0.8rem', marginBottom:'0.22rem', color:C.navy}}>Role</label>
               <select style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'inherit', background:'#F4F8FC', color:C.navy, boxSizing:'border-box'}}
                 value={inviteForm.role} onChange={e => setInviteForm(f => ({...f, role: e.target.value}))}>
-                {ROLES.filter(r => r.value !== 'ceo').map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                {TEAM_ROLES.filter(r => r.value !== 'ceo').map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
             </div>
             <div>
@@ -1512,7 +1504,7 @@ function TeamTab({P}:{P:any}) {
               <select style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'inherit', background:'#F4F8FC', color:C.navy, boxSizing:'border-box'}}
                 value={inviteForm.business_unit} onChange={e => setInviteForm(f => ({...f, business_unit: e.target.value}))}>
                 <option value="">Select unit...</option>
-                {BUSINESS_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                {TEAM_BUSINESS_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
           </div>
@@ -1547,7 +1539,7 @@ function TeamTab({P}:{P:any}) {
                   <td style={{padding:'9px 12px'}}>
                     <select style={{fontFamily:'monospace', fontSize:'0.7rem', padding:'0.2rem 0.3rem', border:`1px solid ${C.border}`, borderRadius:4, background:'transparent', cursor:'pointer'}}
                       value={m.role} onChange={e => updateMember(m.id, {role: e.target.value})}>
-                      {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                      {TEAM_ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                     </select>
                   </td>
                   <td style={{padding:'9px 12px', color:C.slate, fontSize:'0.78rem'}}>{m.business_unit || '—'}</td>
@@ -1575,23 +1567,15 @@ function TeamTab({P}:{P:any}) {
 }
 
 // ── ACTUALS TAB ──────────────────────────────────────────
-function ActualsTab({P}:{P:any}) {
-  const BUSINESS_UNITS = [
-    'Input Profit Centre 1','Input Profit Centre 2','Input Profit Centre 3',
-    'Input Profit Centre 4','Input Profit Centre 5',
-    'FGE Production and Marketing','Own Farm','Advisory Services',
-    'Customer Acquisition and Management',
-  ]
+function ActualsTab({role,userId,userName,businessUnit}:{role:string;userId:string;userName:string;businessUnit:string}) {
+  const isCEO = role === 'ceo'
+  const isFM = role === 'finance_manager'
 
-  const isCEO = P.role === 'ceo'
-  const isFM = P.role === 'finance_manager'
-  const isUnitHead = P.role === 'unit_head' || P.role === 'advisory_expert'
+  const visibleUnits = (isCEO || isFM)
+    ? ACTUALS_BUSINESS_UNITS
+    : ACTUALS_BUSINESS_UNITS.filter(u => u === (businessUnit || ''))
 
-  const visibleUnits = isCEO || isFM
-    ? BUSINESS_UNITS
-    : BUSINESS_UNITS.filter(u => u === P.businessUnit)
-
-  const [selUnit, setSelUnit] = React.useState(visibleUnits[0] || '')
+  const [selUnit, setSelUnit] = React.useState(() => visibleUnits[0] || '')
   const [selPeriod, setSelPeriod] = React.useState(() => {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}-01`
@@ -1627,8 +1611,7 @@ function ActualsTab({P}:{P:any}) {
     setLoading(true)
     async function load() {
       try {
-        const sb = getSupabase()
-        const { data } = await sb.from('unit_actuals')
+                const { data } = await supabase.from('unit_actuals')
           .select('*')
           .eq('client_id', CONAS_CLIENT_ID)
           .eq('business_unit', selUnit)
@@ -1645,8 +1628,7 @@ function ActualsTab({P}:{P:any}) {
     if (!isCEO && !isFM) return
     async function loadAll() {
       try {
-        const sb = getSupabase()
-        const { data } = await sb.from('unit_actuals')
+                const { data } = await supabase.from('unit_actuals')
           .select('*')
           .eq('client_id', CONAS_CLIENT_ID)
           .eq('period', selPeriod)
@@ -1655,27 +1637,26 @@ function ActualsTab({P}:{P:any}) {
       } catch(e) {}
     }
     loadAll()
-  }, [selPeriod])
+  }, [selPeriod, isCEO, isFM])
 
-  function fmt(n) { return Number(n || 0).toLocaleString() }
+  function fmtNum(n) { return Number(n || 0).toLocaleString() }
 
   async function save(submit = false) {
     setSaving(true)
     try {
-      const sb = getSupabase()
-      const payload = {
+            const payload = {
         client_id: CONAS_CLIENT_ID,
         business_unit: selUnit,
         period: selPeriod,
         ...actuals,
-        entered_by_name: P.userName || '',
+        entered_by_name: userName || '',
         entered_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         submitted: submit ? true : (actuals?.submitted || false),
         submitted_at: submit ? new Date().toISOString() : (actuals?.submitted_at || null),
       }
       delete payload.id
-      const { data } = await sb.from('unit_actuals')
+      const { data } = await supabase.from('unit_actuals')
         .upsert(payload, {onConflict: 'client_id,business_unit,period'})
         .select().single()
       setActuals(data)
@@ -1733,9 +1714,9 @@ function ActualsTab({P}:{P:any}) {
                   return (
                     <tr key={a.id} style={{background: i % 2 === 0 ? C.cream : C.white, cursor:'pointer'}} onClick={() => setSelUnit(a.business_unit)}>
                       <td style={{padding:'8px 10px', fontWeight:600, color:C.navy}}>{a.business_unit}</td>
-                      <td style={{padding:'8px 10px', color:C.green}}>{fmt(rev)}</td>
-                      <td style={{padding:'8px 10px', color:C.red}}>{fmt(costs)}</td>
-                      <td style={{padding:'8px 10px', fontWeight:700, color: gp >= 0 ? C.green : C.red}}>{fmt(gp)}</td>
+                      <td style={{padding:'8px 10px', color:C.green}}>{fmtNum(rev)}</td>
+                      <td style={{padding:'8px 10px', color:C.red}}>{fmtNum(costs)}</td>
+                      <td style={{padding:'8px 10px', fontWeight:700, color: gp >= 0 ? C.green : C.red}}>{fmtNum(gp)}</td>
                       <td style={{padding:'8px 10px'}}>
                         <span style={{fontFamily:'monospace', fontSize:'0.63rem', padding:'0.1rem 0.42rem', borderRadius:4, background: a.submitted ? C.green : C.amber, color:C.white}}>
                           {a.submitted ? 'Submitted' : 'Draft'}
@@ -1797,9 +1778,9 @@ function ActualsTab({P}:{P:any}) {
 
             <div style={{display:'flex', gap:'0.75rem', marginTop:'1rem', alignItems:'center', flexWrap:'wrap'}}>
               <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap'}}>
-                <div style={{fontFamily:'monospace', fontSize:'0.72rem', color:C.slate}}>Revenue: <strong style={{color:C.green}}>{fmt(totalRevenue)}</strong></div>
-                <div style={{fontFamily:'monospace', fontSize:'0.72rem', color:C.slate}}>Costs: <strong style={{color:C.red}}>{fmt(totalCosts)}</strong></div>
-                <div style={{fontFamily:'monospace', fontSize:'0.72rem', color:C.slate}}>Gross Profit: <strong style={{color: grossProfit >= 0 ? C.green : C.red}}>{fmt(grossProfit)}</strong></div>
+                <div style={{fontFamily:'monospace', fontSize:'0.72rem', color:C.slate}}>Revenue: <strong style={{color:C.green}}>{fmtNum(totalRevenue)}</strong></div>
+                <div style={{fontFamily:'monospace', fontSize:'0.72rem', color:C.slate}}>Costs: <strong style={{color:C.red}}>{fmtNum(totalCosts)}</strong></div>
+                <div style={{fontFamily:'monospace', fontSize:'0.72rem', color:C.slate}}>Gross Profit: <strong style={{color: grossProfit >= 0 ? C.green : C.red}}>{fmtNum(grossProfit)}</strong></div>
               </div>
               <div style={{marginLeft:'auto', display:'flex', gap:'0.6rem'}}>
                 <button style={{fontFamily:'monospace', fontSize:'0.72rem', padding:'0.38rem 0.8rem', border:`1px solid ${C.border}`, borderRadius:4, background:'transparent', color:C.slate, cursor:'pointer'}} onClick={() => save(false)} disabled={saving}>
@@ -1820,9 +1801,9 @@ function ActualsTab({P}:{P:any}) {
 }
 
 // ── TIME RECORDS TAB ──────────────────────────────────────
-function TimeRecordsTab({P}:{P:any}) {
-  const isFM = P.role === 'finance_manager'
-  const isCEO = P.role === 'ceo'
+function TimeRecordsTab({role,userId,userName,businessUnit}:{role:string;userId:string;userName:string;businessUnit:string}) {
+  const isFM = role === 'finance_manager'
+  const isCEO = role === 'ceo'
   const isStaff = !isFM && !isCEO
 
   const BUSINESS_UNITS = [
@@ -1836,7 +1817,7 @@ function TimeRecordsTab({P}:{P:any}) {
   const [loading, setLoading] = React.useState(true)
   const [showForm, setShowForm] = React.useState(false)
   const [form, setForm] = React.useState({
-    business_unit: P.businessUnit || '',
+    business_unit: businessUnit || '',
     period: `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-01`,
     total_days: '',
     description: '',
@@ -1846,26 +1827,24 @@ function TimeRecordsTab({P}:{P:any}) {
   React.useEffect(() => {
     async function load() {
       try {
-        const sb = getSupabase()
-        let query = sb.from('staff_time_records').select('*').eq('client_id', CONAS_CLIENT_ID).order('created_at', {ascending:false})
-        if (isStaff) query = query.eq('submitted_by', P.userId)
+                let query = supabase.from('staff_time_records').select('*').eq('client_id', CONAS_CLIENT_ID).order('created_at', {ascending:false})
+        if (isStaff) query = query.eq('submitted_by', userId)
         const { data } = await query
         setRecords(data || [])
       } catch(e) {}
       setLoading(false)
     }
     load()
-  }, [])
+  }, [isStaff, userId])
 
   async function submit() {
     if (!form.business_unit || !form.total_days || !form.period) return
     setSaving(true)
     try {
-      const sb = getSupabase()
-      const { data } = await sb.from('staff_time_records').insert([{
+            const { data } = await supabase.from('staff_time_records').insert([{
         client_id: CONAS_CLIENT_ID,
-        submitted_by: P.userId,
-        submitted_by_name: P.userName || '',
+        submitted_by: userId,
+        submitted_by_name: userName || '',
         business_unit: form.business_unit,
         period: form.period,
         total_days: Number(form.total_days),
@@ -1874,14 +1853,13 @@ function TimeRecordsTab({P}:{P:any}) {
       }]).select().single()
       setRecords(prev => [data, ...prev])
       setShowForm(false)
-      setForm({business_unit: P.businessUnit || '', period: form.period, total_days: '', description: ''})
+      setForm({business_unit: businessUnit || '', period: form.period, total_days: '', description: ''})
     } catch(e) {}
     setSaving(false)
   }
 
   async function updateRecord(id, updates) {
-    const sb = getSupabase()
-    await sb.from('staff_time_records').update({...updates, updated_at:new Date().toISOString()}).eq('id', id)
+        await supabase.from('staff_time_records').update({...updates, updated_at:new Date().toISOString()}).eq('id', id)
     setRecords(prev => prev.map(r => r.id !== id ? r : {...r, ...updates}))
   }
 
@@ -1909,7 +1887,7 @@ function TimeRecordsTab({P}:{P:any}) {
               <select style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'inherit', background:'#F4F8FC', color:C.navy, boxSizing:'border-box'}}
                 value={form.business_unit} onChange={e => setForm(f => ({...f, business_unit: e.target.value}))}>
                 <option value="">Select...</option>
-                {BUSINESS_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                {TEAM_BUSINESS_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
             <div>
@@ -2002,8 +1980,8 @@ function TimeRecordsTab({P}:{P:any}) {
 
 // ── SPEND REQUESTS TAB ────────────────────────────────────
 function SpendRequestsTab({P}:{P:any}) {
-  const isCEO = P.role === 'ceo'
-  const isFM = P.role === 'finance_manager'
+  const isCEO = role === 'ceo'
+  const isFM = role === 'finance_manager'
 
   const BUSINESS_UNITS = [
     'Input Profit Centre 1','Input Profit Centre 2','Input Profit Centre 3',
@@ -2018,7 +1996,7 @@ function SpendRequestsTab({P}:{P:any}) {
   const [loading, setLoading] = React.useState(true)
   const [showForm, setShowForm] = React.useState(false)
   const [form, setForm] = React.useState({
-    business_unit: P.businessUnit || '',
+    business_unit: businessUnit || '',
     amount: '',
     description: '',
     category: 'other',
@@ -2030,26 +2008,24 @@ function SpendRequestsTab({P}:{P:any}) {
   React.useEffect(() => {
     async function load() {
       try {
-        const sb = getSupabase()
-        let query = sb.from('spend_requests').select('*').eq('client_id', CONAS_CLIENT_ID).order('created_at', {ascending:false})
-        if (!isCEO && !isFM) query = query.eq('requested_by', P.userId)
+                let query = supabase.from('spend_requests').select('*').eq('client_id', CONAS_CLIENT_ID).order('created_at', {ascending:false})
+        if (!isCEO && !isFM) query = query.eq('requested_by', userId)
         const { data } = await query
         setRequests(data || [])
       } catch(e) {}
       setLoading(false)
     }
     load()
-  }, [])
+  }, [isCEO, isFM, userId])
 
   async function submitRequest() {
     if (!form.business_unit || !form.amount || !form.description) return
     setSaving(true)
     try {
-      const sb = getSupabase()
-      const { data } = await sb.from('spend_requests').insert([{
+            const { data } = await supabase.from('spend_requests').insert([{
         client_id: CONAS_CLIENT_ID,
-        requested_by: P.userId,
-        requested_by_name: P.userName || '',
+        requested_by: userId,
+        requested_by_name: userName || '',
         business_unit: form.is_shared_cost ? 'HQ Shared' : form.business_unit,
         amount: Number(form.amount),
         currency: 'UGX',
@@ -2066,32 +2042,43 @@ function SpendRequestsTab({P}:{P:any}) {
   }
 
   async function fmForward(id) {
-    const sb = getSupabase()
-    const updates = {status:'pending_ceo', fm_reviewed_at:new Date().toISOString(), fm_reviewed_by:P.userId, updated_at:new Date().toISOString()}
-    await sb.from('spend_requests').update(updates).eq('id', id)
+        const updates = {status:'pending_ceo', fm_reviewed_at:new Date().toISOString(), fm_reviewed_by:userId, updated_at:new Date().toISOString()}
+    await supabase.from('spend_requests').update(updates).eq('id', id)
     setRequests(prev => prev.map(r => r.id !== id ? r : {...r, ...updates}))
   }
 
   async function ceoDecide(id, approved) {
-    const sb = getSupabase()
     const updates = {
       status: approved ? 'approved' : 'declined',
       ceo_decided_at: new Date().toISOString(),
-      ceo_decided_by: P.userId,
+      ceo_decided_by: userId,
       posted_to_actuals: approved,
       posted_at: approved ? new Date().toISOString() : null,
       updated_at: new Date().toISOString(),
     }
-    await sb.from('spend_requests').update(updates).eq('id', id)
+    await supabase.from('spend_requests').update(updates).eq('id', id)
     if (approved) {
       const req = requests.find(r => r.id === id)
       if (req) {
-        await sb.from('unit_actuals').upsert({
+        const period = req.period || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-01`
+        const costField = req.category === 'staff' ? 'staff_cost'
+          : req.category === 'inputs' ? 'input_purchases'
+          : req.category === 'transport' ? 'transport_cost'
+          : 'direct_operating_cost'
+        const { data: existing } = await supabase
+          .from('unit_actuals')
+          .select('*')
+          .eq('client_id', CONAS_CLIENT_ID)
+          .eq('business_unit', req.business_unit)
+          .eq('period', period)
+          .maybeSingle()
+        const currentVal = Number(existing?.[costField] || 0)
+        await supabase.from('unit_actuals').upsert({
+          ...(existing || {}),
           client_id: CONAS_CLIENT_ID,
           business_unit: req.business_unit,
-          period: req.period || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-01`,
-          [req.category === 'staff' ? 'staff_cost' : req.category === 'inputs' ? 'input_purchases' : req.category === 'transport' ? 'transport_cost' : 'direct_operating_cost']:
-            sb.rpc ? req.amount : req.amount,
+          period,
+          [costField]: currentVal + Number(req.amount),
           updated_at: new Date().toISOString(),
         }, {onConflict:'client_id,business_unit,period'})
       }
@@ -2099,7 +2086,7 @@ function SpendRequestsTab({P}:{P:any}) {
     setRequests(prev => prev.map(r => r.id !== id ? r : {...r, ...updates}))
   }
 
-  function fmt(n) { return Number(n || 0).toLocaleString() }
+  function fmtNum(n) { return Number(n || 0).toLocaleString() }
 
   const statusColor = (s) => ({
     pending_fm: C.slate, pending_ceo: C.amber, approved: C.green, declined: C.red
@@ -2136,7 +2123,7 @@ function SpendRequestsTab({P}:{P:any}) {
               <select style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'inherit', background:'#F4F8FC', color:C.navy, boxSizing:'border-box'}}
                 value={form.business_unit} onChange={e => setForm(f => ({...f, business_unit: e.target.value}))}>
                 <option value="">Select...</option>
-                {BUSINESS_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                {TEAM_BUSINESS_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
             <div>
@@ -2190,7 +2177,7 @@ function SpendRequestsTab({P}:{P:any}) {
                   <td style={{padding:'9px 12px', fontWeight:600, color:C.navy, fontSize:'0.78rem'}}>{r.requested_by_name || '—'}</td>
                   <td style={{padding:'9px 12px', color:C.slate, fontSize:'0.75rem'}}>{r.business_unit}</td>
                   <td style={{padding:'9px 12px', fontFamily:'monospace', fontSize:'0.72rem'}}>{r.category}</td>
-                  <td style={{padding:'9px 12px', fontFamily:'monospace', fontWeight:700, color:C.navy}}>{fmt(r.amount)}</td>
+                  <td style={{padding:'9px 12px', fontFamily:'monospace', fontWeight:700, color:C.navy}}>{fmtNum(r.amount)}</td>
                   <td style={{padding:'9px 12px', color:C.slate, maxWidth:200, fontSize:'0.78rem'}}>{r.description}</td>
                   <td style={{padding:'9px 12px'}}>
                     <span style={{fontFamily:'monospace', fontSize:'0.63rem', padding:'0.1rem 0.42rem', borderRadius:4, background:statusColor(r.status), color:C.white, whiteSpace:'nowrap'}}>
@@ -2275,7 +2262,7 @@ function SpendRequestsTab({P}:{P:any}) {
             </div>
             <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginTop:'0.4rem'}}>
               <span style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.cyan,border:`1px solid rgba(0,180,216,0.4)`,borderRadius:4,padding:'0.18rem 0.5rem'}}>
-                {roleLabel(P.role)} — {P.fullName}
+                {roleLabel(role)} — {P.fullName}
               </span>
               <button onClick={P.onSignOut} style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid rgba(255,255,255,0.25)`,borderRadius:4,color:'rgba(255,255,255,0.6)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>
                 Sign out
@@ -2308,10 +2295,10 @@ function SpendRequestsTab({P}:{P:any}) {
         {view==='cashflow'        &&<CashFlowTab/>}
         {view==='balancesheet'    &&<BalanceSheetTab/>}
         {view==='scenarios'       &&<ScenariosTab/>}
-        {view==='actuals'         &&<ActualsTab P={P}/>}
-        {view==='spends'           &&<SpendRequestsTab P={P}/>}
-        {view==='timerecords'      &&<TimeRecordsTab P={P}/>}
-        {view==='team'            &&<TeamTab P={P}/>}
+        {view==='actuals'         &&<ActualsTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
+        {view==='spends'           &&<SpendRequestsTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
+        {view==='timerecords'      &&<TimeRecordsTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
+        {view==='team'            &&<TeamTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
         {view==='settings'        &&<SettingsTab/>}
       </main>
       <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.67rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>
