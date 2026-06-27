@@ -234,7 +234,7 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
     setActuals(next)
     setSaving(true)
     try{
-      await supabase.from('monthly_actuals').upsert({client_id:'client_wonderland',month_index:selMonth,actuals_data:next[selMonth]||{},updated_at:new Date().toISOString()},{onConflict:'client_id,month_index'})
+      await supabase.from('model_config').upsert({client_id:'bcf0da0f-7263-4f71-b703-46c8aad03ec1',config:{overrides,debtObligations,coachAssessments:savedAssessments,actuals:next},version:1,updated_at:new Date().toISOString(),updated_by:'dashboard'},{onConflict:'client_id'})
       await onSaveActuals(next)
     }catch(e){}
     setSaving(false)
@@ -243,7 +243,7 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
   async function saveObligations(next){
     setObligations(next)
     try{
-      await supabase.from('model_config').upsert({client_id:'client_wonderland',config_type:'debt_obligations',config_data:next,updated_at:new Date().toISOString()},{onConflict:'client_id,config_type'})
+      await supabase.from('model_config').upsert({client_id:'bcf0da0f-7263-4f71-b703-46c8aad03ec1',config:{overrides,debtObligations:next,coachAssessments:savedAssessments,actuals},version:1,updated_at:new Date().toISOString(),updated_by:'dashboard'},{onConflict:'client_id'})
       await onSaveDebtObligations(next)
     }catch(e){}
   }
@@ -297,7 +297,7 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
           {/* Actuals entry for selected month */}
           <div style={card}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem',flexWrap:'wrap',gap:'0.5rem'}}>
-              <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:CC.navy}}>{selLabel} — Plan vs Actuals Entry</div>
+              <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:CC.navy}}>{selLabel}  -  Plan vs Actuals Entry</div>
               <button onClick={()=>saveActuals(actuals)} style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,padding:'0.42rem 1rem',border:'none',borderRadius:4,background:CC.cyan,color:CC.navy,cursor:'pointer'}}>{saving?'Saving…':'Save Actuals'}</button>
             </div>
             <div style={{overflowX:'auto'}}>
@@ -324,8 +324,8 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
                             <input type="number" value={actual??''} onChange={e=>setActualValue(u.id,line,e.target.value)} placeholder="Enter actual" style={{...inp,width:130,textAlign:'right',padding:'0.28rem 0.4rem',fontSize:'0.78rem'}}/>
                           )}
                         </td>
-                        <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',color:variance===null?CC.slate:variance>=0?CC.green:CC.red,fontWeight:isEbitda?700:400}}>{variance!==null?compactCurrency(variance,cc):'—'}</td>
-                        <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.78rem',color:varPct===null?CC.slate:varPct>=0?CC.green:CC.red}}>{varPct!==null?pct(varPct):'—'}</td>
+                        <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',color:variance===null?CC.slate:variance>=0?CC.green:CC.red,fontWeight:isEbitda?700:400}}>{variance!==null?compactCurrency(variance,cc):' - '}</td>
+                        <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.78rem',color:varPct===null?CC.slate:varPct>=0?CC.green:CC.red}}>{varPct!==null?pct(varPct):' - '}</td>
                       </tr>)
                     })
                   })}
@@ -339,9 +339,9 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
                       <td style={{padding:'7px 10px',fontWeight:700,color:CC.white}}>{line==='revenue'?'CONSOLIDATED':''}</td>
                       <td style={{padding:'7px 10px',color:CC.cyan,fontWeight:600,fontSize:'0.78rem'}}>{line==='revenue'?'Total Revenue':line==='cogs'?'Total Cost of Sales':'Total EBITDA'}</td>
                       <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',color:CC.white}}>{compactCurrency(plan,cc)}</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',color:CC.white}}>{actual!==null?compactCurrency(actual,cc):'—'}</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',color:variance===null?'rgba(255,255,255,0.5)':variance>=0?'#7DCEA0':CC.red,fontWeight:700}}>{variance!==null?compactCurrency(variance,cc):'—'}</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.78rem',color:varPct===null?'rgba(255,255,255,0.5)':varPct>=0?'#7DCEA0':CC.red}}>{varPct!==null?pct(varPct):'—'}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',color:CC.white}}>{actual!==null?compactCurrency(actual,cc):' - '}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',color:variance===null?'rgba(255,255,255,0.5)':variance>=0?'#7DCEA0':CC.red,fontWeight:700}}>{variance!==null?compactCurrency(variance,cc):' - '}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.78rem',color:varPct===null?'rgba(255,255,255,0.5)':varPct>=0?'#7DCEA0':CC.red}}>{varPct!==null?pct(varPct):' - '}</td>
                     </tr>)
                   })}
                 </tbody>
@@ -350,7 +350,7 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
           </div>
 
           {/* 12-month actuals summary */}
-          <MonthlyTable title="Plan vs Actuals — Consolidated Revenue (all months entered)" rows={[
+          <MonthlyTable title="Plan vs Actuals  -  Consolidated Revenue (all months entered)" rows={[
             {label:'Plan Revenue',values:result.consolidated.revenue.slice(0,12),cc},
             {label:'Actual Revenue',values:monthLabels.slice(0,12).map((_,i)=>{const v=config.units.reduce((s,u)=>s+(actuals[i]?.[`${u.id}_revenue`]??0),0);return v>0?v:null}).map(v=>v??0),cc},
             {label:'Variance',values:monthLabels.slice(0,12).map((_,i)=>{const a=config.units.reduce((s,u)=>s+(actuals[i]?.[`${u.id}_revenue`]??0),0);return a>0?a-result.consolidated.revenue[i]:0}),highlight:true,cc},
@@ -394,13 +394,13 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
 
           {obligations.length>0&&(
             <>
-              <MonthlyTable title="Debt Service Schedule — Year 1 (monthly)" rows={[
+              <MonthlyTable title="Debt Service Schedule  -  Year 1 (monthly)" rows={[
                 {label:'Total Interest',values:debtSchedule.totalInterest.slice(0,12),cc},
                 {label:'Total Principal',values:debtSchedule.totalPrincipal.slice(0,12),cc},
                 {label:'Total Debt Service',values:debtSchedule.totalRepayment.slice(0,12),bold:true,highlight:true,cc},
                 {label:'Outstanding Balance',values:debtSchedule.totalOutstanding.slice(0,12),cc},
               ]} months={monthLabels.slice(0,12)}/>
-              <MonthlyTable title="Debt Service Schedule — Year 2 (monthly)" rows={[
+              <MonthlyTable title="Debt Service Schedule  -  Year 2 (monthly)" rows={[
                 {label:'Total Interest',values:debtSchedule.totalInterest.slice(12,24),cc},
                 {label:'Total Principal',values:debtSchedule.totalPrincipal.slice(12,24),cc},
                 {label:'Total Debt Service',values:debtSchedule.totalRepayment.slice(12,24),bold:true,highlight:true,cc},
@@ -419,7 +419,7 @@ function PlanningActualsTab({config,result,monthLabels,cc,savedActuals,onSaveAct
             <HeroCard label="Outstanding Balance M12" value={compactCurrency(debtSchedule.totalOutstanding[11]||0,cc)}/>
             <HeroCard label="Obligations Entered" value={obligations.length}/>
           </div>
-          <MonthlyTable title="Plan Revenue vs Actuals Revenue — Full 24 months" rows={[
+          <MonthlyTable title="Plan Revenue vs Actuals Revenue  -  Full 24 months" rows={[
             {label:'Plan',values:result.consolidated.revenue,cc},
             {label:'Actuals (entered months)',values:Array(24).fill(0).map((_,i)=>{const v=config.units.reduce((s,u)=>s+(actuals[i]?.[`${u.id}_revenue`]??0),0);return v}),cc},
           ]} months={monthLabels}/>
@@ -496,7 +496,7 @@ function OperationalCashflowView({result,actuals,debtObligations,monthLabels,cc,
         </div>
       )}
 
-      <MonthlyTable title="Operational Cashflow — Year 1 (Cash In vs Cash Out)" rows={[
+      <MonthlyTable title="Operational Cashflow  -  Year 1 (Cash In vs Cash Out)" rows={[
         {label:'Cash In (Operating)',values:moneyIn.slice(0,12),cc},
         {label:'Cash Out (Operating + Debt Service)',values:moneyOut.slice(0,12).map(v=>-v),cc},
         {label:'  of which: Manual Debt Service',values:debtSchedule.totalRepayment.slice(0,12).map(v=>-v),cc},
@@ -505,7 +505,7 @@ function OperationalCashflowView({result,actuals,debtObligations,monthLabels,cc,
         {label:'Cumulative Cash Position',values:cumulative.slice(0,12),bold:true,highlight:true,cc},
       ]} months={monthLabels.slice(0,12)} footnote="Cash In is the model operating cashflow adjusted for any actual revenue variance entered. Debt service shown is from obligations entered in the Planning tab only."/>
 
-      <MonthlyTable title="Operational Cashflow — Year 2" rows={[
+      <MonthlyTable title="Operational Cashflow  -  Year 2" rows={[
         {label:'Money In',values:moneyIn.slice(12,24),cc},
         {label:'Money Out',values:moneyOut.slice(12,24).map(v=>-v),cc},
         {label:'Net Cash',values:net.slice(12,24),bold:true,cc},
@@ -535,7 +535,7 @@ function ScenarioBuilder({config,overrides,result,baseResult,onApply,monthLabels
         <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,marginBottom:'1rem',color:CC.navy}}>Grant Negotiation</div>
         {config.capitalStructure.grants.filter(g=>g.repayable).map(grant=>(
           <div key={grant.id}>
-            <label style={lbl}>{grant.name} — Forgiveness %</label>
+            <label style={lbl}>{grant.name}  -  Forgiveness %</label>
             <div style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'0.5rem'}}>
               <input type="range" min="0" max="100" step="1" value={(local.grantForgivenessOverrides[grant.id]??0)*100} onChange={e=>update('grantForgivenessOverrides',{...local.grantForgivenessOverrides,[grant.id]:Number(e.target.value)/100})} style={{flex:1,accentColor:CC.cyan}}/>
               <span style={{fontFamily:'monospace',fontWeight:700,minWidth:'3.5rem'}}>{pct(local.grantForgivenessOverrides[grant.id]??0)}</span>
@@ -555,10 +555,10 @@ function ScenarioBuilder({config,overrides,result,baseResult,onApply,monthLabels
       </div>
       <div style={{background:CC.navy,borderRadius:8,padding:'1rem 1.25rem',marginBottom:'1.25rem'}}>
         <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:CC.cyan,marginBottom:'0.5rem'}}>IMPACT VS BASE CASE</div>
-        <Flag type={deltaEbitda>=0?'ok':'warn'}>Year 1 EBITDA {deltaEbitda>=0?'improves':'worsens'} by {currency(Math.abs(deltaEbitda),cc)} — from {currency(bm.year1EBITDA,cc)} to {currency(m.year1EBITDA,cc)}.</Flag>
+        <Flag type={deltaEbitda>=0?'ok':'warn'}>Year 1 EBITDA {deltaEbitda>=0?'improves':'worsens'} by {currency(Math.abs(deltaEbitda),cc)}  -  from {currency(bm.year1EBITDA,cc)} to {currency(m.year1EBITDA,cc)}.</Flag>
         <div style={{marginTop:'0.4rem'}}><Flag type={m.minCashBalance>=0?'ok':'warn'}>Lowest cash: {currency(m.minCashBalance,cc)} at Month {m.minCashMonth}.</Flag></div>
       </div>
-      <MonthlyTable title="Scenario vs Base Case — Year 1 Cash" rows={[{label:'This Scenario',values:liveResult.cashFlow.closingCash.slice(0,12),bold:true,cc},{label:'Base Case',values:baseResult.cashFlow.closingCash.slice(0,12),cc}]} months={monthLabels.slice(0,12)}/>
+      <MonthlyTable title="Scenario vs Base Case  -  Year 1 Cash" rows={[{label:'This Scenario',values:liveResult.cashFlow.closingCash.slice(0,12),bold:true,cc},{label:'Base Case',values:baseResult.cashFlow.closingCash.slice(0,12),cc}]} months={monthLabels.slice(0,12)}/>
       <button onClick={()=>onApply(local)} style={{fontFamily:'monospace',fontSize:'0.8rem',fontWeight:700,padding:'0.65rem 1.5rem',border:'none',borderRadius:4,background:CC.cyan,color:CC.navy,cursor:'pointer'}}>Apply as active scenario</button>
     </div>
   )
@@ -905,8 +905,8 @@ function UnitsView({result, config, activeUnit, setActiveUnit, monthLabels, cc})
         <HeroCard label="Year 1 Opex" value={compactCurrency(y1Opex,cc)}/>
         <HeroCard label="Year 1 EBITDA" value={compactCurrency(y1Ebitda,cc)} color={y1Ebitda>=0?CC.green:CC.red}/>
       </div>
-      {Object.keys(unitData.revenueLines).length>0&&<MonthlyTable title={unitMeta.name+' — Revenue lines (Year 1)'} rows={Object.entries(unitData.revenueLines).map(function(e){return{label:e[0],values:e[1].slice(0,12),cc}})} months={monthLabels.slice(0,12)}/>}
-      <MonthlyTable title={unitMeta.name+' — Full P&L (Year 1)'} rows={[
+      {Object.keys(unitData.revenueLines).length>0&&<MonthlyTable title={unitMeta.name+'  -  Revenue lines (Year 1)'} rows={Object.entries(unitData.revenueLines).map(function(e){return{label:e[0],values:e[1].slice(0,12),cc}})} months={monthLabels.slice(0,12)}/>}
+      <MonthlyTable title={unitMeta.name+'  -  Full P&L (Year 1)'} rows={[
         {label:'Revenue',values:unitData.revenue.slice(0,12),cc},
         {label:'Cost of Sales',values:unitData.cogs.slice(0,12),cc},
         {label:'Gross Profit',values:unitData.grossProfit.slice(0,12),bold:true,cc},
@@ -938,35 +938,27 @@ export default function WonderlandDashboard(){
   useEffect(()=>{
     async function load(){
       try{
-        const {data:{user}}=await supabase.auth.getUser()
-        if(user){
-          const [{data:cfg},{data:acts}]=await Promise.all([
-            supabase.from('model_config').select('config_data,config_type').eq('client_id','client_wonderland'),
-            supabase.from('monthly_actuals').select('month_index,actuals_data').eq('client_id','client_wonderland')
-          ])
-          if(cfg){
-            const scen=cfg.find(r=>r.config_type==='scenario_overrides')
-            if(scen?.config_data)setOverrides({...defaultOverrides(),...scen.config_data})
-            const debt=cfg.find(r=>r.config_type==='debt_obligations')
-            if(debt?.config_data)setDebtObligations(debt.config_data)
-            const assess=cfg.find(r=>r.config_type==='coach_assessments')
-            if(assess?.config_data)setSavedAssessments(assess.config_data)
-          }
-          if(acts){
-            const actObj={}
-            acts.forEach(row=>{actObj[row.month_index]=row.actuals_data})
-            setActuals(actObj)
-          }
+        const {data:cfg}=await supabase
+          .from('model_config')
+          .select('config')
+          .eq('client_id','bcf0da0f-7263-4f71-b703-46c8aad03ec1')
+          .maybeSingle()
+        if(cfg?.config){
+          const saved=cfg.config
+          if(saved.overrides)setOverrides({...defaultOverrides(),...saved.overrides})
+          if(saved.debtObligations)setDebtObligations(saved.debtObligations)
+          if(saved.coachAssessments)setSavedAssessments(saved.coachAssessments)
+          if(saved.actuals)setActuals(saved.actuals)
         }
       }catch(e){}
-      finally{setLoading(false)}
+      setLoading(false)
     }
     load()
   },[])
 
   async function persist(nextOverrides){
     setOverrides(nextOverrides);setSaving(true)
-    try{await supabase.from('model_config').upsert({client_id:'client_wonderland',config_type:'scenario_overrides',config_data:nextOverrides,updated_at:new Date().toISOString()},{onConflict:'client_id,config_type'})}catch(e){}
+    try{await supabase.from('model_config').upsert({client_id:'bcf0da0f-7263-4f71-b703-46c8aad03ec1',config:{overrides:nextOverrides,debtObligations,coachAssessments:savedAssessments,actuals},version:1,updated_at:new Date().toISOString(),updated_by:'dashboard'},{onConflict:'client_id'})}catch(e){}
     setSaving(false)
   }
 
@@ -986,7 +978,7 @@ export default function WonderlandDashboard(){
         <div style={{maxWidth:1500,margin:'0 auto',padding:'1.25rem 1.5rem'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem',marginBottom:'1rem'}}>
             <div>
-              <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.15em',color:CC.cyan,marginBottom:'0.25rem'}}>CANVAS COACH — CLEARVIEW</div>
+              <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.15em',color:CC.cyan,marginBottom:'0.25rem'}}>CANVAS COACH  -  CLEARVIEW</div>
               <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:CC.white,margin:'0 0 0.18rem'}}>Wonderland Farm Services</h1>
               <div style={{fontSize:'0.77rem',color:'rgba(255,255,255,0.6)'}}>Multi-unit agri-aggregator · 24-month projection · {saving?'Saving…':'All data saved'}</div>
             </div>
@@ -1020,11 +1012,11 @@ export default function WonderlandDashboard(){
             </div>
             <div style={{background:CC.navy,borderRadius:8,padding:'1rem 1.25rem',marginBottom:'1.5rem',display:'flex',flexDirection:'column',gap:'0.55rem'}}>
               <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:CC.cyan,marginBottom:'0.35rem'}}>READING THE PICTURE</div>
-              {metrics.minCashBalance<0?<Flag type="warn">Cash goes negative at {currency(metrics.minCashBalance,cc)} in Month {metrics.minCashMonth}.</Flag>:<Flag type="ok">Cash stays positive — lowest {currency(metrics.minCashBalance,cc)}.</Flag>}
-              {metrics.year1EBITDA<0?<Flag type="warn">Year 1 EBITDA negative at {currency(metrics.year1EBITDA,cc)}.</Flag>:<Flag type="ok">Year 1 EBITDA positive at {currency(metrics.year1EBITDA,cc)} — gross margin {pct(metrics.grossMarginY1)}.</Flag>}
+              {metrics.minCashBalance<0?<Flag type="warn">Cash goes negative at {currency(metrics.minCashBalance,cc)} in Month {metrics.minCashMonth}.</Flag>:<Flag type="ok">Cash stays positive  -  lowest {currency(metrics.minCashBalance,cc)}.</Flag>}
+              {metrics.year1EBITDA<0?<Flag type="warn">Year 1 EBITDA negative at {currency(metrics.year1EBITDA,cc)}.</Flag>:<Flag type="ok">Year 1 EBITDA positive at {currency(metrics.year1EBITDA,cc)}  -  gross margin {pct(metrics.grossMarginY1)}.</Flag>}
               <Flag type="info">Average FGE input credit outstanding: {currency(metrics.avgWorkingCapitalRequirement,cc)}, peak {currency(metrics.maxWorkingCapitalRequirement,cc)}.</Flag>
             </div>
-            <MonthlyTable title="Consolidated P&L — Year 1" rows={[
+            <MonthlyTable title="Consolidated P&L  -  Year 1" rows={[
               {label:'Revenue',values:con.revenue.slice(0,12),cc},{label:'Cost of Sales',values:con.cogs.slice(0,12),cc},
               {label:'Gross Profit',values:con.grossProfit.slice(0,12),bold:true,cc},{label:'Operating Expenses',values:con.opex.slice(0,12),cc},
               {label:'EBITDA',values:con.ebitda.slice(0,12),bold:true,cc},{label:'Grant Forgiveness Gain',values:con.grantForgivenessGain.slice(0,12),cc},
@@ -1044,8 +1036,8 @@ export default function WonderlandDashboard(){
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
               <HeroCard label="Opening Cash" value={compactCurrency(result.cashFlow.openingCash[0],cc)}/><HeroCard label="Closing Cash M12" value={compactCurrency(result.cashFlow.closingCash[11],cc)}/><HeroCard label="Closing Cash M24" value={compactCurrency(result.cashFlow.closingCash[23],cc)}/><HeroCard label="Lowest Point" value={compactCurrency(Math.min(...result.cashFlow.closingCash),cc)} color={Math.min(...result.cashFlow.closingCash)<0?CC.red:CC.navy} sub={`Month ${result.cashFlow.closingCash.indexOf(Math.min(...result.cashFlow.closingCash))+1}`}/>
             </div>
-            <MonthlyTable title="Cash Flow Statement — Year 1" rows={[{label:'Opening Cash',values:result.cashFlow.openingCash.slice(0,12),cc},{label:'Operating Cash Flow',values:result.cashFlow.operatingCash.slice(0,12),cc},{label:'Investing Cash Flow',values:result.cashFlow.investingCash.slice(0,12),cc},{label:'Financing Cash Flow',values:result.cashFlow.financingCash.slice(0,12),cc},{label:'Net Change',values:result.cashFlow.netChange.slice(0,12),bold:true,cc},{label:'Closing Cash',values:result.cashFlow.closingCash.slice(0,12),bold:true,highlight:true,cc}]} months={monthLabels.slice(0,12)}/>
-            <MonthlyTable title="Cash Flow Statement — Year 2" rows={[{label:'Opening Cash',values:result.cashFlow.openingCash.slice(12,24),cc},{label:'Operating Cash Flow',values:result.cashFlow.operatingCash.slice(12,24),cc},{label:'Financing Cash Flow',values:result.cashFlow.financingCash.slice(12,24),cc},{label:'Net Change',values:result.cashFlow.netChange.slice(12,24),bold:true,cc},{label:'Closing Cash',values:result.cashFlow.closingCash.slice(12,24),bold:true,highlight:true,cc}]} months={monthLabels.slice(12,24)}/>
+            <MonthlyTable title="Cash Flow Statement  -  Year 1" rows={[{label:'Opening Cash',values:result.cashFlow.openingCash.slice(0,12),cc},{label:'Operating Cash Flow',values:result.cashFlow.operatingCash.slice(0,12),cc},{label:'Investing Cash Flow',values:result.cashFlow.investingCash.slice(0,12),cc},{label:'Financing Cash Flow',values:result.cashFlow.financingCash.slice(0,12),cc},{label:'Net Change',values:result.cashFlow.netChange.slice(0,12),bold:true,cc},{label:'Closing Cash',values:result.cashFlow.closingCash.slice(0,12),bold:true,highlight:true,cc}]} months={monthLabels.slice(0,12)}/>
+            <MonthlyTable title="Cash Flow Statement  -  Year 2" rows={[{label:'Opening Cash',values:result.cashFlow.openingCash.slice(12,24),cc},{label:'Operating Cash Flow',values:result.cashFlow.operatingCash.slice(12,24),cc},{label:'Financing Cash Flow',values:result.cashFlow.financingCash.slice(12,24),cc},{label:'Net Change',values:result.cashFlow.netChange.slice(12,24),bold:true,cc},{label:'Closing Cash',values:result.cashFlow.closingCash.slice(12,24),bold:true,highlight:true,cc}]} months={monthLabels.slice(12,24)}/>
           </div>
         )}
 
@@ -1054,14 +1046,14 @@ export default function WonderlandDashboard(){
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
               <HeroCard label="Peak Working Capital" value={compactCurrency(metrics.maxWorkingCapitalRequirement,cc)}/><HeroCard label="Average Outstanding" value={compactCurrency(metrics.avgWorkingCapitalRequirement,cc)}/><HeroCard label="FGE Count" value={metrics.totalCounterpartyGroups}/>
             </div>
-            <MonthlyTable title="FGE Input Credit Outstanding — Year 1" rows={[{label:'Input Credit Outstanding',values:result.creditReceivables.slice(0,12),bold:true,highlight:true,cc},{label:'Working Capital Movement',values:result.cashFlow.workingCapitalMovement.slice(0,12),cc}]} months={monthLabels.slice(0,12)}/>
-            {Object.entries(result.rollingFunds).map(([fid,fund])=>(<MonthlyTable key={fid} title={`${fund.name} — Year 1`} rows={[{label:'Fund Balance',values:fund.fundBalanceByMonth.slice(0,12),bold:true,highlight:true,cc},{label:'Contributions In',values:fund.fundContributions.slice(0,12),cc},{label:'Disbursements Out',values:fund.fundDisbursements.slice(0,12),cc}]} months={monthLabels.slice(0,12)} footnote={fund.fundShortfallMonths.length>0?`Shortfall in: ${fund.fundShortfallMonths.map(s=>`Month ${s.month}`).join(', ')}`:'Rolling fund managed for FGE benefit.'}/>))}
+            <MonthlyTable title="FGE Input Credit Outstanding  -  Year 1" rows={[{label:'Input Credit Outstanding',values:result.creditReceivables.slice(0,12),bold:true,highlight:true,cc},{label:'Working Capital Movement',values:result.cashFlow.workingCapitalMovement.slice(0,12),cc}]} months={monthLabels.slice(0,12)}/>
+            {Object.entries(result.rollingFunds).map(([fid,fund])=>(<MonthlyTable key={fid} title={`${fund.name}  -  Year 1`} rows={[{label:'Fund Balance',values:fund.fundBalanceByMonth.slice(0,12),bold:true,highlight:true,cc},{label:'Contributions In',values:fund.fundContributions.slice(0,12),cc},{label:'Disbursements Out',values:fund.fundDisbursements.slice(0,12),cc}]} months={monthLabels.slice(0,12)} footnote={fund.fundShortfallMonths.length>0?`Shortfall in: ${fund.fundShortfallMonths.map(s=>`Month ${s.month}`).join(', ')}`:'Rolling fund managed for FGE benefit.'}/>))}
           </div>
         )}
 
         {view==='balancesheet'&&(
           <div>
-            <MonthlyTable title="Balance Sheet — Year 1" rows={[{label:'Loan to Rolling Funds',values:result.balanceSheet.loanToRollingFunds.slice(0,12),cc},{label:'Cash & Bank',values:result.balanceSheet.cash.slice(0,12),cc},{label:'FGE Input Receivables',values:result.balanceSheet.creditReceivables.slice(0,12),cc},{label:'Total Assets',values:result.balanceSheet.totalAssets.slice(0,12),bold:true,cc},{label:'Share Capital',values:result.balanceSheet.shareCapital.slice(0,12),cc},{label:'Non-Repayable Grant (Equity)',values:result.balanceSheet.grantEquity.slice(0,12),cc},{label:'Retained Earnings',values:result.balanceSheet.retainedEarnings.slice(0,12),cc},{label:'Total Equity',values:result.balanceSheet.totalEquity.slice(0,12),bold:true,cc},{label:'Recoverable Grant Outstanding',values:result.balanceSheet.grantsOutstanding.slice(0,12),cc},{label:'Loans Outstanding',values:result.balanceSheet.loansOutstanding.slice(0,12),cc},{label:'Total Liabilities',values:result.balanceSheet.totalLiabilities.slice(0,12),bold:true,highlight:true,cc}]} months={monthLabels.slice(0,12)} footnote="Total Assets = Total Equity + Total Liabilities."/>
+            <MonthlyTable title="Balance Sheet  -  Year 1" rows={[{label:'Loan to Rolling Funds',values:result.balanceSheet.loanToRollingFunds.slice(0,12),cc},{label:'Cash & Bank',values:result.balanceSheet.cash.slice(0,12),cc},{label:'FGE Input Receivables',values:result.balanceSheet.creditReceivables.slice(0,12),cc},{label:'Total Assets',values:result.balanceSheet.totalAssets.slice(0,12),bold:true,cc},{label:'Share Capital',values:result.balanceSheet.shareCapital.slice(0,12),cc},{label:'Non-Repayable Grant (Equity)',values:result.balanceSheet.grantEquity.slice(0,12),cc},{label:'Retained Earnings',values:result.balanceSheet.retainedEarnings.slice(0,12),cc},{label:'Total Equity',values:result.balanceSheet.totalEquity.slice(0,12),bold:true,cc},{label:'Recoverable Grant Outstanding',values:result.balanceSheet.grantsOutstanding.slice(0,12),cc},{label:'Loans Outstanding',values:result.balanceSheet.loansOutstanding.slice(0,12),cc},{label:'Total Liabilities',values:result.balanceSheet.totalLiabilities.slice(0,12),bold:true,highlight:true,cc}]} months={monthLabels.slice(0,12)} footnote="Total Assets = Total Equity + Total Liabilities."/>
           </div>
         )}
 
@@ -1086,7 +1078,7 @@ export default function WonderlandDashboard(){
           savedAssessments={savedAssessments}
           onSaveAssessments={async(assess)=>{
             setSavedAssessments(assess)
-            try{await supabase.from('model_config').upsert({client_id:'client_wonderland',config_type:'coach_assessments',config_data:assess,updated_at:new Date().toISOString()},{onConflict:'client_id,config_type'})}catch(e){}
+            try{await supabase.from('model_config').upsert({client_id:'bcf0da0f-7263-4f71-b703-46c8aad03ec1',config:{overrides,debtObligations,coachAssessments:assess,actuals},version:1,updated_at:new Date().toISOString(),updated_by:'dashboard'},{onConflict:'client_id'})}catch(e){}
           }}
         />}
         {view==='analytics'&&!mounted&&<div style={{padding:'2rem',color:CC.slate}}>Loading analytics...</div>}
