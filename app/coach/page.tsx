@@ -2,7 +2,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import CoachDashboard from '@/components/CoachDashboard'
+import CoachDashboard from '@/components/coach/CoachDashboard'
 
 export default function CoachPage() {
   const [status, setStatus] = useState('checking')
