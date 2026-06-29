@@ -15,15 +15,21 @@ export default function LoginPage() {
   const [checking, setChecking] = useState(true)
   const [error, setError] = useState('')
 
-  // If already logged in, redirect
   useEffect(() => {
+    // Timeout after 3 seconds -- if session check hangs, just show login form
+    const timeout = setTimeout(() => setChecking(false), 3000)
     supabase.auth.getSession().then(({ data: { session } }) => {
+      clearTimeout(timeout)
       if (session) {
         window.location.href = '/coach'
       } else {
         setChecking(false)
       }
+    }).catch(() => {
+      clearTimeout(timeout)
+      setChecking(false)
     })
+    return () => clearTimeout(timeout)
   }, [])
 
   async function handleLogin() {
@@ -92,7 +98,7 @@ export default function LoginPage() {
           <button
             onClick={handleLogin}
             disabled={loading}
-            style={{width:'100%',padding:'0.75rem',border:'none',borderRadius:6,background:loading?C.slate:C.navy,color:C.white,fontSize:'0.9rem',fontWeight:600,cursor:loading?'not-allowed':'pointer',fontFamily:'inherit',transition:'background 0.2s'}}>
+            style={{width:'100%',padding:'0.75rem',border:'none',borderRadius:6,background:loading?C.slate:C.navy,color:C.white,fontSize:'0.9rem',fontWeight:600,cursor:loading?'not-allowed':'pointer',fontFamily:'inherit'}}>
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
         </div>
