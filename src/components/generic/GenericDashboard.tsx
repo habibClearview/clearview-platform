@@ -1,0 +1,1777 @@
+// @ts-nocheck
+'use client'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { supabase } from '@/lib/supabase'
+import {
+  fmt, fmtFull, pct, buildMonthLabels,
+  runGenericModel, defaultGenericConfig,
+  blankLine, spreadLine, serviceFeeLine,
+  type GenericModelConfig, type GenericBusinessUnit,
+  type GenericPlanLine, type LineCategory, type UnitType,
+} from '@/lib/generic-engine'
+
+// ── Design tokens ────────────────────────────────────────────
+const C = {
+  navy:'#1B2A4A', cyan:'#00B4D8', cream:'#F8F4EE', white:'#FFFFFF',
+  slate:'#4A5A6A', border:'#D8E0E8', teal:'#1A9DAA',
+  red:'#C0392B', green:'#1A7A4A', amber:'#B8860B', purple:'#6B4A8B',
+  lightBg:'#F0F4F8', planBg:'#FFFFFF', actualBg:'#E8F6F8',
+}
+
+// ── Style helpers ────────────────────────────────────────────
+const card: React.CSSProperties = {background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}
+const secH: React.CSSProperties = {fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
+const inp:  React.CSSProperties = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'inherit',background:'#F4F8FC',color:C.navy,boxSizing:'border-box'}
+const lbl:  React.CSSProperties = {display:'block',fontWeight:600,fontSize:'0.8rem',marginBottom:'0.22rem',color:C.navy}
+const hint: React.CSSProperties = {fontSize:'0.7rem',color:C.slate,lineHeight:1.4,marginTop:'0.18rem'}
+const fGrid:React.CSSProperties = {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:'1.1rem'}
+const kpiGrid:React.CSSProperties = {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(175px,1fr))',gap:'1rem',marginBottom:'1.25rem'}
+const addBtn = (sm=false, col=C.cyan): React.CSSProperties => ({fontFamily:'monospace',fontSize:sm?'0.68rem':'0.72rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:4,background:'transparent',color:col,cursor:'pointer'})
+const solidBtn = (col=C.cyan, sm=false): React.CSSProperties => ({fontFamily:'monospace',fontSize:sm?'0.72rem':'0.78rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:4,background:col,color:col===C.white?C.navy:C.white,cursor:'pointer'})
+const delBtn: React.CSSProperties = {fontSize:'0.68rem',color:C.red,background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,cursor:'pointer',padding:'0.18rem 0.42rem'}
+
+function navBtn(active: boolean): React.CSSProperties {
+  return {fontFamily:'monospace',fontSize:'0.72rem',padding:'0.65rem 1rem',border:'none',background:'transparent',
+    color:active?C.cyan:'rgba(255,255,255,0.6)',cursor:'pointer',
+    borderBottom:active?`3px solid ${C.cyan}`:'3px solid transparent',
+    fontWeight:active?700:400,whiteSpace:'nowrap'}
+}
+
+// ── Shared components ────────────────────────────────────────
+function KPI({label,value,sub,color}:{label:string;value:string;sub?:string;color?:string}) {
+  return (
+    <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1rem 1.1rem'}}>
+      <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.1em',color:C.slate,textTransform:'uppercase',marginBottom:'0.28rem'}}>{label}</div>
+      <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:color||C.navy}}>{value}</div>
+      {sub&&<div style={{fontSize:'0.7rem',color:C.slate,marginTop:'0.18rem'}}>{sub}</div>}
+    </div>
+  )
+}
+
+function Badge({text,color}:{text:string;color?:string}) {
+  return <span style={{fontFamily:'monospace',fontSize:'0.63rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:C.white,display:'inline-block'}}>{text}</span>
+}
+
+function Spinner() {
+  return <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'3rem',color:C.slate,fontSize:'0.9rem'}}>Loading...</div>
+}
+
+function SectionHeader({title,action}:{title:string;action?:React.ReactNode}) {
+  return (
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+      <div style={secH}>{title}</div>
+      {action}
+    </div>
+  )
+}
+
+function PLRow({label,values,bold,highlight,negate,months,cc}:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;months:string[];cc:string}) {
+  const total = values.reduce((s,v)=>s+v,0)
+  const display = (v:number) => negate ? fmt(-Math.abs(v),cc) : fmt(v,cc)
+  return (
+    <tr style={{background:highlight?'#EBF8FF':bold?C.lightBg:C.white}}>
+      <td style={{padding:'7px 10px',fontWeight:bold?700:400,color:C.navy,minWidth:160,fontSize:'0.8rem'}}>{label}</td>
+      {values.map((v,i)=>(
+        <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',color:negate?C.red:v<0?C.red:C.navy,fontWeight:bold?700:400}}>
+          {display(v)}
+        </td>
+      ))}
+      <td style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:700,color:negate?C.red:total<0?C.red:C.navy,borderLeft:`2px solid ${C.border}`}}>
+        {display(total)}
+      </td>
+    </tr>
+  )
+}
+
+function PLTable({title,rows,months,cc,showExport}:{title?:string;rows:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean}[];months:string[];cc:string;showExport?:boolean}) {
+  function exportCSV() {
+    const headers = ['',  ...months, 'Total']
+    const data = rows.map(r => [r.label, ...r.values.map(v=>String(Math.round(v))), String(Math.round(r.values.reduce((s,v)=>s+v,0)))])
+    const csv = [headers,...data].map(r=>r.map(c=>`"${c}"`).join(',')).join('\n')
+    const blob = new Blob([csv],{type:'text/csv'})
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href=url; a.download=`${title||'export'}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
+  return (
+    <div style={{...card,padding:0,overflow:'hidden'}}>
+      {title&&(
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.85rem 1.1rem',borderBottom:`1px solid ${C.border}`}}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy}}>{title}</div>
+          {showExport&&<div style={{display:'flex',gap:'0.5rem'}}>
+            <button style={addBtn(true)} onClick={()=>window.print()}>Print</button>
+            <button style={addBtn(true)} onClick={exportCSV}>Export CSV</button>
+          </div>}
+        </div>
+      )}
+      <div style={{overflowX:'auto'}}>
+        <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.77rem',fontFamily:'monospace'}}>
+          <thead>
+            <tr style={{background:C.navy}}>
+              <th style={{textAlign:'left',padding:'8px 10px',color:C.white,minWidth:160,fontSize:'0.75rem'}}></th>
+              {months.map((m,i)=><th key={i} style={{textAlign:'right',padding:'8px 8px',color:C.white,whiteSpace:'nowrap',fontSize:'0.72rem'}}>{m}</th>)}
+              <th style={{textAlign:'right',padding:'8px 8px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',borderLeft:`2px solid rgba(255,255,255,0.2)`}}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r,i)=><PLRow key={i} {...r} months={months} cc={cc}/>)}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ── Permissions ──────────────────────────────────────────────
+export interface GenericPermissions {
+  role: string
+  userId: string
+  fullName: string
+  clientId: string
+  unitIds: string[]   // assigned units (empty = all)
+  canEditPlan: boolean
+  canApprove: boolean
+  canSubmitRequest: boolean
+  canEnterActuals: boolean
+  canManageTeam: boolean
+  canViewAI: boolean
+  onSignOut: () => void
+}
+
+const FULL_PERMISSIONS: GenericPermissions = {
+  role:'super_coach', userId:'', fullName:'Coach', clientId:'',
+  unitIds:[], canEditPlan:true, canApprove:true, canSubmitRequest:true,
+  canEnterActuals:true, canManageTeam:true, canViewAI:true, onSignOut:()=>{},
+}
+
+// ── Main dashboard component ─────────────────────────────────
+export default function GenericDashboard({
+  clientId,
+  permissions: permProp,
+}: {
+  clientId: string
+  permissions?: GenericPermissions
+}) {
+  const P = permProp || FULL_PERMISSIONS
+  const isSuperCoach = P.role === 'super_coach' || P.role === 'coach'
+  const isCEO = P.role === 'ceo'
+  const isFM = P.role === 'finance_manager'
+  const canSeeAll = isSuperCoach || isCEO || isFM
+
+  const [config, setConfig] = useState<GenericModelConfig | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string|null>(null)
+  const [view, setView] = useState('overview')
+  const [saving, setSaving] = useState(false)
+
+  // Load config from Supabase
+  useEffect(() => {
+    async function load() {
+      try {
+        const { data, error: err } = await supabase
+          .from('generic_model_config')
+          .select('*')
+          .eq('client_id', clientId)
+          .single()
+        if (err && err.code !== 'PGRST116') throw err
+        if (data) {
+          setConfig({
+            client_id: data.client_id,
+            business_name: data.business_name,
+            currency: data.currency,
+            start_date: data.start_date,
+            planning_months: data.planning_months,
+            business_units: data.business_units || [],
+            plan_lines: data.plan_lines || [],
+            shared_lines: data.shared_lines || [],
+            settings: data.settings || {},
+          })
+        } else {
+          setConfig(defaultGenericConfig({ client_id: clientId }))
+        }
+      } catch(e: any) {
+        setError(e.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    if (clientId) load()
+  }, [clientId])
+
+  // Save config to Supabase
+  const saveConfig = useCallback(async (newConfig: GenericModelConfig) => {
+    setSaving(true)
+    try {
+      const { error: err } = await supabase
+        .from('generic_model_config')
+        .upsert({
+          client_id: newConfig.client_id,
+          business_name: newConfig.business_name,
+          currency: newConfig.currency,
+          start_date: newConfig.start_date,
+          planning_months: newConfig.planning_months,
+          business_units: newConfig.business_units,
+          plan_lines: newConfig.plan_lines,
+          shared_lines: newConfig.shared_lines,
+          settings: newConfig.settings,
+          updated_at: new Date().toISOString(),
+          updated_by: P.userId,
+        }, { onConflict: 'client_id' })
+      if (err) throw err
+      setConfig(newConfig)
+    } catch(e: any) {
+      alert('Save failed: ' + e.message)
+    } finally {
+      setSaving(false)
+    }
+  }, [P.userId])
+
+  const months = useMemo(() => config ? buildMonthLabels(config.start_date, config.planning_months) : [], [config])
+  const result = useMemo(() => config && config.business_units.length > 0 ? runGenericModel(config) : null, [config])
+  const cc = config?.currency || 'UGX'
+
+  if (loading) return <Spinner/>
+  if (error) return (
+    <div style={{padding:'2rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+      <div style={{color:C.red,marginBottom:'1rem'}}>Error loading data: {error}</div>
+      <button onClick={P.onSignOut} style={solidBtn(C.navy)}>Sign Out</button>
+    </div>
+  )
+  if (!config) return <Spinner/>
+
+  const activeUnits = config.business_units.filter(u => u.active)
+
+  const mainNav = [
+    ['overview','Overview'],
+    ['planning','Planning'],
+    ['unit_pl','Unit P&L'],
+    ['consolidated','Consolidated P&L'],
+    ['cashflow','Cash Flow'],
+    ['balancesheet','Balance Sheet'],
+    ['analytics','Analytics'],
+    ['spread','Spread Analysis'],
+    ['service','Service Margins'],
+    ['breakeven','Break-Even'],
+    ['actuals','Actuals'],
+    ['events','Mgmt Events'],
+    ['staff_eff','Staff Efficiency'],
+    ['ai_health','AI Health Check'],
+    ['investment','Investment Readiness'],
+    ['scenarios','Scenarios'],
+    ['spends','Spend Requests'],
+    ['approvals','Approvals'],
+    ['team','Team'],
+    ['settings','Settings'],
+  ]
+
+  return (
+    <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif",background:C.cream,color:C.navy,minHeight:'100vh'}}>
+      {/* Header */}
+      <header style={{background:C.navy,borderBottom:`3px solid ${C.cyan}`}}>
+        <div style={{maxWidth:1600,margin:'0 auto',padding:'1.25rem 1.5rem',display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
+          <div>
+            <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>CANVAS COACH — CLEARVIEW</div>
+            <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:C.white,margin:'0.1rem 0 0.15rem'}}>{config.business_name || 'New Client'}</h1>
+            <div style={{fontSize:'0.76rem',color:'rgba(255,255,255,0.6)'}}>
+              {activeUnits.length} unit{activeUnits.length!==1?'s':''} · {cc} · {P.fullName}
+              {saving&&<span style={{marginLeft:8,color:C.amber}}>· Saving...</span>}
+            </div>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}>
+            <span style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.cyan,border:`1px solid rgba(0,180,216,0.4)`,borderRadius:4,padding:'0.18rem 0.5rem',textTransform:'uppercase'}}>{P.role.replace('_',' ')}</span>
+            <button onClick={P.onSignOut} style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid rgba(255,255,255,0.25)`,borderRadius:4,color:'rgba(255,255,255,0.6)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
+          </div>
+        </div>
+      </header>
+
+      {/* Nav */}
+      <nav style={{background:'#142038',borderBottom:`1px solid rgba(0,180,216,0.15)`,overflowX:'auto'}}>
+        <div style={{maxWidth:1600,margin:'0 auto',padding:'0 1.5rem',display:'flex'}}>
+          {mainNav.map(([id,label])=>(
+            <button key={id} style={navBtn(view===id)} onClick={()=>setView(id)}>{label}</button>
+          ))}
+        </div>
+      </nav>
+
+      {/* Main */}
+      <main style={{maxWidth:1600,margin:'0 auto',padding:'1.5rem'}}>
+        {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
+        {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
+        {view==='unit_pl'     && <UnitPLTab config={config} result={result} months={months} cc={cc} P={P}/>}
+        {view==='consolidated'&& <ConsolidatedTab config={config} result={result} months={months} cc={cc}/>}
+        {view==='cashflow'    && <CashFlowTab result={result} months={months} cc={cc}/>}
+        {view==='balancesheet'&& <BalanceSheetTab result={result} months={months} cc={cc}/>}
+        {view==='analytics'   && <AnalyticsTab config={config} result={result} months={months} cc={cc}/>}
+        {view==='spread'      && <SpreadTab config={config} result={result} months={months} cc={cc}/>}
+        {view==='service'     && <ServiceMarginsTab config={config} result={result} months={months} cc={cc}/>}
+        {view==='breakeven'   && <BreakEvenTab config={config} result={result} cc={cc}/>}
+        {view==='actuals'     && <ActualsTab config={config} months={months} cc={cc} P={P} onSave={saveConfig}/>}
+        {view==='events'      && <EventsTab clientId={clientId} config={config} cc={cc} P={P}/>}
+        {view==='staff_eff'   && <StaffEfficiencyTab config={config} result={result} months={months} cc={cc}/>}
+        {view==='ai_health'   && <AIHealthTab clientId={clientId} config={config} result={result} cc={cc} P={P}/>}
+        {view==='investment'  && <InvestmentTab clientId={clientId} config={config} result={result} cc={cc} P={P}/>}
+        {view==='scenarios'   && <ScenariosTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
+        {view==='spends'      && <SpendRequestsTab clientId={clientId} config={config} cc={cc} P={P}/>}
+        {view==='approvals'   && <ApprovalsTab clientId={clientId} config={config} cc={cc} P={P}/>}
+        {view==='team'        && <TeamTab clientId={clientId} config={config} P={P}/>}
+        {view==='settings'    && <SettingsTab config={config} P={P} onSave={saveConfig}/>}
+      </main>
+
+      <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.67rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>
+        Canvas Coach · Clearview · {config.business_name} · habibonifade.com · Confidential
+      </footer>
+    </div>
+  )
+}
+// ── OVERVIEW TAB ─────────────────────────────────────────────
+function OverviewTab({config,result,months,cc,P,onSave}) {
+  if (!result) return (
+    <div style={card}>
+      <div style={{...secH,marginBottom:'0.5rem'}}>Welcome to Clearview</div>
+      <p style={{color:C.slate,fontSize:'0.88rem',lineHeight:1.7}}>
+        This financial planning platform is ready for {config.business_name||'your business'}.
+        Start by going to <strong>Settings</strong> to define your business units and revenue lines,
+        then go to <strong>Planning</strong> to enter your financial plan.
+      </p>
+    </div>
+  )
+  const m = result.metrics
+  return (
+    <div>
+      <div style={kpiGrid}>
+        <KPI label="Total Revenue" value={fmt(m.total_revenue,cc)} color={C.navy}/>
+        <KPI label="Gross Profit" value={fmt(m.total_gp,cc)} sub={pct(m.gross_margin)} color={m.total_gp>=0?C.green:C.red}/>
+        <KPI label="EBITDA" value={fmt(m.total_ebitda,cc)} sub={pct(m.net_margin)} color={m.total_ebitda>=0?C.teal:C.red}/>
+        <KPI label="Min Cash" value={fmt(m.min_cash,cc)} sub={`Month ${m.min_cash_month}`} color={m.min_cash>=0?C.navy:C.red}/>
+        <KPI label="Break-Even" value={fmt(m.business_breakeven,cc)} sub="Annual revenue needed" color={C.amber}/>
+        <KPI label="Revenue/Head" value={fmt(m.revenue_per_head,cc)} sub={`${m.total_headcount} staff`} color={C.purple}/>
+      </div>
+      {/* Unit performance cards */}
+      <div style={{...secH,marginTop:'0.5rem'}}>Business Unit Performance</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
+        {result.allocUnits.map(u => {
+          const pl = result.unitPL[u.id]
+          if (!pl) return null
+          return (
+            <div key={u.id} style={{...card,borderTop:`4px solid ${u.color||C.cyan}`,marginBottom:0}}>
+              <div style={{fontWeight:700,fontSize:'0.9rem',color:C.navy,marginBottom:'0.5rem'}}>{u.name}</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.5rem',fontSize:'0.8rem'}}>
+                <div><div style={{color:C.slate,fontSize:'0.7rem'}}>Revenue</div><div style={{fontWeight:700,color:C.navy,fontFamily:'monospace'}}>{fmt(pl.ann_rev,cc)}</div></div>
+                <div><div style={{color:C.slate,fontSize:'0.7rem'}}>Gross Profit</div><div style={{fontWeight:700,color:pl.ann_gp>=0?C.green:C.red,fontFamily:'monospace'}}>{fmt(pl.ann_gp,cc)}</div></div>
+                <div><div style={{color:C.slate,fontSize:'0.7rem'}}>EBITDA</div><div style={{fontWeight:700,color:pl.ann_ebitda>=0?C.teal:C.red,fontFamily:'monospace'}}>{fmt(pl.ann_ebitda,cc)}</div></div>
+                <div><div style={{color:C.slate,fontSize:'0.7rem'}}>GP Margin</div><div style={{fontWeight:700,color:C.navy,fontFamily:'monospace'}}>{pct(pl.gp_margin)}</div></div>
+              </div>
+              {/* Sub-units if any */}
+              {result.subUnitsByParent[u.id]&&(
+                <div style={{marginTop:'0.75rem',borderTop:`1px solid ${C.border}`,paddingTop:'0.5rem'}}>
+                  <div style={{fontSize:'0.7rem',color:C.slate,marginBottom:'0.35rem',fontFamily:'monospace',letterSpacing:'0.08em'}}>SUB-UNITS</div>
+                  {result.subUnitsByParent[u.id].map(su=>{
+                    const spl = result.unitPL[su.id]
+                    return spl ? (
+                      <div key={su.id} style={{display:'flex',justifyContent:'space-between',fontSize:'0.78rem',padding:'0.2rem 0',borderBottom:`1px solid ${C.border}`}}>
+                        <span style={{color:C.navy}}>{su.name}</span>
+                        <span style={{fontFamily:'monospace',color:spl.ann_ebitda>=0?C.green:C.red,fontWeight:700}}>{fmt(spl.ann_ebitda,cc)}</span>
+                      </div>
+                    ) : null
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── PLANNING TAB ─────────────────────────────────────────────
+function PlanningTab({config,result,months,cc,P,onSave}) {
+  const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active)?.id||'')
+  const [selSection, setSelSection] = useState<LineCategory>('revenue')
+  const [saving, setSaving] = useState(false)
+
+  const unit = config.business_units.find(u=>u.id===selUnit)
+  const lines = config.plan_lines.filter(l=>l.unit_id===selUnit&&l.category===selSection&&l.active)
+
+  function updateLine(lineId:string, mIdx:number, val:number) {
+    const newConfig = {...config, plan_lines: config.plan_lines.map(l =>
+      l.id===lineId ? {...l, monthly_plan:l.monthly_plan.map((v,i)=>i===mIdx?val:v)} : l
+    )}
+    onSave(newConfig)
+  }
+
+  function addLine(category:LineCategory) {
+    const id = `${selUnit}_${category}_${Date.now()}`
+    const newLine = blankLine(id, selUnit, 'New line', category, config.planning_months)
+    onSave({...config, plan_lines:[...config.plan_lines, newLine]})
+  }
+
+  function updateLineName(lineId:string, name:string) {
+    onSave({...config, plan_lines:config.plan_lines.map(l=>l.id===lineId?{...l,name}:l)})
+  }
+
+  function deleteLine(lineId:string) {
+    onSave({...config, plan_lines:config.plan_lines.map(l=>l.id===lineId?{...l,active:false}:l)})
+  }
+
+  const sections: [LineCategory,string][] = [['revenue','Revenue'],['cost_of_sales','Cost of Sales'],['staff','Staff'],['direct_opex','Overheads']]
+
+  const unitRevenue = result?.unitPL[selUnit]
+  const totals = selSection==='revenue' ? unitRevenue?.rev : selSection==='cost_of_sales' ? unitRevenue?.cogs : selSection==='staff' ? unitRevenue?.staff : unitRevenue?.opex
+
+  return (
+    <div>
+      {/* Unit selector */}
+      <div style={{display:'flex',gap:'0.45rem',marginBottom:'1.25rem',flexWrap:'wrap',alignItems:'center'}}>
+        {config.business_units.filter(u=>u.active).map(u=>(
+          <button key={u.id} style={{fontFamily:'monospace',fontSize:'0.71rem',padding:'0.45rem 0.85rem',
+            border:`2px solid ${selUnit===u.id?(u.color||C.cyan):C.border}`,borderRadius:4,
+            background:selUnit===u.id?(u.color||C.cyan):C.white,
+            color:selUnit===u.id?C.white:C.navy,cursor:'pointer'}}
+            onClick={()=>setSelUnit(u.id)}>
+            {u.short||u.name.split(' ')[0]}
+          </button>
+        ))}
+      </div>
+
+      {/* Section tabs */}
+      <div style={{display:'flex',gap:'0.35rem',marginBottom:'1.25rem',borderBottom:`1px solid ${C.border}`,paddingBottom:'0.5rem'}}>
+        {sections.map(([cat,label])=>(
+          <button key={cat} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.85rem',border:'none',
+            background:selSection===cat?C.navy:C.white,color:selSection===cat?C.white:C.slate,
+            borderRadius:4,cursor:'pointer',fontWeight:selSection===cat?700:400}}
+            onClick={()=>setSelSection(cat)}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Lines */}
+      <div style={card}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy}}>{unit?.name} — {sections.find(s=>s[0]===selSection)?.[1]}</div>
+          {P.canEditPlan&&<button style={addBtn(true)} onClick={()=>addLine(selSection)}>+ Add Line</button>}
+        </div>
+
+        {/* Header row */}
+        <div style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.76rem',fontFamily:'monospace'}}>
+            <thead>
+              <tr style={{background:C.lightBg}}>
+                <th style={{textAlign:'left',padding:'6px 8px',fontWeight:600,color:C.navy,minWidth:180,fontSize:'0.75rem'}}>Line</th>
+                {months.map((m,i)=><th key={i} style={{textAlign:'right',padding:'6px 6px',color:C.slate,whiteSpace:'nowrap',fontSize:'0.68rem'}}>{m}</th>)}
+                <th style={{textAlign:'right',padding:'6px 8px',color:C.navy,fontWeight:700,borderLeft:`2px solid ${C.border}`,fontSize:'0.72rem'}}>Total</th>
+                {P.canEditPlan&&<th style={{width:30}}></th>}
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((l,ri)=>{
+                const total = l.monthly_plan.reduce((s,v)=>s+v,0)
+                return (
+                  <tr key={l.id} style={{background:ri%2===0?C.cream:C.white}}>
+                    <td style={{padding:'5px 8px'}}>
+                      {P.canEditPlan
+                        ? <input style={{...inp,background:'transparent',border:'none',padding:0,fontSize:'0.8rem',fontFamily:'inherit'}}
+                            value={l.name} onChange={e=>updateLineName(l.id,e.target.value)}/>
+                        : <span style={{fontSize:'0.8rem',color:C.navy}}>{l.name}</span>
+                      }
+                    </td>
+                    {l.monthly_plan.map((v,m)=>(
+                      <td key={m} style={{padding:'4px 4px'}}>
+                        {P.canEditPlan
+                          ? <input type="number" style={{width:80,padding:'3px 5px',border:`1px solid ${C.border}`,borderRadius:3,fontSize:'0.72rem',fontFamily:'monospace',textAlign:'right',background:C.white,color:C.navy}}
+                              value={v||''} placeholder="0"
+                              onChange={e=>updateLine(l.id,m,Number(e.target.value))}/>
+                          : <span style={{display:'block',textAlign:'right',padding:'3px 5px',fontSize:'0.72rem'}}>{fmt(v,cc)}</span>
+                        }
+                      </td>
+                    ))}
+                    <td style={{padding:'5px 8px',textAlign:'right',fontWeight:700,color:C.navy,borderLeft:`2px solid ${C.border}`}}>{fmt(total,cc)}</td>
+                    {P.canEditPlan&&<td><button style={delBtn} onClick={()=>deleteLine(l.id)}>×</button></td>}
+                  </tr>
+                )
+              })}
+              {/* Total row */}
+              {totals&&(
+                <tr style={{background:C.navy}}>
+                  <td style={{padding:'6px 8px',fontWeight:700,color:C.white,fontSize:'0.78rem'}}>Total</td>
+                  {totals.map((v,i)=><td key={i} style={{padding:'6px 6px',textAlign:'right',fontFamily:'monospace',fontSize:'0.72rem',color:C.cyan,fontWeight:700}}>{fmt(v,cc)}</td>)}
+                  <td style={{padding:'6px 8px',textAlign:'right',fontFamily:'monospace',fontWeight:700,color:C.cyan,borderLeft:`2px solid rgba(255,255,255,0.2)`}}>{fmt(totals.reduce((s,v)=>s+v,0),cc)}</td>
+                  {P.canEditPlan&&<td></td>}
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Shared lines section */}
+      {selSection==='staff'&&(
+        <div style={card}>
+          <SectionHeader title="Shared / Central Costs" action={P.canEditPlan?<button style={addBtn(true)} onClick={()=>{
+            const id=`shared_${Date.now()}`
+            onSave({...config,shared_lines:[...config.shared_lines,blankLine(id,'shared','New shared cost','shared',config.planning_months)]})
+          }}>+ Add Shared Cost</button>:null}/>
+          <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'0.75rem'}}>Central costs (CEO salary, office costs etc) allocated across all units by headcount and revenue.</p>
+          {config.shared_lines.map((l,ri)=>(
+            <div key={l.id} style={{display:'flex',gap:'0.75rem',alignItems:'center',marginBottom:'0.5rem',padding:'0.4rem 0.6rem',background:ri%2===0?C.cream:C.white,borderRadius:4}}>
+              <div style={{flex:1}}>
+                {P.canEditPlan
+                  ? <input style={{...inp,background:'transparent',border:'none',padding:0,fontSize:'0.82rem'}}
+                      value={l.name} onChange={e=>onSave({...config,shared_lines:config.shared_lines.map(sl=>sl.id===l.id?{...sl,name:e.target.value}:sl)})}/>
+                  : <span style={{fontSize:'0.82rem',color:C.navy}}>{l.name}</span>
+                }
+              </div>
+              <div style={{width:140}}>
+                {P.canEditPlan
+                  ? <input type="number" style={{...inp,textAlign:'right',fontFamily:'monospace',fontSize:'0.82rem'}}
+                      value={l.monthly_plan[0]||''} placeholder="Monthly amount"
+                      onChange={e=>onSave({...config,shared_lines:config.shared_lines.map(sl=>sl.id===l.id?{...sl,monthly_plan:Array(config.planning_months).fill(Number(e.target.value))}:sl)})}/>
+                  : <span style={{fontFamily:'monospace',fontSize:'0.82rem',color:C.navy,display:'block',textAlign:'right'}}>{fmt(l.monthly_plan[0],cc)}/mo</span>
+                }
+              </div>
+              <div style={{fontFamily:'monospace',fontSize:'0.78rem',color:C.slate,width:100,textAlign:'right'}}>{fmt(l.monthly_plan.reduce((s,v)=>s+v,0),cc)}/yr</div>
+              {P.canEditPlan&&<button style={delBtn} onClick={()=>onSave({...config,shared_lines:config.shared_lines.filter(sl=>sl.id!==l.id)})}>×</button>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── UNIT P&L TAB ─────────────────────────────────────────────
+function UnitPLTab({config,result,months,cc,P}) {
+  const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active)?.id||'')
+  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
+  const pl = result.unitPL[selUnit]
+  if (!pl) return <div style={card}><p style={{color:C.slate}}>No data for this unit.</p></div>
+
+  const rows = [
+    {label:'Revenue',values:pl.rev,bold:true},
+    {label:'Cost of Sales',values:pl.cogs,negate:true},
+    {label:'Gross Profit',values:pl.gp,bold:true,highlight:true},
+    {label:'Staff Costs',values:pl.staff,negate:true},
+    {label:'Direct Overheads',values:pl.opex,negate:true},
+    {label:'Shared Costs',values:pl.shared,negate:true},
+    {label:'EBITDA',values:pl.ebitda,bold:true,highlight:true},
+  ]
+
+  // Add actuals comparison if available
+  const hasActuals = pl.act_rev.some(v=>v!==null)
+
+  return (
+    <div>
+      <div style={{display:'flex',gap:'0.45rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
+        {config.business_units.filter(u=>u.active).map(u=>(
+          <button key={u.id} style={{fontFamily:'monospace',fontSize:'0.71rem',padding:'0.45rem 0.85rem',
+            border:`2px solid ${selUnit===u.id?(u.color||C.cyan):C.border}`,borderRadius:4,
+            background:selUnit===u.id?(u.color||C.cyan):C.white,
+            color:selUnit===u.id?C.white:C.navy,cursor:'pointer'}}
+            onClick={()=>setSelUnit(u.id)}>
+            {config.business_units.find(u2=>u2.id===u.id)?.short||u.name.split(' ')[0]}
+          </button>
+        ))}
+      </div>
+      <PLTable title={`${config.business_units.find(u=>u.id===selUnit)?.name} — P&L`} rows={rows} months={months} cc={cc} showExport/>
+      <div style={kpiGrid}>
+        <KPI label="Annual Revenue" value={fmt(pl.ann_rev,cc)}/>
+        <KPI label="Gross Profit" value={fmt(pl.ann_gp,cc)} sub={pct(pl.gp_margin)} color={pl.ann_gp>=0?C.green:C.red}/>
+        <KPI label="EBITDA" value={fmt(pl.ann_ebitda,cc)} sub={pct(pl.ebitda_margin)} color={pl.ann_ebitda>=0?C.teal:C.red}/>
+        <KPI label="Staff Cost %" value={pct(pl.staff_efficiency.staff_cost_pct)} sub={`${pl.staff_efficiency.headcount} staff`} color={C.amber}/>
+      </div>
+    </div>
+  )
+}
+
+// ── CONSOLIDATED P&L TAB ─────────────────────────────────────
+function ConsolidatedTab({config,result,months,cc}) {
+  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
+  const con = result.con
+  const rows = [
+    {label:'Revenue',values:con.rev,bold:true},
+    {label:'Cost of Sales',values:con.cogs,negate:true},
+    {label:'Gross Profit',values:con.gp,bold:true,highlight:true},
+    {label:'Total Operating Costs',values:con.opex,negate:true},
+    {label:'EBITDA',values:con.ebitda,bold:true,highlight:true},
+    {label:'Tax',values:con.tax,negate:true},
+    {label:'Net Profit After Tax',values:con.npat,bold:true,highlight:true},
+  ]
+  return <PLTable title={`${config.business_name} — Consolidated P&L`} rows={rows} months={months} cc={cc} showExport/>
+}
+
+// ── CASH FLOW TAB ────────────────────────────────────────────
+function CashFlowTab({result,months,cc}) {
+  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
+  const cf = result.cf
+  const rows = [
+    {label:'Opening Cash',values:cf.open,bold:true},
+    {label:'Net Profit After Tax',values:result.con.npat},
+    {label:'Operating Cash Flow',values:cf.op_cash,bold:true},
+    {label:'Capital & Financing',values:cf.fin_cash},
+    {label:'Net Change in Cash',values:cf.net,bold:true},
+    {label:'Closing Cash',values:cf.close,bold:true,highlight:true},
+  ]
+  return (
+    <div>
+      <div style={kpiGrid}>
+        <KPI label="Opening Cash" value={fmt(cf.open[0],cc)}/>
+        <KPI label="Month 6 Cash" value={fmt(cf.close[5]||0,cc)} color={(cf.close[5]||0)>=0?C.navy:C.red}/>
+        <KPI label="Closing Cash" value={fmt(cf.close[cf.close.length-1],cc)} color={cf.close[cf.close.length-1]>=0?C.navy:C.red}/>
+        <KPI label="Lowest Point" value={fmt(result.metrics.min_cash,cc)} sub={`Month ${result.metrics.min_cash_month}`} color={result.metrics.min_cash>=0?C.navy:C.red}/>
+      </div>
+      <PLTable title="Cash Flow Statement" rows={rows} months={months} cc={cc} showExport/>
+    </div>
+  )
+}
+
+// ── BALANCE SHEET TAB ────────────────────────────────────────
+function BalanceSheetTab({result,months,cc}) {
+  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
+  const bs = result.bs
+  const rows = [
+    {label:'ASSETS',values:Array(months.length).fill(0),bold:true},
+    {label:'Cash & Bank',values:bs.cash},
+    {label:'Fixed Assets',values:bs.fixed_assets},
+    {label:'Total Assets',values:bs.total_assets,bold:true,highlight:true},
+    {label:'EQUITY',values:Array(months.length).fill(0),bold:true},
+    {label:'Share Capital',values:bs.share_capital},
+    {label:'Grant Equity',values:bs.grant_equity},
+    {label:'Retained Earnings',values:bs.retained_earnings},
+    {label:'Total Equity',values:bs.total_equity,bold:true},
+    {label:'LIABILITIES',values:Array(months.length).fill(0),bold:true},
+    {label:'Grant Liability',values:bs.grant_liability},
+    {label:'Loan Liability',values:bs.loan_liability},
+    {label:'Total Liabilities',values:bs.total_liabilities,bold:true},
+    {label:'Total Equity & Liabilities',values:bs.total_equity_and_liabilities,bold:true,highlight:true},
+  ]
+  return <PLTable title="Balance Sheet" rows={rows} months={months} cc={cc} showExport/>
+}
+// ── ANALYTICS TAB ────────────────────────────────────────────
+function AnalyticsTab({config,result,months,cc}) {
+  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
+  const m = result.metrics
+  return (
+    <div>
+      <div style={kpiGrid}>
+        <KPI label="Gross Margin" value={pct(m.gross_margin)} color={m.gross_margin>0.3?C.green:m.gross_margin>0.1?C.amber:C.red}/>
+        <KPI label="Net Margin" value={pct(m.net_margin)} color={m.net_margin>0.1?C.green:m.net_margin>0?C.amber:C.red}/>
+        <KPI label="Staff Cost %" value={pct(m.staff_cost_pct)} color={m.staff_cost_pct<0.3?C.green:m.staff_cost_pct<0.5?C.amber:C.red}/>
+        <KPI label="Shared Cost Pool" value={fmt(m.total_shared,cc)} color={C.slate}/>
+      </div>
+      {/* Revenue by unit bar chart (text-based) */}
+      <div style={card}>
+        <div style={secH}>Revenue by Business Unit</div>
+        {result.allocUnits.map(u=>{
+          const pl = result.unitPL[u.id]
+          if (!pl) return null
+          const share = m.total_revenue>0 ? pl.ann_rev/m.total_revenue : 0
+          return (
+            <div key={u.id} style={{marginBottom:'0.75rem'}}>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.82rem',marginBottom:'0.25rem'}}>
+                <span style={{fontWeight:600,color:C.navy}}>{u.name}</span>
+                <span style={{fontFamily:'monospace',color:C.navy}}>{fmt(pl.ann_rev,cc)} · {pct(share)}</span>
+              </div>
+              <div style={{background:C.border,borderRadius:3,height:8}}>
+                <div style={{background:u.color||C.cyan,height:8,borderRadius:3,width:`${Math.min(100,share*100)}%`}}/>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      {/* Monthly revenue trend */}
+      <PLTable title="Monthly Revenue Trend" rows={[
+        {label:'Revenue',values:result.con.rev,bold:true},
+        {label:'Gross Profit',values:result.con.gp},
+        {label:'EBITDA',values:result.con.ebitda,highlight:true},
+      ]} months={months} cc={cc} showExport/>
+    </div>
+  )
+}
+
+// ── SPREAD ANALYSIS TAB ───────────────────────────────────────
+function SpreadTab({config,result,months,cc}) {
+  if (!result) return <div style={card}><p style={{color:C.slate}}>No spread lines defined yet. Add spread-type revenue lines in Planning.</p></div>
+  const allSpreads = result.allocUnits.flatMap(u => result.unitPL[u.id]?.spread_analysis||[])
+  if (allSpreads.length===0) return (
+    <div style={card}>
+      <div style={secH}>Spread Analysis</div>
+      <p style={{color:C.slate,fontSize:'0.88rem'}}>No spread lines defined. In Planning, add a revenue line and set its type to "Spread" to track buy price, sell price, and margin per unit.</p>
+    </div>
+  )
+  return (
+    <div>
+      {allSpreads.map(s=>(
+        <div key={s.line_id} style={card}>
+          <div style={secH}>{s.name}</div>
+          <div style={kpiGrid}>
+            <KPI label="Total Volume" value={s.volume.reduce((a,b)=>a+b,0).toLocaleString()} sub="units"/>
+            <KPI label="Avg Buy Price" value={fmt(s.buy_price.filter(v=>v>0).reduce((a,b)=>a+b,0)/Math.max(1,s.buy_price.filter(v=>v>0).length),cc)} color={C.red}/>
+            <KPI label="Avg Sell Price" value={fmt(s.sell_price.filter(v=>v>0).reduce((a,b)=>a+b,0)/Math.max(1,s.sell_price.filter(v=>v>0).length),cc)} color={C.green}/>
+            <KPI label="Total Spread" value={fmt(s.total_spread.reduce((a,b)=>a+b,0),cc)} color={C.teal}/>
+          </div>
+          <PLTable title="" rows={[
+            {label:'Volume (units)',values:s.volume},
+            {label:'Buy Price',values:s.buy_price},
+            {label:'Sell Price',values:s.sell_price},
+            {label:'Spread per Unit',values:s.spread_per_unit,highlight:true},
+            {label:'Total Spread Revenue',values:s.total_spread,bold:true},
+          ]} months={months} cc={cc} showExport/>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── SERVICE MARGINS TAB ───────────────────────────────────────
+function ServiceMarginsTab({config,result,months,cc}) {
+  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
+  const allMargins = result.allocUnits.flatMap(u => result.unitPL[u.id]?.service_margins||[])
+  if (allMargins.length===0) return (
+    <div style={card}>
+      <div style={secH}>Service Margins</div>
+      <p style={{color:C.slate,fontSize:'0.88rem'}}>No service fee lines defined. In Planning, add a revenue line and set its type to "Service Fee" to track fee, cost of delivery, and margin per engagement.</p>
+    </div>
+  )
+  return (
+    <div>
+      {allMargins.map(s=>(
+        <div key={s.line_id} style={card}>
+          <div style={secH}>{s.name}</div>
+          <div style={kpiGrid}>
+            <KPI label="Total Engagements" value={s.engagements.reduce((a,b)=>a+b,0).toLocaleString()}/>
+            <KPI label="Avg Fee" value={fmt(s.fee.filter(v=>v>0).reduce((a,b)=>a+b,0)/Math.max(1,s.fee.filter(v=>v>0).length),cc)} color={C.green}/>
+            <KPI label="Avg Cost/Engagement" value={fmt(s.cost.filter(v=>v>0).reduce((a,b)=>a+b,0)/Math.max(1,s.cost.filter(v=>v>0).length),cc)} color={C.red}/>
+            <KPI label="Total Margin" value={fmt(s.margin.reduce((a,b)=>a+b,0),cc)} color={C.teal}/>
+          </div>
+          <PLTable title="" rows={[
+            {label:'Engagements',values:s.engagements},
+            {label:'Fee per Engagement',values:s.fee},
+            {label:'Cost per Engagement',values:s.cost,negate:true},
+            {label:'Margin per Engagement',values:s.margin.map((m,i)=>s.engagements[i]>0?m/s.engagements[i]:0),highlight:true},
+            {label:'Total Margin',values:s.margin,bold:true},
+          ]} months={months} cc={cc} showExport/>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── BREAK-EVEN TAB ────────────────────────────────────────────
+function BreakEvenTab({config,result,cc}) {
+  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
+  const m = result.metrics
+  return (
+    <div>
+      {/* Whole business */}
+      <div style={card}>
+        <div style={secH}>Whole Business Break-Even</div>
+        <div style={kpiGrid}>
+          <KPI label="Break-Even Revenue" value={fmt(m.business_breakeven,cc)} sub="Annual" color={C.amber}/>
+          <KPI label="Planned Revenue" value={fmt(m.total_revenue,cc)} color={C.navy}/>
+          <KPI label="Gap / Surplus" value={fmt(m.total_revenue-m.business_breakeven,cc)} color={m.total_revenue>=m.business_breakeven?C.green:C.red}/>
+          <KPI label="Variable Cost %" value={pct(m.variable_cost_pct)} sub="of revenue" color={C.slate}/>
+        </div>
+        <div style={{background:C.lightBg,borderRadius:6,padding:'1rem',marginTop:'0.5rem'}}>
+          <div style={{fontSize:'0.82rem',color:C.slate,lineHeight:1.7}}>
+            At the planned variable cost ratio of <strong>{pct(m.variable_cost_pct)}</strong>, the business needs to generate <strong>{fmt(m.business_breakeven,cc)}</strong> in annual revenue to cover all fixed and shared costs.
+            {m.total_revenue>=m.business_breakeven
+              ? ` The current plan exceeds break-even by ${fmt(m.total_revenue-m.business_breakeven,cc)}.`
+              : ` The current plan is ${fmt(m.business_breakeven-m.total_revenue,cc)} below break-even.`}
+          </div>
+        </div>
+      </div>
+
+      {/* Break-even by unit and revenue line */}
+      {result.allocUnits.map(u=>{
+        const pl = result.unitPL[u.id]
+        if (!pl||pl.breakeven.length===0) return null
+        return (
+          <div key={u.id} style={card}>
+            <div style={secH}>{u.name}</div>
+            <div style={{overflowX:'auto'}}>
+              <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.8rem'}}>
+                <thead>
+                  <tr style={{background:C.navy,color:C.white}}>
+                    {['Revenue Line','Break-Even Revenue','Current Revenue','Gap / Surplus','Variable Cost %'].map(h=>(
+                      <th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.75rem'}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {pl.breakeven.map((be,i)=>(
+                    <tr key={be.line_id} style={{background:i%2===0?C.cream:C.white}}>
+                      <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{be.name}</td>
+                      <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{fmt(be.breakeven_revenue,cc)}</td>
+                      <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{fmt(be.current_revenue,cc)}</td>
+                      <td style={{padding:'8px 10px',fontFamily:'monospace',fontWeight:700,color:be.gap>=0?C.green:C.red}}>{fmt(be.gap,cc)}</td>
+                      <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{pct(be.variable_cost_pct)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── STAFF EFFICIENCY TAB ─────────────────────────────────────
+function StaffEfficiencyTab({config,result,months,cc}) {
+  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
+  const m = result.metrics
+  return (
+    <div>
+      <div style={kpiGrid}>
+        <KPI label="Total Headcount" value={String(m.total_headcount)} color={C.navy}/>
+        <KPI label="Revenue per Head" value={fmt(m.revenue_per_head,cc)} color={C.teal}/>
+        <KPI label="Total Staff Cost" value={fmt(m.total_staff_cost,cc)} color={C.red}/>
+        <KPI label="Staff Cost %" value={pct(m.staff_cost_pct)} color={m.staff_cost_pct<0.3?C.green:m.staff_cost_pct<0.5?C.amber:C.red}/>
+      </div>
+      <div style={card}>
+        <div style={secH}>Staff Efficiency by Unit</div>
+        <div style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.8rem'}}>
+            <thead>
+              <tr style={{background:C.navy,color:C.white}}>
+                {['Unit','Headcount','Revenue','Staff Cost','Revenue/Head','Staff Cost %'].map(h=>(
+                  <th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.75rem'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {result.allocUnits.map((u,i)=>{
+                const pl = result.unitPL[u.id]
+                if (!pl) return null
+                return (
+                  <tr key={u.id} style={{background:i%2===0?C.cream:C.white}}>
+                    <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{u.name}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace'}}>{u.headcount}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace'}}>{fmt(pl.ann_rev,cc)}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',color:C.red}}>{fmt(pl.ann_staff,cc)}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',color:C.teal}}>{fmt(pl.staff_efficiency.revenue_per_head,cc)}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',color:pl.staff_efficiency.staff_cost_pct<0.3?C.green:pl.staff_efficiency.staff_cost_pct<0.5?C.amber:C.red,fontWeight:700}}>{pct(pl.staff_efficiency.staff_cost_pct)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <PLTable title="Monthly Staff Cost Trend" rows={[
+        {label:'Total Staff Costs',values:result.allocUnits.reduce((acc,u)=>{
+          const pl = result.unitPL[u.id]
+          return pl ? acc.map((v,m)=>v+pl.staff[m]) : acc
+        },Array(months.length).fill(0)),bold:true},
+      ]} months={months} cc={cc} showExport/>
+    </div>
+  )
+}
+
+// ── SCENARIOS TAB ────────────────────────────────────────────
+function ScenariosTab({config,result,months,cc,P,onSave}) {
+  const scenarios = config.settings.scenarios||[]
+  const activeId = scenarios.find(s=>s.active)?.id||'base'
+
+  function setActiveScenario(id:string) {
+    onSave({...config,settings:{...config.settings,
+      scenarios:scenarios.map(s=>({...s,active:s.id===id}))
+    }})
+  }
+
+  return (
+    <div>
+      <div style={card}>
+        <div style={secH}>Scenarios</div>
+        {scenarios.map(sc=>(
+          <div key={sc.id} style={{display:'flex',alignItems:'center',gap:'1rem',padding:'0.75rem',border:`1px solid ${sc.active?C.cyan:C.border}`,borderRadius:6,marginBottom:'0.5rem',background:sc.active?'#EBF8FF':C.white}}>
+            <input type="radio" checked={sc.active} onChange={()=>setActiveScenario(sc.id)} style={{cursor:'pointer'}}/>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>{sc.label}</div>
+              <div style={{fontSize:'0.75rem',color:C.slate}}>Revenue ×{sc.rev_mult} · Costs ×{sc.cost_mult}</div>
+            </div>
+            {sc.active&&<Badge text="Active" color={C.cyan}/>}
+          </div>
+        ))}
+      </div>
+      {result&&(
+        <PLTable title="Scenario P&L" rows={[
+          {label:'Revenue',values:result.con.rev,bold:true},
+          {label:'Gross Profit',values:result.con.gp,highlight:true},
+          {label:'EBITDA',values:result.con.ebitda,bold:true,highlight:true},
+        ]} months={months} cc={cc} showExport/>
+      )}
+    </div>
+  )
+}
+// ── ACTUALS TAB ───────────────────────────────────────────────
+function ActualsTab({config,months,cc,P,onSave}) {
+  const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active&&(!P.unitIds.length||P.unitIds.includes(u.id)))?.id||'')
+  const [selPeriod, setSelPeriod] = useState(()=>{
+    const d=new Date(); d.setDate(1)
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`
+  })
+  const [lineValues, setLineValues] = useState<Record<string,number>>({})
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [allActuals, setAllActuals] = useState<any[]>([])
+
+  // Rolling 24 months
+  const periodMonths = Array.from({length:24},(_,i)=>{
+    const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-12+i)
+    return {value:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`,
+      label:d.toLocaleString('en-GB',{month:'long',year:'numeric'})}
+  })
+
+  const visibleUnits = config.business_units.filter(u=>u.active&&(!P.unitIds.length||P.unitIds.includes(u.id)||P.role==='super_coach'||P.role==='ceo'||P.role==='finance_manager'))
+  const canSeeAll = P.role==='super_coach'||P.role==='ceo'||P.role==='finance_manager'
+
+  useEffect(()=>{
+    if (!selUnit||!selPeriod) return
+    setLoading(true)
+    supabase.from('generic_actuals').select('*')
+      .eq('client_id',config.client_id).eq('unit_id',selUnit).eq('period',selPeriod)
+      .maybeSingle()
+      .then(({data})=>{
+        setLineValues(data?.line_values||{})
+        setSubmitted(data?.submitted||false)
+        setLoading(false)
+      })
+  },[selUnit,selPeriod])
+
+  useEffect(()=>{
+    if (!canSeeAll) return
+    supabase.from('generic_actuals').select('*')
+      .eq('client_id',config.client_id).eq('period',selPeriod)
+      .then(({data})=>setAllActuals(data||[]))
+  },[selPeriod,canSeeAll])
+
+  async function save(submit=false) {
+    setSaving(true)
+    const {error} = await supabase.from('generic_actuals').upsert({
+      client_id:config.client_id, unit_id:selUnit, period:selPeriod,
+      line_values:lineValues, submitted:submit||(submitted&&!canSeeAll),
+      submitted_at:submit?new Date().toISOString():undefined,
+      submitted_by:submit?P.fullName:undefined,
+      entered_by:P.fullName, entered_at:new Date().toISOString(),
+      updated_at:new Date().toISOString(),
+    },{onConflict:'client_id,unit_id,period'})
+    if (!error) { if(submit) setSubmitted(true) }
+    setSaving(false)
+  }
+
+  const lines = config.plan_lines.filter(l=>l.unit_id===selUnit&&l.active&&!l.name.startsWith('Add '))
+  const sections:[string,string][] = [['revenue','Revenue'],['cost_of_sales','Cost of Sales'],['staff','Staff'],['direct_opex','Overheads']]
+
+  const totalRev = lines.filter(l=>l.category==='revenue').reduce((s,l)=>s+Number(lineValues[l.id]||0),0)
+  const totalCost = lines.filter(l=>l.category!=='revenue').reduce((s,l)=>s+Number(lineValues[l.id]||0),0)
+
+  return (
+    <div>
+      {/* Selectors */}
+      <div style={{display:'flex',gap:'0.75rem',flexWrap:'wrap',alignItems:'center',marginBottom:'1.25rem'}}>
+        {canSeeAll&&(
+          <select style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.38rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,background:C.white,color:C.navy}}
+            value={selUnit} onChange={e=>setSelUnit(e.target.value)}>
+            {visibleUnits.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+        )}
+        <select style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.38rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,background:C.white,color:C.navy}}
+          value={selPeriod} onChange={e=>setSelPeriod(e.target.value)}>
+          {periodMonths.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}
+        </select>
+        {submitted&&<Badge text="Submitted" color={C.green}/>}
+      </div>
+
+      {/* All units summary */}
+      {canSeeAll&&allActuals.length>0&&(
+        <div style={card}>
+          <div style={{fontWeight:700,color:C.navy,marginBottom:'0.75rem',fontSize:'0.88rem'}}>All Units — {periodMonths.find(m=>m.value===selPeriod)?.label}</div>
+          <div style={{overflowX:'auto'}}>
+            <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.78rem',fontFamily:'monospace'}}>
+              <thead><tr style={{background:C.navy,color:C.white}}>
+                {['Business Unit','Revenue','Costs','Gross Profit','Status'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600}}>{h}</th>)}
+              </tr></thead>
+              <tbody>{allActuals.map((a,i)=>{
+                const aLines = config.plan_lines.filter(l=>l.unit_id===a.unit_id&&l.active)
+                const rev = aLines.filter(l=>l.category==='revenue').reduce((s,l)=>s+Number(a.line_values?.[l.id]||0),0)
+                const cost = aLines.filter(l=>l.category!=='revenue').reduce((s,l)=>s+Number(a.line_values?.[l.id]||0),0)
+                const gp = rev-cost
+                return (
+                  <tr key={a.id} style={{background:i%2===0?C.cream:C.white,cursor:'pointer'}} onClick={()=>setSelUnit(a.unit_id)}>
+                    <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{config.business_units.find(u=>u.id===a.unit_id)?.name||a.unit_id}</td>
+                    <td style={{padding:'8px 10px',color:C.green}}>{fmt(rev,cc)}</td>
+                    <td style={{padding:'8px 10px',color:C.red}}>{fmt(cost,cc)}</td>
+                    <td style={{padding:'8px 10px',fontWeight:700,color:gp>=0?C.green:C.red}}>{fmt(gp,cc)}</td>
+                    <td style={{padding:'8px 10px'}}><Badge text={a.submitted?'Submitted':'Draft'} color={a.submitted?C.green:C.amber}/></td>
+                  </tr>
+                )
+              })}</tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Entry form */}
+      <div style={card}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem',flexWrap:'wrap',gap:'0.5rem'}}>
+          <div style={{fontWeight:700,color:C.navy,fontSize:'0.9rem'}}>{config.business_units.find(u=>u.id===selUnit)?.name}</div>
+          <div style={{display:'flex',gap:'0.5rem'}}>
+            <div style={{fontFamily:'monospace',fontSize:'0.75rem',color:C.slate}}>Revenue: <strong style={{color:C.green}}>{fmt(totalRev,cc)}</strong> · Costs: <strong style={{color:C.red}}>{fmt(totalCost,cc)}</strong> · GP: <strong style={{color:totalRev-totalCost>=0?C.green:C.red}}>{fmt(totalRev-totalCost,cc)}</strong></div>
+          </div>
+        </div>
+        {loading?<Spinner/>:(
+          <>
+            {sections.map(([cat,label])=>{
+              const sLines = lines.filter(l=>l.category===cat)
+              if (sLines.length===0) return null
+              const sTotal = sLines.reduce((s,l)=>s+Number(lineValues[l.id]||0),0)
+              return (
+                <div key={cat} style={{marginBottom:'1.5rem'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:`2px solid ${cat==='revenue'?C.green:C.red}`,paddingBottom:'0.4rem',marginBottom:'0.75rem'}}>
+                    <div style={{fontFamily:'monospace',fontSize:'0.68rem',letterSpacing:'0.1em',color:cat==='revenue'?C.green:C.red,textTransform:'uppercase',fontWeight:700}}>{label}</div>
+                    <div style={{fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,color:cat==='revenue'?C.green:C.red}}>{fmt(sTotal,cc)}</div>
+                  </div>
+                  {sLines.map(l=>(
+                    <div key={l.id} style={{display:'grid',gridTemplateColumns:'1fr 180px',alignItems:'center',gap:'0.75rem',marginBottom:'0.5rem',padding:'0.45rem 0.75rem',background:C.cream,borderRadius:4}}>
+                      <label style={{fontWeight:600,fontSize:'0.82rem',color:C.navy,lineHeight:1.3}}>{l.name}</label>
+                      <input type="number"
+                        style={{width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'monospace',background:submitted&&!canSeeAll?'#F5F5F5':C.white,color:C.navy,textAlign:'right',boxSizing:'border-box'}}
+                        value={lineValues[l.id]||''} placeholder="0"
+                        disabled={submitted&&!canSeeAll}
+                        onChange={e=>setLineValues(v=>({...v,[l.id]:Number(e.target.value)}))}/>
+                    </div>
+                  ))}
+                </div>
+              )
+            })}
+            <div style={{display:'flex',gap:'0.75rem',flexWrap:'wrap',marginTop:'1rem'}}>
+              <button style={solidBtn(C.navy)} disabled={saving} onClick={()=>save(false)}>{saving?'Saving...':'Save Draft'}</button>
+              {!submitted&&P.canEnterActuals&&(
+                <button style={solidBtn(C.green)} disabled={saving} onClick={()=>save(true)}>Submit for Approval</button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── MANAGEMENT EVENTS TAB ─────────────────────────────────────
+function EventsTab({clientId,config,cc,P}) {
+  const [events, setEvents] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [analysing, setAnalysing] = useState<string|null>(null)
+  const [form, setForm] = useState({name:'',event_type:'promotion',date:new Date().toISOString().split('T')[0],cost:0,description:'',revenue_before:0,revenue_after:0,period_weeks:4,unit_id:''})
+
+  useEffect(()=>{
+    supabase.from('management_events').select('*').eq('client_id',clientId).order('date',{ascending:false})
+      .then(({data})=>{ setEvents(data||[]); setLoading(false) })
+  },[clientId])
+
+  async function save() {
+    const {data,error} = await supabase.from('management_events').insert([{...form,client_id:clientId,created_at:new Date().toISOString(),updated_at:new Date().toISOString()}]).select().single()
+    if (!error&&data) { setEvents(e=>[data,...e]); setShowForm(false) }
+  }
+
+  async function analyseEvent(evt:any) {
+    setAnalysing(evt.id)
+    try {
+      const prompt = `You are a business analyst for an MSME in Africa. Analyse this marketing/promotion event:
+Business: ${config.business_name}
+Event: ${evt.name} (${evt.event_type})
+Date: ${evt.date}
+Cost: ${cc} ${evt.cost?.toLocaleString()}
+Description: ${evt.description}
+Revenue ${evt.period_weeks} weeks before: ${cc} ${evt.revenue_before?.toLocaleString()}
+Revenue ${evt.period_weeks} weeks after: ${cc} ${evt.revenue_after?.toLocaleString()}
+
+Provide: 1) ROI assessment 2) Whether the event was effective 3) Recommendation for future events. Be specific and practical. Write for a business owner who is not a financial expert. Maximum 200 words.`
+
+      const response = await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+      })
+      const data = await response.json()
+      const text = data.content?.[0]?.text||'Analysis unavailable'
+      await supabase.from('management_events').update({ai_analysis:text,ai_analysed_at:new Date().toISOString()}).eq('id',evt.id)
+      setEvents(e=>e.map(ev=>ev.id===evt.id?{...ev,ai_analysis:text}:ev))
+    } catch(e) { alert('Analysis failed') }
+    setAnalysing(null)
+  }
+
+  if (loading) return <Spinner/>
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem'}}>
+        <div style={secH}>Promotion & Marketing Events</div>
+        <button style={addBtn()} onClick={()=>setShowForm(!showForm)}>+ Add Event</button>
+      </div>
+      {showForm&&(
+        <div style={{...card,border:`1px solid ${C.cyan}`}}>
+          <div style={fGrid}>
+            <div><label style={lbl}>Event Name</label><input style={inp} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></div>
+            <div><label style={lbl}>Type</label><select style={inp} value={form.event_type} onChange={e=>setForm(f=>({...f,event_type:e.target.value}))}>
+              {['promotion','marketing','farmer_day','trade_fair','demonstration','other'].map(t=><option key={t} value={t}>{t.replace('_',' ')}</option>)}
+            </select></div>
+            <div><label style={lbl}>Business Unit</label><select style={inp} value={form.unit_id} onChange={e=>setForm(f=>({...f,unit_id:e.target.value}))}>
+              <option value="">All units</option>
+              {config.business_units.filter(u=>u.active).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+            </select></div>
+            <div><label style={lbl}>Date</label><input type="date" style={inp} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></div>
+            <div><label style={lbl}>Cost ({cc})</label><input type="number" style={inp} value={form.cost||''} onChange={e=>setForm(f=>({...f,cost:Number(e.target.value)}))}/></div>
+            <div><label style={lbl}>Comparison Window (weeks)</label><input type="number" style={inp} value={form.period_weeks} onChange={e=>setForm(f=>({...f,period_weeks:Number(e.target.value)}))}/></div>
+            <div><label style={lbl}>Revenue Before ({cc})</label><input type="number" style={inp} value={form.revenue_before||''} onChange={e=>setForm(f=>({...f,revenue_before:Number(e.target.value)}))}/></div>
+            <div><label style={lbl}>Revenue After ({cc})</label><input type="number" style={inp} value={form.revenue_after||''} onChange={e=>setForm(f=>({...f,revenue_after:Number(e.target.value)}))}/></div>
+            <div style={{gridColumn:'1/-1'}}><label style={lbl}>Description</label><textarea style={{...inp,minHeight:60,resize:'vertical'}} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></div>
+          </div>
+          <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
+            <button style={solidBtn()} onClick={save}>Save Event</button>
+            <button style={addBtn(true,C.slate)} onClick={()=>setShowForm(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {events.length===0&&!showForm&&<div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No events recorded yet.</div>}
+      {events.map(evt=>{
+        const roi = evt.cost>0 ? (evt.revenue_after-evt.revenue_before-evt.cost)/evt.cost : null
+        const lift = evt.revenue_before>0 ? (evt.revenue_after-evt.revenue_before)/evt.revenue_before : null
+        return (
+          <div key={evt.id} style={{...card,borderLeft:`4px solid ${roi&&roi>0?C.green:roi&&roi<0?C.red:C.border}`}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'0.5rem',marginBottom:'0.75rem'}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:'0.9rem',color:C.navy}}>{evt.name}</div>
+                <div style={{fontSize:'0.75rem',color:C.slate}}>{evt.date} · {evt.event_type.replace('_',' ')} · Cost: {fmt(evt.cost,cc)}</div>
+              </div>
+              <div style={{display:'flex',gap:'0.5rem',alignItems:'center'}}>
+                {roi!==null&&<Badge text={`ROI: ${(roi*100).toFixed(0)}%`} color={roi>0?C.green:C.red}/>}
+                {lift!==null&&<Badge text={`Lift: ${(lift*100).toFixed(0)}%`} color={lift>0?C.teal:C.red}/>}
+                <button style={addBtn(true,C.purple)} disabled={analysing===evt.id} onClick={()=>analyseEvent(evt)}>
+                  {analysing===evt.id?'Analysing...':'AI Analysis'}
+                </button>
+              </div>
+            </div>
+            {evt.revenue_before>0&&(
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'0.75rem',marginBottom:'0.75rem'}}>
+                <div style={{background:C.lightBg,borderRadius:5,padding:'0.6rem'}}>
+                  <div style={{fontSize:'0.7rem',color:C.slate}}>Revenue Before</div>
+                  <div style={{fontFamily:'monospace',fontWeight:700,color:C.navy}}>{fmt(evt.revenue_before,cc)}</div>
+                </div>
+                <div style={{background:C.lightBg,borderRadius:5,padding:'0.6rem'}}>
+                  <div style={{fontSize:'0.7rem',color:C.slate}}>Revenue After</div>
+                  <div style={{fontFamily:'monospace',fontWeight:700,color:C.navy}}>{fmt(evt.revenue_after,cc)}</div>
+                </div>
+                <div style={{background:C.lightBg,borderRadius:5,padding:'0.6rem'}}>
+                  <div style={{fontSize:'0.7rem',color:C.slate}}>Revenue Change</div>
+                  <div style={{fontFamily:'monospace',fontWeight:700,color:evt.revenue_after>=evt.revenue_before?C.green:C.red}}>{fmt(evt.revenue_after-evt.revenue_before,cc)}</div>
+                </div>
+              </div>
+            )}
+            {evt.description&&<p style={{fontSize:'0.82rem',color:C.slate,margin:'0 0 0.5rem'}}>{evt.description}</p>}
+            {evt.ai_analysis&&(
+              <div style={{background:'#F0F4FF',borderRadius:6,padding:'0.85rem',borderLeft:`3px solid ${C.purple}`,marginTop:'0.5rem'}}>
+                <div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.purple,marginBottom:'0.4rem',letterSpacing:'0.08em'}}>AI ANALYSIS</div>
+                <div style={{fontSize:'0.83rem',color:C.navy,lineHeight:1.7}}>{evt.ai_analysis}</div>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+// ── AI HEALTH CHECK TAB ───────────────────────────────────────
+function AIHealthTab({clientId,config,result,cc,P}) {
+  const [reports, setReports] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
+
+  useEffect(()=>{
+    supabase.from('ai_health_checks').select('*').eq('client_id',clientId).order('period',{ascending:false}).limit(12)
+      .then(({data})=>{ setReports(data||[]); setLoading(false) })
+  },[clientId])
+
+  async function generateReport(period?:string) {
+    if (!result) { alert('Set up your financial plan first.'); return }
+    setGenerating(true)
+    const m = result.metrics
+    const targetPeriod = period || new Date().toISOString().slice(0,7)+'-01'
+    try {
+      const prompt = `You are a financial health advisor for an African MSME. Produce a monthly business health check report for ${config.business_name}.
+
+Financial summary:
+- Total planned revenue: ${cc} ${m.total_revenue.toLocaleString()}
+- Gross profit: ${cc} ${m.total_gp.toLocaleString()} (${(m.gross_margin*100).toFixed(1)}% margin)
+- EBITDA: ${cc} ${m.total_ebitda.toLocaleString()} (${(m.net_margin*100).toFixed(1)}% margin)
+- Minimum cash position: ${cc} ${m.min_cash.toLocaleString()} in month ${m.min_cash_month}
+- Break-even revenue needed: ${cc} ${m.business_breakeven.toLocaleString()}
+- Staff cost as % of revenue: ${(m.staff_cost_pct*100).toFixed(1)}%
+- Total headcount: ${m.total_headcount}
+
+Business units: ${config.business_units.filter(u=>u.active).map(u=>u.name).join(', ')}
+
+Write a clear, plain-English health check report for the CEO. Include:
+1. Overall business health status (Green/Amber/Red with reason)
+2. Two or three things going well
+3. Two or three areas of concern
+4. Three specific actions the CEO should take this month
+
+Write at a level suitable for a business owner who is not a financial expert. Maximum 300 words. Be direct and specific.`
+
+      const response = await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+      })
+      const data = await response.json()
+      const text = data.content?.[0]?.text||'Report unavailable'
+      const {data:saved} = await supabase.from('ai_health_checks').upsert({
+        client_id:clientId, period:targetPeriod, report_text:text,
+        triggered_by:'manual', generated_at:new Date().toISOString(), visible_to_ceo:true,
+      },{onConflict:'client_id,period'}).select().single()
+      if (saved) setReports(r=>[saved,...r.filter(x=>x.period!==targetPeriod)])
+    } catch(e) { alert('Report generation failed') }
+    setGenerating(false)
+  }
+
+  if (loading) return <Spinner/>
+  const latest = reports[0]
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem'}}>
+        <div style={secH}>AI Business Health Check</div>
+        <button style={solidBtn(C.purple)} disabled={generating} onClick={()=>generateReport()}>
+          {generating?'Generating...':'Generate This Month'}
+        </button>
+      </div>
+      {!latest&&!generating&&(
+        <div style={{...card,textAlign:'center',padding:'2.5rem'}}>
+          <div style={{fontSize:'1.5rem',marginBottom:'0.75rem'}}>🩺</div>
+          <div style={{fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>No health checks yet</div>
+          <p style={{color:C.slate,fontSize:'0.88rem'}}>Click "Generate This Month" to get an AI-powered assessment of your business health.</p>
+        </div>
+      )}
+      {reports.map(r=>(
+        <div key={r.id} style={card}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+            <div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,color:C.navy}}>
+              Health Check — {new Date(r.period).toLocaleString('en-GB',{month:'long',year:'numeric'})}
+            </div>
+            <div style={{fontSize:'0.75rem',color:C.slate}}>Generated {new Date(r.generated_at).toLocaleDateString('en-GB')}</div>
+          </div>
+          <div style={{fontSize:'0.88rem',color:C.navy,lineHeight:1.8,whiteSpace:'pre-wrap'}}>{r.report_text}</div>
+          {P.role==='super_coach'&&(
+            <div style={{marginTop:'1rem',paddingTop:'0.75rem',borderTop:`1px solid ${C.border}`}}>
+              <button style={addBtn(true,C.amber)} onClick={()=>generateReport(r.period)}>Regenerate</button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── INVESTMENT READINESS TAB ──────────────────────────────────
+function InvestmentTab({clientId,config,result,cc,P}) {
+  const [assessments, setAssessments] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
+
+  useEffect(()=>{
+    supabase.from('investment_readiness').select('*').eq('client_id',clientId).order('generated_at',{ascending:false}).limit(5)
+      .then(({data})=>{ setAssessments(data||[]); setLoading(false) })
+  },[clientId])
+
+  async function generate() {
+    if (!result) { alert('Set up your financial plan first.'); return }
+    setGenerating(true)
+    const m = result.metrics
+    try {
+      const prompt = `You are an investment readiness advisor for African MSMEs. Assess the investment and credit readiness of ${config.business_name}.
+
+Financial data:
+- Annual revenue: ${cc} ${m.total_revenue.toLocaleString()}
+- Gross margin: ${(m.gross_margin*100).toFixed(1)}%
+- EBITDA: ${cc} ${m.total_ebitda.toLocaleString()} (${(m.net_margin*100).toFixed(1)}% margin)
+- Break-even revenue: ${cc} ${m.business_breakeven.toLocaleString()}
+- Current cash position (month 1): ${cc} ${result.cf.close[0].toLocaleString()}
+- Staff cost ratio: ${(m.staff_cost_pct*100).toFixed(1)}%
+- Business units: ${config.business_units.filter(u=>u.active).length}
+
+Score the business on investment readiness from 0-100 and provide:
+1. Overall readiness score and classification (Not Ready / Early Stage / Developing / Ready)
+2. Top three strengths from an investor/lender perspective
+3. Top three gaps that must be addressed before seeking investment
+4. Specific recommendations for each gap
+5. Estimated timeline to investment readiness if recommendations are followed
+
+Write clearly for a business owner. Maximum 350 words.`
+
+      const response = await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+      })
+      const data = await response.json()
+      const text = data.content?.[0]?.text||'Assessment unavailable'
+      // Extract score from text (look for number)
+      const scoreMatch = text.match(/(\d+)\s*(?:\/\s*100|out of 100|%)/i)
+      const score = scoreMatch ? parseInt(scoreMatch[1]) : 50
+      const {data:saved} = await supabase.from('investment_readiness').insert([{
+        client_id:clientId, assessment_text:text, readiness_score:score,
+        generated_at:new Date().toISOString(),
+      }]).select().single()
+      if (saved) setAssessments(a=>[saved,...a])
+    } catch(e) { alert('Assessment failed') }
+    setGenerating(false)
+  }
+
+  if (loading) return <Spinner/>
+  const latest = assessments[0]
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem'}}>
+        <div style={secH}>Investment Readiness Assessment</div>
+        <button style={solidBtn(C.amber)} disabled={generating} onClick={generate}>
+          {generating?'Assessing...':'Run Assessment'}
+        </button>
+      </div>
+      {latest&&(
+        <div style={kpiGrid}>
+          <KPI label="Readiness Score" value={`${latest.readiness_score}/100`}
+            color={latest.readiness_score>=70?C.green:latest.readiness_score>=40?C.amber:C.red}
+            sub={latest.readiness_score>=70?'Ready':latest.readiness_score>=40?'Developing':'Not Ready'}/>
+          <KPI label="Last Assessed" value={new Date(latest.generated_at).toLocaleDateString('en-GB')} color={C.slate}/>
+        </div>
+      )}
+      {!latest&&!generating&&(
+        <div style={{...card,textAlign:'center',padding:'2.5rem'}}>
+          <div style={{fontSize:'1.5rem',marginBottom:'0.75rem'}}>📊</div>
+          <div style={{fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>No assessments yet</div>
+          <p style={{color:C.slate,fontSize:'0.88rem'}}>Run an assessment to see whether this business is ready for credit or investment.</p>
+        </div>
+      )}
+      {assessments.map(a=>(
+        <div key={a.id} style={card}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+            <div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,color:C.navy}}>Assessment</div>
+            <div style={{display:'flex',gap:'0.5rem',alignItems:'center'}}>
+              <Badge text={`Score: ${a.readiness_score}/100`} color={a.readiness_score>=70?C.green:a.readiness_score>=40?C.amber:C.red}/>
+              <span style={{fontSize:'0.75rem',color:C.slate}}>{new Date(a.generated_at).toLocaleDateString('en-GB')}</span>
+            </div>
+          </div>
+          <div style={{fontSize:'0.88rem',color:C.navy,lineHeight:1.8,whiteSpace:'pre-wrap'}}>{a.assessment_text}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── SPEND REQUESTS TAB ────────────────────────────────────────
+function SpendRequestsTab({clientId,config,cc,P}) {
+  const [requests, setRequests] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({unit_id:'',category:'direct_opex',description:'',amount:0})
+
+  useEffect(()=>{
+    let q = supabase.from('generic_spend_requests').select('*').eq('client_id',clientId).order('created_at',{ascending:false})
+    if (P.role==='unit_head'||P.role==='accounts_assistant') q = q.eq('requested_by',P.userId)
+    q.then(({data})=>{ setRequests(data||[]); setLoading(false) })
+  },[clientId,P.userId])
+
+  async function submit() {
+    if (!form.description||!form.amount) return
+    const {data,error} = await supabase.from('generic_spend_requests').insert([{
+      client_id:clientId, ...form, requested_by:P.userId, requested_by_name:P.fullName,
+      status:'pending_fm', created_at:new Date().toISOString(), updated_at:new Date().toISOString(),
+      currency:config.currency,
+    }]).select().single()
+    if (!error&&data) { setRequests(r=>[data,...r]); setShowForm(false); setForm({unit_id:'',category:'direct_opex',description:'',amount:0}) }
+  }
+
+  const statusColor = (s:string) => s==='approved'?C.green:s==='rejected'?C.red:s==='pending_ceo'?C.cyan:C.amber
+
+  if (loading) return <Spinner/>
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem'}}>
+        <div style={secH}>Spend Requests</div>
+        {P.canSubmitRequest&&<button style={addBtn()} onClick={()=>setShowForm(!showForm)}>+ New Request</button>}
+      </div>
+      {showForm&&(
+        <div style={{...card,border:`1px solid ${C.cyan}`}}>
+          <div style={fGrid}>
+            <div><label style={lbl}>Business Unit</label><select style={inp} value={form.unit_id} onChange={e=>setForm(f=>({...f,unit_id:e.target.value}))}>
+              <option value="">Select unit</option>
+              {config.business_units.filter(u=>u.active&&(!P.unitIds.length||P.unitIds.includes(u.id))).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+            </select></div>
+            <div><label style={lbl}>Category</label><select style={inp} value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}>
+              {['cost_of_sales','staff','direct_opex','shared'].map(c=><option key={c} value={c}>{c.replace('_',' ')}</option>)}
+            </select></div>
+            <div><label style={lbl}>Amount ({cc})</label><input type="number" style={inp} value={form.amount||''} onChange={e=>setForm(f=>({...f,amount:Number(e.target.value)}))}/></div>
+            <div style={{gridColumn:'1/-1'}}><label style={lbl}>Description</label><textarea style={{...inp,minHeight:60,resize:'vertical'}} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></div>
+          </div>
+          <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
+            <button style={solidBtn()} onClick={submit}>Submit Request</button>
+            <button style={addBtn(true,C.slate)} onClick={()=>setShowForm(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {requests.length===0&&!showForm&&<div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No requests yet.</div>}
+      {requests.map(r=>(
+        <div key={r.id} style={{...card,borderLeft:`4px solid ${statusColor(r.status)}`}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'0.5rem'}}>
+            <div>
+              <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>{r.description}</div>
+              <div style={{fontSize:'0.75rem',color:C.slate}}>
+                {config.business_units.find(u=>u.id===r.unit_id)?.name||'General'} · {r.category?.replace('_',' ')} · {r.requested_by_name} · {new Date(r.created_at).toLocaleDateString('en-GB')}
+              </div>
+            </div>
+            <div style={{display:'flex',gap:'0.5rem',alignItems:'center'}}>
+              <span style={{fontFamily:'monospace',fontWeight:700,color:C.navy}}>{fmt(r.amount,cc)}</span>
+              <Badge text={r.status.replace('_',' ')} color={statusColor(r.status)}/>
+            </div>
+          </div>
+          {r.fm_note&&<div style={{marginTop:'0.5rem',fontSize:'0.8rem',color:C.slate,fontStyle:'italic'}}>FM: {r.fm_note}</div>}
+          {r.ceo_note&&<div style={{marginTop:'0.25rem',fontSize:'0.8rem',color:C.slate,fontStyle:'italic'}}>CEO: {r.ceo_note}</div>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── APPROVALS TAB ─────────────────────────────────────────────
+function ApprovalsTab({clientId,config,cc,P}) {
+  const [requests, setRequests] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [notes, setNotes] = useState<Record<string,string>>({})
+
+  const isFM = P.role==='finance_manager'||P.role==='super_coach'
+  const isCEO = P.role==='ceo'||P.role==='super_coach'
+  // Check delegation
+  const delegatedApprover = config.settings?.delegated_approver_id === P.userId
+
+  useEffect(()=>{
+    supabase.from('generic_spend_requests').select('*').eq('client_id',clientId)
+      .in('status',['pending_fm','pending_ceo']).order('created_at',{ascending:false})
+      .then(({data})=>{ setRequests(data||[]); setLoading(false) })
+  },[clientId])
+
+  async function fmAction(id:string, forward:boolean) {
+    const note = notes[id]||''
+    const newStatus = forward ? 'pending_ceo' : 'rejected'
+    const {data} = await supabase.from('generic_spend_requests').update({
+      status:newStatus, fm_note:note,
+      fm_reviewed_at:new Date().toISOString(), fm_reviewed_by:P.fullName,
+      updated_at:new Date().toISOString(),
+    }).eq('id',id).select().single()
+    if (data) setRequests(r=>r.filter(x=>x.id!==id))
+  }
+
+  async function ceoAction(id:string, approved:boolean) {
+    const note = notes[id]||''
+    const {data} = await supabase.from('generic_spend_requests').update({
+      status:approved?'approved':'rejected', ceo_note:note,
+      ceo_decided_at:new Date().toISOString(), ceo_decided_by:P.fullName,
+      updated_at:new Date().toISOString(),
+    }).eq('id',id).select().single()
+    if (data) setRequests(r=>r.filter(x=>x.id!==id))
+  }
+
+  const pendingFM = requests.filter(r=>r.status==='pending_fm')
+  const pendingCEO = requests.filter(r=>r.status==='pending_ceo')
+
+  if (loading) return <Spinner/>
+  return (
+    <div>
+      <div style={secH}>Approvals</div>
+      {isFM&&pendingFM.length>0&&(
+        <div style={{...card,border:`1px solid ${C.amber}`}}>
+          <div style={{fontWeight:700,color:C.amber,marginBottom:'0.75rem'}}>Pending FM Review ({pendingFM.length})</div>
+          {pendingFM.map(r=>(
+            <div key={r.id} style={{border:`1px solid ${C.border}`,borderRadius:6,padding:'0.85rem',marginBottom:'0.75rem',background:C.white}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.5rem'}}>
+                <div>
+                  <div style={{fontWeight:700,color:C.navy}}>{r.description}</div>
+                  <div style={{fontSize:'0.75rem',color:C.slate}}>{config.business_units.find(u=>u.id===r.unit_id)?.name||'General'} · {r.requested_by_name} · {new Date(r.created_at).toLocaleDateString('en-GB')}</div>
+                </div>
+                <span style={{fontFamily:'monospace',fontWeight:700,color:C.navy}}>{fmt(r.amount,cc)}</span>
+              </div>
+              <textarea style={{...inp,minHeight:50,resize:'vertical',marginBottom:'0.5rem'}} placeholder="Add note (optional)" value={notes[r.id]||''} onChange={e=>setNotes(n=>({...n,[r.id]:e.target.value}))}/>
+              <div style={{display:'flex',gap:'0.5rem'}}>
+                <button style={solidBtn(C.cyan,true)} onClick={()=>fmAction(r.id,true)}>Forward to CEO</button>
+                <button style={solidBtn(C.red,true)} onClick={()=>fmAction(r.id,false)}>Reject</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {(isCEO||delegatedApprover)&&pendingCEO.length>0&&(
+        <div style={{...card,border:`1px solid ${C.cyan}`}}>
+          <div style={{fontWeight:700,color:C.navy,marginBottom:'0.75rem'}}>Awaiting CEO Approval ({pendingCEO.length})</div>
+          {pendingCEO.map(r=>(
+            <div key={r.id} style={{border:`1px solid ${C.border}`,borderRadius:6,padding:'0.85rem',marginBottom:'0.75rem',background:C.white}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.5rem'}}>
+                <div>
+                  <div style={{fontWeight:700,color:C.navy}}>{r.description}</div>
+                  <div style={{fontSize:'0.75rem',color:C.slate}}>{config.business_units.find(u=>u.id===r.unit_id)?.name||'General'} · {r.requested_by_name} · {new Date(r.created_at).toLocaleDateString('en-GB')}</div>
+                  {r.fm_note&&<div style={{fontSize:'0.78rem',color:C.slate,fontStyle:'italic',marginTop:'0.25rem'}}>FM note: {r.fm_note}</div>}
+                </div>
+                <span style={{fontFamily:'monospace',fontWeight:700,color:C.navy}}>{fmt(r.amount,cc)}</span>
+              </div>
+              <textarea style={{...inp,minHeight:50,resize:'vertical',marginBottom:'0.5rem'}} placeholder="Add note (optional)" value={notes[r.id]||''} onChange={e=>setNotes(n=>({...n,[r.id]:e.target.value}))}/>
+              <div style={{display:'flex',gap:'0.5rem'}}>
+                <button style={solidBtn(C.green,true)} onClick={()=>ceoAction(r.id,true)}>Approve</button>
+                <button style={solidBtn(C.red,true)} onClick={()=>ceoAction(r.id,false)}>Reject</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {pendingFM.length===0&&pendingCEO.length===0&&(
+        <div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No pending approvals.</div>
+      )}
+    </div>
+  )
+}
+// ── TEAM TAB ─────────────────────────────────────────────────
+function TeamTab({clientId,config,P}) {
+  const [members, setMembers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showInvite, setShowInvite] = useState(false)
+  const [inviteForm, setInviteForm] = useState({email:'',full_name:'',role:'unit_head',unit_ids:[] as string[]})
+  const [saving, setSaving] = useState(false)
+
+  useEffect(()=>{
+    supabase.from('user_profiles').select('id,role,full_name,email,assigned_unit_ids,status')
+      .eq('client_id',clientId)
+      .then(({data})=>{ setMembers(data||[]); setLoading(false) })
+  },[clientId])
+
+  async function invite() {
+    if (!inviteForm.email||!inviteForm.full_name) return
+    setSaving(true)
+    // Insert pending profile -- actual auth invite handled separately
+    const {data,error} = await supabase.from('user_profiles').insert([{
+      client_id:clientId, email:inviteForm.email, full_name:inviteForm.full_name,
+      role:inviteForm.role, assigned_unit_ids:inviteForm.unit_ids,
+      status:'invited', invited_at:new Date().toISOString(), invited_by:P.userId,
+    }]).select().single()
+    if (!error&&data) { setMembers(m=>[...m,data]); setShowInvite(false) }
+    setSaving(false)
+  }
+
+  const roles = [['ceo','CEO'],['finance_manager','Finance Manager'],['unit_head','Unit Head'],['accounts_assistant','Accounts Assistant']]
+
+  if (loading) return <Spinner/>
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem'}}>
+        <div style={secH}>Team</div>
+        {P.canManageTeam&&<button style={addBtn()} onClick={()=>setShowInvite(!showInvite)}>+ Invite Member</button>}
+      </div>
+      {showInvite&&(
+        <div style={{...card,border:`1px solid ${C.cyan}`}}>
+          <div style={fGrid}>
+            <div><label style={lbl}>Full Name</label><input style={inp} value={inviteForm.full_name} onChange={e=>setInviteForm(f=>({...f,full_name:e.target.value}))}/></div>
+            <div><label style={lbl}>Email</label><input type="email" style={inp} value={inviteForm.email} onChange={e=>setInviteForm(f=>({...f,email:e.target.value}))}/></div>
+            <div><label style={lbl}>Role</label><select style={inp} value={inviteForm.role} onChange={e=>setInviteForm(f=>({...f,role:e.target.value}))}>
+              {roles.map(([v,l])=><option key={v} value={v}>{l}</option>)}
+            </select></div>
+          </div>
+          {(inviteForm.role==='unit_head'||inviteForm.role==='accounts_assistant')&&(
+            <div style={{marginTop:'0.75rem'}}>
+              <label style={lbl}>Assign to Units</label>
+              <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',marginTop:'0.3rem'}}>
+                {config.business_units.filter(u=>u.active).map(u=>(
+                  <label key={u.id} style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'0.82rem',cursor:'pointer',padding:'0.3rem 0.6rem',border:`1px solid ${inviteForm.unit_ids.includes(u.id)?C.cyan:C.border}`,borderRadius:4,background:inviteForm.unit_ids.includes(u.id)?'#EBF8FF':C.white}}>
+                    <input type="checkbox" checked={inviteForm.unit_ids.includes(u.id)} onChange={e=>setInviteForm(f=>({...f,unit_ids:e.target.checked?[...f.unit_ids,u.id]:f.unit_ids.filter(id=>id!==u.id)}))}/>{u.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+          <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
+            <button style={solidBtn()} disabled={saving} onClick={invite}>{saving?'Saving...':'Add Member'}</button>
+            <button style={addBtn(true,C.slate)} onClick={()=>setShowInvite(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {members.length===0&&!showInvite&&<div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No team members yet.</div>}
+      {members.map(m=>(
+        <div key={m.id} style={{...card,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.5rem'}}>
+          <div>
+            <div style={{fontWeight:700,color:C.navy}}>{m.full_name}</div>
+            <div style={{fontSize:'0.78rem',color:C.slate}}>{m.email} · {roles.find(r=>r[0]===m.role)?.[1]||m.role}</div>
+            {m.assigned_unit_ids?.length>0&&(
+              <div style={{fontSize:'0.75rem',color:C.slate,marginTop:'0.2rem'}}>
+                Units: {m.assigned_unit_ids.map((id:string)=>config.business_units.find(u=>u.id===id)?.name||id).join(', ')}
+              </div>
+            )}
+          </div>
+          <Badge text={m.status||'active'} color={m.status==='invited'?C.amber:C.green}/>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── SETTINGS TAB ─────────────────────────────────────────────
+function SettingsTab({config,P,onSave}) {
+  const [form, setForm] = useState({...config})
+  const [saving, setSaving] = useState(false)
+  const [activeSection, setActiveSection] = useState('general')
+
+  async function save() {
+    setSaving(true)
+    await onSave(form)
+    setSaving(false)
+  }
+
+  function addUnit() {
+    const id = `unit_${Date.now()}`
+    const newUnit: any = {id,name:'New Unit',short:'Unit',type:'product',color:C.cyan,headcount:0,active:true,sort_order:form.business_units.length}
+    setForm(f=>({...f,business_units:[...f.business_units,newUnit]}))
+  }
+
+  function updateUnit(id:string, updates:any) {
+    setForm(f=>({...f,business_units:f.business_units.map(u=>u.id===id?{...u,...updates}:u)}))
+  }
+
+  function addSubUnit(parentId:string) {
+    const id = `unit_${Date.now()}`
+    const parent = form.business_units.find(u=>u.id===parentId)
+    const newUnit: any = {id,name:`${parent?.name||''} Group 1`,short:'Grp 1',type:parent?.type||'product',color:parent?.color||C.cyan,headcount:0,active:true,parent_id:parentId,sort_order:form.business_units.length}
+    setForm(f=>({...f,business_units:[...f.business_units,newUnit]}))
+  }
+
+  const sections = [['general','General'],['units','Business Units'],['capital','Capital Structure'],['delegation','Approval Delegation']]
+
+  return (
+    <div>
+      <div style={{display:'flex',gap:'0.35rem',marginBottom:'1.25rem',borderBottom:`1px solid ${C.border}`,paddingBottom:'0.5rem'}}>
+        {sections.map(([id,label])=>(
+          <button key={id} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.85rem',border:'none',
+            background:activeSection===id?C.navy:C.white,color:activeSection===id?C.white:C.slate,
+            borderRadius:4,cursor:'pointer'}} onClick={()=>setActiveSection(id)}>{label}</button>
+        ))}
+      </div>
+
+      {activeSection==='general'&&(
+        <div style={card}>
+          <div style={secH}>General Settings</div>
+          <div style={fGrid}>
+            <div><label style={lbl}>Business Name</label><input style={inp} value={form.business_name} onChange={e=>setForm(f=>({...f,business_name:e.target.value}))}/></div>
+            <div><label style={lbl}>Currency</label><select style={inp} value={form.currency} onChange={e=>setForm(f=>({...f,currency:e.target.value}))}>
+              {['UGX','KES','NGN','GHS','USD','GBP'].map(c=><option key={c} value={c}>{c}</option>)}
+            </select></div>
+            <div><label style={lbl}>Planning Start Month</label><input type="date" style={inp} value={form.start_date} onChange={e=>setForm(f=>({...f,start_date:e.target.value}))}/></div>
+            <div><label style={lbl}>Planning Horizon (months)</label><select style={inp} value={form.planning_months} onChange={e=>setForm(f=>({...f,planning_months:Number(e.target.value)}))}>
+              <option value={12}>12 months</option>
+              <option value={24}>24 months</option>
+              <option value={36}>36 months</option>
+            </select></div>
+            <div><label style={lbl}>Shared Cost Allocation (% by headcount)</label>
+              <input type="number" min={0} max={100} style={inp} value={Math.round((form.settings.shared_cost_fixed_pct||0.5)*100)} onChange={e=>setForm(f=>({...f,settings:{...f.settings,shared_cost_fixed_pct:Number(e.target.value)/100}}))}/>
+              <div style={hint}>Remainder allocated by revenue share</div>
+            </div>
+            <div><label style={lbl}>Corporate Tax Rate (%)</label>
+              <input type="number" min={0} max={100} style={inp} value={Math.round((form.settings.corporate_tax_rate||0.30)*100)} onChange={e=>setForm(f=>({...f,settings:{...f.settings,corporate_tax_rate:Number(e.target.value)/100}}))}/>
+            </div>
+            <div><label style={lbl}>Opening Cash Balance</label><input type="number" style={inp} value={form.settings.opening_cash_balance||0} onChange={e=>setForm(f=>({...f,settings:{...f.settings,opening_cash_balance:Number(e.target.value)}}))}/></div>
+          </div>
+        </div>
+      )}
+
+      {activeSection==='units'&&(
+        <div>
+          {/* Top-level units */}
+          {form.business_units.filter(u=>!u.parent_id).map(u=>(
+            <div key={u.id} style={{...card,borderTop:`4px solid ${u.color||C.cyan}`}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'0.75rem',marginBottom:'1rem'}}>
+                <div style={{fontWeight:700,color:C.navy}}>{u.name}</div>
+                <div style={{display:'flex',gap:'0.5rem'}}>
+                  <button style={addBtn(true)} onClick={()=>addSubUnit(u.id)}>+ Add Sub-Unit</button>
+                  <button style={{...delBtn}} onClick={()=>updateUnit(u.id,{active:false})}>Remove</button>
+                </div>
+              </div>
+              <div style={fGrid}>
+                <div><label style={lbl}>Unit Name</label><input style={inp} value={u.name} onChange={e=>updateUnit(u.id,{name:e.target.value,short:e.target.value.split(' ').map((w:string)=>w[0]).join('').toUpperCase().slice(0,4)})}/></div>
+                <div><label style={lbl}>Short Name</label><input style={inp} value={u.short} onChange={e=>updateUnit(u.id,{short:e.target.value})}/></div>
+                <div><label style={lbl}>Type</label><select style={inp} value={u.type} onChange={e=>updateUnit(u.id,{type:e.target.value})}>
+                  {[['product','Product / Trading'],['service','Service'],['aggregator','Aggregator'],['mixed','Mixed']].map(([v,l])=><option key={v} value={v}>{l}</option>)}
+                </select></div>
+                <div><label style={lbl}>Headcount</label><input type="number" style={inp} value={u.headcount} onChange={e=>updateUnit(u.id,{headcount:Number(e.target.value)})}/></div>
+                <div><label style={lbl}>Colour</label><input type="color" style={{...inp,height:38,padding:'0.2rem'}} value={u.color||'#1B2A4A'} onChange={e=>updateUnit(u.id,{color:e.target.value})}/></div>
+              </div>
+              {/* Sub-units */}
+              {form.business_units.filter(su=>su.parent_id===u.id&&su.active).map(su=>(
+                <div key={su.id} style={{background:C.lightBg,borderRadius:6,padding:'0.85rem',marginTop:'0.75rem'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.5rem'}}>
+                    <div style={{fontSize:'0.82rem',fontWeight:700,color:C.navy}}>{su.name}</div>
+                    <button style={delBtn} onClick={()=>updateUnit(su.id,{active:false})}>Remove</button>
+                  </div>
+                  <div style={fGrid}>
+                    <div><label style={lbl}>Name</label><input style={inp} value={su.name} onChange={e=>updateUnit(su.id,{name:e.target.value})}/></div>
+                    <div><label style={lbl}>Short</label><input style={inp} value={su.short} onChange={e=>updateUnit(su.id,{short:e.target.value})}/></div>
+                    <div><label style={lbl}>Headcount</label><input type="number" style={inp} value={su.headcount} onChange={e=>updateUnit(su.id,{headcount:Number(e.target.value)})}/></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+          <button style={addBtn()} onClick={addUnit}>+ Add Business Unit</button>
+        </div>
+      )}
+
+      {activeSection==='capital'&&(
+        <div style={card}>
+          <div style={secH}>Capital Structure</div>
+          <div style={fGrid}>
+            {[
+              ['shareholder_contribution','Shareholder Contribution'],
+              ['grant_non_repayable','Grant (Non-Repayable)'],
+              ['grant_recoverable','Grant (Recoverable)'],
+              ['bank_loan','Bank Loan'],
+              ['fixed_assets','Fixed Assets'],
+            ].map(([key,label])=>(
+              <div key={key}><label style={lbl}>{label}</label>
+                <input type="number" style={inp}
+                  value={(form.settings.capital_structure as any)?.[key]||0}
+                  onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),  [key]:Number(e.target.value)}}}))}/>
+              </div>
+            ))}
+            <div><label style={lbl}>Annual Interest Rate (%)</label>
+              <input type="number" style={inp} value={Math.round(((form.settings.capital_structure?.annual_interest_rate||0.18)*100))}
+                onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),annual_interest_rate:Number(e.target.value)/100}}}))}/>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeSection==='delegation'&&(
+        <div style={card}>
+          <div style={secH}>Approval Delegation</div>
+          <p style={{fontSize:'0.85rem',color:C.slate,marginBottom:'1rem',lineHeight:1.7}}>The CEO can delegate final approval authority to another person. The delegated approver can approve spend requests in place of the CEO.</p>
+          <div style={fGrid}>
+            <div><label style={lbl}>Delegated Approver (User ID)</label>
+              <input style={inp} value={form.settings.delegated_approver_id||''} placeholder="Leave blank to remove delegation"
+                onChange={e=>setForm(f=>({...f,settings:{...f.settings,delegated_approver_id:e.target.value||undefined}}))}/>
+              <div style={hint}>Enter the user ID of the person you are delegating to. Find user IDs in the Team tab.</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{marginTop:'1.25rem',display:'flex',gap:'0.75rem'}}>
+        <button style={solidBtn(C.navy)} disabled={saving} onClick={save}>{saving?'Saving...':'Save All Settings'}</button>
+      </div>
+    </div>
+  )
+}
