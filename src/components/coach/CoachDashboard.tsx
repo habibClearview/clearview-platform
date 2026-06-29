@@ -202,7 +202,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   }
 
   if(loading)return<Spinner/>
-  if(error)return<div style={{padding:'2rem',color:C.red}}>Error loading data: {error}</div>
+  if(error)return<div style={{padding:'2rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}><div style={{color:C.red,marginBottom:'1.5rem'}}>Error loading data: {error}</div><p style={{color:C.slate,fontSize:'0.85rem',marginBottom:'1rem'}}>This is usually caused by a stale session. Sign out and sign back in to fix it.</p><button onClick={onSignOut} style={{fontFamily:'monospace',fontSize:'0.85rem',padding:'0.6rem 1.4rem',border:'none',borderRadius:6,background:C.navy,color:C.white,cursor:'pointer'}}>Sign Out and Refresh</button></div>
 
   const selClient=clients.find(c=>c.id===selClientId)
   const selClientFullData=clientData[selClientId]||{}
