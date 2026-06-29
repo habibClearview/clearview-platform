@@ -556,7 +556,7 @@ function PLTable({rows,months,title,footnote}:{
   const hasAct=rows.some(r=>r.actual?.some(v=>v!==null))
   return(
     <div style={card}>
-      {title&&<div style={secH}>{title}</div>}
+      {title&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.5rem'}}><div style={secH} style={{margin:0}}>{title}</div><button style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,color:C.slate,cursor:'pointer',padding:'0.15rem 0.5rem',flexShrink:0}} onClick={()=>window.print()}>Export / Print</button></div>}
       {hasAct&&(
         <div style={{display:'flex',gap:'1.2rem',marginBottom:'0.6rem',fontSize:'0.7rem',color:C.slate}}>
           <span style={{display:'inline-flex',alignItems:'center',gap:4}}><span style={{width:10,height:10,borderRadius:2,background:C.planBg,border:`1px solid ${C.border}`,display:'inline-block'}}/> Plan</span>
@@ -650,6 +650,17 @@ function LineEditor({line:l,onPlanChange,onActualChange,onRename,onRemove,months
       {showActual&&<div style={{fontSize:'0.68rem',color:C.teal,marginTop:'0.35rem'}}>Row 1 = Plan · Row 2 (teal) = Actual for closed months</div>}
     </div>
   )
+}
+
+function exportToCSV(title: string, headers: string[], rows: (string|number)[][]) {
+  const csvContent = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
+  const blob = new Blob([csvContent], {type:'text/csv'})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${title.replace(/[^a-z0-9]/gi,'_')}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 function exportToPrint(title: string) {
@@ -860,8 +871,10 @@ function TeamTab({role,userId,userName,businessUnit,canSeeAllUnits}:{role:string
 function ActualsTab({role,userId,userName,businessUnit}:{role:string;userId:string;userName:string;businessUnit:string}) {
   const isCEO = role === 'ceo'
   const isFM = role === 'finance_manager'
+  const isSuperCoach = role === 'super_coach' || role === 'coach'
+  const canSeeAll = isCEO || isFM || isSuperCoach
 
-  const visibleUnits = (isCEO || isFM)
+  const visibleUnits = canSeeAll
     ? ACTUALS_BUSINESS_UNITS
     : ACTUALS_BUSINESS_UNITS.filter(u => u === (businessUnit || ''))
 
@@ -875,10 +888,13 @@ function ActualsTab({role,userId,userName,businessUnit}:{role:string;userId:stri
   const [saving, setSaving] = React.useState(false)
   const [allActuals, setAllActuals] = React.useState([])
 
-  const PERIOD_MONTHS = Array.from({length: 12}, (_, i) => {
-    const d = new Date(2026, i, 1)
+  // Rolling 24 months from 12 months ago to 12 months ahead
+  const PERIOD_MONTHS = Array.from({length: 24}, (_, i) => {
+    const d = new Date()
+    d.setDate(1)
+    d.setMonth(d.getMonth() - 12 + i)
     return {
-      value: `2026-${String(i+1).padStart(2,'0')}-01`,
+      value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}-01`,
       label: d.toLocaleString('en-GB', {month:'long', year:'numeric'})
     }
   })
@@ -915,7 +931,7 @@ function ActualsTab({role,userId,userName,businessUnit}:{role:string;userId:stri
   }, [selUnit, selPeriod])
 
   React.useEffect(() => {
-    if (!isCEO && !isFM) return
+    if (!canSeeAll) return
     async function loadAll() {
       try {
                 const { data } = await supabase.from('unit_actuals')
@@ -950,7 +966,7 @@ function ActualsTab({role,userId,userName,businessUnit}:{role:string;userId:stri
         .upsert(payload, {onConflict: 'client_id,business_unit,period'})
         .select().single()
       setActuals(data)
-      if (isCEO || isFM) {
+      if (canSeeAll) {
         setAllActuals(prev => {
           const existing = prev.findIndex(a => a.business_unit === selUnit)
           if (existing >= 0) { const n = [...prev]; n[existing] = data; return n }
@@ -970,7 +986,7 @@ function ActualsTab({role,userId,userName,businessUnit}:{role:string;userId:stri
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.25rem', flexWrap:'wrap', gap:'1rem'}}>
         <div style={{fontFamily:'Georgia,serif', fontSize:'1.1rem', fontWeight:700, color:C.navy}}>Monthly Actuals</div>
         <div style={{display:'flex', gap:'0.75rem', flexWrap:'wrap', alignItems:'center'}}>
-          {(isCEO || isFM) && (
+          {canSeeAll && (
             <select style={{fontFamily:'monospace', fontSize:'0.75rem', padding:'0.38rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, background:C.white, color:C.navy}}
               value={selUnit} onChange={e => setSelUnit(e.target.value)}>
               {visibleUnits.map(u => <option key={u} value={u}>{u}</option>)}
@@ -984,7 +1000,7 @@ function ActualsTab({role,userId,userName,businessUnit}:{role:string;userId:stri
       </div>
 
       {/* Consolidated summary for CEO/FM */}
-      {(isCEO || isFM) && allActuals.length > 0 && (
+      {canSeeAll && allActuals.length > 0 && (
         <div style={{...card, marginBottom:'1.25rem'}}>
           <div style={{fontWeight:700, color:C.navy, marginBottom:'0.75rem', fontSize:'0.88rem'}}>All Units  -  {PERIOD_MONTHS.find(m => m.value === selPeriod)?.label}</div>
           <div style={{overflowX:'auto'}}>
@@ -1178,8 +1194,8 @@ function TimeRecordsTab({role,userId,userName,businessUnit}:{role:string;userId:
               <select style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'inherit', background:'#F4F8FC', color:C.navy, boxSizing:'border-box'}}
                 value={form.period} onChange={e => setForm(f => ({...f, period: e.target.value}))}>
                 {Array.from({length:12}, (_,i) => {
-                  const d = new Date(2026, i, 1)
-                  const v = `2026-${String(i+1).padStart(2,'0')}-01`
+                  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 6 + i)
+                  const v = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`
                   return <option key={v} value={v}>{d.toLocaleString('en-GB',{month:'long',year:'numeric'})}</option>
                 })}
               </select>
