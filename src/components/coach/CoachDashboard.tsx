@@ -287,9 +287,37 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 
     const visibleTabs=isCanvas
       ? CANVAS_TABS.filter(t=>!t.coachOnly||(t.coachOnly&&canViewCoachGuidance(userRole)))
-      : CANVAS_TABS.filter(t=>['cover','how_to_start','eng_setup','tracker','evidence'].includes(t.id))
+      : []
 
     function printSection(){window.print()}
+
+    if(!isCanvas) return(
+      <div>
+        <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'1rem',fontSize:'0.8rem',color:C.slate}}>
+          <button style={{fontFamily:'monospace',fontSize:'0.72rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem'}} onClick={()=>setView('overview')}>← Coach Dashboard</button>
+          <span>/</span><span style={{color:C.navy,fontWeight:600}}>{selClient.name}</span>
+        </div>
+        <div style={{...card,background:C.navy,color:C.white,marginBottom:'1.25rem'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
+            <div>
+              <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.3rem'}}>{CLIENT_TYPE_LABELS[selClient.type]} · {prog?.name||'—'} · Clearview Financial Model</div>
+              <h2 style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:C.white,margin:'0 0 0.25rem'}}>{selClient.name}</h2>
+              <div style={{fontSize:'0.77rem',color:'rgba(255,255,255,0.6)'}}>{selClient.contact_name&&`${selClient.contact_name} · `}{selClient.country} · {selClient.sector}</div>
+            </div>
+            <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
+              <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
+              <a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily:'monospace',fontSize:'0.78rem',padding:'0.4rem 1rem',borderRadius:4,background:C.teal,color:C.white,textDecoration:'none',fontWeight:700}}>Open Clearview Financial Model ↗</a>
+            </div>
+          </div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'1rem',marginBottom:'1.25rem'}}>
+          <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 1 — Open Clearview</div><p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.7,margin:0}}>Click "Open Clearview Financial Model" above. Go to Settings to define business units and revenue lines.</p></div>
+          <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 2 — Define Business Units</div><p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.7,margin:0}}>In Settings, add business units. Set each unit type: product, service, or aggregator.</p></div>
+          <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 3 — Enter the Plan</div><p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.7,margin:0}}>Go to Planning to add revenue and cost lines. Enter monthly figures for the full planning period.</p></div>
+        </div>
+        <div style={card}><TabCover client={selClient} prog={prog} onUpdate={updates=>updateClient(selClient.id,updates)}/></div>
+      </div>
+    )
 
     return(
       <div>
