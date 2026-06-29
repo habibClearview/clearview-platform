@@ -20,7 +20,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null)
   const [loading, setLoading] = useState(true)
 
-  async function loadProfile(userId: string): Promise<AppUser | null> {
+  async function loadProfile(userId: string, email: string): Promise<AppUser> {
+    // Try to read from user_profiles
     try {
       const { data, error } = await supabase
         .from('user_profiles')
@@ -28,26 +29,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('id', userId)
         .single()
 
-      if (error || !data) return null
-
-      const { data: authUser } = await supabase.auth.getUser()
-      return {
-        id: data.id,
-        email: authUser.user?.email || '',
-        role: (data.role as UserRole) || 'accounts_assistant',
-        full_name: data.full_name || '',
-        client_id: data.client_id,
-        assigned_unit_ids: data.assigned_unit_ids || [],
+      if (!error && data && data.role) {
+        return {
+          id: data.id,
+          email,
+          role: (data.role as UserRole),
+          full_name: data.full_name || '',
+          client_id: data.client_id,
+          assigned_unit_ids: data.assigned_unit_ids || [],
+        }
       }
-    } catch {
-      return null
+    } catch { /* fall through */ }
+
+    // Fallback: derive role from email
+    // Habib is always super_coach regardless of profile read failure
+    const role: UserRole = email === 'habib@habibonifade.com' ? 'super_coach' : 'accounts_assistant'
+    return {
+      id: userId,
+      email,
+      role,
+      full_name: email === 'habib@habibonifade.com' ? 'Habib Onifade' : '',
+      client_id: null,
+      assigned_unit_ids: [],
     }
   }
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        const profile = await loadProfile(session.user.id)
+        const profile = await loadProfile(session.user.id, session.user.email || '')
         setUser(profile)
       }
       setLoading(false)
@@ -55,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        const profile = await loadProfile(session.user.id)
+        const profile = await loadProfile(session.user.id, session.user.email || '')
         setUser(profile)
       } else {
         setUser(null)
