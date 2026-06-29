@@ -461,7 +461,7 @@ function ConasOperationalCashflowTab({result, months, cc}:{result:ReturnType<typ
       )}
 
       <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy,marginBottom:'1rem'}}>Operational Cashflow (Cash In vs Cash Out)</div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>Operational Cashflow (Cash In vs Cash Out)</div><button style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,color:C.slate,cursor:'pointer',padding:'0.15rem 0.5rem'}} onClick={()=>window.print()}>Export / Print</button></div>
         <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.75rem',fontFamily:'monospace'}}>
           <thead><tr style={{background:C.navy,color:C.white}}>
             <th style={{padding:'7px 10px',textAlign:'left',minWidth:160}}>Line</th>
@@ -530,7 +530,7 @@ function ConasWorkingCapitalTab({result, months, cc}:{result:ReturnType<typeof r
       </div>
 
       <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy,marginBottom:'1rem'}}>Irrigation Kit Deployment</div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>Irrigation Kit Deployment</div><button style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,color:C.slate,cursor:'pointer',padding:'0.15rem 0.5rem'}} onClick={()=>window.print()}>Export / Print</button></div>
         <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.75rem',fontFamily:'monospace'}}>
           <thead><tr style={{background:C.navy,color:C.white}}>
             <th style={{padding:'7px 10px',textAlign:'left',minWidth:160}}>Line</th>
