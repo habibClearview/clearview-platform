@@ -868,7 +868,7 @@ function TeamTab({role,userId,userName,businessUnit,canSeeAllUnits}:{role:string
 }
 
 // ── ACTUALS TAB ──────────────────────────────────────────
-function ActualsTab({role,userId,userName,businessUnit}:{role:string;userId:string;userName:string;businessUnit:string}) {
+function ActualsTab({role,userId,userName,businessUnit,planUnits}:{role:string;userId:string;userName:string;businessUnit:string;planUnits:any[]}) {
   const isCEO = role === 'ceo'
   const isFM = role === 'finance_manager'
   const isSuperCoach = role === 'super_coach' || role === 'coach'
@@ -899,17 +899,37 @@ function ActualsTab({role,userId,userName,businessUnit}:{role:string;userId:stri
     }
   })
 
-  const LINES = [
+  const UNIT_ID_MAP: Record<string,string> = {
+    'Input Profit Centre 1': 'shop_1',
+    'Input Profit Centre 2': 'shop_2',
+    'Input Profit Centre 3': 'shop_3',
+    'Input Profit Centre 4': 'shop_4',
+    'Input Profit Centre 5': 'shop_5',
+    'FGE Production and Marketing': 'fge',
+    'Own Farm': 'own_farm',
+    'Advisory Services': 'advisory',
+    'Customer Acquisition and Management': 'customer',
+  }
+
+  function getLinesForUnit(unitName: string) {
+    const unitId = UNIT_ID_MAP[unitName]
+    if (!unitId || !planUnits) return []
+    const unit = planUnits.find((u: any) => u.id === unitId)
+    if (!unit) return []
+    return [
+      ...unit.lines.filter((l: any) => l.category === 'revenue' && !l.name.startsWith('Add ')).map((l: any) => ({key: l.id, label: l.name, section: 'revenue'})),
+      ...unit.lines.filter((l: any) => l.category === 'cost_of_sales').map((l: any) => ({key: l.id, label: l.name, section: 'costs'})),
+      ...unit.lines.filter((l: any) => l.category === 'staff' && !l.name.startsWith('Add ')).map((l: any) => ({key: l.id, label: l.name, section: 'staff'})),
+      ...unit.lines.filter((l: any) => l.category === 'direct_opex' && !l.name.startsWith('Add ')).map((l: any) => ({key: l.id, label: l.name, section: 'opex'})),
+    ]
+  }
+
+  const LINES = getLinesForUnit(selUnit).length > 0 ? getLinesForUnit(selUnit) : [
     {key:'revenue_primary', label:'Primary Revenue', section:'revenue'},
     {key:'revenue_secondary', label:'Secondary Revenue', section:'revenue'},
-    {key:'revenue_other', label:'Other Revenue', section:'revenue'},
     {key:'cost_of_sales', label:'Cost of Sales', section:'costs'},
-    {key:'input_purchases', label:'Input Purchases', section:'costs'},
     {key:'staff_cost', label:'Staff Cost', section:'costs'},
     {key:'direct_operating_cost', label:'Direct Operating Cost', section:'costs'},
-    {key:'transport_cost', label:'Transport Cost', section:'costs'},
-    {key:'internal_transfer_in', label:'Internal Transfer In', section:'internal'},
-    {key:'internal_transfer_out', label:'Internal Transfer Out', section:'internal'},
   ]
 
   React.useEffect(() => {
@@ -977,8 +997,10 @@ function ActualsTab({role,userId,userName,businessUnit}:{role:string;userId:stri
     setSaving(false)
   }
 
-  const totalRevenue = ['revenue_primary','revenue_secondary','revenue_other'].reduce((s,k) => s + Number(actuals?.[k] || 0), 0)
-  const totalCosts = ['cost_of_sales','input_purchases','staff_cost','direct_operating_cost','transport_cost'].reduce((s,k) => s + Number(actuals?.[k] || 0), 0)
+  const revenueLines = LINES.filter(l => l.section === 'revenue')
+  const costLines = LINES.filter(l => l.section === 'costs' || l.section === 'staff' || l.section === 'opex')
+  const totalRevenue = revenueLines.reduce((s,l) => s + Number(actuals?.[l.key] || 0), 0)
+  const totalCosts = costLines.reduce((s,l) => s + Number(actuals?.[l.key] || 0), 0)
   const grossProfit = totalRevenue - totalCosts
 
   return (
@@ -1050,27 +1072,33 @@ function ActualsTab({role,userId,userName,businessUnit}:{role:string;userId:stri
           <div style={{color:C.slate, padding:'1rem', fontSize:'0.83rem'}}>Loading...</div>
         ) : (
           <>
-            {['revenue','costs','internal'].map(section => (
-              <div key={section} style={{marginBottom:'1.25rem'}}>
-                <div style={{fontFamily:'monospace', fontSize:'0.65rem', letterSpacing:'0.1em', color:C.cyan, textTransform:'uppercase', marginBottom:'0.6rem', borderBottom:`1px solid ${C.border}`, paddingBottom:'0.3rem'}}>
-                  {section === 'revenue' ? 'Revenue' : section === 'costs' ? 'Costs' : 'Internal Transfers'}
-                </div>
-                <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'0.75rem'}}>
-                  {LINES.filter(l => l.section === section).map(line => (
-                    <div key={line.key}>
-                      <label style={{display:'block', fontWeight:600, fontSize:'0.78rem', marginBottom:'0.22rem', color:C.navy}}>{line.label}</label>
+            {(['revenue','costs','staff','opex'] as const).map(section => {
+              const sectionLines = LINES.filter(l => l.section === section)
+              if (sectionLines.length === 0) return null
+              const sectionLabel = section === 'revenue' ? 'Revenue' : section === 'costs' ? 'Cost of Sales' : section === 'staff' ? 'Staff Costs' : 'Overheads'
+              const sectionTotal = sectionLines.reduce((s,l) => s + Number(actuals?.[l.key] || 0), 0)
+              return (
+                <div key={section} style={{marginBottom:'1.5rem'}}>
+                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:`2px solid ${section==='revenue'?C.green:C.red}`, paddingBottom:'0.4rem', marginBottom:'0.75rem'}}>
+                    <div style={{fontFamily:'monospace', fontSize:'0.68rem', letterSpacing:'0.1em', color:section==='revenue'?C.green:C.red, textTransform:'uppercase', fontWeight:700}}>{sectionLabel}</div>
+                    <div style={{fontFamily:'monospace', fontSize:'0.78rem', fontWeight:700, color:section==='revenue'?C.green:C.red}}>{fmtNum(sectionTotal)}</div>
+                  </div>
+                  {sectionLines.map(line => (
+                    <div key={line.key} style={{display:'flex', alignItems:'center', gap:'1rem', marginBottom:'0.6rem', padding:'0.5rem 0.75rem', background:C.cream, borderRadius:4}}>
+                      <label style={{flex:1, fontWeight:600, fontSize:'0.82rem', color:C.navy}}>{line.label}</label>
                       <input
                         type="number"
-                        style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'monospace', background: actuals?.submitted ? '#F5F5F5' : '#F4F8FC', color:C.navy, boxSizing:'border-box'}}
+                        style={{width:160, padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'monospace', background: actuals?.submitted ? '#F5F5F5' : C.white, color:C.navy, textAlign:'right'}}
                         value={actuals?.[line.key] || ''}
-                        disabled={actuals?.submitted && !isCEO && !isFM}
-                        onChange={e => setActuals(a => ({...a, [line.key]: e.target.value}))}
+                        disabled={actuals?.submitted && !canSeeAll}
+                        placeholder="0"
+                        onChange={e => setActuals((a: any) => ({...a, [line.key]: e.target.value}))}
                       />
                     </div>
                   ))}
                 </div>
-              </div>
-            ))}
+              )
+            })}
 
             <div>
               <label style={{display:'block', fontWeight:600, fontSize:'0.78rem', marginBottom:'0.22rem', color:C.navy}}>Notes</label>
@@ -2296,7 +2324,7 @@ export default function CONASDashboard({
         {view==='cashflow'        &&<CashFlowTab/>}
         {view==='balancesheet'    &&<BalanceSheetTab/>}
         {view==='scenarios'       &&<ScenariosTab/>}
-        {view==='actuals'         &&<ActualsTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
+        {view==='actuals'         &&<ActualsTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits} planUnits={inputs.units}/>}
         {view==='spends'           &&<SpendRequestsTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
         {view==='timerecords'      &&<TimeRecordsTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
         {view==='team'            &&<TeamTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
