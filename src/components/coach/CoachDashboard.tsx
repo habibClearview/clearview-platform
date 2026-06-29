@@ -376,13 +376,41 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // \u2500\u2500 PROGRAMMES VIEW \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   function ProgrammesView(){
     const [showNew,setShowNew]=useState(false)
+    const [editingProg,setEditingProg]=useState(false)
+    const [progForm,setProgForm]=useState(null)
     const prog=selProgId?programmes.find(p=>p.id===selProgId):null
     if(prog)return(
       <div>
-        <button style={{fontFamily:'monospace',fontSize:'0.72rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem',marginBottom:'1rem'}} onClick={()=>setSelProgId(null)}>\u2190 All Programmes</button>
-        <div style={{...card,background:C.navy,color:C.white}}><div style={{fontFamily:'monospace',fontSize:'0.62rem',color:C.cyan,letterSpacing:'0.12em',marginBottom:'0.3rem'}}>{prog.type==='donor_programme'?'DONOR PROGRAMME':'DIRECT CLIENT'}</div><h2 style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.white,margin:'0 0 0.2rem'}}>{prog.name}</h2><div style={{fontSize:'0.77rem',color:'rgba(255,255,255,0.6)'}}>{prog.funder} \u00b7 {prog.country}</div></div>
-        <div style={card}><div style={secH}>Client Organisations</div>{clients.filter(c=>c.programme_id===prog.id).map(c=><div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.75rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.45rem'}}><div><div style={{fontWeight:600,fontSize:'0.85rem'}}>{c.name}</div><div style={{fontSize:'0.72rem',color:C.slate}}>{CLIENT_TYPE_LABELS[c.type]} \u00b7 {statusLabel(c.status)}</div></div><button style={addBtn(true)} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}>Open \u2192</button></div>)}</div>
-        {prog.notes&&<div style={card}><div style={secH}>Notes</div><div style={{fontSize:'0.82rem',color:C.slate,lineHeight:1.6}}>{prog.notes}</div></div>}
+        <button style={{fontFamily:'monospace',fontSize:'0.72rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem',marginBottom:'1rem'}} onClick={()=>{setSelProgId(null);setEditingProg(false)}}>\u2190 All Programmes</button>
+        {editingProg&&progForm?(
+          <div style={card}>
+            <div style={{...secH,marginBottom:'1rem'}}>Edit Programme</div>
+            <div style={fGrid}>
+              <div><label style={lbl}>Programme Name</label><input style={inp} value={progForm.name} onChange={e=>setProgForm(f=>({...f,name:e.target.value}))}/></div>
+              <div><label style={lbl}>Type</label><select style={inp} value={progForm.type} onChange={e=>setProgForm(f=>({...f,type:e.target.value}))}><option value="donor_programme">Donor Programme</option><option value="direct_client">Direct Client</option><option value="blended">Blended</option></select></div>
+              <div><label style={lbl}>Funder</label><input style={inp} value={progForm.funder} onChange={e=>setProgForm(f=>({...f,funder:e.target.value}))}/></div>
+              <div><label style={lbl}>Country</label><input style={inp} value={progForm.country} onChange={e=>setProgForm(f=>({...f,country:e.target.value}))}/></div>
+              <div><label style={lbl}>Start Date</label><input type="date" style={inp} value={progForm.start_date||''} onChange={e=>setProgForm(f=>({...f,start_date:e.target.value}))}/></div>
+              <div><label style={lbl}>End Date</label><input type="date" style={inp} value={progForm.end_date||''} onChange={e=>setProgForm(f=>({...f,end_date:e.target.value}))}/></div>
+              <div style={{gridColumn:'1/-1'}}><label style={lbl}>Notes</label><textarea style={{...inp,minHeight:72,resize:'vertical'}} value={progForm.notes||''} onChange={e=>setProgForm(f=>({...f,notes:e.target.value}))}/></div>
+            </div>
+            <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
+              <button style={solidBtn()} onClick={async()=>{await supabase.from('programmes').update({...progForm,updated_at:new Date().toISOString()}).eq('id',prog.id);setPrograms(prev=>prev.map(p=>p.id!==prog.id?p:{...p,...progForm}));setEditingProg(false)}}>Save</button>
+              <button style={addBtn(true,C.slate)} onClick={()=>setEditingProg(false)}>Cancel</button>
+            </div>
+          </div>
+        ):(
+          <div>
+            <div style={{...card,background:C.navy,color:C.white}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                <div><div style={{fontFamily:'monospace',fontSize:'0.62rem',color:C.cyan,letterSpacing:'0.12em',marginBottom:'0.3rem'}}>{prog.type==='donor_programme'?'DONOR PROGRAMME':'DIRECT CLIENT'}</div><h2 style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.white,margin:'0 0 0.2rem'}}>{prog.name}</h2><div style={{fontSize:'0.77rem',color:'rgba(255,255,255,0.6)'}}>{prog.funder} \u00b7 {prog.country}</div></div>
+                <button style={{fontFamily:'monospace',fontSize:'0.7rem',padding:'0.3rem 0.8rem',border:'1px solid rgba(255,255,255,0.3)',borderRadius:4,background:'transparent',color:'rgba(255,255,255,0.8)',cursor:'pointer'}} onClick={()=>{setProgForm({...prog});setEditingProg(true)}}>Edit</button>
+              </div>
+            </div>
+            <div style={card}><div style={secH}>Client Organisations</div>{clients.filter(c=>c.programme_id===prog.id).map(c=><div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.75rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.45rem'}}><div><div style={{fontWeight:600,fontSize:'0.85rem'}}>{c.name}</div><div style={{fontSize:'0.72rem',color:C.slate}}>{CLIENT_TYPE_LABELS[c.type]} \u00b7 {statusLabel(c.status)}</div></div><button style={addBtn(true)} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}>Open \u2192</button></div>)}</div>
+            {prog.notes&&<div style={card}><div style={secH}>Notes</div><div style={{fontSize:'0.82rem',color:C.slate,lineHeight:1.6}}>{prog.notes}</div></div>}
+          </div>
+        )}
       </div>
     )
     return(
@@ -506,6 +534,8 @@ function TabCover({client,prog,onUpdate}){
             <div><label style={lbl}>Contact Email</label><input style={inp} value={form.contact_email} onChange={e=>setForm(f=>({...f,contact_email:e.target.value}))}/></div>
             <div><label style={lbl}>Country</label><input style={inp} value={form.country} onChange={e=>setForm(f=>({...f,country:e.target.value}))}/></div>
             <div><label style={lbl}>Sector</label><input style={inp} value={form.sector} onChange={e=>setForm(f=>({...f,sector:e.target.value}))}/></div>
+            <div><label style={lbl}>Client Type</label><select style={inp} value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}><option value="crop_aggregator">Crop Aggregator</option><option value="livestock_aggregator">Livestock Aggregator</option><option value="farmer_group_enterprise">Farmer Group Enterprise</option><option value="service_lsp">Service LSP</option></select></div>
+            <div><label style={lbl}>Engagement Mode</label><select style={inp} value={form.engagement_mode} onChange={e=>setForm(f=>({...f,engagement_mode:e.target.value}))}><option value="canvas">Full GtCV Canvas</option><option value="financial">Clearview Financial Only</option></select></div>
             <div><label style={lbl}>Status</label><select style={inp} value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>{['setup','phase_0','dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09','complete','paused'].map(s=><option key={s} value={s}>{statusLabel(s)}</option>)}</select></div>
             <div><label style={lbl}>Start Date</label><input type="date" style={inp} value={form.start_date||''} onChange={e=>setForm(f=>({...f,start_date:e.target.value}))}/></div>
             <div><label style={lbl}>Target Handover</label><input type="date" style={inp} value={form.expected_close||''} onChange={e=>setForm(f=>({...f,expected_close:e.target.value}))}/></div>
@@ -1312,3 +1342,4 @@ function NewCIForm({clients,onSave,onCancel}){
     </div>
   )
 }
+
