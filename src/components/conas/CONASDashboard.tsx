@@ -1084,11 +1084,11 @@ function ActualsTab({role,userId,userName,businessUnit,planUnits}:{role:string;u
                     <div style={{fontFamily:'monospace', fontSize:'0.78rem', fontWeight:700, color:section==='revenue'?C.green:C.red}}>{fmtNum(sectionTotal)}</div>
                   </div>
                   {sectionLines.map(line => (
-                    <div key={line.key} style={{display:'flex', alignItems:'center', gap:'1rem', marginBottom:'0.6rem', padding:'0.5rem 0.75rem', background:C.cream, borderRadius:4}}>
-                      <label style={{flex:1, fontWeight:600, fontSize:'0.82rem', color:C.navy}}>{line.label}</label>
+                    <div key={line.key} style={{display:'grid', gridTemplateColumns:'1fr 180px', alignItems:'center', gap:'0.75rem', marginBottom:'0.5rem', padding:'0.45rem 0.75rem', background:C.cream, borderRadius:4}}>
+                      <label style={{fontWeight:600, fontSize:'0.82rem', color:C.navy, lineHeight:1.3}}>{line.label}</label>
                       <input
                         type="number"
-                        style={{width:160, padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'monospace', background: actuals?.submitted ? '#F5F5F5' : C.white, color:C.navy, textAlign:'right'}}
+                        style={{width:'100%', padding:'0.42rem 0.6rem', border:`1px solid ${C.border}`, borderRadius:4, fontSize:'0.83rem', fontFamily:'monospace', background: actuals?.submitted ? '#F5F5F5' : C.white, color:C.navy, textAlign:'right', boxSizing:'border-box'}}
                         value={actuals?.[line.key] || ''}
                         disabled={actuals?.submitted && !canSeeAll}
                         placeholder="0"
