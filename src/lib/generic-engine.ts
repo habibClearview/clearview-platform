@@ -1,4 +1,4 @@
-import { computeScores, buildDebtSchedule, defaultCoachAssessment, type CoachAssessment, type ScoringResult } from './scoring-engine'
+import { computeScores, buildDebtSchedule, computeTradeCredit, defaultCoachAssessment, type CoachAssessment, type ScoringResult, type DebtObligation, type TradeCreditLine } from './scoring-engine'
 
 // ============================================================
 // CLEARVIEW GENERIC ENGINE v1
@@ -87,6 +87,13 @@ export interface GenericModelConfig {
     scenarios?: GenericScenario[]
     capital_structure?: GenericCapital
     coach_assessment?: CoachAssessment
+    // Multiple debt obligations (bank loans, non-bank facilities/SACCOs, etc) --
+    // each with its own rate, tenor and drawdown. Supplements capital_structure.bank_loan
+    // for clients who only have one simple loan; use this list when there is more than one.
+    debts?: DebtObligation[]
+    // Trade credit: supplier credit received (payable) and customer/partner
+    // credit given (receivable), tracked monthly per line.
+    trade_credit_lines?: TradeCreditLine[]
   }
 }
 
@@ -510,15 +517,23 @@ export function runGenericModel(
     }
   }
 
+  // ── Trade credit working capital adjustment ────────────────
+  // Computed before cash flow so its cash effect can be added as a proper
+  // working capital line, the way real accounting treats AR/AP movements.
+  const tradeCreditCashEffect = computeTradeCredit(
+    settings.trade_credit_lines || [], con.cogs, con.rev, months
+  ).monthlyCashEffect
+
   // ── Cash flow ─────────────────────────────────────────────
   const cap = settings.capital_structure || { shareholder_contribution: 0, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, fixed_assets: 0 }
   const cf = {
     op_cash:  zero(), fin_cash: zero(), net: zero(),
     open: zero(), close: zero(),
+    working_capital_adj: tradeCreditCashEffect,
   }
   cf.fin_cash[0] = cap.shareholder_contribution + cap.grant_non_repayable + cap.grant_recoverable + cap.bank_loan
   for (let m = 0; m < months; m++) {
-    cf.op_cash[m] = con.npat[m]
+    cf.op_cash[m] = con.npat[m] + (cf.working_capital_adj[m] || 0)
     cf.net[m]     = cf.op_cash[m] + cf.fin_cash[m]
     cf.open[m]    = m === 0 ? (settings.opening_cash_balance || 0) : cf.close[m - 1]
     cf.close[m]   = cf.open[m] + cf.net[m]
@@ -581,22 +596,29 @@ export function runGenericModel(
   // Uses the same shared engine as CONAS, so every client gets the same
   // rigorous methodology, not just an AI estimate.
   const coachAssessment: CoachAssessment = settings.coach_assessment || defaultCoachAssessment()
-  const debtObligations = cap.bank_loan > 0 ? [{
-    drawdownMonth: 1,
-    annualRate: cap.annual_interest_rate || 0.18,
-    tenorMonths: (cap.loan_tenor_years || 2) * 12,
-    gracePeriodMonths: 0,
-    principal: cap.bank_loan,
-    repaymentType: 'amortising',
-  }] : []
+  // Multiple debt obligations: use the explicit `debts` list if provided (supports
+  // bank loans + non-bank facilities together), otherwise fall back to the single
+  // bank_loan field for clients with simple one-loan structures.
+  const debtObligations: DebtObligation[] = (settings.debts && settings.debts.length > 0)
+    ? settings.debts
+    : (cap.bank_loan > 0 ? [{
+        drawdownMonth: 1,
+        annualRate: cap.annual_interest_rate || 0.18,
+        tenorMonths: (cap.loan_tenor_years || 2) * 12,
+        gracePeriodMonths: 0,
+        principal: cap.bank_loan,
+        repaymentType: 'amortising',
+      }] : [])
   const scores: ScoringResult = computeScores({
     rev: con.rev,
     ebitda: con.ebitda,
+    cogs: con.cogs,
     cashClose: cf.close,
     totalEquity: bs.total_equity[bs.total_equity.length - 1] || 0,
     totalLiabilities: bs.total_liabilities[bs.total_liabilities.length - 1] || 0,
     months,
     debtObligations,
+    tradeCreditLines: settings.trade_credit_lines || [],
     assess: coachAssessment,
   })
 
