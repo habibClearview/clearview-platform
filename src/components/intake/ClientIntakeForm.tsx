@@ -17,9 +17,13 @@ const btn = (col=C.navy) => ({fontFamily:'monospace',fontSize:'0.85rem',fontWeig
 const ghostBtn = {fontFamily:'monospace',fontSize:'0.85rem',fontWeight:600,padding:'0.6rem 1.4rem',border:`1px solid ${C.border}`,borderRadius:5,background:C.white,color:C.navy,cursor:'pointer'}
 const smallBtn = (col=C.cyan) => ({fontFamily:'monospace',fontSize:'0.74rem',padding:'0.32rem 0.7rem',border:`1px solid ${col}`,borderRadius:4,background:'transparent',color:col,cursor:'pointer'})
 
-const STEPS = ['Welcome','Business Details','Business Structure','Financial Data','Review & Submit']
+const STEPS = ['Welcome','Business Details','Business Structure','Products & Figures','Review & Submit']
 
 function genId(prefix:string) { return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,7)}` }
+
+// A "Product" pairs one revenue line with one cost line, entered together.
+// monthData stores { [productId]: { [monthOffset]: { revenue, cost } } }
+// monthOffset is relative to TODAY: negative = past, 0 = current month, positive = future
 
 export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
   const [step, setStep] = useState(0)
@@ -31,29 +35,25 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
 
   const [business, setBusiness] = useState({
     business_name:'', contact_name:'', contact_email:'', contact_phone:'',
-    country:'Uganda', sector:'', currency:'UGX', start_date:new Date().toISOString().split('T')[0],
+    country:'Uganda', sector:'', currency:'UGX',
   })
 
-  // Structure question
   const [hasUnits, setHasUnits] = useState<boolean|null>(null)
   const [units, setUnits] = useState<{id:string,name:string}[]>([{id:genId('unit'),name:''}])
 
-  // Per-unit lines (used when hasUnits === true)
-  // structure: { unitId: { revenueLines: [{id,name}], costLines: [{id,name}] } }
-  const [unitLines, setUnitLines] = useState<Record<string,{revenueLines:{id:string,name:string}[],costLines:{id:string,name:string}[]}>>({})
-
-  // Whole-business lines (used when hasUnits === false)
-  const [revenueLines, setRevenueLines] = useState<{id:string,name:string}[]>([{id:genId('rev'),name:''}])
-  const [costLines, setCostLines] = useState<{id:string,name:string}[]>([{id:genId('cost'),name:''}])
+  // products: { unitId or 'whole': [{id, name}] }
+  const [products, setProducts] = useState<Record<string,{id:string,name:string}[]>>({})
   const [commonCosts, setCommonCosts] = useState<{id:string,name:string}[]>([{id:genId('common'),name:''}])
   const [assets, setAssets] = useState<{id:string,name:string,value:number}[]>([{id:genId('asset'),name:'',value:0}])
 
-  const [historicalMonths, setHistoricalMonths] = useState(6)
-  const [forwardMonths, setForwardMonths] = useState(12)
-  // historicalData / forwardData: { lineId: { monthIdx: amount } }
-  const [historicalData, setHistoricalData] = useState<Record<string,Record<number,number>>>({})
-  const [forwardData, setForwardData] = useState<Record<string,Record<number,number>>>({})
+  const [pastMonths, setPastMonths] = useState(6)
+  const [futureMonths, setFutureMonths] = useState(6)
+  // monthData: { productOrLineId: { offset: {revenue, cost} } } -- offset relative to today, 0 = current month
+  const [monthData, setMonthData] = useState<Record<string,Record<number,{revenue?:number,cost?:number}>>>({})
+  const [commonCostData, setCommonCostData] = useState<Record<string,Record<number,number>>>({})
   const [notes, setNotes] = useState('')
+
+  const wholeKey = 'whole'
 
   useEffect(()=>{
     if (!intakeToken) { setLoading(false); return }
@@ -65,42 +65,32 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
       })
   },[intakeToken])
 
-  function setHist(lineId:string, monthIdx:number, val:number) {
-    setHistoricalData(h=>({...h,[lineId]:{...h[lineId],[monthIdx]:val}}))
+  function getProducts(key:string) { return products[key] || [{id:genId('prod'),name:''}] }
+  function addProduct(key:string) {
+    setProducts(p=>({...p,[key]:[...getProducts(key),{id:genId('prod'),name:''}]}))
   }
-  function setFwd(lineId:string, monthIdx:number, val:number) {
-    setForwardData(f=>({...f,[lineId]:{...f[lineId],[monthIdx]:val}}))
+  function updateProduct(key:string, idx:number, name:string) {
+    setProducts(p=>({...p,[key]:getProducts(key).map((x,i)=>i===idx?{...x,name}:x)}))
+  }
+  function removeProduct(key:string, idx:number) {
+    setProducts(p=>({...p,[key]:getProducts(key).filter((_,i)=>i!==idx)}))
+  }
+
+  function setFigure(lineId:string, offset:number, field:'revenue'|'cost', val:number) {
+    setMonthData(m=>({...m,[lineId]:{...m[lineId],[offset]:{...m[lineId]?.[offset],[field]:val}}}))
+  }
+  function setCommonFigure(lineId:string, offset:number, val:number) {
+    setCommonCostData(c=>({...c,[lineId]:{...c[lineId],[offset]:val}}))
+  }
+
+  function monthLabel(offset:number) {
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()+offset)
+    return d.toLocaleString('en-GB',{month:'short',year:'numeric'})
   }
 
   function addUnit() { setUnits(u=>[...u,{id:genId('unit'),name:''}]) }
   function updateUnit(idx:number, name:string) { setUnits(u=>u.map((x,i)=>i===idx?{...x,name}:x)) }
   function removeUnit(idx:number) { setUnits(u=>u.filter((_,i)=>i!==idx)) }
-
-  function getUnitLines(unitId:string) {
-    return unitLines[unitId] || {revenueLines:[{id:genId('rev'),name:''}], costLines:[{id:genId('cost'),name:''}]}
-  }
-  function addUnitLine(unitId:string, kind:'revenueLines'|'costLines') {
-    setUnitLines(ul=>{
-      const cur = ul[unitId] || {revenueLines:[],costLines:[]}
-      return {...ul,[unitId]:{...cur,[kind]:[...cur[kind],{id:genId(kind==='revenueLines'?'rev':'cost'),name:''}]}}
-    })
-  }
-  function updateUnitLine(unitId:string, kind:'revenueLines'|'costLines', lineId:string, name:string) {
-    setUnitLines(ul=>{
-      const cur = ul[unitId] || {revenueLines:[],costLines:[]}
-      return {...ul,[unitId]:{...cur,[kind]:cur[kind].map(l=>l.id===lineId?{...l,name}:l)}}
-    })
-  }
-
-  function addLine(setter:any, prefix:string) { setter((l:any)=>[...l,{id:genId(prefix),name:''}]) }
-  function updateLine(setter:any, idx:number, name:string) { setter((l:any)=>l.map((x:any,i:number)=>i===idx?{...x,name}:x)) }
-  function removeLine(setter:any, idx:number) { setter((l:any)=>l.filter((_:any,i:number)=>i!==idx)) }
-
-  function monthLabel(offset:number, isHistorical:boolean) {
-    const d = new Date(); d.setDate(1)
-    d.setMonth(d.getMonth() + (isHistorical ? -historicalMonths+offset : offset))
-    return d.toLocaleString('en-GB',{month:'short',year:'numeric'})
-  }
 
   async function submit() {
     setSubmitting(true)
@@ -111,71 +101,78 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
         id: genId('client'), name: business.business_name, slug, type: 'service_lsp',
         engagement_mode: 'financial', status: 'setup', country: business.country, sector: business.sector,
         contact_name: business.contact_name, contact_email: business.contact_email, contact_phone: business.contact_phone,
-        clearview_active: true, programme_id: intake?.programme_id || null, start_date: business.start_date,
+        clearview_active: true, programme_id: intake?.programme_id || null,
+        start_date: new Date().toISOString().split('T')[0],
         notes: `Self-submitted intake. Structure: ${hasUnits?'Multiple units':'Single business'}. ${notes}`,
       }]).select().single()
       if (clientErr) throw clientErr
 
       const businessUnits: any[] = []
       const planLines: any[] = []
+      const totalMonths = Math.max(pastMonths+futureMonths, 24)
 
-      if (hasUnits) {
-        units.forEach((u,i) => {
-          businessUnits.push({
-            id:u.id, name:u.name, short:u.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,4),
-            type:'product', color:['#00B4D8','#1A9DAA','#B8860B','#6B4A8B','#1A7A4A'][i%5],
-            headcount:0, active:true, sort_order:i,
-          })
-          const lines = getUnitLines(u.id)
-          lines.revenueLines.filter(l=>l.name).forEach(l => {
-            planLines.push({id:l.id, unit_id:u.id, name:l.name, category:'revenue', line_type:'standard',
-              monthly_plan:Array.from({length:Math.max(forwardMonths,24)},(_,i)=>forwardData[l.id]?.[i]||0), active:true})
-          })
-          lines.costLines.filter(l=>l.name).forEach(l => {
-            planLines.push({id:l.id, unit_id:u.id, name:l.name, category:'cost_of_sales', line_type:'standard',
-              monthly_plan:Array.from({length:Math.max(forwardMonths,24)},(_,i)=>forwardData[l.id]?.[i]||0), active:true})
-          })
+      function buildPlanArray(lineId:string, field:'revenue'|'cost') {
+        // index 0 of array = pastMonths before today; we map offsets accordingly
+        return Array.from({length:totalMonths},(_,i)=>{
+          const offset = i - pastMonths
+          return monthData[lineId]?.[offset]?.[field] || 0
         })
-      } else {
-        const wholeUnitId = genId('unit')
-        businessUnits.push({id:wholeUnitId, name:business.business_name, short:'MAIN', type:'mixed',
-          color:'#00B4D8', headcount:0, active:true, sort_order:0})
-        revenueLines.filter(l=>l.name).forEach(l => {
-          planLines.push({id:l.id, unit_id:wholeUnitId, name:l.name, category:'revenue', line_type:'standard',
-            monthly_plan:Array.from({length:Math.max(forwardMonths,24)},(_,i)=>forwardData[l.id]?.[i]||0), active:true})
+      }
+      function buildCommonArray(lineId:string) {
+        return Array.from({length:totalMonths},(_,i)=>{
+          const offset = i - pastMonths
+          return commonCostData[lineId]?.[offset] || 0
         })
-        costLines.filter(l=>l.name).forEach(l => {
-          planLines.push({id:l.id, unit_id:wholeUnitId, name:l.name, category:'cost_of_sales', line_type:'standard',
-            monthly_plan:Array.from({length:Math.max(forwardMonths,24)},(_,i)=>forwardData[l.id]?.[i]||0), active:true})
+      }
+
+      const keys = hasUnits ? units.map(u=>u.id) : [wholeKey]
+      keys.forEach((key,ki) => {
+        const unitName = hasUnits ? units.find(u=>u.id===key)?.name : business.business_name
+        businessUnits.push({
+          id:key, name:unitName, short:(unitName||'').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,4),
+          type:'mixed', color:['#00B4D8','#1A9DAA','#B8860B','#6B4A8B','#1A7A4A'][ki%5],
+          headcount:0, active:true, sort_order:ki,
         })
+        getProducts(key).filter(p=>p.name).forEach(p => {
+          planLines.push({id:`${p.id}_rev`, unit_id:key, name:p.name, category:'revenue', line_type:'standard',
+            monthly_plan:buildPlanArray(p.id,'revenue'), active:true})
+          planLines.push({id:`${p.id}_cost`, unit_id:key, name:`${p.name} — Cost`, category:'cost_of_sales', line_type:'standard',
+            monthly_plan:buildPlanArray(p.id,'cost'), active:true})
+        })
+      })
+
+      if (!hasUnits) {
         commonCosts.filter(l=>l.name).forEach(l => {
-          planLines.push({id:l.id, unit_id:wholeUnitId, name:l.name, category:'direct_opex', line_type:'standard',
-            monthly_plan:Array.from({length:Math.max(forwardMonths,24)},(_,i)=>forwardData[l.id]?.[i]||0), active:true})
+          planLines.push({id:l.id, unit_id:wholeKey, name:l.name, category:'direct_opex', line_type:'standard',
+            monthly_plan:buildCommonArray(l.id), active:true})
         })
       }
 
       const { error: configErr } = await supabase.from('generic_model_config').insert([{
         client_id: client.id, business_name: business.business_name, currency: business.currency,
-        start_date: business.start_date, planning_months: 24, business_units: businessUnits,
+        start_date: new Date(new Date().setMonth(new Date().getMonth()-pastMonths)).toISOString().split('T')[0],
+        planning_months: totalMonths, business_units: businessUnits,
         plan_lines: planLines, shared_lines: [],
         settings: { shared_cost_fixed_pct:0.5, corporate_tax_rate:0.30, opening_cash_balance:0,
           submitted_assets: assets.filter(a=>a.name), structure_confirmed: false },
       }])
       if (configErr) throw configErr
 
-      // Historical actuals
-      const allLines = planLines
-      for (const l of allLines) {
-        const hist = historicalData[l.id] || {}
-        for (const [monthIdx, amount] of Object.entries(hist)) {
-          if (!amount) continue
-          const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()-historicalMonths+Number(monthIdx))
-          const period = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`
-          await supabase.from('generic_actuals').upsert({
-            client_id: client.id, unit_id: l.unit_id, period,
-            line_values: { [l.id]: amount }, submitted: true, submitted_at: new Date().toISOString(),
-            submitted_by: business.contact_name, entered_by: business.contact_name,
-          }, { onConflict: 'client_id,unit_id,period' })
+      // Save historical (offset < 0) as actuals
+      for (const key of keys) {
+        for (const p of getProducts(key).filter(p=>p.name)) {
+          for (let offset = -pastMonths; offset < 0; offset++) {
+            const vals = monthData[p.id]?.[offset]
+            if (!vals || (!vals.revenue && !vals.cost)) continue
+            const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()+offset)
+            const period = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`
+            await supabase.from('generic_actuals').upsert({
+              client_id: client.id, unit_id: key, period,
+              line_values: { [`${p.id}_rev`]: vals.revenue||0, [`${p.id}_cost`]: vals.cost||0 },
+              submitted: true, submitted_at: new Date().toISOString(),
+              submitted_by: business.contact_name, entered_by: business.contact_name,
+            }, { onConflict: 'client_id,unit_id,period' })
+          }
         }
       }
 
@@ -205,9 +202,11 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
     </div>
   )
 
+  const activeKeys = hasUnits ? units.filter(u=>u.name).map(u=>u.id) : [wholeKey]
+
   return (
     <div style={{minHeight:'100vh',background:C.cream,fontFamily:"'Segoe UI',system-ui,sans-serif",padding:'2rem 1rem'}}>
-      <div style={{maxWidth:800,margin:'0 auto'}}>
+      <div style={{maxWidth:880,margin:'0 auto'}}>
         <div style={{display:'flex',gap:'0.3rem',marginBottom:'1.5rem'}}>
           {STEPS.map((s,i)=><div key={s} style={{flex:1,height:4,borderRadius:2,background:i<=step?C.cyan:C.border}}/>)}
         </div>
@@ -217,8 +216,8 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
         {step===0&&(
           <div style={card}>
             <p style={{fontSize:'0.92rem',color:C.navy,lineHeight:1.8,marginBottom:'1rem'}}>Welcome. This form collects information about your business so we can set up your Clearview financial dashboard.</p>
-            <p style={{fontSize:'0.88rem',color:C.slate,lineHeight:1.8,marginBottom:'1rem'}}>You will be asked for: basic business details, how your business is structured, and your financial figures — past months where available, and your plan for the months ahead.</p>
-            <p style={{fontSize:'0.88rem',color:C.slate,lineHeight:1.8,marginBottom:'1.5rem'}}>Estimates are fine where exact figures are not available. This takes about 15-20 minutes.</p>
+            <p style={{fontSize:'0.88rem',color:C.slate,lineHeight:1.8,marginBottom:'1rem'}}>For each product or service you sell, you will enter its revenue and the direct cost of producing it, side by side, so we can see what each one earns.</p>
+            <p style={{fontSize:'0.88rem',color:C.slate,lineHeight:1.8,marginBottom:'1.5rem'}}>Estimates are fine where exact figures are not available. This takes about 20-30 minutes.</p>
             <button style={btn()} onClick={()=>setStep(1)}>Get Started</button>
           </div>
         )}
@@ -247,7 +246,7 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
         {step===2&&(
           <div style={card}>
             <div style={secH}>How is your business structured?</div>
-            <p style={{fontSize:'0.85rem',color:C.slate,marginBottom:'1.25rem',lineHeight:1.7}}>Do you operate this business as separate parts — for example different shops, products, or services that you track separately — or as one whole business?</p>
+            <p style={{fontSize:'0.85rem',color:C.slate,marginBottom:'1.25rem',lineHeight:1.7}}>Do you operate this business as separate parts — for example different shops or locations — or as one whole business?</p>
             <div style={{display:'flex',gap:'0.75rem',marginBottom:'1.25rem'}}>
               <button style={{...btn(hasUnits===true?C.cyan:C.white),color:hasUnits===true?C.white:C.navy,border:`2px solid ${C.cyan}`,flex:1}} onClick={()=>setHasUnits(true)}>Yes, separate parts</button>
               <button style={{...btn(hasUnits===false?C.cyan:C.white),color:hasUnits===false?C.white:C.navy,border:`2px solid ${C.cyan}`,flex:1}} onClick={()=>setHasUnits(false)}>No, one business</button>
@@ -255,19 +254,20 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
 
             {hasUnits===true&&(
               <div>
-                <p style={{fontSize:'0.83rem',color:C.slate,marginBottom:'0.75rem'}}>Name each part of your business:</p>
+                <p style={{fontSize:'0.83rem',color:C.slate,marginBottom:'0.75rem'}}>Name each part of your business (e.g. Shop 1, Farm A, Branch Office):</p>
                 {units.map((u,i)=>(
                   <div key={u.id} style={{display:'flex',gap:'0.5rem',marginBottom:'0.5rem'}}>
-                    <input style={inp} placeholder="e.g. Shop 1, Eggs, Advisory Services" value={u.name} onChange={e=>updateUnit(i,e.target.value)}/>
+                    <input style={inp} placeholder="e.g. Shop 1" value={u.name} onChange={e=>updateUnit(i,e.target.value)}/>
                     {units.length>1&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>removeUnit(i)}>×</button>}
                   </div>
                 ))}
                 <button style={smallBtn()} onClick={addUnit}>+ Add Another Part</button>
+                <p style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.75rem'}}>On the next page, you will list the products or services each part sells.</p>
               </div>
             )}
 
             {hasUnits===false&&(
-              <p style={{fontSize:'0.83rem',color:C.teal,padding:'0.75rem',background:'#EBF8FF',borderRadius:5}}>You will enter revenue by product, costs by product, common costs, and assets in the next step.</p>
+              <p style={{fontSize:'0.83rem',color:C.teal,padding:'0.75rem',background:'#EBF8FF',borderRadius:5}}>On the next page, you will list each product or service you sell, with its revenue and direct cost side by side.</p>
             )}
 
             <div style={{display:'flex',gap:'0.6rem',marginTop:'1.25rem'}}>
@@ -279,57 +279,51 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
 
         {step===3&&(
           <div style={card}>
-            <div style={secH}>Financial Data</div>
+            <div style={secH}>Products & Figures</div>
+            <div style={{background:'#EBF8FF',borderRadius:6,padding:'0.85rem 1rem',marginBottom:'1.25rem'}}>
+              <p style={{fontSize:'0.82rem',color:C.navy,lineHeight:1.6,margin:0}}>
+                For each product, enter <strong>revenue</strong> (money it brought in) and <strong>cost</strong> (what it directly cost to produce or buy) for the same month, side by side. The column marked <strong>"This Month"</strong> is the current month — months to its left are the past, months to its right are your plan for the future.
+              </p>
+            </div>
+
             <div style={{display:'flex',gap:'1.5rem',marginBottom:'1.5rem',flexWrap:'wrap'}}>
               <div>
-                <label style={lbl}>Past months you can provide</label>
-                <select style={{...inp,maxWidth:200}} value={historicalMonths} onChange={e=>setHistoricalMonths(Number(e.target.value))}>
-                  {[0,3,6,12,24,36].map(n=><option key={n} value={n}>{n===0?'None — starting fresh':`${n} months`}</option>)}
+                <label style={lbl}>Past months you can provide figures for</label>
+                <select style={{...inp,maxWidth:200}} value={pastMonths} onChange={e=>setPastMonths(Number(e.target.value))}>
+                  {[0,3,6,12].map(n=><option key={n} value={n}>{n===0?'None — starting fresh':`${n} months back`}</option>)}
                 </select>
               </div>
               <div>
-                <label style={lbl}>Months ahead to plan</label>
-                <select style={{...inp,maxWidth:200}} value={forwardMonths} onChange={e=>setForwardMonths(Number(e.target.value))}>
-                  {[12,24,36].map(n=><option key={n} value={n}>{n} months</option>)}
+                <label style={lbl}>Future months to plan</label>
+                <select style={{...inp,maxWidth:200}} value={futureMonths} onChange={e=>setFutureMonths(Number(e.target.value))}>
+                  {[3,6,12].map(n=><option key={n} value={n}>{n} months ahead</option>)}
                 </select>
               </div>
             </div>
 
-            {hasUnits===true&&units.map(u=>{
-              const lines = getUnitLines(u.id)
-              return (
-                <div key={u.id} style={{marginBottom:'2rem',padding:'1rem',background:'#F4F8FC',borderRadius:6}}>
-                  <div style={{fontWeight:700,fontSize:'0.92rem',color:C.navy,marginBottom:'1rem'}}>{u.name}</div>
-                  <LineGroup label="Revenue Lines" lines={lines.revenueLines} kind="revenueLines" unitId={u.id}
-                    addUnitLine={addUnitLine} updateUnitLine={updateUnitLine}
-                    historicalMonths={historicalMonths} forwardMonths={forwardMonths}
-                    historicalData={historicalData} forwardData={forwardData} setHist={setHist} setFwd={setFwd}
-                    monthLabel={monthLabel} cc={business.currency}/>
-                  <LineGroup label="Cost Lines" lines={lines.costLines} kind="costLines" unitId={u.id}
-                    addUnitLine={addUnitLine} updateUnitLine={updateUnitLine}
-                    historicalMonths={historicalMonths} forwardMonths={forwardMonths}
-                    historicalData={historicalData} forwardData={forwardData} setHist={setHist} setFwd={setFwd}
-                    monthLabel={monthLabel} cc={business.currency}/>
-                </div>
-              )
-            })}
-
-            {hasUnits===false&&(
+            {hasUnits===true?units.filter(u=>u.name).map(u=>(
+              <div key={u.id} style={{marginBottom:'2rem'}}>
+                <div style={{fontWeight:700,fontSize:'0.95rem',color:C.navy,marginBottom:'0.75rem',padding:'0.5rem 0.75rem',background:C.navy,color:C.white,borderRadius:5}}>{u.name}</div>
+                <ProductList unitKey={u.id} products={getProducts(u.id)} addProduct={addProduct} updateProduct={updateProduct} removeProduct={removeProduct}
+                  pastMonths={pastMonths} futureMonths={futureMonths} monthData={monthData} setFigure={setFigure} monthLabel={monthLabel} cc={business.currency}/>
+              </div>
+            )):hasUnits===false&&(
               <div>
-                <SimpleLineGroup label="Revenue by Product" lines={revenueLines} setter={setRevenueLines}
-                  historicalMonths={historicalMonths} forwardMonths={forwardMonths}
-                  historicalData={historicalData} forwardData={forwardData} setHist={setHist} setFwd={setFwd}
-                  monthLabel={monthLabel} cc={business.currency} addLine={addLine} updateLine={updateLine} removeLine={removeLine} prefix="rev"/>
-                <SimpleLineGroup label="Cost by Product" lines={costLines} setter={setCostLines}
-                  historicalMonths={historicalMonths} forwardMonths={forwardMonths}
-                  historicalData={historicalData} forwardData={forwardData} setHist={setHist} setFwd={setFwd}
-                  monthLabel={monthLabel} cc={business.currency} addLine={addLine} updateLine={updateLine} removeLine={removeLine} prefix="cost"/>
-                <SimpleLineGroup label="Common Costs (staff, rent, admin — not tied to one product)" lines={commonCosts} setter={setCommonCosts}
-                  historicalMonths={historicalMonths} forwardMonths={forwardMonths}
-                  historicalData={historicalData} forwardData={forwardData} setHist={setHist} setFwd={setFwd}
-                  monthLabel={monthLabel} cc={business.currency} addLine={addLine} updateLine={updateLine} removeLine={removeLine} prefix="common"/>
-                <div style={{marginBottom:'1.5rem'}}>
-                  <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy,marginBottom:'0.6rem'}}>Assets (equipment, stock, vehicles you own)</div>
+                <ProductList unitKey={wholeKey} products={getProducts(wholeKey)} addProduct={addProduct} updateProduct={updateProduct} removeProduct={removeProduct}
+                  pastMonths={pastMonths} futureMonths={futureMonths} monthData={monthData} setFigure={setFigure} monthLabel={monthLabel} cc={business.currency}/>
+
+                <div style={{marginTop:'2rem',marginBottom:'1.5rem'}}>
+                  <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy,marginBottom:'0.4rem'}}>Common Costs</div>
+                  <p style={{fontSize:'0.78rem',color:C.slate,marginBottom:'0.75rem'}}>Costs not tied to one product — staff salaries, rent, admin.</p>
+                  {commonCosts.map((l,i)=>(
+                    <CommonCostLine key={l.id} line={l} idx={i} setter={setCommonCosts} lines={commonCosts}
+                      pastMonths={pastMonths} futureMonths={futureMonths} commonCostData={commonCostData} setCommonFigure={setCommonFigure} monthLabel={monthLabel} cc={business.currency}/>
+                  ))}
+                  <button style={smallBtn()} onClick={()=>setCommonCosts(c=>[...c,{id:genId('common'),name:''}])}>+ Add Common Cost</button>
+                </div>
+
+                <div style={{marginBottom:'1rem'}}>
+                  <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy,marginBottom:'0.6rem'}}>Assets (equipment, stock, vehicles you own — current value only)</div>
                   {assets.map((a,i)=>(
                     <div key={a.id} style={{display:'grid',gridTemplateColumns:'2fr 1fr auto',gap:'0.5rem',marginBottom:'0.5rem'}}>
                       <input style={inp} placeholder="Asset name" value={a.name} onChange={e=>setAssets(arr=>arr.map((x,j)=>j===i?{...x,name:e.target.value}:x))}/>
@@ -342,7 +336,7 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
               </div>
             )}
 
-            <div><label style={lbl}>Anything else we should know?</label><textarea style={{...inp,minHeight:80,resize:'vertical'}} value={notes} onChange={e=>setNotes(e.target.value)}/></div>
+            <div style={{marginTop:'1rem'}}><label style={lbl}>Anything else we should know?</label><textarea style={{...inp,minHeight:80,resize:'vertical'}} value={notes} onChange={e=>setNotes(e.target.value)}/></div>
             <div style={{display:'flex',gap:'0.6rem',marginTop:'1.25rem'}}>
               <button style={ghostBtn} onClick={()=>setStep(2)}>Back</button>
               <button style={btn()} onClick={()=>setStep(4)}>Continue</button>
@@ -359,9 +353,17 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
             </div>
             <div style={{marginBottom:'1rem'}}>
               <div style={{fontSize:'0.82rem',fontWeight:600,color:C.navy,marginBottom:'0.4rem'}}>Structure</div>
-              <div style={{fontSize:'0.82rem',color:C.slate}}>{hasUnits?`${units.length} separate parts: ${units.map(u=>u.name).join(', ')}`:'Single business with itemised revenue, costs, common costs, and assets'}</div>
+              <div style={{fontSize:'0.82rem',color:C.slate}}>
+                {hasUnits?`${units.filter(u=>u.name).length} separate parts: ${units.filter(u=>u.name).map(u=>u.name).join(', ')}`:'Single business'}
+              </div>
+              {activeKeys.map(k=>{
+                const prods = getProducts(k).filter(p=>p.name)
+                return prods.length>0 ? <div key={k} style={{fontSize:'0.8rem',color:C.slate,marginTop:'0.3rem'}}>
+                  {hasUnits&&<strong>{units.find(u=>u.id===k)?.name}: </strong>}{prods.map(p=>p.name).join(', ')}
+                </div> : null
+              })}
             </div>
-            <div style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1.25rem'}}>{historicalMonths} months of historical data · {forwardMonths} months forward plan</div>
+            <div style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1.25rem'}}>{pastMonths} months of past data · {futureMonths} months forward plan</div>
             {error&&<div style={{color:C.red,fontSize:'0.85rem',marginBottom:'1rem',padding:'0.7rem',background:'#FDF0EE',borderRadius:5}}>{error}</div>}
             <div style={{display:'flex',gap:'0.6rem'}}>
               <button style={ghostBtn} onClick={()=>setStep(3)}>Back</button>
@@ -374,72 +376,105 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
   )
 }
 
-function LineGroup({label,lines,kind,unitId,addUnitLine,updateUnitLine,historicalMonths,forwardMonths,historicalData,forwardData,setHist,setFwd,monthLabel,cc}:any) {
+function ProductList({unitKey,products,addProduct,updateProduct,removeProduct,pastMonths,futureMonths,monthData,setFigure,monthLabel,cc}:any) {
   const [expanded, setExpanded] = useState<Record<string,boolean>>({})
   return (
-    <div style={{marginBottom:'1.25rem'}}>
-      <div style={{fontWeight:700,fontSize:'0.82rem',color:C.navy,marginBottom:'0.5rem'}}>{label}</div>
-      {lines.map((l:any)=>(
-        <div key={l.id} style={{marginBottom:'0.5rem'}}>
+    <div>
+      <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'0.75rem'}}>List each product or service. For each one, you will enter its revenue and direct cost together.</p>
+      {products.map((p:any,i:number)=>(
+        <div key={p.id} style={{marginBottom:'0.75rem',border:`1px solid ${C.border}`,borderRadius:6,padding:'0.75rem'}}>
           <div style={{display:'flex',gap:'0.5rem',alignItems:'center'}}>
-            <input style={inp} placeholder="Line name" value={l.name} onChange={e=>updateUnitLine(unitId,kind,l.id,e.target.value)}/>
-            {l.name&&<button style={smallBtn()} onClick={()=>setExpanded(x=>({...x,[l.id]:!x[l.id]}))}>{expanded[l.id]?'Hide':'Enter figures'}</button>}
+            <input style={inp} placeholder="Product or service name (e.g. Eggs, Off-layers, Advisory visits)" value={p.name} onChange={e=>updateProduct(unitKey,i,e.target.value)}/>
+            {p.name&&<button style={smallBtn()} onClick={()=>setExpanded(x=>({...x,[p.id]:!x[p.id]}))}>{expanded[p.id]?'Hide figures':'Enter figures'}</button>}
+            {products.length>1&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>removeProduct(unitKey,i)}>×</button>}
           </div>
-          {expanded[l.id]&&l.name&&<MonthGrid lineId={l.id} historicalMonths={historicalMonths} forwardMonths={forwardMonths} historicalData={historicalData} forwardData={forwardData} setHist={setHist} setFwd={setFwd} monthLabel={monthLabel} cc={cc}/>}
+          {expanded[p.id]&&p.name&&(
+            <ProductMonthGrid productId={p.id} pastMonths={pastMonths} futureMonths={futureMonths} monthData={monthData} setFigure={setFigure} monthLabel={monthLabel} cc={cc}/>
+          )}
         </div>
       ))}
-      <button style={smallBtn()} onClick={()=>addUnitLine(unitId,kind)}>+ Add Line</button>
+      <button style={smallBtn()} onClick={()=>addProduct(unitKey)}>+ Add Product</button>
     </div>
   )
 }
 
-function SimpleLineGroup({label,lines,historicalMonths,forwardMonths,historicalData,forwardData,setHist,setFwd,monthLabel,cc,addLine,updateLine,removeLine,setter,prefix}:any) {
-  const [expanded, setExpanded] = useState<Record<string,boolean>>({})
+function ProductMonthGrid({productId,pastMonths,futureMonths,monthData,setFigure,monthLabel,cc}:any) {
+  const offsets = []
+  for (let i=-pastMonths;i<=futureMonths;i++) offsets.push(i)
   return (
-    <div style={{marginBottom:'1.5rem'}}>
-      <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy,marginBottom:'0.6rem'}}>{label}</div>
-      {lines.map((l:any,i:number)=>(
-        <div key={l.id} style={{marginBottom:'0.5rem'}}>
-          <div style={{display:'flex',gap:'0.5rem',alignItems:'center'}}>
-            <input style={inp} placeholder="Line name" value={l.name} onChange={e=>updateLine(setter,i,e.target.value)}/>
-            {l.name&&<button style={smallBtn()} onClick={()=>setExpanded(x=>({...x,[l.id]:!x[l.id]}))}>{expanded[l.id]?'Hide':'Enter figures'}</button>}
-            {lines.length>1&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>removeLine(setter,i)}>×</button>}
-          </div>
-          {expanded[l.id]&&l.name&&<MonthGrid lineId={l.id} historicalMonths={historicalMonths} forwardMonths={forwardMonths} historicalData={historicalData} forwardData={forwardData} setHist={setHist} setFwd={setFwd} monthLabel={monthLabel} cc={cc}/>}
-        </div>
-      ))}
-      <button style={smallBtn()} onClick={()=>addLine(setter,prefix)}>+ Add Line</button>
-    </div>
-  )
-}
-
-function MonthGrid({lineId,historicalMonths,forwardMonths,historicalData,forwardData,setHist,setFwd,monthLabel,cc}:any) {
-  return (
-    <div style={{marginTop:'0.5rem',padding:'0.75rem',background:C.white,borderRadius:5,border:`1px solid ${C.border}`}}>
-      {historicalMonths>0&&(
-        <div style={{marginBottom:'0.6rem'}}>
-          <div style={{fontSize:'0.7rem',color:C.slate,marginBottom:'0.3rem'}}>Historical ({cc})</div>
-          <div style={{display:'flex',gap:'0.4rem',overflowX:'auto',paddingBottom:'0.3rem'}}>
-            {Array.from({length:historicalMonths},(_,i)=>(
-              <div key={i} style={{minWidth:90}}>
-                <div style={{fontSize:'0.65rem',color:C.slate,marginBottom:'0.15rem'}}>{monthLabel(i,true)}</div>
-                <input type="number" style={{...inp,padding:'0.3rem 0.4rem',fontSize:'0.78rem',textAlign:'right'}} value={historicalData[lineId]?.[i]||''} placeholder="0" onChange={e=>setHist(lineId,i,Number(e.target.value))}/>
-              </div>
+    <div style={{marginTop:'0.75rem',overflowX:'auto'}}>
+      <table style={{borderCollapse:'collapse',fontSize:'0.78rem'}}>
+        <thead>
+          <tr>
+            <th style={{padding:'4px 6px',textAlign:'left',minWidth:70}}></th>
+            {offsets.map(o=>(
+              <th key={o} style={{
+                padding:'4px 6px',textAlign:'center',minWidth:88,
+                background:o===0?C.cyan:o<0?'#F4F8FC':'#EBF8FF',
+                color:o===0?C.white:C.navy,
+                borderLeft:o===0?`2px solid ${C.navy}`:'none',
+                borderRight:o===0?`2px solid ${C.navy}`:'none',
+                fontWeight:o===0?700:600,
+              }}>{o===0?'This Month':monthLabel(o)}</th>
             ))}
-          </div>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={{padding:'4px 6px',fontWeight:600,color:C.green,fontSize:'0.76rem'}}>Revenue</td>
+            {offsets.map(o=>(
+              <td key={o} style={{padding:'2px 4px',background:o===0?'#F0FBFF':'transparent',borderLeft:o===0?`2px solid ${C.navy}`:'none',borderRight:o===0?`2px solid ${C.navy}`:'none'}}>
+                <input type="number" style={{width:'100%',padding:'0.3rem 0.35rem',fontSize:'0.76rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:C.white,boxSizing:'border-box'}}
+                  value={monthData[productId]?.[o]?.revenue||''} placeholder="0" onChange={e=>setFigure(productId,o,'revenue',Number(e.target.value))}/>
+              </td>
+            ))}
+          </tr>
+          <tr>
+            <td style={{padding:'4px 6px',fontWeight:600,color:C.red,fontSize:'0.76rem'}}>Cost</td>
+            {offsets.map(o=>(
+              <td key={o} style={{padding:'2px 4px',background:o===0?'#F0FBFF':'transparent',borderLeft:o===0?`2px solid ${C.navy}`:'none',borderRight:o===0?`2px solid ${C.navy}`:'none',borderBottom:o===0?`2px solid ${C.navy}`:'none'}}>
+                <input type="number" style={{width:'100%',padding:'0.3rem 0.35rem',fontSize:'0.76rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:C.white,boxSizing:'border-box'}}
+                  value={monthData[productId]?.[o]?.cost||''} placeholder="0" onChange={e=>setFigure(productId,o,'cost',Number(e.target.value))}/>
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+      <p style={{fontSize:'0.7rem',color:C.slate,marginTop:'0.4rem'}}>All figures in {cc}. Past months on the left are what actually happened. Future months on the right are your plan.</p>
+    </div>
+  )
+}
+
+function CommonCostLine({line,idx,setter,lines,pastMonths,futureMonths,commonCostData,setCommonFigure,monthLabel,cc}:any) {
+  const [expanded,setExpanded] = useState(false)
+  const offsets = []
+  for (let i=-pastMonths;i<=futureMonths;i++) offsets.push(i)
+  return (
+    <div style={{marginBottom:'0.6rem'}}>
+      <div style={{display:'flex',gap:'0.5rem',alignItems:'center'}}>
+        <input style={inp} placeholder="e.g. Staff salaries, Rent" value={line.name} onChange={e=>setter((l:any)=>l.map((x:any,i:number)=>i===idx?{...x,name:e.target.value}:x))}/>
+        {line.name&&<button style={smallBtn()} onClick={()=>setExpanded(!expanded)}>{expanded?'Hide':'Enter figures'}</button>}
+        {lines.length>1&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>setter((l:any)=>l.filter((_:any,i:number)=>i!==idx))}>×</button>}
+      </div>
+      {expanded&&line.name&&(
+        <div style={{marginTop:'0.5rem',overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',fontSize:'0.78rem'}}>
+            <thead><tr>
+              {offsets.map(o=>(
+                <th key={o} style={{padding:'4px 6px',textAlign:'center',minWidth:88,background:o===0?C.cyan:o<0?'#F4F8FC':'#EBF8FF',color:o===0?C.white:C.navy,fontWeight:o===0?700:600}}>{o===0?'This Month':monthLabel(o)}</th>
+              ))}
+            </tr></thead>
+            <tbody><tr>
+              {offsets.map(o=>(
+                <td key={o} style={{padding:'2px 4px'}}>
+                  <input type="number" style={{width:'100%',padding:'0.3rem 0.35rem',fontSize:'0.76rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:C.white,boxSizing:'border-box'}}
+                    value={commonCostData[line.id]?.[o]||''} placeholder="0" onChange={e=>setCommonFigure(line.id,o,Number(e.target.value))}/>
+                </td>
+              ))}
+            </tr></tbody>
+          </table>
         </div>
       )}
-      <div>
-        <div style={{fontSize:'0.7rem',color:C.slate,marginBottom:'0.3rem'}}>Forward Plan ({cc})</div>
-        <div style={{display:'flex',gap:'0.4rem',overflowX:'auto',paddingBottom:'0.3rem'}}>
-          {Array.from({length:Math.min(forwardMonths,12)},(_,i)=>(
-            <div key={i} style={{minWidth:90}}>
-              <div style={{fontSize:'0.65rem',color:C.slate,marginBottom:'0.15rem'}}>{monthLabel(i,false)}</div>
-              <input type="number" style={{...inp,padding:'0.3rem 0.4rem',fontSize:'0.78rem',textAlign:'right'}} value={forwardData[lineId]?.[i]||''} placeholder="0" onChange={e=>setFwd(lineId,i,Number(e.target.value))}/>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   )
 }
