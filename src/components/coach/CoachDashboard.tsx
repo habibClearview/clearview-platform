@@ -208,9 +208,25 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   const selClientFullData=clientData[selClientId]||{}
 
   // \u2500\u2500 OVERVIEW \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  const newSubmissions = clients.filter(c => c.status === 'setup' && (c.notes || '').includes('Self-submitted intake'))
+
   function OverviewTab(){
     return(
       <div>
+        {newSubmissions.length>0&&(
+          <div style={{background:'#EBF8FF',border:`1px solid ${C.teal}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem'}}>
+            <div style={{fontWeight:700,color:C.teal,marginBottom:'0.6rem'}}>New Clearview data capture submissions ({newSubmissions.length})</div>
+            {newSubmissions.map(c=>(
+              <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.5rem 0.75rem',background:C.white,borderRadius:5,marginBottom:'0.4rem',border:`1px solid ${C.border}`}}>
+                <div>
+                  <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{c.name}</div>
+                  <div style={{fontSize:'0.7rem',color:C.slate}}>{c.contact_name}{c.created_at?(' \u00b7 submitted '+new Date(c.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})):''}</div>
+                </div>
+                <button style={addBtn(true,C.teal)} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}>Review {'\u2192'}</button>
+              </div>
+            ))}
+          </div>
+        )}
         {pending>0&&<div style={{background:'#FFF8E8',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontWeight:600,color:C.amber}}>\u23f3 {pending} timesheet{pending>1?'s':''} awaiting approval</span><button style={addBtn(true,C.amber)} onClick={()=>setView('team')}>Review \u2192</button></div>}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(165px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
           <KPI label="Active Engagements" value={String(activeClients.length)}/>
