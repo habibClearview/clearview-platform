@@ -122,6 +122,36 @@ function ClientCard({client,programmes,onClick}){
 }
 
 // \u2500\u2500\u2500 MAIN COMPONENT \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function DeleteClientConfirm({client,onCancel,onDeleted}){
+  const [text,setText]=useState('')
+  const [deleting,setDeleting]=useState(false)
+
+  async function handleDelete(){
+    setDeleting(true)
+    try{
+      await supabase.from('generic_actuals').delete().eq('client_id',client.id)
+      await supabase.from('generic_model_config').delete().eq('client_id',client.id)
+      await supabase.from('engagement_clients').delete().eq('id',client.id)
+      onDeleted()
+    }catch(e){
+      alert('Delete failed: '+e.message)
+      setDeleting(false)
+    }
+  }
+
+  return(
+    <div style={{...card,border:`2px solid ${C.red}`,background:'#FDF0EE'}}>
+      <div style={{fontWeight:700,color:C.red,marginBottom:'0.5rem'}}>Delete {client.name}?</div>
+      <p style={{fontSize:'0.85rem',color:C.navy,lineHeight:1.7,marginBottom:'0.85rem'}}>This permanently deletes this client, their entire financial model, and all submitted actuals. This cannot be undone. Type the client's name below to confirm.</p>
+      <input style={{...inp,marginBottom:'0.75rem'}} placeholder={client.name} value={text} onChange={e=>setText(e.target.value)} autoFocus/>
+      <div style={{display:'flex',gap:'0.6rem'}}>
+        <button disabled={text!==client.name||deleting} onClick={handleDelete} style={{fontFamily:'monospace',fontSize:'0.8rem',fontWeight:700,padding:'0.5rem 1.1rem',border:'none',borderRadius:5,background:text===client.name?C.red:C.border,color:C.white,cursor:text===client.name?'pointer':'not-allowed'}}>{deleting?'Deleting...':'Permanently Delete'}</button>
+        <button onClick={onCancel} style={addBtn(true,C.slate)}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
 export default function CoachDashboard({onSignOut,userRole='super_coach',userName='Habib Onifade'}){
   const [programmes,setPrograms]=useState([])
   const [clients,setClients]=useState([])
@@ -132,26 +162,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   const [view,setView]=useState('overview')
   const [selClientId,setSelClientId]=useState(null)
   const [selProgId,setSelProgId]=useState(null)
-  const [deleteConfirmText,setDeleteConfirmText]=useState('')
   const [showDeleteConfirm,setShowDeleteConfirm]=useState(false)
-  const [deleting,setDeleting]=useState(false)
-
-  async function deleteClient(clientId){
-    setDeleting(true)
-    try{
-      await supabase.from('generic_actuals').delete().eq('client_id',clientId)
-      await supabase.from('generic_model_config').delete().eq('client_id',clientId)
-      await supabase.from('engagement_clients').delete().eq('id',clientId)
-      setClients(prev=>prev.filter(c=>c.id!==clientId))
-      setSelClientId(null)
-      setShowDeleteConfirm(false)
-      setDeleteConfirmText('')
-      setView('overview')
-    }catch(e){
-      alert('Delete failed: '+e.message)
-    }
-    setDeleting(false)
-  }
   const [clientData,setClientData]=useState({})
   const [clientLoading,setClientLoading]=useState(false)
   const [activeTab,setActiveTab]=useState('cover')
@@ -348,15 +359,11 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           </div>
         </div>
         {showDeleteConfirm&&(
-          <div style={{...card,border:`2px solid ${C.red}`,background:'#FDF0EE'}}>
-            <div style={{fontWeight:700,color:C.red,marginBottom:'0.5rem'}}>Delete {selClient.name}?</div>
-            <p style={{fontSize:'0.85rem',color:C.navy,lineHeight:1.7,marginBottom:'0.85rem'}}>This permanently deletes this client, their entire financial model, and all submitted actuals. This cannot be undone. Type the client's name below to confirm.</p>
-            <input style={{...inp,marginBottom:'0.75rem'}} placeholder={selClient.name} value={deleteConfirmText} onChange={e=>setDeleteConfirmText(e.target.value)}/>
-            <div style={{display:'flex',gap:'0.6rem'}}>
-              <button disabled={deleteConfirmText!==selClient.name||deleting} onClick={()=>deleteClient(selClient.id)} style={{fontFamily:'monospace',fontSize:'0.8rem',fontWeight:700,padding:'0.5rem 1.1rem',border:'none',borderRadius:5,background:deleteConfirmText===selClient.name?C.red:C.border,color:C.white,cursor:deleteConfirmText===selClient.name?'pointer':'not-allowed'}}>{deleting?'Deleting...':'Permanently Delete'}</button>
-              <button onClick={()=>{setShowDeleteConfirm(false);setDeleteConfirmText('')}} style={addBtn(true,C.slate)}>Cancel</button>
-            </div>
-          </div>
+          <DeleteClientConfirm
+            client={selClient}
+            onCancel={()=>setShowDeleteConfirm(false)}
+            onDeleted={()=>{setClients(prev=>prev.filter(c=>c.id!==selClient.id));setSelClientId(null);setView('overview')}}
+          />
         )}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'1rem',marginBottom:'1.25rem'}}>
           <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 1 — Open Clearview</div><p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.7,margin:0}}>Click "Open Clearview Financial Model" above. Go to Settings to define business units and revenue lines.</p></div>
