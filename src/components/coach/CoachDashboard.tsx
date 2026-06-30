@@ -132,6 +132,26 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   const [view,setView]=useState('overview')
   const [selClientId,setSelClientId]=useState(null)
   const [selProgId,setSelProgId]=useState(null)
+  const [deleteConfirmText,setDeleteConfirmText]=useState('')
+  const [showDeleteConfirm,setShowDeleteConfirm]=useState(false)
+  const [deleting,setDeleting]=useState(false)
+
+  async function deleteClient(clientId){
+    setDeleting(true)
+    try{
+      await supabase.from('generic_actuals').delete().eq('client_id',clientId)
+      await supabase.from('generic_model_config').delete().eq('client_id',clientId)
+      await supabase.from('engagement_clients').delete().eq('id',clientId)
+      setClients(prev=>prev.filter(c=>c.id!==clientId))
+      setSelClientId(null)
+      setShowDeleteConfirm(false)
+      setDeleteConfirmText('')
+      setView('overview')
+    }catch(e){
+      alert('Delete failed: '+e.message)
+    }
+    setDeleting(false)
+  }
   const [clientData,setClientData]=useState({})
   const [clientLoading,setClientLoading]=useState(false)
   const [activeTab,setActiveTab]=useState('cover')
@@ -323,9 +343,21 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
               <a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily:'monospace',fontSize:'0.78rem',padding:'0.4rem 1rem',borderRadius:4,background:C.teal,color:C.white,textDecoration:'none',fontWeight:700}}>Open Clearview Financial Model ↗</a>
+              <button onClick={()=>setShowDeleteConfirm(true)} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid rgba(255,255,255,0.4)',color:'rgba(255,255,255,0.8)',cursor:'pointer'}}>Delete Client</button>
             </div>
           </div>
         </div>
+        {showDeleteConfirm&&(
+          <div style={{...card,border:`2px solid ${C.red}`,background:'#FDF0EE'}}>
+            <div style={{fontWeight:700,color:C.red,marginBottom:'0.5rem'}}>Delete {selClient.name}?</div>
+            <p style={{fontSize:'0.85rem',color:C.navy,lineHeight:1.7,marginBottom:'0.85rem'}}>This permanently deletes this client, their entire financial model, and all submitted actuals. This cannot be undone. Type the client's name below to confirm.</p>
+            <input style={{...inp,marginBottom:'0.75rem'}} placeholder={selClient.name} value={deleteConfirmText} onChange={e=>setDeleteConfirmText(e.target.value)}/>
+            <div style={{display:'flex',gap:'0.6rem'}}>
+              <button disabled={deleteConfirmText!==selClient.name||deleting} onClick={()=>deleteClient(selClient.id)} style={{fontFamily:'monospace',fontSize:'0.8rem',fontWeight:700,padding:'0.5rem 1.1rem',border:'none',borderRadius:5,background:deleteConfirmText===selClient.name?C.red:C.border,color:C.white,cursor:deleteConfirmText===selClient.name?'pointer':'not-allowed'}}>{deleting?'Deleting...':'Permanently Delete'}</button>
+              <button onClick={()=>{setShowDeleteConfirm(false);setDeleteConfirmText('')}} style={addBtn(true,C.slate)}>Cancel</button>
+            </div>
+          </div>
+        )}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'1rem',marginBottom:'1.25rem'}}>
           <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 1 — Open Clearview</div><p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.7,margin:0}}>Click "Open Clearview Financial Model" above. Go to Settings to define business units and revenue lines.</p></div>
           <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 2 — Define Business Units</div><p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.7,margin:0}}>In Settings, add business units. Set each unit type: product, service, or aggregator.</p></div>
