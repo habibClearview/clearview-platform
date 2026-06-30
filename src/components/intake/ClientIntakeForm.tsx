@@ -1,6 +1,6 @@
 // @ts-nocheck
 'use client'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, Component } from 'react'
 import { supabase } from '@/lib/supabase'
 
 const C = {
@@ -24,7 +24,36 @@ function genId(prefix:string) { return `${prefix}_${Date.now()}_${Math.random().
 // A Product has: one revenue line, and one or more named cost lines (feed, DOC, vaccines, etc).
 // figureData stores { [revOrCostLineId]: { [monthOffset]: amount } } -- offset 0 = current month
 
-export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
+class IntakeErrorBoundary extends Component<{children:React.ReactNode},{hasError:boolean,errorMsg:string}> {
+  constructor(props:any) {
+    super(props)
+    this.state = { hasError: false, errorMsg: '' }
+  }
+  static getDerivedStateFromError(error:any) {
+    return { hasError: true, errorMsg: error?.message || String(error) }
+  }
+  componentDidCatch(error:any, info:any) {
+    console.error('Intake form error:', error, info)
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:C.cream,padding:'1.5rem'}}>
+          <div style={{...card,maxWidth:480,textAlign:'center'}}>
+            <div style={{fontSize:'2rem',marginBottom:'1rem'}}>⚠️</div>
+            <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.red,marginBottom:'0.75rem'}}>Something went wrong</div>
+            <p style={{color:C.slate,fontSize:'0.88rem',marginBottom:'1rem'}}>The form ran into a problem and could not continue. Please contact your coach with this message:</p>
+            <div style={{background:'#FDF0EE',borderRadius:5,padding:'0.75rem',fontSize:'0.78rem',color:C.red,fontFamily:'monospace',wordBreak:'break-word',marginBottom:'1rem'}}>{this.state.errorMsg}</div>
+            <button style={btn()} onClick={()=>window.location.reload()}>Reload and Try Again</button>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -186,7 +215,8 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
 
       setSubmitted(true)
     } catch(e:any) {
-      setError(e.message || 'Submission failed. Please try again or contact your coach.')
+      console.error('Intake submission failed:', e)
+      setError(e.message || 'Submission failed. Please try again or contact your coach. Error details: ' + JSON.stringify(e).slice(0,200))
     }
     setSubmitting(false)
   }
@@ -467,5 +497,13 @@ function SimpleLine({line,idx,setter,lines,pastMonths,futureMonths,figureData,se
       </div>
       {line.name&&<MonthRow label={line.name} labelColor={C.navy} lineId={line.id} pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel}/>}
     </div>
+  )
+}
+
+export default function ClientIntakeForm(props:{intakeToken:string}) {
+  return (
+    <IntakeErrorBoundary>
+      <ClientIntakeFormInner {...props}/>
+    </IntakeErrorBoundary>
   )
 }
