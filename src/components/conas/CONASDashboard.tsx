@@ -2028,6 +2028,42 @@ export default function CONASDashboard({
           </div>
         </div>
         <div style={card}>
+          <div style={secH}>Additional Debt Obligations</div>
+          <p style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.85rem'}}>Use this if the business has more than one loan -- bank loans, SACCO loans, or other non-bank facilities. Each is tracked separately in DSCR.</p>
+          {(inputs.debts||[]).map((d,i)=>(
+            <div key={i} style={{display:'grid',gridTemplateColumns:'1.5fr 1fr 1fr 1fr 1fr auto',gap:'0.5rem',alignItems:'end',padding:'0.6rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.5rem'}}>
+              <div><div style={hint}>Name</div><input style={inp} value={d.name||''} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],name:e.target.value};return{...p,debts:ds}})}/></div>
+              <div><div style={hint}>Principal ({cc})</div><input type="number" style={inp} value={d.principal||0} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],principal:Number(e.target.value)};return{...p,debts:ds}})}/></div>
+              <div><div style={hint}>Annual Rate %</div><input type="number" step="0.5" style={inp} value={((d.annualRate||0)*100).toFixed(1)} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],annualRate:Number(e.target.value)/100};return{...p,debts:ds}})}/></div>
+              <div><div style={hint}>Tenor (months)</div><input type="number" style={inp} value={d.tenorMonths||12} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],tenorMonths:Number(e.target.value)};return{...p,debts:ds}})}/></div>
+              <div><div style={hint}>Grace (months)</div><input type="number" style={inp} value={d.gracePeriodMonths||0} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],gracePeriodMonths:Number(e.target.value)};return{...p,debts:ds}})}/></div>
+              <button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>upd(p=>({...p,debts:(p.debts||[]).filter((_,j)=>j!==i)}))}>×</button>
+            </div>
+          ))}
+          <button style={addBtn(true)} onClick={()=>upd(p=>({...p,debts:[...(p.debts||[]),{name:'',principal:0,annualRate:0.18,tenorMonths:12,gracePeriodMonths:0,drawdownMonth:1,repaymentType:'amortising'}]}))}>+ Add Debt Obligation</button>
+        </div>
+        <div style={card}>
+          <div style={secH}>Trade Credit Lines</div>
+          <p style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.85rem'}}>Supplier credit received (payable) or credit given to a customer/licensing partner (receivable), tracked month by month. This feeds Days Payable / Days Receivable in Credit Risk and Going Concern.</p>
+          {(inputs.tradeCreditLines||[]).map((tc,i)=>(
+            <div key={tc.id} style={{padding:'0.6rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.6rem'}}>
+              <div style={{display:'flex',gap:'0.5rem',alignItems:'center',marginBottom:'0.5rem'}}>
+                <input style={{...inp,flex:2}} placeholder="e.g. Input Supplier, Licensing Partner" value={tc.name} onChange={e=>upd(p=>{const tcs=[...(p.tradeCreditLines||[])];tcs[i]={...tcs[i],name:e.target.value};return{...p,tradeCreditLines:tcs}})}/>
+                <select style={inp} value={tc.type} onChange={e=>upd(p=>{const tcs=[...(p.tradeCreditLines||[])];tcs[i]={...tcs[i],type:e.target.value as 'payable'|'receivable'};return{...p,tradeCreditLines:tcs}})}>
+                  <option value="payable">Payable (we owe)</option>
+                  <option value="receivable">Receivable (owed to us)</option>
+                </select>
+                <button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>upd(p=>({...p,tradeCreditLines:(p.tradeCreditLines||[]).filter((_,j)=>j!==i)}))}>×</button>
+              </div>
+              <div style={hint}>Average monthly outstanding ({cc})</div>
+              <input type="number" style={inp} value={tc.monthlyOutstanding?.reduce((a,b)=>a+b,0)/Math.max(1,tc.monthlyOutstanding?.length||1)||0}
+                onChange={e=>upd(p=>{const tcs=[...(p.tradeCreditLines||[])];const v=Number(e.target.value);tcs[i]={...tcs[i],monthlyOutstanding:Array(months.length).fill(v)};return{...p,tradeCreditLines:tcs}})}/>
+              <div style={hint}>This sets the same figure across all months -- a simple starting point. Vary by month directly in Supabase if seasonal detail is needed.</div>
+            </div>
+          ))}
+          <button style={addBtn(true)} onClick={()=>upd(p=>({...p,tradeCreditLines:[...(p.tradeCreditLines||[]),{id:`tc_${Date.now()}`,name:'',type:'payable' as const,monthlyOutstanding:Array(months.length).fill(0)}]}))}>+ Add Trade Credit Line</button>
+        </div>
+        <div style={card}>
           <div style={secH}>Business Units</div>
           {inputs.units.map((bu,i)=>(
             <div key={bu.id} style={{display:'flex',gap:'0.6rem',alignItems:'center',padding:'0.5rem 0.7rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.42rem',borderLeft:`4px solid ${bu.color}`}}>
@@ -2114,7 +2150,7 @@ export default function CONASDashboard({
       </nav>
       <main style={{maxWidth:1440,margin:'0 auto',padding:'1.5rem'}}>
         {view==='overview'        &&<OverviewTab/>}
-        {view==='intelligence'    &&<ConasIntelligenceTab result={result} coachAssessments={coachAssessments} onSaveAssessments={setCoachAssessments} months={months} cc={cc} P={P}/>}
+        {view==='intelligence'    &&<ConasIntelligenceTab result={result} inputs={inputs} coachAssessments={coachAssessments} onSaveAssessments={setCoachAssessments} months={months} cc={cc} P={P}/>}
         {view==='unitpl'          &&<UnitPLTab/>}
         {view==='planning'        &&<PlanningTab/>}
         {view==='opcashflow'      &&<ConasOperationalCashflowTab result={result} months={months} cc={cc}/>}
@@ -2145,7 +2181,7 @@ export default function CONASDashboard({
 // Assessment inputs, Engagement Close, plus AI narrative, health
 // check, and cash flow early warning.
 
-function ConasIntelligenceTab({result, coachAssessments, onSaveAssessments, months, cc, P}:{result:ReturnType<typeof runCONASModel>;coachAssessments:Record<string,unknown>|null;onSaveAssessments:(a:Record<string,unknown>)=>void;months:string[];cc:string;P:any}) {
+function ConasIntelligenceTab({result, inputs, coachAssessments, onSaveAssessments, months, cc, P}:{result:ReturnType<typeof runCONASModel>;inputs:CONASInputs;coachAssessments:Record<string,unknown>|null;onSaveAssessments:(a:Record<string,unknown>)=>void;months:string[];cc:string;P:any}) {
   const clientId = CONAS_CLIENT_ID
   const [assess, setAssess] = React.useState<any>(coachAssessments || defaultCoachAssessment())
   const [activeSection, setActiveSection] = React.useState('summary')
@@ -2181,17 +2217,33 @@ function ConasIntelligenceTab({result, coachAssessments, onSaveAssessments, mont
   const bs = result.bs
   const m = months.length
 
+  // Multiple debt obligations: use the explicit `debts` list if provided,
+  // otherwise fall back to the single bankLoan field for backward compatibility.
+  const conasDebtObligations = (inputs.debts && inputs.debts.length > 0)
+    ? inputs.debts
+    : (inputs.capitalStructure?.bankLoan > 0 ? [{
+        drawdownMonth: 1,
+        annualRate: inputs.capitalStructure.annualInterestRate || 0.18,
+        tenorMonths: (inputs.capitalStructure.loanTenorYears || 2) * 12,
+        gracePeriodMonths: 0,
+        principal: inputs.capitalStructure.bankLoan,
+        repaymentType: 'amortising',
+      }] : [])
+  const conasTradeCreditLines = (inputs.tradeCreditLines || []).map(l => ({
+    id: l.id, name: l.name, type: l.type, monthly_outstanding: l.monthlyOutstanding,
+  }))
+
   const scores = computeScores({
-    rev: con.rev, ebitda: con.ebitda, cashClose: cf.close,
+    rev: con.rev, ebitda: con.ebitda, cogs: con.cogs, cashClose: cf.close,
     totalEquity: bs.totalEquity?.[bs.totalEquity.length-1]||0,
     totalLiabilities: bs.totalLiabilities?.[bs.totalLiabilities.length-1]||0,
-    months: m, assess,
+    months: m, debtObligations: conasDebtObligations, tradeCreditLines: conasTradeCreditLines, assess,
   })
   const { score, classification, classColor, dscrAvg, dscrVals, cashGaps, revTrend,
     gcScore, gcRating, gcColor, irScore, irTier, irColor, irFinancial, irDebt,
-    annualRevenue, annualEbitda, minCash, ebitdaMargin, deToEq } = scores
+    tradeCredit, annualRevenue, annualEbitda, minCash, ebitdaMargin, deToEq } = scores
 
-  const debtSched = buildDebtSchedule([], m)
+  const debtSched = buildDebtSchedule(conasDebtObligations, m)
   const cashWarnings = cf.close.map((v:number,i:number)=>({month:months[i]||`Month ${i+1}`,balance:v})).filter((w:any)=>w.balance<0)
 
   // Whole-business breakeven (same logic as generic engine, computed here since CONAS doesn't have it natively)
@@ -2311,14 +2363,21 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
             <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'1rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>Revenue Trend</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:revTrend==='Growing'?C.green:revTrend==='Stable'?C.amber:C.red}}>{revTrend}</div></div>
             <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'1rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>Break-Even Revenue</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.amber}}>{fmt(businessBreakeven,cc)}</div></div>
             <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'1rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>Staff Cost %</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:staffCostPct<0.3?C.green:staffCostPct<0.5?C.amber:C.red}}>{pct(staffCostPct)}</div></div>
+            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'1rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>Days to Collect (DSO)</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy}}>{tradeCredit.dso.toFixed(0)}d</div></div>
+            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'1rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>Days to Pay (DPO)</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy}}>{tradeCredit.dpo.toFixed(0)}d</div></div>
+            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'1rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>Cash Conversion Gap</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:tradeCredit.cashConversionGap<=0?C.green:tradeCredit.cashConversionGap>30?C.red:C.amber}}>{tradeCredit.cashConversionGap.toFixed(0)}d</div></div>
           </div>
-          <div style={{background:C.navy,borderRadius:8,padding:'1rem 1.25rem'}}>
+          <div style={{background:C.navy,borderRadius:8,padding:'1rem 1.25rem',marginBottom:'1.25rem'}}>
             <div style={{fontFamily:'monospace',fontSize:'0.65rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.75rem'}}>READING THE PICTURE</div>
             {[
               [dscrAvg>=1.5?'ok':dscrAvg>=1.0?'info':'warn', `Debt service coverage: DSCR ${dscrAvg.toFixed(2)}x. ${dscrAvg>=1.5?'Strong.':dscrAvg>=1.0?'Adequate but watch closely.':'Weak: not generating enough to service obligations.'}`],
               [cashGaps===0?'ok':'warn', `Cash position: ${cashGaps===0?'Positive throughout the season.':'Negative in '+cashGaps+' month(s).'}`],
               [revTrend==='Growing'?'ok':revTrend==='Stable'?'info':'warn', `Revenue trend: ${revTrend} from start to end of season.`],
               [irScore>=17?'ok':'info', `Investment readiness: ${irTier} (${irScore}/30).`],
+              [(tradeCredit.dso>0||tradeCredit.dpo>0)?(tradeCredit.cashConversionGap<=0?'ok':tradeCredit.cashConversionGap>30?'warn':'info'):'info',
+                (tradeCredit.dso>0||tradeCredit.dpo>0)
+                  ? `Trade credit: collecting in ${tradeCredit.dso.toFixed(0)} days, paying suppliers in ${tradeCredit.dpo.toFixed(0)} days. ${tradeCredit.cashConversionGap<=0?'Effectively supplier-financed -- a healthy position.':'Cash is tied up for '+tradeCredit.cashConversionGap.toFixed(0)+' days waiting to collect before suppliers are paid.'}`
+                  : 'Trade credit: no supplier or customer credit data entered yet.'],
             ].map((item,i)=>{
               const col = item[0]==='ok'?C.green:item[0]==='warn'?C.red:C.teal
               return(
