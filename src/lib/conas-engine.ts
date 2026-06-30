@@ -6,6 +6,8 @@
 // - All figures flow: plan → unit P&L → consolidated → cash flow → balance sheet
 // ============================================================
 
+import { computeTradeCredit } from './scoring-engine'
+
 export const MONTHS = 12
 
 export function fmt(n: number, cc = 'UGX'): string {
@@ -105,7 +107,7 @@ export interface CONASInputs {
   // capitalStructure.bankLoan for clients with more than one loan.
   debts?: { drawdownMonth?: number; annualRate?: number; tenorMonths?: number; gracePeriodMonths?: number; principal?: number; repaymentType?: string; name?: string }[]
   // Trade credit: supplier credit received and customer/partner credit given, monthly.
-  tradeCreditLines?: { id: string; name: string; type: 'payable'|'receivable'; monthlyOutstanding: number[] }[]
+  tradeCreditLines?: { id: string; name: string; type: 'payable'|'receivable'; monthlyNew: number[]; monthlySettled: number[] }[]
   seasons: Season[]
   spendingRequests: SpendingRequest[]
   monthlyNotes: string[]
@@ -625,6 +627,17 @@ export function runCONASModel(inputs: CONASInputs) {
   irrigationOut[1] = Math.ceil(fgeCount / 2)  * 8_000_000
 
   const cap = inputs.capitalStructure
+
+  // Trade credit working capital adjustment -- computed from real monthly
+  // movements (new credit + amounts settled), not a flat estimate, and fed
+  // directly into operating cash flow the way AR/AP movements work in practice.
+  const conasTradeCreditLines = (inputs.tradeCreditLines || []).map(l => ({
+    id: l.id, name: l.name, type: l.type,
+    monthly_new: l.monthlyNew || Array(MONTHS).fill(0),
+    monthly_settled: l.monthlySettled || Array(MONTHS).fill(0),
+  }))
+  const tradeCreditCashEffect = computeTradeCredit(conasTradeCreditLines, con.cogs, con.rev, MONTHS).monthlyCashEffect
+
   const cf = {
     opCash:  Array(MONTHS).fill(0) as number[],
     finCash: Array(MONTHS).fill(0) as number[],
@@ -633,10 +646,11 @@ export function runCONASModel(inputs: CONASInputs) {
     close:   Array(MONTHS).fill(0) as number[],
     irrigation: irrigationOut,
     approvedSpend: approvedCashOut,
+    workingCapitalAdj: tradeCreditCashEffect,
   }
   cf.finCash[0] = cap.shareholderContribution + cap.grantNonRepayable + cap.grantRecoverable + cap.bankLoan
   for (let m = 0; m < MONTHS; m++) {
-    cf.opCash[m] = con.npat[m] - irrigationOut[m] - approvedCashOut[m]
+    cf.opCash[m] = con.npat[m] - irrigationOut[m] - approvedCashOut[m] + (tradeCreditCashEffect[m] || 0)
     cf.net[m]    = cf.opCash[m] + cf.finCash[m]
     cf.open[m]   = m === 0 ? inputs.global.openingCashBalance : cf.close[m - 1]
     cf.close[m]  = cf.open[m] + cf.net[m]
