@@ -167,7 +167,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
         })
         getProducts(key).filter(p=>p.name).forEach(p => {
           planLines.push({id:`${p.id}_rev`, unit_id:key, name:p.name, category:'revenue', line_type:'standard',
-            monthly_plan:buildPlanArray(p.id), active:true})
+            monthly_plan:buildPlanArray(`${p.id}_rev`), active:true})
           p.costLines.filter(c=>c.name).forEach(c => {
             planLines.push({id:c.id, unit_id:key, name:`${p.name} — ${c.name}`, category:'cost_of_sales', line_type:'standard',
               monthly_plan:buildPlanArray(c.id), active:true})
