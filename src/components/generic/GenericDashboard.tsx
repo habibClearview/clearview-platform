@@ -9,6 +9,7 @@ import {
   type GenericModelConfig, type GenericBusinessUnit,
   type GenericPlanLine, type LineCategory, type UnitType,
 } from '@/lib/generic-engine'
+import { buildDebtSchedule, defaultCoachAssessment } from '@/lib/scoring-engine'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
@@ -297,7 +298,7 @@ export default function GenericDashboard({
       {/* Main */}
       <main style={{maxWidth:1600,margin:'0 auto',padding:'1.5rem'}}>
         {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
-        {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P}/>}
+        {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
         {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
         {view==='unit_pl'     && <UnitPLTab config={config} result={result} months={months} cc={cc} P={P}/>}
         {view==='consolidated'&& <ConsolidatedTab config={config} result={result} months={months} cc={cc}/>}
@@ -1783,25 +1784,6 @@ function SettingsTab({config,P,onSave}) {
 // break-even tracking, investment readiness, credit risk, staff efficiency,
 // promotion effectiveness, monthly narrative -- all in one place.
 
-function computeCreditRisk(result:any) {
-  if (!result) return {score:0,rating:'No Data',color:C.slate}
-  const m = result.metrics
-  let score = 0
-  // Gross margin contribution (0-25)
-  score += Math.min(25, Math.max(0, m.gross_margin*100*0.5))
-  // Net margin contribution (0-25)
-  score += Math.min(25, Math.max(0, m.net_margin*100*1.0))
-  // Cash buffer contribution (0-25) -- positive min cash across period
-  score += m.min_cash >= 0 ? 25 : Math.max(0, 25 + (m.min_cash/Math.max(1,m.total_revenue))*25)
-  // Break-even headroom (0-25)
-  const headroom = m.total_revenue>0 ? (m.total_revenue-m.business_breakeven)/m.total_revenue : -1
-  score += Math.min(25, Math.max(0, headroom*50+12.5))
-  score = Math.round(Math.max(0,Math.min(100,score)))
-  const rating = score>=75?'Strong':score>=50?'Moderate':score>=25?'Weak':'High Risk'
-  const color = score>=75?C.green:score>=50?C.teal:score>=25?C.amber:C.red
-  return {score,rating,color}
-}
-
 function findCashWarningMonths(result:any, months:string[]) {
   if (!result) return []
   const warnings:{month:string,balance:number}[] = []
@@ -1811,7 +1793,8 @@ function findCashWarningMonths(result:any, months:string[]) {
   return warnings
 }
 
-function ClearviewIntelligenceTab({clientId,config,result,months,cc,P}) {
+function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave}) {
+  const [activeSection,setActiveSection]=useState('summary')
   const [healthReports, setHealthReports] = useState<any[]>([])
   const [investmentAssessments, setInvestmentAssessments] = useState<any[]>([])
   const [events, setEvents] = useState<any[]>([])
@@ -1835,20 +1818,54 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P}) {
     })
   },[clientId])
 
+  function updateAssess(field:string, value:unknown) {
+    const current = config.settings.coach_assessment || defaultCoachAssessment()
+    const next = {...current,[field]:value}
+    onSave({...config,settings:{...config.settings,coach_assessment:next}})
+  }
+
+  function Badge2({label,color}:{label:string;color:string}) {
+    return <span style={{fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,padding:'0.25rem 0.7rem',borderRadius:20,background:color,color:C.white}}>{label}</span>
+  }
+
+  if (loading) return <Spinner/>
+  if (!result) return (
+    <div style={{...card,textAlign:'center',padding:'2.5rem'}}>
+      <div style={{fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Set up your financial plan first</div>
+      <p style={{color:C.slate,fontSize:'0.88rem'}}>Clearview Business Intelligence needs business units and a financial plan to generate analysis.</p>
+    </div>
+  )
+
+  const m = result.metrics
+  const s = result.scores
+  const assess = config.settings.coach_assessment || defaultCoachAssessment()
+  const months_n = months.length
+  const warnings = findCashWarningMonths(result, months)
+  const latestHealth = healthReports[0]
+  const latestInvestment = investmentAssessments[0]
+  const debtSched = buildDebtSchedule(
+    config.settings.capital_structure?.bank_loan > 0 ? [{
+      drawdownMonth:1, annualRate:config.settings.capital_structure?.annual_interest_rate||0.18,
+      tenorMonths:(config.settings.capital_structure?.loan_tenor_years||2)*12,
+      gracePeriodMonths:0, principal:config.settings.capital_structure?.bank_loan, repaymentType:'amortising',
+    }] : [], months_n
+  )
+
   async function generateHealthCheck() {
-    if (!result) { alert('Set up your financial plan first.'); return }
     setGeneratingHealth(true)
-    const m = result.metrics
     const targetPeriod = new Date().toISOString().slice(0,7)+'-01'
     try {
       const prompt = `You are a financial health advisor for an African MSME. Produce a monthly business health check report for ${config.business_name}.
 
 Financial summary:
-- Total planned revenue: ${cc} ${m.total_revenue.toLocaleString()}
-- Gross profit: ${cc} ${m.total_gp.toLocaleString()} (${(m.gross_margin*100).toFixed(1)}% margin)
+- Total revenue: ${cc} ${m.total_revenue.toLocaleString()}
 - EBITDA: ${cc} ${m.total_ebitda.toLocaleString()} (${(m.net_margin*100).toFixed(1)}% margin)
-- Minimum cash position: ${cc} ${m.min_cash.toLocaleString()} in month ${m.min_cash_month}
-- Break-even revenue needed: ${cc} ${m.business_breakeven.toLocaleString()}
+- Credit Risk Score: ${s.score}/100 (${s.classification})
+- Going Concern: ${s.gcScore}/20 (${s.gcRating})
+- Investment Readiness: ${s.irScore}/30 (${s.irTier})
+- Minimum cash position: ${cc} ${m.min_cash.toLocaleString()}
+- DSCR average: ${s.dscrAvg.toFixed(2)}x
+- Break-even revenue: ${cc} ${m.business_breakeven.toLocaleString()}
 - Staff cost as % of revenue: ${(m.staff_cost_pct*100).toFixed(1)}%
 
 Write a clear, plain-English health check report for the CEO. Include: 1) Overall status (Green/Amber/Red with reason) 2) Two or three things going well 3) Two or three areas of concern 4) Three specific actions this month. Maximum 300 words.`
@@ -1868,24 +1885,20 @@ Write a clear, plain-English health check report for the CEO. Include: 1) Overal
   }
 
   async function generateNarrative() {
-    if (!result) { alert('Set up your financial plan first.'); return }
     setGeneratingNarrative(true)
-    const m = result.metrics
-    const risk = computeCreditRisk(result)
-    const warnings = findCashWarningMonths(result, months)
     try {
-      const prompt = `You are writing a monthly business narrative for the CEO of ${config.business_name}, an African MSME. This is a complete story of where the business stands right now, written in plain conversational English -- not a list, a narrative someone reads top to bottom like a letter.
+      const prompt = `You are writing a monthly business narrative for the CEO of ${config.business_name}, an African MSME. Write a complete story of where the business stands right now, in plain conversational English -- not a list, a narrative read top to bottom like a letter.
 
 Data:
-- Revenue: ${cc} ${m.total_revenue.toLocaleString()}, Gross margin: ${(m.gross_margin*100).toFixed(1)}%, Net margin: ${(m.net_margin*100).toFixed(1)}%
-- Credit risk score: ${risk.score}/100 (${risk.rating})
+- Revenue: ${cc} ${m.total_revenue.toLocaleString()}, EBITDA margin: ${(m.net_margin*100).toFixed(1)}%
+- Credit Risk: ${s.score}/100 (${s.classification}); Going Concern: ${s.gcScore}/20 (${s.gcRating}); Investment Readiness: ${s.irScore}/30 (${s.irTier})
+- DSCR: ${s.dscrAvg.toFixed(2)}x
 - Break-even revenue: ${cc} ${m.business_breakeven.toLocaleString()}
-- Cash position lowest point: ${cc} ${m.min_cash.toLocaleString()}
-- Cash shortfall months: ${warnings.length>0?warnings.map(w=>w.month).join(', '):'none projected'}
+- Cash shortfall months: ${warnings.length>0?warnings.map(w=>w.month).join(', '):'none'}
 - Staff cost ratio: ${(m.staff_cost_pct*100).toFixed(1)}%
 - Business units: ${config.business_units.filter(u=>u.active).map(u=>u.name).join(', ')}
 
-Write 4-5 short paragraphs telling the story of this business right now: where it stands, what's driving that, what to watch, and what to focus on next month. Write as if speaking directly to the owner. No headers, no bullet points, no jargon. Maximum 350 words.`
+Write 4-5 short paragraphs telling the story of this business right now. Speak directly to the owner. No headers, no bullets, no jargon. Maximum 350 words.`
       const response = await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
@@ -1902,116 +1915,211 @@ Write 4-5 short paragraphs telling the story of this business right now: where i
     setGeneratingNarrative(false)
   }
 
-  if (loading) return <Spinner/>
-  if (!result) return (
-    <div style={{...card,textAlign:'center',padding:'2.5rem'}}>
-      <div style={{fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Set up your financial plan first</div>
-      <p style={{color:C.slate,fontSize:'0.88rem'}}>Clearview Business Intelligence needs business units and a financial plan to generate analysis.</p>
-    </div>
-  )
-
-  const m = result.metrics
-  const risk = computeCreditRisk(result)
-  const warnings = findCashWarningMonths(result, months)
-  const latestHealth = healthReports[0]
-  const latestInvestment = investmentAssessments[0]
+  const tabList:[string,string][] = [
+    ['summary','Summary'],['narrative',"This Month's Story"],['credit','Credit Risk'],
+    ['going_concern','Going Concern'],['investment','Investment Readiness'],
+    ['coach','Coach Assessment'],['events','Promotion Events'],
+  ]
 
   return (
     <div>
-      <div style={{...card,background:C.navy,marginBottom:'1.5rem'}}>
+      <div style={{...card,background:C.navy,marginBottom:'1.25rem'}}>
         <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.3rem'}}>CLEARVIEW BUSINESS INTELLIGENCE</div>
         <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.white,marginBottom:'0.5rem'}}>{config.business_name}</div>
         <div style={{display:'flex',gap:'1.5rem',flexWrap:'wrap'}}>
-          <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>CREDIT RISK</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:risk.color}}>{risk.score}/100</div><div style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.7)'}}>{risk.rating}</div></div>
-          <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>EBITDA MARGIN</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:C.white}}>{(m.net_margin*100).toFixed(0)}%</div></div>
-          <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>CASH WARNINGS</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:warnings.length>0?C.red:C.green}}>{warnings.length}</div><div style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.7)'}}>{warnings.length>0?'months at risk':'no shortfall projected'}</div></div>
+          <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>CREDIT RISK</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.classColor}}>{s.score}/100</div></div>
+          <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>GOING CONCERN</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.gcColor}}>{s.gcScore}/20</div></div>
+          <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>INVESTMENT READY</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.irColor}}>{s.irScore}/30</div></div>
+          <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>CASH WARNINGS</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:warnings.length>0?C.red:C.green}}>{warnings.length}</div></div>
         </div>
       </div>
 
-      {/* Monthly Narrative */}
-      <div style={card}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
-          <div style={secH}>This Month's Story</div>
-          <button style={solidBtn(C.purple,true)} disabled={generatingNarrative} onClick={generateNarrative}>{generatingNarrative?'Writing...':'Generate Narrative'}</button>
-        </div>
-        {narrative ? (
-          <div>
-            <div style={{fontSize:'0.75rem',color:C.slate,marginBottom:'0.75rem'}}>{narrative.period_covered} · Generated {new Date(narrative.generated_at).toLocaleDateString('en-GB')}</div>
-            <div style={{fontSize:'0.9rem',color:C.navy,lineHeight:1.85,whiteSpace:'pre-wrap'}}>{narrative.briefing_text}</div>
+      <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',marginBottom:'1.5rem',borderBottom:`2px solid ${C.border}`,paddingBottom:'0.75rem'}}>
+        {tabList.map(t=>(
+          <button key={t[0]} onClick={()=>setActiveSection(t[0])} style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1rem',border:`1px solid ${activeSection===t[0]?C.cyan:C.border}`,borderRadius:5,background:activeSection===t[0]?C.cyan:C.white,color:activeSection===t[0]?C.navy:C.slate,cursor:'pointer',fontWeight:activeSection===t[0]?700:400}}>{t[1]}</button>
+        ))}
+      </div>
+
+      {activeSection==='summary'&&(
+        <div>
+          <div style={kpiGrid}>
+            <KPI label="Credit Risk" value={`${s.score}/100`} sub={s.classification} color={s.classColor}/>
+            <KPI label="Going Concern" value={`${s.gcScore}/20`} sub={s.gcRating} color={s.gcColor}/>
+            <KPI label="Investment Readiness" value={`${s.irScore}/30`} sub={s.irTier} color={s.irColor}/>
+            <KPI label="Avg DSCR" value={`${s.dscrAvg.toFixed(2)}x`} color={s.dscrAvg>=1.5?C.green:s.dscrAvg>=1.0?C.amber:C.red}/>
+            <KPI label="Break-Even Revenue" value={fmt(m.business_breakeven,cc)} color={C.amber}/>
+            <KPI label="Staff Cost %" value={pct(m.staff_cost_pct)} color={m.staff_cost_pct<0.3?C.green:m.staff_cost_pct<0.5?C.amber:C.red}/>
           </div>
-        ) : (
-          <p style={{color:C.slate,fontSize:'0.85rem'}}>Generate a plain-English story of how the business is doing this month, written for the CEO.</p>
-        )}
-      </div>
+          <div style={{background:C.navy,borderRadius:8,padding:'1rem 1.25rem'}}>
+            <div style={{fontFamily:'monospace',fontSize:'0.65rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.75rem'}}>READING THE PICTURE</div>
+            {[
+              [s.dscrAvg>=1.5?'ok':s.dscrAvg>=1.0?'info':'warn', `Debt service coverage: DSCR ${s.dscrAvg.toFixed(2)}x. ${s.dscrAvg>=1.5?'Strong.':s.dscrAvg>=1.0?'Adequate but watch closely.':'Weak: not generating enough to service obligations.'}`],
+              [s.cashGaps===0?'ok':'warn', `Cash position: ${s.cashGaps===0?'Positive throughout the period.':'Negative in '+s.cashGaps+' month(s).'}`],
+              [s.revTrend==='Growing'?'ok':s.revTrend==='Stable'?'info':'warn', `Revenue trend: ${s.revTrend} from start to end of period.`],
+              [s.irScore>=17?'ok':'info', `Investment readiness: ${s.irTier} (${s.irScore}/30).`],
+            ].map((item,i)=>{
+              const col = item[0]==='ok'?C.green:item[0]==='warn'?C.red:C.teal
+              return(
+                <div key={i} style={{display:'flex',gap:'0.6rem',marginBottom:'0.5rem',fontSize:'0.84rem',color:C.white,lineHeight:1.5}}>
+                  <span style={{width:8,height:8,borderRadius:'50%',background:col,marginTop:'0.45rem',flexShrink:0,display:'inline-block'}}/>
+                  <span>{item[1]}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
-      {/* Cash Flow Early Warning */}
-      <div style={card}>
-        <div style={secH}>Cash Flow Early Warning</div>
-        {warnings.length===0 ? (
-          <div style={{padding:'0.85rem',background:'#EBFAF0',borderRadius:6,color:C.green,fontSize:'0.85rem',fontWeight:600}}>No cash shortfall projected across the planning period.</div>
-        ) : (
-          <div>
-            <p style={{fontSize:'0.83rem',color:C.slate,marginBottom:'0.75rem'}}>Cash balance is projected to go negative in {warnings.length} month{warnings.length!==1?'s':''}:</p>
-            {warnings.map((w,i)=>(
-              <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'0.5rem 0.75rem',background:'#FDF0EE',borderRadius:5,marginBottom:'0.4rem'}}>
-                <span style={{fontWeight:600,color:C.navy}}>{w.month}</span>
-                <span style={{fontFamily:'monospace',color:C.red,fontWeight:700}}>{fmt(w.balance,cc)}</span>
+      {activeSection==='narrative'&&(
+        <div>
+          <div style={card}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+              <div style={secH}>This Month's Story</div>
+              <button style={solidBtn(C.purple,true)} disabled={generatingNarrative} onClick={generateNarrative}>{generatingNarrative?'Writing...':'Generate Narrative'}</button>
+            </div>
+            {narrative ? (
+              <div>
+                <div style={{fontSize:'0.75rem',color:C.slate,marginBottom:'0.75rem'}}>{narrative.period_covered} · Generated {new Date(narrative.generated_at).toLocaleDateString('en-GB')}</div>
+                <div style={{fontSize:'0.9rem',color:C.navy,lineHeight:1.85,whiteSpace:'pre-wrap'}}>{narrative.briefing_text}</div>
+              </div>
+            ) : <p style={{color:C.slate,fontSize:'0.85rem'}}>Generate a plain-English story of how the business is doing this month, written for the CEO.</p>}
+          </div>
+          <div style={card}>
+            <div style={secH}>Cash Flow Early Warning</div>
+            {warnings.length===0 ? (
+              <div style={{padding:'0.85rem',background:'#EBFAF0',borderRadius:6,color:C.green,fontSize:'0.85rem',fontWeight:600}}>No cash shortfall projected across the planning period.</div>
+            ) : (
+              <div>
+                {warnings.map((w,i)=>(
+                  <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'0.5rem 0.75rem',background:'#FDF0EE',borderRadius:5,marginBottom:'0.4rem'}}>
+                    <span style={{fontWeight:600,color:C.navy}}>{w.month}</span>
+                    <span style={{fontFamily:'monospace',color:C.red,fontWeight:700}}>{fmt(w.balance,cc)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div style={card}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+              <div style={secH}>Business Health Check</div>
+              <button style={solidBtn(C.purple,true)} disabled={generatingHealth} onClick={generateHealthCheck}>{generatingHealth?'Generating...':'Generate This Month'}</button>
+            </div>
+            {latestHealth ? (
+              <div>
+                <div style={{fontSize:'0.75rem',color:C.slate,marginBottom:'0.75rem'}}>{new Date(latestHealth.period).toLocaleString('en-GB',{month:'long',year:'numeric'})}</div>
+                <div style={{fontSize:'0.88rem',color:C.navy,lineHeight:1.8,whiteSpace:'pre-wrap'}}>{latestHealth.report_text}</div>
+              </div>
+            ) : <p style={{color:C.slate,fontSize:'0.85rem'}}>No health check generated yet this month.</p>}
+          </div>
+        </div>
+      )}
+
+      {activeSection==='credit'&&(
+        <div style={card}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1.25rem',flexWrap:'wrap',gap:'0.75rem'}}>
+            <div style={secH}>Credit Risk Dashboard</div>
+            <div style={{display:'flex',alignItems:'center',gap:'1rem'}}>
+              <div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:s.classColor,lineHeight:1}}>{s.score}</div>
+              <div><div style={{fontSize:'0.75rem',color:C.slate}}>out of 100</div><Badge2 label={s.classification} color={s.classColor}/></div>
+            </div>
+          </div>
+          <div style={kpiGrid}>
+            <KPI label="DSCR Average" value={`${s.dscrAvg.toFixed(2)}x`} color={s.dscrAvg>=1.5?C.green:s.dscrAvg>=1.0?C.amber:C.red}/>
+            <KPI label="Revenue Trend" value={s.revTrend} color={s.revTrend==='Growing'?C.green:s.revTrend==='Stable'?C.amber:C.red}/>
+            <KPI label="Cash-Negative Months" value={String(s.cashGaps)} color={s.cashGaps===0?C.green:C.red}/>
+            <KPI label="Annual EBITDA" value={fmt(m.total_ebitda,cc)} color={m.total_ebitda>=0?C.green:C.red}/>
+          </div>
+          <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.75rem',fontFamily:'monospace'}}>
+            <thead><tr style={{background:C.navy,color:C.white}}><th style={{padding:'7px 10px',textAlign:'left',minWidth:120}}>Metric</th>{months.map((mo,i)=><th key={i} style={{padding:'7px 8px',textAlign:'right',whiteSpace:'nowrap'}}>{mo}</th>)}</tr></thead>
+            <tbody>
+              <tr style={{background:'#F8F4EE'}}><td style={{padding:'6px 10px',fontWeight:600}}>EBITDA</td>{result.con.ebitda.map((v:number,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right',color:v>=0?C.green:C.red}}>{fmt(v,cc)}</td>)}</tr>
+              <tr><td style={{padding:'6px 10px',fontWeight:600}}>Debt Service</td>{debtSched.totalRepayment.map((v:number,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right'}}>{fmt(v,cc)}</td>)}</tr>
+              <tr style={{background:'#F0F4F8'}}><td style={{padding:'6px 10px',fontWeight:700}}>DSCR</td>{s.dscrVals.map((v:number,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:v>=1.5?C.green:v>=1.0?C.amber:C.red}}>{v.toFixed(2)}x</td>)}</tr>
+            </tbody>
+          </table></div>
+        </div>
+      )}
+
+      {activeSection==='going_concern'&&(
+        <div style={card}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem',flexWrap:'wrap',gap:'0.75rem'}}>
+            <div style={secH}>Going Concern Assessment</div>
+            <div style={{display:'flex',alignItems:'center',gap:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:s.gcColor,lineHeight:1}}>{s.gcScore}</div><div><div style={{fontSize:'0.75rem',color:C.slate}}>out of 20</div><Badge2 label={s.gcRating} color={s.gcColor}/></div></div>
+          </div>
+          {[
+            {name:'Debt Service Coverage',sc:s.dscrAvg>=1.5?4:s.dscrAvg>=1.0?3:s.dscrAvg>=0.5?2:1,max:4,ev:'DSCR '+s.dscrAvg.toFixed(2)+'x',field:null},
+            {name:'Liquidity Position',sc:m.min_cash>=0?4:m.min_cash>-10000000?1:0,max:4,ev:'Min cash: '+fmt(m.min_cash,cc),field:null},
+            {name:'Revenue Sustainability',sc:3,max:4,ev:'Revenue trend: '+s.revTrend,field:null},
+            {name:'Operational Profitability',sc:m.total_ebitda>0?3:2,max:4,ev:'Annual EBITDA: '+fmt(m.total_ebitda,cc),field:null},
+            {name:'Management & Governance',sc:Number(assess.managementCapability)||2,max:4,ev:'Coach assessment',field:'managementCapability'},
+          ].map(ind=>(
+            <div key={ind.name} style={{marginBottom:'1rem',paddingBottom:'1rem',borderBottom:`1px solid ${C.border}`}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}><span style={{fontWeight:600,fontSize:'0.88rem',color:C.navy}}>{ind.name}</span><span style={{fontFamily:'monospace',fontWeight:700,color:ind.sc>=3?C.green:ind.sc>=2?C.amber:C.red}}>{ind.sc}/{ind.max}</span></div>
+              <div style={{background:'#E8ECF0',borderRadius:999,height:7}}><div style={{width:(ind.sc/ind.max*100)+'%',height:'100%',background:ind.sc>=3?C.green:ind.sc>=2?C.amber:C.red,borderRadius:999}}/></div>
+              <div style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.3rem'}}>{ind.ev}</div>
+              {ind.field!=null&&<input type="range" min="0" max={ind.max} step="1" value={(assess as any)[ind.field]||2} onChange={e=>updateAssess(ind.field as string,Number(e.target.value))} style={{width:'100%',accentColor:C.cyan,marginTop:'0.4rem'}}/>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {activeSection==='investment'&&(
+        <div style={card}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem',flexWrap:'wrap',gap:'0.75rem'}}>
+            <div style={secH}>Investment Readiness Score</div>
+            <div style={{display:'flex',alignItems:'center',gap:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:s.irColor,lineHeight:1}}>{s.irScore}</div><div><div style={{fontSize:'0.75rem',color:C.slate}}>out of 30</div><Badge2 label={s.irTier} color={s.irColor}/></div></div>
+          </div>
+          {[
+            {name:'Financial Viability',sc:s.irFinancial,max:5,ev:'EBITDA margin '+(s.ebitdaMargin*100).toFixed(1)+'%',field:null},
+            {name:'Debt Serviceability',sc:s.irDebt,max:5,ev:'DSCR '+s.dscrAvg.toFixed(2)+'x',field:null},
+            {name:'Commercial Model Clarity',sc:Number(assess.commercialModel)||2,max:5,ev:'Coach assessment',field:'commercialModel'},
+            {name:'Management Capability',sc:Number(assess.managementCapability)||2,max:5,ev:'Coach assessment',field:'managementCapability'},
+            {name:'Market Evidence',sc:Number(assess.marketEvidence)||2,max:5,ev:'Coach assessment',field:'marketEvidence'},
+            {name:'Governance & Records',sc:Number(assess.governance)||2,max:5,ev:'Coach assessment',field:'governance'},
+          ].map(dim=>(
+            <div key={dim.name} style={{marginBottom:'1rem',paddingBottom:'1rem',borderBottom:`1px solid ${C.border}`}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}><span style={{fontWeight:600,fontSize:'0.88rem',color:C.navy}}>{dim.name}</span><span style={{fontFamily:'monospace',fontWeight:700,color:dim.sc>=4?C.green:dim.sc>=3?C.teal:dim.sc>=2?C.amber:C.red}}>{dim.sc}/{dim.max}</span></div>
+              <div style={{background:'#E8ECF0',borderRadius:999,height:7}}><div style={{width:(dim.sc/dim.max*100)+'%',height:'100%',background:dim.sc>=4?C.green:dim.sc>=3?C.teal:dim.sc>=2?C.amber:C.red,borderRadius:999}}/></div>
+              <div style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.3rem'}}>{dim.ev}</div>
+              {dim.field!=null&&<input type="range" min="0" max={dim.max} step="1" value={(assess as any)[dim.field]||2} onChange={e=>updateAssess(dim.field as string,Number(e.target.value))} style={{width:'100%',accentColor:C.cyan,marginTop:'0.4rem'}}/>}
+            </div>
+          ))}
+          {latestInvestment&&(
+            <div style={{marginTop:'1.25rem',paddingTop:'1.25rem',borderTop:`1px solid ${C.border}`}}>
+              <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy,marginBottom:'0.5rem'}}>AI Narrative Assessment</div>
+              <div style={{fontSize:'0.85rem',color:C.navy,lineHeight:1.75,whiteSpace:'pre-wrap'}}>{latestInvestment.assessment_text}</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeSection==='coach'&&(
+        <div style={card}>
+          <div style={secH}>Coach Assessment Inputs</div>
+          <p style={{fontSize:'0.85rem',color:C.slate,marginBottom:'1.5rem',lineHeight:1.6}}>These scores feed into Going Concern and Investment Readiness.</p>
+          <div style={fGrid}>
+            {[{label:'Commercial Model Clarity',field:'commercialModel',max:5},{label:'Management Capability',field:'managementCapability',max:4},{label:'Market Evidence',field:'marketEvidence',max:5},{label:'Governance & Record-Keeping',field:'governance',max:5}].map(item=>(
+              <div key={item.field}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}>
+                  <label style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{item.label}</label>
+                  <span style={{fontFamily:'monospace',fontWeight:700,color:C.cyan}}>{Number((assess as any)[item.field])||2}/{item.max}</span>
+                </div>
+                <input type="range" min="0" max={item.max} step="1" value={(assess as any)[item.field]||2} onChange={e=>updateAssess(item.field,Number(e.target.value))} style={{width:'100%',accentColor:C.cyan,marginBottom:'0.2rem'}}/>
               </div>
             ))}
           </div>
-        )}
-      </div>
-
-      {/* Break-Even Headroom */}
-      <div style={card}>
-        <div style={secH}>Break-Even Position</div>
-        <div style={kpiGrid}>
-          <KPI label="Break-Even Revenue" value={fmt(m.business_breakeven,cc)} color={C.amber}/>
-          <KPI label="Planned Revenue" value={fmt(m.total_revenue,cc)}/>
-          <KPI label="Headroom" value={fmt(m.total_revenue-m.business_breakeven,cc)} color={m.total_revenue>=m.business_breakeven?C.green:C.red}/>
-        </div>
-      </div>
-
-      {/* Staff Efficiency Summary */}
-      <div style={card}>
-        <div style={secH}>Staff Efficiency</div>
-        <div style={kpiGrid}>
-          <KPI label="Revenue per Head" value={fmt(m.revenue_per_head,cc)} color={C.teal}/>
-          <KPI label="Staff Cost %" value={pct(m.staff_cost_pct)} color={m.staff_cost_pct<0.3?C.green:m.staff_cost_pct<0.5?C.amber:C.red}/>
-          <KPI label="Total Headcount" value={String(m.total_headcount)}/>
-        </div>
-      </div>
-
-      {/* Health Check */}
-      <div style={card}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
-          <div style={secH}>Business Health Check</div>
-          <button style={solidBtn(C.purple,true)} disabled={generatingHealth} onClick={generateHealthCheck}>{generatingHealth?'Generating...':'Generate This Month'}</button>
-        </div>
-        {latestHealth ? (
-          <div>
-            <div style={{fontSize:'0.75rem',color:C.slate,marginBottom:'0.75rem'}}>{new Date(latestHealth.period).toLocaleString('en-GB',{month:'long',year:'numeric'})}</div>
-            <div style={{fontSize:'0.88rem',color:C.navy,lineHeight:1.8,whiteSpace:'pre-wrap'}}>{latestHealth.report_text}</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginTop:'1.5rem'}}>
+            {[{label:'Immediate Actions (30 days)',field:'immediateActions'},{label:'Near-Term Actions (60-90 days)',field:'nearTermActions'},{label:'Required Follow-Up',field:'followUp'},{label:'Coach Notes',field:'coachNotes'}].map(item=>(
+              <div key={item.field}>
+                <label style={{display:'block',fontWeight:600,fontSize:'0.82rem',marginBottom:'0.25rem',color:C.navy}}>{item.label}</label>
+                <textarea value={(assess as any)[item.field]||''} onChange={e=>updateAssess(item.field,e.target.value)} style={{...inp,minHeight:75,resize:'vertical'}} placeholder="One per line..."/>
+              </div>
+            ))}
           </div>
-        ) : <p style={{color:C.slate,fontSize:'0.85rem'}}>No health check generated yet this month.</p>}
-      </div>
+        </div>
+      )}
 
-      {/* Investment Readiness Summary */}
-      <div style={card}>
-        <div style={secH}>Investment Readiness</div>
-        {latestInvestment ? (
-          <div>
-            <div style={{display:'flex',gap:'1rem',alignItems:'center',marginBottom:'0.75rem'}}>
-              <Badge text={`${latestInvestment.readiness_score}/100`} color={latestInvestment.readiness_score>=70?C.green:latestInvestment.readiness_score>=40?C.amber:C.red}/>
-              <span style={{fontSize:'0.75rem',color:C.slate}}>Last assessed {new Date(latestInvestment.generated_at).toLocaleDateString('en-GB')}</span>
-            </div>
-            <div style={{fontSize:'0.85rem',color:C.navy,lineHeight:1.75,whiteSpace:'pre-wrap'}}>{latestInvestment.assessment_text}</div>
-          </div>
-        ) : <p style={{color:C.slate,fontSize:'0.85rem'}}>No assessment yet. Run one from the Investment Readiness tab.</p>}
-      </div>
-
-      {/* Recent Promotion Events */}
-      {events.length>0&&(
+      {activeSection==='events'&&events.length>0&&(
         <div style={card}>
           <div style={secH}>Recent Promotion & Marketing Effectiveness</div>
           {events.map(evt=>{
@@ -2027,6 +2135,9 @@ Write 4-5 short paragraphs telling the story of this business right now: where i
             )
           })}
         </div>
+      )}
+      {activeSection==='events'&&events.length===0&&(
+        <div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No promotion events recorded yet. Add some in Mgmt Events.</div>
       )}
     </div>
   )
