@@ -1458,6 +1458,7 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
             <div style={secH}>Investment Readiness Score</div>
             <div style={{display:'flex',alignItems:'center',gap:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:s.irColor,lineHeight:1}}>{s.irScore}</div><div><div style={{fontSize:'0.75rem',color:C.slate}}>out of 30</div><Badge2 label={s.irTier} color={s.irColor}/></div></div>
           </div>
+          <InvestmentPitchDownload clientId={clientId}/>
           {[
             {name:'Financial Viability',sc:s.irFinancial,max:5,ev:'EBITDA margin '+(s.ebitdaMargin*100).toFixed(1)+'%',field:null},
             {name:'Debt Serviceability',sc:s.irDebt,max:5,ev:'DSCR '+s.dscrAvg.toFixed(2)+'x',field:null},
@@ -2084,6 +2085,56 @@ function PromotionEventsSection({clientId,config,cc,P,events,setEvents}) {
           })}
         </div>
       )}
+    </div>
+  )
+}
+
+// ── INVESTMENT PITCH DOWNLOAD ────────────────────────────────
+function InvestmentPitchDownload({clientId}:{clientId:string}) {
+  const [downloading, setDownloading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function download() {
+    setDownloading(true)
+    setError('')
+    try {
+      const response = await fetch('/api/investment-pitch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId }),
+      })
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || 'Could not generate the document')
+      }
+      const blob = await response.blob()
+      const disposition = response.headers.get('Content-Disposition') || ''
+      const match = disposition.match(/filename="(.+)"/)
+      const fileName = match ? match[1] : 'Investment_Summary.docx'
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      setError(e.message || 'Download failed')
+    }
+    setDownloading(false)
+  }
+
+  return (
+    <div style={{background:'#EBF8FF',borderRadius:6,padding:'0.85rem 1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.75rem'}}>
+      <div>
+        <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>Investment Pitch Summary</div>
+        <div style={{fontSize:'0.78rem',color:C.slate}}>A one-page Word document with the financial summary and scores, ready to send to a lender or investor.</div>
+      </div>
+      <button style={solidBtn(C.navy)} disabled={downloading} onClick={download}>
+        {downloading ? 'Generating...' : 'Download Word Document'}
+      </button>
+      {error && <div style={{width:'100%',color:C.red,fontSize:'0.8rem'}}>{error}</div>}
     </div>
   )
 }
