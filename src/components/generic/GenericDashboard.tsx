@@ -1508,25 +1508,8 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
         </div>
       )}
 
-      {activeSection==='events'&&events.length>0&&(
-        <div style={card}>
-          <div style={secH}>Recent Promotion & Marketing Effectiveness</div>
-          {events.map(evt=>{
-            const roi = evt.cost>0 ? (evt.revenue_after-evt.revenue_before-evt.cost)/evt.cost : null
-            return (
-              <div key={evt.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.5rem 0.75rem',background:C.lightBg,borderRadius:5,marginBottom:'0.4rem'}}>
-                <div>
-                  <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{evt.name}</div>
-                  <div style={{fontSize:'0.7rem',color:C.slate}}>{evt.date}</div>
-                </div>
-                {roi!==null&&<Badge text={`ROI ${(roi*100).toFixed(0)}%`} color={roi>0?C.green:C.red}/>}
-              </div>
-            )
-          })}
-        </div>
-      )}
-      {activeSection==='events'&&events.length===0&&(
-        <div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No promotion events recorded yet. Add some in Mgmt Events.</div>
+      {activeSection==='events'&&(
+        <PromotionEventsSection clientId={clientId} config={config} cc={cc} P={P} events={events} setEvents={setEvents}/>
       )}
     </div>
   )
@@ -1968,6 +1951,139 @@ function SettingsAndAdminTab({config,result,months,cc,clientId,P,onSave}) {
       {mode==='settings' && <SettingsTab config={config} P={P} onSave={onSave}/>}
       {mode==='scenarios' && <ScenariosTab config={config} result={result} months={months} cc={cc} P={P} onSave={onSave}/>}
       {mode==='team' && <TeamTab clientId={clientId} config={config} P={P}/>}
+    </div>
+  )
+}
+
+// ── PROMOTION EVENTS & CUSTOMER ACQUISITION COST ──────────────
+function PromotionEventsSection({clientId,config,cc,P,events,setEvents}) {
+  const [showForm, setShowForm] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({
+    name:'', channel:'', event_type:'promotion', date:new Date().toISOString().split('T')[0],
+    cost:0, description:'', revenue_before:0, revenue_after:0, customers_acquired:0,
+    period_weeks:4, unit_id:'',
+  })
+
+  async function saveEvent() {
+    if (!form.name) return
+    setSaving(true)
+    const {data,error} = await supabase.from('management_events').insert([{
+      ...form, client_id:clientId, created_at:new Date().toISOString(), updated_at:new Date().toISOString(),
+    }]).select().single()
+    if (!error&&data) {
+      setEvents((e:any[])=>[data,...e])
+      setShowForm(false)
+      setForm({name:'',channel:'',event_type:'promotion',date:new Date().toISOString().split('T')[0],cost:0,description:'',revenue_before:0,revenue_after:0,customers_acquired:0,period_weeks:4,unit_id:''})
+    }
+    setSaving(false)
+  }
+
+  // CAC by channel: total cost / total customers acquired, grouped by channel
+  const channelStats: Record<string,{cost:number,customers:number,events:number,revenueLift:number}> = {}
+  events.forEach((evt:any) => {
+    const ch = evt.channel || 'Unspecified'
+    if (!channelStats[ch]) channelStats[ch] = {cost:0,customers:0,events:0,revenueLift:0}
+    channelStats[ch].cost += evt.cost||0
+    channelStats[ch].customers += evt.customers_acquired||0
+    channelStats[ch].events += 1
+    channelStats[ch].revenueLift += Math.max(0,(evt.revenue_after||0)-(evt.revenue_before||0))
+  })
+  const channelRows = Object.entries(channelStats).map(([channel,s])=>({
+    channel, ...s, cac: s.customers>0 ? s.cost/s.customers : null,
+  })).sort((a,b)=>{
+    if (a.cac===null) return 1
+    if (b.cac===null) return -1
+    return a.cac-b.cac
+  })
+
+  return (
+    <div>
+      <div style={card}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+          <div style={secH}>Customer Acquisition Cost by Channel</div>
+          {P.canEditPlan&&<button style={addBtn()} onClick={()=>setShowForm(!showForm)}>+ Add Event</button>}
+        </div>
+        {channelRows.length===0 ? (
+          <p style={{color:C.slate,fontSize:'0.85rem'}}>No promotion events recorded yet. Add one below to start tracking cost per customer acquired, by channel.</p>
+        ) : (
+          <div style={{overflowX:'auto'}}>
+            <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.8rem'}}>
+              <thead>
+                <tr style={{background:C.navy,color:C.white}}>
+                  {['Channel','Events','Total Cost','Customers Acquired','Cost per Customer (CAC)','Revenue Lift'].map(h=>(
+                    <th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.75rem'}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {channelRows.map((r,i)=>(
+                  <tr key={r.channel} style={{background:i%2===0?C.cream:C.white}}>
+                    <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{r.channel}</td>
+                    <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{r.events}</td>
+                    <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{fmt(r.cost,cc)}</td>
+                    <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{r.customers}</td>
+                    <td style={{padding:'8px 10px',fontFamily:'monospace',fontWeight:700,color:r.cac===null?C.slate:r.cac<r.cost/Math.max(1,r.customers)*0.8?C.green:C.navy}}>
+                      {r.cac===null?'No customers recorded':fmt(r.cac,cc)}
+                    </td>
+                    <td style={{padding:'8px 10px',fontFamily:'monospace',color:C.green}}>{fmt(r.revenueLift,cc)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.6rem'}}>Lower cost per customer means a more efficient channel. Channels with no customers recorded cannot be ranked -- add a customer count to each event to see this.</p>
+          </div>
+        )}
+      </div>
+
+      {showForm&&(
+        <div style={{...card,border:`1px solid ${C.cyan}`}}>
+          <div style={fGrid}>
+            <div><label style={lbl}>Event Name</label><input style={inp} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></div>
+            <div><label style={lbl}>Channel</label><input style={inp} placeholder="e.g. Farmer Field Days, Radio, WhatsApp" value={form.channel} onChange={e=>setForm(f=>({...f,channel:e.target.value}))}/></div>
+            <div><label style={lbl}>Type</label><select style={inp} value={form.event_type} onChange={e=>setForm(f=>({...f,event_type:e.target.value}))}>
+              {['promotion','marketing','farmer_day','trade_fair','demonstration','other'].map(t=><option key={t} value={t}>{t.replace('_',' ')}</option>)}
+            </select></div>
+            <div><label style={lbl}>Business Unit</label><select style={inp} value={form.unit_id} onChange={e=>setForm(f=>({...f,unit_id:e.target.value}))}>
+              <option value="">All units</option>
+              {config.business_units.filter((u:any)=>u.active).map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}
+            </select></div>
+            <div><label style={lbl}>Date</label><input type="date" style={inp} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></div>
+            <div><label style={lbl}>Cost ({cc})</label><input type="number" style={inp} value={form.cost||''} onChange={e=>setForm(f=>({...f,cost:Number(e.target.value)}))}/></div>
+            <div><label style={lbl}>Customers Acquired</label><input type="number" style={inp} value={form.customers_acquired||''} placeholder="New customers from this event" onChange={e=>setForm(f=>({...f,customers_acquired:Number(e.target.value)}))}/></div>
+            <div><label style={lbl}>Comparison Window (weeks)</label><input type="number" style={inp} value={form.period_weeks} onChange={e=>setForm(f=>({...f,period_weeks:Number(e.target.value)}))}/></div>
+            <div><label style={lbl}>Revenue Before ({cc})</label><input type="number" style={inp} value={form.revenue_before||''} onChange={e=>setForm(f=>({...f,revenue_before:Number(e.target.value)}))}/></div>
+            <div><label style={lbl}>Revenue After ({cc})</label><input type="number" style={inp} value={form.revenue_after||''} onChange={e=>setForm(f=>({...f,revenue_after:Number(e.target.value)}))}/></div>
+            <div style={{gridColumn:'1/-1'}}><label style={lbl}>Description</label><textarea style={{...inp,minHeight:60,resize:'vertical'}} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></div>
+          </div>
+          <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
+            <button style={solidBtn()} disabled={saving} onClick={saveEvent}>{saving?'Saving...':'Save Event'}</button>
+            <button style={addBtn(true,C.slate)} onClick={()=>setShowForm(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {events.length>0 && (
+        <div style={card}>
+          <div style={secH}>All Events</div>
+          {events.map((evt:any)=>{
+            const roi = evt.cost>0 ? (evt.revenue_after-evt.revenue_before-evt.cost)/evt.cost : null
+            const cac = evt.customers_acquired>0 ? evt.cost/evt.customers_acquired : null
+            return (
+              <div key={evt.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.75rem',background:C.lightBg,borderRadius:5,marginBottom:'0.4rem',flexWrap:'wrap',gap:'0.5rem'}}>
+                <div>
+                  <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{evt.name}</div>
+                  <div style={{fontSize:'0.7rem',color:C.slate}}>{evt.date} · {evt.channel||'No channel set'}</div>
+                </div>
+                <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap'}}>
+                  {cac!==null&&<Badge text={`CAC ${fmt(cac,cc)}`} color={C.teal}/>}
+                  {roi!==null&&<Badge text={`ROI ${(roi*100).toFixed(0)}%`} color={roi>0?C.green:C.red}/>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
