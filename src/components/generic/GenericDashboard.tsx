@@ -164,6 +164,14 @@ export default function GenericDashboard({
   const [error, setError] = useState<string|null>(null)
   const [view, setView] = useState('overview')
   const [saving, setSaving] = useState(false)
+  const [pendingApprovalCount, setPendingApprovalCount] = useState(0)
+
+  useEffect(() => {
+    if (!clientId) return
+    supabase.from('generic_spend_requests').select('id',{count:'exact',head:true})
+      .eq('client_id',clientId).in('status',['pending_fm','pending_ceo'])
+      .then(({count}) => setPendingApprovalCount(count||0))
+  }, [clientId, view])
 
   // Load config from Supabase
   useEffect(() => {
@@ -244,26 +252,14 @@ export default function GenericDashboard({
 
   const mainNav = [
     ['overview','Overview'],
+    ['approvals',`Approvals${pendingApprovalCount>0?` (${pendingApprovalCount})`:''}`],
     ['intelligence','Clearview Intelligence'],
     ['planning','Planning'],
-    ['unit_pl','Unit P&L'],
-    ['consolidated','Consolidated P&L'],
+    ['pl','P&L'],
     ['cashflow','Cash Flow'],
     ['balancesheet','Balance Sheet'],
-    ['analytics','Analytics'],
-    ['spread','Spread Analysis'],
-    ['service','Service Margins'],
-    ['breakeven','Break-Even'],
-    ['actuals','Actuals'],
-    ['workingcapital','Working Capital'],
-    ['events','Mgmt Events'],
-    ['staff_eff','Staff Efficiency'],
-    ['ai_health','AI Health Check'],
-    ['investment','Investment Readiness'],
-    ['scenarios','Scenarios'],
-    ['spends','Spend Requests'],
-    ['approvals','Approvals'],
-    ['team','Team'],
+    ['margins','Margins & Break-Even'],
+    ['actuals_wc','Actuals & Working Capital'],
     ['settings','Settings'],
   ]
 
@@ -298,28 +294,16 @@ export default function GenericDashboard({
 
       {/* Main */}
       <main style={{maxWidth:1600,margin:'0 auto',padding:'1.5rem'}}>
-        {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
+        {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} pendingApprovalCount={pendingApprovalCount} onGoToApprovals={()=>setView('approvals')}/>}
+        {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P}/>}
         {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
         {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
-        {view==='unit_pl'     && <UnitPLTab config={config} result={result} months={months} cc={cc} P={P}/>}
-        {view==='consolidated'&& <ConsolidatedTab config={config} result={result} months={months} cc={cc}/>}
+        {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P}/>}
         {view==='cashflow'    && <CashFlowTab result={result} months={months} cc={cc}/>}
         {view==='balancesheet'&& <BalanceSheetTab result={result} months={months} cc={cc}/>}
-        {view==='analytics'   && <AnalyticsTab config={config} result={result} months={months} cc={cc}/>}
-        {view==='spread'      && <SpreadTab config={config} result={result} months={months} cc={cc}/>}
-        {view==='service'     && <ServiceMarginsTab config={config} result={result} months={months} cc={cc}/>}
-        {view==='breakeven'   && <BreakEvenTab config={config} result={result} cc={cc}/>}
-        {view==='actuals'     && <ActualsTab config={config} months={months} cc={cc} P={P} onSave={saveConfig}/>}
-        {view==='workingcapital' && <WorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
-        {view==='events'      && <EventsTab clientId={clientId} config={config} cc={cc} P={P}/>}
-        {view==='staff_eff'   && <StaffEfficiencyTab config={config} result={result} months={months} cc={cc}/>}
-        {view==='ai_health'   && <AIHealthTab clientId={clientId} config={config} result={result} cc={cc} P={P}/>}
-        {view==='investment'  && <InvestmentTab clientId={clientId} config={config} result={result} cc={cc} P={P}/>}
-        {view==='scenarios'   && <ScenariosTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
-        {view==='spends'      && <SpendRequestsTab clientId={clientId} config={config} cc={cc} P={P}/>}
-        {view==='approvals'   && <ApprovalsTab clientId={clientId} config={config} cc={cc} P={P}/>}
-        {view==='team'        && <TeamTab clientId={clientId} config={config} P={P}/>}
-        {view==='settings'    && <SettingsTab config={config} P={P} onSave={saveConfig}/>}
+        {view==='margins'     && <MarginsTab config={config} result={result} months={months} cc={cc}/>}
+        {view==='actuals_wc'  && <ActualsAndWorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
+        {view==='settings'    && <SettingsAndAdminTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={saveConfig}/>}
       </main>
 
       <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.67rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>
@@ -329,7 +313,7 @@ export default function GenericDashboard({
   )
 }
 // ── OVERVIEW TAB ─────────────────────────────────────────────
-function OverviewTab({config,result,months,cc,P,onSave}) {
+function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGoToApprovals}) {
   if (!result) return (
     <div style={card}>
       <div style={{...secH,marginBottom:'0.5rem'}}>Welcome to Clearview</div>
@@ -343,6 +327,12 @@ function OverviewTab({config,result,months,cc,P,onSave}) {
   const m = result.metrics
   return (
     <div>
+      {pendingApprovalCount>0&&(
+        <div style={{background:'#FFF8E8',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{fontWeight:600,color:C.amber}}>⏳ {pendingApprovalCount} spend request{pendingApprovalCount>1?'s':''} awaiting approval</span>
+          <button style={addBtn(true,C.amber)} onClick={onGoToApprovals}>Review now →</button>
+        </div>
+      )}
       <div style={kpiGrid}>
         <KPI label="Total Revenue" value={fmt(m.total_revenue,cc)} color={C.navy}/>
         <KPI label="Gross Profit" value={fmt(m.total_gp,cc)} sub={pct(m.gross_margin)} color={m.total_gp>=0?C.green:C.red}/>
@@ -546,336 +536,6 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
 }
 
 // ── UNIT P&L TAB ─────────────────────────────────────────────
-function UnitPLTab({config,result,months,cc,P}) {
-  const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active)?.id||'')
-  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
-  const pl = result.unitPL[selUnit]
-  if (!pl) return <div style={card}><p style={{color:C.slate}}>No data for this unit.</p></div>
-
-  const rows = [
-    {label:'Revenue',values:pl.rev,bold:true},
-    {label:'Cost of Sales',values:pl.cogs,negate:true},
-    {label:'Gross Profit',values:pl.gp,bold:true,highlight:true},
-    {label:'Staff Costs',values:pl.staff,negate:true},
-    {label:'Direct Overheads',values:pl.opex,negate:true},
-    {label:'Shared Costs',values:pl.shared,negate:true},
-    {label:'EBITDA',values:pl.ebitda,bold:true,highlight:true},
-  ]
-
-  // Add actuals comparison if available
-  const hasActuals = pl.act_rev.some(v=>v!==null)
-
-  return (
-    <div>
-      <div style={{display:'flex',gap:'0.45rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
-        {config.business_units.filter(u=>u.active).map(u=>(
-          <button key={u.id} style={{fontFamily:'monospace',fontSize:'0.71rem',padding:'0.45rem 0.85rem',
-            border:`2px solid ${selUnit===u.id?(u.color||C.cyan):C.border}`,borderRadius:4,
-            background:selUnit===u.id?(u.color||C.cyan):C.white,
-            color:selUnit===u.id?C.white:C.navy,cursor:'pointer'}}
-            onClick={()=>setSelUnit(u.id)}>
-            {config.business_units.find(u2=>u2.id===u.id)?.short||u.name.split(' ')[0]}
-          </button>
-        ))}
-      </div>
-      <PLTable title={`${config.business_units.find(u=>u.id===selUnit)?.name} — P&L`} rows={rows} months={months} cc={cc} showExport/>
-      <div style={kpiGrid}>
-        <KPI label="Annual Revenue" value={fmt(pl.ann_rev,cc)}/>
-        <KPI label="Gross Profit" value={fmt(pl.ann_gp,cc)} sub={pct(pl.gp_margin)} color={pl.ann_gp>=0?C.green:C.red}/>
-        <KPI label="EBITDA" value={fmt(pl.ann_ebitda,cc)} sub={pct(pl.ebitda_margin)} color={pl.ann_ebitda>=0?C.teal:C.red}/>
-        <KPI label="Staff Cost %" value={pct(pl.staff_efficiency.staff_cost_pct)} sub={`${pl.staff_efficiency.headcount} staff`} color={C.amber}/>
-      </div>
-    </div>
-  )
-}
-
-// ── CONSOLIDATED P&L TAB ─────────────────────────────────────
-function ConsolidatedTab({config,result,months,cc}) {
-  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
-  const con = result.con
-  const rows = [
-    {label:'Revenue',values:con.rev,bold:true},
-    {label:'Cost of Sales',values:con.cogs,negate:true},
-    {label:'Gross Profit',values:con.gp,bold:true,highlight:true},
-    {label:'Total Operating Costs',values:con.opex,negate:true},
-    {label:'EBITDA',values:con.ebitda,bold:true,highlight:true},
-    {label:'Tax',values:con.tax,negate:true},
-    {label:'Net Profit After Tax',values:con.npat,bold:true,highlight:true},
-  ]
-  return <PLTable title={`${config.business_name} — Consolidated P&L`} rows={rows} months={months} cc={cc} showExport/>
-}
-
-// ── CASH FLOW TAB ────────────────────────────────────────────
-function CashFlowTab({result,months,cc}) {
-  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
-  const cf = result.cf
-  const rows = [
-    {label:'Opening Cash',values:cf.open,bold:true},
-    {label:'Net Profit After Tax',values:result.con.npat},
-    {label:'Operating Cash Flow',values:cf.op_cash,bold:true},
-    {label:'Capital & Financing',values:cf.fin_cash},
-    {label:'Net Change in Cash',values:cf.net,bold:true},
-    {label:'Closing Cash',values:cf.close,bold:true,highlight:true},
-  ]
-  return (
-    <div>
-      <div style={kpiGrid}>
-        <KPI label="Opening Cash" value={fmt(cf.open[0],cc)}/>
-        <KPI label="Month 6 Cash" value={fmt(cf.close[5]||0,cc)} color={(cf.close[5]||0)>=0?C.navy:C.red}/>
-        <KPI label="Closing Cash" value={fmt(cf.close[cf.close.length-1],cc)} color={cf.close[cf.close.length-1]>=0?C.navy:C.red}/>
-        <KPI label="Lowest Point" value={fmt(result.metrics.min_cash,cc)} sub={`Month ${result.metrics.min_cash_month}`} color={result.metrics.min_cash>=0?C.navy:C.red}/>
-      </div>
-      <PLTable title="Cash Flow Statement" rows={rows} months={months} cc={cc} showExport/>
-    </div>
-  )
-}
-
-// ── BALANCE SHEET TAB ────────────────────────────────────────
-function BalanceSheetTab({result,months,cc}) {
-  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
-  const bs = result.bs
-  const rows = [
-    {label:'ASSETS',values:Array(months.length).fill(0),bold:true},
-    {label:'Cash & Bank',values:bs.cash},
-    {label:'Fixed Assets',values:bs.fixed_assets},
-    {label:'Total Assets',values:bs.total_assets,bold:true,highlight:true},
-    {label:'EQUITY',values:Array(months.length).fill(0),bold:true},
-    {label:'Share Capital',values:bs.share_capital},
-    {label:'Grant Equity',values:bs.grant_equity},
-    {label:'Retained Earnings',values:bs.retained_earnings},
-    {label:'Total Equity',values:bs.total_equity,bold:true},
-    {label:'LIABILITIES',values:Array(months.length).fill(0),bold:true},
-    {label:'Grant Liability',values:bs.grant_liability},
-    {label:'Loan Liability',values:bs.loan_liability},
-    {label:'Total Liabilities',values:bs.total_liabilities,bold:true},
-    {label:'Total Equity & Liabilities',values:bs.total_equity_and_liabilities,bold:true,highlight:true},
-  ]
-  return <PLTable title="Balance Sheet" rows={rows} months={months} cc={cc} showExport/>
-}
-// ── ANALYTICS TAB ────────────────────────────────────────────
-function AnalyticsTab({config,result,months,cc}) {
-  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
-  const m = result.metrics
-  return (
-    <div>
-      <div style={kpiGrid}>
-        <KPI label="Gross Margin" value={pct(m.gross_margin)} color={m.gross_margin>0.3?C.green:m.gross_margin>0.1?C.amber:C.red}/>
-        <KPI label="Net Margin" value={pct(m.net_margin)} color={m.net_margin>0.1?C.green:m.net_margin>0?C.amber:C.red}/>
-        <KPI label="Staff Cost %" value={pct(m.staff_cost_pct)} color={m.staff_cost_pct<0.3?C.green:m.staff_cost_pct<0.5?C.amber:C.red}/>
-        <KPI label="Shared Cost Pool" value={fmt(m.total_shared,cc)} color={C.slate}/>
-      </div>
-      {/* Revenue by unit bar chart (text-based) */}
-      <div style={card}>
-        <div style={secH}>Revenue by Business Unit</div>
-        {result.allocUnits.map(u=>{
-          const pl = result.unitPL[u.id]
-          if (!pl) return null
-          const share = m.total_revenue>0 ? pl.ann_rev/m.total_revenue : 0
-          return (
-            <div key={u.id} style={{marginBottom:'0.75rem'}}>
-              <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.82rem',marginBottom:'0.25rem'}}>
-                <span style={{fontWeight:600,color:C.navy}}>{u.name}</span>
-                <span style={{fontFamily:'monospace',color:C.navy}}>{fmt(pl.ann_rev,cc)} · {pct(share)}</span>
-              </div>
-              <div style={{background:C.border,borderRadius:3,height:8}}>
-                <div style={{background:u.color||C.cyan,height:8,borderRadius:3,width:`${Math.min(100,share*100)}%`}}/>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-      {/* Monthly revenue trend */}
-      <PLTable title="Monthly Revenue Trend" rows={[
-        {label:'Revenue',values:result.con.rev,bold:true},
-        {label:'Gross Profit',values:result.con.gp},
-        {label:'EBITDA',values:result.con.ebitda,highlight:true},
-      ]} months={months} cc={cc} showExport/>
-    </div>
-  )
-}
-
-// ── SPREAD ANALYSIS TAB ───────────────────────────────────────
-function SpreadTab({config,result,months,cc}) {
-  if (!result) return <div style={card}><p style={{color:C.slate}}>No spread lines defined yet. Add spread-type revenue lines in Planning.</p></div>
-  const allSpreads = result.allocUnits.flatMap(u => result.unitPL[u.id]?.spread_analysis||[])
-  if (allSpreads.length===0) return (
-    <div style={card}>
-      <div style={secH}>Spread Analysis</div>
-      <p style={{color:C.slate,fontSize:'0.88rem'}}>No spread lines defined. In Planning, add a revenue line and set its type to "Spread" to track buy price, sell price, and margin per unit.</p>
-    </div>
-  )
-  return (
-    <div>
-      {allSpreads.map(s=>(
-        <div key={s.line_id} style={card}>
-          <div style={secH}>{s.name}</div>
-          <div style={kpiGrid}>
-            <KPI label="Total Volume" value={s.volume.reduce((a,b)=>a+b,0).toLocaleString()} sub="units"/>
-            <KPI label="Avg Buy Price" value={fmt(s.buy_price.filter(v=>v>0).reduce((a,b)=>a+b,0)/Math.max(1,s.buy_price.filter(v=>v>0).length),cc)} color={C.red}/>
-            <KPI label="Avg Sell Price" value={fmt(s.sell_price.filter(v=>v>0).reduce((a,b)=>a+b,0)/Math.max(1,s.sell_price.filter(v=>v>0).length),cc)} color={C.green}/>
-            <KPI label="Total Spread" value={fmt(s.total_spread.reduce((a,b)=>a+b,0),cc)} color={C.teal}/>
-          </div>
-          <PLTable title="" rows={[
-            {label:'Volume (units)',values:s.volume},
-            {label:'Buy Price',values:s.buy_price},
-            {label:'Sell Price',values:s.sell_price},
-            {label:'Spread per Unit',values:s.spread_per_unit,highlight:true},
-            {label:'Total Spread Revenue',values:s.total_spread,bold:true},
-          ]} months={months} cc={cc} showExport/>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ── SERVICE MARGINS TAB ───────────────────────────────────────
-function ServiceMarginsTab({config,result,months,cc}) {
-  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
-  const allMargins = result.allocUnits.flatMap(u => result.unitPL[u.id]?.service_margins||[])
-  if (allMargins.length===0) return (
-    <div style={card}>
-      <div style={secH}>Service Margins</div>
-      <p style={{color:C.slate,fontSize:'0.88rem'}}>No service fee lines defined. In Planning, add a revenue line and set its type to "Service Fee" to track fee, cost of delivery, and margin per engagement.</p>
-    </div>
-  )
-  return (
-    <div>
-      {allMargins.map(s=>(
-        <div key={s.line_id} style={card}>
-          <div style={secH}>{s.name}</div>
-          <div style={kpiGrid}>
-            <KPI label="Total Engagements" value={s.engagements.reduce((a,b)=>a+b,0).toLocaleString()}/>
-            <KPI label="Avg Fee" value={fmt(s.fee.filter(v=>v>0).reduce((a,b)=>a+b,0)/Math.max(1,s.fee.filter(v=>v>0).length),cc)} color={C.green}/>
-            <KPI label="Avg Cost/Engagement" value={fmt(s.cost.filter(v=>v>0).reduce((a,b)=>a+b,0)/Math.max(1,s.cost.filter(v=>v>0).length),cc)} color={C.red}/>
-            <KPI label="Total Margin" value={fmt(s.margin.reduce((a,b)=>a+b,0),cc)} color={C.teal}/>
-          </div>
-          <PLTable title="" rows={[
-            {label:'Engagements',values:s.engagements},
-            {label:'Fee per Engagement',values:s.fee},
-            {label:'Cost per Engagement',values:s.cost,negate:true},
-            {label:'Margin per Engagement',values:s.margin.map((m,i)=>s.engagements[i]>0?m/s.engagements[i]:0),highlight:true},
-            {label:'Total Margin',values:s.margin,bold:true},
-          ]} months={months} cc={cc} showExport/>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ── BREAK-EVEN TAB ────────────────────────────────────────────
-function BreakEvenTab({config,result,cc}) {
-  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
-  const m = result.metrics
-  return (
-    <div>
-      {/* Whole business */}
-      <div style={card}>
-        <div style={secH}>Whole Business Break-Even</div>
-        <div style={kpiGrid}>
-          <KPI label="Break-Even Revenue" value={fmt(m.business_breakeven,cc)} sub="Annual" color={C.amber}/>
-          <KPI label="Planned Revenue" value={fmt(m.total_revenue,cc)} color={C.navy}/>
-          <KPI label="Gap / Surplus" value={fmt(m.total_revenue-m.business_breakeven,cc)} color={m.total_revenue>=m.business_breakeven?C.green:C.red}/>
-          <KPI label="Variable Cost %" value={pct(m.variable_cost_pct)} sub="of revenue" color={C.slate}/>
-        </div>
-        <div style={{background:C.lightBg,borderRadius:6,padding:'1rem',marginTop:'0.5rem'}}>
-          <div style={{fontSize:'0.82rem',color:C.slate,lineHeight:1.7}}>
-            At the planned variable cost ratio of <strong>{pct(m.variable_cost_pct)}</strong>, the business needs to generate <strong>{fmt(m.business_breakeven,cc)}</strong> in annual revenue to cover all fixed and shared costs.
-            {m.total_revenue>=m.business_breakeven
-              ? ` The current plan exceeds break-even by ${fmt(m.total_revenue-m.business_breakeven,cc)}.`
-              : ` The current plan is ${fmt(m.business_breakeven-m.total_revenue,cc)} below break-even.`}
-          </div>
-        </div>
-      </div>
-
-      {/* Break-even by unit and revenue line */}
-      {result.allocUnits.map(u=>{
-        const pl = result.unitPL[u.id]
-        if (!pl||pl.breakeven.length===0) return null
-        return (
-          <div key={u.id} style={card}>
-            <div style={secH}>{u.name}</div>
-            <div style={{overflowX:'auto'}}>
-              <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.8rem'}}>
-                <thead>
-                  <tr style={{background:C.navy,color:C.white}}>
-                    {['Revenue Line','Break-Even Revenue','Current Revenue','Gap / Surplus','Variable Cost %'].map(h=>(
-                      <th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.75rem'}}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {pl.breakeven.map((be,i)=>(
-                    <tr key={be.line_id} style={{background:i%2===0?C.cream:C.white}}>
-                      <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{be.name}</td>
-                      <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{fmt(be.breakeven_revenue,cc)}</td>
-                      <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{fmt(be.current_revenue,cc)}</td>
-                      <td style={{padding:'8px 10px',fontFamily:'monospace',fontWeight:700,color:be.gap>=0?C.green:C.red}}>{fmt(be.gap,cc)}</td>
-                      <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{pct(be.variable_cost_pct)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-// ── STAFF EFFICIENCY TAB ─────────────────────────────────────
-function StaffEfficiencyTab({config,result,months,cc}) {
-  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
-  const m = result.metrics
-  return (
-    <div>
-      <div style={kpiGrid}>
-        <KPI label="Total Headcount" value={String(m.total_headcount)} color={C.navy}/>
-        <KPI label="Revenue per Head" value={fmt(m.revenue_per_head,cc)} color={C.teal}/>
-        <KPI label="Total Staff Cost" value={fmt(m.total_staff_cost,cc)} color={C.red}/>
-        <KPI label="Staff Cost %" value={pct(m.staff_cost_pct)} color={m.staff_cost_pct<0.3?C.green:m.staff_cost_pct<0.5?C.amber:C.red}/>
-      </div>
-      <div style={card}>
-        <div style={secH}>Staff Efficiency by Unit</div>
-        <div style={{overflowX:'auto'}}>
-          <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.8rem'}}>
-            <thead>
-              <tr style={{background:C.navy,color:C.white}}>
-                {['Unit','Headcount','Revenue','Staff Cost','Revenue/Head','Staff Cost %'].map(h=>(
-                  <th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.75rem'}}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {result.allocUnits.map((u,i)=>{
-                const pl = result.unitPL[u.id]
-                if (!pl) return null
-                return (
-                  <tr key={u.id} style={{background:i%2===0?C.cream:C.white}}>
-                    <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{u.name}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace'}}>{u.headcount}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace'}}>{fmt(pl.ann_rev,cc)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',color:C.red}}>{fmt(pl.ann_staff,cc)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',color:C.teal}}>{fmt(pl.staff_efficiency.revenue_per_head,cc)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',color:pl.staff_efficiency.staff_cost_pct<0.3?C.green:pl.staff_efficiency.staff_cost_pct<0.5?C.amber:C.red,fontWeight:700}}>{pct(pl.staff_efficiency.staff_cost_pct)}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <PLTable title="Monthly Staff Cost Trend" rows={[
-        {label:'Total Staff Costs',values:result.allocUnits.reduce((acc,u)=>{
-          const pl = result.unitPL[u.id]
-          return pl ? acc.map((v,m)=>v+pl.staff[m]) : acc
-        },Array(months.length).fill(0)),bold:true},
-      ]} months={months} cc={cc} showExport/>
-    </div>
-  )
-}
-
-// ── SCENARIOS TAB ────────────────────────────────────────────
 function ScenariosTab({config,result,months,cc,P,onSave}) {
   const scenarios = config.settings.scenarios||[]
   const activeId = scenarios.find(s=>s.active)?.id||'base'
@@ -1067,317 +727,6 @@ function ActualsTab({config,months,cc,P,onSave}) {
 }
 
 // ── MANAGEMENT EVENTS TAB ─────────────────────────────────────
-function EventsTab({clientId,config,cc,P}) {
-  const [events, setEvents] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [analysing, setAnalysing] = useState<string|null>(null)
-  const [form, setForm] = useState({name:'',event_type:'promotion',date:new Date().toISOString().split('T')[0],cost:0,description:'',revenue_before:0,revenue_after:0,period_weeks:4,unit_id:''})
-
-  useEffect(()=>{
-    supabase.from('management_events').select('*').eq('client_id',clientId).order('date',{ascending:false})
-      .then(({data})=>{ setEvents(data||[]); setLoading(false) })
-  },[clientId])
-
-  async function save() {
-    const {data,error} = await supabase.from('management_events').insert([{...form,client_id:clientId,created_at:new Date().toISOString(),updated_at:new Date().toISOString()}]).select().single()
-    if (!error&&data) { setEvents(e=>[data,...e]); setShowForm(false) }
-  }
-
-  async function analyseEvent(evt:any) {
-    setAnalysing(evt.id)
-    try {
-      const prompt = `You are a business analyst for an MSME in Africa. Analyse this marketing/promotion event:
-Business: ${config.business_name}
-Event: ${evt.name} (${evt.event_type})
-Date: ${evt.date}
-Cost: ${cc} ${evt.cost?.toLocaleString()}
-Description: ${evt.description}
-Revenue ${evt.period_weeks} weeks before: ${cc} ${evt.revenue_before?.toLocaleString()}
-Revenue ${evt.period_weeks} weeks after: ${cc} ${evt.revenue_after?.toLocaleString()}
-
-Provide: 1) ROI assessment 2) Whether the event was effective 3) Recommendation for future events. Be specific and practical. Write for a business owner who is not a financial expert. Maximum 200 words.`
-
-      const response = await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
-      })
-      const data = await response.json()
-      const text = data.content?.[0]?.text||'Analysis unavailable'
-      await supabase.from('management_events').update({ai_analysis:text,ai_analysed_at:new Date().toISOString()}).eq('id',evt.id)
-      setEvents(e=>e.map(ev=>ev.id===evt.id?{...ev,ai_analysis:text}:ev))
-    } catch(e) { alert('Analysis failed') }
-    setAnalysing(null)
-  }
-
-  if (loading) return <Spinner/>
-  return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem'}}>
-        <div style={secH}>Promotion & Marketing Events</div>
-        <button style={addBtn()} onClick={()=>setShowForm(!showForm)}>+ Add Event</button>
-      </div>
-      {showForm&&(
-        <div style={{...card,border:`1px solid ${C.cyan}`}}>
-          <div style={fGrid}>
-            <div><label style={lbl}>Event Name</label><input style={inp} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></div>
-            <div><label style={lbl}>Type</label><select style={inp} value={form.event_type} onChange={e=>setForm(f=>({...f,event_type:e.target.value}))}>
-              {['promotion','marketing','farmer_day','trade_fair','demonstration','other'].map(t=><option key={t} value={t}>{t.replace('_',' ')}</option>)}
-            </select></div>
-            <div><label style={lbl}>Business Unit</label><select style={inp} value={form.unit_id} onChange={e=>setForm(f=>({...f,unit_id:e.target.value}))}>
-              <option value="">All units</option>
-              {config.business_units.filter(u=>u.active).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
-            </select></div>
-            <div><label style={lbl}>Date</label><input type="date" style={inp} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></div>
-            <div><label style={lbl}>Cost ({cc})</label><input type="number" style={inp} value={form.cost||''} onChange={e=>setForm(f=>({...f,cost:Number(e.target.value)}))}/></div>
-            <div><label style={lbl}>Comparison Window (weeks)</label><input type="number" style={inp} value={form.period_weeks} onChange={e=>setForm(f=>({...f,period_weeks:Number(e.target.value)}))}/></div>
-            <div><label style={lbl}>Revenue Before ({cc})</label><input type="number" style={inp} value={form.revenue_before||''} onChange={e=>setForm(f=>({...f,revenue_before:Number(e.target.value)}))}/></div>
-            <div><label style={lbl}>Revenue After ({cc})</label><input type="number" style={inp} value={form.revenue_after||''} onChange={e=>setForm(f=>({...f,revenue_after:Number(e.target.value)}))}/></div>
-            <div style={{gridColumn:'1/-1'}}><label style={lbl}>Description</label><textarea style={{...inp,minHeight:60,resize:'vertical'}} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></div>
-          </div>
-          <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
-            <button style={solidBtn()} onClick={save}>Save Event</button>
-            <button style={addBtn(true,C.slate)} onClick={()=>setShowForm(false)}>Cancel</button>
-          </div>
-        </div>
-      )}
-      {events.length===0&&!showForm&&<div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No events recorded yet.</div>}
-      {events.map(evt=>{
-        const roi = evt.cost>0 ? (evt.revenue_after-evt.revenue_before-evt.cost)/evt.cost : null
-        const lift = evt.revenue_before>0 ? (evt.revenue_after-evt.revenue_before)/evt.revenue_before : null
-        return (
-          <div key={evt.id} style={{...card,borderLeft:`4px solid ${roi&&roi>0?C.green:roi&&roi<0?C.red:C.border}`}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'0.5rem',marginBottom:'0.75rem'}}>
-              <div>
-                <div style={{fontWeight:700,fontSize:'0.9rem',color:C.navy}}>{evt.name}</div>
-                <div style={{fontSize:'0.75rem',color:C.slate}}>{evt.date} · {evt.event_type.replace('_',' ')} · Cost: {fmt(evt.cost,cc)}</div>
-              </div>
-              <div style={{display:'flex',gap:'0.5rem',alignItems:'center'}}>
-                {roi!==null&&<Badge text={`ROI: ${(roi*100).toFixed(0)}%`} color={roi>0?C.green:C.red}/>}
-                {lift!==null&&<Badge text={`Lift: ${(lift*100).toFixed(0)}%`} color={lift>0?C.teal:C.red}/>}
-                <button style={addBtn(true,C.purple)} disabled={analysing===evt.id} onClick={()=>analyseEvent(evt)}>
-                  {analysing===evt.id?'Analysing...':'AI Analysis'}
-                </button>
-              </div>
-            </div>
-            {evt.revenue_before>0&&(
-              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'0.75rem',marginBottom:'0.75rem'}}>
-                <div style={{background:C.lightBg,borderRadius:5,padding:'0.6rem'}}>
-                  <div style={{fontSize:'0.7rem',color:C.slate}}>Revenue Before</div>
-                  <div style={{fontFamily:'monospace',fontWeight:700,color:C.navy}}>{fmt(evt.revenue_before,cc)}</div>
-                </div>
-                <div style={{background:C.lightBg,borderRadius:5,padding:'0.6rem'}}>
-                  <div style={{fontSize:'0.7rem',color:C.slate}}>Revenue After</div>
-                  <div style={{fontFamily:'monospace',fontWeight:700,color:C.navy}}>{fmt(evt.revenue_after,cc)}</div>
-                </div>
-                <div style={{background:C.lightBg,borderRadius:5,padding:'0.6rem'}}>
-                  <div style={{fontSize:'0.7rem',color:C.slate}}>Revenue Change</div>
-                  <div style={{fontFamily:'monospace',fontWeight:700,color:evt.revenue_after>=evt.revenue_before?C.green:C.red}}>{fmt(evt.revenue_after-evt.revenue_before,cc)}</div>
-                </div>
-              </div>
-            )}
-            {evt.description&&<p style={{fontSize:'0.82rem',color:C.slate,margin:'0 0 0.5rem'}}>{evt.description}</p>}
-            {evt.ai_analysis&&(
-              <div style={{background:'#F0F4FF',borderRadius:6,padding:'0.85rem',borderLeft:`3px solid ${C.purple}`,marginTop:'0.5rem'}}>
-                <div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.purple,marginBottom:'0.4rem',letterSpacing:'0.08em'}}>AI ANALYSIS</div>
-                <div style={{fontSize:'0.83rem',color:C.navy,lineHeight:1.7}}>{evt.ai_analysis}</div>
-              </div>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-// ── AI HEALTH CHECK TAB ───────────────────────────────────────
-function AIHealthTab({clientId,config,result,cc,P}) {
-  const [reports, setReports] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [generating, setGenerating] = useState(false)
-
-  useEffect(()=>{
-    supabase.from('ai_health_checks').select('*').eq('client_id',clientId).order('period',{ascending:false}).limit(12)
-      .then(({data})=>{ setReports(data||[]); setLoading(false) })
-  },[clientId])
-
-  async function generateReport(period?:string) {
-    if (!result) { alert('Set up your financial plan first.'); return }
-    setGenerating(true)
-    const m = result.metrics
-    const targetPeriod = period || new Date().toISOString().slice(0,7)+'-01'
-    try {
-      const prompt = `You are a financial health advisor for an African MSME. Produce a monthly business health check report for ${config.business_name}.
-
-Financial summary:
-- Total planned revenue: ${cc} ${m.total_revenue.toLocaleString()}
-- Gross profit: ${cc} ${m.total_gp.toLocaleString()} (${(m.gross_margin*100).toFixed(1)}% margin)
-- EBITDA: ${cc} ${m.total_ebitda.toLocaleString()} (${(m.net_margin*100).toFixed(1)}% margin)
-- Minimum cash position: ${cc} ${m.min_cash.toLocaleString()} in month ${m.min_cash_month}
-- Break-even revenue needed: ${cc} ${m.business_breakeven.toLocaleString()}
-- Staff cost as % of revenue: ${(m.staff_cost_pct*100).toFixed(1)}%
-- Total headcount: ${m.total_headcount}
-
-Business units: ${config.business_units.filter(u=>u.active).map(u=>u.name).join(', ')}
-
-Write a clear, plain-English health check report for the CEO. Include:
-1. Overall business health status (Green/Amber/Red with reason)
-2. Two or three things going well
-3. Two or three areas of concern
-4. Three specific actions the CEO should take this month
-
-Write at a level suitable for a business owner who is not a financial expert. Maximum 300 words. Be direct and specific.`
-
-      const response = await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
-      })
-      const data = await response.json()
-      const text = data.content?.[0]?.text||'Report unavailable'
-      const {data:saved} = await supabase.from('ai_health_checks').upsert({
-        client_id:clientId, period:targetPeriod, report_text:text,
-        triggered_by:'manual', generated_at:new Date().toISOString(), visible_to_ceo:true,
-      },{onConflict:'client_id,period'}).select().single()
-      if (saved) setReports(r=>[saved,...r.filter(x=>x.period!==targetPeriod)])
-    } catch(e) { alert('Report generation failed') }
-    setGenerating(false)
-  }
-
-  if (loading) return <Spinner/>
-  const latest = reports[0]
-  return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem'}}>
-        <div style={secH}>AI Business Health Check</div>
-        <button style={solidBtn(C.purple)} disabled={generating} onClick={()=>generateReport()}>
-          {generating?'Generating...':'Generate This Month'}
-        </button>
-      </div>
-      {!latest&&!generating&&(
-        <div style={{...card,textAlign:'center',padding:'2.5rem'}}>
-          <div style={{fontSize:'1.5rem',marginBottom:'0.75rem'}}>🩺</div>
-          <div style={{fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>No health checks yet</div>
-          <p style={{color:C.slate,fontSize:'0.88rem'}}>Click "Generate This Month" to get an AI-powered assessment of your business health.</p>
-        </div>
-      )}
-      {reports.map(r=>(
-        <div key={r.id} style={card}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
-            <div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,color:C.navy}}>
-              Health Check — {new Date(r.period).toLocaleString('en-GB',{month:'long',year:'numeric'})}
-            </div>
-            <div style={{fontSize:'0.75rem',color:C.slate}}>Generated {new Date(r.generated_at).toLocaleDateString('en-GB')}</div>
-          </div>
-          <div style={{fontSize:'0.88rem',color:C.navy,lineHeight:1.8,whiteSpace:'pre-wrap'}}>{r.report_text}</div>
-          {P.role==='super_coach'&&(
-            <div style={{marginTop:'1rem',paddingTop:'0.75rem',borderTop:`1px solid ${C.border}`}}>
-              <button style={addBtn(true,C.amber)} onClick={()=>generateReport(r.period)}>Regenerate</button>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ── INVESTMENT READINESS TAB ──────────────────────────────────
-function InvestmentTab({clientId,config,result,cc,P}) {
-  const [assessments, setAssessments] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [generating, setGenerating] = useState(false)
-
-  useEffect(()=>{
-    supabase.from('investment_readiness').select('*').eq('client_id',clientId).order('generated_at',{ascending:false}).limit(5)
-      .then(({data})=>{ setAssessments(data||[]); setLoading(false) })
-  },[clientId])
-
-  async function generate() {
-    if (!result) { alert('Set up your financial plan first.'); return }
-    setGenerating(true)
-    const m = result.metrics
-    try {
-      const prompt = `You are an investment readiness advisor for African MSMEs. Assess the investment and credit readiness of ${config.business_name}.
-
-Financial data:
-- Annual revenue: ${cc} ${m.total_revenue.toLocaleString()}
-- Gross margin: ${(m.gross_margin*100).toFixed(1)}%
-- EBITDA: ${cc} ${m.total_ebitda.toLocaleString()} (${(m.net_margin*100).toFixed(1)}% margin)
-- Break-even revenue: ${cc} ${m.business_breakeven.toLocaleString()}
-- Current cash position (month 1): ${cc} ${result.cf.close[0].toLocaleString()}
-- Staff cost ratio: ${(m.staff_cost_pct*100).toFixed(1)}%
-- Business units: ${config.business_units.filter(u=>u.active).length}
-
-Score the business on investment readiness from 0-100 and provide:
-1. Overall readiness score and classification (Not Ready / Early Stage / Developing / Ready)
-2. Top three strengths from an investor/lender perspective
-3. Top three gaps that must be addressed before seeking investment
-4. Specific recommendations for each gap
-5. Estimated timeline to investment readiness if recommendations are followed
-
-Write clearly for a business owner. Maximum 350 words.`
-
-      const response = await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
-      })
-      const data = await response.json()
-      const text = data.content?.[0]?.text||'Assessment unavailable'
-      // Extract score from text (look for number)
-      const scoreMatch = text.match(/(\d+)\s*(?:\/\s*100|out of 100|%)/i)
-      const score = scoreMatch ? parseInt(scoreMatch[1]) : 50
-      const {data:saved} = await supabase.from('investment_readiness').insert([{
-        client_id:clientId, assessment_text:text, readiness_score:score,
-        generated_at:new Date().toISOString(),
-      }]).select().single()
-      if (saved) setAssessments(a=>[saved,...a])
-    } catch(e) { alert('Assessment failed') }
-    setGenerating(false)
-  }
-
-  if (loading) return <Spinner/>
-  const latest = assessments[0]
-  return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem'}}>
-        <div style={secH}>Investment Readiness Assessment</div>
-        <button style={solidBtn(C.amber)} disabled={generating} onClick={generate}>
-          {generating?'Assessing...':'Run Assessment'}
-        </button>
-      </div>
-      {latest&&(
-        <div style={kpiGrid}>
-          <KPI label="Readiness Score" value={`${latest.readiness_score}/100`}
-            color={latest.readiness_score>=70?C.green:latest.readiness_score>=40?C.amber:C.red}
-            sub={latest.readiness_score>=70?'Ready':latest.readiness_score>=40?'Developing':'Not Ready'}/>
-          <KPI label="Last Assessed" value={new Date(latest.generated_at).toLocaleDateString('en-GB')} color={C.slate}/>
-        </div>
-      )}
-      {!latest&&!generating&&(
-        <div style={{...card,textAlign:'center',padding:'2.5rem'}}>
-          <div style={{fontSize:'1.5rem',marginBottom:'0.75rem'}}>📊</div>
-          <div style={{fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>No assessments yet</div>
-          <p style={{color:C.slate,fontSize:'0.88rem'}}>Run an assessment to see whether this business is ready for credit or investment.</p>
-        </div>
-      )}
-      {assessments.map(a=>(
-        <div key={a.id} style={card}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
-            <div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,color:C.navy}}>Assessment</div>
-            <div style={{display:'flex',gap:'0.5rem',alignItems:'center'}}>
-              <Badge text={`Score: ${a.readiness_score}/100`} color={a.readiness_score>=70?C.green:a.readiness_score>=40?C.amber:C.red}/>
-              <span style={{fontSize:'0.75rem',color:C.slate}}>{new Date(a.generated_at).toLocaleDateString('en-GB')}</span>
-            </div>
-          </div>
-          <div style={{fontSize:'0.88rem',color:C.navy,lineHeight:1.8,whiteSpace:'pre-wrap'}}>{a.assessment_text}</div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ── SPEND REQUESTS TAB ────────────────────────────────────────
 function SpendRequestsTab({clientId,config,cc,P}) {
   const [requests, setRequests] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -2296,6 +1645,329 @@ function TradeCreditLineGrid({line,months,cc,canEdit,updateLineName,removeLine,u
           <p style={{fontSize:'0.68rem',color:C.slate,marginTop:'0.4rem'}}>All figures in {cc}. The outstanding balance carries forward automatically: new credit increases it, settling reduces it.</p>
         </div>
       )}
+    </div>
+  )
+}
+// ── P&L TAB (Unit + Consolidated merged with toggle) ─────────
+function PLTab({config,result,months,cc,P}) {
+  const [viewMode, setViewMode] = useState<'unit'|'consolidated'>('unit')
+  const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active)?.id||'')
+  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
+
+  return (
+    <div>
+      <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:viewMode==='unit'?C.navy:C.white,color:viewMode==='unit'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:viewMode==='unit'?700:400}}
+          onClick={()=>setViewMode('unit')}>By Business Unit</button>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:viewMode==='consolidated'?C.navy:C.white,color:viewMode==='consolidated'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:viewMode==='consolidated'?700:400}}
+          onClick={()=>setViewMode('consolidated')}>Consolidated</button>
+      </div>
+
+      {viewMode==='unit' && (() => {
+        const pl = result.unitPL[selUnit]
+        if (!pl) return <div style={card}><p style={{color:C.slate}}>No data for this unit.</p></div>
+        const rows = [
+          {label:'Revenue',values:pl.rev,bold:true},
+          {label:'Cost of Sales',values:pl.cogs,negate:true},
+          {label:'Gross Profit',values:pl.gp,bold:true,highlight:true},
+          {label:'Staff Costs',values:pl.staff,negate:true},
+          {label:'Direct Overheads',values:pl.opex,negate:true},
+          {label:'Shared Costs',values:pl.shared,negate:true},
+          {label:'EBITDA',values:pl.ebitda,bold:true,highlight:true},
+        ]
+        return (
+          <div>
+            <div style={{display:'flex',gap:'0.45rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
+              {config.business_units.filter(u=>u.active).map(u=>(
+                <button key={u.id} style={{fontFamily:'monospace',fontSize:'0.71rem',padding:'0.45rem 0.85rem',
+                  border:`2px solid ${selUnit===u.id?(u.color||C.cyan):C.border}`,borderRadius:4,
+                  background:selUnit===u.id?(u.color||C.cyan):C.white,
+                  color:selUnit===u.id?C.white:C.navy,cursor:'pointer'}}
+                  onClick={()=>setSelUnit(u.id)}>
+                  {config.business_units.find(u2=>u2.id===u.id)?.short||u.name.split(' ')[0]}
+                </button>
+              ))}
+            </div>
+            <PLTable title={`${config.business_units.find(u=>u.id===selUnit)?.name} — P&L`} rows={rows} months={months} cc={cc} showExport/>
+            <div style={kpiGrid}>
+              <KPI label="Annual Revenue" value={fmt(pl.ann_rev,cc)}/>
+              <KPI label="Gross Profit" value={fmt(pl.ann_gp,cc)} sub={pct(pl.gp_margin)} color={pl.ann_gp>=0?C.green:C.red}/>
+              <KPI label="EBITDA" value={fmt(pl.ann_ebitda,cc)} sub={pct(pl.ebitda_margin)} color={pl.ann_ebitda>=0?C.teal:C.red}/>
+              <KPI label="Staff Cost %" value={pct(pl.staff_efficiency.staff_cost_pct)} sub={`${pl.staff_efficiency.headcount} staff`} color={C.amber}/>
+            </div>
+          </div>
+        )
+      })()}
+
+      {viewMode==='consolidated' && (() => {
+        const con = result.con
+        const rows = [
+          {label:'Revenue',values:con.rev,bold:true},
+          {label:'Cost of Sales',values:con.cogs,negate:true},
+          {label:'Gross Profit',values:con.gp,bold:true,highlight:true},
+          {label:'Total Operating Costs',values:con.opex,negate:true},
+          {label:'EBITDA',values:con.ebitda,bold:true,highlight:true},
+          {label:'Tax',values:con.tax,negate:true},
+          {label:'Net Profit After Tax',values:con.npat,bold:true,highlight:true},
+        ]
+        return <PLTable title={`${config.business_name} — Consolidated P&L`} rows={rows} months={months} cc={cc} showExport/>
+      })()}
+    </div>
+  )
+}
+// ── MARGINS & BREAK-EVEN TAB (Spread + Service + Break-Even + Staff merged) ──
+function MarginsTab({config,result,months,cc}) {
+  const [section, setSection] = useState<'spread'|'service'|'breakeven'|'staff'>('breakeven')
+  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
+  const m = result.metrics
+
+  const sections: [string,string][] = [
+    ['breakeven','Break-Even'],['spread','Spread Analysis'],
+    ['service','Service Margins'],['staff','Staff Efficiency'],
+  ]
+
+  return (
+    <div>
+      <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',marginBottom:'1.5rem'}}>
+        {sections.map(([id,label])=>(
+          <button key={id} style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1rem',
+            border:`1px solid ${section===id?C.cyan:C.border}`,borderRadius:5,
+            background:section===id?C.cyan:C.white,color:section===id?C.navy:C.slate,
+            cursor:'pointer',fontWeight:section===id?700:400}}
+            onClick={()=>setSection(id as any)}>{label}</button>
+        ))}
+      </div>
+
+      {section==='breakeven' && (
+        <div>
+          <div style={card}>
+            <div style={secH}>Whole Business Break-Even</div>
+            <div style={kpiGrid}>
+              <KPI label="Break-Even Revenue" value={fmt(m.business_breakeven,cc)} sub="Annual" color={C.amber}/>
+              <KPI label="Planned Revenue" value={fmt(m.total_revenue,cc)} color={C.navy}/>
+              <KPI label="Gap / Surplus" value={fmt(m.total_revenue-m.business_breakeven,cc)} color={m.total_revenue>=m.business_breakeven?C.green:C.red}/>
+              <KPI label="Variable Cost %" value={pct(m.variable_cost_pct)} sub="of revenue" color={C.slate}/>
+            </div>
+            <div style={{background:C.lightBg,borderRadius:6,padding:'1rem',marginTop:'0.5rem'}}>
+              <div style={{fontSize:'0.82rem',color:C.slate,lineHeight:1.7}}>
+                At the planned variable cost ratio of <strong>{pct(m.variable_cost_pct)}</strong>, the business needs to generate <strong>{fmt(m.business_breakeven,cc)}</strong> in annual revenue to cover all fixed and shared costs.
+                {m.total_revenue>=m.business_breakeven
+                  ? ` The current plan exceeds break-even by ${fmt(m.total_revenue-m.business_breakeven,cc)}.`
+                  : ` The current plan is ${fmt(m.business_breakeven-m.total_revenue,cc)} below break-even.`}
+              </div>
+            </div>
+          </div>
+          {result.allocUnits.map(u=>{
+            const pl = result.unitPL[u.id]
+            if (!pl||pl.breakeven.length===0) return null
+            return (
+              <div key={u.id} style={card}>
+                <div style={secH}>{u.name}</div>
+                <div style={{overflowX:'auto'}}>
+                  <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.8rem'}}>
+                    <thead>
+                      <tr style={{background:C.navy,color:C.white}}>
+                        {['Revenue Line','Break-Even Revenue','Current Revenue','Gap / Surplus','Variable Cost %'].map(h=>(
+                          <th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.75rem'}}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pl.breakeven.map((be,i)=>(
+                        <tr key={be.line_id} style={{background:i%2===0?C.cream:C.white}}>
+                          <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{be.name}</td>
+                          <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{fmt(be.breakeven_revenue,cc)}</td>
+                          <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{fmt(be.current_revenue,cc)}</td>
+                          <td style={{padding:'8px 10px',fontFamily:'monospace',fontWeight:700,color:be.gap>=0?C.green:C.red}}>{fmt(be.gap,cc)}</td>
+                          <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{pct(be.variable_cost_pct)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {section==='spread' && (() => {
+        const allSpreads = result.allocUnits.flatMap(u => result.unitPL[u.id]?.spread_analysis||[])
+        if (allSpreads.length===0) return (
+          <div style={card}>
+            <p style={{color:C.slate,fontSize:'0.88rem'}}>No spread lines defined. In Planning, add a revenue line and set its type to "Spread" to track buy price, sell price, and margin per unit.</p>
+          </div>
+        )
+        return (
+          <div>
+            {allSpreads.map(s=>(
+              <div key={s.line_id} style={card}>
+                <div style={secH}>{s.name}</div>
+                <div style={kpiGrid}>
+                  <KPI label="Total Volume" value={s.volume.reduce((a,b)=>a+b,0).toLocaleString()} sub="units"/>
+                  <KPI label="Avg Buy Price" value={fmt(s.buy_price.filter(v=>v>0).reduce((a,b)=>a+b,0)/Math.max(1,s.buy_price.filter(v=>v>0).length),cc)} color={C.red}/>
+                  <KPI label="Avg Sell Price" value={fmt(s.sell_price.filter(v=>v>0).reduce((a,b)=>a+b,0)/Math.max(1,s.sell_price.filter(v=>v>0).length),cc)} color={C.green}/>
+                  <KPI label="Total Spread" value={fmt(s.total_spread.reduce((a,b)=>a+b,0),cc)} color={C.teal}/>
+                </div>
+                <PLTable title="" rows={[
+                  {label:'Volume (units)',values:s.volume},
+                  {label:'Buy Price',values:s.buy_price},
+                  {label:'Sell Price',values:s.sell_price},
+                  {label:'Spread per Unit',values:s.spread_per_unit,highlight:true},
+                  {label:'Total Spread Revenue',values:s.total_spread,bold:true},
+                ]} months={months} cc={cc} showExport/>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
+
+      {section==='service' && (() => {
+        const allMargins = result.allocUnits.flatMap(u => result.unitPL[u.id]?.service_margins||[])
+        if (allMargins.length===0) return (
+          <div style={card}>
+            <p style={{color:C.slate,fontSize:'0.88rem'}}>No service fee lines defined. In Planning, add a revenue line and set its type to "Service Fee" to track fee, cost of delivery, and margin per engagement.</p>
+          </div>
+        )
+        return (
+          <div>
+            {allMargins.map(s=>(
+              <div key={s.line_id} style={card}>
+                <div style={secH}>{s.name}</div>
+                <div style={kpiGrid}>
+                  <KPI label="Total Engagements" value={s.engagements.reduce((a,b)=>a+b,0).toLocaleString()}/>
+                  <KPI label="Avg Fee" value={fmt(s.fee.filter(v=>v>0).reduce((a,b)=>a+b,0)/Math.max(1,s.fee.filter(v=>v>0).length),cc)} color={C.green}/>
+                  <KPI label="Avg Cost/Engagement" value={fmt(s.cost.filter(v=>v>0).reduce((a,b)=>a+b,0)/Math.max(1,s.cost.filter(v=>v>0).length),cc)} color={C.red}/>
+                  <KPI label="Total Margin" value={fmt(s.margin.reduce((a,b)=>a+b,0),cc)} color={C.teal}/>
+                </div>
+                <PLTable title="" rows={[
+                  {label:'Engagements',values:s.engagements},
+                  {label:'Fee per Engagement',values:s.fee},
+                  {label:'Cost per Engagement',values:s.cost,negate:true},
+                  {label:'Margin per Engagement',values:s.margin.map((mv,i)=>s.engagements[i]>0?mv/s.engagements[i]:0),highlight:true},
+                  {label:'Total Margin',values:s.margin,bold:true},
+                ]} months={months} cc={cc} showExport/>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
+
+      {section==='staff' && (
+        <div>
+          <div style={kpiGrid}>
+            <KPI label="Total Headcount" value={String(m.total_headcount)} color={C.navy}/>
+            <KPI label="Revenue per Head" value={fmt(m.revenue_per_head,cc)} color={C.teal}/>
+            <KPI label="Total Staff Cost" value={fmt(m.total_staff_cost,cc)} color={C.red}/>
+            <KPI label="Staff Cost %" value={pct(m.staff_cost_pct)} color={m.staff_cost_pct<0.3?C.green:m.staff_cost_pct<0.5?C.amber:C.red}/>
+          </div>
+          <div style={card}>
+            <div style={secH}>Staff Efficiency by Unit</div>
+            <div style={{overflowX:'auto'}}>
+              <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.8rem'}}>
+                <thead>
+                  <tr style={{background:C.navy,color:C.white}}>
+                    {['Unit','Headcount','Revenue','Staff Cost','Revenue/Head','Staff Cost %'].map(h=>(
+                      <th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.75rem'}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.allocUnits.map((u,i)=>{
+                    const pl = result.unitPL[u.id]
+                    if (!pl) return null
+                    return (
+                      <tr key={u.id} style={{background:i%2===0?C.cream:C.white}}>
+                        <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{u.name}</td>
+                        <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace'}}>{u.headcount}</td>
+                        <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace'}}>{fmt(pl.ann_rev,cc)}</td>
+                        <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',color:C.red}}>{fmt(pl.ann_staff,cc)}</td>
+                        <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',color:C.teal}}>{fmt(pl.staff_efficiency.revenue_per_head,cc)}</td>
+                        <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',color:pl.staff_efficiency.staff_cost_pct<0.3?C.green:pl.staff_efficiency.staff_cost_pct<0.5?C.amber:C.red,fontWeight:700}}>{pct(pl.staff_efficiency.staff_cost_pct)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <PLTable title="Monthly Staff Cost Trend" rows={[
+            {label:'Total Staff Costs',values:result.allocUnits.reduce((acc,u)=>{
+              const pl = result.unitPL[u.id]
+              return pl ? acc.map((v,m2)=>v+pl.staff[m2]) : acc
+            },Array(months.length).fill(0)),bold:true},
+          ]} months={months} cc={cc} showExport/>
+        </div>
+      )}
+    </div>
+  )
+}
+// ── ACTUALS & WORKING CAPITAL TAB (toggle between two existing components) ──
+function ActualsAndWorkingCapitalTab({config,result,months,cc,P,onSave}) {
+  const [mode, setMode] = useState<'actuals'|'workingcapital'>('actuals')
+  return (
+    <div>
+      <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:mode==='actuals'?C.navy:C.white,color:mode==='actuals'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:mode==='actuals'?700:400}}
+          onClick={()=>setMode('actuals')}>Monthly Actuals</button>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:mode==='workingcapital'?C.navy:C.white,color:mode==='workingcapital'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:mode==='workingcapital'?700:400}}
+          onClick={()=>setMode('workingcapital')}>Working Capital (Trade Credit)</button>
+      </div>
+      {mode==='actuals' && <ActualsTab config={config} months={months} cc={cc} P={P} onSave={onSave}/>}
+      {mode==='workingcapital' && <WorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={onSave}/>}
+    </div>
+  )
+}
+// ── APPROVALS & SPEND REQUESTS TAB (toggle, reuses existing components) ──
+function ApprovalsAndSpendTab({clientId,config,cc,P}) {
+  const [mode, setMode] = useState<'approvals'|'requests'>('approvals')
+  return (
+    <div>
+      <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:mode==='approvals'?C.navy:C.white,color:mode==='approvals'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:mode==='approvals'?700:400}}
+          onClick={()=>setMode('approvals')}>Approvals</button>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:mode==='requests'?C.navy:C.white,color:mode==='requests'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:mode==='requests'?700:400}}
+          onClick={()=>setMode('requests')}>My Spend Requests</button>
+      </div>
+      {mode==='approvals' && <ApprovalsTab clientId={clientId} config={config} cc={cc} P={P}/>}
+      {mode==='requests' && <SpendRequestsTab clientId={clientId} config={config} cc={cc} P={P}/>}
+    </div>
+  )
+}
+// ── SETTINGS & ADMIN TAB (Settings + Scenarios + Team merged, toggle) ──
+function SettingsAndAdminTab({config,result,months,cc,clientId,P,onSave}) {
+  const [mode, setMode] = useState<'settings'|'scenarios'|'team'>('settings')
+  return (
+    <div>
+      <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:mode==='settings'?C.navy:C.white,color:mode==='settings'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:mode==='settings'?700:400}}
+          onClick={()=>setMode('settings')}>General Settings</button>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:mode==='scenarios'?C.navy:C.white,color:mode==='scenarios'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:mode==='scenarios'?700:400}}
+          onClick={()=>setMode('scenarios')}>Scenarios</button>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:mode==='team'?C.navy:C.white,color:mode==='team'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:mode==='team'?700:400}}
+          onClick={()=>setMode('team')}>Team</button>
+      </div>
+      {mode==='settings' && <SettingsTab config={config} P={P} onSave={onSave}/>}
+      {mode==='scenarios' && <ScenariosTab config={config} result={result} months={months} cc={cc} P={P} onSave={onSave}/>}
+      {mode==='team' && <TeamTab clientId={clientId} config={config} P={P}/>}
     </div>
   )
 }
