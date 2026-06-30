@@ -243,6 +243,7 @@ export default function GenericDashboard({
 
   const mainNav = [
     ['overview','Overview'],
+    ['intelligence','Clearview Intelligence'],
     ['planning','Planning'],
     ['unit_pl','Unit P&L'],
     ['consolidated','Consolidated P&L'],
@@ -296,6 +297,7 @@ export default function GenericDashboard({
       {/* Main */}
       <main style={{maxWidth:1600,margin:'0 auto',padding:'1.5rem'}}>
         {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
+        {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P}/>}
         {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
         {view==='unit_pl'     && <UnitPLTab config={config} result={result} months={months} cc={cc} P={P}/>}
         {view==='consolidated'&& <ConsolidatedTab config={config} result={result} months={months} cc={cc}/>}
@@ -1772,6 +1774,260 @@ function SettingsTab({config,P,onSave}) {
       <div style={{marginTop:'1.25rem',display:'flex',gap:'0.75rem'}}>
         <button style={solidBtn(C.navy)} disabled={saving} onClick={save}>{saving?'Saving...':'Save All Settings'}</button>
       </div>
+    </div>
+  )
+}
+
+// ── CLEARVIEW BUSINESS INTELLIGENCE ────────────────────────────
+// Consolidates: financial trend, health check, cash flow early warning,
+// break-even tracking, investment readiness, credit risk, staff efficiency,
+// promotion effectiveness, monthly narrative -- all in one place.
+
+function computeCreditRisk(result:any) {
+  if (!result) return {score:0,rating:'No Data',color:C.slate}
+  const m = result.metrics
+  let score = 0
+  // Gross margin contribution (0-25)
+  score += Math.min(25, Math.max(0, m.gross_margin*100*0.5))
+  // Net margin contribution (0-25)
+  score += Math.min(25, Math.max(0, m.net_margin*100*1.0))
+  // Cash buffer contribution (0-25) -- positive min cash across period
+  score += m.min_cash >= 0 ? 25 : Math.max(0, 25 + (m.min_cash/Math.max(1,m.total_revenue))*25)
+  // Break-even headroom (0-25)
+  const headroom = m.total_revenue>0 ? (m.total_revenue-m.business_breakeven)/m.total_revenue : -1
+  score += Math.min(25, Math.max(0, headroom*50+12.5))
+  score = Math.round(Math.max(0,Math.min(100,score)))
+  const rating = score>=75?'Strong':score>=50?'Moderate':score>=25?'Weak':'High Risk'
+  const color = score>=75?C.green:score>=50?C.teal:score>=25?C.amber:C.red
+  return {score,rating,color}
+}
+
+function findCashWarningMonths(result:any, months:string[]) {
+  if (!result) return []
+  const warnings:{month:string,balance:number}[] = []
+  result.cf.close.forEach((bal:number,i:number)=>{
+    if (bal<0) warnings.push({month:months[i]||`Month ${i+1}`,balance:bal})
+  })
+  return warnings
+}
+
+function ClearviewIntelligenceTab({clientId,config,result,months,cc,P}) {
+  const [healthReports, setHealthReports] = useState<any[]>([])
+  const [investmentAssessments, setInvestmentAssessments] = useState<any[]>([])
+  const [events, setEvents] = useState<any[]>([])
+  const [narrative, setNarrative] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [generatingNarrative, setGeneratingNarrative] = useState(false)
+  const [generatingHealth, setGeneratingHealth] = useState(false)
+
+  useEffect(()=>{
+    Promise.all([
+      supabase.from('ai_health_checks').select('*').eq('client_id',clientId).order('period',{ascending:false}).limit(1),
+      supabase.from('investment_readiness').select('*').eq('client_id',clientId).order('generated_at',{ascending:false}).limit(1),
+      supabase.from('management_events').select('*').eq('client_id',clientId).order('date',{ascending:false}).limit(5),
+      supabase.from('coach_briefings').select('*').eq('client_id',clientId).order('generated_at',{ascending:false}).limit(1),
+    ]).then(([h,i,e,n])=>{
+      setHealthReports(h.data||[])
+      setInvestmentAssessments(i.data||[])
+      setEvents(e.data||[])
+      setNarrative(n.data?.[0]||null)
+      setLoading(false)
+    })
+  },[clientId])
+
+  async function generateHealthCheck() {
+    if (!result) { alert('Set up your financial plan first.'); return }
+    setGeneratingHealth(true)
+    const m = result.metrics
+    const targetPeriod = new Date().toISOString().slice(0,7)+'-01'
+    try {
+      const prompt = `You are a financial health advisor for an African MSME. Produce a monthly business health check report for ${config.business_name}.
+
+Financial summary:
+- Total planned revenue: ${cc} ${m.total_revenue.toLocaleString()}
+- Gross profit: ${cc} ${m.total_gp.toLocaleString()} (${(m.gross_margin*100).toFixed(1)}% margin)
+- EBITDA: ${cc} ${m.total_ebitda.toLocaleString()} (${(m.net_margin*100).toFixed(1)}% margin)
+- Minimum cash position: ${cc} ${m.min_cash.toLocaleString()} in month ${m.min_cash_month}
+- Break-even revenue needed: ${cc} ${m.business_breakeven.toLocaleString()}
+- Staff cost as % of revenue: ${(m.staff_cost_pct*100).toFixed(1)}%
+
+Write a clear, plain-English health check report for the CEO. Include: 1) Overall status (Green/Amber/Red with reason) 2) Two or three things going well 3) Two or three areas of concern 4) Three specific actions this month. Maximum 300 words.`
+      const response = await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+      })
+      const data = await response.json()
+      const text = data.content?.[0]?.text||'Report unavailable'
+      const {data:saved} = await supabase.from('ai_health_checks').upsert({
+        client_id:clientId, period:targetPeriod, report_text:text,
+        triggered_by:'manual', generated_at:new Date().toISOString(), visible_to_ceo:true,
+      },{onConflict:'client_id,period'}).select().single()
+      if (saved) setHealthReports([saved])
+    } catch(e) { alert('Health check generation failed') }
+    setGeneratingHealth(false)
+  }
+
+  async function generateNarrative() {
+    if (!result) { alert('Set up your financial plan first.'); return }
+    setGeneratingNarrative(true)
+    const m = result.metrics
+    const risk = computeCreditRisk(result)
+    const warnings = findCashWarningMonths(result, months)
+    try {
+      const prompt = `You are writing a monthly business narrative for the CEO of ${config.business_name}, an African MSME. This is a complete story of where the business stands right now, written in plain conversational English -- not a list, a narrative someone reads top to bottom like a letter.
+
+Data:
+- Revenue: ${cc} ${m.total_revenue.toLocaleString()}, Gross margin: ${(m.gross_margin*100).toFixed(1)}%, Net margin: ${(m.net_margin*100).toFixed(1)}%
+- Credit risk score: ${risk.score}/100 (${risk.rating})
+- Break-even revenue: ${cc} ${m.business_breakeven.toLocaleString()}
+- Cash position lowest point: ${cc} ${m.min_cash.toLocaleString()}
+- Cash shortfall months: ${warnings.length>0?warnings.map(w=>w.month).join(', '):'none projected'}
+- Staff cost ratio: ${(m.staff_cost_pct*100).toFixed(1)}%
+- Business units: ${config.business_units.filter(u=>u.active).map(u=>u.name).join(', ')}
+
+Write 4-5 short paragraphs telling the story of this business right now: where it stands, what's driving that, what to watch, and what to focus on next month. Write as if speaking directly to the owner. No headers, no bullet points, no jargon. Maximum 350 words.`
+      const response = await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+      })
+      const data = await response.json()
+      const text = data.content?.[0]?.text||'Narrative unavailable'
+      const {data:saved} = await supabase.from('coach_briefings').insert([{
+        client_id:clientId, briefing_text:text, visit_context:'Monthly Narrative',
+        period_covered:new Date().toLocaleString('en-GB',{month:'long',year:'numeric'}),
+        generated_at:new Date().toISOString(),
+      }]).select().single()
+      if (saved) setNarrative(saved)
+    } catch(e) { alert('Narrative generation failed') }
+    setGeneratingNarrative(false)
+  }
+
+  if (loading) return <Spinner/>
+  if (!result) return (
+    <div style={{...card,textAlign:'center',padding:'2.5rem'}}>
+      <div style={{fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Set up your financial plan first</div>
+      <p style={{color:C.slate,fontSize:'0.88rem'}}>Clearview Business Intelligence needs business units and a financial plan to generate analysis.</p>
+    </div>
+  )
+
+  const m = result.metrics
+  const risk = computeCreditRisk(result)
+  const warnings = findCashWarningMonths(result, months)
+  const latestHealth = healthReports[0]
+  const latestInvestment = investmentAssessments[0]
+
+  return (
+    <div>
+      <div style={{...card,background:C.navy,marginBottom:'1.5rem'}}>
+        <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.3rem'}}>CLEARVIEW BUSINESS INTELLIGENCE</div>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.white,marginBottom:'0.5rem'}}>{config.business_name}</div>
+        <div style={{display:'flex',gap:'1.5rem',flexWrap:'wrap'}}>
+          <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>CREDIT RISK</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:risk.color}}>{risk.score}/100</div><div style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.7)'}}>{risk.rating}</div></div>
+          <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>EBITDA MARGIN</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:C.white}}>{(m.net_margin*100).toFixed(0)}%</div></div>
+          <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>CASH WARNINGS</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:warnings.length>0?C.red:C.green}}>{warnings.length}</div><div style={{fontSize:'0.7rem',color:'rgba(255,255,255,0.7)'}}>{warnings.length>0?'months at risk':'no shortfall projected'}</div></div>
+        </div>
+      </div>
+
+      {/* Monthly Narrative */}
+      <div style={card}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+          <div style={secH}>This Month's Story</div>
+          <button style={solidBtn(C.purple,true)} disabled={generatingNarrative} onClick={generateNarrative}>{generatingNarrative?'Writing...':'Generate Narrative'}</button>
+        </div>
+        {narrative ? (
+          <div>
+            <div style={{fontSize:'0.75rem',color:C.slate,marginBottom:'0.75rem'}}>{narrative.period_covered} · Generated {new Date(narrative.generated_at).toLocaleDateString('en-GB')}</div>
+            <div style={{fontSize:'0.9rem',color:C.navy,lineHeight:1.85,whiteSpace:'pre-wrap'}}>{narrative.briefing_text}</div>
+          </div>
+        ) : (
+          <p style={{color:C.slate,fontSize:'0.85rem'}}>Generate a plain-English story of how the business is doing this month, written for the CEO.</p>
+        )}
+      </div>
+
+      {/* Cash Flow Early Warning */}
+      <div style={card}>
+        <div style={secH}>Cash Flow Early Warning</div>
+        {warnings.length===0 ? (
+          <div style={{padding:'0.85rem',background:'#EBFAF0',borderRadius:6,color:C.green,fontSize:'0.85rem',fontWeight:600}}>No cash shortfall projected across the planning period.</div>
+        ) : (
+          <div>
+            <p style={{fontSize:'0.83rem',color:C.slate,marginBottom:'0.75rem'}}>Cash balance is projected to go negative in {warnings.length} month{warnings.length!==1?'s':''}:</p>
+            {warnings.map((w,i)=>(
+              <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'0.5rem 0.75rem',background:'#FDF0EE',borderRadius:5,marginBottom:'0.4rem'}}>
+                <span style={{fontWeight:600,color:C.navy}}>{w.month}</span>
+                <span style={{fontFamily:'monospace',color:C.red,fontWeight:700}}>{fmt(w.balance,cc)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Break-Even Headroom */}
+      <div style={card}>
+        <div style={secH}>Break-Even Position</div>
+        <div style={kpiGrid}>
+          <KPI label="Break-Even Revenue" value={fmt(m.business_breakeven,cc)} color={C.amber}/>
+          <KPI label="Planned Revenue" value={fmt(m.total_revenue,cc)}/>
+          <KPI label="Headroom" value={fmt(m.total_revenue-m.business_breakeven,cc)} color={m.total_revenue>=m.business_breakeven?C.green:C.red}/>
+        </div>
+      </div>
+
+      {/* Staff Efficiency Summary */}
+      <div style={card}>
+        <div style={secH}>Staff Efficiency</div>
+        <div style={kpiGrid}>
+          <KPI label="Revenue per Head" value={fmt(m.revenue_per_head,cc)} color={C.teal}/>
+          <KPI label="Staff Cost %" value={pct(m.staff_cost_pct)} color={m.staff_cost_pct<0.3?C.green:m.staff_cost_pct<0.5?C.amber:C.red}/>
+          <KPI label="Total Headcount" value={String(m.total_headcount)}/>
+        </div>
+      </div>
+
+      {/* Health Check */}
+      <div style={card}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+          <div style={secH}>Business Health Check</div>
+          <button style={solidBtn(C.purple,true)} disabled={generatingHealth} onClick={generateHealthCheck}>{generatingHealth?'Generating...':'Generate This Month'}</button>
+        </div>
+        {latestHealth ? (
+          <div>
+            <div style={{fontSize:'0.75rem',color:C.slate,marginBottom:'0.75rem'}}>{new Date(latestHealth.period).toLocaleString('en-GB',{month:'long',year:'numeric'})}</div>
+            <div style={{fontSize:'0.88rem',color:C.navy,lineHeight:1.8,whiteSpace:'pre-wrap'}}>{latestHealth.report_text}</div>
+          </div>
+        ) : <p style={{color:C.slate,fontSize:'0.85rem'}}>No health check generated yet this month.</p>}
+      </div>
+
+      {/* Investment Readiness Summary */}
+      <div style={card}>
+        <div style={secH}>Investment Readiness</div>
+        {latestInvestment ? (
+          <div>
+            <div style={{display:'flex',gap:'1rem',alignItems:'center',marginBottom:'0.75rem'}}>
+              <Badge text={`${latestInvestment.readiness_score}/100`} color={latestInvestment.readiness_score>=70?C.green:latestInvestment.readiness_score>=40?C.amber:C.red}/>
+              <span style={{fontSize:'0.75rem',color:C.slate}}>Last assessed {new Date(latestInvestment.generated_at).toLocaleDateString('en-GB')}</span>
+            </div>
+            <div style={{fontSize:'0.85rem',color:C.navy,lineHeight:1.75,whiteSpace:'pre-wrap'}}>{latestInvestment.assessment_text}</div>
+          </div>
+        ) : <p style={{color:C.slate,fontSize:'0.85rem'}}>No assessment yet. Run one from the Investment Readiness tab.</p>}
+      </div>
+
+      {/* Recent Promotion Events */}
+      {events.length>0&&(
+        <div style={card}>
+          <div style={secH}>Recent Promotion & Marketing Effectiveness</div>
+          {events.map(evt=>{
+            const roi = evt.cost>0 ? (evt.revenue_after-evt.revenue_before-evt.cost)/evt.cost : null
+            return (
+              <div key={evt.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.5rem 0.75rem',background:C.lightBg,borderRadius:5,marginBottom:'0.4rem'}}>
+                <div>
+                  <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{evt.name}</div>
+                  <div style={{fontSize:'0.7rem',color:C.slate}}>{evt.date}</div>
+                </div>
+                {roi!==null&&<Badge text={`ROI ${(roi*100).toFixed(0)}%`} color={roi>0?C.green:C.red}/>}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
