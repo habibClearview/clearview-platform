@@ -220,6 +220,24 @@ function ConasOperationalCashflowTab({result, months, cc}:{result:ReturnType<typ
 
   const pressureMonths = net.map(function(v:number,i:number){return{idx:i,label:months[i],value:v}}).filter(function(x){return x.value < -50000})
 
+  function exportOpCashflowCSV() {
+    const headers = ['', ...months]
+    const rows = [
+      ['Cash In (Operating)', ...moneyIn.map(v=>Math.round(v))],
+      ['Irrigation Outflows', ...(result.cf.irrigation||Array(m).fill(0)).map(v=>v>0?-Math.round(v):0)],
+      ['Approved Spending', ...(result.cf.approvedSpend||Array(m).fill(0)).map(v=>v>0?-Math.round(v):0)],
+      ['Cash Out (Total)', ...moneyOut.map(v=>-Math.round(v))],
+      ['Net Cash', ...net.map(v=>Math.round(v))],
+      ['Cumulative Position', ...cumulative.map(v=>Math.round(v))],
+    ]
+    const csv = [headers,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv],{type:'text/csv'})
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href=url; a.download='Operational_Cashflow.csv'; a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
@@ -245,7 +263,7 @@ function ConasOperationalCashflowTab({result, months, cc}:{result:ReturnType<typ
       )}
 
       <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>Operational Cashflow (Cash In vs Cash Out)</div><button style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,color:C.slate,cursor:'pointer',padding:'0.15rem 0.5rem'}} onClick={()=>window.print()}>Print</button></div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>Operational Cashflow (Cash In vs Cash Out)</div><div style={{display:'flex',gap:'0.4rem'}}><button style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,color:C.slate,cursor:'pointer',padding:'0.15rem 0.5rem'}} onClick={()=>window.print()}>Print</button><button style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,color:C.slate,cursor:'pointer',padding:'0.15rem 0.5rem'}} onClick={exportOpCashflowCSV}>Export CSV</button></div></div>
         <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.75rem',fontFamily:'monospace'}}>
           <thead><tr style={{background:C.navy,color:C.white}}>
             <th style={{padding:'7px 10px',textAlign:'left',minWidth:160}}>Line</th>
@@ -288,6 +306,20 @@ function ConasWorkingCapitalTab({result, months, cc}:{result:ReturnType<typeof r
   const peakCredit = Math.max.apply(null, inputCredit)
   const avgCredit = inputCredit.reduce(function(a:number,b:number){return a+b},0) / m
 
+  function exportWorkingCapitalCSV() {
+    const headers = ['', ...months]
+    const rows = [
+      ['Kit Outflows', ...irrigationByMonth.map((v:number)=>v>0?-Math.round(v):0)],
+      ['Closing Cash (after kits)', ...result.cf.close.map((v:number)=>Math.round(v))],
+    ]
+    const csv = [headers,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv],{type:'text/csv'})
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href=url; a.download='Working_Capital_Irrigation.csv'; a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
@@ -314,7 +346,7 @@ function ConasWorkingCapitalTab({result, months, cc}:{result:ReturnType<typeof r
       </div>
 
       <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>Irrigation Kit Deployment</div><button style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,color:C.slate,cursor:'pointer',padding:'0.15rem 0.5rem'}} onClick={()=>window.print()}>Export / Print</button></div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>Irrigation Kit Deployment</div><div style={{display:'flex',gap:'0.4rem'}}><button style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,color:C.slate,cursor:'pointer',padding:'0.15rem 0.5rem'}} onClick={()=>window.print()}>Print</button><button style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,color:C.slate,cursor:'pointer',padding:'0.15rem 0.5rem'}} onClick={exportWorkingCapitalCSV}>Export CSV</button></div></div>
         <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.75rem',fontFamily:'monospace'}}>
           <thead><tr style={{background:C.navy,color:C.white}}>
             <th style={{padding:'7px 10px',textAlign:'left',minWidth:160}}>Line</th>
