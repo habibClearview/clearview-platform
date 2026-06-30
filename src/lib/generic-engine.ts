@@ -1,3 +1,5 @@
+import { computeScores, buildDebtSchedule, defaultCoachAssessment, type CoachAssessment, type ScoringResult } from './scoring-engine'
+
 // ============================================================
 // CLEARVIEW GENERIC ENGINE v1
 // Database-driven financial model for any client type
@@ -84,6 +86,7 @@ export interface GenericModelConfig {
     transfer_price_margin?: number
     scenarios?: GenericScenario[]
     capital_structure?: GenericCapital
+    coach_assessment?: CoachAssessment
   }
 }
 
@@ -574,12 +577,37 @@ export function runGenericModel(
       ? allocUnits.reduce((s, u) => s + yr(unitPL[u.id]?.staff || []), 0) / total_rev : 0,
   }
 
+  // ── Deterministic scoring: Credit Risk, Going Concern, Investment Readiness ──
+  // Uses the same shared engine as CONAS, so every client gets the same
+  // rigorous methodology, not just an AI estimate.
+  const coachAssessment: CoachAssessment = settings.coach_assessment || defaultCoachAssessment()
+  const debtObligations = cap.bank_loan > 0 ? [{
+    drawdownMonth: 1,
+    annualRate: cap.annual_interest_rate || 0.18,
+    tenorMonths: (cap.loan_tenor_years || 2) * 12,
+    gracePeriodMonths: 0,
+    principal: cap.bank_loan,
+    repaymentType: 'amortising',
+  }] : []
+  const scores: ScoringResult = computeScores({
+    rev: con.rev,
+    ebitda: con.ebitda,
+    cashClose: cf.close,
+    totalEquity: bs.total_equity[bs.total_equity.length - 1] || 0,
+    totalLiabilities: bs.total_liabilities[bs.total_liabilities.length - 1] || 0,
+    months,
+    debtObligations,
+    assess: coachAssessment,
+  })
+
   return {
     unitPL,
     con,
     cf,
     bs,
     metrics,
+    scores,
+    coachAssessment,
     sharedPool,
     allocUnits,
     subUnitsByParent,
