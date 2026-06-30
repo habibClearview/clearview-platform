@@ -15,11 +15,12 @@ const btn = (col=C.navy) => ({fontFamily:'monospace',fontSize:'0.85rem',fontWeig
 
 function genId(prefix:string) { return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,7)}` }
 
-const PRODUCT_BLOCK_START_ROW = 7  // 1-indexed, B7 = first product name
+const WHICH_PART_ROW = 5           // B5 label, C5 = unit name entered by client
+const HEADER_ROW = 7               // month headers now on row 7
+const PRODUCT_BLOCK_START_ROW = 8  // 1-indexed, B8 = first product name
 const ROWS_PER_PRODUCT = 7         // name, revenue, 4 cost lines, 1 spacer
 const PRODUCT_SLOTS = 4
 const COST_LINES_PER_PRODUCT = 4
-const COMMON_COSTS_START_OFFSET = 1 // rows after last product block, before common cost header
 const COMMON_COST_SLOTS = 4
 const MONTH_START_COL = 2 // column C (0-indexed: A=0,B=1,C=2)
 
@@ -62,8 +63,12 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
 
       const bd = wb.Sheets['Business Details']
       const st = wb.Sheets['Structure']
-      const pf = wb.Sheets['Products & Figures']
-      if (!bd || !st || !pf) throw new Error('This does not look like the Clearview Data Capture template. Missing required sheets.')
+      if (!bd || !st) throw new Error('This does not look like the Clearview Data Capture template. Missing required sheets.')
+
+      // Find every sheet that is a Products & Figures sheet -- the original, or any copy
+      // the client made per business unit (sheet name starts with "Products")
+      const productSheetNames = wb.SheetNames.filter(n => n.toLowerCase().startsWith('products'))
+      if (productSheetNames.length === 0) throw new Error('No Products & Figures sheet found.')
 
       const business = {
         business_name: cellStr(bd,'C4'),
@@ -86,62 +91,84 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
         }
       }
 
-      // Detect month columns from header row 6: find "THIS MONTH" column, count columns either side
-      const headerRow = 6
-      let monthCols: number[] = []
-      let thisMonthColIdx = -1
-      for (let c = MONTH_START_COL; c < MONTH_START_COL + 30; c++) {
-        const addr = `${colLetter(c)}${headerRow}`
-        const val = cellStr(pf, addr)
-        if (!val) break
-        monthCols.push(c)
-        if (val.toUpperCase().includes('THIS MONTH')) thisMonthColIdx = monthCols.length - 1
-      }
-      if (monthCols.length === 0) throw new Error('Could not find month columns in Products & Figures sheet.')
-      const pastMonths = thisMonthColIdx >= 0 ? thisMonthColIdx : 0
-      const futureMonths = monthCols.length - pastMonths - 1
+      // Parse every product sheet found. Each contributes products tagged with
+      // the unit name declared in its "Which Part Is This For?" cell.
+      type ParsedProduct = {name:string, costLines:{name:string,values:number[]}[], revenue:number[], unitName:string}
+      const allProducts: ParsedProduct[] = []
+      const allCommonCosts: {name:string,values:number[],unitName:string}[] = []
+      let pastMonths = 0, futureMonths = 0, monthColsCount = 0
+      const unassignedSheets: string[] = []
 
-      // Parse products
-      const products: {name:string, costLines:{name:string,row:number}[], revenueRow:number}[] = []
-      let row = PRODUCT_BLOCK_START_ROW
-      for (let p = 0; p < PRODUCT_SLOTS; p++) {
-        const name = cellStr(pf, `B${row}`)
-        const revenueRow = row + 1
-        const costLines: {name:string,row:number}[] = []
-        for (let cl = 0; cl < COST_LINES_PER_PRODUCT; cl++) {
-          const costRow = row + 2 + cl
-          const costName = cellStr(pf, `C${costRow}`)
-          if (costName) costLines.push({ name: costName, row: costRow })
+      for (const sheetName of productSheetNames) {
+        const pf = wb.Sheets[sheetName]
+        const sheetUnitName = cellStr(pf, `C${WHICH_PART_ROW}`)
+        const headerRow = HEADER_ROW
+
+        let monthCols: number[] = []
+        let thisMonthColIdx = -1
+        for (let c = MONTH_START_COL; c < MONTH_START_COL + 30; c++) {
+          const addr = `${colLetter(c)}${headerRow}`
+          const val = cellStr(pf, addr)
+          if (!val) break
+          monthCols.push(c)
+          if (val.toUpperCase().includes('THIS MONTH')) thisMonthColIdx = monthCols.length - 1
         }
-        if (name) products.push({ name, costLines, revenueRow })
-        row += ROWS_PER_PRODUCT
-      }
+        if (monthCols.length === 0) continue // sheet has no data, skip
+        const sheetPast = thisMonthColIdx >= 0 ? thisMonthColIdx : 0
+        const sheetFuture = monthCols.length - sheetPast - 1
+        pastMonths = Math.max(pastMonths, sheetPast)
+        futureMonths = Math.max(futureMonths, sheetFuture)
+        monthColsCount = Math.max(monthColsCount, monthCols.length)
 
-      // Parse common costs (only relevant when hasUnits is false)
-      // Find the COMMON COSTS row by scanning column B for the label
-      let commonRow = -1
-      for (let r = row; r < row + 10; r++) {
-        if (cellStr(pf, `B${r}`).toUpperCase().includes('COMMON COSTS')) { commonRow = r + 1; break }
-      }
-      const commonCosts: {name:string,row:number}[] = []
-      if (commonRow > 0) {
-        for (let cl = 0; cl < COMMON_COST_SLOTS; cl++) {
-          const r = commonRow + cl
-          const name = cellStr(pf, `C${r}`)
-          if (name) commonCosts.push({ name, row: r })
+        function readVals(rowNum: number): number[] {
+          return monthCols.map(c => cellNum(pf, `${colLetter(c)}${rowNum}`))
+        }
+
+        // Resolve which declared unit this sheet belongs to
+        let resolvedUnitName = ''
+        if (hasUnits) {
+          if (!sheetUnitName) {
+            unassignedSheets.push(sheetName)
+            resolvedUnitName = units[0]?.name || ''
+          } else {
+            const match = units.find(u => u.name.trim().toLowerCase() === sheetUnitName.trim().toLowerCase())
+            if (match) { resolvedUnitName = match.name }
+            else { unassignedSheets.push(sheetName); resolvedUnitName = units[0]?.name || '' }
+          }
+        }
+
+        let row = PRODUCT_BLOCK_START_ROW
+        for (let p = 0; p < PRODUCT_SLOTS; p++) {
+          const name = cellStr(pf, `C${row}`)
+          const revenueRow = row + 1
+          const costLines: {name:string,values:number[]}[] = []
+          for (let cl = 0; cl < COST_LINES_PER_PRODUCT; cl++) {
+            const costRow = row + 2 + cl
+            const costName = cellStr(pf, `C${costRow}`)
+            if (costName) costLines.push({ name: costName, values: readVals(costRow) })
+          }
+          if (name) allProducts.push({ name, costLines, revenue: readVals(revenueRow), unitName: resolvedUnitName })
+          row += ROWS_PER_PRODUCT
+        }
+
+        let commonRow = -1
+        for (let r = row; r < row + 10; r++) {
+          if (cellStr(pf, `B${r}`).toUpperCase().includes('COMMON COSTS')) { commonRow = r + 1; break }
+        }
+        if (commonRow > 0 && !hasUnits) {
+          for (let cl = 0; cl < 4; cl++) {
+            const r = commonRow + cl
+            const name = cellStr(pf, `C${r}`)
+            if (name) allCommonCosts.push({ name, values: readVals(r), unitName: resolvedUnitName })
+          }
         }
       }
 
-      function readMonthValues(rowNum: number): number[] {
-        return monthCols.map(c => cellNum(pf, `${colLetter(c)}${rowNum}`))
-      }
-
-      if (products.length === 0) throw new Error('No products found. Please name at least one product in the Products & Figures sheet.')
+      if (allProducts.length === 0) throw new Error('No products found. Please name at least one product on a Products & Figures sheet.')
 
       setPreview({
-        business, hasUnits, units, products, commonCosts,
-        pastMonths, futureMonths, monthColsCount: monthCols.length,
-        readMonthValues,
+        business, hasUnits, units, products: allProducts, commonCosts: allCommonCosts,
+        pastMonths, futureMonths, monthColsCount, unassignedSheets,
       })
     } catch(e:any) {
       setError(e.message || 'Could not read this file. Please make sure it is the Clearview Data Capture template.')
@@ -154,7 +181,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
     setSubmitting(true)
     setError('')
     try {
-      const { business, hasUnits, units, products, commonCosts, pastMonths, readMonthValues } = preview
+      const { business, hasUnits, units, products, commonCosts, pastMonths, unassignedSheets } = preview
       const slug = business.business_name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')
 
       const { data: client, error: clientErr } = await supabase.from('engagement_clients').insert([{
@@ -176,37 +203,34 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
       }
 
       const wholeKey = 'whole'
+      // Build unit id lookup by name so products can be assigned to the correct unit
+      const unitIdByName: Record<string,string> = {}
       const keys = hasUnits ? units.map((u:any,i:number)=>({id:genId('unit'),name:u.name,idx:i})) : [{id:wholeKey,name:business.business_name,idx:0}]
-
-      // Single-unit case: all products + common costs go under the one unit
-      // Multi-unit case: this template does not capture per-unit product breakdown
-      // (the spreadsheet does not ask which unit each product belongs to),
-      // so all products are placed in the first unit and flagged for coach review.
       keys.forEach((k:any,ki:number)=>{
+        unitIdByName[k.name] = k.id
         businessUnits.push({
           id:k.id, name:k.name, short:(k.name||'').split(' ').map((w:string)=>w[0]).join('').toUpperCase().slice(0,4),
           type:'mixed', color:['#00B4D8','#1A9DAA','#B8860B','#6B4A8B','#1A7A4A'][ki%5],
           headcount:0, active:true, sort_order:ki,
         })
       })
-      const primaryUnitId = keys[0].id
 
       products.forEach((p:any) => {
+        const unitId = hasUnits ? (unitIdByName[p.unitName] || keys[0].id) : wholeKey
         const revId = genId('rev')
-        planLines.push({ id: revId, unit_id: primaryUnitId, name: p.name, category:'revenue', line_type:'standard',
-          monthly_plan: planArray(readMonthValues(p.revenueRow)), active:true })
+        planLines.push({ id: revId, unit_id: unitId, name: p.name, category:'revenue', line_type:'standard',
+          monthly_plan: planArray(p.revenue), active:true })
         p.costLines.forEach((c:any) => {
-          planLines.push({ id: genId('cost'), unit_id: primaryUnitId, name: `${p.name} — ${c.name}`, category:'cost_of_sales', line_type:'standard',
-            monthly_plan: planArray(readMonthValues(c.row)), active:true })
+          planLines.push({ id: genId('cost'), unit_id: unitId, name: `${p.name} — ${c.name}`, category:'cost_of_sales', line_type:'standard',
+            monthly_plan: planArray(c.values), active:true })
         })
       })
 
-      if (!hasUnits) {
-        commonCosts.forEach((c:any) => {
-          planLines.push({ id: genId('common'), unit_id: primaryUnitId, name: c.name, category:'direct_opex', line_type:'standard',
-            monthly_plan: planArray(readMonthValues(c.row)), active:true })
-        })
-      }
+      commonCosts.forEach((c:any) => {
+        const unitId = hasUnits ? (unitIdByName[c.unitName] || keys[0].id) : wholeKey
+        planLines.push({ id: genId('common'), unit_id: unitId, name: c.name, category:'direct_opex', line_type:'standard',
+          monthly_plan: planArray(c.values), active:true })
+      })
 
       const { error: configErr } = await supabase.from('generic_model_config').insert([{
         client_id: client.id, business_name: business.business_name, currency: business.currency,
@@ -214,7 +238,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
         planning_months: totalMonths, business_units: businessUnits, plan_lines: planLines, shared_lines: [],
         settings: { shared_cost_fixed_pct:0.5, corporate_tax_rate:0.30, opening_cash_balance:0,
           structure_confirmed: false,
-          upload_note: hasUnits ? 'Uploaded via spreadsheet -- all products placed under first unit; coach should review and reassign to correct units.' : '' },
+          upload_note: unassignedSheets?.length>0 ? `Some sheets could not be matched to a unit by name (${unassignedSheets.join(', ')}) -- their products were placed under "${units[0]?.name}". Coach should review and reassign.` : '' },
       }])
       if (configErr) throw configErr
 
@@ -262,10 +286,21 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
           <div style={{fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>{preview.business.business_name}</div>
           <div style={{fontSize:'0.82rem',color:C.slate,marginBottom:'0.3rem'}}>{preview.business.contact_name} · {preview.business.contact_email} · {preview.business.country}</div>
           <div style={{fontSize:'0.82rem',color:C.slate,marginBottom:'0.3rem'}}>Structure: {preview.hasUnits ? `${preview.units.length} units: ${preview.units.map((u:any)=>u.name).join(', ')}` : 'Single business'}</div>
-          <div style={{fontSize:'0.82rem',color:C.slate,marginBottom:'0.3rem'}}>Products: {preview.products.map((p:any)=>p.name).join(', ')}</div>
-          <div style={{fontSize:'0.82rem',color:C.slate}}>{preview.pastMonths} months past data · {preview.futureMonths} months forward plan</div>
-          {preview.hasUnits && (
-            <p style={{fontSize:'0.78rem',color:C.amber,marginTop:'0.6rem'}}>Note: this template does not record which unit each product belongs to. All products will be placed under "{preview.units[0]?.name}" -- you will need to reassign them to the correct units afterward.</p>
+          {preview.hasUnits ? (
+            preview.units.map((u:any)=>{
+              const unitProducts = preview.products.filter((p:any)=>p.unitName===u.name)
+              return (
+                <div key={u.name} style={{fontSize:'0.82rem',color:C.slate,marginBottom:'0.2rem'}}>
+                  <strong style={{color:C.navy}}>{u.name}:</strong> {unitProducts.length>0 ? unitProducts.map((p:any)=>p.name).join(', ') : <em>no products found for this part</em>}
+                </div>
+              )
+            })
+          ) : (
+            <div style={{fontSize:'0.82rem',color:C.slate,marginBottom:'0.3rem'}}>Products: {preview.products.map((p:any)=>p.name).join(', ')}</div>
+          )}
+          <div style={{fontSize:'0.82rem',color:C.slate,marginTop:'0.4rem'}}>{preview.pastMonths} months past data · {preview.futureMonths} months forward plan</div>
+          {preview.unassignedSheets?.length>0 && (
+            <p style={{fontSize:'0.78rem',color:C.amber,marginTop:'0.6rem'}}>Note: the sheet(s) "{preview.unassignedSheets.join(', ')}" did not have a "Which Part Is This For?" value matching a named part, so their products were placed under "{preview.units[0]?.name}". You should review and reassign these.</p>
           )}
         </div>
       )}
