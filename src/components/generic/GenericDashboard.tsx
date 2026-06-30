@@ -1654,7 +1654,7 @@ function SettingsTab({config,P,onSave}) {
     setForm(f=>({...f,business_units:[...f.business_units,newUnit]}))
   }
 
-  const sections = [['general','General'],['units','Business Units'],['capital','Capital Structure'],['delegation','Approval Delegation']]
+  const sections = [['general','General'],['units','Business Units'],['capital','Capital Structure'],['credit','Debts & Trade Credit'],['delegation','Approval Delegation']]
 
   return (
     <div>
@@ -1754,6 +1754,47 @@ function SettingsTab({config,P,onSave}) {
               <input type="number" style={inp} value={Math.round(((form.settings.capital_structure?.annual_interest_rate||0.18)*100))}
                 onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),annual_interest_rate:Number(e.target.value)/100}}}))}/>
             </div>
+          </div>
+        </div>
+      )}
+
+      {activeSection==='credit'&&(
+        <div>
+          <div style={card}>
+            <div style={secH}>Additional Debt Obligations</div>
+            <p style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.85rem'}}>Use this if the business has more than one loan -- bank loans, SACCO loans, or other non-bank facilities. Supplements the single Bank Loan field above; each is tracked separately in DSCR.</p>
+            {(form.settings.debts||[]).map((d:any,i:number)=>(
+              <div key={i} style={{display:'grid',gridTemplateColumns:'1.5fr 1fr 1fr 1fr 1fr auto',gap:'0.5rem',alignItems:'end',padding:'0.6rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.5rem'}}>
+                <div><div style={hint}>Name</div><input style={inp} value={d.name||''} onChange={e=>{const ds=[...(form.settings.debts||[])];ds[i]={...ds[i],name:e.target.value};setForm(f=>({...f,settings:{...f.settings,debts:ds}}))}}/></div>
+                <div><div style={hint}>Principal ({form.currency})</div><input type="number" style={inp} value={d.principal||0} onChange={e=>{const ds=[...(form.settings.debts||[])];ds[i]={...ds[i],principal:Number(e.target.value)};setForm(f=>({...f,settings:{...f.settings,debts:ds}}))}}/></div>
+                <div><div style={hint}>Annual Rate %</div><input type="number" step="0.5" style={inp} value={((d.annualRate||0)*100).toFixed(1)} onChange={e=>{const ds=[...(form.settings.debts||[])];ds[i]={...ds[i],annualRate:Number(e.target.value)/100};setForm(f=>({...f,settings:{...f.settings,debts:ds}}))}}/></div>
+                <div><div style={hint}>Tenor (months)</div><input type="number" style={inp} value={d.tenorMonths||12} onChange={e=>{const ds=[...(form.settings.debts||[])];ds[i]={...ds[i],tenorMonths:Number(e.target.value)};setForm(f=>({...f,settings:{...f.settings,debts:ds}}))}}/></div>
+                <div><div style={hint}>Grace (months)</div><input type="number" style={inp} value={d.gracePeriodMonths||0} onChange={e=>{const ds=[...(form.settings.debts||[])];ds[i]={...ds[i],gracePeriodMonths:Number(e.target.value)};setForm(f=>({...f,settings:{...f.settings,debts:ds}}))}}/></div>
+                <button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>setForm(f=>({...f,settings:{...f.settings,debts:(f.settings.debts||[]).filter((_:any,j:number)=>j!==i)}}))}>×</button>
+              </div>
+            ))}
+            <button style={addBtn(true)} onClick={()=>setForm(f=>({...f,settings:{...f.settings,debts:[...(f.settings.debts||[]),{name:'',principal:0,annualRate:0.18,tenorMonths:12,gracePeriodMonths:0,drawdownMonth:1,repaymentType:'amortising'}]}}))}>+ Add Debt Obligation</button>
+          </div>
+          <div style={card}>
+            <div style={secH}>Trade Credit Lines</div>
+            <p style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.85rem'}}>Supplier credit received (payable) or credit given to a customer/licensing partner (receivable). Feeds Days Payable / Days Receivable in Credit Risk and Going Concern.</p>
+            {(form.settings.trade_credit_lines||[]).map((tc:any,i:number)=>(
+              <div key={tc.id} style={{padding:'0.6rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.6rem'}}>
+                <div style={{display:'flex',gap:'0.5rem',alignItems:'center',marginBottom:'0.5rem'}}>
+                  <input style={{...inp,flex:2}} placeholder="e.g. Input Supplier, Licensing Partner" value={tc.name} onChange={e=>{const tcs=[...(form.settings.trade_credit_lines||[])];tcs[i]={...tcs[i],name:e.target.value};setForm(f=>({...f,settings:{...f.settings,trade_credit_lines:tcs}}))}}/>
+                  <select style={inp} value={tc.type} onChange={e=>{const tcs=[...(form.settings.trade_credit_lines||[])];tcs[i]={...tcs[i],type:e.target.value};setForm(f=>({...f,settings:{...f.settings,trade_credit_lines:tcs}}))}}>
+                    <option value="payable">Payable (we owe)</option>
+                    <option value="receivable">Receivable (owed to us)</option>
+                  </select>
+                  <button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>setForm(f=>({...f,settings:{...f.settings,trade_credit_lines:(f.settings.trade_credit_lines||[]).filter((_:any,j:number)=>j!==i)}}))}>×</button>
+                </div>
+                <div style={hint}>Average monthly outstanding ({form.currency})</div>
+                <input type="number" style={inp} value={(tc.monthly_outstanding||[]).reduce((a:number,b:number)=>a+b,0)/Math.max(1,(tc.monthly_outstanding||[]).length||1)||0}
+                  onChange={e=>{const tcs=[...(form.settings.trade_credit_lines||[])];const v=Number(e.target.value);tcs[i]={...tcs[i],monthly_outstanding:Array(form.planning_months||24).fill(v)};setForm(f=>({...f,settings:{...f.settings,trade_credit_lines:tcs}}))}}/>
+                <div style={hint}>Sets the same figure across all months -- a simple starting point. Adjust per month directly in Supabase if seasonal detail is needed.</div>
+              </div>
+            ))}
+            <button style={addBtn(true)} onClick={()=>setForm(f=>({...f,settings:{...f.settings,trade_credit_lines:[...(f.settings.trade_credit_lines||[]),{id:`tc_${Date.now()}`,name:'',type:'payable',monthly_outstanding:Array(form.planning_months||24).fill(0)}]}}))}>+ Add Trade Credit Line</button>
           </div>
         </div>
       )}
@@ -1949,6 +1990,9 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
             <KPI label="Avg DSCR" value={`${s.dscrAvg.toFixed(2)}x`} color={s.dscrAvg>=1.5?C.green:s.dscrAvg>=1.0?C.amber:C.red}/>
             <KPI label="Break-Even Revenue" value={fmt(m.business_breakeven,cc)} color={C.amber}/>
             <KPI label="Staff Cost %" value={pct(m.staff_cost_pct)} color={m.staff_cost_pct<0.3?C.green:m.staff_cost_pct<0.5?C.amber:C.red}/>
+            <KPI label="Days to Collect (DSO)" value={`${s.tradeCredit.dso.toFixed(0)}d`} color={C.navy}/>
+            <KPI label="Days to Pay (DPO)" value={`${s.tradeCredit.dpo.toFixed(0)}d`} color={C.navy}/>
+            <KPI label="Cash Conversion Gap" value={`${s.tradeCredit.cashConversionGap.toFixed(0)}d`} color={s.tradeCredit.cashConversionGap<=0?C.green:s.tradeCredit.cashConversionGap>30?C.red:C.amber}/>
           </div>
           <div style={{background:C.navy,borderRadius:8,padding:'1rem 1.25rem'}}>
             <div style={{fontFamily:'monospace',fontSize:'0.65rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.75rem'}}>READING THE PICTURE</div>
@@ -1957,6 +2001,10 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
               [s.cashGaps===0?'ok':'warn', `Cash position: ${s.cashGaps===0?'Positive throughout the period.':'Negative in '+s.cashGaps+' month(s).'}`],
               [s.revTrend==='Growing'?'ok':s.revTrend==='Stable'?'info':'warn', `Revenue trend: ${s.revTrend} from start to end of period.`],
               [s.irScore>=17?'ok':'info', `Investment readiness: ${s.irTier} (${s.irScore}/30).`],
+              [(s.tradeCredit.dso>0||s.tradeCredit.dpo>0)?(s.tradeCredit.cashConversionGap<=0?'ok':s.tradeCredit.cashConversionGap>30?'warn':'info'):'info',
+                (s.tradeCredit.dso>0||s.tradeCredit.dpo>0)
+                  ? `Trade credit: collecting in ${s.tradeCredit.dso.toFixed(0)} days, paying suppliers in ${s.tradeCredit.dpo.toFixed(0)} days. ${s.tradeCredit.cashConversionGap<=0?'Effectively supplier-financed -- a healthy position.':'Cash is tied up for '+s.tradeCredit.cashConversionGap.toFixed(0)+' days waiting to collect before suppliers are paid.'}`
+                  : 'Trade credit: no supplier or customer credit data entered yet.'],
             ].map((item,i)=>{
               const col = item[0]==='ok'?C.green:item[0]==='warn'?C.red:C.teal
               return(
