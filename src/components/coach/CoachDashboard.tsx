@@ -224,6 +224,52 @@ function ClearviewHealthSummary({clients}){
   )
 }
 
+function CopyIntakeLink({client}){
+  const [link,setLink]=useState(null)
+  const [loading,setLoading]=useState(true)
+  const [copied,setCopied]=useState(false)
+  const [creating,setCreating]=useState(false)
+
+  useEffect(()=>{
+    supabase.from('client_intake_links').select('token').eq('client_id',client.id).order('created_at',{ascending:false}).limit(1).maybeSingle()
+      .then(({data})=>{ setLink(data?.token||null); setLoading(false) })
+  },[client.id])
+
+  async function generateLink(){
+    setCreating(true)
+    const {data,error}=await supabase.from('client_intake_links').insert([{
+      client_name:client.name, client_id:client.id, programme_id:client.programme_id||null, created_by:'coach',
+    }]).select('token').single()
+    if(!error&&data) setLink(data.token)
+    setCreating(false)
+  }
+
+  function copyToClipboard(){
+    if(!link)return
+    const url=`https://clearview.habibonifade.com/intake/${link}`
+    navigator.clipboard.writeText(url).then(()=>{
+      setCopied(true)
+      setTimeout(()=>setCopied(false),2000)
+    })
+  }
+
+  if(loading)return null
+
+  if(!link){
+    return(
+      <button onClick={generateLink} disabled={creating} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid rgba(255,255,255,0.4)',color:'rgba(255,255,255,0.8)',cursor:creating?'not-allowed':'pointer'}}>
+        {creating?'Creating link...':`Generate ${client.name} Data Capture Link`}
+      </button>
+    )
+  }
+
+  return(
+    <button onClick={copyToClipboard} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.85rem',borderRadius:4,background:copied?C.green:'transparent',border:`1px solid ${copied?C.green:'rgba(255,255,255,0.4)'}`,color:C.white,cursor:'pointer'}}>
+      {copied?'Copied!':`Copy ${client.name} Data Capture Link`}
+    </button>
+  )
+}
+
 export default function CoachDashboard({onSignOut,userRole='super_coach',userName='Habib Onifade'}){
   const [programmes,setPrograms]=useState([])
   const [clients,setClients]=useState([])
@@ -430,6 +476,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
               <a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily:'monospace',fontSize:'0.78rem',padding:'0.4rem 1rem',borderRadius:4,background:C.teal,color:C.white,textDecoration:'none',fontWeight:700}}>Open Clearview Financial Model ↗</a>
+              <CopyIntakeLink client={selClient}/>
               <button onClick={()=>setShowDeleteConfirm(true)} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid rgba(255,255,255,0.4)',color:'rgba(255,255,255,0.8)',cursor:'pointer'}}>Delete Client</button>
             </div>
           </div>
