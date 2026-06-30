@@ -8,6 +8,7 @@ import {
   READINESS_QUESTIONS, buildEmptyCanvas,
 } from '@/lib/coach-types'
 import { supabase } from '@/lib/supabase'
+import SpreadsheetUpload from '@/components/intake/SpreadsheetUpload'
 
 // \u2500\u2500\u2500 DESIGN TOKENS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 const C = {
@@ -365,6 +366,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   function ClientsView(){
     const [filter,setFilter]=useState('all')
     const [showNew,setShowNew]=useState(false)
+    const [showUpload,setShowUpload]=useState(false)
     const filtered=filter==='all'?clients:clients.filter(c=>c.type===filter||c.engagement_mode===filter)
     return(
       <div>
@@ -374,8 +376,10 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               {f==='all'?'All':f==='canvas'?'GtCV Canvas':f==='financial'?'Clearview Only':CLIENT_TYPE_LABELS[f]||f}
             </button>
           ))}
-          <button style={{...addBtn(),marginLeft:'auto'}} onClick={()=>setShowNew(!showNew)}>+ New Client</button>
+          <button style={{...addBtn(true,C.teal),marginLeft:'auto'}} onClick={()=>{setShowUpload(!showUpload);setShowNew(false)}}>Upload Spreadsheet</button>
+          <button style={addBtn()} onClick={()=>{setShowNew(!showNew);setShowUpload(false)}}>+ New Client</button>
         </div>
+        {showUpload&&<SpreadsheetUpload onSuccess={(clientId)=>{setShowUpload(false);supabase.from('engagement_clients').select('*').eq('id',clientId).single().then(({data})=>{if(data)setClients(prev=>[...prev,data])})}}/>}
         {showNew&&<NewClientForm onSave={async c=>{
           const {data,error}=await supabase.from('engagement_clients').insert([c]).select().single()
           if(!error&&data){setClients(prev=>[...prev,data]);setShowNew(false)}
