@@ -285,7 +285,7 @@ function ConasOperationalCashflowTab({result, months, cc}:{result:ReturnType<typ
 }
 
 // ── CONAS WORKING CAPITAL TAB ────────────────────────────────
-function ConasWorkingCapitalTab({result, months, cc}:{result:ReturnType<typeof runCONASModel>;months:string[];cc:string}) {
+function ConasWorkingCapitalTab({result, months, cc, inputs, upd, canEdit}:{result:ReturnType<typeof runCONASModel>;months:string[];cc:string;inputs:CONASInputs;upd:(f:(p:CONASInputs)=>CONASInputs)=>void;canEdit:boolean}) {
   const m = months.length
   const irrigationByMonth = result.cf.irrigation || Array(m).fill(0)
   const totalIrrigation = irrigationByMonth.reduce(function(a:number,b:number){return a+b},0)
@@ -359,6 +359,81 @@ function ConasWorkingCapitalTab({result, months, cc}:{result:ReturnType<typeof r
         </table></div>
         <div style={{marginTop:'0.75rem',fontSize:'0.78rem',color:C.slate}}>Kits deployed: {Math.round(fgeCount/2)} in Month 1, {Math.ceil(fgeCount/2)} in Month 2. Total: {fmt(totalIrrigation,cc)}. Enter shareholder contribution or grant in Settings → Capital Structure to ensure cash stays positive.</div>
       </div>
+
+      <div style={{background:'#EBF8FF',borderRadius:6,padding:'0.85rem 1rem',marginBottom:'1.25rem'}}>
+        <p style={{fontSize:'0.82rem',color:C.navy,lineHeight:1.6,margin:0}}>
+          Track input supplier credit and credit extended to FGEs, customers, or licensing partners month by month. Enter <strong>new credit</strong> and what was <strong>actually settled</strong> each month. The outstanding balance and its cash effect are calculated automatically and feed directly into Cash Flow and Going Concern.
+        </p>
+      </div>
+
+      <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>Payable — Supplier Credit</div>
+          {canEdit&&<button style={addBtn(true)} onClick={()=>upd(p=>({...p,tradeCreditLines:[...(p.tradeCreditLines||[]),{id:`tc_${Date.now()}`,name:'',type:'payable' as const,monthlyNew:Array(months.length).fill(0),monthlySettled:Array(months.length).fill(0)}]}))}>+ Add Supplier Credit Line</button>}
+        </div>
+        {(inputs.tradeCreditLines||[]).filter(l=>l.type==='payable').length===0 && <p style={{color:C.slate,fontSize:'0.85rem'}}>No supplier credit lines yet.</p>}
+        {(inputs.tradeCreditLines||[]).filter(l=>l.type==='payable').map(line=>(
+          <ConasTradeCreditLineGrid key={line.id} line={line} months={months} cc={cc} canEdit={canEdit} upd={upd}/>
+        ))}
+      </div>
+
+      <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>Receivable — FGE / Customer / Partner Credit</div>
+          {canEdit&&<button style={addBtn(true)} onClick={()=>upd(p=>({...p,tradeCreditLines:[...(p.tradeCreditLines||[]),{id:`tc_${Date.now()}`,name:'',type:'receivable' as const,monthlyNew:Array(months.length).fill(0),monthlySettled:Array(months.length).fill(0)}]}))}>+ Add Receivable Line</button>}
+        </div>
+        {(inputs.tradeCreditLines||[]).filter(l=>l.type==='receivable').length===0 && <p style={{color:C.slate,fontSize:'0.85rem'}}>No receivable lines yet. Use this for FGE input credit advances, or credit given to customers or licensing partners.</p>}
+        {(inputs.tradeCreditLines||[]).filter(l=>l.type==='receivable').map(line=>(
+          <ConasTradeCreditLineGrid key={line.id} line={line} months={months} cc={cc} canEdit={canEdit} upd={upd}/>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ConasTradeCreditLineGrid({line,months,cc,canEdit,upd}:{line:any;months:string[];cc:string;canEdit:boolean;upd:(f:(p:CONASInputs)=>CONASInputs)=>void}) {
+  const [expanded,setExpanded] = React.useState(false)
+  function updateName(name:string) {
+    upd(p=>({...p,tradeCreditLines:(p.tradeCreditLines||[]).map(l=>l.id===line.id?{...l,name}:l)}))
+  }
+  function removeLine() {
+    upd(p=>({...p,tradeCreditLines:(p.tradeCreditLines||[]).filter(l=>l.id!==line.id)}))
+  }
+  function updateMonth(field:'monthlyNew'|'monthlySettled', idx:number, val:number) {
+    upd(p=>({...p,tradeCreditLines:(p.tradeCreditLines||[]).map(l=>l.id===line.id?{...l,[field]:(l[field]||Array(months.length).fill(0)).map((v:number,i:number)=>i===idx?val:v)}:l)}))
+  }
+  return (
+    <div style={{marginBottom:'1rem',border:`1px solid ${C.border}`,borderRadius:6,padding:'0.75rem'}}>
+      <div style={{display:'flex',gap:'0.5rem',alignItems:'center',marginBottom:'0.5rem'}}>
+        <input style={{...inp,fontWeight:700}} placeholder="e.g. Input Supplier, Licensing Partner" value={line.name} disabled={!canEdit} onChange={e=>updateName(e.target.value)}/>
+        {line.name&&<button style={addBtn(true)} onClick={()=>setExpanded(!expanded)}>{expanded?'Hide months':'Enter monthly figures'}</button>}
+        {canEdit&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={removeLine}>×</button>}
+      </div>
+      {expanded&&line.name&&(
+        <div style={{overflowX:'auto',marginTop:'0.6rem'}}>
+          <table style={{borderCollapse:'collapse',fontSize:'0.74rem'}}>
+            <thead><tr>
+              <th style={{padding:'4px 6px',textAlign:'left',minWidth:90}}></th>
+              {months.map((m,i)=><th key={i} style={{padding:'4px 5px',textAlign:'center',minWidth:78,background:'#F0F4F8',color:C.navy,fontWeight:600}}>{m}</th>)}
+            </tr></thead>
+            <tbody>
+              <tr>
+                <td style={{padding:'4px 6px',fontWeight:600,color:C.teal,fontSize:'0.72rem'}}>{line.type==='payable'?'New Credit Received':'New Credit Extended'}</td>
+                {(line.monthlyNew||Array(months.length).fill(0)).map((v:number,i:number)=>(
+                  <td key={i} style={{padding:'2px 3px'}}><input type="number" disabled={!canEdit} style={{width:70,padding:'0.28rem 0.32rem',fontSize:'0.7rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:canEdit?C.white:'#F4F4F4'}} value={v||''} placeholder="0" onChange={e=>updateMonth('monthlyNew',i,Number(e.target.value))}/></td>
+                ))}
+              </tr>
+              <tr>
+                <td style={{padding:'4px 6px',fontWeight:600,color:C.green,fontSize:'0.72rem'}}>{line.type==='payable'?'Paid This Month':'Collected This Month'}</td>
+                {(line.monthlySettled||Array(months.length).fill(0)).map((v:number,i:number)=>(
+                  <td key={i} style={{padding:'2px 3px'}}><input type="number" disabled={!canEdit} style={{width:70,padding:'0.28rem 0.32rem',fontSize:'0.7rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:canEdit?C.white:'#F4F4F4'}} value={v||''} placeholder="0" onChange={e=>updateMonth('monthlySettled',i,Number(e.target.value))}/></td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+          <p style={{fontSize:'0.68rem',color:C.slate,marginTop:'0.4rem'}}>All figures in {cc}. The outstanding balance carries forward automatically.</p>
+        </div>
+      )}
     </div>
   )
 }
@@ -2075,27 +2150,6 @@ export default function CONASDashboard({
           <button style={addBtn(true)} onClick={()=>upd(p=>({...p,debts:[...(p.debts||[]),{name:'',principal:0,annualRate:0.18,tenorMonths:12,gracePeriodMonths:0,drawdownMonth:1,repaymentType:'amortising'}]}))}>+ Add Debt Obligation</button>
         </div>
         <div style={card}>
-          <div style={secH}>Trade Credit Lines</div>
-          <p style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.85rem'}}>Supplier credit received (payable) or credit given to a customer/licensing partner (receivable), tracked month by month. This feeds Days Payable / Days Receivable in Credit Risk and Going Concern.</p>
-          {(inputs.tradeCreditLines||[]).map((tc,i)=>(
-            <div key={tc.id} style={{padding:'0.6rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.6rem'}}>
-              <div style={{display:'flex',gap:'0.5rem',alignItems:'center',marginBottom:'0.5rem'}}>
-                <input style={{...inp,flex:2}} placeholder="e.g. Input Supplier, Licensing Partner" value={tc.name} onChange={e=>upd(p=>{const tcs=[...(p.tradeCreditLines||[])];tcs[i]={...tcs[i],name:e.target.value};return{...p,tradeCreditLines:tcs}})}/>
-                <select style={inp} value={tc.type} onChange={e=>upd(p=>{const tcs=[...(p.tradeCreditLines||[])];tcs[i]={...tcs[i],type:e.target.value as 'payable'|'receivable'};return{...p,tradeCreditLines:tcs}})}>
-                  <option value="payable">Payable (we owe)</option>
-                  <option value="receivable">Receivable (owed to us)</option>
-                </select>
-                <button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>upd(p=>({...p,tradeCreditLines:(p.tradeCreditLines||[]).filter((_,j)=>j!==i)}))}>×</button>
-              </div>
-              <div style={hint}>Average monthly outstanding ({cc})</div>
-              <input type="number" style={inp} value={tc.monthlyOutstanding?.reduce((a,b)=>a+b,0)/Math.max(1,tc.monthlyOutstanding?.length||1)||0}
-                onChange={e=>upd(p=>{const tcs=[...(p.tradeCreditLines||[])];const v=Number(e.target.value);tcs[i]={...tcs[i],monthlyOutstanding:Array(months.length).fill(v)};return{...p,tradeCreditLines:tcs}})}/>
-              <div style={hint}>This sets the same figure across all months -- a simple starting point. Vary by month directly in Supabase if seasonal detail is needed.</div>
-            </div>
-          ))}
-          <button style={addBtn(true)} onClick={()=>upd(p=>({...p,tradeCreditLines:[...(p.tradeCreditLines||[]),{id:`tc_${Date.now()}`,name:'',type:'payable' as const,monthlyOutstanding:Array(months.length).fill(0)}]}))}>+ Add Trade Credit Line</button>
-        </div>
-        <div style={card}>
           <div style={secH}>Business Units</div>
           {inputs.units.map((bu,i)=>(
             <div key={bu.id} style={{display:'flex',gap:'0.6rem',alignItems:'center',padding:'0.5rem 0.7rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.42rem',borderLeft:`4px solid ${bu.color}`}}>
@@ -2186,7 +2240,7 @@ export default function CONASDashboard({
         {view==='unitpl'          &&<UnitPLTab/>}
         {view==='planning'        &&<PlanningTab/>}
         {view==='opcashflow'      &&<ConasOperationalCashflowTab result={result} months={months} cc={cc}/>}
-        {view==='workingcapital'  &&<ConasWorkingCapitalTab result={result} months={months} cc={cc}/>}
+        {view==='workingcapital'  &&<ConasWorkingCapitalTab result={result} months={months} cc={cc} inputs={inputs} upd={upd} canEdit={P.canEditPlan}/>}
         {view==='approvals' &&<ApprovalsTab spendingRequests={inputs.spendingRequests} pending={pending} spendForm={spendForm} setSpendForm={setSpendForm} allActiveUnits={allActiveUnits} months={months} cc={cc} canSubmitRequest={P.canSubmitRequest} canApprove={P.canApprove} submitSpend={submitSpend} resolveRequest={resolveRequest}/>}
         {view==='cashflow'        &&<CashFlowTab/>}
         {view==='balancesheet'    &&<BalanceSheetTab/>}
@@ -2262,7 +2316,9 @@ function ConasIntelligenceTab({result, inputs, coachAssessments, onSaveAssessmen
         repaymentType: 'amortising',
       }] : [])
   const conasTradeCreditLines = (inputs.tradeCreditLines || []).map(l => ({
-    id: l.id, name: l.name, type: l.type, monthly_outstanding: l.monthlyOutstanding,
+    id: l.id, name: l.name, type: l.type,
+    monthly_new: l.monthlyNew || Array(months.length).fill(0),
+    monthly_settled: l.monthlySettled || Array(months.length).fill(0),
   }))
 
   const scores = computeScores({
