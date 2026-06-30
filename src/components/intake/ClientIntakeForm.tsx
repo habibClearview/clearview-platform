@@ -399,25 +399,21 @@ function ProductList({unitKey,products,addProduct,updateProductName,removeProduc
             <input style={{...inp,fontWeight:700}} placeholder="Product or service name (e.g. Eggs, Off-layers)" value={p.name} onChange={e=>updateProductName(unitKey,pi,e.target.value)}/>
             {products.length>1&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>removeProduct(unitKey,pi)}>×</button>}
           </div>
-          {p.name&&(
-            <>
-              <MonthRow label="Revenue" labelColor={C.green} lineId={`${p.id}_rev`} pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel}/>
-              <div style={{marginTop:'0.5rem',paddingLeft:'0.75rem',borderLeft:`2px solid ${C.border}`}}>
-                <div style={{fontSize:'0.76rem',fontWeight:600,color:C.red,marginBottom:'0.3rem'}}>Cost Lines</div>
-                {p.costLines.map((c:any,ci:number)=>(
-                  <div key={c.id} style={{marginBottom:'0.5rem'}}>
-                    <div style={{display:'flex',gap:'0.5rem',alignItems:'center',marginBottom:'0.3rem'}}>
-                      <input style={{...inp,fontSize:'0.82rem'}} placeholder="e.g. Feed, DOC, Vaccines, Labour" value={c.name} onChange={e=>updateCostLineName(unitKey,pi,ci,e.target.value)}/>
-                      {p.costLines.length>1&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1rem'}} onClick={()=>removeCostLine(unitKey,pi,ci)}>×</button>}
-                    </div>
-                    {c.name&&<MonthRow label={c.name} labelColor={C.red} lineId={c.id} pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel} compact/>}
-                  </div>
-                ))}
-                <button style={smallBtn(C.red)} onClick={()=>addCostLine(unitKey,pi)}>+ Add Cost Line</button>
+          <MonthRow label={p.name||'Revenue'} labelColor={C.green} lineId={`${p.id}_rev`} pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel}/>
+          <div style={{marginTop:'0.5rem',paddingLeft:'0.75rem',borderLeft:`2px solid ${C.border}`}}>
+            <div style={{fontSize:'0.76rem',fontWeight:600,color:C.red,marginBottom:'0.3rem'}}>Cost Lines</div>
+            {p.costLines.map((c:any,ci:number)=>(
+              <div key={c.id} style={{marginBottom:'0.5rem'}}>
+                <div style={{display:'flex',gap:'0.5rem',alignItems:'center',marginBottom:'0.3rem'}}>
+                  <input style={{...inp,fontSize:'0.82rem'}} placeholder="e.g. Feed, DOC, Vaccines, Labour" value={c.name} onChange={e=>updateCostLineName(unitKey,pi,ci,e.target.value)}/>
+                  {p.costLines.length>1&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1rem'}} onClick={()=>removeCostLine(unitKey,pi,ci)}>×</button>}
+                </div>
+                <MonthRow label={c.name||'Cost'} labelColor={C.red} lineId={c.id} pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel} compact/>
               </div>
-              <p style={{fontSize:'0.68rem',color:C.slate,marginTop:'0.5rem'}}>All figures in {cc}.</p>
-            </>
-          )}
+            ))}
+            <button style={smallBtn(C.red)} onClick={()=>addCostLine(unitKey,pi)}>+ Add Cost Line</button>
+          </div>
+          <p style={{fontSize:'0.68rem',color:C.slate,marginTop:'0.5rem'}}>All figures in {cc}.</p>
         </div>
       ))}
       <button style={smallBtn()} onClick={()=>addProduct(unitKey)}>+ Add Product</button>
