@@ -2148,6 +2148,7 @@ function CashFlowTab({result,months,cc}) {
     {label:'Net Profit After Tax',values:result.con.npat},
     {label:'Operating Cash Flow',values:cf.op_cash,bold:true},
     {label:'Capital & Financing',values:cf.fin_cash},
+    {label:'Fixed Asset Purchases',values:cf.inv_cash||Array(months.length).fill(0),negate:false},
     {label:'Net Change in Cash',values:cf.net,bold:true},
     {label:'Closing Cash',values:cf.close,bold:true,highlight:true},
   ]
