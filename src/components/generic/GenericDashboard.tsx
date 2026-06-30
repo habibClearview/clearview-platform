@@ -255,6 +255,7 @@ export default function GenericDashboard({
     ['service','Service Margins'],
     ['breakeven','Break-Even'],
     ['actuals','Actuals'],
+    ['workingcapital','Working Capital'],
     ['events','Mgmt Events'],
     ['staff_eff','Staff Efficiency'],
     ['ai_health','AI Health Check'],
@@ -309,6 +310,7 @@ export default function GenericDashboard({
         {view==='service'     && <ServiceMarginsTab config={config} result={result} months={months} cc={cc}/>}
         {view==='breakeven'   && <BreakEvenTab config={config} result={result} cc={cc}/>}
         {view==='actuals'     && <ActualsTab config={config} months={months} cc={cc} P={P} onSave={saveConfig}/>}
+        {view==='workingcapital' && <WorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
         {view==='events'      && <EventsTab clientId={clientId} config={config} cc={cc} P={P}/>}
         {view==='staff_eff'   && <StaffEfficiencyTab config={config} result={result} months={months} cc={cc}/>}
         {view==='ai_health'   && <AIHealthTab clientId={clientId} config={config} result={result} cc={cc} P={P}/>}
@@ -1654,7 +1656,7 @@ function SettingsTab({config,P,onSave}) {
     setForm(f=>({...f,business_units:[...f.business_units,newUnit]}))
   }
 
-  const sections = [['general','General'],['units','Business Units'],['capital','Capital Structure'],['credit','Debts & Trade Credit'],['delegation','Approval Delegation']]
+  const sections = [['general','General'],['units','Business Units'],['capital','Capital Structure'],['credit','Debt Obligations'],['delegation','Approval Delegation']]
 
   return (
     <div>
@@ -1774,27 +1776,6 @@ function SettingsTab({config,P,onSave}) {
               </div>
             ))}
             <button style={addBtn(true)} onClick={()=>setForm(f=>({...f,settings:{...f.settings,debts:[...(f.settings.debts||[]),{name:'',principal:0,annualRate:0.18,tenorMonths:12,gracePeriodMonths:0,drawdownMonth:1,repaymentType:'amortising'}]}}))}>+ Add Debt Obligation</button>
-          </div>
-          <div style={card}>
-            <div style={secH}>Trade Credit Lines</div>
-            <p style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.85rem'}}>Supplier credit received (payable) or credit given to a customer/licensing partner (receivable). Feeds Days Payable / Days Receivable in Credit Risk and Going Concern.</p>
-            {(form.settings.trade_credit_lines||[]).map((tc:any,i:number)=>(
-              <div key={tc.id} style={{padding:'0.6rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.6rem'}}>
-                <div style={{display:'flex',gap:'0.5rem',alignItems:'center',marginBottom:'0.5rem'}}>
-                  <input style={{...inp,flex:2}} placeholder="e.g. Input Supplier, Licensing Partner" value={tc.name} onChange={e=>{const tcs=[...(form.settings.trade_credit_lines||[])];tcs[i]={...tcs[i],name:e.target.value};setForm(f=>({...f,settings:{...f.settings,trade_credit_lines:tcs}}))}}/>
-                  <select style={inp} value={tc.type} onChange={e=>{const tcs=[...(form.settings.trade_credit_lines||[])];tcs[i]={...tcs[i],type:e.target.value};setForm(f=>({...f,settings:{...f.settings,trade_credit_lines:tcs}}))}}>
-                    <option value="payable">Payable (we owe)</option>
-                    <option value="receivable">Receivable (owed to us)</option>
-                  </select>
-                  <button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>setForm(f=>({...f,settings:{...f.settings,trade_credit_lines:(f.settings.trade_credit_lines||[]).filter((_:any,j:number)=>j!==i)}}))}>×</button>
-                </div>
-                <div style={hint}>Average monthly outstanding ({form.currency})</div>
-                <input type="number" style={inp} value={(tc.monthly_outstanding||[]).reduce((a:number,b:number)=>a+b,0)/Math.max(1,(tc.monthly_outstanding||[]).length||1)||0}
-                  onChange={e=>{const tcs=[...(form.settings.trade_credit_lines||[])];const v=Number(e.target.value);tcs[i]={...tcs[i],monthly_outstanding:Array(form.planning_months||24).fill(v)};setForm(f=>({...f,settings:{...f.settings,trade_credit_lines:tcs}}))}}/>
-                <div style={hint}>Sets the same figure across all months -- a simple starting point. Adjust per month directly in Supabase if seasonal detail is needed.</div>
-              </div>
-            ))}
-            <button style={addBtn(true)} onClick={()=>setForm(f=>({...f,settings:{...f.settings,trade_credit_lines:[...(f.settings.trade_credit_lines||[]),{id:`tc_${Date.now()}`,name:'',type:'payable',monthly_outstanding:Array(form.planning_months||24).fill(0)}]}}))}>+ Add Trade Credit Line</button>
           </div>
         </div>
       )}
@@ -2186,6 +2167,123 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
       )}
       {activeSection==='events'&&events.length===0&&(
         <div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No promotion events recorded yet. Add some in Mgmt Events.</div>
+      )}
+    </div>
+  )
+}
+
+// ── WORKING CAPITAL TAB ──────────────────────────────────────
+// Trade credit (supplier payables, customer/partner receivables) entered
+// as monthly movements -- new credit and amounts settled -- the way real
+// bookkeeping works. The outstanding balance and DSO/DPO are derived, not
+// entered directly. These movements feed the cash flow statement automatically.
+function WorkingCapitalTab({config,result,months,cc,P,onSave}) {
+  const lines: any[] = config.settings.trade_credit_lines || []
+
+  function addLine(type:'payable'|'receivable') {
+    const id = `tc_${Date.now()}`
+    const newLine = {
+      id, name: '', type,
+      monthly_new: Array(config.planning_months).fill(0),
+      monthly_settled: Array(config.planning_months).fill(0),
+    }
+    onSave({...config, settings:{...config.settings, trade_credit_lines:[...lines, newLine]}})
+  }
+  function updateLineName(id:string, name:string) {
+    onSave({...config, settings:{...config.settings, trade_credit_lines: lines.map(l=>l.id===id?{...l,name}:l)}})
+  }
+  function removeLine(id:string) {
+    onSave({...config, settings:{...config.settings, trade_credit_lines: lines.filter(l=>l.id!==id)}})
+  }
+  function updateMonth(id:string, field:'monthly_new'|'monthly_settled', idx:number, val:number) {
+    onSave({...config, settings:{...config.settings, trade_credit_lines: lines.map(l=>
+      l.id===id ? {...l, [field]: l[field].map((v:number,i:number)=>i===idx?val:v)} : l
+    )}})
+  }
+
+  const payableLines = lines.filter(l=>l.type==='payable')
+  const receivableLines = lines.filter(l=>l.type==='receivable')
+  const s = result?.scores
+
+  return (
+    <div>
+      <div style={{background:'#EBF8FF',borderRadius:6,padding:'0.85rem 1rem',marginBottom:'1.25rem'}}>
+        <p style={{fontSize:'0.82rem',color:C.navy,lineHeight:1.6,margin:0}}>
+          Track supplier credit received (Payable) and credit extended to customers or partners such as licensing partners (Receivable) month by month. Enter <strong>new credit</strong> and what was <strong>actually settled</strong> each month. The outstanding balance and how it affects cash are calculated automatically and feed directly into Cash Flow and Going Concern.
+        </p>
+      </div>
+
+      {s && (
+        <div style={kpiGrid}>
+          <KPI label="Days to Collect (DSO)" value={`${s.tradeCredit.dso.toFixed(0)}d`} color={C.navy}/>
+          <KPI label="Days to Pay (DPO)" value={`${s.tradeCredit.dpo.toFixed(0)}d`} color={C.navy}/>
+          <KPI label="Cash Conversion Gap" value={`${s.tradeCredit.cashConversionGap.toFixed(0)}d`} color={s.tradeCredit.cashConversionGap<=0?C.green:s.tradeCredit.cashConversionGap>30?C.red:C.amber}/>
+          <KPI label="Current Payable Outstanding" value={fmt(s.tradeCredit.totalPayableOutstanding[s.tradeCredit.totalPayableOutstanding.length-1]||0,cc)}/>
+          <KPI label="Current Receivable Outstanding" value={fmt(s.tradeCredit.totalReceivableOutstanding[s.tradeCredit.totalReceivableOutstanding.length-1]||0,cc)}/>
+        </div>
+      )}
+
+      <div style={card}>
+        <SectionHeader title="Payable -- Supplier Credit" action={P.canEditPlan?<button style={addBtn(true)} onClick={()=>addLine('payable')}>+ Add Supplier Credit Line</button>:null}/>
+        {payableLines.length===0 && <p style={{color:C.slate,fontSize:'0.85rem'}}>No supplier credit lines yet.</p>}
+        {payableLines.map(line=>(
+          <TradeCreditLineGrid key={line.id} line={line} months={months} cc={cc} canEdit={P.canEditPlan}
+            updateLineName={updateLineName} removeLine={removeLine} updateMonth={updateMonth}/>
+        ))}
+      </div>
+
+      <div style={card}>
+        <SectionHeader title="Receivable -- Customer / Partner Credit" action={P.canEditPlan?<button style={addBtn(true)} onClick={()=>addLine('receivable')}>+ Add Receivable Line</button>:null}/>
+        {receivableLines.length===0 && <p style={{color:C.slate,fontSize:'0.85rem'}}>No receivable lines yet. Use this for credit given to customers or licensing partners.</p>}
+        {receivableLines.map(line=>(
+          <TradeCreditLineGrid key={line.id} line={line} months={months} cc={cc} canEdit={P.canEditPlan}
+            updateLineName={updateLineName} removeLine={removeLine} updateMonth={updateMonth}/>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function TradeCreditLineGrid({line,months,cc,canEdit,updateLineName,removeLine,updateMonth}:any) {
+  const [expanded,setExpanded] = useState(false)
+  return (
+    <div style={{marginBottom:'1rem',border:`1px solid ${C.border}`,borderRadius:6,padding:'0.75rem'}}>
+      <div style={{display:'flex',gap:'0.5rem',alignItems:'center',marginBottom:'0.5rem'}}>
+        <input style={{...inp,fontWeight:700}} placeholder="e.g. Input Supplier, Licensing Partner" value={line.name}
+          disabled={!canEdit} onChange={e=>updateLineName(line.id,e.target.value)}/>
+        {line.name && <button style={addBtn(true)} onClick={()=>setExpanded(!expanded)}>{expanded?'Hide months':'Enter monthly figures'}</button>}
+        {canEdit && <button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>removeLine(line.id)}>×</button>}
+      </div>
+      {expanded && line.name && (
+        <div style={{overflowX:'auto',marginTop:'0.6rem'}}>
+          <table style={{borderCollapse:'collapse',fontSize:'0.74rem'}}>
+            <thead><tr>
+              <th style={{padding:'4px 6px',textAlign:'left',minWidth:90}}></th>
+              {months.map((m:string,i:number)=><th key={i} style={{padding:'4px 5px',textAlign:'center',minWidth:78,background:C.lightBg,color:C.navy,fontWeight:600}}>{m}</th>)}
+            </tr></thead>
+            <tbody>
+              <tr>
+                <td style={{padding:'4px 6px',fontWeight:600,color:C.teal,fontSize:'0.72rem'}}>{line.type==='payable'?'New Credit Received':'New Credit Extended'}</td>
+                {(line.monthly_new||[]).map((v:number,i:number)=>(
+                  <td key={i} style={{padding:'2px 3px'}}>
+                    <input type="number" disabled={!canEdit} style={{width:70,padding:'0.28rem 0.32rem',fontSize:'0.7rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:canEdit?C.white:'#F4F4F4'}}
+                      value={v||''} placeholder="0" onChange={e=>updateMonth(line.id,'monthly_new',i,Number(e.target.value))}/>
+                  </td>
+                ))}
+              </tr>
+              <tr>
+                <td style={{padding:'4px 6px',fontWeight:600,color:C.green,fontSize:'0.72rem'}}>{line.type==='payable'?'Paid This Month':'Collected This Month'}</td>
+                {(line.monthly_settled||[]).map((v:number,i:number)=>(
+                  <td key={i} style={{padding:'2px 3px'}}>
+                    <input type="number" disabled={!canEdit} style={{width:70,padding:'0.28rem 0.32rem',fontSize:'0.7rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:canEdit?C.white:'#F4F4F4'}}
+                      value={v||''} placeholder="0" onChange={e=>updateMonth(line.id,'monthly_settled',i,Number(e.target.value))}/>
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+          <p style={{fontSize:'0.68rem',color:C.slate,marginTop:'0.4rem'}}>All figures in {cc}. The outstanding balance carries forward automatically: new credit increases it, settling reduces it.</p>
+        </div>
       )}
     </div>
   )
