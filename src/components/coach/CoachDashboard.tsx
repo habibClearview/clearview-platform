@@ -144,10 +144,12 @@ function DeleteClientConfirm({client,onCancel,onDeleted}){
       <div style={{fontWeight:700,color:C.red,marginBottom:'0.5rem'}}>Delete {client.name}?</div>
       <p style={{fontSize:'0.85rem',color:C.navy,lineHeight:1.7,marginBottom:'0.85rem'}}>This permanently deletes this client, their entire financial model, and all submitted actuals. This cannot be undone. Type the client's name below to confirm.</p>
       <input style={{...inp,marginBottom:'0.75rem'}} placeholder={client.name} value={text} onChange={e=>setText(e.target.value)} autoFocus/>
+      {(()=>{const isMatch=text.trim().toLowerCase()===client.name.trim().toLowerCase();return(
       <div style={{display:'flex',gap:'0.6rem'}}>
-        <button disabled={text!==client.name||deleting} onClick={handleDelete} style={{fontFamily:'monospace',fontSize:'0.8rem',fontWeight:700,padding:'0.5rem 1.1rem',border:'none',borderRadius:5,background:text===client.name?C.red:C.border,color:C.white,cursor:text===client.name?'pointer':'not-allowed'}}>{deleting?'Deleting...':'Permanently Delete'}</button>
+        <button disabled={!isMatch||deleting} onClick={handleDelete} style={{fontFamily:'monospace',fontSize:'0.8rem',fontWeight:700,padding:'0.5rem 1.1rem',border:'none',borderRadius:5,background:isMatch?C.red:C.border,color:C.white,cursor:isMatch?'pointer':'not-allowed'}}>{deleting?'Deleting...':'Permanently Delete'}</button>
         <button onClick={onCancel} style={addBtn(true,C.slate)}>Cancel</button>
       </div>
+      )})()}
     </div>
   )
 }
