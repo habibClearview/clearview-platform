@@ -154,6 +154,75 @@ function DeleteClientConfirm({client,onCancel,onDeleted}){
   )
 }
 
+function ClearviewHealthSummary({clients}){
+  const [summaries,setSummaries]=useState({})
+  const [loading,setLoading]=useState(true)
+  const financialClients = clients.filter(c=>c.engagement_mode==='financial'&&c.clearview_active)
+
+  useEffect(()=>{
+    if(financialClients.length===0){setLoading(false);return}
+    Promise.all(financialClients.map(c=>
+      supabase.from('ai_health_checks').select('period,report_text,generated_at').eq('client_id',c.id).order('period',{ascending:false}).limit(1)
+        .then(({data})=>({clientId:c.id,latest:data?.[0]||null}))
+    )).then(results=>{
+      const map={}
+      results.forEach(r=>{map[r.clientId]=r.latest})
+      setSummaries(map)
+      setLoading(false)
+    })
+  },[clients.length])
+
+  function statusFromReport(text){
+    if(!text)return{label:'No data',color:C.slate,dot:'\u26AA'}
+    const lower=text.toLowerCase()
+    if(lower.includes('red')||lower.includes('at risk')||lower.includes('concern'))return{label:'Needs attention',color:C.red,dot:'\ud83d\udd34'}
+    if(lower.includes('amber')||lower.includes('caution'))return{label:'Watch',color:C.amber,dot:'\ud83d\udfe1'}
+    if(lower.includes('green')||lower.includes('healthy')||lower.includes('strong'))return{label:'Healthy',color:C.green,dot:'\ud83d\udfe2'}
+    return{label:'Reviewed',color:C.teal,dot:'\ud83d\udd35'}
+  }
+
+  if(financialClients.length===0)return null
+  if(loading)return<div style={{...card,textAlign:'center',padding:'1.5rem',color:C.slate,fontSize:'0.85rem'}}>Loading Clearview health summary...</div>
+
+  const flagged = financialClients.filter(c=>{
+    const r=summaries[c.id]
+    const s=statusFromReport(r?.report_text)
+    return s.label==='Needs attention'||s.label==='Watch'
+  })
+  const sorted = [...financialClients].sort((a,b)=>{
+    const sa=statusFromReport(summaries[a.id]?.report_text)
+    const sb=statusFromReport(summaries[b.id]?.report_text)
+    const rank={'Needs attention':0,'Watch':1,'Reviewed':2,'Healthy':3,'No data':4}
+    return rank[sa.label]-rank[sb.label]
+  })
+
+  return(
+    <div style={card}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+        <div style={secH}>Clearview Business Intelligence — All Clients</div>
+        {flagged.length>0&&<Badge text={`${flagged.length} need attention`} color={C.red}/>}
+      </div>
+      {sorted.map(c=>{
+        const report=summaries[c.id]
+        const status=statusFromReport(report?.report_text)
+        return(
+          <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.85rem',borderRadius:6,marginBottom:'0.45rem',background:status.label==='Needs attention'?'#FDF0EE':status.label==='Watch'?'#FFF8E8':C.lightBg,cursor:'pointer'}}
+            onClick={()=>window.open(`/dashboard/${c.slug}`,'_blank')}>
+            <div style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
+              <span style={{fontSize:'1rem'}}>{status.dot}</span>
+              <div>
+                <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{c.name}</div>
+                <div style={{fontSize:'0.7rem',color:C.slate}}>{report?`Last reviewed ${new Date(report.generated_at).toLocaleDateString('en-GB')}`:'No health check generated yet'}</div>
+              </div>
+            </div>
+            <Badge text={status.label} color={status.color}/>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function CoachDashboard({onSignOut,userRole='super_coach',userName='Habib Onifade'}){
   const [programmes,setPrograms]=useState([])
   const [clients,setClients]=useState([])
@@ -246,6 +315,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   function OverviewTab(){
     return(
       <div>
+        <ClearviewHealthSummary clients={clients}/>
         {newSubmissions.length>0&&(
           <div style={{background:'#EBF8FF',border:`1px solid ${C.teal}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem'}}>
             <div style={{fontWeight:700,color:C.teal,marginBottom:'0.6rem'}}>New Clearview data capture submissions ({newSubmissions.length})</div>
