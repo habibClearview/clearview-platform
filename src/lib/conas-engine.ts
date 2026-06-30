@@ -641,6 +641,7 @@ export function runCONASModel(inputs: CONASInputs) {
   const cf = {
     opCash:  Array(MONTHS).fill(0) as number[],
     finCash: Array(MONTHS).fill(0) as number[],
+    invCash: Array(MONTHS).fill(0) as number[],
     net:     Array(MONTHS).fill(0) as number[],
     open:    Array(MONTHS).fill(0) as number[],
     close:   Array(MONTHS).fill(0) as number[],
@@ -649,9 +650,13 @@ export function runCONASModel(inputs: CONASInputs) {
     workingCapitalAdj: tradeCreditCashEffect,
   }
   cf.finCash[0] = cap.shareholderContribution + cap.grantNonRepayable + cap.grantRecoverable + cap.bankLoan
+  // Fixed assets purchased with cash are an investing outflow in month 0 --
+  // without this, fixed assets appear on the balance sheet with no cash
+  // consequence, breaking Assets = Equity + Liabilities.
+  cf.invCash[0] = -(cap.fixedAssets || 0)
   for (let m = 0; m < MONTHS; m++) {
     cf.opCash[m] = con.npat[m] - irrigationOut[m] - approvedCashOut[m] + (tradeCreditCashEffect[m] || 0)
-    cf.net[m]    = cf.opCash[m] + cf.finCash[m]
+    cf.net[m]    = cf.opCash[m] + cf.finCash[m] + cf.invCash[m]
     cf.open[m]   = m === 0 ? inputs.global.openingCashBalance : cf.close[m - 1]
     cf.close[m]  = cf.open[m] + cf.net[m]
   }
@@ -661,11 +666,17 @@ export function runCONASModel(inputs: CONASInputs) {
   // Equity: Capital + retained earnings
   // Liabilities: Grants (recoverable) + loans
   const totalIrrigation = yr(irrigationOut)
+  // Cumulative irrigation deployed by each month, not the full-year total
+  // applied retroactively to every month -- the asset only exists once cash
+  // has actually been spent on it.
+  const cumIrrigation: number[] = []
+  let runningIrrigation = 0
+  for (let m = 0; m < MONTHS; m++) { runningIrrigation += irrigationOut[m]; cumIrrigation.push(runningIrrigation) }
   const totalCapital = cap.shareholderContribution + cap.grantNonRepayable + cap.grantRecoverable + cap.bankLoan + cap.fixedAssets
 
   const bs = {
     cash:           cf.close,
-    irrigationKits: Array(MONTHS).fill(totalIrrigation) as number[], // simplified — depreciates over time in full model
+    irrigationKits: cumIrrigation, // cumulative kits actually deployed and paid for by each month
     fixedAssets:    Array(MONTHS).fill(cap.fixedAssets) as number[],
     totalAssets:    Array(MONTHS).fill(0) as number[],
     shareCapital:   Array(MONTHS).fill(cap.shareholderContribution) as number[],
@@ -678,7 +689,9 @@ export function runCONASModel(inputs: CONASInputs) {
     totalEquityAndLiabilities: Array(MONTHS).fill(0) as number[],
   }
 
-  let cumNPAT = 0
+  // Opening cash balance is pre-existing capital from before the season --
+  // without a balance sheet source, cash exists with no matching equity.
+  let cumNPAT = inputs.global.openingCashBalance || 0
   for (let m = 0; m < MONTHS; m++) {
     cumNPAT += con.npat[m]
     bs.retainedEarnings[m] = cumNPAT
