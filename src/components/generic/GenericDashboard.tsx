@@ -91,7 +91,7 @@ function PLTable({title,rows,months,cc,showExport}:{title?:string;rows:{label:st
     const csv = [headers,...data].map(r=>r.map(c=>`"${c}"`).join(',')).join('\n')
     const blob = new Blob([csv],{type:'text/csv'})
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href=url; a.download=`${title||'export'}.csv`; a.click()
+    const a = document.createElement('a'); a.href=url; a.download=`${title||'export'}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
   return (
