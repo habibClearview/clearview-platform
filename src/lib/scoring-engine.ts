@@ -22,6 +22,56 @@ export interface DebtSchedule {
   annualY1: number
 }
 
+// ── Trade credit: supplier credit (payable) and customer/partner credit (receivable) ──
+// Both are monthly since real businesses (e.g. seasonal input credit, licensing
+// partner terms) vary across the year, not a single static figure.
+export interface TradeCreditLine {
+  id: string
+  name: string               // e.g. "Input Supplier", "Licensing Partner", "FGE Advance"
+  type: 'payable' | 'receivable'
+  monthly_outstanding: number[]  // amount owed/owing at end of each month
+}
+
+export interface TradeCreditSummary {
+  totalPayableOutstanding: number[]    // monthly, summed across all payable lines
+  totalReceivableOutstanding: number[] // monthly, summed across all receivable lines
+  dpo: number   // Days Payable Outstanding (average days to pay suppliers)
+  dso: number   // Days Sales Outstanding (average days to collect from customers/partners)
+  cashConversionGap: number  // DSO - DPO. Positive = cash tied up; negative = supplier-financed
+  peakPayable: number
+  peakReceivable: number
+}
+
+export function computeTradeCredit(
+  lines: TradeCreditLine[],
+  monthlyCostOfSales: number[],  // used as denominator for DPO
+  monthlyRevenue: number[],      // used as denominator for DSO
+  months: number
+): TradeCreditSummary {
+  const totalPayableOutstanding = Array(months).fill(0)
+  const totalReceivableOutstanding = Array(months).fill(0)
+  ;(lines || []).forEach(line => {
+    const target = line.type === 'payable' ? totalPayableOutstanding : totalReceivableOutstanding
+    for (let i = 0; i < months; i++) target[i] += (line.monthly_outstanding[i] || 0)
+  })
+
+  const avgPayable = totalPayableOutstanding.reduce((a,b)=>a+b,0) / Math.max(1,months)
+  const avgReceivable = totalReceivableOutstanding.reduce((a,b)=>a+b,0) / Math.max(1,months)
+  const annualCogs = monthlyCostOfSales.reduce((a,b)=>a+b,0)
+  const annualRev = monthlyRevenue.reduce((a,b)=>a+b,0)
+
+  // Standard formulas: DPO = (Avg Payables / COGS) × 365, DSO = (Avg Receivables / Revenue) × 365
+  const dpo = annualCogs > 0 ? (avgPayable / annualCogs) * 365 : 0
+  const dso = annualRev > 0 ? (avgReceivable / annualRev) * 365 : 0
+  const cashConversionGap = dso - dpo
+
+  return {
+    totalPayableOutstanding, totalReceivableOutstanding, dpo, dso, cashConversionGap,
+    peakPayable: totalPayableOutstanding.length>0 ? Math.max(...totalPayableOutstanding) : 0,
+    peakReceivable: totalReceivableOutstanding.length>0 ? Math.max(...totalReceivableOutstanding) : 0,
+  }
+}
+
 export function buildDebtSchedule(obligations: DebtObligation[], months: number): DebtSchedule {
   months = months || 12
   const totalInterest = Array(months).fill(0)
@@ -92,11 +142,13 @@ export function defaultCoachAssessment(): CoachAssessment {
 export interface ScoringInputs {
   rev: number[]       // monthly consolidated revenue
   ebitda: number[]     // monthly consolidated EBITDA
+  cogs?: number[]      // monthly consolidated cost of sales -- needed for DPO
   cashClose: number[]  // monthly closing cash balance
   totalEquity: number  // latest period total equity
   totalLiabilities: number // latest period total liabilities
   months: number
-  debtObligations?: DebtObligation[]
+  debtObligations?: DebtObligation[]   // supports multiple: bank loans, non-bank facilities, etc
+  tradeCreditLines?: TradeCreditLine[] // supports multiple: supplier credit, partner/customer credit
   assess: CoachAssessment
 }
 
@@ -119,6 +171,8 @@ export interface ScoringResult {
   irColor: string
   irFinancial: number
   irDebt: number
+  // Trade credit / working capital management
+  tradeCredit: TradeCreditSummary
   // Shared raw figures used across all three
   annualRevenue: number
   annualEbitda: number
@@ -132,7 +186,10 @@ const GREEN = '#1A7A4A', AMBER = '#B8860B', RED = '#C0392B', TEAL = '#1A9DAA'
 export function computeScores(inputs: ScoringInputs): ScoringResult {
   const { rev, ebitda, cashClose, totalEquity, totalLiabilities, months, assess } = inputs
   const m = months || rev.length
+  const cogs = inputs.cogs || rev.map(() => 0)
 
+  // Supports multiple debt obligations (bank loans, non-bank facilities, etc) --
+  // each contributes its own interest/principal schedule, summed together.
   const debtSched = buildDebtSchedule(inputs.debtObligations || [], m)
   const dscrVals = ebitda.map((e, i) => {
     const ds = debtSched.totalRepayment[i]
@@ -148,6 +205,11 @@ export function computeScores(inputs: ScoringInputs): ScoringResult {
   const q4Rev = rev.slice(Math.max(0, m - quarterLen), m).reduce((a, b) => a + b, 0)
   const revTrend: 'Growing'|'Stable'|'Declining' = q4Rev > q1Rev * 1.05 ? 'Growing' : q4Rev < q1Rev * 0.95 ? 'Declining' : 'Stable'
 
+  // ── Trade credit: supplier payables (e.g. input credit) and customer/partner
+  // receivables (e.g. licensing partner credit). Tracks how effectively the
+  // client manages credit it gives and receives -- collection speed vs payment speed.
+  const tradeCredit = computeTradeCredit(inputs.tradeCreditLines || [], cogs, rev, m)
+
   // ── Credit Risk Score (0-100) ──
   let score = 50
   if (dscrAvg >= 1.5) score += 30
@@ -157,15 +219,29 @@ export function computeScores(inputs: ScoringInputs): ScoringResult {
   else if (cashGaps > 2) score -= 10
   if (revTrend === 'Growing') score += 10
   else if (revTrend === 'Declining') score -= 5
+  // Trade credit quality: collecting faster than paying (negative gap) is a
+  // positive signal -- the business is effectively financed by supplier credit
+  // rather than tying up its own cash. A large positive gap (slow collection,
+  // fast payment) strains cash and is penalised.
+  if (tradeCredit.dso > 0 || tradeCredit.dpo > 0) {
+    if (tradeCredit.cashConversionGap <= 0) score += 5
+    else if (tradeCredit.cashConversionGap > 60) score -= 10
+    else if (tradeCredit.cashConversionGap > 30) score -= 5
+  }
   score = Math.max(0, Math.min(100, score))
   const classification: 'Stable'|'At Risk'|'High Risk' = score >= 65 ? 'Stable' : score >= 40 ? 'At Risk' : 'High Risk'
   const classColor = classification === 'Stable' ? GREEN : classification === 'At Risk' ? AMBER : RED
 
   // ── Going Concern Score (0-20) ──
+  // Revenue sustainability factor now reflects trade credit management quality
+  // when data is available, rather than a flat default.
+  const revenueSustainabilityScore = (tradeCredit.dso > 0 || tradeCredit.dpo > 0)
+    ? (tradeCredit.cashConversionGap <= 0 ? 4 : tradeCredit.cashConversionGap <= 30 ? 3 : tradeCredit.cashConversionGap <= 60 ? 2 : 1)
+    : 3 // no trade credit data entered -- default adequate
   const gcScore = Math.min(20,
     (dscrAvg >= 1.5 ? 4 : dscrAvg >= 1.0 ? 3 : dscrAvg >= 0.5 ? 2 : 1) +
     (minCash >= 0 ? 4 : minCash > -10000000 ? 1 : 0) +
-    3 + // revenue sustainability -- default adequate
+    revenueSustainabilityScore +
     (annualEbitda > 0 ? 3 : 2) +
     (Number(assess.managementCapability) || 2)
   )
@@ -185,6 +261,7 @@ export function computeScores(inputs: ScoringInputs): ScoringResult {
     score, classification, classColor, dscrAvg, dscrVals, cashGaps, revTrend,
     gcScore, gcRating, gcColor,
     irScore, irTier, irColor, irFinancial, irDebt,
+    tradeCredit,
     annualRevenue, annualEbitda, minCash, ebitdaMargin, deToEq,
   }
 }
