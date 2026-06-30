@@ -1,0 +1,198 @@
+// ============================================================
+// CLEARVIEW SHARED SCORING ENGINE
+// Deterministic Credit Risk, Going Concern, and Investment
+// Readiness scoring, usable by any client's financial result.
+// Originally built for CONAS, now shared across all clients.
+// ============================================================
+
+export interface DebtObligation {
+  drawdownMonth?: number
+  annualRate?: number
+  tenorMonths?: number
+  gracePeriodMonths?: number
+  principal?: number
+  repaymentType?: string
+}
+
+export interface DebtSchedule {
+  totalInterest: number[]
+  totalPrincipal: number[]
+  totalRepayment: number[]
+  totalOutstanding: number[]
+  annualY1: number
+}
+
+export function buildDebtSchedule(obligations: DebtObligation[], months: number): DebtSchedule {
+  months = months || 12
+  const totalInterest = Array(months).fill(0)
+  const totalPrincipal = Array(months).fill(0)
+  const totalRepayment = Array(months).fill(0)
+  const totalOutstanding = Array(months).fill(0)
+  ;(obligations || []).forEach((ob) => {
+    const startIdx = Math.max(0, (ob.drawdownMonth || 1) - 1)
+    const monthlyRate = (ob.annualRate || 0) / 12
+    const tenor = ob.tenorMonths || 12
+    const grace = ob.gracePeriodMonths || 0
+    const interestByMonth = Array(months).fill(0)
+    const principalByMonth = Array(months).fill(0)
+    const balanceByMonth = Array(months).fill(0)
+    let totalPP = 0
+    for (let m = startIdx; m < Math.min(startIdx + tenor, months); m++) {
+      if ((m - startIdx) >= grace) totalPP++
+    }
+    let bal = ob.principal || 0
+    let repayCount = 0
+    for (let m = startIdx; m < months; m++) {
+      if (bal <= 0.01) { balanceByMonth[m] = 0; continue }
+      const mss = m - startIdx
+      const interest = bal * monthlyRate
+      interestByMonth[m] = interest
+      let principal = 0
+      if (mss < tenor && mss >= grace) {
+        if (ob.repaymentType === 'bullet') {
+          if (mss === tenor - 1) principal = bal
+        } else {
+          principal = Math.min(bal / Math.max(1, totalPP - repayCount), bal)
+          repayCount++
+        }
+      }
+      principalByMonth[m] = principal
+      bal = Math.max(0, bal - principal)
+      balanceByMonth[m] = bal
+    }
+    for (let m = 0; m < months; m++) {
+      totalInterest[m] += interestByMonth[m]
+      totalPrincipal[m] += principalByMonth[m]
+      totalRepayment[m] += interestByMonth[m] + principalByMonth[m]
+      totalOutstanding[m] += balanceByMonth[m]
+    }
+  })
+  return { totalInterest, totalPrincipal, totalRepayment, totalOutstanding,
+    annualY1: totalRepayment.reduce((a,b)=>a+b,0) }
+}
+
+export interface CoachAssessment {
+  commercialModel: number
+  managementCapability: number
+  marketEvidence: number
+  governance: number
+  immediateActions: string
+  nearTermActions: string
+  followUp: string
+  coachNotes: string
+}
+
+export function defaultCoachAssessment(): CoachAssessment {
+  return {
+    commercialModel: 2, managementCapability: 2, marketEvidence: 2, governance: 2,
+    immediateActions: '', nearTermActions: '', followUp: '', coachNotes: '',
+  }
+}
+
+export interface ScoringInputs {
+  rev: number[]       // monthly consolidated revenue
+  ebitda: number[]     // monthly consolidated EBITDA
+  cashClose: number[]  // monthly closing cash balance
+  totalEquity: number  // latest period total equity
+  totalLiabilities: number // latest period total liabilities
+  months: number
+  debtObligations?: DebtObligation[]
+  assess: CoachAssessment
+}
+
+export interface ScoringResult {
+  // Credit Risk
+  score: number
+  classification: 'Stable' | 'At Risk' | 'High Risk'
+  classColor: string
+  dscrAvg: number
+  dscrVals: number[]
+  cashGaps: number
+  revTrend: 'Growing' | 'Stable' | 'Declining'
+  // Going Concern
+  gcScore: number
+  gcRating: 'Strong' | 'Adequate' | 'Marginal' | 'Concern'
+  gcColor: string
+  // Investment Readiness
+  irScore: number
+  irTier: 'Investment Ready' | 'Near Ready' | 'Development Stage' | 'Pre-Investment'
+  irColor: string
+  irFinancial: number
+  irDebt: number
+  // Shared raw figures used across all three
+  annualRevenue: number
+  annualEbitda: number
+  minCash: number
+  ebitdaMargin: number
+  deToEq: number
+}
+
+const GREEN = '#1A7A4A', AMBER = '#B8860B', RED = '#C0392B', TEAL = '#1A9DAA'
+
+export function computeScores(inputs: ScoringInputs): ScoringResult {
+  const { rev, ebitda, cashClose, totalEquity, totalLiabilities, months, assess } = inputs
+  const m = months || rev.length
+
+  const debtSched = buildDebtSchedule(inputs.debtObligations || [], m)
+  const dscrVals = ebitda.map((e, i) => {
+    const ds = debtSched.totalRepayment[i]
+    return ds > 0 ? e / ds : (e > 0 ? 3 : 0)
+  })
+  const dscrAvg = dscrVals.reduce((a, b) => a + b, 0) / Math.max(1, m)
+  const cashGaps = cashClose.filter(v => v < 0).length
+  const annualRevenue = rev.reduce((a, b) => a + b, 0)
+  const annualEbitda = ebitda.reduce((a, b) => a + b, 0)
+  const minCash = cashClose.length > 0 ? Math.min(...cashClose) : 0
+  const quarterLen = Math.max(1, Math.floor(m / 4))
+  const q1Rev = rev.slice(0, quarterLen).reduce((a, b) => a + b, 0)
+  const q4Rev = rev.slice(Math.max(0, m - quarterLen), m).reduce((a, b) => a + b, 0)
+  const revTrend: 'Growing'|'Stable'|'Declining' = q4Rev > q1Rev * 1.05 ? 'Growing' : q4Rev < q1Rev * 0.95 ? 'Declining' : 'Stable'
+
+  // ── Credit Risk Score (0-100) ──
+  let score = 50
+  if (dscrAvg >= 1.5) score += 30
+  else if (dscrAvg >= 1.0) score += 15
+  else if (dscrAvg < 0.5) score -= 20
+  if (cashGaps === 0) score += 20
+  else if (cashGaps > 2) score -= 10
+  if (revTrend === 'Growing') score += 10
+  else if (revTrend === 'Declining') score -= 5
+  score = Math.max(0, Math.min(100, score))
+  const classification: 'Stable'|'At Risk'|'High Risk' = score >= 65 ? 'Stable' : score >= 40 ? 'At Risk' : 'High Risk'
+  const classColor = classification === 'Stable' ? GREEN : classification === 'At Risk' ? AMBER : RED
+
+  // ── Going Concern Score (0-20) ──
+  const gcScore = Math.min(20,
+    (dscrAvg >= 1.5 ? 4 : dscrAvg >= 1.0 ? 3 : dscrAvg >= 0.5 ? 2 : 1) +
+    (minCash >= 0 ? 4 : minCash > -10000000 ? 1 : 0) +
+    3 + // revenue sustainability -- default adequate
+    (annualEbitda > 0 ? 3 : 2) +
+    (Number(assess.managementCapability) || 2)
+  )
+  const gcRating: 'Strong'|'Adequate'|'Marginal'|'Concern' = gcScore >= 17 ? 'Strong' : gcScore >= 12 ? 'Adequate' : gcScore >= 7 ? 'Marginal' : 'Concern'
+  const gcColor = gcRating === 'Strong' ? GREEN : gcRating === 'Adequate' ? TEAL : gcRating === 'Marginal' ? AMBER : RED
+
+  // ── Investment Readiness Score (0-30) ──
+  const ebitdaMargin = annualRevenue > 0 ? annualEbitda / annualRevenue : 0
+  const deToEq = (totalEquity > 0) ? (totalLiabilities || 0) / totalEquity : 99
+  const irFinancial = Math.min(5, (ebitdaMargin >= 0.2 ? 2 : ebitdaMargin >= 0.05 ? 1 : 0) + (annualEbitda > 0 ? 1 : 0) + (deToEq < 1 ? 2 : deToEq < 2 ? 1 : 0))
+  const irDebt = Math.min(5, Math.round(dscrAvg >= 2 ? 5 : dscrAvg >= 1.5 ? 4 : dscrAvg >= 1 ? 3 : 2))
+  const irScore = Math.min(30, irFinancial + irDebt + (Number(assess.commercialModel) || 2) + (Number(assess.managementCapability) || 2) + (Number(assess.marketEvidence) || 2) + (Number(assess.governance) || 2))
+  const irTier: 'Investment Ready'|'Near Ready'|'Development Stage'|'Pre-Investment' = irScore >= 24 ? 'Investment Ready' : irScore >= 17 ? 'Near Ready' : irScore >= 10 ? 'Development Stage' : 'Pre-Investment'
+  const irColor = irTier === 'Investment Ready' ? GREEN : irTier === 'Near Ready' ? TEAL : AMBER
+
+  return {
+    score, classification, classColor, dscrAvg, dscrVals, cashGaps, revTrend,
+    gcScore, gcRating, gcColor,
+    irScore, irTier, irColor, irFinancial, irDebt,
+    annualRevenue, annualEbitda, minCash, ebitdaMargin, deToEq,
+  }
+}
+
+// ── Engagement Close viability rating, shared logic ──
+export function computeViabilityRating(gcScore: number, creditScore: number): string {
+  if (gcScore >= 15 && creditScore >= 65) return 'Viable'
+  if (gcScore >= 10 && creditScore >= 40) return 'Conditionally Viable'
+  if (gcScore >= 7) return 'At Risk'
+  return 'Not Viable'
+}
