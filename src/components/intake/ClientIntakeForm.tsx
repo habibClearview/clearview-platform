@@ -21,9 +21,8 @@ const STEPS = ['Welcome','Business Details','Business Structure','Products & Fig
 
 function genId(prefix:string) { return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,7)}` }
 
-// A "Product" pairs one revenue line with one cost line, entered together.
-// monthData stores { [productId]: { [monthOffset]: { revenue, cost } } }
-// monthOffset is relative to TODAY: negative = past, 0 = current month, positive = future
+// A Product has: one revenue line, and one or more named cost lines (feed, DOC, vaccines, etc).
+// figureData stores { [revOrCostLineId]: { [monthOffset]: amount } } -- offset 0 = current month
 
 export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
   const [step, setStep] = useState(0)
@@ -41,16 +40,15 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
   const [hasUnits, setHasUnits] = useState<boolean|null>(null)
   const [units, setUnits] = useState<{id:string,name:string}[]>([{id:genId('unit'),name:''}])
 
-  // products: { unitId or 'whole': [{id, name}] }
-  const [products, setProducts] = useState<Record<string,{id:string,name:string}[]>>({})
+  // products: { unitKey: [{id, name, costLines:[{id,name}]}] }
+  const [products, setProducts] = useState<Record<string,{id:string,name:string,costLines:{id:string,name:string}[]}[]>>({})
   const [commonCosts, setCommonCosts] = useState<{id:string,name:string}[]>([{id:genId('common'),name:''}])
   const [assets, setAssets] = useState<{id:string,name:string,value:number}[]>([{id:genId('asset'),name:'',value:0}])
 
   const [pastMonths, setPastMonths] = useState(6)
   const [futureMonths, setFutureMonths] = useState(6)
-  // monthData: { productOrLineId: { offset: {revenue, cost} } } -- offset relative to today, 0 = current month
-  const [monthData, setMonthData] = useState<Record<string,Record<number,{revenue?:number,cost?:number}>>>({})
-  const [commonCostData, setCommonCostData] = useState<Record<string,Record<number,number>>>({})
+  // figureData: { lineId: { offset: amount } } -- works for revenue lines, cost lines, common costs alike
+  const [figureData, setFigureData] = useState<Record<string,Record<number,number>>>({})
   const [notes, setNotes] = useState('')
 
   const wholeKey = 'whole'
@@ -65,22 +63,33 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
       })
   },[intakeToken])
 
-  function getProducts(key:string) { return products[key] || [{id:genId('prod'),name:''}] }
-  function addProduct(key:string) {
-    setProducts(p=>({...p,[key]:[...getProducts(key),{id:genId('prod'),name:''}]}))
+  function getProducts(key:string) {
+    return products[key] || [{id:genId('prod'),name:'',costLines:[{id:genId('cost'),name:''}]}]
   }
-  function updateProduct(key:string, idx:number, name:string) {
-    setProducts(p=>({...p,[key]:getProducts(key).map((x,i)=>i===idx?{...x,name}:x)}))
+  function setProductsFor(key:string, updater:(p:any[])=>any[]) {
+    setProducts(p=>({...p,[key]:updater(getProducts(key))}))
+  }
+  function addProduct(key:string) {
+    setProductsFor(key, p=>[...p,{id:genId('prod'),name:'',costLines:[{id:genId('cost'),name:''}]}])
+  }
+  function updateProductName(key:string, idx:number, name:string) {
+    setProductsFor(key, p=>p.map((x,i)=>i===idx?{...x,name}:x))
   }
   function removeProduct(key:string, idx:number) {
-    setProducts(p=>({...p,[key]:getProducts(key).filter((_,i)=>i!==idx)}))
+    setProductsFor(key, p=>p.filter((_,i)=>i!==idx))
+  }
+  function addCostLine(key:string, productIdx:number) {
+    setProductsFor(key, p=>p.map((x,i)=>i===productIdx?{...x,costLines:[...x.costLines,{id:genId('cost'),name:''}]}:x))
+  }
+  function updateCostLineName(key:string, productIdx:number, costIdx:number, name:string) {
+    setProductsFor(key, p=>p.map((x,i)=>i===productIdx?{...x,costLines:x.costLines.map((c,ci)=>ci===costIdx?{...c,name}:c)}:x))
+  }
+  function removeCostLine(key:string, productIdx:number, costIdx:number) {
+    setProductsFor(key, p=>p.map((x,i)=>i===productIdx?{...x,costLines:x.costLines.filter((_,ci)=>ci!==costIdx)}:x))
   }
 
-  function setFigure(lineId:string, offset:number, field:'revenue'|'cost', val:number) {
-    setMonthData(m=>({...m,[lineId]:{...m[lineId],[offset]:{...m[lineId]?.[offset],[field]:val}}}))
-  }
-  function setCommonFigure(lineId:string, offset:number, val:number) {
-    setCommonCostData(c=>({...c,[lineId]:{...c[lineId],[offset]:val}}))
+  function setFigure(lineId:string, offset:number, val:number) {
+    setFigureData(f=>({...f,[lineId]:{...f[lineId],[offset]:val}}))
   }
 
   function monthLabel(offset:number) {
@@ -111,21 +120,14 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
       const planLines: any[] = []
       const totalMonths = Math.max(pastMonths+futureMonths, 24)
 
-      function buildPlanArray(lineId:string, field:'revenue'|'cost') {
-        // index 0 of array = pastMonths before today; we map offsets accordingly
+      function buildPlanArray(lineId:string) {
         return Array.from({length:totalMonths},(_,i)=>{
           const offset = i - pastMonths
-          return monthData[lineId]?.[offset]?.[field] || 0
-        })
-      }
-      function buildCommonArray(lineId:string) {
-        return Array.from({length:totalMonths},(_,i)=>{
-          const offset = i - pastMonths
-          return commonCostData[lineId]?.[offset] || 0
+          return figureData[lineId]?.[offset] || 0
         })
       }
 
-      const keys = hasUnits ? units.map(u=>u.id) : [wholeKey]
+      const keys = hasUnits ? units.filter(u=>u.name).map(u=>u.id) : [wholeKey]
       keys.forEach((key,ki) => {
         const unitName = hasUnits ? units.find(u=>u.id===key)?.name : business.business_name
         businessUnits.push({
@@ -135,16 +137,18 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
         })
         getProducts(key).filter(p=>p.name).forEach(p => {
           planLines.push({id:`${p.id}_rev`, unit_id:key, name:p.name, category:'revenue', line_type:'standard',
-            monthly_plan:buildPlanArray(p.id,'revenue'), active:true})
-          planLines.push({id:`${p.id}_cost`, unit_id:key, name:`${p.name} — Cost`, category:'cost_of_sales', line_type:'standard',
-            monthly_plan:buildPlanArray(p.id,'cost'), active:true})
+            monthly_plan:buildPlanArray(p.id), active:true})
+          p.costLines.filter(c=>c.name).forEach(c => {
+            planLines.push({id:c.id, unit_id:key, name:`${p.name} — ${c.name}`, category:'cost_of_sales', line_type:'standard',
+              monthly_plan:buildPlanArray(c.id), active:true})
+          })
         })
       })
 
       if (!hasUnits) {
         commonCosts.filter(l=>l.name).forEach(l => {
           planLines.push({id:l.id, unit_id:wholeKey, name:l.name, category:'direct_opex', line_type:'standard',
-            monthly_plan:buildCommonArray(l.id), active:true})
+            monthly_plan:buildPlanArray(l.id), active:true})
         })
       }
 
@@ -158,17 +162,21 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
       }])
       if (configErr) throw configErr
 
-      // Save historical (offset < 0) as actuals
       for (const key of keys) {
-        for (const p of getProducts(key).filter(p=>p.name)) {
+        const allLines: {id:string}[] = []
+        getProducts(key).filter(p=>p.name).forEach(p => {
+          allLines.push({id:`${p.id}_rev`})
+          p.costLines.filter(c=>c.name).forEach(c=>allLines.push({id:c.id}))
+        })
+        for (const line of allLines) {
           for (let offset = -pastMonths; offset < 0; offset++) {
-            const vals = monthData[p.id]?.[offset]
-            if (!vals || (!vals.revenue && !vals.cost)) continue
+            const val = figureData[line.id]?.[offset]
+            if (!val) continue
             const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()+offset)
             const period = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`
             await supabase.from('generic_actuals').upsert({
               client_id: client.id, unit_id: key, period,
-              line_values: { [`${p.id}_rev`]: vals.revenue||0, [`${p.id}_cost`]: vals.cost||0 },
+              line_values: { [line.id]: val },
               submitted: true, submitted_at: new Date().toISOString(),
               submitted_by: business.contact_name, entered_by: business.contact_name,
             }, { onConflict: 'client_id,unit_id,period' })
@@ -206,7 +214,7 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
 
   return (
     <div style={{minHeight:'100vh',background:C.cream,fontFamily:"'Segoe UI',system-ui,sans-serif",padding:'2rem 1rem'}}>
-      <div style={{maxWidth:880,margin:'0 auto'}}>
+      <div style={{maxWidth:920,margin:'0 auto'}}>
         <div style={{display:'flex',gap:'0.3rem',marginBottom:'1.5rem'}}>
           {STEPS.map((s,i)=><div key={s} style={{flex:1,height:4,borderRadius:2,background:i<=step?C.cyan:C.border}}/>)}
         </div>
@@ -216,7 +224,7 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
         {step===0&&(
           <div style={card}>
             <p style={{fontSize:'0.92rem',color:C.navy,lineHeight:1.8,marginBottom:'1rem'}}>Welcome. This form collects information about your business so we can set up your Clearview financial dashboard.</p>
-            <p style={{fontSize:'0.88rem',color:C.slate,lineHeight:1.8,marginBottom:'1rem'}}>For each product or service you sell, you will enter its revenue and the direct cost of producing it, side by side, so we can see what each one earns.</p>
+            <p style={{fontSize:'0.88rem',color:C.slate,lineHeight:1.8,marginBottom:'1rem'}}>For each product or service you sell, you will enter its revenue, and as many cost lines as you need (e.g. feed cost, DOC cost, vaccines), each with its own monthly figures.</p>
             <p style={{fontSize:'0.88rem',color:C.slate,lineHeight:1.8,marginBottom:'1.5rem'}}>Estimates are fine where exact figures are not available. This takes about 20-30 minutes.</p>
             <button style={btn()} onClick={()=>setStep(1)}>Get Started</button>
           </div>
@@ -262,12 +270,12 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
                   </div>
                 ))}
                 <button style={smallBtn()} onClick={addUnit}>+ Add Another Part</button>
-                <p style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.75rem'}}>On the next page, you will list the products or services each part sells.</p>
+                <p style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.75rem'}}>On the next page, you will list the products each part sells.</p>
               </div>
             )}
 
             {hasUnits===false&&(
-              <p style={{fontSize:'0.83rem',color:C.teal,padding:'0.75rem',background:'#EBF8FF',borderRadius:5}}>On the next page, you will list each product or service you sell, with its revenue and direct cost side by side.</p>
+              <p style={{fontSize:'0.83rem',color:C.teal,padding:'0.75rem',background:'#EBF8FF',borderRadius:5}}>On the next page, you will list each product or service you sell, with its revenue and cost lines.</p>
             )}
 
             <div style={{display:'flex',gap:'0.6rem',marginTop:'1.25rem'}}>
@@ -282,7 +290,7 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
             <div style={secH}>Products & Figures</div>
             <div style={{background:'#EBF8FF',borderRadius:6,padding:'0.85rem 1rem',marginBottom:'1.25rem'}}>
               <p style={{fontSize:'0.82rem',color:C.navy,lineHeight:1.6,margin:0}}>
-                For each product, enter <strong>revenue</strong> (money it brought in) and <strong>cost</strong> (what it directly cost to produce or buy) for the same month, side by side. The column marked <strong>"This Month"</strong> is the current month — months to its left are the past, months to its right are your plan for the future.
+                For each product: name it, then add as many <strong>cost lines</strong> as you need (feed, DOC, vaccines — whatever applies). Enter monthly figures directly in the table below each one. <strong>THIS MONTH</strong> is highlighted — months to its left are the past, months to its right are your plan.
               </p>
             </div>
 
@@ -303,21 +311,25 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
 
             {hasUnits===true?units.filter(u=>u.name).map(u=>(
               <div key={u.id} style={{marginBottom:'2rem'}}>
-                <div style={{fontWeight:700,fontSize:'0.95rem',color:C.navy,marginBottom:'0.75rem',padding:'0.5rem 0.75rem',background:C.navy,color:C.white,borderRadius:5}}>{u.name}</div>
-                <ProductList unitKey={u.id} products={getProducts(u.id)} addProduct={addProduct} updateProduct={updateProduct} removeProduct={removeProduct}
-                  pastMonths={pastMonths} futureMonths={futureMonths} monthData={monthData} setFigure={setFigure} monthLabel={monthLabel} cc={business.currency}/>
+                <div style={{fontWeight:700,fontSize:'0.95rem',marginBottom:'0.75rem',padding:'0.5rem 0.75rem',background:C.navy,color:C.white,borderRadius:5}}>{u.name}</div>
+                <ProductList unitKey={u.id} products={getProducts(u.id)}
+                  addProduct={addProduct} updateProductName={updateProductName} removeProduct={removeProduct}
+                  addCostLine={addCostLine} updateCostLineName={updateCostLineName} removeCostLine={removeCostLine}
+                  pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel} cc={business.currency}/>
               </div>
             )):hasUnits===false&&(
               <div>
-                <ProductList unitKey={wholeKey} products={getProducts(wholeKey)} addProduct={addProduct} updateProduct={updateProduct} removeProduct={removeProduct}
-                  pastMonths={pastMonths} futureMonths={futureMonths} monthData={monthData} setFigure={setFigure} monthLabel={monthLabel} cc={business.currency}/>
+                <ProductList unitKey={wholeKey} products={getProducts(wholeKey)}
+                  addProduct={addProduct} updateProductName={updateProductName} removeProduct={removeProduct}
+                  addCostLine={addCostLine} updateCostLineName={updateCostLineName} removeCostLine={removeCostLine}
+                  pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel} cc={business.currency}/>
 
                 <div style={{marginTop:'2rem',marginBottom:'1.5rem'}}>
                   <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy,marginBottom:'0.4rem'}}>Common Costs</div>
                   <p style={{fontSize:'0.78rem',color:C.slate,marginBottom:'0.75rem'}}>Costs not tied to one product — staff salaries, rent, admin.</p>
                   {commonCosts.map((l,i)=>(
-                    <CommonCostLine key={l.id} line={l} idx={i} setter={setCommonCosts} lines={commonCosts}
-                      pastMonths={pastMonths} futureMonths={futureMonths} commonCostData={commonCostData} setCommonFigure={setCommonFigure} monthLabel={monthLabel} cc={business.currency}/>
+                    <SimpleLine key={l.id} line={l} idx={i} setter={setCommonCosts} lines={commonCosts}
+                      pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel} cc={business.currency}/>
                   ))}
                   <button style={smallBtn()} onClick={()=>setCommonCosts(c=>[...c,{id:genId('common'),name:''}])}>+ Add Common Cost</button>
                 </div>
@@ -359,7 +371,8 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
               {activeKeys.map(k=>{
                 const prods = getProducts(k).filter(p=>p.name)
                 return prods.length>0 ? <div key={k} style={{fontSize:'0.8rem',color:C.slate,marginTop:'0.3rem'}}>
-                  {hasUnits&&<strong>{units.find(u=>u.id===k)?.name}: </strong>}{prods.map(p=>p.name).join(', ')}
+                  {hasUnits&&<strong>{units.find(u=>u.id===k)?.name}: </strong>}
+                  {prods.map(p=>`${p.name} (${p.costLines.filter(c=>c.name).length} cost line${p.costLines.filter(c=>c.name).length!==1?'s':''})`).join(', ')}
                 </div> : null
               })}
             </div>
@@ -376,20 +389,34 @@ export default function ClientIntakeForm({intakeToken}:{intakeToken:string}) {
   )
 }
 
-function ProductList({unitKey,products,addProduct,updateProduct,removeProduct,pastMonths,futureMonths,monthData,setFigure,monthLabel,cc}:any) {
-  const [expanded, setExpanded] = useState<Record<string,boolean>>({})
+function ProductList({unitKey,products,addProduct,updateProductName,removeProduct,addCostLine,updateCostLineName,removeCostLine,pastMonths,futureMonths,figureData,setFigure,monthLabel,cc}:any) {
   return (
     <div>
-      <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'0.75rem'}}>List each product or service. For each one, you will enter its revenue and direct cost together.</p>
-      {products.map((p:any,i:number)=>(
-        <div key={p.id} style={{marginBottom:'0.75rem',border:`1px solid ${C.border}`,borderRadius:6,padding:'0.75rem'}}>
-          <div style={{display:'flex',gap:'0.5rem',alignItems:'center'}}>
-            <input style={inp} placeholder="Product or service name (e.g. Eggs, Off-layers, Advisory visits)" value={p.name} onChange={e=>updateProduct(unitKey,i,e.target.value)}/>
-            {p.name&&<button style={smallBtn()} onClick={()=>setExpanded(x=>({...x,[p.id]:!x[p.id]}))}>{expanded[p.id]?'Hide figures':'Enter figures'}</button>}
-            {products.length>1&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>removeProduct(unitKey,i)}>×</button>}
+      <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'0.75rem'}}>List each product or service. Add as many cost lines as apply to it.</p>
+      {products.map((p:any,pi:number)=>(
+        <div key={p.id} style={{marginBottom:'1rem',border:`1px solid ${C.border}`,borderRadius:6,padding:'0.85rem',background:C.white}}>
+          <div style={{display:'flex',gap:'0.5rem',alignItems:'center',marginBottom:'0.6rem'}}>
+            <input style={{...inp,fontWeight:700}} placeholder="Product or service name (e.g. Eggs, Off-layers)" value={p.name} onChange={e=>updateProductName(unitKey,pi,e.target.value)}/>
+            {products.length>1&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>removeProduct(unitKey,pi)}>×</button>}
           </div>
-          {expanded[p.id]&&p.name&&(
-            <ProductMonthGrid productId={p.id} pastMonths={pastMonths} futureMonths={futureMonths} monthData={monthData} setFigure={setFigure} monthLabel={monthLabel} cc={cc}/>
+          {p.name&&(
+            <>
+              <MonthRow label="Revenue" labelColor={C.green} lineId={`${p.id}_rev`} pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel}/>
+              <div style={{marginTop:'0.5rem',paddingLeft:'0.75rem',borderLeft:`2px solid ${C.border}`}}>
+                <div style={{fontSize:'0.76rem',fontWeight:600,color:C.red,marginBottom:'0.3rem'}}>Cost Lines</div>
+                {p.costLines.map((c:any,ci:number)=>(
+                  <div key={c.id} style={{marginBottom:'0.5rem'}}>
+                    <div style={{display:'flex',gap:'0.5rem',alignItems:'center',marginBottom:'0.3rem'}}>
+                      <input style={{...inp,fontSize:'0.82rem'}} placeholder="e.g. Feed, DOC, Vaccines, Labour" value={c.name} onChange={e=>updateCostLineName(unitKey,pi,ci,e.target.value)}/>
+                      {p.costLines.length>1&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1rem'}} onClick={()=>removeCostLine(unitKey,pi,ci)}>×</button>}
+                    </div>
+                    {c.name&&<MonthRow label={c.name} labelColor={C.red} lineId={c.id} pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel} compact/>}
+                  </div>
+                ))}
+                <button style={smallBtn(C.red)} onClick={()=>addCostLine(unitKey,pi)}>+ Add Cost Line</button>
+              </div>
+              <p style={{fontSize:'0.68rem',color:C.slate,marginTop:'0.5rem'}}>All figures in {cc}.</p>
+            </>
           )}
         </div>
       ))}
@@ -398,83 +425,53 @@ function ProductList({unitKey,products,addProduct,updateProduct,removeProduct,pa
   )
 }
 
-function ProductMonthGrid({productId,pastMonths,futureMonths,monthData,setFigure,monthLabel,cc}:any) {
+function MonthRow({label,labelColor,lineId,pastMonths,futureMonths,figureData,setFigure,monthLabel,compact}:any) {
   const offsets = []
   for (let i=-pastMonths;i<=futureMonths;i++) offsets.push(i)
   return (
-    <div style={{marginTop:'0.75rem',overflowX:'auto'}}>
-      <table style={{borderCollapse:'collapse',fontSize:'0.78rem'}}>
-        <thead>
-          <tr>
-            <th style={{padding:'4px 6px',textAlign:'left',minWidth:70}}></th>
-            {offsets.map(o=>(
-              <th key={o} style={{
-                padding:'4px 6px',textAlign:'center',minWidth:88,
-                background:o===0?C.cyan:o<0?'#F4F8FC':'#EBF8FF',
-                color:o===0?C.white:C.navy,
-                borderLeft:o===0?`2px solid ${C.navy}`:'none',
-                borderRight:o===0?`2px solid ${C.navy}`:'none',
-                fontWeight:o===0?700:600,
-              }}>{o===0?'This Month':monthLabel(o)}</th>
-            ))}
-          </tr>
-        </thead>
+    <div style={{overflowX:'auto'}}>
+      <table style={{borderCollapse:'collapse',fontSize:compact?'0.72rem':'0.78rem'}}>
+        {!compact&&(
+          <thead>
+            <tr>
+              <th style={{padding:'3px 6px',textAlign:'left',minWidth:90}}></th>
+              {offsets.map(o=>(
+                <th key={o} style={{
+                  padding:'3px 5px',textAlign:'center',minWidth:80,
+                  background:o===0?C.cyan:o<0?'#F4F8FC':'#EBF8FF',
+                  color:o===0?C.white:C.navy,
+                  borderLeft:o===0?`2px solid ${C.navy}`:'none',
+                  borderRight:o===0?`2px solid ${C.navy}`:'none',
+                  fontWeight:o===0?700:600, fontSize:'0.68rem',
+                }}>{o===0?'THIS MONTH':monthLabel(o)}</th>
+              ))}
+            </tr>
+          </thead>
+        )}
         <tbody>
           <tr>
-            <td style={{padding:'4px 6px',fontWeight:600,color:C.green,fontSize:'0.76rem'}}>Revenue</td>
+            <td style={{padding:'3px 6px',fontWeight:600,color:labelColor,minWidth:90,fontSize:compact?'0.72rem':'0.76rem'}}>{label}</td>
             {offsets.map(o=>(
-              <td key={o} style={{padding:'2px 4px',background:o===0?'#F0FBFF':'transparent',borderLeft:o===0?`2px solid ${C.navy}`:'none',borderRight:o===0?`2px solid ${C.navy}`:'none'}}>
-                <input type="number" style={{width:'100%',padding:'0.3rem 0.35rem',fontSize:'0.76rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:C.white,boxSizing:'border-box'}}
-                  value={monthData[productId]?.[o]?.revenue||''} placeholder="0" onChange={e=>setFigure(productId,o,'revenue',Number(e.target.value))}/>
-              </td>
-            ))}
-          </tr>
-          <tr>
-            <td style={{padding:'4px 6px',fontWeight:600,color:C.red,fontSize:'0.76rem'}}>Cost</td>
-            {offsets.map(o=>(
-              <td key={o} style={{padding:'2px 4px',background:o===0?'#F0FBFF':'transparent',borderLeft:o===0?`2px solid ${C.navy}`:'none',borderRight:o===0?`2px solid ${C.navy}`:'none',borderBottom:o===0?`2px solid ${C.navy}`:'none'}}>
-                <input type="number" style={{width:'100%',padding:'0.3rem 0.35rem',fontSize:'0.76rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:C.white,boxSizing:'border-box'}}
-                  value={monthData[productId]?.[o]?.cost||''} placeholder="0" onChange={e=>setFigure(productId,o,'cost',Number(e.target.value))}/>
+              <td key={o} style={{padding:'2px 3px',background:o===0?'#F0FBFF':'transparent',borderLeft:o===0?`2px solid ${C.navy}`:'none',borderRight:o===0?`2px solid ${C.navy}`:'none',borderBottom:o===0?`2px solid ${C.navy}`:'none',minWidth:80}}>
+                <input type="number" style={{width:'100%',padding:'0.28rem 0.32rem',fontSize:compact?'0.7rem':'0.74rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:C.white,boxSizing:'border-box'}}
+                  value={figureData[lineId]?.[o]||''} placeholder="0" onChange={e=>setFigure(lineId,o,Number(e.target.value))}/>
               </td>
             ))}
           </tr>
         </tbody>
       </table>
-      <p style={{fontSize:'0.7rem',color:C.slate,marginTop:'0.4rem'}}>All figures in {cc}. Past months on the left are what actually happened. Future months on the right are your plan.</p>
     </div>
   )
 }
 
-function CommonCostLine({line,idx,setter,lines,pastMonths,futureMonths,commonCostData,setCommonFigure,monthLabel,cc}:any) {
-  const [expanded,setExpanded] = useState(false)
-  const offsets = []
-  for (let i=-pastMonths;i<=futureMonths;i++) offsets.push(i)
+function SimpleLine({line,idx,setter,lines,pastMonths,futureMonths,figureData,setFigure,monthLabel,cc}:any) {
   return (
-    <div style={{marginBottom:'0.6rem'}}>
-      <div style={{display:'flex',gap:'0.5rem',alignItems:'center'}}>
+    <div style={{marginBottom:'0.75rem'}}>
+      <div style={{display:'flex',gap:'0.5rem',alignItems:'center',marginBottom:'0.3rem'}}>
         <input style={inp} placeholder="e.g. Staff salaries, Rent" value={line.name} onChange={e=>setter((l:any)=>l.map((x:any,i:number)=>i===idx?{...x,name:e.target.value}:x))}/>
-        {line.name&&<button style={smallBtn()} onClick={()=>setExpanded(!expanded)}>{expanded?'Hide':'Enter figures'}</button>}
         {lines.length>1&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>setter((l:any)=>l.filter((_:any,i:number)=>i!==idx))}>×</button>}
       </div>
-      {expanded&&line.name&&(
-        <div style={{marginTop:'0.5rem',overflowX:'auto'}}>
-          <table style={{borderCollapse:'collapse',fontSize:'0.78rem'}}>
-            <thead><tr>
-              {offsets.map(o=>(
-                <th key={o} style={{padding:'4px 6px',textAlign:'center',minWidth:88,background:o===0?C.cyan:o<0?'#F4F8FC':'#EBF8FF',color:o===0?C.white:C.navy,fontWeight:o===0?700:600}}>{o===0?'This Month':monthLabel(o)}</th>
-              ))}
-            </tr></thead>
-            <tbody><tr>
-              {offsets.map(o=>(
-                <td key={o} style={{padding:'2px 4px'}}>
-                  <input type="number" style={{width:'100%',padding:'0.3rem 0.35rem',fontSize:'0.76rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:C.white,boxSizing:'border-box'}}
-                    value={commonCostData[line.id]?.[o]||''} placeholder="0" onChange={e=>setCommonFigure(line.id,o,Number(e.target.value))}/>
-                </td>
-              ))}
-            </tr></tbody>
-          </table>
-        </div>
-      )}
+      {line.name&&<MonthRow label={line.name} labelColor={C.navy} lineId={line.id} pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel}/>}
     </div>
   )
 }
