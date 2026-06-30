@@ -444,7 +444,7 @@ export function runGenericModel(
 
   const allocUnits = topUnits.filter(u => unitPL[u.id])
   const totalHC = allocUnits.reduce((s, u) => s + u.headcount, 0) || 1
-  const fixedPct = settings.shared_cost_fixed_pct || 0.5
+  const fixedPct = settings.shared_cost_fixed_pct ?? 0.5
 
   for (let m = 0; m < months; m++) {
     const totalRev = allocUnits.reduce((s, u) => s + (unitPL[u.id]?.rev[m] || 0), 0)
@@ -510,7 +510,7 @@ export function runGenericModel(
       }
     })
     con.nbt[m]  = con.ebitda[m]
-    con.tax[m]  = con.nbt[m] > 0 ? con.nbt[m] * (settings.corporate_tax_rate || 0.30) : 0
+    con.tax[m]  = con.nbt[m] > 0 ? con.nbt[m] * (settings.corporate_tax_rate ?? 0.30) : 0
     con.npat[m] = con.nbt[m] - con.tax[m]
     if (con.act_rev[m] !== null) {
       con.act_ebitda[m] = (con.act_rev[m] as number) - con.cogs[m] - con.opex[m]
@@ -527,14 +527,18 @@ export function runGenericModel(
   // ── Cash flow ─────────────────────────────────────────────
   const cap = settings.capital_structure || { shareholder_contribution: 0, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, fixed_assets: 0 }
   const cf = {
-    op_cash:  zero(), fin_cash: zero(), net: zero(),
+    op_cash:  zero(), fin_cash: zero(), inv_cash: zero(), net: zero(),
     open: zero(), close: zero(),
     working_capital_adj: tradeCreditCashEffect,
   }
   cf.fin_cash[0] = cap.shareholder_contribution + cap.grant_non_repayable + cap.grant_recoverable + cap.bank_loan
+  // Fixed assets purchased with cash are an investing outflow in month 0 --
+  // without this, fixed assets appear on the balance sheet with no cash
+  // consequence, breaking the fundamental accounting identity (Assets = Equity + Liabilities).
+  cf.inv_cash[0] = -(cap.fixed_assets || 0)
   for (let m = 0; m < months; m++) {
     cf.op_cash[m] = con.npat[m] + (cf.working_capital_adj[m] || 0)
-    cf.net[m]     = cf.op_cash[m] + cf.fin_cash[m]
+    cf.net[m]     = cf.op_cash[m] + cf.fin_cash[m] + cf.inv_cash[m]
     cf.open[m]    = m === 0 ? (settings.opening_cash_balance || 0) : cf.close[m - 1]
     cf.close[m]   = cf.open[m] + cf.net[m]
   }
@@ -553,7 +557,10 @@ export function runGenericModel(
     total_liabilities: zero(),
     total_equity_and_liabilities: zero(),
   }
-  let cum_npat = 0
+  // Opening cash balance represents pre-existing capital from before the
+  // planning period -- without a source on the balance sheet, cash exists
+  // with no matching equity, breaking Assets = Equity + Liabilities.
+  let cum_npat = settings.opening_cash_balance || 0
   for (let m = 0; m < months; m++) {
     cum_npat += con.npat[m]
     bs.retained_earnings[m] = cum_npat
@@ -603,8 +610,8 @@ export function runGenericModel(
     ? settings.debts
     : (cap.bank_loan > 0 ? [{
         drawdownMonth: 1,
-        annualRate: cap.annual_interest_rate || 0.18,
-        tenorMonths: (cap.loan_tenor_years || 2) * 12,
+        annualRate: cap.annual_interest_rate ?? 0.18,
+        tenorMonths: (cap.loan_tenor_years ?? 2) * 12,
         gracePeriodMonths: 0,
         principal: cap.bank_loan,
         repaymentType: 'amortising',
