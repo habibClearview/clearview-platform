@@ -431,23 +431,21 @@ function MonthRow({label,labelColor,lineId,pastMonths,futureMonths,figureData,se
   return (
     <div style={{overflowX:'auto'}}>
       <table style={{borderCollapse:'collapse',fontSize:compact?'0.72rem':'0.78rem'}}>
-        {!compact&&(
-          <thead>
-            <tr>
-              <th style={{padding:'3px 6px',textAlign:'left',minWidth:90}}></th>
-              {offsets.map(o=>(
-                <th key={o} style={{
-                  padding:'3px 5px',textAlign:'center',minWidth:80,
-                  background:o===0?C.cyan:o<0?'#F4F8FC':'#EBF8FF',
-                  color:o===0?C.white:C.navy,
-                  borderLeft:o===0?`2px solid ${C.navy}`:'none',
-                  borderRight:o===0?`2px solid ${C.navy}`:'none',
-                  fontWeight:o===0?700:600, fontSize:'0.68rem',
-                }}>{o===0?'THIS MONTH':monthLabel(o)}</th>
-              ))}
-            </tr>
-          </thead>
-        )}
+        <thead>
+          <tr>
+            <th style={{padding:'3px 6px',textAlign:'left',minWidth:90}}></th>
+            {offsets.map(o=>(
+              <th key={o} style={{
+                padding:'3px 5px',textAlign:'center',minWidth:80,
+                background:o===0?C.cyan:o<0?'#F4F8FC':'#EBF8FF',
+                color:o===0?C.white:C.navy,
+                borderLeft:o===0?`2px solid ${C.navy}`:'none',
+                borderRight:o===0?`2px solid ${C.navy}`:'none',
+                fontWeight:o===0?700:600, fontSize:compact?'0.62rem':'0.68rem',
+              }}>{o===0?'THIS MONTH':monthLabel(o)}</th>
+            ))}
+          </tr>
+        </thead>
         <tbody>
           <tr>
             <td style={{padding:'3px 6px',fontWeight:600,color:labelColor,minWidth:90,fontSize:compact?'0.72rem':'0.76rem'}}>{label}</td>
