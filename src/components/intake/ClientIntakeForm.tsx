@@ -133,7 +133,8 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
   async function submit() {
     setSubmitting(true)
     try {
-      const slug = business.business_name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')
+      const slugBase = business.business_name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')
+      const slug = `${slugBase}-${Math.random().toString(36).slice(2,7)}`
 
       const { data: client, error: clientErr } = await supabase.from('engagement_clients').insert([{
         id: genId('client'), name: business.business_name, slug, type: 'service_lsp',
