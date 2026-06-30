@@ -234,7 +234,7 @@ function ConasOperationalCashflowTab({result, months, cc}:{result:ReturnType<typ
     const blob = new Blob([csv],{type:'text/csv'})
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href=url; a.download='Operational_Cashflow.csv'; a.click()
+    a.href=url; a.download='Operational_Cashflow.csv'; document.body.appendChild(a); a.click(); document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
 
@@ -316,7 +316,7 @@ function ConasWorkingCapitalTab({result, months, cc, inputs, upd, canEdit}:{resu
     const blob = new Blob([csv],{type:'text/csv'})
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href=url; a.download='Working_Capital_Irrigation.csv'; a.click()
+    a.href=url; a.download='Working_Capital_Irrigation.csv'; document.body.appendChild(a); a.click(); document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
 
@@ -457,7 +457,7 @@ function PLTable({rows,months,title,footnote}:{
     const blob=new Blob([csv],{type:'text/csv'})
     const url=URL.createObjectURL(blob)
     const a=document.createElement('a')
-    a.href=url; a.download=`${(title||'export').replace(/[^a-z0-9]/gi,'_')}.csv`; a.click()
+    a.href=url; a.download=`${(title||'export').replace(/[^a-z0-9]/gi,'_')}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
   return(
@@ -565,7 +565,7 @@ function exportToCSV(title: string, headers: string[], rows: (string|number)[][]
   const a = document.createElement('a')
   a.href = url
   a.download = `${title.replace(/[^a-z0-9]/gi,'_')}.csv`
-  a.click()
+  document.body.appendChild(a); a.click(); document.body.removeChild(a)
   URL.revokeObjectURL(url)
 }
 
