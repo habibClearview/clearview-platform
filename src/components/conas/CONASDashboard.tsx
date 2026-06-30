@@ -461,7 +461,7 @@ function ConasOperationalCashflowTab({result, months, cc}:{result:ReturnType<typ
       )}
 
       <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>Operational Cashflow (Cash In vs Cash Out)</div><button style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,color:C.slate,cursor:'pointer',padding:'0.15rem 0.5rem'}} onClick={()=>window.print()}>Export / Print</button></div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>Operational Cashflow (Cash In vs Cash Out)</div><button style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,color:C.slate,cursor:'pointer',padding:'0.15rem 0.5rem'}} onClick={()=>window.print()}>Print</button></div>
         <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.75rem',fontFamily:'monospace'}}>
           <thead><tr style={{background:C.navy,color:C.white}}>
             <th style={{padding:'7px 10px',textAlign:'left',minWidth:160}}>Line</th>
@@ -554,9 +554,24 @@ function PLTable({rows,months,title,footnote}:{
   rows:{label:string;plan:number[];actual?:(number|null)[];bold?:boolean;highlight?:boolean;negate?:boolean;indent?:boolean}[]
 }){
   const hasAct=rows.some(r=>r.actual?.some(v=>v!==null))
+  function downloadCSV(){
+    const headers=['',...months,'Total']
+    const dataRows=rows.map(row=>{
+      const dsp=(v:number)=>row.negate?-Math.abs(v):v
+      const vals=row.plan.map(dsp)
+      const total=vals.reduce((a,b)=>a+b,0)
+      return [row.label,...vals.map(v=>String(Math.round(v))),String(Math.round(total))]
+    })
+    const csv=[headers,...dataRows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
+    const blob=new Blob([csv],{type:'text/csv'})
+    const url=URL.createObjectURL(blob)
+    const a=document.createElement('a')
+    a.href=url; a.download=`${(title||'export').replace(/[^a-z0-9]/gi,'_')}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
   return(
     <div style={card}>
-      {title&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.5rem'}}><div style={secH} style={{margin:0}}>{title}</div><button style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,color:C.slate,cursor:'pointer',padding:'0.15rem 0.5rem',flexShrink:0}} onClick={()=>window.print()}>Export / Print</button></div>}
+      {title&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.5rem'}}><div style={secH} style={{margin:0}}>{title}</div><div style={{display:'flex',gap:'0.4rem'}}><button style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,color:C.slate,cursor:'pointer',padding:'0.15rem 0.5rem',flexShrink:0}} onClick={()=>window.print()}>Print</button><button style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,color:C.slate,cursor:'pointer',padding:'0.15rem 0.5rem',flexShrink:0}} onClick={downloadCSV}>Export CSV</button></div></div>}
       {hasAct&&(
         <div style={{display:'flex',gap:'1.2rem',marginBottom:'0.6rem',fontSize:'0.7rem',color:C.slate}}>
           <span style={{display:'inline-flex',alignItems:'center',gap:4}}><span style={{width:10,height:10,borderRadius:2,background:C.planBg,border:`1px solid ${C.border}`,display:'inline-block'}}/> Plan</span>
