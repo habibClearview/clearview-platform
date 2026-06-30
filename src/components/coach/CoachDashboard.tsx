@@ -360,8 +360,18 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   const newSubmissions = clients.filter(c => c.status === 'setup' && (c.notes || '').includes('Self-submitted intake'))
 
   function OverviewTab(){
+    const [refreshingOv,setRefreshingOv]=useState(false)
+    async function refreshOverview(){
+      setRefreshingOv(true)
+      try { const fresh = await loadClients(); setClients(fresh) }
+      catch(e) {}
+      setRefreshingOv(false)
+    }
     return(
       <div>
+        <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'0.75rem'}}>
+          <button style={addBtn(true,C.teal)} onClick={refreshOverview} disabled={refreshingOv}>{refreshingOv?'Refreshing...':'\u21bb Refresh client list'}</button>
+        </div>
         <ClearviewHealthSummary clients={clients}/>
         {newSubmissions.length>0&&(
           <div style={{background:'#EBF8FF',border:`1px solid ${C.teal}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem'}}>
@@ -413,10 +423,18 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     const [filter,setFilter]=useState('all')
     const [showNew,setShowNew]=useState(false)
     const [showUpload,setShowUpload]=useState(false)
+    const [refreshing,setRefreshing]=useState(false)
     const filtered=filter==='all'?clients:clients.filter(c=>c.type===filter||c.engagement_mode===filter)
+    async function refreshClients(){
+      setRefreshing(true)
+      try { const fresh = await loadClients(); setClients(fresh) }
+      catch(e) { /* ignore -- keep existing list on failure */ }
+      setRefreshing(false)
+    }
     return(
       <div>
         <div style={{display:'flex',gap:'0.45rem',marginBottom:'1.25rem',flexWrap:'wrap',alignItems:'center'}}>
+          <button style={addBtn(true,C.teal)} onClick={refreshClients} disabled={refreshing}>{refreshing?'Refreshing...':'\u21bb Refresh'}</button>
           {['all','canvas','financial','crop_aggregator','livestock_aggregator','farmer_group_enterprise','service_lsp'].map(f=>(
             <button key={f} style={{fontFamily:'monospace',fontSize:'0.68rem',padding:'0.3rem 0.65rem',border:`1px solid ${filter===f?C.cyan:C.border}`,borderRadius:4,background:filter===f?C.cyan:C.white,color:filter===f?C.navy:C.slate,cursor:'pointer'}} onClick={()=>setFilter(f)}>
               {f==='all'?'All':f==='canvas'?'GtCV Canvas':f==='financial'?'Clearview Only':CLIENT_TYPE_LABELS[f]||f}
