@@ -2138,3 +2138,51 @@ function InvestmentPitchDownload({clientId}:{clientId:string}) {
     </div>
   )
 }
+
+// ── CASH FLOW TAB ────────────────────────────────────────────
+function CashFlowTab({result,months,cc}) {
+  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
+  const cf = result.cf
+  const rows = [
+    {label:'Opening Cash',values:cf.open,bold:true},
+    {label:'Net Profit After Tax',values:result.con.npat},
+    {label:'Operating Cash Flow',values:cf.op_cash,bold:true},
+    {label:'Capital & Financing',values:cf.fin_cash},
+    {label:'Net Change in Cash',values:cf.net,bold:true},
+    {label:'Closing Cash',values:cf.close,bold:true,highlight:true},
+  ]
+  return (
+    <div>
+      <div style={kpiGrid}>
+        <KPI label="Opening Cash" value={fmt(cf.open[0],cc)}/>
+        <KPI label="Month 6 Cash" value={fmt(cf.close[5]||0,cc)} color={(cf.close[5]||0)>=0?C.navy:C.red}/>
+        <KPI label="Closing Cash" value={fmt(cf.close[cf.close.length-1],cc)} color={cf.close[cf.close.length-1]>=0?C.navy:C.red}/>
+        <KPI label="Lowest Point" value={fmt(result.metrics.min_cash,cc)} sub={`Month ${result.metrics.min_cash_month}`} color={result.metrics.min_cash>=0?C.navy:C.red}/>
+      </div>
+      <PLTable title="Cash Flow Statement" rows={rows} months={months} cc={cc} showExport/>
+    </div>
+  )
+}
+
+// ── BALANCE SHEET TAB ────────────────────────────────────────
+function BalanceSheetTab({result,months,cc}) {
+  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
+  const bs = result.bs
+  const rows = [
+    {label:'ASSETS',values:Array(months.length).fill(0),bold:true},
+    {label:'Cash & Bank',values:bs.cash},
+    {label:'Fixed Assets',values:bs.fixed_assets},
+    {label:'Total Assets',values:bs.total_assets,bold:true,highlight:true},
+    {label:'EQUITY',values:Array(months.length).fill(0),bold:true},
+    {label:'Share Capital',values:bs.share_capital},
+    {label:'Grant Equity',values:bs.grant_equity},
+    {label:'Retained Earnings',values:bs.retained_earnings},
+    {label:'Total Equity',values:bs.total_equity,bold:true},
+    {label:'LIABILITIES',values:Array(months.length).fill(0),bold:true},
+    {label:'Grant Liability',values:bs.grant_liability},
+    {label:'Loan Liability',values:bs.loan_liability},
+    {label:'Total Liabilities',values:bs.total_liabilities,bold:true},
+    {label:'Total Equity & Liabilities',values:bs.total_equity_and_liabilities,bold:true,highlight:true},
+  ]
+  return <PLTable title="Balance Sheet" rows={rows} months={months} cc={cc} showExport/>
+}
