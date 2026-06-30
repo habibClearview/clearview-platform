@@ -234,7 +234,7 @@ function ConasOperationalCashflowTab({result, months, cc}:{result:ReturnType<typ
     const blob = new Blob([csv],{type:'text/csv'})
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href=url; a.download='Operational_Cashflow.csv'; document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    a.href=url; a.download='Operational_Cashflow.csv'; a.click()
     URL.revokeObjectURL(url)
   }
 
@@ -316,7 +316,7 @@ function ConasWorkingCapitalTab({result, months, cc, inputs, upd, canEdit}:{resu
     const blob = new Blob([csv],{type:'text/csv'})
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href=url; a.download='Working_Capital_Irrigation.csv'; document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    a.href=url; a.download='Working_Capital_Irrigation.csv'; a.click()
     URL.revokeObjectURL(url)
   }
 
@@ -457,7 +457,7 @@ function PLTable({rows,months,title,footnote}:{
     const blob=new Blob([csv],{type:'text/csv'})
     const url=URL.createObjectURL(blob)
     const a=document.createElement('a')
-    a.href=url; a.download=`${(title||'export').replace(/[^a-z0-9]/gi,'_')}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    a.href=url; a.download=`${(title||'export').replace(/[^a-z0-9]/gi,'_')}.csv`; a.click()
     URL.revokeObjectURL(url)
   }
   return(
@@ -565,7 +565,7 @@ function exportToCSV(title: string, headers: string[], rows: (string|number)[][]
   const a = document.createElement('a')
   a.href = url
   a.download = `${title.replace(/[^a-z0-9]/gi,'_')}.csv`
-  document.body.appendChild(a); a.click(); document.body.removeChild(a)
+  a.click()
   URL.revokeObjectURL(url)
 }
 
@@ -1976,22 +1976,8 @@ export default function CONASDashboard({
   }
 
   function CashFlowTab(){
-    const [cfMode,setCfMode]=useState<'statement'|'operational'>('statement')
-    if(cfMode==='operational')return(
-      <div>
-        <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
-          <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',background:C.white,color:C.slate,borderRadius:4,cursor:'pointer'}} onClick={()=>setCfMode('statement')}>Cash Flow Statement</button>
-          <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',background:C.navy,color:C.white,borderRadius:4,cursor:'pointer',fontWeight:700}} onClick={()=>setCfMode('operational')}>Operational Cashflow</button>
-        </div>
-        <ConasOperationalCashflowTab result={result} months={months} cc={cc}/>
-      </div>
-    )
     return(
       <div>
-        <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
-          <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',background:C.navy,color:C.white,borderRadius:4,cursor:'pointer',fontWeight:700}} onClick={()=>setCfMode('statement')}>Cash Flow Statement</button>
-          <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',background:C.white,color:C.slate,borderRadius:4,cursor:'pointer'}} onClick={()=>setCfMode('operational')}>Operational Cashflow</button>
-        </div>
         <div style={kpiGrid}>
           <KPI label="Opening Cash" value={fmt(cf.open[0],cc)}/>
           <KPI label="Month 6 Cash" value={fmt(cf.close[5],cc)} color={cf.close[5]>=0?C.navy:C.red}/>
@@ -2007,6 +1993,7 @@ export default function CONASDashboard({
             {label:'Approved Spending (posted)',plan:cf.approvedSpend,negate:true},
             {label:'Operating Cash Flow',plan:cf.opCash,bold:true},
             {label:'Capital & Grant Inflows',plan:cf.finCash},
+            {label:'Fixed Asset Purchases',plan:cf.invCash||Array(MONTHS).fill(0)},
             {label:'Net Change in Cash',plan:cf.net,bold:true},
             {label:'Closing Cash',plan:cf.close,bold:true,highlight:true},
           ]}
@@ -2152,24 +2139,13 @@ export default function CONASDashboard({
           <div style={secH}>Additional Debt Obligations</div>
           <p style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.85rem'}}>Use this if the business has more than one loan -- bank loans, SACCO loans, or other non-bank facilities. Each is tracked separately in DSCR.</p>
           {(inputs.debts||[]).map((d,i)=>(
-            <div key={i} style={{padding:'0.75rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.6rem'}}>
-              <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr auto',gap:'0.5rem',alignItems:'end',marginBottom:'0.5rem'}}>
-                <div><div style={hint}>Name</div><input style={inp} value={d.name||''} placeholder="e.g. Bank loan, SACCO loan" onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],name:e.target.value};return{...p,debts:ds}})}/></div>
-                <div><div style={hint}>Principal ({cc})</div><input type="number" style={inp} value={d.principal||0} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],principal:Number(e.target.value)};return{...p,debts:ds}})}/></div>
-                <div><div style={hint}>Annual Rate %</div><input type="number" step="0.5" style={inp} value={((d.annualRate||0)*100).toFixed(1)} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],annualRate:Number(e.target.value)/100};return{...p,debts:ds}})}/></div>
-                <button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>upd(p=>({...p,debts:(p.debts||[]).filter((_,j)=>j!==i)}))}>×</button>
-              </div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1.3fr',gap:'0.5rem'}}>
-                <div><div style={hint}>Tenor (months)</div><input type="number" style={inp} value={d.tenorMonths||12} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],tenorMonths:Number(e.target.value)};return{...p,debts:ds}})}/></div>
-                <div><div style={hint}>Grace Period (months)</div><input type="number" style={inp} value={d.gracePeriodMonths||0} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],gracePeriodMonths:Number(e.target.value)};return{...p,debts:ds}})}/></div>
-                <div><div style={hint}>Drawdown Month</div><input type="number" min="1" style={inp} value={d.drawdownMonth||1} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],drawdownMonth:Number(e.target.value)};return{...p,debts:ds}})}/></div>
-                <div><div style={hint}>Repayment Type</div>
-                  <select style={inp} value={d.repaymentType||'amortising'} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],repaymentType:e.target.value};return{...p,debts:ds}})}>
-                    <option value="amortising">Amortising (equal principal each month)</option>
-                    <option value="bullet">Bullet (full principal at end of tenor)</option>
-                  </select>
-                </div>
-              </div>
+            <div key={i} style={{display:'grid',gridTemplateColumns:'1.5fr 1fr 1fr 1fr 1fr auto',gap:'0.5rem',alignItems:'end',padding:'0.6rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.5rem'}}>
+              <div><div style={hint}>Name</div><input style={inp} value={d.name||''} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],name:e.target.value};return{...p,debts:ds}})}/></div>
+              <div><div style={hint}>Principal ({cc})</div><input type="number" style={inp} value={d.principal||0} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],principal:Number(e.target.value)};return{...p,debts:ds}})}/></div>
+              <div><div style={hint}>Annual Rate %</div><input type="number" step="0.5" style={inp} value={((d.annualRate||0)*100).toFixed(1)} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],annualRate:Number(e.target.value)/100};return{...p,debts:ds}})}/></div>
+              <div><div style={hint}>Tenor (months)</div><input type="number" style={inp} value={d.tenorMonths||12} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],tenorMonths:Number(e.target.value)};return{...p,debts:ds}})}/></div>
+              <div><div style={hint}>Grace (months)</div><input type="number" style={inp} value={d.gracePeriodMonths||0} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],gracePeriodMonths:Number(e.target.value)};return{...p,debts:ds}})}/></div>
+              <button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>upd(p=>({...p,debts:(p.debts||[]).filter((_,j)=>j!==i)}))}>×</button>
             </div>
           ))}
           <button style={addBtn(true)} onClick={()=>upd(p=>({...p,debts:[...(p.debts||[]),{name:'',principal:0,annualRate:0.18,tenorMonths:12,gracePeriodMonths:0,drawdownMonth:1,repaymentType:'amortising'}]}))}>+ Add Debt Obligation</button>
@@ -2204,15 +2180,19 @@ export default function CONASDashboard({
 
   const tabs:[string,string][]=[
     ['overview','Overview'],
-    ['approvals',`Approvals${pending.length>0?` (${pending.length})`:''}`],
     ['intelligence','Clearview Intelligence'],
+    ['unitpl','Unit P&L'],
     ['planning','Planning'],
-    ['unitpl','P&L'],
+    ['opcashflow','Operational Cashflow'],
+    ['workingcapital','Working Capital'],
+    ['approvals',`Approvals${pending.length>0?` (${pending.length})`:''}`],
+    ['actuals','Actuals'],
+    ['spends','Spend Requests'],
+    ['timerecords','Time Records'],
     ['cashflow','Cash Flow'],
     ['balancesheet','Balance Sheet'],
-    ['workingcapital','Working Capital'],
-    ['actuals','Actuals'],
-    ['timerecords','Time Records'],
+    ['scenarios','Scenarios'],
+    ['team','Team'],
     ['settings','Settings'],
   ]
 
@@ -2257,19 +2237,20 @@ export default function CONASDashboard({
       </nav>
       <main style={{maxWidth:1440,margin:'0 auto',padding:'1.5rem'}}>
         {view==='overview'        &&<OverviewTab/>}
-        {view==='approvals' &&<ApprovalsAndSpendWrapper
-          approvalsEl={<ApprovalsTab spendingRequests={inputs.spendingRequests} pending={pending} spendForm={spendForm} setSpendForm={setSpendForm} allActiveUnits={allActiveUnits} months={months} cc={cc} canSubmitRequest={P.canSubmitRequest} canApprove={P.canApprove} submitSpend={submitSpend} resolveRequest={resolveRequest}/>}
-          spendEl={<SpendRequestsTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
-        />}
         {view==='intelligence'    &&<ConasIntelligenceTab result={result} inputs={inputs} coachAssessments={coachAssessments} onSaveAssessments={setCoachAssessments} months={months} cc={cc} P={P}/>}
         {view==='unitpl'          &&<UnitPLTab/>}
         {view==='planning'        &&<PlanningTab/>}
+        {view==='opcashflow'      &&<ConasOperationalCashflowTab result={result} months={months} cc={cc}/>}
         {view==='workingcapital'  &&<ConasWorkingCapitalTab result={result} months={months} cc={cc} inputs={inputs} upd={upd} canEdit={P.canEditPlan}/>}
+        {view==='approvals' &&<ApprovalsTab spendingRequests={inputs.spendingRequests} pending={pending} spendForm={spendForm} setSpendForm={setSpendForm} allActiveUnits={allActiveUnits} months={months} cc={cc} canSubmitRequest={P.canSubmitRequest} canApprove={P.canApprove} submitSpend={submitSpend} resolveRequest={resolveRequest}/>}
         {view==='cashflow'        &&<CashFlowTab/>}
         {view==='balancesheet'    &&<BalanceSheetTab/>}
+        {view==='scenarios'       &&<ScenariosTab/>}
         {view==='actuals'         &&<ActualsTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits} planUnits={inputs.units}/>}
+        {view==='spends'           &&<SpendRequestsTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
         {view==='timerecords'      &&<TimeRecordsTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
-        {view==='settings'        &&<SettingsAndAdminWrapper settingsEl={<SettingsTab/>} scenariosEl={<ScenariosTab/>} teamEl={<TeamTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}/>}
+        {view==='team'            &&<TeamTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
+        {view==='settings'        &&<SettingsTab/>}
       </main>
       <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.67rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>
         Canvas Coach · Clearview Planner · {inputs.global.businessName} · habibonifade.com
@@ -2651,50 +2632,6 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
       {activeSection==='close'&&(
         <ConasEngagementClose score={score} classification={classification} classColor={classColor} gcScore={gcScore} gcRating={gcRating} gcColor={gcColor} irScore={irScore} irTier={irTier} irColor={irColor} dscrAvg={dscrAvg} cashGaps={cashGaps} assess={assess} cc={cc}/>
       )}
-    </div>
-  )
-}
-
-// ── APPROVALS & SPEND REQUESTS WRAPPER (toggle, reuses existing elements) ──
-function ApprovalsAndSpendWrapper({approvalsEl,spendEl}:{approvalsEl:React.ReactNode;spendEl:React.ReactNode}) {
-  const [mode,setMode]=useState<'approvals'|'requests'>('approvals')
-  return (
-    <div>
-      <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
-        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='approvals'?C.navy:C.white,color:mode==='approvals'?C.white:C.slate,
-          borderRadius:4,cursor:'pointer',fontWeight:mode==='approvals'?700:400}}
-          onClick={()=>setMode('approvals')}>Approvals</button>
-        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='requests'?C.navy:C.white,color:mode==='requests'?C.white:C.slate,
-          borderRadius:4,cursor:'pointer',fontWeight:mode==='requests'?700:400}}
-          onClick={()=>setMode('requests')}>My Spend Requests</button>
-      </div>
-      {mode==='approvals'?approvalsEl:spendEl}
-    </div>
-  )
-}
-
-// ── SETTINGS, SCENARIOS & TEAM WRAPPER (toggle, reuses existing elements) ──
-function SettingsAndAdminWrapper({settingsEl,scenariosEl,teamEl}:{settingsEl:React.ReactNode;scenariosEl:React.ReactNode;teamEl:React.ReactNode}) {
-  const [mode,setMode]=useState<'settings'|'scenarios'|'team'>('settings')
-  return (
-    <div>
-      <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
-        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='settings'?C.navy:C.white,color:mode==='settings'?C.white:C.slate,
-          borderRadius:4,cursor:'pointer',fontWeight:mode==='settings'?700:400}}
-          onClick={()=>setMode('settings')}>General Settings</button>
-        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='scenarios'?C.navy:C.white,color:mode==='scenarios'?C.white:C.slate,
-          borderRadius:4,cursor:'pointer',fontWeight:mode==='scenarios'?700:400}}
-          onClick={()=>setMode('scenarios')}>Scenarios</button>
-        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='team'?C.navy:C.white,color:mode==='team'?C.white:C.slate,
-          borderRadius:4,cursor:'pointer',fontWeight:mode==='team'?700:400}}
-          onClick={()=>setMode('team')}>Team</button>
-      </div>
-      {mode==='settings'?settingsEl:mode==='scenarios'?scenariosEl:teamEl}
     </div>
   )
 }
