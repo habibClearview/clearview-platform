@@ -101,6 +101,11 @@ export interface CONASInputs {
     loanTenorYears: number
     fixedAssets: number
   }
+  // Multiple debt obligations (bank + non-bank facilities) -- supplements
+  // capitalStructure.bankLoan for clients with more than one loan.
+  debts?: { drawdownMonth?: number; annualRate?: number; tenorMonths?: number; gracePeriodMonths?: number; principal?: number; repaymentType?: string; name?: string }[]
+  // Trade credit: supplier credit received and customer/partner credit given, monthly.
+  tradeCreditLines?: { id: string; name: string; type: 'payable'|'receivable'; monthlyOutstanding: number[] }[]
   seasons: Season[]
   spendingRequests: SpendingRequest[]
   monthlyNotes: string[]
@@ -336,6 +341,8 @@ export function defaultCONASInputs(): CONASInputs {
       loanTenorYears: 2,
       fixedAssets: 0,
     },
+    debts: [],
+    tradeCreditLines: [],
 
     seasons: [{
       id: 's1', name: 'Season 1 — Jul–Sep 2026',
