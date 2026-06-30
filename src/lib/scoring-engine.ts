@@ -22,21 +22,33 @@ export interface DebtSchedule {
   annualY1: number
 }
 
-// ── Trade credit: supplier credit (payable) and customer/partner credit (receivable) ──
-// Both are monthly since real businesses (e.g. seasonal input credit, licensing
-// partner terms) vary across the year, not a single static figure.
+// ── Trade credit: supplier credit (payable) and customer/partner credit
+// (receivable) -- tracked as MOVEMENTS, the way real bookkeeping works.
+// Each month: new credit extended/received, and what was actually settled.
+// The outstanding balance is a derived running total, never entered directly.
+// This is standard working capital practice: AR/AP movements flow into the
+// cash flow statement as operating adjustments (an AR increase consumes cash,
+// an AP increase releases cash), and DSO/DPO are computed from the resulting
+// balances over the period -- not typed in as a flat average.
 export interface TradeCreditLine {
   id: string
   name: string               // e.g. "Input Supplier", "Licensing Partner", "FGE Advance"
   type: 'payable' | 'receivable'
-  monthly_outstanding: number[]  // amount owed/owing at end of each month
+  monthly_new: number[]      // new credit received (payable) or extended (receivable) this month
+  monthly_settled: number[]  // amount actually paid (payable) or collected (receivable) this month
 }
 
 export interface TradeCreditSummary {
-  totalPayableOutstanding: number[]    // monthly, summed across all payable lines
-  totalReceivableOutstanding: number[] // monthly, summed across all receivable lines
-  dpo: number   // Days Payable Outstanding (average days to pay suppliers)
-  dso: number   // Days Sales Outstanding (average days to collect from customers/partners)
+  totalPayableOutstanding: number[]    // monthly closing balance, summed across all payable lines
+  totalReceivableOutstanding: number[] // monthly closing balance, summed across all receivable lines
+  // Net monthly cash effect of trade credit movements -- this is what should
+  // be added into the cash flow statement as a working capital adjustment.
+  // Payable: new credit received delays a cash outflow (positive cash effect
+  // in the month received, reversed when settled). Receivable: collecting
+  // cash is a positive effect; extending new credit defers the inflow.
+  monthlyCashEffect: number[]
+  dpo: number   // Days Payable Outstanding -- average days to pay suppliers
+  dso: number   // Days Sales Outstanding -- average days to collect from customers/partners
   cashConversionGap: number  // DSO - DPO. Positive = cash tied up; negative = supplier-financed
   peakPayable: number
   peakReceivable: number
@@ -50,9 +62,29 @@ export function computeTradeCredit(
 ): TradeCreditSummary {
   const totalPayableOutstanding = Array(months).fill(0)
   const totalReceivableOutstanding = Array(months).fill(0)
+  const monthlyCashEffect = Array(months).fill(0)
+
   ;(lines || []).forEach(line => {
-    const target = line.type === 'payable' ? totalPayableOutstanding : totalReceivableOutstanding
-    for (let i = 0; i < months; i++) target[i] += (line.monthly_outstanding[i] || 0)
+    const isPayable = line.type === 'payable'
+    const balanceTarget = isPayable ? totalPayableOutstanding : totalReceivableOutstanding
+    let runningBalance = 0
+    for (let i = 0; i < months; i++) {
+      const newAmt = line.monthly_new?.[i] || 0
+      const settledAmt = line.monthly_settled?.[i] || 0
+      runningBalance = Math.max(0, runningBalance + newAmt - settledAmt)
+      balanceTarget[i] += runningBalance
+
+      // Cash effect: for a payable, receiving new credit defers a cash outflow
+      // (positive effect that month); settling it is the actual outflow (negative).
+      // For a receivable, extending new credit defers a cash inflow (negative
+      // effect -- revenue was earned but not yet collected); settling it is the
+      // actual inflow (positive).
+      if (isPayable) {
+        monthlyCashEffect[i] += newAmt - settledAmt
+      } else {
+        monthlyCashEffect[i] += settledAmt - newAmt
+      }
+    }
   })
 
   const avgPayable = totalPayableOutstanding.reduce((a,b)=>a+b,0) / Math.max(1,months)
@@ -66,7 +98,8 @@ export function computeTradeCredit(
   const cashConversionGap = dso - dpo
 
   return {
-    totalPayableOutstanding, totalReceivableOutstanding, dpo, dso, cashConversionGap,
+    totalPayableOutstanding, totalReceivableOutstanding, monthlyCashEffect,
+    dpo, dso, cashConversionGap,
     peakPayable: totalPayableOutstanding.length>0 ? Math.max(...totalPayableOutstanding) : 0,
     peakReceivable: totalReceivableOutstanding.length>0 ? Math.max(...totalReceivableOutstanding) : 0,
   }
