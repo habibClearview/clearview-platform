@@ -1300,7 +1300,7 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
   const tabList:[string,string][] = [
     ['summary','Summary'],['narrative',"This Month's Story"],['credit','Credit Risk'],
     ['going_concern','Going Concern'],['investment','Investment Readiness'],
-    ['coach','Coach Assessment'],['events','Promotion Events'],
+    ['coach','Coach Assessment'],['events','Marketing Events'],
   ]
 
   return (
@@ -2134,7 +2134,12 @@ function InvestmentPitchDownload({clientId}:{clientId:string}) {
       <button style={solidBtn(C.navy)} disabled={downloading} onClick={download}>
         {downloading ? 'Generating...' : 'Download Word Document'}
       </button>
-      {error && <div style={{width:'100%',color:C.red,fontSize:'0.8rem'}}>{error}</div>}
+      {error && (
+        <div style={{width:'100%',background:'#FDF0EE',border:`2px solid ${C.red}`,borderRadius:6,padding:'0.85rem 1rem',marginTop:'0.5rem'}}>
+          <div style={{fontWeight:700,color:C.red,fontSize:'0.85rem',marginBottom:'0.3rem'}}>⚠ Could not generate the document</div>
+          <div style={{color:C.red,fontSize:'0.8rem'}}>{error}</div>
+        </div>
+      )}
     </div>
   )
 }
