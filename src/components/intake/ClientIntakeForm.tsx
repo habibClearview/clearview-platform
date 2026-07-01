@@ -80,6 +80,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
   // figureData: { lineId: { offset: amount } } -- works for revenue lines, cost lines, common costs alike
   const [figureData, setFigureData] = useState<Record<string,Record<number,number>>>({})
   const [notes, setNotes] = useState('')
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
 
   const wholeKey = 'whole'
 
@@ -434,10 +435,32 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
               </div>
             ):<div style={{background:'#FDF0EE',border:`1px solid ${C.red}`,borderRadius:6,padding:'0.85rem 1rem'}}><p style={{margin:0,fontSize:'0.85rem',color:C.red}}>Please go back and answer whether your business has multiple parts before entering figures.</p></div>}
 
+            {validationErrors.length>0&&(
+              <div style={{background:'#FDF0EE',border:`2px solid ${C.red}`,borderRadius:8,padding:'1rem',marginTop:'1rem'}}>
+                <div style={{fontWeight:700,color:C.red,marginBottom:'0.5rem',fontSize:'0.88rem'}}>⚠ Please fix these before continuing:</div>
+                {validationErrors.map((e,i)=>(
+                  <div key={i} style={{fontSize:'0.82rem',color:C.red,marginBottom:'0.25rem'}}>• {e}</div>
+                ))}
+              </div>
+            )}
             <div style={{marginTop:'1rem'}}><label style={lbl}>Anything else we should know?</label><textarea style={{...inp,minHeight:80,resize:'vertical'}} value={notes} onChange={e=>setNotes(e.target.value)}/></div>
             <div style={{display:'flex',gap:'0.6rem',marginTop:'1.25rem'}}>
               <button style={ghostBtn} onClick={()=>setStep(2)}>Back</button>
-              <button style={btn()} onClick={()=>setStep(4)}>Continue</button>
+              <button style={btn()} onClick={()=>{
+                const errs:string[]=[]
+                const keys2 = hasUnits ? units.filter(u=>u.name).map(u=>u.id) : [wholeKey]
+                keys2.forEach(key=>{
+                  const prods2 = products[key]||[]
+                  if(prods2.filter(p=>p.name).length===0) errs.push('Add at least one product or service name.')
+                  prods2.filter(p=>p.name).forEach(p=>{
+                    const revPlan = Object.values(figureData[`${p.id}_rev`]||{})
+                    if(!revPlan.some((v:any)=>v>0)) errs.push(`Enter at least one revenue figure for "${p.name}".`)
+                  })
+                })
+                if(errs.length>0){setValidationErrors(errs);return}
+                setValidationErrors([])
+                setStep(4)
+              }}>Continue</button>
             </div>
           </div>
         )}
@@ -491,7 +514,11 @@ function ProductList({unitKey,products,addProduct,updateProductName,removeProduc
             {p.costLines.map((c:any,ci:number)=>(
               <div key={c.id} style={{marginBottom:'0.5rem'}}>
                 <div style={{display:'flex',gap:'0.5rem',alignItems:'center',marginBottom:'0.3rem'}}>
-                  <input style={{...inp,fontSize:'0.82rem'}} placeholder="Name this cost (e.g. Feed, Labour) — required to save" value={c.name} onChange={e=>updateCostLineName(unitKey,pi,ci,e.target.value)}/>
+                  <input style={{...inp,fontSize:'0.82rem',
+                    borderColor:!c.name&&Object.values(figureData[c.id]||{}).some((v:any)=>v>0)?C.amber:undefined,
+                    background:!c.name&&Object.values(figureData[c.id]||{}).some((v:any)=>v>0)?'#FFFBEA':undefined,
+                  }} placeholder="Name this cost (e.g. Feed, Labour)" value={c.name} onChange={e=>updateCostLineName(unitKey,pi,ci,e.target.value)}/>
+                  {!c.name&&Object.values(figureData[c.id]||{}).some((v:any)=>v>0)&&<span style={{fontSize:'0.68rem',color:C.amber,marginLeft:'4px'}}>Give this cost a name</span>}
                   {p.costLines.length>1&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1rem'}} onClick={()=>removeCostLine(unitKey,pi,ci)}>×</button>}
                 </div>
                 <MonthRow label={c.name||'Cost'} labelColor={C.red} lineId={c.id} pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel} compact/>
