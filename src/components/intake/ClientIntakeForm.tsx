@@ -145,15 +145,34 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
       const slugBase = business.business_name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')
       const slug = `${slugBase}-${Math.random().toString(36).slice(2,7)}`
 
-      const { data: client, error: clientErr } = await supabase.from('engagement_clients').insert([{
-        id: genId('client'), name: business.business_name, slug, type: 'service_lsp',
-        engagement_mode: 'financial', status: 'setup', country: business.country, sector: business.sector,
-        contact_name: business.contact_name, contact_email: business.contact_email, contact_phone: business.contact_phone,
-        clearview_active: true, programme_id: intake?.programme_id || null,
-        start_date: new Date().toISOString().split('T')[0],
-        notes: `Self-submitted intake. Structure: ${hasUnits?'Multiple units':'Single business'}. ${notes}`,
-      }]).select().single()
-      if (clientErr) throw clientErr
+      // If the intake link is tied to an existing client, use that client
+      // instead of creating a new one -- this is how coach-dashboard generated
+      // links work. Only create a new client for standalone/anonymous submissions.
+      let client: any
+      if (intake?.client_id) {
+        const { data: existing, error: fetchErr } = await supabase
+          .from('engagement_clients').select('*').eq('id', intake.client_id).single()
+        if (fetchErr || !existing) throw new Error('Could not find the client linked to this intake form.')
+        client = existing
+        // Update client record with submitted details
+        await supabase.from('engagement_clients').update({
+          country: business.country, sector: business.sector,
+          contact_name: business.contact_name, contact_email: business.contact_email,
+          contact_phone: business.contact_phone, status: 'active',
+          notes: `Self-submitted intake. Structure: ${hasUnits?'Multiple units':'Single business'}. ${notes}`,
+        }).eq('id', client.id)
+      } else {
+        const { data: newClient, error: clientErr } = await supabase.from('engagement_clients').insert([{
+          id: genId('client'), name: business.business_name, slug, type: 'service_lsp',
+          engagement_mode: 'financial', status: 'setup', country: business.country, sector: business.sector,
+          contact_name: business.contact_name, contact_email: business.contact_email, contact_phone: business.contact_phone,
+          clearview_active: true, programme_id: intake?.programme_id || null,
+          start_date: new Date().toISOString().split('T')[0],
+          notes: `Self-submitted intake. Structure: ${hasUnits?'Multiple units':'Single business'}. ${notes}`,
+        }]).select().single()
+        if (clientErr) throw clientErr
+        client = newClient
+      }
 
       const businessUnits: any[] = []
       const planLines: any[] = []
@@ -191,6 +210,10 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
         })
       }
 
+      // Delete any existing config for this client (e.g. from a prior failed submission)
+      // so we can resubmit cleanly without a duplicate key error
+      await supabase.from('generic_model_config').delete().eq('client_id', client.id)
+
       const { error: configErr } = await supabase.from('generic_model_config').insert([{
         client_id: client.id, business_name: business.business_name, currency: business.currency,
         start_date: new Date(new Date().setMonth(new Date().getMonth()-pastMonths)).toISOString().split('T')[0],
@@ -221,6 +244,13 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
             }, { onConflict: 'client_id,unit_id,period' })
           }
         }
+      }
+
+      // Mark the intake link as used
+      if (intakeToken) {
+        await supabase.from('client_intake_links').update({
+          used: true, used_at: new Date().toISOString()
+        }).eq('token', intakeToken)
       }
 
       setSubmitted(true)
