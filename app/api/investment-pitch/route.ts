@@ -1,79 +1,157 @@
 // ============================================================
 // API ROUTE: /api/investment-pitch
-// Generates an AI-written investment readiness memo as a Word
-// document. Claude writes the narrative; docx formats it.
+// AI-written investment brief, infographic/box style,
+// Clearview branding, concise not text-heavy
 // ============================================================
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-  HeadingLevel, BorderStyle, WidthType, AlignmentType,
+  HeadingLevel, BorderStyle, WidthType, AlignmentType, ShadingType,
 } from 'docx'
 import { runGenericModel, buildMonthLabels, type GenericModelConfig } from '@/lib/generic-engine'
-import { computeScores, defaultCoachAssessment } from '@/lib/scoring-engine'
+import { computeScores, defaultCoachAssessment, computeTradeCredit } from '@/lib/scoring-engine'
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
-  if (!url || !key) throw new Error('Supabase admin credentials not configured. Go to Vercel → Settings → Environment Variables and add SUPABASE_SERVICE_ROLE_KEY.')
+  if (!url || !key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel environment variables.')
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
-const NAVY = '1B2A4A', CYAN = '00B4D8', SLATE = '4A5A6A'
-const GREEN = '1A7A4A', AMBER = 'B8860B', RED = 'C0392B', BORDER = 'D8E0E8'
+// ── Clearview brand colours ──
+const NAVY   = '1B2A4A'
+const CYAN   = '00B4D8'
+const CREAM  = 'F8F4EE'
+const WHITE  = 'FFFFFF'
+const SLATE  = '4A5A6A'
+const GREEN  = '1A7A4A'
+const AMBER  = 'B8860B'
+const RED    = 'C0392B'
+const BORDER = 'D8E0E8'
+const LBBLUE = 'EBF8FF'
 
 function fmt(n: number, cc: string) {
-  return `${cc} ${Math.abs(Math.round(n || 0)).toLocaleString('en-US')}${n < 0 ? ' (deficit)' : ''}`
+  if (!n || isNaN(n)) return `${cc} 0`
+  const v = Math.round(Math.abs(n))
+  const s = v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}K` : v.toString()
+  return `${cc} ${s}${n < 0 ? ' (deficit)' : ''}`
 }
-function pct(n: number) { return `${(n * 100).toFixed(1)}%` }
+function pct(n: number) { return `${((n||0)*100).toFixed(1)}%` }
 
-function h1(text: string) {
-  return new Paragraph({
-    heading: HeadingLevel.HEADING_1,
-    children: [new TextRun({ text, bold: true, color: NAVY, font: 'Georgia', size: 28 })],
-    spacing: { before: 400, after: 160 },
-    border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: CYAN, space: 6 } },
-  })
-}
-function h2(text: string) {
-  return new Paragraph({
-    children: [new TextRun({ text, bold: true, color: CYAN, font: 'Arial', size: 22 })],
-    spacing: { before: 280, after: 100 },
-  })
-}
-function p(text: string, color = NAVY) {
-  return new Paragraph({
-    children: [new TextRun({ text, size: 22, font: 'Arial', color })],
-    spacing: { after: 160 },
-    alignment: AlignmentType.JUSTIFIED,
-  })
-}
-function scoreRow(label: string, score: string, rating: string, color: string) {
-  const border = { style: BorderStyle.SINGLE, size: 1, color: BORDER }
-  const borders = { top: border, bottom: border, left: border, right: border }
-  const m = { top: 80, bottom: 80, left: 120, right: 120 }
-  return new TableRow({ children: [
-    new TableCell({ borders, width: { size: 3000, type: WidthType.DXA }, margins: m,
-      children: [new Paragraph({ children: [new TextRun({ text: label, size: 20, font: 'Arial', color: SLATE })] })] }),
-    new TableCell({ borders, width: { size: 1500, type: WidthType.DXA }, margins: m,
-      children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: score, size: 22, bold: true, color })] })] }),
-    new TableCell({ borders, width: { size: 4860, type: WidthType.DXA }, margins: m,
-      children: [new Paragraph({ children: [new TextRun({ text: rating, size: 20, font: 'Arial', color })] })] }),
-  ]})
+// ── Layout helpers ──
+function spacer(before = 0, after = 0) {
+  return new Paragraph({ children: [new TextRun('')], spacing: { before, after } })
 }
 
-async function generateNarrative(prompt: string): Promise<string> {
+// Full-width navy section header
+function sectionHeader(text: string) {
+  return new Table({
+    width: { size: 9360, type: WidthType.DXA },
+    columnWidths: [9360],
+    borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideH: { style: BorderStyle.NONE }, insideV: { style: BorderStyle.NONE } },
+    rows: [new TableRow({ children: [new TableCell({
+      shading: { fill: NAVY, type: ShadingType.SOLID },
+      margins: { top: 120, bottom: 120, left: 200, right: 200 },
+      children: [new Paragraph({ children: [new TextRun({ text, bold: true, color: CYAN, size: 22, font: 'Arial', allCaps: true })] })],
+    })] })],
+  })
+}
+
+// Metric box: used in rows of 3-4
+function metricBox(label: string, value: string, sub: string, color: string, width: number) {
+  const b = { style: BorderStyle.SINGLE, size: 4, color: CYAN }
+  const borders = { top: b, bottom: b, left: b, right: b }
+  return new TableCell({
+    borders,
+    shading: { fill: LBBLUE, type: ShadingType.SOLID },
+    width: { size: width, type: WidthType.DXA },
+    margins: { top: 100, bottom: 100, left: 140, right: 140 },
+    children: [
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: value, bold: true, color, size: 36, font: 'Georgia' })] }),
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: label, color: NAVY, size: 16, font: 'Arial', bold: true })] }),
+      ...(sub ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: sub, color: SLATE, size: 14, font: 'Arial', italics: true })] })] : []),
+    ],
+  })
+}
+
+function metricRow(metrics: { label: string; value: string; sub: string; color: string }[]) {
+  const cellWidth = Math.floor(9360 / metrics.length)
+  return new Table({
+    width: { size: 9360, type: WidthType.DXA },
+    columnWidths: metrics.map(() => cellWidth),
+    borders: { insideV: { style: BorderStyle.NONE }, insideH: { style: BorderStyle.NONE }, top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+    rows: [new TableRow({ children: metrics.map(m => metricBox(m.label, m.value, m.sub, m.color, cellWidth)) })],
+  })
+}
+
+// Two-column info box
+function infoBox(left: string[], right: string[], leftWidth = 4500, rightWidth = 4860) {
+  const b = { style: BorderStyle.SINGLE, size: 2, color: BORDER }
+  const borders = { top: b, bottom: b, left: b, right: b }
+  const noBorder = { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideH: { style: BorderStyle.NONE }, insideV: { style: BorderStyle.NONE } }
+  return new Table({
+    width: { size: 9360, type: WidthType.DXA },
+    columnWidths: [leftWidth, rightWidth],
+    borders: noBorder,
+    rows: [new TableRow({ children: [
+      new TableCell({ borders, shading: { fill: CREAM, type: ShadingType.SOLID }, width: { size: leftWidth, type: WidthType.DXA }, margins: { top: 120, bottom: 120, left: 160, right: 160 },
+        children: left.map(t => new Paragraph({ children: [new TextRun({ text: t, size: 20, font: 'Arial', color: NAVY })] })) }),
+      new TableCell({ borders, shading: { fill: WHITE, type: ShadingType.SOLID }, width: { size: rightWidth, type: WidthType.DXA }, margins: { top: 120, bottom: 120, left: 160, right: 160 },
+        children: right.map(t => new Paragraph({ children: [new TextRun({ text: t, size: 20, font: 'Arial', color: NAVY })] })) }),
+    ]})],
+  })
+}
+
+// Short bullet-style paragraph
+function bullet(text: string, color = NAVY) {
+  return new Paragraph({
+    bullet: { level: 0 },
+    children: [new TextRun({ text, size: 20, font: 'Arial', color })],
+    spacing: { after: 60 },
+  })
+}
+
+function note(text: string) {
+  return new Paragraph({
+    children: [new TextRun({ text, size: 18, font: 'Arial', color: SLATE, italics: true })],
+    spacing: { after: 80 },
+  })
+}
+
+// Score badge row
+function scoreBadge(label: string, score: string, rating: string, color: string, width: number) {
+  const b = { style: BorderStyle.SINGLE, size: 2, color: BORDER }
+  const borders = { top: b, bottom: b, left: b, right: b }
+  return new TableCell({
+    borders, width: { size: width, type: WidthType.DXA },
+    margins: { top: 80, bottom: 80, left: 120, right: 120 },
+    children: [
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: score, bold: true, color, size: 28, font: 'Georgia' })] }),
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: label, color: NAVY, size: 16, bold: true, font: 'Arial' })] }),
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: rating, color, size: 15, font: 'Arial', italics: true })] }),
+    ],
+  })
+}
+
+async function callClaude(prompt: string): Promise<string> {
+  const key = process.env.ANTHROPIC_API_KEY
+  if (!key) return ''
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4000,
-      messages: [{ role: 'user', content: prompt }],
-    }),
+    headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] }),
   })
   const data = await response.json()
   return data.content?.[0]?.text || ''
+}
+
+function shortPara(text: string) {
+  return new Paragraph({
+    children: [new TextRun({ text: text.trim(), size: 20, font: 'Arial', color: NAVY })],
+    spacing: { after: 120 },
+    alignment: AlignmentType.JUSTIFIED,
+  })
 }
 
 export async function POST(req: NextRequest) {
@@ -83,14 +161,19 @@ export async function POST(req: NextRequest) {
 
     const admin = getAdminClient()
 
-    const [{ data: client }, { data: configRow }, { data: latestNarrative }, { data: coachBriefing }] = await Promise.all([
+    const [
+      { data: client },
+      { data: configRow },
+      { data: coachBriefing },
+      { data: events },
+    ] = await Promise.all([
       admin.from('engagement_clients').select('*').eq('id', clientId).single(),
       admin.from('generic_model_config').select('*').eq('client_id', clientId).single(),
-      admin.from('investment_readiness').select('*').eq('client_id', clientId).order('generated_at', { ascending: false }).limit(1).maybeSingle(),
       admin.from('coach_briefings').select('*').eq('client_id', clientId).order('generated_at', { ascending: false }).limit(1).maybeSingle(),
+      admin.from('management_events').select('*').eq('client_id', clientId).order('date', { ascending: false }),
     ])
 
-    if (!configRow) return NextResponse.json({ error: 'No financial model found for this client. Set up the financial plan first.' }, { status: 404 })
+    if (!configRow) return NextResponse.json({ error: 'No financial model found. Set up the financial plan first.' }, { status: 404 })
 
     const config: GenericModelConfig = {
       client_id: configRow.client_id,
@@ -109,146 +192,242 @@ export async function POST(req: NextRequest) {
     const m = result.metrics
     const s = result.scores
     const assess = config.settings.coach_assessment || defaultCoachAssessment()
-
     const cashWarnings = result.cf.close.filter((v: number) => v < 0).length
-    const unitSummaries = result.allocUnits.map((u: any) => {
+    const hasTradeCredit = (config.settings.trade_credit_lines || []).length > 0
+    const hasMarketing = (events?.length || 0) > 0
+    const hasDebt = (config.settings.debts || []).length > 0 || (config.settings.capital_structure?.bank_loan || 0) > 0
+
+    // CAC by channel if marketing events exist
+    const channelMap: Record<string, { cost: number; customers: number }> = {}
+    ;(events || []).forEach((e: any) => {
+      const ch = e.channel || 'Unspecified'
+      if (!channelMap[ch]) channelMap[ch] = { cost: 0, customers: 0 }
+      channelMap[ch].cost += e.cost || 0
+      channelMap[ch].customers += e.customers_acquired || 0
+    })
+    const channels = Object.entries(channelMap).map(([ch, v]) => ({
+      channel: ch, cac: v.customers > 0 ? v.cost / v.customers : null, ...v,
+    })).sort((a, b) => (a.cac || 999999) - (b.cac || 999999))
+
+    // Trade credit DSO/DPO
+    const tc = s.tradeCredit
+    const hasTCData = tc.dso > 0 || tc.dpo > 0
+
+    // Unit summaries
+    const unitLines = result.allocUnits.map((u: any) => {
       const pl = result.unitPL[u.id]
-      return pl ? `${u.name}: revenue ${fmt(pl.ann_rev, cc)}, gross profit ${fmt(pl.ann_gp, cc)} (${pct(pl.gp_margin)} margin), EBITDA ${fmt(pl.ann_ebitda, cc)}` : `${u.name}: no data`
-    }).join('\n')
+      if (!pl || pl.ann_rev === 0) return null
+      return `${u.name}: ${fmt(pl.ann_rev, cc)} revenue · ${pct(pl.gp_margin)} gross margin`
+    }).filter(Boolean)
 
-    // Build the AI prompt with all the data an investor would want addressed
-    const aiPrompt = `You are writing a professional investment readiness memo for ${config.business_name}, an African agribusiness in the ${client?.sector || 'agricultural'} sector in ${client?.country || 'Uganda'}.
+    // ── AI narrative sections ──
+    const hasApiKey = !!process.env.ANTHROPIC_API_KEY
 
-This memo will be presented to a potential lender or investor. Write it as a professional document that a development finance institution or commercial bank would read. It should be honest, analytical, and make a clear case for (or identify conditions on) investment readiness.
+    let valueProposition = '', businessModel = '', scaleGrowth = '', riskMitigation = '', recommendation = ''
 
-FINANCIAL DATA:
-- Business structure: ${config.business_units.filter((u: any) => u.active).length} business unit(s): ${config.business_units.filter((u: any) => u.active).map((u: any) => u.name).join(', ')}
-- Planning period: ${configRow.planning_months} months from ${configRow.start_date}
-- Currency: ${cc}
-
-Revenue and profitability:
-- Total planned revenue: ${fmt(m.total_revenue, cc)}
-- Gross profit: ${fmt(m.total_gp, cc)} (${pct(m.gross_margin)} gross margin)
-- EBITDA: ${fmt(m.total_ebitda, cc)} (${pct(m.net_margin)} EBITDA margin)
-- Break-even revenue: ${fmt(m.business_breakeven, cc)}
-- Revenue headroom above break-even: ${fmt(m.total_revenue - m.business_breakeven, cc)}
-
-By business unit:
-${unitSummaries}
-
-Liquidity:
-- Minimum cash position: ${fmt(m.min_cash, cc)} in month ${m.min_cash_month}
-- Cash-negative months: ${cashWarnings} of ${configRow.planning_months}
-- Staff cost as % of revenue: ${pct(m.staff_cost_pct)}
-
-INVESTMENT READINESS SCORES:
-- Overall Investment Readiness: ${s.irScore}/30 — ${s.irTier}
-- Credit Risk: ${s.score}/100 — ${s.classification}
-- Going Concern: ${s.gcScore}/20 — ${s.gcRating}
-- Debt Service Coverage (DSCR): ${s.dscrAvg.toFixed(2)}x average
-- Revenue trend: ${s.revTrend}
-
-COACH ASSESSMENT (qualitative scores set by the engagement coach):
-- Commercial model clarity: ${assess.commercialModel || 2}/5
-- Management capability: ${assess.managementCapability || 2}/4
-- Market evidence: ${assess.marketEvidence || 2}/5
-- Governance and record-keeping: ${assess.governance || 2}/5
-${assess.coachNotes ? `\nCoach notes: ${assess.coachNotes}` : ''}
-
-${coachBriefing?.briefing_text ? `RECENT BUSINESS NARRATIVE:\n${coachBriefing.briefing_text}` : ''}
-${latestNarrative?.assessment_text ? `PREVIOUS INVESTMENT ASSESSMENT NOTES:\n${latestNarrative.assessment_text}` : ''}
-
-Write a professional investment readiness memo with the following sections. Each section should be a substantive paragraph or two — not bullet points, not a data table. Write as if you are a senior analyst presenting this business to an investment committee.
-
-1. EXECUTIVE SUMMARY — One paragraph. What is this business, what does it do, and what is the headline investment case? State the investment readiness rating clearly.
-
-2. BUSINESS MODEL AND COMMERCIAL VIABILITY — Explain how the business makes money, which revenue streams are strongest, and whether the commercial model is proven. Reference the margin data.
-
-3. FINANCIAL PERFORMANCE AND PROJECTIONS — Analyse the revenue, margin, and profitability picture. Is the business profitable? Is it above break-even? What does the EBITDA margin say about operational efficiency?
-
-4. LIQUIDITY AND CASH FLOW — Address cash flow health. Are there months at risk? What does the minimum cash position indicate? Is the business able to service debt obligations?
-
-5. MANAGEMENT AND GOVERNANCE — Based on the coach assessment scores, what is the quality of management and governance? This is a key investor concern for early-stage African agribusinesses.
-
-6. RISK FACTORS — What are the two or three most significant risks an investor should be aware of? Be honest.
-
-7. INVESTMENT RECOMMENDATION — Given all of the above, what is your recommendation? Is the business investment-ready now, near-ready with specific conditions, or at an earlier stage? Be specific about what conditions or improvements would change the rating.
-
-Write in plain, direct English. Avoid jargon. Maximum 1200 words across all sections.`
-
-    const narrative = await generateNarrative(aiPrompt)
-
-    // Parse the narrative into sections for structured Word formatting
-    const sections = narrative.split(/\n\n(?=\d+\.|[A-Z]{2,})/g).filter(Boolean)
-
-    const docChildren: any[] = [
-      // Cover
-      new Paragraph({ children: [new TextRun({ text: 'INVESTMENT READINESS MEMO', size: 18, color: CYAN, bold: true, font: 'Arial' })], spacing: { after: 60 } }),
-      new Paragraph({ children: [new TextRun({ text: config.business_name, size: 44, bold: true, font: 'Georgia', color: NAVY })], spacing: { after: 40 } }),
-      new Paragraph({ children: [new TextRun({ text: `${client?.sector || 'Agriculture'} · ${client?.country || 'Uganda'} · Prepared by Canvas Coach`, size: 18, color: SLATE, italics: true }) ], spacing: { after: 20 } }),
-      new Paragraph({ children: [new TextRun({ text: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }), size: 18, color: SLATE })],
-        spacing: { after: 360 }, border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: CYAN, space: 8 } } }),
-
-      // Scorecard
-      h1('Investment Readiness Scorecard'),
-      new Table({
-        width: { size: 9360, type: WidthType.DXA },
-        columnWidths: [3000, 1500, 4860],
-        rows: [
-          new TableRow({ tableHeader: true, children: [
-            new TableCell({ shading: { fill: NAVY }, width: { size: 3000, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
-              children: [new Paragraph({ children: [new TextRun({ text: 'Indicator', color: 'FFFFFF', bold: true, size: 18 })] })] }),
-            new TableCell({ shading: { fill: NAVY }, width: { size: 1500, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
-              children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Score', color: 'FFFFFF', bold: true, size: 18 })] })] }),
-            new TableCell({ shading: { fill: NAVY }, width: { size: 4860, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
-              children: [new Paragraph({ children: [new TextRun({ text: 'Rating', color: 'FFFFFF', bold: true, size: 18 })] })] }),
-          ]}),
-          scoreRow('Investment Readiness', `${s.irScore}/30`, s.irTier, s.irScore >= 24 ? GREEN : s.irScore >= 17 ? CYAN : AMBER),
-          scoreRow('Credit Risk', `${s.score}/100`, s.classification, s.classification === 'Stable' ? GREEN : s.classification === 'At Risk' ? AMBER : RED),
-          scoreRow('Going Concern', `${s.gcScore}/20`, s.gcRating, s.gcRating === 'Strong' ? GREEN : s.gcRating === 'Adequate' ? CYAN : AMBER),
-          scoreRow('Debt Service Coverage', `${s.dscrAvg.toFixed(2)}x`, s.dscrAvg >= 1.5 ? 'Strong — well above 1.0x minimum' : s.dscrAvg >= 1.0 ? 'Adequate — meets minimum threshold' : 'Below threshold — debt serviceability concern', s.dscrAvg >= 1.5 ? GREEN : s.dscrAvg >= 1.0 ? AMBER : RED),
-          scoreRow('Revenue Trend', s.revTrend, s.revTrend === 'Growing' ? 'Revenue increasing over the period' : s.revTrend === 'Stable' ? 'Revenue consistent, limited growth' : 'Revenue declining — requires attention', s.revTrend === 'Growing' ? GREEN : s.revTrend === 'Stable' ? AMBER : RED),
-          scoreRow('Cash Position', cashWarnings === 0 ? 'Positive' : `${cashWarnings} month(s) at risk`, cashWarnings === 0 ? 'No cash shortfall projected' : `Cash goes negative in ${cashWarnings} month(s)`, cashWarnings === 0 ? GREEN : RED),
-        ],
-      }),
-      new Paragraph({ spacing: { after: 200 } }),
-
-      // AI narrative sections
-      h1('Analyst Assessment'),
-    ]
-
-    // Add the AI narrative — split into paragraphs
-    const narrativeParagraphs = narrative.split('\n').filter(line => line.trim())
-    for (const para of narrativeParagraphs) {
-      const clean = para.trim()
-      // Detect section headings (numbered or ALL CAPS)
-      if (/^\d+\.\s+[A-Z]/.test(clean) || /^[A-Z][A-Z\s&]{10,}$/.test(clean)) {
-        docChildren.push(h2(clean.replace(/^\d+\.\s+/, '')))
-      } else if (clean) {
-        docChildren.push(p(clean))
-      }
+    if (hasApiKey) {
+      const context = `
+Business: ${config.business_name}, ${client?.sector || 'agribusiness'} sector, ${client?.country || 'Uganda'}
+Revenue: ${fmt(m.total_revenue, cc)} | Gross Margin: ${pct(m.gross_margin)} | EBITDA: ${fmt(m.total_ebitda, cc)} (${pct(m.net_margin)})
+Break-even: ${fmt(m.business_breakeven, cc)} | Headroom: ${fmt(m.total_revenue - m.business_breakeven, cc)}
+Investment Readiness: ${s.irScore}/30 (${s.irTier}) | Credit Risk: ${s.score}/100 (${s.classification}) | DSCR: ${s.dscrAvg.toFixed(2)}x
+Units: ${unitLines.join('; ')}
+${hasMarketing ? `Top marketing channel by CAC: ${channels[0]?.channel} at ${channels[0]?.cac ? fmt(channels[0].cac, cc) : 'unquantified'} per customer` : ''}
+${hasTCData ? `DSO: ${tc.dso.toFixed(0)} days | DPO: ${tc.dpo.toFixed(0)} days | Cash conversion gap: ${tc.cashConversionGap.toFixed(0)} days` : ''}
+Coach assessment: Commercial model ${assess.commercialModel}/5 | Management ${assess.managementCapability}/4 | Market evidence ${assess.marketEvidence}/5 | Governance ${assess.governance}/5
+${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text.slice(0, 500)}` : ''}
+`
+      const [vp, bm, sg, rm, rec] = await Promise.all([
+        callClaude(`Write 2 punchy sentences on the value proposition of ${config.business_name} for an investment brief. Who does it serve, what problem does it solve, and what makes it distinctive? No jargon. Data:\n${context}`),
+        callClaude(`Write 2-3 sentences on how ${config.business_name} makes money — its revenue model, key customers, and channels. Mention the gross margin and what it says about the model. Data:\n${context}`),
+        callClaude(`Write 2 sentences on the scale potential of ${config.business_name}. What is the current reach and what enables it to grow without rebuilding from scratch? Data:\n${context}`),
+        callClaude(`Name 2 specific risks for ${config.business_name} and one mitigation for each. Be honest and concrete. Format as: Risk 1: [name] — [one sentence description]. Mitigation: [one sentence]. Risk 2: same. Data:\n${context}`),
+        callClaude(`Write 3 sentences giving an investment recommendation for ${config.business_name}. State clearly: is it investment-ready now, near-ready with conditions, or at an earlier stage? What is the single most important thing that would improve the case? Data:\n${context}`),
+      ])
+      valueProposition = vp
+      businessModel = bm
+      scaleGrowth = sg
+      riskMitigation = rm
+      recommendation = rec
     }
 
-    // Footer
-    docChildren.push(
-      new Paragraph({ spacing: { before: 400 } }),
-      new Paragraph({
-        children: [new TextRun({ text: `This memo was prepared by Canvas Coach using Clearview financial planning software. All financial projections are based on plans submitted by the business and have not been independently audited. · habibonifade.com · Confidential`, size: 16, color: SLATE, italics: true })],
-        border: { top: { style: BorderStyle.SINGLE, size: 4, color: BORDER, space: 8 } },
-        alignment: AlignmentType.CENTER,
-      })
-    )
+    // ── Build document ──
+    const children: any[] = []
+
+    // ── COVER BAND ──
+    children.push(new Table({
+      width: { size: 9360, type: WidthType.DXA },
+      columnWidths: [9360],
+      borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideH: { style: BorderStyle.NONE }, insideV: { style: BorderStyle.NONE } },
+      rows: [new TableRow({ children: [new TableCell({
+        shading: { fill: NAVY, type: ShadingType.SOLID },
+        margins: { top: 200, bottom: 200, left: 280, right: 280 },
+        children: [
+          new Paragraph({ children: [new TextRun({ text: config.business_name, bold: true, color: WHITE, size: 48, font: 'Georgia' })] }),
+          new Paragraph({ children: [new TextRun({ text: `${client?.sector || 'Agribusiness'} · ${client?.country || 'Uganda'}`, color: CYAN, size: 22, font: 'Arial' })] }),
+          new Paragraph({ children: [new TextRun({ text: `Investment Readiness Brief · ${new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}`, color: 'AAAAAA', size: 18, font: 'Arial', italics: true })] }),
+        ],
+      })] })],
+    }))
+    children.push(spacer(0, 200))
+
+    // ── INVESTMENT READINESS SCORECARD ──
+    children.push(sectionHeader('Investment Readiness Scorecard'))
+    children.push(spacer(0, 80))
+    const w4 = Math.floor(9360 / 4)
+    children.push(new Table({
+      width: { size: 9360, type: WidthType.DXA },
+      columnWidths: [w4, w4, w4, w4],
+      borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideH: { style: BorderStyle.NONE }, insideV: { style: BorderStyle.NONE } },
+      rows: [new TableRow({ children: [
+        scoreBadge('Investment Readiness', `${s.irScore}/30`, s.irTier, s.irScore >= 24 ? GREEN : s.irScore >= 17 ? CYAN : AMBER, w4),
+        scoreBadge('Credit Risk Score', `${s.score}/100`, s.classification, s.classification === 'Stable' ? GREEN : s.classification === 'At Risk' ? AMBER : RED, w4),
+        scoreBadge('Going Concern', `${s.gcScore}/20`, s.gcRating, s.gcRating === 'Strong' ? GREEN : s.gcRating === 'Adequate' ? CYAN : AMBER, w4),
+        scoreBadge('Debt Service (DSCR)', `${s.dscrAvg.toFixed(2)}x`, s.dscrAvg >= 1.5 ? 'Strong' : s.dscrAvg >= 1.0 ? 'Adequate' : 'Below threshold', s.dscrAvg >= 1.5 ? GREEN : s.dscrAvg >= 1.0 ? AMBER : RED, w4),
+      ]})],
+    }))
+    children.push(spacer(0, 200))
+
+    // ── FINANCIAL SNAPSHOT ──
+    children.push(sectionHeader('Financial Snapshot'))
+    children.push(spacer(0, 80))
+    children.push(metricRow([
+      { label: 'Revenue', value: fmt(m.total_revenue, cc), sub: 'planned period', color: NAVY },
+      { label: 'Gross Margin', value: pct(m.gross_margin), sub: 'after direct costs', color: m.gross_margin > 0.3 ? GREEN : AMBER },
+      { label: 'EBITDA', value: fmt(m.total_ebitda, cc), sub: pct(m.net_margin) + ' margin', color: m.total_ebitda >= 0 ? GREEN : RED },
+      { label: 'Break-Even', value: fmt(m.business_breakeven, cc), sub: m.total_revenue >= m.business_breakeven ? `${fmt(m.total_revenue - m.business_breakeven, cc)} headroom` : 'not yet reached', color: m.total_revenue >= m.business_breakeven ? GREEN : RED },
+    ]))
+    children.push(spacer(0, 80))
+    children.push(metricRow([
+      { label: 'Cash Position', value: cashWarnings === 0 ? 'Positive' : `${cashWarnings} months at risk`, sub: cashWarnings === 0 ? 'no shortfall projected' : `lowest: ${fmt(m.min_cash, cc)}`, color: cashWarnings === 0 ? GREEN : RED },
+      { label: 'Revenue Trend', value: s.revTrend, sub: 'across planning period', color: s.revTrend === 'Growing' ? GREEN : s.revTrend === 'Stable' ? AMBER : RED },
+      { label: 'Staff Cost', value: pct(m.staff_cost_pct), sub: `${m.total_headcount} staff · ${fmt(m.revenue_per_head, cc)}/head`, color: m.staff_cost_pct < 0.35 ? GREEN : AMBER },
+      { label: 'Business Units', value: String(config.business_units.filter((u: any) => u.active).length), sub: config.business_units.filter((u: any) => u.active).map((u: any) => u.short || u.name.slice(0,8)).join(' · '), color: NAVY },
+    ]))
+    children.push(spacer(0, 200))
+
+    // ── VALUE PROPOSITION & BUSINESS MODEL ──
+    if (valueProposition || businessModel) {
+      children.push(sectionHeader('Value Proposition & Business Model'))
+      children.push(spacer(0, 80))
+      children.push(infoBox(
+        ['VALUE PROPOSITION', '', ...(valueProposition ? valueProposition.split('\n').filter(Boolean) : ['—'])],
+        ['HOW IT MAKES MONEY', '', ...(businessModel ? businessModel.split('\n').filter(Boolean) : ['—'])],
+      ))
+      children.push(spacer(0, 200))
+    }
+
+    // ── UNIT PERFORMANCE ──
+    if (unitLines.length > 0) {
+      children.push(sectionHeader('Business Unit Performance'))
+      children.push(spacer(0, 80))
+      const unitMetrics = result.allocUnits
+        .filter((u: any) => { const pl = result.unitPL[u.id]; return pl && pl.ann_rev > 0 })
+        .slice(0, 4)
+        .map((u: any) => {
+          const pl = result.unitPL[u.id]
+          return { label: u.name, value: fmt(pl.ann_rev, cc), sub: `GP: ${pct(pl.gp_margin)}`, color: pl.gp_margin > 0.3 ? GREEN : AMBER }
+        })
+      if (unitMetrics.length > 0) children.push(metricRow(unitMetrics))
+      children.push(spacer(0, 200))
+    }
+
+    // ── MARKETING & CUSTOMER ACQUISITION ──
+    if (hasMarketing) {
+      children.push(sectionHeader('Marketing Channels & Customer Acquisition'))
+      children.push(spacer(0, 80))
+      const cacMetrics = channels.slice(0, 4).map(ch => ({
+        label: ch.channel,
+        value: ch.cac ? fmt(ch.cac, cc) : 'No count',
+        sub: `${ch.customers} customers · ${fmt(ch.cost, cc)} spend`,
+        color: ch.cac && ch.cac < m.total_revenue / Math.max(1, m.total_headcount) ? GREEN : AMBER,
+      }))
+      if (cacMetrics.length > 0) children.push(metricRow(cacMetrics))
+      children.push(spacer(0, 200))
+    }
+
+    // ── TRADE CREDIT ──
+    if (hasTCData) {
+      children.push(sectionHeader('Working Capital & Trade Credit'))
+      children.push(spacer(0, 80))
+      children.push(metricRow([
+        { label: 'Days to Collect (DSO)', value: `${tc.dso.toFixed(0)}d`, sub: 'average receivable days', color: tc.dso < 30 ? GREEN : tc.dso < 60 ? AMBER : RED },
+        { label: 'Days to Pay (DPO)', value: `${tc.dpo.toFixed(0)}d`, sub: 'average payable days', color: NAVY },
+        { label: 'Cash Conversion Gap', value: `${Math.abs(tc.cashConversionGap).toFixed(0)}d`, sub: tc.cashConversionGap <= 0 ? 'supplier-financed (healthy)' : 'cash tied up', color: tc.cashConversionGap <= 0 ? GREEN : tc.cashConversionGap > 30 ? RED : AMBER },
+        { label: 'Peak Receivable', value: fmt(tc.peakReceivable, cc), sub: 'highest outstanding', color: NAVY },
+      ]))
+      children.push(spacer(0, 200))
+    }
+
+    // ── SCALE & GROWTH ──
+    if (scaleGrowth) {
+      children.push(sectionHeader('Scale Potential & Growth Levers'))
+      children.push(spacer(0, 80))
+      scaleGrowth.split('\n').filter(Boolean).forEach(t => children.push(shortPara(t)))
+      children.push(spacer(0, 200))
+    }
+
+    // ── GOVERNANCE & FOUNDATIONS ──
+    const govScore = (Number(assess.commercialModel || 0) + Number(assess.managementCapability || 0) + Number(assess.marketEvidence || 0) + Number(assess.governance || 0))
+    const govMax = 19
+    children.push(sectionHeader('Governance & Business Foundations'))
+    children.push(spacer(0, 80))
+    children.push(metricRow([
+      { label: 'Commercial Model', value: `${assess.commercialModel || '—'}/5`, sub: 'clarity & viability', color: Number(assess.commercialModel) >= 4 ? GREEN : AMBER },
+      { label: 'Management', value: `${assess.managementCapability || '—'}/4`, sub: 'capability assessed', color: Number(assess.managementCapability) >= 3 ? GREEN : AMBER },
+      { label: 'Market Evidence', value: `${assess.marketEvidence || '—'}/5`, sub: 'demand & traction', color: Number(assess.marketEvidence) >= 4 ? GREEN : AMBER },
+      { label: 'Governance & Records', value: `${assess.governance || '—'}/5`, sub: 'systems & compliance', color: Number(assess.governance) >= 4 ? GREEN : AMBER },
+    ]))
+    children.push(spacer(0, 200))
+
+    // ── RISK ──
+    if (riskMitigation) {
+      children.push(sectionHeader('Key Risks & Mitigations'))
+      children.push(spacer(0, 80))
+      riskMitigation.split('\n').filter(Boolean).forEach(t => children.push(shortPara(t)))
+      children.push(spacer(0, 200))
+    }
+
+    // ── RECOMMENDATION ──
+    children.push(sectionHeader('Investment Recommendation'))
+    children.push(spacer(0, 80))
+    if (recommendation) {
+      recommendation.split('\n').filter(Boolean).forEach(t => children.push(shortPara(t)))
+    } else {
+      children.push(shortPara(`Investment Readiness: ${s.irTier} (${s.irScore}/30). Credit Risk: ${s.classification} (${s.score}/100). ${s.irScore >= 17 ? 'The business demonstrates sufficient financial foundations for investment consideration.' : 'Further development is required before investment readiness can be confirmed.'}`))
+    }
+    if (!hasApiKey) {
+      children.push(spacer(0, 80))
+      children.push(note('Note: AI narrative sections require ANTHROPIC_API_KEY to be set in Vercel environment variables.'))
+    }
+    children.push(spacer(0, 200))
+
+    // ── FOOTER ──
+    children.push(new Table({
+      width: { size: 9360, type: WidthType.DXA },
+      columnWidths: [9360],
+      borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideH: { style: BorderStyle.NONE }, insideV: { style: BorderStyle.NONE } },
+      rows: [new TableRow({ children: [new TableCell({
+        shading: { fill: NAVY, type: ShadingType.SOLID },
+        margins: { top: 100, bottom: 100, left: 200, right: 200 },
+        children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [
+          new TextRun({ text: 'Powered by ', color: 'AAAAAA', size: 16, font: 'Arial' }),
+          new TextRun({ text: 'Canvas Coach Clearview', color: CYAN, size: 16, font: 'Arial', bold: true }),
+          new TextRun({ text: '  ·  habibonifade.com  ·  Confidential — not for circulation without permission', color: 'AAAAAA', size: 16, font: 'Arial' }),
+        ] })],
+      })] })],
+    }))
 
     const doc = new Document({
-      styles: { default: { document: { run: { font: 'Arial', size: 22, color: NAVY } } } },
+      styles: { default: { document: { run: { font: 'Arial', size: 20, color: NAVY } } } },
       sections: [{
-        properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1080, right: 1080, bottom: 1080, left: 1080 } } },
-        children: docChildren,
+        properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 720, right: 720, bottom: 720, left: 720 } } },
+        children,
       }],
     })
 
     const buffer = await Packer.toBuffer(doc)
-    const fileName = `${config.business_name.replace(/[^a-z0-9]+/gi, '_')}_Investment_Memo.docx`
+    const fileName = `${config.business_name.replace(/[^a-z0-9]+/gi, '_')}_Investment_Brief.docx`
 
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
