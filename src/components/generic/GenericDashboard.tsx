@@ -424,7 +424,7 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
             background:selUnit===u.id?(u.color||C.cyan):C.white,
             color:selUnit===u.id?C.white:C.navy,cursor:'pointer'}}
             onClick={()=>setSelUnit(u.id)}>
-            {u.short||u.name.split(' ')[0]}
+            {u.name}
           </button>
         ))}
       </div>
@@ -1672,7 +1672,7 @@ function PLTab({config,result,months,cc,P}) {
                   background:selUnit===u.id?(u.color||C.cyan):C.white,
                   color:selUnit===u.id?C.white:C.navy,cursor:'pointer'}}
                   onClick={()=>setSelUnit(u.id)}>
-                  {config.business_units.find(u2=>u2.id===u.id)?.short||u.name.split(' ')[0]}
+                  {u.name}
                 </button>
               ))}
             </div>
