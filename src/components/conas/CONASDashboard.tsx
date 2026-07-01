@@ -2275,6 +2275,7 @@ function ConasIntelligenceTab({result, inputs, coachAssessments, onSaveAssessmen
   const [healthReports,setHealthReports]=useState<any[]>([])
   const [investmentAssessments,setInvestmentAssessments]=useState<any[]>([])
   const [narrative,setNarrative]=useState<any>(null)
+  const [events,setEvents]=useState<any[]>([])
   const [loadingAI,setLoadingAI]=useState(true)
   const [generatingNarrative,setGeneratingNarrative]=useState(false)
   const [generatingHealth,setGeneratingHealth]=useState(false)
@@ -2284,10 +2285,12 @@ function ConasIntelligenceTab({result, inputs, coachAssessments, onSaveAssessmen
       supabase.from('ai_health_checks').select('*').eq('client_id',clientId).order('period',{ascending:false}).limit(1),
       supabase.from('investment_readiness').select('*').eq('client_id',clientId).order('generated_at',{ascending:false}).limit(1),
       supabase.from('coach_briefings').select('*').eq('client_id',clientId).order('generated_at',{ascending:false}).limit(1),
-    ]).then(([h,i,n])=>{
+      supabase.from('management_events').select('*').eq('client_id',clientId).order('date',{ascending:false}),
+    ]).then(([h,i,n,e])=>{
       setHealthReports(h.data||[])
       setInvestmentAssessments(i.data||[])
       setNarrative(n.data?.[0]||null)
+      setEvents(e.data||[])
       setLoadingAI(false)
     })
   },[clientId])
@@ -2419,7 +2422,7 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
   const tabList:[string,string][] = [
     ['summary','Summary'],['narrative',"This Month's Story"],['credit','Credit Risk'],
     ['going_concern','Going Concern'],['investment','Investment Readiness'],
-    ['coach','Coach Assessment'],['close','Engagement Close'],
+    ['coach','Coach Assessment'],['events','Marketing Events'],['close','Engagement Close'],
   ]
 
   return (
@@ -2577,8 +2580,12 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
         <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem',flexWrap:'wrap',gap:'0.75rem'}}>
             <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>Investment Readiness Score</div>
-            <div style={{display:'flex',alignItems:'center',gap:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:irColor,lineHeight:1}}>{irScore}</div><div><div style={{fontSize:'0.75rem',color:C.slate}}>out of 30</div><Badge label={irTier} color={irColor}/></div></div>
+            <div style={{display:'flex',alignItems:'center',gap:'1rem'}}>
+              <div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:irColor,lineHeight:1}}>{irScore}</div>
+              <div><div style={{fontSize:'0.75rem',color:C.slate}}>out of 30</div><Badge label={irTier} color={irColor}/></div>
+            </div>
           </div>
+          <ConasPitchDownload/>
           {[
             {name:'Financial Viability',sc:irFinancial,max:5,ev:'EBITDA margin '+(ebitdaMargin*100).toFixed(1)+'%',field:null},
             {name:'Debt Serviceability',sc:irDebt,max:5,ev:'DSCR '+dscrAvg.toFixed(2)+'x',field:null},
@@ -2629,8 +2636,183 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
         </div>
       )}
 
+      {activeSection==='events'&&(
+        <ConasPromotionEventsSection clientId={clientId} units={inputs.units} cc={cc} P={P} events={events} setEvents={setEvents}/>
+      )}
+
       {activeSection==='close'&&(
         <ConasEngagementClose score={score} classification={classification} classColor={classColor} gcScore={gcScore} gcRating={gcRating} gcColor={gcColor} irScore={irScore} irTier={irTier} irColor={irColor} dscrAvg={dscrAvg} cashGaps={cashGaps} assess={assess} cc={cc}/>
+      )}
+    </div>
+  )
+}
+
+// ── CONAS PROMOTION EVENTS & CUSTOMER ACQUISITION COST ────────
+function ConasPromotionEventsSection({clientId,units,cc,P,events,setEvents}:{clientId:string;units:any[];cc:string;P:any;events:any[];setEvents:(e:any[])=>void}) {
+  const [showForm, setShowForm] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({
+    name:'', channel:'', event_type:'promotion', date:new Date().toISOString().split('T')[0],
+    cost:0, description:'', revenue_before:0, revenue_after:0, customers_acquired:0,
+    period_weeks:4, unit_id:'',
+  })
+
+  async function saveEvent() {
+    if (!form.name) return
+    setSaving(true)
+    const {data,error} = await supabase.from('management_events').insert([{
+      ...form, client_id:clientId, created_at:new Date().toISOString(), updated_at:new Date().toISOString(),
+    }]).select().single()
+    if (!error&&data) {
+      setEvents([data,...events])
+      setShowForm(false)
+      setForm({name:'',channel:'',event_type:'promotion',date:new Date().toISOString().split('T')[0],cost:0,description:'',revenue_before:0,revenue_after:0,customers_acquired:0,period_weeks:4,unit_id:''})
+    }
+    setSaving(false)
+  }
+
+  const channelStats: Record<string,{cost:number,customers:number,events:number,revenueLift:number}> = {}
+  events.forEach((evt:any) => {
+    const ch = evt.channel || 'Unspecified'
+    if (!channelStats[ch]) channelStats[ch] = {cost:0,customers:0,events:0,revenueLift:0}
+    channelStats[ch].cost += evt.cost||0
+    channelStats[ch].customers += evt.customers_acquired||0
+    channelStats[ch].events += 1
+    channelStats[ch].revenueLift += Math.max(0,(evt.revenue_after||0)-(evt.revenue_before||0))
+  })
+  const channelRows = Object.entries(channelStats).map(([channel,s])=>({
+    channel, ...s, cac: s.customers>0 ? s.cost/s.customers : null,
+  })).sort((a,b)=>{
+    if (a.cac===null) return 1
+    if (b.cac===null) return -1
+    return a.cac-b.cac
+  })
+
+  return (
+    <div>
+      <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>Customer Acquisition Cost by Channel</div>
+          {P.canEditPlan&&<button style={addBtn(true)} onClick={()=>setShowForm(!showForm)}>+ Add Event</button>}
+        </div>
+        {channelRows.length===0 ? (
+          <p style={{color:C.slate,fontSize:'0.85rem'}}>No promotion events recorded yet. Add one below to start tracking cost per customer acquired, by channel.</p>
+        ) : (
+          <div style={{overflowX:'auto'}}>
+            <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.8rem'}}>
+              <thead>
+                <tr style={{background:C.navy,color:C.white}}>
+                  {['Channel','Events','Total Cost','Customers Acquired','Cost per Customer (CAC)','Revenue Lift'].map(h=>(
+                    <th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.75rem'}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {channelRows.map((r,i)=>(
+                  <tr key={r.channel} style={{background:i%2===0?C.cream:C.white}}>
+                    <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{r.channel}</td>
+                    <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{r.events}</td>
+                    <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{fmt(r.cost,cc)}</td>
+                    <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{r.customers}</td>
+                    <td style={{padding:'8px 10px',fontFamily:'monospace',fontWeight:700,color:r.cac===null?C.slate:C.navy}}>
+                      {r.cac===null?'No customers recorded':fmt(r.cac,cc)}
+                    </td>
+                    <td style={{padding:'8px 10px',fontFamily:'monospace',color:C.green}}>{fmt(r.revenueLift,cc)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.6rem'}}>Lower cost per customer means a more efficient channel. Channels with no customers recorded cannot be ranked.</p>
+          </div>
+        )}
+      </div>
+
+      {showForm&&(
+        <div style={{background:C.white,border:`1px solid ${C.cyan}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:'1rem'}}>
+            <div><label style={lbl}>Event Name</label><input style={inp} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></div>
+            <div><label style={lbl}>Channel</label><input style={inp} placeholder="e.g. Farmer Field Days, Radio" value={form.channel} onChange={e=>setForm(f=>({...f,channel:e.target.value}))}/></div>
+            <div><label style={lbl}>FGE / Unit</label><select style={inp} value={form.unit_id} onChange={e=>setForm(f=>({...f,unit_id:e.target.value}))}>
+              <option value="">All FGEs</option>
+              {units.filter((u:any)=>u.active).map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}
+            </select></div>
+            <div><label style={lbl}>Date</label><input type="date" style={inp} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></div>
+            <div><label style={lbl}>Cost ({cc})</label><input type="number" style={inp} value={form.cost||''} onChange={e=>setForm(f=>({...f,cost:Number(e.target.value)}))}/></div>
+            <div><label style={lbl}>Customers Acquired</label><input type="number" style={inp} value={form.customers_acquired||''} onChange={e=>setForm(f=>({...f,customers_acquired:Number(e.target.value)}))}/></div>
+            <div><label style={lbl}>Revenue Before ({cc})</label><input type="number" style={inp} value={form.revenue_before||''} onChange={e=>setForm(f=>({...f,revenue_before:Number(e.target.value)}))}/></div>
+            <div><label style={lbl}>Revenue After ({cc})</label><input type="number" style={inp} value={form.revenue_after||''} onChange={e=>setForm(f=>({...f,revenue_after:Number(e.target.value)}))}/></div>
+            <div style={{gridColumn:'1/-1'}}><label style={lbl}>Description</label><textarea style={{...inp,minHeight:60,resize:'vertical'}} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></div>
+          </div>
+          <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
+            <button style={{fontFamily:'monospace',fontSize:'0.78rem',fontWeight:600,padding:'0.5rem 1.1rem',border:'none',borderRadius:4,background:C.navy,color:C.white,cursor:'pointer'}} disabled={saving} onClick={saveEvent}>{saving?'Saving...':'Save Event'}</button>
+            <button style={addBtn(true)} onClick={()=>setShowForm(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {events.length>0 && (
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.25rem'}}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}}>All Events</div>
+          {events.map((evt:any)=>{
+            const roi = evt.cost>0 ? (evt.revenue_after-evt.revenue_before-evt.cost)/evt.cost : null
+            const cac = evt.customers_acquired>0 ? evt.cost/evt.customers_acquired : null
+            return (
+              <div key={evt.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.75rem',background:'#F4F8FC',borderRadius:5,marginBottom:'0.4rem',flexWrap:'wrap',gap:'0.5rem'}}>
+                <div>
+                  <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{evt.name}</div>
+                  <div style={{fontSize:'0.7rem',color:C.slate}}>{evt.date} · {evt.channel||'No channel set'}</div>
+                </div>
+                <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap'}}>
+                  {cac!==null&&<Badge label={`CAC ${fmt(cac,cc)}`} color={C.teal}/>}
+                  {roi!==null&&<Badge label={`ROI ${(roi*100).toFixed(0)}%`} color={roi>0?C.green:C.red}/>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── CONAS INVESTMENT PITCH DOWNLOAD ─────────────────────────
+function ConasPitchDownload() {
+  const [downloading, setDownloading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function download() {
+    setDownloading(true)
+    setError('')
+    try {
+      const response = await fetch('/api/investment-pitch-conas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      if (!response.ok) {
+        const errData = await response.json().catch(()=>({}))
+        throw new Error(errData.error || 'Could not generate the document')
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = 'CONAS_Investment_Summary.docx'
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch(e:any) { setError(e.message || 'Download failed') }
+    setDownloading(false)
+  }
+
+  return (
+    <div style={{background:'#EBF8FF',borderRadius:6,padding:'0.85rem 1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.75rem'}}>
+      <div>
+        <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>Investment Pitch Summary</div>
+        <div style={{fontSize:'0.78rem',color:C.slate}}>A Word document with CONAS's financial summary and investment readiness scores, ready to send to a lender or investor.</div>
+      </div>
+      <button style={{fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,padding:'0.5rem 1.1rem',border:'none',borderRadius:4,background:C.navy,color:C.white,cursor:'pointer'}} disabled={downloading} onClick={download}>
+        {downloading?'Generating...':'Download Word Document'}
+      </button>
+      {error&&(
+        <div style={{width:'100%',background:'#FDF0EE',border:`2px solid ${C.red}`,borderRadius:6,padding:'0.85rem 1rem',marginTop:'0.5rem'}}>
+          <div style={{fontWeight:700,color:C.red,fontSize:'0.85rem',marginBottom:'0.3rem'}}>⚠ Could not generate the document</div>
+          <div style={{color:C.red,fontSize:'0.8rem'}}>{error}</div>
+        </div>
       )}
     </div>
   )
