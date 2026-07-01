@@ -261,7 +261,8 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
       borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideH: { style: BorderStyle.NONE }, insideV: { style: BorderStyle.NONE } },
       rows: [new TableRow({ children: [new TableCell({
         shading: { fill: NAVY, type: ShadingType.SOLID },
-        margins: { top: 200, bottom: 200, left: 280, right: 280 },
+        width: { size: 9360, type: WidthType.DXA },
+        margins: { top: 280, bottom: 280, left: 280, right: 280 },
         children: [
           new Paragraph({ children: [new TextRun({ text: config.business_name, bold: true, color: WHITE, size: 48, font: 'Georgia' })] }),
           new Paragraph({ children: [new TextRun({ text: `${client?.sector || 'Agribusiness'} · ${client?.country || 'Uganda'}`, color: CYAN, size: 22, font: 'Arial' })] }),
