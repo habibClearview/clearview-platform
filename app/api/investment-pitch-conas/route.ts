@@ -156,7 +156,7 @@ Capital: Shareholder ${fmt(inputs.capitalStructure?.shareholderContribution||0,c
     // Cover
     children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[9360],
       borders:{top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE},insideH:{style:BorderStyle.NONE},insideV:{style:BorderStyle.NONE}},
-      rows:[new TableRow({children:[new TableCell({shading:{fill:NAVY,type:ShadingType.SOLID},margins:{top:200,bottom:200,left:280,right:280},children:[
+      rows:[new TableRow({children:[new TableCell({shading:{fill:NAVY,type:ShadingType.SOLID},width:{size:9360,type:WidthType.DXA},margins:{top:280,bottom:280,left:280,right:280},children:[
         new Paragraph({children:[new TextRun({text:'CONAS Agricultural Hub',bold:true,color:WHITE,size:48,font:'Georgia'})]}),
         new Paragraph({children:[new TextRun({text:'Crop Aggregation · Five Input Profit Centres · Northern Uganda',color:CYAN,size:22,font:'Arial'})]}),
         new Paragraph({children:[new TextRun({text:`Investment Readiness Brief · ${new Date().toLocaleDateString('en-GB',{month:'long',year:'numeric'})}`,color:'AAAAAA',size:18,font:'Arial',italics:true})]}),
