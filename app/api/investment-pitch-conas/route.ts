@@ -1,150 +1,205 @@
 // ============================================================
 // API ROUTE: /api/investment-pitch-conas
-// Generates a downloadable Word investment summary for CONAS.
-// Reads from the model_config table using the admin client.
+// AI-written investment readiness memo for CONAS Agricultural Hub
 // ============================================================
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-  HeadingLevel, BorderStyle, WidthType,
+  HeadingLevel, BorderStyle, WidthType, AlignmentType,
 } from 'docx'
 import { runCONASModel, defaultCONASInputs } from '@/lib/conas-engine'
 import { computeScores, defaultCoachAssessment } from '@/lib/scoring-engine'
 
+const CONAS_CLIENT_ID = '1556298e-5fa0-4d6a-ae86-da8c708ec6ee'
+
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
-  if (!url || !key) throw new Error('Supabase admin credentials not configured.\n\nTo fix this: go to Vercel → clearview-platform → Settings → Environment Variables and add SUPABASE_SERVICE_ROLE_KEY with the value from your Supabase project Settings → API → service_role key. Then redeploy.')
+  if (!url || !key) throw new Error('Supabase admin credentials not configured. Go to Vercel → Settings → Environment Variables and add SUPABASE_SERVICE_ROLE_KEY.')
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
 const NAVY = '1B2A4A', CYAN = '00B4D8', SLATE = '4A5A6A'
 const GREEN = '1A7A4A', AMBER = 'B8860B', RED = 'C0392B', BORDER = 'D8E0E8'
 
-function fmtMoney(n: number, cc: string) {
-  const v = Math.round(n || 0)
-  return `${cc} ${Math.abs(v).toLocaleString('en-US')}${v < 0 ? ' (deficit)' : ''}`
-}
+function fmt(n: number, cc: string) { return `${cc} ${Math.abs(Math.round(n||0)).toLocaleString('en-US')}${n<0?' (deficit)':''}` }
+function pct(n: number) { return `${(n*100).toFixed(1)}%` }
 
-function heading(text: string) {
+function h1(text: string) {
   return new Paragraph({
     heading: HeadingLevel.HEADING_1,
-    children: [new TextRun({ text, color: NAVY })],
-    spacing: { before: 360, after: 180 },
+    children: [new TextRun({ text, bold: true, color: NAVY, font: 'Georgia', size: 28 })],
+    spacing: { before: 400, after: 160 },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: CYAN, space: 6 } },
   })
 }
-
-function body(text: string) {
+function h2(text: string) {
   return new Paragraph({
-    children: [new TextRun({ text, size: 22, font: 'Arial' })],
-    spacing: { after: 160 },
+    children: [new TextRun({ text, bold: true, color: CYAN, font: 'Arial', size: 22 })],
+    spacing: { before: 280, after: 100 },
   })
 }
-
-function row(label: string, value: string, color = NAVY) {
+function p(text: string) {
+  return new Paragraph({
+    children: [new TextRun({ text, size: 22, font: 'Arial', color: NAVY })],
+    spacing: { after: 160 },
+    alignment: AlignmentType.JUSTIFIED,
+  })
+}
+function scoreRow(label: string, score: string, rating: string, color: string) {
   const border = { style: BorderStyle.SINGLE, size: 1, color: BORDER }
   const borders = { top: border, bottom: border, left: border, right: border }
-  const margin = { top: 80, bottom: 80, left: 120, right: 120 }
+  const m = { top: 80, bottom: 80, left: 120, right: 120 }
   return new TableRow({ children: [
-    new TableCell({ borders, width: { size: 4680, type: WidthType.DXA }, margins: margin,
+    new TableCell({ borders, width: { size: 3000, type: WidthType.DXA }, margins: m,
       children: [new Paragraph({ children: [new TextRun({ text: label, size: 20, font: 'Arial', color: SLATE })] })] }),
-    new TableCell({ borders, width: { size: 4680, type: WidthType.DXA }, margins: margin,
-      children: [new Paragraph({ children: [new TextRun({ text: value, size: 22, font: 'Arial', bold: true, color })] })] }),
+    new TableCell({ borders, width: { size: 1500, type: WidthType.DXA }, margins: m,
+      children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: score, size: 22, bold: true, color })] })] }),
+    new TableCell({ borders, width: { size: 4860, type: WidthType.DXA }, margins: m,
+      children: [new Paragraph({ children: [new TextRun({ text: rating, size: 20, font: 'Arial', color })] })] }),
   ]})
 }
-
-const CONAS_CLIENT_ID = '1556298e-5fa0-4d6a-ae86-da8c708ec6ee'
 
 export async function POST(req: NextRequest) {
   try {
     const admin = getAdminClient()
 
-    const { data: client } = await admin
-      .from('engagement_clients').select('*').eq('id', CONAS_CLIENT_ID).single()
+    const [{ data: client }, { data: configRow }, { data: coachBriefing }, { data: investmentNarrative }] = await Promise.all([
+      admin.from('engagement_clients').select('*').eq('id', CONAS_CLIENT_ID).single(),
+      admin.from('model_config').select('*').eq('client_id', CONAS_CLIENT_ID).single(),
+      admin.from('coach_briefings').select('*').eq('client_id', CONAS_CLIENT_ID).order('generated_at', { ascending: false }).limit(1).maybeSingle(),
+      admin.from('investment_readiness').select('*').eq('client_id', CONAS_CLIENT_ID).order('generated_at', { ascending: false }).limit(1).maybeSingle(),
+    ])
 
-    const { data: configRow } = await admin
-      .from('model_config').select('*').eq('client_id', CONAS_CLIENT_ID).single()
-
-    const inputs = configRow?.config
-      ? { ...defaultCONASInputs(), ...configRow.config }
-      : defaultCONASInputs()
-
+    const inputs = configRow?.config ? { ...defaultCONASInputs(), ...configRow.config } : defaultCONASInputs()
     const result = runCONASModel(inputs)
-    const m = result.metrics
     const cc = inputs.global?.currency || 'UGX'
+    const m = result.metrics
 
-    const conasDebtObligations = (inputs.debts && inputs.debts.length > 0)
-      ? inputs.debts
+    const debtObligations = (inputs.debts && inputs.debts.length > 0) ? inputs.debts
       : (inputs.capitalStructure?.bankLoan > 0 ? [{
-          drawdownMonth: 1, annualRate: inputs.capitalStructure.annualInterestRate || 0.18,
-          tenorMonths: (inputs.capitalStructure.loanTenorYears || 2) * 12,
+          drawdownMonth: 1, annualRate: inputs.capitalStructure.annualInterestRate ?? 0.18,
+          tenorMonths: (inputs.capitalStructure.loanTenorYears ?? 2) * 12,
           gracePeriodMonths: 0, principal: inputs.capitalStructure.bankLoan, repaymentType: 'amortising',
         }] : [])
 
     const scores = computeScores({
       rev: result.con.rev, ebitda: result.con.ebitda, cogs: result.con.cogs,
       cashClose: result.cf.close,
-      totalEquity: result.bs.totalEquity?.[result.bs.totalEquity.length - 1] || 0,
-      totalLiabilities: result.bs.totalLiabilities?.[result.bs.totalLiabilities.length - 1] || 0,
-      months: 12, debtObligations: conasDebtObligations, assess: defaultCoachAssessment(),
+      totalEquity: result.bs.totalEquity?.[11] || 0,
+      totalLiabilities: result.bs.totalLiabilities?.[11] || 0,
+      months: 12, debtObligations, assess: defaultCoachAssessment(),
     })
 
-    const { data: latestNarrative } = await admin
-      .from('coach_briefings').select('*').eq('client_id', CONAS_CLIENT_ID)
-      .order('generated_at', { ascending: false }).limit(1).maybeSingle()
+    const cashWarnings = result.cf.close.filter((v: number) => v < 0).length
+    const ebitdaMargin = m.totalRevenue > 0 ? m.totalEBITDA / m.totalRevenue : 0
+    const unitSummaries = result.allocUnits.map((u: any) => {
+      const pl = result.unitPL[u.id]
+      return pl ? `${u.name}: revenue ${fmt(pl.annRev, cc)}, gross profit ${fmt(pl.annGP, cc)} (${pct(pl.gpMargin)} margin)` : ''
+    }).filter(Boolean).join('\n')
 
-    const { data: latestInvestment } = await admin
-      .from('investment_readiness').select('*').eq('client_id', CONAS_CLIENT_ID)
-      .order('generated_at', { ascending: false }).limit(1).maybeSingle()
+    const aiPrompt = `You are writing a professional investment readiness memo for CONAS Agricultural Hub, a crop aggregator with five Input Profit Centres operating in Northern Uganda. This memo will be presented to a potential lender or development finance institution.
 
-    const tierColor = (t: string) => t === 'Investment Ready' ? GREEN : t === 'Near Ready' ? CYAN : AMBER
+FINANCIAL DATA (planning season):
+- Total revenue: ${fmt(m.totalRevenue, cc)}
+- Total gross profit: ${fmt(m.totalGP, cc)} (${pct(m.totalRevenue > 0 ? m.totalGP/m.totalRevenue : 0)} gross margin)
+- EBITDA: ${fmt(m.totalEBITDA, cc)} (${pct(ebitdaMargin)} EBITDA margin)
+- Net profit after tax: ${fmt(m.totalNPAT, cc)}
+- Minimum cash position: ${fmt(m.minCash, cc)} in month ${m.minCashMonth}
+- Cash-negative months: ${cashWarnings} of 12
+- Number of FGEs: ${m.fgeCount}
+- Irrigation kits: deployed across Input Profit Centres
+
+By business unit:
+${unitSummaries}
+
+Capital structure:
+- Shareholder contribution: ${fmt(inputs.capitalStructure?.shareholderContribution || 0, cc)}
+- Grant (non-repayable): ${fmt(inputs.capitalStructure?.grantNonRepayable || 0, cc)}
+- Grant (recoverable): ${fmt(inputs.capitalStructure?.grantRecoverable || 0, cc)}
+- Bank loan: ${fmt(inputs.capitalStructure?.bankLoan || 0, cc)}
+
+INVESTMENT READINESS SCORES:
+- Investment Readiness: ${scores.irScore}/30 — ${scores.irTier}
+- Credit Risk: ${scores.score}/100 — ${scores.classification}
+- Going Concern: ${scores.gcScore}/20 — ${scores.gcRating}
+- DSCR average: ${scores.dscrAvg.toFixed(2)}x
+- Revenue trend: ${scores.revTrend}
+
+${coachBriefing?.briefing_text ? `RECENT BUSINESS NARRATIVE FROM COACH:\n${coachBriefing.briefing_text}` : ''}
+${investmentNarrative?.assessment_text ? `PREVIOUS INVESTMENT ASSESSMENT:\n${investmentNarrative.assessment_text}` : ''}
+
+Write a professional investment readiness memo with the following sections. Each section should be a substantive paragraph or two — no bullet points. Write as a senior analyst presenting to an investment committee. Be specific about CONAS's business model (crop aggregation, FGE network, irrigation kit deployment, input credit).
+
+1. EXECUTIVE SUMMARY — What is CONAS Agricultural Hub, what is the headline investment case, and what is the investment readiness rating?
+
+2. BUSINESS MODEL AND COMMERCIAL VIABILITY — Explain how CONAS makes money through its Input Profit Centres, FGE network, and aggregation model. Which revenue streams are strongest and why?
+
+3. FINANCIAL PERFORMANCE — Analyse revenue, margin, and profitability. Is CONAS profitable at the EBITDA level? Is it above break-even? What do the margins say about the model's efficiency?
+
+4. LIQUIDITY AND DEBT SERVICE — Address cash flow health. Can CONAS service its existing obligations? Are there cash pressure months and why? What does the DSCR indicate?
+
+5. OPERATIONAL SCALE AND IMPACT — What does the FGE count and irrigation deployment tell an investor about reach and operational maturity?
+
+6. RISK FACTORS — Name two or three specific, honest risks. These could include seasonal concentration, input credit recovery risk, or dependence on external grant financing.
+
+7. INVESTMENT RECOMMENDATION — Is CONAS investment-ready now, near-ready with specific conditions, or at an earlier stage? What specific actions or milestones would strengthen the case?
+
+Plain, direct English. No jargon. Maximum 1200 words across all sections.`
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4000, messages: [{ role: 'user', content: aiPrompt }] }),
+    })
+    const aiData = await response.json()
+    const narrative = aiData.content?.[0]?.text || 'Narrative generation failed.'
+
+    const docChildren: any[] = [
+      new Paragraph({ children: [new TextRun({ text: 'INVESTMENT READINESS MEMO', size: 18, color: CYAN, bold: true, font: 'Arial' })], spacing: { after: 60 } }),
+      new Paragraph({ children: [new TextRun({ text: 'CONAS Agricultural Hub', size: 44, bold: true, font: 'Georgia', color: NAVY })], spacing: { after: 40 } }),
+      new Paragraph({ children: [new TextRun({ text: `Crop Aggregation · Northern Uganda · Prepared by Canvas Coach`, size: 18, color: SLATE, italics: true })], spacing: { after: 20 } }),
+      new Paragraph({ children: [new TextRun({ text: new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' }), size: 18, color: SLATE })],
+        spacing: { after: 360 }, border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: CYAN, space: 8 } } }),
+
+      h1('Investment Readiness Scorecard'),
+      new Table({ width: { size: 9360, type: WidthType.DXA }, columnWidths: [3000, 1500, 4860], rows: [
+        new TableRow({ tableHeader: true, children: [
+          new TableCell({ shading: { fill: NAVY }, width: { size: 3000, type: WidthType.DXA }, margins: { top:80,bottom:80,left:120,right:120 },
+            children: [new Paragraph({ children: [new TextRun({ text: 'Indicator', color:'FFFFFF', bold:true, size:18 })] })] }),
+          new TableCell({ shading: { fill: NAVY }, width: { size: 1500, type: WidthType.DXA }, margins: { top:80,bottom:80,left:120,right:120 },
+            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Score', color:'FFFFFF', bold:true, size:18 })] })] }),
+          new TableCell({ shading: { fill: NAVY }, width: { size: 4860, type: WidthType.DXA }, margins: { top:80,bottom:80,left:120,right:120 },
+            children: [new Paragraph({ children: [new TextRun({ text: 'Rating', color:'FFFFFF', bold:true, size:18 })] })] }),
+        ]}),
+        scoreRow('Investment Readiness', `${scores.irScore}/30`, scores.irTier, scores.irScore>=24?GREEN:scores.irScore>=17?CYAN:AMBER),
+        scoreRow('Credit Risk', `${scores.score}/100`, scores.classification, scores.classification==='Stable'?GREEN:scores.classification==='At Risk'?AMBER:RED),
+        scoreRow('Going Concern', `${scores.gcScore}/20`, scores.gcRating, scores.gcRating==='Strong'?GREEN:scores.gcRating==='Adequate'?CYAN:AMBER),
+        scoreRow('Debt Service Coverage', `${scores.dscrAvg.toFixed(2)}x`, scores.dscrAvg>=1.5?'Strong':'Adequate', scores.dscrAvg>=1.5?GREEN:AMBER),
+        scoreRow('Revenue Trend', scores.revTrend, scores.revTrend==='Growing'?'Revenue increasing':'Revenue consistent or declining', scores.revTrend==='Growing'?GREEN:scores.revTrend==='Stable'?AMBER:RED),
+        scoreRow('Cash Position', cashWarnings===0?'Positive':cashWarnings+' month(s) at risk', cashWarnings===0?'No shortfall projected':`Cash negative in ${cashWarnings} month(s)`, cashWarnings===0?GREEN:RED),
+      ]}),
+      new Paragraph({ spacing: { after: 200 } }),
+
+      h1('Analyst Assessment'),
+      ...narrative.split('\n').filter((l: string) => l.trim()).map((para: string) => {
+        const clean = para.trim()
+        if (/^\d+\.\s+[A-Z]/.test(clean) || /^[A-Z][A-Z\s&]{10,}$/.test(clean)) return h2(clean.replace(/^\d+\.\s+/, ''))
+        return p(clean)
+      }),
+
+      new Paragraph({ spacing: { before: 400 } }),
+      new Paragraph({
+        children: [new TextRun({ text: 'Prepared by Canvas Coach using Clearview financial planning software. Projections are based on business-submitted plans and have not been independently audited. · habibonifade.com · Confidential', size: 16, color: SLATE, italics: true })],
+        border: { top: { style: BorderStyle.SINGLE, size: 4, color: BORDER, space: 8 } },
+        alignment: AlignmentType.CENTER,
+      }),
+    ]
 
     const doc = new Document({
       styles: { default: { document: { run: { font: 'Arial', size: 22, color: NAVY } } } },
-      sections: [{ properties: {
-        page: { size: { width: 12240, height: 15840 }, margin: { top: 1080, right: 1080, bottom: 1080, left: 1080 } },
-      }, children: [
-        new Paragraph({ children: [new TextRun({ text: 'INVESTMENT READINESS SUMMARY', size: 18, color: CYAN, bold: true })], spacing: { after: 60 } }),
-        new Paragraph({ children: [new TextRun({ text: 'CONAS Agricultural Hub', size: 40, bold: true, font: 'Georgia', color: NAVY })], spacing: { after: 40 } }),
-        new Paragraph({ children: [new TextRun({ text: `Prepared by Canvas Coach · ${new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' })}`, size: 18, color: SLATE, italics: true })],
-          spacing: { after: 320 }, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: CYAN, space: 8 } } }),
-
-        heading('Investment Readiness Score'),
-        new Paragraph({ children: [
-          new TextRun({ text: `${scores.irScore} / 30 — `, size: 32, bold: true, color: tierColor(scores.irTier) }),
-          new TextRun({ text: scores.irTier, size: 32, bold: true, color: tierColor(scores.irTier) }),
-        ], spacing: { after: 200 } }),
-        new Table({ width: { size: 9360, type: WidthType.DXA }, columnWidths: [4680, 4680], rows: [
-          row('Credit Risk', `${scores.score}/100 — ${scores.classification}`, scores.classification === 'Stable' ? GREEN : scores.classification === 'At Risk' ? AMBER : RED),
-          row('Going Concern', `${scores.gcScore}/20 — ${scores.gcRating}`, scores.gcRating === 'Strong' ? GREEN : AMBER),
-          row('Debt Service Coverage (DSCR)', `${scores.dscrAvg.toFixed(2)}x`, scores.dscrAvg >= 1.5 ? GREEN : scores.dscrAvg >= 1.0 ? AMBER : RED),
-        ]}),
-
-        heading('Financial Summary'),
-        new Table({ width: { size: 9360, type: WidthType.DXA }, columnWidths: [4680, 4680], rows: [
-          row('Total Revenue (season)', fmtMoney(m.totalRevenue, cc)),
-          row('Gross Profit', `${fmtMoney(m.totalGP, cc)} (${(m.grossMargin * 100).toFixed(1)}%)`),
-          row('EBITDA', `${fmtMoney(m.totalEBITDA, cc)} (${m.totalRevenue > 0 ? ((m.totalEBITDA/m.totalRevenue)*100).toFixed(1) : '0'}%)`),
-          row('Minimum Cash Position', fmtMoney(m.minCash, cc), m.minCash >= 0 ? GREEN : RED),
-          row('DSCR (average)', `${scores.dscrAvg.toFixed(2)}x`),
-          row('Total Headcount', String(result.allocUnits.reduce((s:number,u:any)=>s+(u.headcount||0),0))),
-        ]}),
-
-        heading('Business Units'),
-        ...result.allocUnits.map((u: any) => {
-          const pl = result.unitPL[u.id]
-          return body(`${u.name}: ${pl ? `${fmtMoney(pl.annRev, cc)} revenue, ${fmtMoney(pl.annGP, cc)} gross profit` : 'no data'}`)
-        }),
-
-        ...(latestNarrative ? [heading('Business Narrative'), body(latestNarrative.briefing_text)] : []),
-        ...(latestInvestment ? [heading('Investment Readiness Assessment'), body(latestInvestment.assessment_text)] : []),
-
-        heading('Contact'),
-        body(`${client?.contact_name || ''}${client?.contact_email ? ' · ' + client.contact_email : ''}${client?.contact_phone ? ' · ' + client.contact_phone : ''}`),
-        new Paragraph({ children: [new TextRun({ text: 'Prepared via Canvas Coach Clearview · habibonifade.com · Confidential', size: 16, color: SLATE, italics: true })],
-          spacing: { before: 320 }, border: { top: { style: BorderStyle.SINGLE, size: 6, color: BORDER, space: 8 } } }),
-      ]}],
+      sections: [{ properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1080, right: 1080, bottom: 1080, left: 1080 } } }, children: docChildren }],
     })
 
     const buffer = await Packer.toBuffer(doc)
@@ -152,7 +207,7 @@ export async function POST(req: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'Content-Disposition': 'attachment; filename="CONAS_Investment_Summary.docx"',
+        'Content-Disposition': 'attachment; filename="CONAS_Investment_Memo.docx"',
       },
     })
   } catch (err: any) {
