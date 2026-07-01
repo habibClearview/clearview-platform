@@ -29,7 +29,7 @@ function spacer(before=0,after=0){return new Paragraph({children:[new TextRun(''
 
 function sectionHeader(text:string){
   return new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[9360],
-    borders:{top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE},insideH:{style:BorderStyle.NONE},insideV:{style:BorderStyle.NONE}},
+    borders:{top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE}},
     rows:[new TableRow({children:[new TableCell({shading:{fill:NAVY,type:ShadingType.SOLID},margins:{top:120,bottom:120,left:200,right:200},
       children:[new Paragraph({children:[new TextRun({text,bold:true,color:CYAN,size:22,font:'Arial',allCaps:true})]})]})]})],
   })
@@ -49,7 +49,7 @@ function metricBox(label:string,value:string,sub:string,color:string,width:numbe
 
 function metricRow(metrics:{label:string;value:string;sub:string;color:string}[]){
   const cw=Math.floor(9360/metrics.length)
-  const nb={top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE},insideH:{style:BorderStyle.NONE},insideV:{style:BorderStyle.NONE}}
+  const nb={top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE}}
   return new Table({width:{size:9360,type:WidthType.DXA},columnWidths:metrics.map(()=>cw),borders:nb,
     rows:[new TableRow({children:metrics.map(m=>metricBox(m.label,m.value,m.sub,m.color,cw))})],
   })
@@ -68,7 +68,7 @@ function scoreBadge(label:string,score:string,rating:string,color:string,width:n
 function infoBox(left:string[],right:string[]){
   const b={style:BorderStyle.SINGLE,size:2,color:BORDER}
   const borders={top:b,bottom:b,left:b,right:b}
-  const nb={top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE},insideH:{style:BorderStyle.NONE},insideV:{style:BorderStyle.NONE}}
+  const nb={top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE}}
   return new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[4500,4860],borders:nb,
     rows:[new TableRow({children:[
       new TableCell({borders,shading:{fill:CREAM,type:ShadingType.SOLID},width:{size:4500,type:WidthType.DXA},margins:{top:120,bottom:120,left:160,right:160},
@@ -155,8 +155,8 @@ Capital: Shareholder ${fmt(inputs.capitalStructure?.shareholderContribution||0,c
 
     // Cover
     children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[9360],
-      borders:{top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE},insideH:{style:BorderStyle.NONE},insideV:{style:BorderStyle.NONE}},
-      rows:[new TableRow({children:[new TableCell({shading:{fill:NAVY,type:ShadingType.SOLID},width:{size:9360,type:WidthType.DXA},margins:{top:280,bottom:280,left:280,right:280},children:[
+      borders:{top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE}},
+      rows:[new TableRow({children:[new TableCell({shading:{fill:NAVY,type:ShadingType.SOLID},margins:{top:200,bottom:200,left:280,right:280},children:[
         new Paragraph({children:[new TextRun({text:'CONAS Agricultural Hub',bold:true,color:WHITE,size:48,font:'Georgia'})]}),
         new Paragraph({children:[new TextRun({text:'Crop Aggregation · Five Input Profit Centres · Northern Uganda',color:CYAN,size:22,font:'Arial'})]}),
         new Paragraph({children:[new TextRun({text:`Investment Readiness Brief · ${new Date().toLocaleDateString('en-GB',{month:'long',year:'numeric'})}`,color:'AAAAAA',size:18,font:'Arial',italics:true})]}),
@@ -168,7 +168,7 @@ Capital: Shareholder ${fmt(inputs.capitalStructure?.shareholderContribution||0,c
     children.push(sectionHeader('Investment Readiness Scorecard'))
     children.push(spacer(0,80))
     const w4=Math.floor(9360/4)
-    const nb2={top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE},insideH:{style:BorderStyle.NONE},insideV:{style:BorderStyle.NONE}}
+    const nb2={top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE}}
     children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[w4,w4,w4,w4],borders:nb2,rows:[new TableRow({children:[
       scoreBadge('Investment Readiness',`${scores.irScore}/30`,scores.irTier,scores.irScore>=24?GREEN:scores.irScore>=17?CYAN:AMBER,w4),
       scoreBadge('Credit Risk',`${scores.score}/100`,scores.classification,scores.classification==='Stable'?GREEN:scores.classification==='At Risk'?AMBER:RED,w4),
@@ -265,7 +265,7 @@ Capital: Shareholder ${fmt(inputs.capitalStructure?.shareholderContribution||0,c
 
     // Footer
     children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[9360],
-      borders:{top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE},insideH:{style:BorderStyle.NONE},insideV:{style:BorderStyle.NONE}},
+      borders:{top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE}},
       rows:[new TableRow({children:[new TableCell({shading:{fill:NAVY,type:ShadingType.SOLID},margins:{top:100,bottom:100,left:200,right:200},children:[
         new Paragraph({alignment:AlignmentType.CENTER,children:[
           new TextRun({text:'Powered by ',color:'AAAAAA',size:16,font:'Arial'}),
