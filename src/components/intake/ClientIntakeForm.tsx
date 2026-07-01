@@ -139,14 +139,10 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
   function updateUnit(idx:number, name:string) { setUnits(u=>u.map((x,i)=>i===idx?{...x,name}:x)) }
   function removeUnit(idx:number) { setUnits(u=>u.filter((_,i)=>i!==idx)) }
 
-  // Keep a ref to products so submit() always reads the current stable state
-  // without triggering getProducts() which can regenerate IDs
-  const productsRef = React.useRef(products)
-  React.useEffect(() => { productsRef.current = products }, [products])
-  const figureDataRef = React.useRef(figureData)
-  React.useEffect(() => { figureDataRef.current = figureData }, [figureData])
-
   async function submit() {
+    // Capture state at the exact moment submit is called -- no refs, no async timing issues
+    const currentProducts = products
+    const currentFigureData = figureData
     setSubmitting(true)
     try {
       const slugBase = business.business_name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')
@@ -186,10 +182,9 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
       const totalMonths = Math.max(pastMonths+futureMonths, 24)
 
       function buildPlanArray(lineId:string) {
-        const fd = figureDataRef.current
         return Array.from({length:totalMonths},(_,i)=>{
           const offset = i - pastMonths
-          return fd[lineId]?.[offset] ?? 0
+          return currentFigureData[lineId]?.[offset] ?? 0
         })
       }
 
@@ -201,7 +196,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
           type:'mixed', color:['#00B4D8','#1A9DAA','#B8860B','#6B4A8B','#1A7A4A'][ki%5],
           headcount:0, active:true, sort_order:ki,
         })
-        const prods = productsRef.current[key] || []
+        const prods = currentProducts[key] || []
         prods.filter((p:any)=>p.name).forEach((p:any) => {
           planLines.push({id:`${p.id}_rev`, unit_id:key, name:p.name, category:'revenue', line_type:'standard',
             monthly_plan:buildPlanArray(`${p.id}_rev`), active:true})
@@ -235,14 +230,14 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
 
       for (const key of keys) {
         const allLines: {id:string}[] = []
-        const acProds = productsRef.current[key] || []
+        const acProds = currentProducts[key] || []
         acProds.filter((p:any)=>p.name).forEach((p:any) => {
           allLines.push({id:`${p.id}_rev`})
           p.costLines.filter((c:any)=>c.name).forEach((c:any)=>allLines.push({id:c.id}))
         })
         for (const line of allLines) {
           for (let offset = -pastMonths; offset < 0; offset++) {
-            const val = figureDataRef.current[line.id]?.[offset]
+            const val = currentFigureData[line.id]?.[offset]
             if (!val) continue
             const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()+offset)
             const period = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`
