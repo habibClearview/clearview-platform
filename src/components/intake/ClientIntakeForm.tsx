@@ -67,9 +67,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
   })
 
   const [hasUnits, setHasUnits] = useState<boolean|null>(null)
-  // Products must be initialized with stable IDs -- getProducts() must never
-  // generate new IDs during render or figureData keys become orphaned
-  const defaultProduct = () => ({id:genId('prod'),name:'',costLines:[{id:genId('cost'),name:''}]})
+
   const [units, setUnits] = useState<{id:string,name:string}[]>([{id:genId('unit'),name:''}])
 
   // products: { unitKey: [{id, name, costLines:[{id,name}]}] }
@@ -85,6 +83,12 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
 
   const wholeKey = 'whole'
 
+  // Initialize products with stable IDs on mount -- must be done here, never during render
+  useEffect(()=>{
+    const initProd = () => ({id:genId('prod'),name:'',costLines:[{id:genId('cost'),name:''}]})
+    setProducts({'whole':[initProd()]})
+  },[])
+
   useEffect(()=>{
     if (!intakeToken) { setLoading(false); return }
     supabase.from('client_intake_links').select('*').eq('token',intakeToken).single()
@@ -96,16 +100,10 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
   },[intakeToken])
 
   function getProducts(key:string) {
-    if (!products[key]) {
-      // Initialize with stable IDs only once -- never generate IDs during render
-      const initial = [defaultProduct()]
-      setProducts(p=>p[key]?p:{...p,[key]:initial})
-      return initial
-    }
-    return products[key]
+    return products[key] || []
   }
   function setProductsFor(key:string, updater:(p:any[])=>any[]) {
-    setProducts(p=>({...p,[key]:updater(getProducts(key))}))
+    setProducts(prev=>({...prev,[key]:updater(prev[key]||[])}))
   }
   function addProduct(key:string) {
     setProductsFor(key, p=>[...p,{id:genId('prod'),name:'',costLines:[{id:genId('cost'),name:''}]}])
@@ -135,7 +133,11 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
     return d.toLocaleString('en-GB',{month:'short',year:'numeric'})
   }
 
-  function addUnit() { setUnits(u=>[...u,{id:genId('unit'),name:''}]) }
+  function addUnit() { 
+    const unitId = genId('unit')
+    setUnits(u=>[...u,{id:unitId,name:''}])
+    setProducts(p=>({...p,[unitId]:[{id:genId('prod'),name:'',costLines:[{id:genId('cost'),name:''}]}]}))
+  }
   function updateUnit(idx:number, name:string) { setUnits(u=>u.map((x,i)=>i===idx?{...x,name}:x)) }
   function removeUnit(idx:number) { setUnits(u=>u.filter((_,i)=>i!==idx)) }
 
