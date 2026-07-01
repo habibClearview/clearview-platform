@@ -1976,8 +1976,22 @@ export default function CONASDashboard({
   }
 
   function CashFlowTab(){
+    const [cfMode,setCfMode]=useState<'statement'|'operational'>('statement')
+    if(cfMode==='operational')return(
+      <div>
+        <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
+          <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',background:C.white,color:C.slate,borderRadius:4,cursor:'pointer'}} onClick={()=>setCfMode('statement')}>Cash Flow Statement</button>
+          <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',background:C.navy,color:C.white,borderRadius:4,cursor:'pointer',fontWeight:700}} onClick={()=>setCfMode('operational')}>Operational Cashflow</button>
+        </div>
+        <ConasOperationalCashflowTab result={result} months={months} cc={cc}/>
+      </div>
+    )
     return(
       <div>
+        <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
+          <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',background:C.navy,color:C.white,borderRadius:4,cursor:'pointer',fontWeight:700}} onClick={()=>setCfMode('statement')}>Cash Flow Statement</button>
+          <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',background:C.white,color:C.slate,borderRadius:4,cursor:'pointer'}} onClick={()=>setCfMode('operational')}>Operational Cashflow</button>
+        </div>
         <div style={kpiGrid}>
           <KPI label="Opening Cash" value={fmt(cf.open[0],cc)}/>
           <KPI label="Month 6 Cash" value={fmt(cf.close[5],cc)} color={cf.close[5]>=0?C.navy:C.red}/>
@@ -2180,19 +2194,15 @@ export default function CONASDashboard({
 
   const tabs:[string,string][]=[
     ['overview','Overview'],
-    ['intelligence','Clearview Intelligence'],
-    ['unitpl','Unit P&L'],
-    ['planning','Planning'],
-    ['opcashflow','Operational Cashflow'],
-    ['workingcapital','Working Capital'],
     ['approvals',`Approvals${pending.length>0?` (${pending.length})`:''}`],
-    ['actuals','Actuals'],
-    ['spends','Spend Requests'],
-    ['timerecords','Time Records'],
+    ['intelligence','Clearview Intelligence'],
+    ['planning','Planning'],
+    ['unitpl','P&L'],
     ['cashflow','Cash Flow'],
     ['balancesheet','Balance Sheet'],
-    ['scenarios','Scenarios'],
-    ['team','Team'],
+    ['workingcapital','Working Capital'],
+    ['actuals','Actuals'],
+    ['timerecords','Time Records'],
     ['settings','Settings'],
   ]
 
@@ -2237,20 +2247,23 @@ export default function CONASDashboard({
       </nav>
       <main style={{maxWidth:1440,margin:'0 auto',padding:'1.5rem'}}>
         {view==='overview'        &&<OverviewTab/>}
+        {view==='approvals'       &&<ConasApprovalsAndSpendTab
+          approvalsEl={<ApprovalsTab spendingRequests={inputs.spendingRequests} pending={pending} spendForm={spendForm} setSpendForm={setSpendForm} allActiveUnits={allActiveUnits} months={months} cc={cc} canSubmitRequest={P.canSubmitRequest} canApprove={P.canApprove} submitSpend={submitSpend} resolveRequest={resolveRequest}/>}
+          spendEl={<SpendRequestsTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
+        />}
         {view==='intelligence'    &&<ConasIntelligenceTab result={result} inputs={inputs} coachAssessments={coachAssessments} onSaveAssessments={setCoachAssessments} months={months} cc={cc} P={P}/>}
-        {view==='unitpl'          &&<UnitPLTab/>}
         {view==='planning'        &&<PlanningTab/>}
-        {view==='opcashflow'      &&<ConasOperationalCashflowTab result={result} months={months} cc={cc}/>}
-        {view==='workingcapital'  &&<ConasWorkingCapitalTab result={result} months={months} cc={cc} inputs={inputs} upd={upd} canEdit={P.canEditPlan}/>}
-        {view==='approvals' &&<ApprovalsTab spendingRequests={inputs.spendingRequests} pending={pending} spendForm={spendForm} setSpendForm={setSpendForm} allActiveUnits={allActiveUnits} months={months} cc={cc} canSubmitRequest={P.canSubmitRequest} canApprove={P.canApprove} submitSpend={submitSpend} resolveRequest={resolveRequest}/>}
+        {view==='unitpl'          &&<UnitPLTab/>}
         {view==='cashflow'        &&<CashFlowTab/>}
         {view==='balancesheet'    &&<BalanceSheetTab/>}
-        {view==='scenarios'       &&<ScenariosTab/>}
+        {view==='workingcapital'  &&<ConasWorkingCapitalTab result={result} months={months} cc={cc} inputs={inputs} upd={upd} canEdit={P.canEditPlan}/>}
         {view==='actuals'         &&<ActualsTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits} planUnits={inputs.units}/>}
-        {view==='spends'           &&<SpendRequestsTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
-        {view==='timerecords'      &&<TimeRecordsTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
-        {view==='team'            &&<TeamTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
-        {view==='settings'        &&<SettingsTab/>}
+        {view==='timerecords'     &&<TimeRecordsTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
+        {view==='settings'        &&<ConasSettingsAndAdminTab
+          settingsEl={<SettingsTab/>}
+          scenariosEl={<ScenariosTab/>}
+          teamEl={<TeamTab role={P.role} userId={P.userId||''} userName={P.fullName||''} businessUnit={P.businessUnit||''} canSeeAllUnits={P.canSeeAllUnits}/>}
+        />}
       </main>
       <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.67rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>
         Canvas Coach · Clearview Planner · {inputs.global.businessName} · habibonifade.com
@@ -2814,6 +2827,50 @@ function ConasPitchDownload() {
           <div style={{color:C.red,fontSize:'0.8rem'}}>{error}</div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── CONAS APPROVALS + SPEND REQUESTS WRAPPER ─────────────────
+function ConasApprovalsAndSpendTab({approvalsEl,spendEl}:{approvalsEl:React.ReactNode;spendEl:React.ReactNode}) {
+  const [mode,setMode]=useState<'approvals'|'requests'>('approvals')
+  return (
+    <div>
+      <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:mode==='approvals'?C.navy:C.white,color:mode==='approvals'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:mode==='approvals'?700:400}}
+          onClick={()=>setMode('approvals')}>Approvals</button>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:mode==='requests'?C.navy:C.white,color:mode==='requests'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:mode==='requests'?700:400}}
+          onClick={()=>setMode('requests')}>My Spend Requests</button>
+      </div>
+      {mode==='approvals'?approvalsEl:spendEl}
+    </div>
+  )
+}
+
+// ── CONAS SETTINGS + SCENARIOS + TEAM WRAPPER ────────────────
+function ConasSettingsAndAdminTab({settingsEl,scenariosEl,teamEl}:{settingsEl:React.ReactNode;scenariosEl:React.ReactNode;teamEl:React.ReactNode}) {
+  const [mode,setMode]=useState<'settings'|'scenarios'|'team'>('settings')
+  return (
+    <div>
+      <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:mode==='settings'?C.navy:C.white,color:mode==='settings'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:mode==='settings'?700:400}}
+          onClick={()=>setMode('settings')}>General Settings</button>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:mode==='scenarios'?C.navy:C.white,color:mode==='scenarios'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:mode==='scenarios'?700:400}}
+          onClick={()=>setMode('scenarios')}>Scenarios</button>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:mode==='team'?C.navy:C.white,color:mode==='team'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:mode==='team'?700:400}}
+          onClick={()=>setMode('team')}>Team</button>
+      </div>
+      {mode==='settings'?settingsEl:mode==='scenarios'?scenariosEl:teamEl}
     </div>
   )
 }
