@@ -475,7 +475,7 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
                       <td key={m} style={{padding:'4px 4px'}}>
                         {P.canEditPlan
                           ? <input type="number" style={{width:80,padding:'3px 5px',border:`1px solid ${C.border}`,borderRadius:3,fontSize:'0.72rem',fontFamily:'monospace',textAlign:'right',background:C.white,color:C.navy}}
-                              value={v||''} placeholder="0"
+                              value={v??''} placeholder="0"
                               onChange={e=>updateLine(l.id,m,Number(e.target.value))}/>
                           : <span style={{display:'block',textAlign:'right',padding:'3px 5px',fontSize:'0.72rem'}}>{fmt(v,cc)}</span>
                         }
@@ -520,7 +520,7 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
               <div style={{width:140}}>
                 {P.canEditPlan
                   ? <input type="number" style={{...inp,textAlign:'right',fontFamily:'monospace',fontSize:'0.82rem'}}
-                      value={l.monthly_plan[0]||''} placeholder="Monthly amount"
+                      value={l.monthly_plan[0]??''} placeholder="Monthly amount"
                       onChange={e=>onSave({...config,shared_lines:config.shared_lines.map(sl=>sl.id===l.id?{...sl,monthly_plan:Array(config.planning_months).fill(Number(e.target.value))}:sl)})}/>
                   : <span style={{fontFamily:'monospace',fontSize:'0.82rem',color:C.navy,display:'block',textAlign:'right'}}>{fmt(l.monthly_plan[0],cc)}/mo</span>
                 }
@@ -705,7 +705,7 @@ function ActualsTab({config,months,cc,P,onSave}) {
                       <label style={{fontWeight:600,fontSize:'0.82rem',color:C.navy,lineHeight:1.3}}>{l.name}</label>
                       <input type="number"
                         style={{width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'monospace',background:submitted&&!canSeeAll?'#F5F5F5':C.white,color:C.navy,textAlign:'right',boxSizing:'border-box'}}
-                        value={lineValues[l.id]||''} placeholder="0"
+                        value={lineValues[l.id]??''} placeholder="0"
                         disabled={submitted&&!canSeeAll}
                         onChange={e=>setLineValues(v=>({...v,[l.id]:Number(e.target.value)}))}/>
                     </div>
@@ -1611,7 +1611,7 @@ function TradeCreditLineGrid({line,months,cc,canEdit,updateLineName,removeLine,u
                 {(line.monthly_new||[]).map((v:number,i:number)=>(
                   <td key={i} style={{padding:'2px 3px'}}>
                     <input type="number" disabled={!canEdit} style={{width:70,padding:'0.28rem 0.32rem',fontSize:'0.7rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:canEdit?C.white:'#F4F4F4'}}
-                      value={v||''} placeholder="0" onChange={e=>updateMonth(line.id,'monthly_new',i,Number(e.target.value))}/>
+                      value={v??''} placeholder="0" onChange={e=>updateMonth(line.id,'monthly_new',i,Number(e.target.value))}/>
                   </td>
                 ))}
               </tr>
@@ -1620,7 +1620,7 @@ function TradeCreditLineGrid({line,months,cc,canEdit,updateLineName,removeLine,u
                 {(line.monthly_settled||[]).map((v:number,i:number)=>(
                   <td key={i} style={{padding:'2px 3px'}}>
                     <input type="number" disabled={!canEdit} style={{width:70,padding:'0.28rem 0.32rem',fontSize:'0.7rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:canEdit?C.white:'#F4F4F4'}}
-                      value={v||''} placeholder="0" onChange={e=>updateMonth(line.id,'monthly_settled',i,Number(e.target.value))}/>
+                      value={v??''} placeholder="0" onChange={e=>updateMonth(line.id,'monthly_settled',i,Number(e.target.value))}/>
                   </td>
                 ))}
               </tr>
