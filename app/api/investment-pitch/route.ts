@@ -49,7 +49,7 @@ function sectionHeader(text: string) {
   return new Table({
     width: { size: 9360, type: WidthType.DXA },
     columnWidths: [9360],
-    borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideH: { style: BorderStyle.NONE }, insideV: { style: BorderStyle.NONE } },
+    borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
     rows: [new TableRow({ children: [new TableCell({
       shading: { fill: NAVY, type: ShadingType.SOLID },
       margins: { top: 120, bottom: 120, left: 200, right: 200 },
@@ -80,7 +80,7 @@ function metricRow(metrics: { label: string; value: string; sub: string; color: 
   return new Table({
     width: { size: 9360, type: WidthType.DXA },
     columnWidths: metrics.map(() => cellWidth),
-    borders: { insideV: { style: BorderStyle.NONE }, insideH: { style: BorderStyle.NONE }, top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+    borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
     rows: [new TableRow({ children: metrics.map(m => metricBox(m.label, m.value, m.sub, m.color, cellWidth)) })],
   })
 }
@@ -89,7 +89,7 @@ function metricRow(metrics: { label: string; value: string; sub: string; color: 
 function infoBox(left: string[], right: string[], leftWidth = 4500, rightWidth = 4860) {
   const b = { style: BorderStyle.SINGLE, size: 2, color: BORDER }
   const borders = { top: b, bottom: b, left: b, right: b }
-  const noBorder = { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideH: { style: BorderStyle.NONE }, insideV: { style: BorderStyle.NONE } }
+  const noBorder = { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }
   return new Table({
     width: { size: 9360, type: WidthType.DXA },
     columnWidths: [leftWidth, rightWidth],
@@ -258,11 +258,10 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
     children.push(new Table({
       width: { size: 9360, type: WidthType.DXA },
       columnWidths: [9360],
-      borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideH: { style: BorderStyle.NONE }, insideV: { style: BorderStyle.NONE } },
+      borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
       rows: [new TableRow({ children: [new TableCell({
         shading: { fill: NAVY, type: ShadingType.SOLID },
-        width: { size: 9360, type: WidthType.DXA },
-        margins: { top: 280, bottom: 280, left: 280, right: 280 },
+        margins: { top: 200, bottom: 200, left: 280, right: 280 },
         children: [
           new Paragraph({ children: [new TextRun({ text: config.business_name, bold: true, color: WHITE, size: 48, font: 'Georgia' })] }),
           new Paragraph({ children: [new TextRun({ text: `${client?.sector || 'Agribusiness'} · ${client?.country || 'Uganda'}`, color: CYAN, size: 22, font: 'Arial' })] }),
@@ -279,7 +278,7 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
     children.push(new Table({
       width: { size: 9360, type: WidthType.DXA },
       columnWidths: [w4, w4, w4, w4],
-      borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideH: { style: BorderStyle.NONE }, insideV: { style: BorderStyle.NONE } },
+      borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
       rows: [new TableRow({ children: [
         scoreBadge('Investment Readiness', `${s.irScore}/30`, s.irTier, s.irScore >= 24 ? GREEN : s.irScore >= 17 ? CYAN : AMBER, w4),
         scoreBadge('Credit Risk Score', `${s.score}/100`, s.classification, s.classification === 'Stable' ? GREEN : s.classification === 'At Risk' ? AMBER : RED, w4),
@@ -407,7 +406,7 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
     children.push(new Table({
       width: { size: 9360, type: WidthType.DXA },
       columnWidths: [9360],
-      borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideH: { style: BorderStyle.NONE }, insideV: { style: BorderStyle.NONE } },
+      borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
       rows: [new TableRow({ children: [new TableCell({
         shading: { fill: NAVY, type: ShadingType.SOLID },
         margins: { top: 100, bottom: 100, left: 200, right: 200 },
