@@ -202,9 +202,13 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
         prods.filter((p:any)=>p.name).forEach((p:any) => {
           planLines.push({id:`${p.id}_rev`, unit_id:key, name:p.name, category:'revenue', line_type:'standard',
             monthly_plan:buildPlanArray(`${p.id}_rev`), active:true})
-          p.costLines.filter((c:any)=>c.name).forEach((c:any) => {
-            planLines.push({id:c.id, unit_id:key, name:`${p.name} — ${c.name}`, category:'cost_of_sales', line_type:'standard',
-              monthly_plan:buildPlanArray(c.id), active:true})
+          p.costLines.forEach((c:any) => {
+            const costPlan = buildPlanArray(c.id)
+            // Save cost line if it has a name OR has any figures entered
+            if (c.name || costPlan.some((v:number)=>v>0)) {
+              planLines.push({id:c.id, unit_id:key, name:`${p.name} — ${c.name||'Cost'}`, category:'cost_of_sales', line_type:'standard',
+                monthly_plan:costPlan, active:true})
+            }
           })
         })
       })
@@ -235,7 +239,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
         const acProds = currentProducts[key] || []
         acProds.filter((p:any)=>p.name).forEach((p:any) => {
           allLines.push({id:`${p.id}_rev`})
-          p.costLines.filter((c:any)=>c.name).forEach((c:any)=>allLines.push({id:c.id}))
+          p.costLines.forEach((c:any)=>allLines.push({id:c.id}))
         })
         for (const line of allLines) {
           for (let offset = -pastMonths; offset < 0; offset++) {
@@ -487,7 +491,7 @@ function ProductList({unitKey,products,addProduct,updateProductName,removeProduc
             {p.costLines.map((c:any,ci:number)=>(
               <div key={c.id} style={{marginBottom:'0.5rem'}}>
                 <div style={{display:'flex',gap:'0.5rem',alignItems:'center',marginBottom:'0.3rem'}}>
-                  <input style={{...inp,fontSize:'0.82rem'}} placeholder="e.g. Feed, DOC, Vaccines, Labour" value={c.name} onChange={e=>updateCostLineName(unitKey,pi,ci,e.target.value)}/>
+                  <input style={{...inp,fontSize:'0.82rem'}} placeholder="Name this cost (e.g. Feed, Labour) — required to save" value={c.name} onChange={e=>updateCostLineName(unitKey,pi,ci,e.target.value)}/>
                   {p.costLines.length>1&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1rem'}} onClick={()=>removeCostLine(unitKey,pi,ci)}>×</button>}
                 </div>
                 <MonthRow label={c.name||'Cost'} labelColor={C.red} lineId={c.id} pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel} compact/>
