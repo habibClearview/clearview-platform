@@ -67,6 +67,9 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
   })
 
   const [hasUnits, setHasUnits] = useState<boolean|null>(null)
+  // Products must be initialized with stable IDs -- getProducts() must never
+  // generate new IDs during render or figureData keys become orphaned
+  const defaultProduct = () => ({id:genId('prod'),name:'',costLines:[{id:genId('cost'),name:''}]})
   const [units, setUnits] = useState<{id:string,name:string}[]>([{id:genId('unit'),name:''}])
 
   // products: { unitKey: [{id, name, costLines:[{id,name}]}] }
@@ -93,7 +96,13 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
   },[intakeToken])
 
   function getProducts(key:string) {
-    return products[key] || [{id:genId('prod'),name:'',costLines:[{id:genId('cost'),name:''}]}]
+    if (!products[key]) {
+      // Initialize with stable IDs only once -- never generate IDs during render
+      const initial = [defaultProduct()]
+      setProducts(p=>p[key]?p:{...p,[key]:initial})
+      return initial
+    }
+    return products[key]
   }
   function setProductsFor(key:string, updater:(p:any[])=>any[]) {
     setProducts(p=>({...p,[key]:updater(getProducts(key))}))
@@ -340,6 +349,11 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
               </div>
             </div>
 
+            {(hasUnits===true&&units.filter(u=>u.name).length===0)&&(
+              <div style={{background:'#FFF8E8',border:`1px solid ${C.amber}`,borderRadius:6,padding:'0.85rem 1rem',marginBottom:'1.25rem'}}>
+                <p style={{margin:0,fontSize:'0.85rem',color:C.amber,fontWeight:600}}>⚠ Please go back to the previous step and give each business part a name before entering figures.</p>
+              </div>
+            )}
             {hasUnits===true?units.filter(u=>u.name).map(u=>(
               <div key={u.id} style={{marginBottom:'2rem'}}>
                 <div style={{fontWeight:700,fontSize:'0.95rem',marginBottom:'0.75rem',padding:'0.5rem 0.75rem',background:C.navy,color:C.white,borderRadius:5}}>{u.name}</div>
@@ -348,7 +362,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
                   addCostLine={addCostLine} updateCostLineName={updateCostLineName} removeCostLine={removeCostLine}
                   pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel} cc={business.currency}/>
               </div>
-            )):hasUnits===false&&(
+            )):hasUnits===false?(
               <div>
                 <ProductList unitKey={wholeKey} products={getProducts(wholeKey)}
                   addProduct={addProduct} updateProductName={updateProductName} removeProduct={removeProduct}
@@ -377,7 +391,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
                   <button style={smallBtn()} onClick={()=>setAssets(a=>[...a,{id:genId('asset'),name:'',value:0}])}>+ Add Asset</button>
                 </div>
               </div>
-            )}
+            ):<div style={{background:'#FDF0EE',border:`1px solid ${C.red}`,borderRadius:6,padding:'0.85rem 1rem'}}><p style={{margin:0,fontSize:'0.85rem',color:C.red}}>Please go back and answer whether your business has multiple parts before entering figures.</p></div>}
 
             <div style={{marginTop:'1rem'}}><label style={lbl}>Anything else we should know?</label><textarea style={{...inp,minHeight:80,resize:'vertical'}} value={notes} onChange={e=>setNotes(e.target.value)}/></div>
             <div style={{display:'flex',gap:'0.6rem',marginTop:'1.25rem'}}>
