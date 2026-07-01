@@ -479,7 +479,7 @@ function MonthRow({label,labelColor,lineId,pastMonths,futureMonths,figureData,se
             {offsets.map(o=>(
               <td key={o} style={{padding:'2px 3px',background:o===0?'#F0FBFF':'transparent',borderLeft:o===0?`2px solid ${C.navy}`:'none',borderRight:o===0?`2px solid ${C.navy}`:'none',borderBottom:o===0?`2px solid ${C.navy}`:'none',minWidth:80}}>
                 <input type="number" style={{width:'100%',padding:'0.28rem 0.32rem',fontSize:compact?'0.7rem':'0.74rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:C.white,boxSizing:'border-box'}}
-                  value={figureData[lineId]?.[o]||''} placeholder="0" onChange={e=>setFigure(lineId,o,Number(e.target.value))}/>
+                  value={figureData[lineId]?.[o]??''} placeholder="0" onChange={e=>setFigure(lineId,o,Number(e.target.value))}/>
               </td>
             ))}
           </tr>
