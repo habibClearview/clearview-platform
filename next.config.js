@@ -1,23 +1,18 @@
 const { withSentryConfig } = require('@sentry/nextjs')
 
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  // Sentry source maps in production
-  productionBrowserSourceMaps: false,
-}
+const nextConfig = {}
 
-module.exports = withSentryConfig(nextConfig, {
-  // Sentry organisation and project -- set via env vars
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  // Silent during builds unless there's an error
-  silent: true,
-  // Upload source maps for better error traces
-  widenClientFileUpload: true,
-  // Hide source maps from browser
-  hideSourceMaps: true,
-  // Tree-shake Sentry in development
-  disableLogger: true,
-  // Don't fail build if Sentry upload fails
-  dryRun: !process.env.SENTRY_AUTH_TOKEN,
-})
+// Only wrap with Sentry if DSN is configured
+// This prevents build failures when Sentry env vars are not set
+if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+  module.exports = withSentryConfig(nextConfig, {
+    silent: true,
+    widenClientFileUpload: true,
+    hideSourceMaps: true,
+    disableLogger: true,
+    automaticVercelMonitors: false,
+  })
+} else {
+  module.exports = nextConfig
+}
