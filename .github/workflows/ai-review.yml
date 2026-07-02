@@ -1,0 +1,97 @@
+# GitHub Action: AI Code Review via Claude
+# Runs on every PR as a backup/supplement to CodeRabbit
+# Posts a structured review comment and sets a status check
+
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      statuses: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR diff
+        id: diff
+        run: |
+          git diff origin/main...HEAD > /tmp/pr.diff
+          # Limit to 8000 chars to fit context
+          head -c 8000 /tmp/pr.diff > /tmp/pr_truncated.diff
+          echo "diff_size=$(wc -c < /tmp/pr.diff)" >> $GITHUB_OUTPUT
+
+      - name: AI Review
+        id: review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DIFF=$(cat /tmp/pr_truncated.diff)
+          
+          RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d '{
+              "model": "claude-sonnet-4-6",
+              "max_tokens": 2000,
+              "messages": [{
+                "role": "user",
+                "content": "You are reviewing a PR for the Clearview financial platform (Next.js 14, Supabase, TypeScript). Review this diff for CRITICAL issues only (auth gaps, data loss, financial calculation errors, SQL injection, falsy-zero bugs with || instead of ??, React state timing bugs, duplicate client creation, type mismatches between UUID and TEXT). Ignore style. Rate each issue as CRITICAL (blocks merge) or WARNING (informational). Be concise. Start your response with either APPROVED or BLOCKED.\n\nDiff:\n'"$DIFF"'"
+              }]
+            }')
+          
+          REVIEW=$(echo $RESPONSE | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          print(d['content'][0]['text'])
+          " 2>/dev/null || echo "Review unavailable")
+          
+          # Determine if blocked
+          if echo "$REVIEW" | grep -q "^BLOCKED"; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "conclusion=failure" >> $GITHUB_OUTPUT
+          else
+            echo "status=success" >> $GITHUB_OUTPUT  
+            echo "conclusion=success" >> $GITHUB_OUTPUT
+          fi
+          
+          # Save review for comment
+          echo "$REVIEW" > /tmp/review.txt
+
+      - name: Post review comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REVIEW=$(cat /tmp/review.txt)
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "## 🤖 AI Code Review
+
+$REVIEW
+
+---
+*Reviewed by Claude. CRITICAL issues block merge. WARNINGS are informational.*"
+
+      - name: Set status check
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CONCLUSION="${{ steps.review.outputs.conclusion }}"
+          if [ "$CONCLUSION" = "failure" ]; then
+            echo "❌ AI Review found critical issues — merge blocked"
+            exit 1
+          else
+            echo "✅ AI Review passed"
+          fi
