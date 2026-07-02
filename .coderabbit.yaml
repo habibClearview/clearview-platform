@@ -1,0 +1,112 @@
+# CodeRabbit Configuration for Clearview Platform
+# Focus: architecture, business logic, security -- not style
+
+version: "2"
+
+reviews:
+  # Run on every PR automatically
+  auto_review:
+    enabled: true
+    drafts: false
+
+  # What to focus on
+  profile: "assertive"
+
+  # Custom instructions -- exactly what Habib specified
+  instructions: |
+    You are reviewing a Next.js 14 / Supabase / TypeScript financial platform 
+    called Clearview, built for agribusiness clients in Uganda. 
+    
+    FOCUS ON:
+    - Architecture correctness -- does this fit the existing patterns?
+    - Business logic correctness -- do financial calculations produce correct results?
+    - SQL injection vectors -- any raw SQL or unsanitised inputs?
+    - Unhandled edge cases -- what happens when data is null, empty, or unexpected?
+    - N+1 query problems -- multiple DB calls inside loops?
+    - Auth gaps -- is every route validating the user's role and client_id?
+    - Data deletion safety -- is any DELETE irreversible without confirmation?
+    - React state timing issues -- useEffect async bugs, stale closures, state captured at wrong time?
+    - Database type mismatches -- engagement_clients.id is TEXT not UUID, user_profiles.client_id is UUID
+    - Falsy-zero bugs -- || operator used where ?? should be used for numeric fields
+    - Duplicate client creation -- form submissions must use existing client_id not create new ones
+    - Plan line key consistency -- revenue lines must use ${product.id}_rev format
+    
+    ALWAYS FLAG (treat as critical):
+    - Any route that does not validate the operator/user token before accessing data
+    - Any DELETE operation without a WHERE clause scoped to the authenticated user's client_id
+    - Any financial calculation using || instead of ?? for numeric values (falsy-zero bug)
+    - Any React state read inside an async function that should be captured as a constant first
+    - Any Supabase query that joins user_profiles.client_id (UUID) with engagement_clients.id (TEXT) without casting
+    - Any form submission that could create a duplicate client record
+    - Any push to main that bypasses a PR
+    
+    IGNORE COMPLETELY:
+    - Code style, formatting, indentation
+    - Variable naming conventions
+    - Comment style
+    - Import ordering
+    - TypeScript strictness preferences
+    - Tailwind class ordering
+    
+    SEVERITY LEVELS:
+    - CRITICAL: blocks merge -- auth gaps, data loss risk, financial calculation errors, type mismatches causing silent failures
+    - WARNING: informational only -- performance concerns, missing error handling that won't cause data loss
+    
+    CONTEXT:
+    - This platform handles real client financial data for agribusinesses
+    - field operators submit transactions via token-based auth (no JWT)
+    - super_coach role (Habib) sees all clients
+    - client_admin role is the CEO of each client business  
+    - All monetary amounts are in local currency (UGX default), stored as NUMERIC
+    - generic_actuals table uses line_values JSONB not individual columns per line
+    - Plan lines are stored as JSONB arrays in generic_model_config, not as separate table rows
+
+  # Path-specific instructions
+  path_instructions:
+    - path: "src/components/intake/**"
+      instructions: |
+        This is the client data capture form. Critical areas:
+        - State must be captured as constants at submit time, not read from refs or closures
+        - Products must use stable IDs initialized in useEffect, never regenerated during render
+        - Revenue key must be ${product.id}_rev -- cost lines use the cost line ID directly
+        - Must use intake.client_id to link to existing client, never create a new client
+        - Must delete existing config before reinsert to handle resubmissions cleanly
+        
+    - path: "app/api/field/**"
+      instructions: |
+        These are field operator API routes. Critical areas:
+        - Every route must validate the operator token before any data access
+        - Token validation must check expiry AND operator.active status
+        - All DB writes must scope client_id from the validated operator, never from request body
+        - The aggregate_field_transactions() RPC must be called after every sync
+        
+    - path: "src/lib/generic-engine.ts"
+      instructions: |
+        This is the core financial calculation engine. Critical areas:
+        - All numeric settings must use ?? not || (corporate_tax_rate ?? 0.30, NOT || 0.30)
+        - Balance sheet must always balance -- total_assets must equal total_equity_and_liabilities
+        - inv_cash[0] must be set from fixed_assets capital outflow
+        - cum_npat must be seeded from opening_cash_balance not from 0
+        
+    - path: "src/lib/conas-engine.ts"
+      instructions: |
+        CONAS-specific engine. Same rules as generic-engine.ts plus:
+        - irrigationKits must use cumulative deployment (cumIrrigation) not total annual value
+        - invCash[0] must be set from fixedAssets capital outflow
+        
+    - path: "app/api/**"
+      instructions: |
+        All API routes. Critical areas:
+        - Must use SUPABASE_SERVICE_ROLE_KEY not anon key
+        - Must return NextResponse.json with appropriate status codes
+        - Must handle missing env vars gracefully without crashing
+        - ANTHROPIC_API_KEY absence should degrade gracefully, not throw
+
+  # Tools to enable
+  tools:
+    github-checks:
+      enabled: true
+
+# Chat -- allow asking CodeRabbit questions in PR comments  
+chat:
+  auto_reply: true
