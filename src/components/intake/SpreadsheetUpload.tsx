@@ -62,34 +62,72 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
       const wb = XLSX.read(buf, { type: 'array', cellDates: false })
 
       const bd = wb.Sheets['Business Details']
-      const st = wb.Sheets['Structure']
-      if (!bd || !st) throw new Error('This does not look like the Clearview Data Capture template. Missing required sheets.')
+      if (!bd) throw new Error('Business Details sheet not found. Please use the Clearview Data Capture template.')
 
-      // Find every sheet that is a Products & Figures sheet -- the original, or any copy
-      // the client made per business unit (sheet name starts with "Products")
-      const productSheetNames = wb.SheetNames.filter(n => n.toLowerCase().startsWith('products'))
-      if (productSheetNames.length === 0) throw new Error('No Products & Figures sheet found.')
+      // Support both old template (sheets starting with "Products") and
+      // new template v7 (sheets named "Unit N Figures")
+      const isNewTemplate = wb.SheetNames.some(n => /unit \d+ figures/i.test(n))
+      const productSheetNames = isNewTemplate
+        ? wb.SheetNames.filter(n => /unit \d+ figures/i.test(n))
+        : wb.SheetNames.filter(n => n.toLowerCase().startsWith('products'))
+
+      if (productSheetNames.length === 0) throw new Error('No Products & Figures sheet found. Please use the Clearview Data Capture template.')
 
       const business = {
-        business_name: cellStr(bd,'C4'),
-        contact_name: cellStr(bd,'C5'),
-        contact_email: cellStr(bd,'C6'),
-        contact_phone: cellStr(bd,'C7'),
-        country: cellStr(bd,'C8') || 'Uganda',
-        sector: cellStr(bd,'C9'),
-        currency: cellStr(bd,'C10') || 'UGX',
+        business_name: cellStr(bd,'C5'),
+        contact_name: cellStr(bd,'C6'),
+        contact_email: cellStr(bd,'C7'),
+        contact_phone: cellStr(bd,'C8'),
+        country: cellStr(bd,'C9') || 'Uganda',
+        sector: cellStr(bd,'C10'),
+        currency: cellStr(bd,'C11') || 'UGX',
+        year_established: cellStr(bd,'C12'),
+        legal_structure: cellStr(bd,'C13'),
+        sales_channel: cellStr(bd,'C14'),
+        season_name: cellStr(bd,'C20'),
+        past_months: cellNum(bd,'C22') || 3,
+        future_months: cellNum(bd,'C23') || 12,
+        year_round: cellStr(bd,'C24') || 'Year-round',
+        // Capital Structure (Section C, rows 28-36)
+        shareholder_contribution: cellNum(bd,'C28') || 0,
+        grant_non_repayable: cellNum(bd,'C29') || 0,
+        grant_recoverable: cellNum(bd,'C30') || 0,
+        bank_loan: cellNum(bd,'C31') || 0,
+        annual_interest_rate: cellNum(bd,'C32') ?? 18,
+        loan_tenor_years: cellNum(bd,'C33') ?? 2,
+        grace_period_months: cellNum(bd,'C34') || 0,
+        fixed_assets: cellNum(bd,'C35') || 0,
+        opening_cash_balance: cellNum(bd,'C36') || 0,
+        corporate_tax_rate: cellNum(bd,'C39') ?? 30,
+        shared_cost_fixed_pct: cellNum(bd,'C40') ?? 50,
+        dso: cellNum(bd,'C43') || 0,
+        dpo: cellNum(bd,'C44') || 0,
       }
       if (!business.business_name) throw new Error('Business Name is missing in the Business Details sheet.')
 
-      const structureAnswer = cellStr(st,'C6').toLowerCase()
-      const hasUnits = structureAnswer.startsWith('y')
-      const units: {name:string}[] = []
-      if (hasUnits) {
-        for (let i = 9; i <= 13; i++) {
-          const name = cellStr(st, `C${i}`)
-          if (name) units.push({ name })
+      // Read business units from Business Details Section F (rows 50-57) for new template
+      // or from Structure sheet for old template
+      const st = wb.Sheets['Structure']
+      let units: {name:string,headcount:number}[] = []
+
+      if (isNewTemplate) {
+        // New template: units in Business Details rows 50-57
+        for (let r = 50; r <= 57; r++) {
+          const name = cellStr(bd, `A${r}`)
+          const hc = cellNum(bd, `C${r}`) || 0
+          if (name) units.push({ name, headcount: hc })
+        }
+      } else if (st) {
+        // Old template: units from Structure sheet
+        const structureAnswer = cellStr(st,'C6').toLowerCase()
+        if (structureAnswer.startsWith('y')) {
+          for (let i = 9; i <= 13; i++) {
+            const name = cellStr(st, `C${i}`)
+            if (name) units.push({ name, headcount: 0 })
+          }
         }
       }
+      const hasUnits = units.length > 0
 
       // Parse every product sheet found. Each contributes products tagged with
       // the unit name declared in its "Which Part Is This For?" cell.
@@ -101,19 +139,34 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
 
       for (const sheetName of productSheetNames) {
         const pf = wb.Sheets[sheetName]
-        const sheetUnitName = cellStr(pf, `C${WHICH_PART_ROW}`)
-        const headerRow = HEADER_ROW
+
+        // Determine unit name for this sheet
+        // New template: unit name in cell B4 (col B, row 4)
+        // Old template: unit name in WHICH_PART_ROW constant
+        const sheetUnitName = isNewTemplate
+          ? cellStr(pf, 'B4')
+          : cellStr(pf, `C\${WHICH_PART_ROW}`)
+
+        // Find month columns
+        // New template: headers in row 6, data starts col C (col index 3, 1-based)
+        // Old template: HEADER_ROW and MONTH_START_COL constants
+        const headerRow = isNewTemplate ? 6 : HEADER_ROW
+        const monthStartCol = isNewTemplate ? 3 : MONTH_START_COL
 
         let monthCols: number[] = []
         let thisMonthColIdx = -1
-        for (let c = MONTH_START_COL; c < MONTH_START_COL + 30; c++) {
-          const addr = `${colLetter(c)}${headerRow}`
+        for (let c = monthStartCol; c < monthStartCol + 30; c++) {
+          const addr = \`\${colLetter(c)}\${headerRow}\`
           const val = cellStr(pf, addr)
           if (!val) break
           monthCols.push(c)
-          if (val.toUpperCase().includes('THIS MONTH')) thisMonthColIdx = monthCols.length - 1
+          const upper = val.toUpperCase()
+          if (upper.includes('M0') || upper.includes('NOW') || upper.includes('THIS MONTH')) {
+            thisMonthColIdx = monthCols.length - 1
+          }
         }
-        if (monthCols.length === 0) continue // sheet has no data, skip
+        if (monthCols.length === 0) continue
+
         const sheetPast = thisMonthColIdx >= 0 ? thisMonthColIdx : 0
         const sheetFuture = monthCols.length - sheetPast - 1
         pastMonths = Math.max(pastMonths, sheetPast)
@@ -121,10 +174,13 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
         monthColsCount = Math.max(monthColsCount, monthCols.length)
 
         function readVals(rowNum: number): number[] {
-          return monthCols.map(c => cellNum(pf, `${colLetter(c)}${rowNum}`))
+          return monthCols.map(c => {
+            const v = cellNum(pf, \`\${colLetter(c)}\${rowNum}\`)
+            return v ?? 0
+          })
         }
 
-        // Resolve which declared unit this sheet belongs to
+        // Resolve unit
         let resolvedUnitName = ''
         if (hasUnits) {
           if (!sheetUnitName) {
@@ -132,34 +188,91 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
             resolvedUnitName = units[0]?.name || ''
           } else {
             const match = units.find(u => u.name.trim().toLowerCase() === sheetUnitName.trim().toLowerCase())
-            if (match) { resolvedUnitName = match.name }
+            if (match) resolvedUnitName = match.name
             else { unassignedSheets.push(sheetName); resolvedUnitName = units[0]?.name || '' }
           }
         }
 
-        let row = PRODUCT_BLOCK_START_ROW
-        for (let p = 0; p < PRODUCT_SLOTS; p++) {
-          const name = cellStr(pf, `C${row}`)
-          const revenueRow = row + 1
-          const costLines: {name:string,values:number[]}[] = []
-          for (let cl = 0; cl < COST_LINES_PER_PRODUCT; cl++) {
-            const costRow = row + 2 + cl
-            const costName = cellStr(pf, `C${costRow}`)
-            if (costName) costLines.push({ name: costName, values: readVals(costRow) })
-          }
-          if (name) allProducts.push({ name, costLines, revenue: readVals(revenueRow), unitName: resolvedUnitName })
-          row += ROWS_PER_PRODUCT
-        }
+        if (isNewTemplate) {
+          // New template v7: paired rows
+          // Revenue section starts after 2 header rows (row 8 = section header, row 9 = note)
+          // Row 10 onwards: each product = 2 rows (rev row + cog row)
+          // Product name is in Col A (merged across both rows)
+          // Row type in Col B: "Sales Revenue" or "Cost of Goods"
+          // Data starts Col C (col 3)
+          // Scan rows 10 to 10+(N_REV*2) for revenue section
+          const revSectionStart = 10
+          const N_REV = 8
 
-        let commonRow = -1
-        for (let r = row; r < row + 10; r++) {
-          if (cellStr(pf, `B${r}`).toUpperCase().includes('COMMON COSTS')) { commonRow = r + 1; break }
-        }
-        if (commonRow > 0 && !hasUnits) {
-          for (let cl = 0; cl < 4; cl++) {
-            const r = commonRow + cl
-            const name = cellStr(pf, `C${r}`)
-            if (name) allCommonCosts.push({ name, values: readVals(r), unitName: resolvedUnitName })
+          for (let i = 0; i < N_REV; i++) {
+            const revRow = revSectionStart + (i * 2)
+            const cogRow = revSectionStart + (i * 2) + 1
+
+            // Name from col A on the revenue row
+            const name = cellStr(pf, \`A\${revRow}\`)
+            if (!name) continue
+
+            const revenue = readVals(revRow)
+            const cogValues = readVals(cogRow)
+
+            // Cost of goods becomes a cost line named "Cost of Goods"
+            const costLines: {name:string,values:number[]}[] = []
+            if (cogValues.some(v => v > 0)) {
+              costLines.push({ name: 'Cost of Goods', values: cogValues })
+            }
+
+            allProducts.push({ name, costLines, revenue, unitName: resolvedUnitName })
+          }
+
+          // Staff section: find it after revenue section
+          // Row 10 + N_REV*2 + 2 (section header + spacer) = staff section
+          const staffSectionStart = revSectionStart + (N_REV * 2) + 2
+          for (let i = 0; i < 4; i++) {
+            const row = staffSectionStart + i
+            const name = cellStr(pf, \`A\${row}\`)
+            const vals = readVals(row)
+            if (name || vals.some(v => v > 0)) {
+              allCommonCosts.push({ name: name || 'Staff', values: vals, unitName: resolvedUnitName })
+            }
+          }
+
+          // Overheads section
+          const opexSectionStart = staffSectionStart + 4 + 2
+          for (let i = 0; i < 4; i++) {
+            const row = opexSectionStart + i
+            const name = cellStr(pf, \`A\${row}\`)
+            const vals = readVals(row)
+            if (name || vals.some(v => v > 0)) {
+              allCommonCosts.push({ name: name || 'Overheads', values: vals, unitName: resolvedUnitName })
+            }
+          }
+
+        } else {
+          // Old template: name in col C, revenue on next row, cost lines following
+          let row = PRODUCT_BLOCK_START_ROW
+          for (let p = 0; p < PRODUCT_SLOTS; p++) {
+            const name = cellStr(pf, \`C\${row}\`)
+            const revenueRow = row + 1
+            const costLines: {name:string,values:number[]}[] = []
+            for (let cl = 0; cl < COST_LINES_PER_PRODUCT; cl++) {
+              const costRow = row + 2 + cl
+              const costName = cellStr(pf, \`C\${costRow}\`)
+              if (costName) costLines.push({ name: costName, values: readVals(costRow) })
+            }
+            if (name) allProducts.push({ name, costLines, revenue: readVals(revenueRow), unitName: resolvedUnitName })
+            row += ROWS_PER_PRODUCT
+          }
+
+          let commonRow = -1
+          for (let r = row; r < row + 10; r++) {
+            if (cellStr(pf, \`B\${r}\`).toUpperCase().includes('COMMON COSTS')) { commonRow = r + 1; break }
+          }
+          if (commonRow > 0 && !hasUnits) {
+            for (let cl = 0; cl < 4; cl++) {
+              const r = commonRow + cl
+              const name = cellStr(pf, \`C\${r}\`)
+              if (name) allCommonCosts.push({ name, values: readVals(r), unitName: resolvedUnitName })
+            }
           }
         }
       }
@@ -205,13 +318,23 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
       const wholeKey = 'whole'
       // Build unit id lookup by name so products can be assigned to the correct unit
       const unitIdByName: Record<string,string> = {}
-      const keys = hasUnits ? units.map((u:any,i:number)=>({id:genId('unit'),name:u.name,idx:i})) : [{id:wholeKey,name:business.business_name,idx:0}]
+      // Read business units from Section F (rows 50-57)
+      const bdUnits: {name:string,headcount:number}[] = []
+      for (let r=50; r<=57; r++) {
+        const name = cellStr(bd, `A${r}`)
+        const hc = cellNum(bd, `C${r}`) || 0
+        if (name) bdUnits.push({name, headcount:hc})
+      }
+      const hasUnitsFromBD = bdUnits.length > 0
+      const keys = hasUnitsFromBD
+        ? bdUnits.map((u,i)=>({id:genId('unit'),name:u.name,headcount:u.headcount,idx:i}))
+        : (hasUnits ? units.map((u:any,i:number)=>({id:genId('unit'),name:u.name,headcount:0,idx:i})) : [{id:wholeKey,name:business.business_name,headcount:0,idx:0}])
       keys.forEach((k:any,ki:number)=>{
         unitIdByName[k.name] = k.id
         businessUnits.push({
           id:k.id, name:k.name, short:(k.name||'').split(' ').map((w:string)=>w[0]).join('').toUpperCase().slice(0,4),
           type:'mixed', color:['#00B4D8','#1A9DAA','#B8860B','#6B4A8B','#1A7A4A'][ki%5],
-          headcount:0, active:true, sort_order:ki,
+          headcount: key.headcount || 0, active:true, sort_order:ki,
         })
       })
 
@@ -236,9 +359,29 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
         client_id: client.id, business_name: business.business_name, currency: business.currency,
         start_date: new Date(new Date().setMonth(new Date().getMonth()-pastMonths)).toISOString().split('T')[0],
         planning_months: totalMonths, business_units: businessUnits, plan_lines: planLines, shared_lines: [],
-        settings: { shared_cost_fixed_pct:0.5, corporate_tax_rate:0.30, opening_cash_balance:0,
-          structure_confirmed: false,
-          upload_note: unassignedSheets?.length>0 ? `Some sheets could not be matched to a unit by name (${unassignedSheets.join(', ')}) -- their products were placed under "${units[0]?.name}". Coach should review and reassign.` : '' },
+        settings: {
+          shared_cost_fixed_pct: (business.shared_cost_fixed_pct ?? 50) / 100,
+          corporate_tax_rate: (business.corporate_tax_rate ?? 30) / 100,
+          opening_cash_balance: business.opening_cash_balance || 0,
+          capital_structure: {
+            shareholder_contribution: business.shareholder_contribution || 0,
+            grant_non_repayable: business.grant_non_repayable || 0,
+            grant_recoverable: business.grant_recoverable || 0,
+            bank_loan: business.bank_loan || 0,
+            annual_interest_rate: (business.annual_interest_rate ?? 18) / 100,
+            loan_tenor_years: business.loan_tenor_years ?? 2,
+            grace_period_months: business.grace_period_months || 0,
+            fixed_assets: business.fixed_assets || 0,
+          },
+          dso_days: business.dso || 0,
+          season_name: business.season_name || '',
+          year_round: business.year_round || 'Year-round',
+          year_established: business.year_established || '',
+          legal_structure: business.legal_structure || '',
+          sales_channel: business.sales_channel || '',
+          structure_confirmed: true,
+          upload_note: unassignedSheets?.length>0 ? \`Some sheets could not be matched to a unit by name (\${unassignedSheets.join(', ')}) -- their products were placed under "\${units[0]?.name}". Coach should review and reassign.\` : '',
+        },
       }])
       if (configErr) throw configErr
 
