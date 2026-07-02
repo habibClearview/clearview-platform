@@ -267,6 +267,12 @@ function CopyIntakeLink({client}){
     <button onClick={copyToClipboard} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.85rem',borderRadius:4,background:copied?C.green:'transparent',border:`1px solid ${copied?C.green:'rgba(255,255,255,0.4)'}`,color:C.white,cursor:'pointer'}}>
       {copied?'Copied!':`Copy ${client.name} Data Capture Link`}
     </button>
+    <a href="/Clearview_Data_Capture_Template_v7.xlsx" download="Clearview_Data_Capture_Template_v7.xlsx"
+      style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.85rem',borderRadius:4,
+        background:'transparent',border:'1px solid rgba(255,255,255,0.4)',
+        color:'rgba(255,255,255,0.8)',cursor:'pointer',textDecoration:'none',display:'inline-block',marginLeft:'0.5rem'}}>
+      ⬇ Download Template
+    </a>
   )
 }
 
