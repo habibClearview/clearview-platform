@@ -17,7 +17,7 @@ const btn = (col=C.navy) => ({fontFamily:'monospace',fontSize:'0.85rem',fontWeig
 const ghostBtn = {fontFamily:'monospace',fontSize:'0.85rem',fontWeight:600,padding:'0.6rem 1.4rem',border:`1px solid ${C.border}`,borderRadius:5,background:C.white,color:C.navy,cursor:'pointer'}
 const smallBtn = (col=C.cyan) => ({fontFamily:'monospace',fontSize:'0.74rem',padding:'0.32rem 0.7rem',border:`1px solid ${col}`,borderRadius:4,background:'transparent',color:col,cursor:'pointer'})
 
-const STEPS = ['Welcome','Business Details','Business Structure','Products & Figures','Review & Submit']
+const STEPS = ['Welcome','About Your Business','Business Structure','Products & Figures','Funding & Capital','Review & Submit']
 
 function genId(prefix:string) { return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,7)}` }
 
@@ -64,11 +64,18 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
   const [business, setBusiness] = useState({
     business_name:'', contact_name:'', contact_email:'', contact_phone:'',
     country:'Uganda', sector:'', currency:'UGX',
+    year_established:'', legal_structure:'', sales_channel:'',
+    season_name:'', year_round:'Year-round',
+    dso:0,
+    shareholder_contribution:0, grant_non_repayable:0, grant_recoverable:0,
+    bank_loan:0, annual_interest_rate:18, loan_tenor_years:2,
+    grace_period_months:0, fixed_assets:0, opening_cash_balance:0,
+    corporate_tax_rate:30, shared_cost_fixed_pct:50,
   })
 
   const [hasUnits, setHasUnits] = useState<boolean|null>(null)
 
-  const [units, setUnits] = useState<{id:string,name:string}[]>([{id:genId('unit'),name:''}])
+  const [units, setUnits] = useState<{id:string,name:string,headcount:number}[]>([{id:genId('unit'),name:'',headcount:0}])
 
   // products: { unitKey: [{id, name, costLines:[{id,name}]}] }
   const [products, setProducts] = useState<Record<string,{id:string,name:string,costLines:{id:string,name:string}[]}[]>>({})
@@ -197,7 +204,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
         businessUnits.push({
           id:key, name:unitName, short:(unitName||'').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,4),
           type:'mixed', color:['#00B4D8','#1A9DAA','#B8860B','#6B4A8B','#1A7A4A'][ki%5],
-          headcount:0, active:true, sort_order:ki,
+          headcount: k.headcount || 0, active:true, sort_order:ki,
         })
         const prods = currentProducts[key] || []
         prods.filter((p:any)=>p.name).forEach((p:any) => {
@@ -230,8 +237,29 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
         start_date: new Date(new Date().setMonth(new Date().getMonth()-pastMonths)).toISOString().split('T')[0],
         planning_months: totalMonths, business_units: businessUnits,
         plan_lines: planLines, shared_lines: [],
-        settings: { shared_cost_fixed_pct:0.5, corporate_tax_rate:0.30, opening_cash_balance:0,
-          submitted_assets: assets.filter(a=>a.name), structure_confirmed: false },
+        settings: {
+          shared_cost_fixed_pct: (business.shared_cost_fixed_pct ?? 50) / 100,
+          corporate_tax_rate: (business.corporate_tax_rate ?? 30) / 100,
+          opening_cash_balance: business.opening_cash_balance || 0,
+          capital_structure: {
+            shareholder_contribution: business.shareholder_contribution || 0,
+            grant_non_repayable: business.grant_non_repayable || 0,
+            grant_recoverable: business.grant_recoverable || 0,
+            bank_loan: business.bank_loan || 0,
+            annual_interest_rate: (business.annual_interest_rate ?? 18) / 100,
+            loan_tenor_years: business.loan_tenor_years || 2,
+            grace_period_months: business.grace_period_months || 0,
+            fixed_assets: business.fixed_assets || 0,
+          },
+          dso_days: business.dso || 0,
+          season_name: business.season_name || '',
+          year_round: business.year_round || 'Year-round',
+          year_established: business.year_established || '',
+          legal_structure: business.legal_structure || '',
+          sales_channel: business.sales_channel || '',
+          submitted_assets: assets.filter((a:any)=>a.name),
+          structure_confirmed: true,
+        },
       }])
       if (configErr) throw configErr
 
@@ -306,7 +334,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
         {step===0&&(
           <div style={card}>
             <p style={{fontSize:'0.92rem',color:C.navy,lineHeight:1.8,marginBottom:'1rem'}}>Welcome. This form collects information about your business so we can set up your Clearview financial dashboard.</p>
-            <p style={{fontSize:'0.88rem',color:C.slate,lineHeight:1.8,marginBottom:'1rem'}}>For each product or service you sell, you will enter its revenue, and as many cost lines as you need (e.g. feed cost, DOC cost, vaccines), each with its own monthly figures.</p>
+            <p style={{fontSize:'0.88rem',color:C.slate,lineHeight:1.8,marginBottom:'1rem'}}>For each product category, you will enter: (1) Sales Revenue — what customers paid you, and (2) Cost of Goods — what you paid to procure or produce those goods. These can be different months — a business may buy inputs in one month and sell them over the next two or three months. Your cash flow will handle the timing automatically.</p>
             <p style={{fontSize:'0.88rem',color:C.slate,lineHeight:1.8,marginBottom:'1.5rem'}}>Estimates are fine where exact figures are not available. This takes about 20-30 minutes.</p>
             <button style={btn()} onClick={()=>setStep(1)}>Get Started</button>
           </div>
@@ -314,17 +342,29 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
 
         {step===1&&(
           <div style={card}>
-            <div style={secH}>Tell us about your business</div>
+            <div style={secH}>About your business</div>
             <div style={fGrid}>
               <div><label style={lbl}>Business Name</label><input style={inp} value={business.business_name} onChange={e=>setBusiness(b=>({...b,business_name:e.target.value}))}/></div>
               <div><label style={lbl}>Your Name</label><input style={inp} value={business.contact_name} onChange={e=>setBusiness(b=>({...b,contact_name:e.target.value}))}/></div>
               <div><label style={lbl}>Email</label><input type="email" style={inp} value={business.contact_email} onChange={e=>setBusiness(b=>({...b,contact_email:e.target.value}))}/></div>
               <div><label style={lbl}>Phone</label><input style={inp} value={business.contact_phone} onChange={e=>setBusiness(b=>({...b,contact_phone:e.target.value}))}/></div>
               <div><label style={lbl}>Country</label><input style={inp} value={business.country} onChange={e=>setBusiness(b=>({...b,country:e.target.value}))}/></div>
-              <div><label style={lbl}>Sector</label><input style={inp} placeholder="e.g. Poultry, Crop Aggregation, Livestock" value={business.sector} onChange={e=>setBusiness(b=>({...b,sector:e.target.value}))}/></div>
+              <div><label style={lbl}>Sector / Industry</label><input style={inp} placeholder="e.g. Crop Aggregation, Livestock, Input Supply" value={business.sector} onChange={e=>setBusiness(b=>({...b,sector:e.target.value}))}/></div>
               <div><label style={lbl}>Currency</label><select style={inp} value={business.currency} onChange={e=>setBusiness(b=>({...b,currency:e.target.value}))}>
                 {['UGX','KES','NGN','GHS','USD'].map(c=><option key={c} value={c}>{c}</option>)}
               </select></div>
+              <div><label style={lbl}>Year Established</label><input style={inp} placeholder="e.g. 2019" value={business.year_established} onChange={e=>setBusiness(b=>({...b,year_established:e.target.value}))}/></div>
+              <div><label style={lbl}>Legal Structure</label><select style={inp} value={business.legal_structure} onChange={e=>setBusiness(b=>({...b,legal_structure:e.target.value}))}>
+                {['','Sole Trader','Partnership','Limited Company','Cooperative','Other'].map(v=><option key={v} value={v}>{v||'Select...'}</option>)}
+              </select></div>
+              <div><label style={lbl}>Primary Sales Channel</label><select style={inp} value={business.sales_channel} onChange={e=>setBusiness(b=>({...b,sales_channel:e.target.value}))}>
+                {['','Direct to farmers','Through agents','Market / wholesale','Mixed'].map(v=><option key={v} value={v}>{v||'Select...'}</option>)}
+              </select></div>
+              <div><label style={lbl}>Season / Period Name</label><input style={inp} placeholder="e.g. Season A 2026, FY2026" value={business.season_name} onChange={e=>setBusiness(b=>({...b,season_name:e.target.value}))}/></div>
+              <div><label style={lbl}>Year-round or Seasonal?</label><select style={inp} value={business.year_round} onChange={e=>setBusiness(b=>({...b,year_round:e.target.value}))}>
+                {['Year-round','Seasonal'].map(v=><option key={v} value={v}>{v}</option>)}
+              </select></div>
+              <div><label style={lbl}>Avg days customers take to pay</label><input type="number" style={inp} placeholder="0 = cash only" value={business.dso||''} onChange={e=>setBusiness(b=>({...b,dso:Number(e.target.value)}))}/></div>
             </div>
             <div style={{display:'flex',gap:'0.6rem',marginTop:'1.25rem'}}>
               <button style={ghostBtn} onClick={()=>setStep(0)}>Back</button>
@@ -347,7 +387,8 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
                 <p style={{fontSize:'0.83rem',color:C.slate,marginBottom:'0.75rem'}}>Name each part of your business (e.g. Shop 1, Farm A, Branch Office):</p>
                 {units.map((u,i)=>(
                   <div key={u.id} style={{display:'flex',gap:'0.5rem',marginBottom:'0.5rem'}}>
-                    <input style={inp} placeholder="e.g. Shop 1" value={u.name} onChange={e=>updateUnit(i,e.target.value)}/>
+                    <input style={{...inp,flex:2}} placeholder="e.g. Livestock Unit, Input Shop" value={u.name} onChange={e=>setUnits(arr=>arr.map((x,j)=>j===i?{...x,name:e.target.value}:x))}/>
+                  <input type="number" style={{...inp,width:80,flex:0}} placeholder="Staff" value={u.headcount||''} onChange={e=>setUnits(arr=>arr.map((x,j)=>j===i?{...x,headcount:Number(e.target.value)}:x))}/>
                     {units.length>1&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>removeUnit(i)}>×</button>}
                   </div>
                 ))}
@@ -467,6 +508,31 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
 
         {step===4&&(
           <div style={card}>
+            <div style={secH}>Funding & Capital Structure</div>
+            <p style={{fontSize:'0.85rem',color:C.slate,marginBottom:'1.25rem',lineHeight:1.7}}>
+              How was the business funded? This is essential for calculating loan repayments and your true cash position. Leave fields at 0 if they don't apply.
+            </p>
+            <div style={fGrid}>
+              <div><label style={lbl}>Shareholder / Owner Contribution ({business.currency})</label><input type="number" style={inp} value={business.shareholder_contribution||''} onChange={e=>setBusiness(b=>({...b,shareholder_contribution:Number(e.target.value)}))}/></div>
+              <div><label style={lbl}>Grant — Non-Repayable ({business.currency})</label><input type="number" style={inp} value={business.grant_non_repayable||''} onChange={e=>setBusiness(b=>({...b,grant_non_repayable:Number(e.target.value)}))}/></div>
+              <div><label style={lbl}>Grant — Recoverable ({business.currency})</label><input type="number" style={inp} value={business.grant_recoverable||''} onChange={e=>setBusiness(b=>({...b,grant_recoverable:Number(e.target.value)}))}/></div>
+              <div><label style={lbl}>Bank / MFI Loan Amount ({business.currency})</label><input type="number" style={inp} value={business.bank_loan||''} onChange={e=>setBusiness(b=>({...b,bank_loan:Number(e.target.value)}))}/></div>
+              <div><label style={lbl}>Loan Interest Rate (% per year)</label><input type="number" style={inp} value={business.annual_interest_rate||''} onChange={e=>setBusiness(b=>({...b,annual_interest_rate:Number(e.target.value)}))}/></div>
+              <div><label style={lbl}>Loan Tenor (years)</label><input type="number" style={inp} value={business.loan_tenor_years||''} onChange={e=>setBusiness(b=>({...b,loan_tenor_years:Number(e.target.value)}))}/></div>
+              <div><label style={lbl}>Grace Period (months before repayments start)</label><input type="number" style={inp} value={business.grace_period_months||''} onChange={e=>setBusiness(b=>({...b,grace_period_months:Number(e.target.value)}))}/></div>
+              <div><label style={lbl}>Fixed Assets at Cost ({business.currency})</label><input type="number" style={inp} value={business.fixed_assets||''} onChange={e=>setBusiness(b=>({...b,fixed_assets:Number(e.target.value)}))}/></div>
+              <div><label style={lbl}>Opening Cash Balance ({business.currency})</label><input type="number" style={inp} value={business.opening_cash_balance||''} onChange={e=>setBusiness(b=>({...b,opening_cash_balance:Number(e.target.value)}))}/></div>
+              <div><label style={lbl}>Corporate Tax Rate (%)</label><input type="number" style={inp} value={business.corporate_tax_rate||''} onChange={e=>setBusiness(b=>({...b,corporate_tax_rate:Number(e.target.value)}))}/></div>
+            </div>
+            <div style={{display:'flex',gap:'0.6rem',marginTop:'1.25rem'}}>
+              <button style={ghostBtn} onClick={()=>setStep(3)}>Back</button>
+              <button style={btn()} onClick={()=>setStep(5)}>Continue</button>
+            </div>
+          </div>
+        )}
+
+        {step===5&&(
+          <div style={card}>
             <div style={secH}>Review and Submit</div>
             <div style={{marginBottom:'1rem'}}>
               <div style={{fontWeight:700,color:C.navy,marginBottom:'0.4rem'}}>{business.business_name}</div>
@@ -488,7 +554,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
             <div style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1.25rem'}}>{pastMonths} months of past data · {futureMonths} months forward plan</div>
             {error&&<div style={{color:C.red,fontSize:'0.85rem',marginBottom:'1rem',padding:'0.7rem',background:'#FDF0EE',borderRadius:5}}>{error}</div>}
             <div style={{display:'flex',gap:'0.6rem'}}>
-              <button style={ghostBtn} onClick={()=>setStep(3)}>Back</button>
+              <button style={ghostBtn} onClick={()=>setStep(4)}>Back</button>
               <button style={btn(C.green)} disabled={submitting} onClick={submit}>{submitting?'Submitting...':'Submit'}</button>
             </div>
           </div>
@@ -501,30 +567,30 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
 function ProductList({unitKey,products,addProduct,updateProductName,removeProduct,addCostLine,updateCostLineName,removeCostLine,pastMonths,futureMonths,figureData,setFigure,monthLabel,cc}:any) {
   return (
     <div>
-      <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'0.75rem'}}>List each product or service. Add as many cost lines as apply to it.</p>
+      <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'0.75rem'}}>List each product category or revenue stream. For each, enter the sales revenue and the cost of goods for that month. They do not need to match — procurement and sales often happen in different months.</p>
       {products.map((p:any,pi:number)=>(
         <div key={p.id} style={{marginBottom:'1rem',border:`1px solid ${C.border}`,borderRadius:6,padding:'0.85rem',background:C.white}}>
           <div style={{display:'flex',gap:'0.5rem',alignItems:'center',marginBottom:'0.6rem'}}>
-            <input style={{...inp,fontWeight:700}} placeholder="Product or service name (e.g. Eggs, Off-layers)" value={p.name} onChange={e=>updateProductName(unitKey,pi,e.target.value)}/>
+            <input style={{...inp,fontWeight:700}} placeholder="Product category (e.g. Egg Sales, Fertiliser Sales, Advisory Services)" value={p.name} onChange={e=>updateProductName(unitKey,pi,e.target.value)}/>
             {products.length>1&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>removeProduct(unitKey,pi)}>×</button>}
           </div>
-          <MonthRow label={p.name||'Revenue'} labelColor={C.green} lineId={`${p.id}_rev`} pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel}/>
+          <MonthRow label={`${p.name||'Category'} — Sales Revenue`} labelColor={C.green} lineId={`${p.id}_rev`} pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel}/>
           <div style={{marginTop:'0.5rem',paddingLeft:'0.75rem',borderLeft:`2px solid ${C.border}`}}>
-            <div style={{fontSize:'0.76rem',fontWeight:600,color:C.red,marginBottom:'0.3rem'}}>Cost Lines</div>
+            <div style={{fontSize:'0.76rem',fontWeight:600,color:C.red,marginBottom:'0.3rem'}}>Cost of Goods / Procurement Cost</div>
             {p.costLines.map((c:any,ci:number)=>(
               <div key={c.id} style={{marginBottom:'0.5rem'}}>
                 <div style={{display:'flex',gap:'0.5rem',alignItems:'center',marginBottom:'0.3rem'}}>
                   <input style={{...inp,fontSize:'0.82rem',
                     borderColor:!c.name&&Object.values(figureData[c.id]||{}).some((v:any)=>v>0)?C.amber:undefined,
                     background:!c.name&&Object.values(figureData[c.id]||{}).some((v:any)=>v>0)?'#FFFBEA':undefined,
-                  }} placeholder="Name this cost (e.g. Feed, Labour)" value={c.name} onChange={e=>updateCostLineName(unitKey,pi,ci,e.target.value)}/>
+                  }} placeholder="Cost name (e.g. Input Purchases, Raw Materials) — optional" value={c.name} onChange={e=>updateCostLineName(unitKey,pi,ci,e.target.value)}/>
                   {!c.name&&Object.values(figureData[c.id]||{}).some((v:any)=>v>0)&&<span style={{fontSize:'0.68rem',color:C.amber,marginLeft:'4px'}}>Give this cost a name</span>}
                   {p.costLines.length>1&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1rem'}} onClick={()=>removeCostLine(unitKey,pi,ci)}>×</button>}
                 </div>
-                <MonthRow label={c.name||'Cost'} labelColor={C.red} lineId={c.id} pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel} compact/>
+                <MonthRow label={c.name||'Cost of Goods'} labelColor={C.red} lineId={c.id} pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel} compact/>
               </div>
             ))}
-            <button style={smallBtn(C.red)} onClick={()=>addCostLine(unitKey,pi)}>+ Add Cost Line</button>
+            <button style={smallBtn(C.red)} onClick={()=>addCostLine(unitKey,pi)}>+ Add Another Cost Line</button>
           </div>
           <p style={{fontSize:'0.68rem',color:C.slate,marginTop:'0.5rem'}}>All figures in {cc}.</p>
         </div>
