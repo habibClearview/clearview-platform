@@ -204,7 +204,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
         businessUnits.push({
           id:key, name:unitName, short:(unitName||'').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,4),
           type:'mixed', color:['#00B4D8','#1A9DAA','#B8860B','#6B4A8B','#1A7A4A'][ki%5],
-          headcount: k.headcount || 0, active:true, sort_order:ki,
+          headcount: hasUnits ? (units.find(u=>u.id===key)?.headcount || 0) : 0, active:true, sort_order:ki,
         })
         const prods = currentProducts[key] || []
         prods.filter((p:any)=>p.name).forEach((p:any) => {
