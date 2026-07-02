@@ -63,6 +63,8 @@ export async function POST(req: NextRequest) {
 
     // 5. Build product catalogue: plan lines for this unit
     const planLines: any[] = config.plan_lines || []
+    // Catalogue: plan lines for this unit
+    // No prices pre-filled -- operator enters actual price at time of transaction
     const catalogue = planLines
       .filter((l: any) => l.unit_id === operator.business_unit_id && l.active)
       .map((l: any) => ({
@@ -70,14 +72,6 @@ export async function POST(req: NextRequest) {
         name: l.name,
         category: l.category,
         line_type: l.line_type || 'standard',
-        // Standard price: average of future monthly plan values (non-zero)
-        standard_price: (() => {
-          const vals: number[] = l.monthly_plan || []
-          const nonZero = vals.filter((v: number) => v > 0)
-          return nonZero.length > 0
-            ? Math.round(nonZero.reduce((a: number, b: number) => a + b, 0) / nonZero.length)
-            : 0
-        })(),
       }))
 
     // 6. Get customers for this unit
