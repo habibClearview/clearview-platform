@@ -145,7 +145,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
         // Old template: unit name in WHICH_PART_ROW constant
         const sheetUnitName = isNewTemplate
           ? cellStr(pf, 'B4')
-          : cellStr(pf, `C\${WHICH_PART_ROW}`)
+          : cellStr(pf, `C${WHICH_PART_ROW}`)
 
         // Find month columns
         // New template: headers in row 6, data starts col C (col index 3, 1-based)
@@ -156,7 +156,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
         let monthCols: number[] = []
         let thisMonthColIdx = -1
         for (let c = monthStartCol; c < monthStartCol + 30; c++) {
-          const addr = \`\${colLetter(c)}\${headerRow}\`
+          const addr = `${colLetter(c)}${headerRow}`
           const val = cellStr(pf, addr)
           if (!val) break
           monthCols.push(c)
@@ -175,7 +175,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
 
         function readVals(rowNum: number): number[] {
           return monthCols.map(c => {
-            const v = cellNum(pf, \`\${colLetter(c)}\${rowNum}\`)
+            const v = cellNum(pf, `${colLetter(c)}${rowNum}`)
             return v ?? 0
           })
         }
@@ -209,7 +209,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
             const cogRow = revSectionStart + (i * 2) + 1
 
             // Name from col A on the revenue row
-            const name = cellStr(pf, \`A\${revRow}\`)
+            const name = cellStr(pf, `A${revRow}`)
             if (!name) continue
 
             const revenue = readVals(revRow)
@@ -229,7 +229,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
           const staffSectionStart = revSectionStart + (N_REV * 2) + 2
           for (let i = 0; i < 4; i++) {
             const row = staffSectionStart + i
-            const name = cellStr(pf, \`A\${row}\`)
+            const name = cellStr(pf, `A${row}`)
             const vals = readVals(row)
             if (name || vals.some(v => v > 0)) {
               allCommonCosts.push({ name: name || 'Staff', values: vals, unitName: resolvedUnitName })
@@ -240,7 +240,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
           const opexSectionStart = staffSectionStart + 4 + 2
           for (let i = 0; i < 4; i++) {
             const row = opexSectionStart + i
-            const name = cellStr(pf, \`A\${row}\`)
+            const name = cellStr(pf, `A${row}`)
             const vals = readVals(row)
             if (name || vals.some(v => v > 0)) {
               allCommonCosts.push({ name: name || 'Overheads', values: vals, unitName: resolvedUnitName })
@@ -251,12 +251,12 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
           // Old template: name in col C, revenue on next row, cost lines following
           let row = PRODUCT_BLOCK_START_ROW
           for (let p = 0; p < PRODUCT_SLOTS; p++) {
-            const name = cellStr(pf, \`C\${row}\`)
+            const name = cellStr(pf, `C${row}`)
             const revenueRow = row + 1
             const costLines: {name:string,values:number[]}[] = []
             for (let cl = 0; cl < COST_LINES_PER_PRODUCT; cl++) {
               const costRow = row + 2 + cl
-              const costName = cellStr(pf, \`C\${costRow}\`)
+              const costName = cellStr(pf, `C${costRow}`)
               if (costName) costLines.push({ name: costName, values: readVals(costRow) })
             }
             if (name) allProducts.push({ name, costLines, revenue: readVals(revenueRow), unitName: resolvedUnitName })
@@ -265,12 +265,12 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
 
           let commonRow = -1
           for (let r = row; r < row + 10; r++) {
-            if (cellStr(pf, \`B\${r}\`).toUpperCase().includes('COMMON COSTS')) { commonRow = r + 1; break }
+            if (cellStr(pf, `B${r}`).toUpperCase().includes('COMMON COSTS')) { commonRow = r + 1; break }
           }
           if (commonRow > 0 && !hasUnits) {
             for (let cl = 0; cl < 4; cl++) {
               const r = commonRow + cl
-              const name = cellStr(pf, \`C\${r}\`)
+              const name = cellStr(pf, `C${r}`)
               if (name) allCommonCosts.push({ name, values: readVals(r), unitName: resolvedUnitName })
             }
           }
@@ -380,7 +380,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
           legal_structure: business.legal_structure || '',
           sales_channel: business.sales_channel || '',
           structure_confirmed: true,
-          upload_note: unassignedSheets?.length>0 ? \`Some sheets could not be matched to a unit by name (\${unassignedSheets.join(', ')}) -- their products were placed under "\${units[0]?.name}". Coach should review and reassign.\` : '',
+          upload_note: unassignedSheets?.length>0 ? `Some sheets could not be matched to a unit by name (${unassignedSheets.join(', ')}) -- their products were placed under "${units[0]?.name}". Coach should review and reassign.` : '',
         },
       }])
       if (configErr) throw configErr
