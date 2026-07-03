@@ -9,7 +9,7 @@ import {
   type GenericModelConfig, type GenericBusinessUnit,
   type GenericPlanLine, type LineCategory, type LineType, type UnitType,
 } from '@/lib/generic-engine'
-import { buildDebtSchedule, defaultCoachAssessment } from '@/lib/scoring-engine'
+import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor } from '@/lib/scoring-engine'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
@@ -1248,14 +1248,28 @@ function SettingsTab({config,P,onSave}) {
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1.3fr',gap:'0.5rem'}}>
                   <div><div style={hint}>Tenor (months)</div><input type="number" style={inp} value={d.tenorMonths||12} onChange={e=>{const ds=[...(form.settings.debts||[])];ds[i]={...ds[i],tenorMonths:Number(e.target.value)};setForm(f=>({...f,settings:{...f.settings,debts:ds}}))}}/></div>
                   <div><div style={hint}>Grace Period (months)</div><input type="number" style={inp} value={d.gracePeriodMonths||0} onChange={e=>{const ds=[...(form.settings.debts||[])];ds[i]={...ds[i],gracePeriodMonths:Number(e.target.value)};setForm(f=>({...f,settings:{...f.settings,debts:ds}}))}}/></div>
-                  <div><div style={hint}>Drawdown Month</div><input type="number" min="1" style={inp} value={d.drawdownMonth||1} onChange={e=>{const ds=[...(form.settings.debts||[])];ds[i]={...ds[i],drawdownMonth:Number(e.target.value)};setForm(f=>({...f,settings:{...f.settings,debts:ds}}))}}/></div>
+                  <div><div style={hint}>Drawdown Month (1 = plan's first month)</div><input type="number" min="1" style={inp} value={d.drawdownMonth||1} onChange={e=>{const ds=[...(form.settings.debts||[])];ds[i]={...ds[i],drawdownMonth:Number(e.target.value)};setForm(f=>({...f,settings:{...f.settings,debts:ds}}))}}/></div>
                   <div><div style={hint}>Repayment Type</div>
                     <select style={inp} value={d.repaymentType||'amortising'} onChange={e=>{const ds=[...(form.settings.debts||[])];ds[i]={...ds[i],repaymentType:e.target.value};setForm(f=>({...f,settings:{...f.settings,debts:ds}}))}}>
                       <option value="amortising">Amortising (equal principal each month)</option>
                       <option value="bullet">Bullet (full principal at end of tenor)</option>
+                      <option value="quarterly">Quarterly (equal principal every 3 months)</option>
+                      <option value="seasonal">Seasonal (specific months only)</option>
                     </select>
                   </div>
                 </div>
+                {d.repaymentType==='seasonal'&&(
+                  <div style={{marginTop:'0.5rem'}}>
+                    <div style={hint}>Repayment months (comma-separated, 1 = plan's first month, e.g. "6, 12" for a twice-yearly harvest schedule)</div>
+                    <input style={inp} value={(d.seasonalMonths||[]).join(', ')}
+                      onChange={e=>{
+                        const ds=[...(form.settings.debts||[])]
+                        const months=e.target.value.split(',').map((x:string)=>parseInt(x.trim(),10)).filter((n:number)=>!isNaN(n)&&n>0)
+                        ds[i]={...ds[i],seasonalMonths:months}
+                        setForm(f=>({...f,settings:{...f.settings,debts:ds}}))
+                      }}/>
+                  </div>
+                )}
               </div>
             ))}
             <button style={addBtn(true)} onClick={()=>setForm(f=>({...f,settings:{...f.settings,debts:[...(f.settings.debts||[]),{name:'',principal:0,annualRate:0.18,tenorMonths:12,gracePeriodMonths:0,drawdownMonth:1,repaymentType:'amortising'}]}}))}>+ Add Debt Obligation</button>
@@ -1369,7 +1383,7 @@ Financial summary:
 - Going Concern: ${s.gcScore}/20 (${s.gcRating})
 - Investment Readiness: ${s.irScore}/30 (${s.irTier})
 - Minimum cash position: ${cc} ${m.min_cash.toLocaleString()}
-- DSCR average: ${s.dscrAvg.toFixed(2)}x
+- Debt service coverage: ${dscrLabel(s)}
 - Break-even revenue: ${cc} ${m.business_breakeven.toLocaleString()}
 - Staff cost as % of revenue: ${(m.staff_cost_pct*100).toFixed(1)}%
 
@@ -1397,7 +1411,7 @@ Write a clear, plain-English health check report for the CEO. Include: 1) Overal
 Data:
 - Revenue: ${cc} ${m.total_revenue.toLocaleString()}, EBITDA margin: ${(m.net_margin*100).toFixed(1)}%
 - Credit Risk: ${s.score}/100 (${s.classification}); Going Concern: ${s.gcScore}/20 (${s.gcRating}); Investment Readiness: ${s.irScore}/30 (${s.irTier})
-- DSCR: ${s.dscrAvg.toFixed(2)}x
+- Debt service coverage: ${dscrLabel(s)}
 - Break-even revenue: ${cc} ${m.business_breakeven.toLocaleString()}
 - Cash shortfall months: ${warnings.length>0?warnings.map(w=>w.month).join(', '):'none'}
 - Staff cost ratio: ${(m.staff_cost_pct*100).toFixed(1)}%
@@ -1451,7 +1465,7 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
             <KPI label="Credit Risk" value={`${s.score}/100`} sub={s.classification} color={s.classColor}/>
             <KPI label="Going Concern" value={`${s.gcScore}/20`} sub={s.gcRating} color={s.gcColor}/>
             <KPI label="Investment Readiness" value={`${s.irScore}/30`} sub={s.irTier} color={s.irColor}/>
-            <KPI label="Avg DSCR" value={`${s.dscrAvg.toFixed(2)}x`} color={s.dscrAvg>=1.5?C.green:s.dscrAvg>=1.0?C.amber:C.red}/>
+            <KPI label="Debt Service Coverage (min)" value={dscrLabel(s)} color={dscrColor(s,C)}/>
             <KPI label="Break-Even Revenue" value={fmt(m.business_breakeven,cc)} color={C.amber}/>
             <KPI label="Staff Cost %" value={pct(m.staff_cost_pct)} color={m.staff_cost_pct<0.3?C.green:m.staff_cost_pct<0.5?C.amber:C.red}/>
             <KPI label="Days to Collect (DSO)" value={`${s.tradeCredit.dso.toFixed(0)}d`} color={C.navy}/>
@@ -1461,7 +1475,8 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
           <div style={{background:C.navy,borderRadius:8,padding:'1rem 1.25rem'}}>
             <div style={{fontFamily:'monospace',fontSize:'0.65rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.75rem'}}>READING THE PICTURE</div>
             {[
-              [s.dscrAvg>=1.5?'ok':s.dscrAvg>=1.0?'info':'warn', `Debt service coverage: DSCR ${s.dscrAvg.toFixed(2)}x. ${s.dscrAvg>=1.5?'Strong.':s.dscrAvg>=1.0?'Adequate but watch closely.':'Weak: not generating enough to service obligations.'}`],
+              [!s.hasDebt?'info':s.dscrMin===null?'info':s.dscrMin>=1.5?'ok':s.dscrMin>=1.0?'info':'warn',
+                `Debt service coverage: ${!s.hasDebt?'No debt obligations on this plan.':s.dscrMin===null?'Debt exists but no repayment has fallen due yet.':`Minimum DSCR ${s.dscrMin.toFixed(2)}x across periods with a repayment due. ${s.dscrMin>=1.5?'Strong.':s.dscrMin>=1.0?'Adequate but watch closely.':'Weak: not generating enough to service obligations in the tightest period.'}`}`],
               [s.cashGaps===0?'ok':'warn', `Cash position: ${s.cashGaps===0?'Positive throughout the period.':'Negative in '+s.cashGaps+' month(s).'}`],
               [s.revTrend==='Growing'?'ok':s.revTrend==='Stable'?'info':'warn', `Revenue trend: ${s.revTrend} from start to end of period.`],
               [s.irScore>=17?'ok':'info', `Investment readiness: ${s.irTier} (${s.irScore}/30).`],
@@ -1536,7 +1551,7 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
             </div>
           </div>
           <div style={kpiGrid}>
-            <KPI label="DSCR Average" value={`${s.dscrAvg.toFixed(2)}x`} color={s.dscrAvg>=1.5?C.green:s.dscrAvg>=1.0?C.amber:C.red}/>
+            <KPI label="Minimum DSCR" value={dscrLabel(s)} color={dscrColor(s,C)}/>
             <KPI label="Revenue Trend" value={s.revTrend} color={s.revTrend==='Growing'?C.green:s.revTrend==='Stable'?C.amber:C.red}/>
             <KPI label="Cash-Negative Months" value={String(s.cashGaps)} color={s.cashGaps===0?C.green:C.red}/>
             <KPI label="Annual EBITDA" value={fmt(m.total_ebitda,cc)} color={m.total_ebitda>=0?C.green:C.red}/>
@@ -1546,7 +1561,7 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
             <tbody>
               <tr style={{background:'#F8F4EE'}}><td style={{padding:'6px 10px',fontWeight:600}}>EBITDA</td>{result.con.ebitda.map((v:number,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right',color:v>=0?C.green:C.red}}>{fmt(v,cc)}</td>)}</tr>
               <tr><td style={{padding:'6px 10px',fontWeight:600}}>Debt Service</td>{debtSched.totalRepayment.map((v:number,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right'}}>{fmt(v,cc)}</td>)}</tr>
-              <tr style={{background:'#F0F4F8'}}><td style={{padding:'6px 10px',fontWeight:700}}>DSCR</td>{s.dscrVals.map((v:number,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:v>=1.5?C.green:v>=1.0?C.amber:C.red}}>{v.toFixed(2)}x</td>)}</tr>
+              <tr style={{background:'#F0F4F8'}}><td style={{padding:'6px 10px',fontWeight:700}}>DSCR</td>{s.dscrVals.map((v:number|null,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:v===null?C.slate:v>=1.5?C.green:v>=1.0?C.amber:C.red}}>{v===null?'–':`${v.toFixed(2)}x`}</td>)}</tr>
             </tbody>
           </table></div>
         </div>
@@ -1559,7 +1574,7 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
             <div style={{display:'flex',alignItems:'center',gap:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:s.gcColor,lineHeight:1}}>{s.gcScore}</div><div><div style={{fontSize:'0.75rem',color:C.slate}}>out of 20</div><Badge2 label={s.gcRating} color={s.gcColor}/></div></div>
           </div>
           {[
-            {name:'Debt Service Coverage',sc:s.dscrAvg>=1.5?4:s.dscrAvg>=1.0?3:s.dscrAvg>=0.5?2:1,max:4,ev:'DSCR '+s.dscrAvg.toFixed(2)+'x',field:null},
+            {name:'Debt Service Coverage',sc:!s.hasDebt?4:s.dscrMin===null?3:s.dscrMin>=1.5?4:s.dscrMin>=1.0?3:s.dscrMin>=0.5?2:1,max:4,ev:dscrLabel(s),field:null},
             {name:'Liquidity Position',sc:m.min_cash>=0?4:m.min_cash>-10000000?1:0,max:4,ev:'Min cash: '+fmt(m.min_cash,cc),field:null},
             {name:'Revenue Sustainability',sc:3,max:4,ev:'Revenue trend: '+s.revTrend,field:null},
             {name:'Operational Profitability',sc:m.total_ebitda>0?3:2,max:4,ev:'Annual EBITDA: '+fmt(m.total_ebitda,cc),field:null},
@@ -1584,7 +1599,7 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
           <InvestmentPitchDownload clientId={clientId}/>
           {[
             {name:'Financial Viability',sc:s.irFinancial,max:5,ev:'EBITDA margin '+(s.ebitdaMargin*100).toFixed(1)+'%',field:null},
-            {name:'Debt Serviceability',sc:s.irDebt,max:5,ev:'DSCR '+s.dscrAvg.toFixed(2)+'x',field:null},
+            {name:'Debt Serviceability',sc:s.irDebt,max:5,ev:dscrLabel(s),field:null},
             {name:'Commercial Model Clarity',sc:Number(assess.commercialModel)||2,max:5,ev:'Coach assessment',field:'commercialModel'},
             {name:'Management Capability',sc:Number(assess.managementCapability)||2,max:5,ev:'Coach assessment',field:'managementCapability'},
             {name:'Market Evidence',sc:Number(assess.marketEvidence)||2,max:5,ev:'Coach assessment',field:'marketEvidence'},

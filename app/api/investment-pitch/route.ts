@@ -10,7 +10,7 @@ import {
   HeadingLevel, BorderStyle, WidthType, AlignmentType, ShadingType,
 } from 'docx'
 import { runGenericModel, buildMonthLabels, type GenericModelConfig } from '@/lib/generic-engine'
-import { computeScores, defaultCoachAssessment, computeTradeCredit } from '@/lib/scoring-engine'
+import { computeScores, defaultCoachAssessment, computeTradeCredit, dscrLabel, dscrColor } from '@/lib/scoring-engine'
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -230,7 +230,7 @@ export async function POST(req: NextRequest) {
 Business: ${config.business_name}, ${client?.sector || 'agribusiness'} sector, ${client?.country || 'Uganda'}
 Revenue: ${fmt(m.total_revenue, cc)} | Gross Margin: ${pct(m.gross_margin)} | EBITDA: ${fmt(m.total_ebitda, cc)} (${pct(m.net_margin)})
 Break-even: ${fmt(m.business_breakeven, cc)} | Headroom: ${fmt(m.total_revenue - m.business_breakeven, cc)}
-Investment Readiness: ${s.irScore}/30 (${s.irTier}) | Credit Risk: ${s.score}/100 (${s.classification}) | DSCR: ${s.dscrAvg.toFixed(2)}x
+Investment Readiness: ${s.irScore}/30 (${s.irTier}) | Credit Risk: ${s.score}/100 (${s.classification}) | DSCR: ${dscrLabel(s)}
 Units: ${unitLines.join('; ')}
 ${hasMarketing ? `Top marketing channel by CAC: ${channels[0]?.channel} at ${channels[0]?.cac ? fmt(channels[0].cac, cc) : 'unquantified'} per customer` : ''}
 ${hasTCData ? `DSO: ${tc.dso.toFixed(0)} days | DPO: ${tc.dpo.toFixed(0)} days | Cash conversion gap: ${tc.cashConversionGap.toFixed(0)} days` : ''}
@@ -283,7 +283,7 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
         scoreBadge('Investment Readiness', `${s.irScore}/30`, s.irTier, s.irScore >= 24 ? GREEN : s.irScore >= 17 ? CYAN : AMBER, w4),
         scoreBadge('Credit Risk Score', `${s.score}/100`, s.classification, s.classification === 'Stable' ? GREEN : s.classification === 'At Risk' ? AMBER : RED, w4),
         scoreBadge('Going Concern', `${s.gcScore}/20`, s.gcRating, s.gcRating === 'Strong' ? GREEN : s.gcRating === 'Adequate' ? CYAN : AMBER, w4),
-        scoreBadge('Debt Service (DSCR)', `${s.dscrAvg.toFixed(2)}x`, s.dscrAvg >= 1.5 ? 'Strong' : s.dscrAvg >= 1.0 ? 'Adequate' : 'Below threshold', s.dscrAvg >= 1.5 ? GREEN : s.dscrAvg >= 1.0 ? AMBER : RED, w4),
+        scoreBadge('Debt Service (DSCR)', dscrLabel(s), !s.hasDebt ? 'No Debt' : s.dscrMin===null ? 'Not Yet Due' : s.dscrMin >= 1.5 ? 'Strong' : s.dscrMin >= 1.0 ? 'Adequate' : 'Below threshold', dscrColor(s,{green:GREEN,amber:AMBER,red:RED,slate:SLATE}), w4),
       ]})],
     }))
     children.push(spacer(0, 200))

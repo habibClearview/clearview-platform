@@ -11,7 +11,14 @@ export interface DebtObligation {
   tenorMonths?: number
   gracePeriodMonths?: number
   principal?: number
+  // 'amortising' (default, equal principal each period) | 'bullet' (full principal at term end)
+  // | 'quarterly' (equal principal every 3rd month) | 'seasonal' (equal principal on the
+  // specific plan months listed in seasonalMonths -- for harvest-cycle repayment)
   repaymentType?: string
+  // Only used when repaymentType === 'seasonal'. 1-indexed months of the plan
+  // (not calendar months) on which a repayment falls due, e.g. [6, 12] for a
+  // twice-yearly harvest-linked schedule starting at drawdown.
+  seasonalMonths?: number[]
 }
 
 export interface DebtSchedule {
@@ -123,13 +130,26 @@ export function buildDebtSchedule(obligations: DebtObligation[], months: number)
     const monthlyRate = (ob.annualRate || 0) / 12
     const tenor = ob.tenorMonths || 12
     const grace = ob.gracePeriodMonths || 0
+    const type = ob.repaymentType || 'monthly'
     const interestByMonth = Array(months).fill(0)
     const principalByMonth = Array(months).fill(0)
     const balanceByMonth = Array(months).fill(0)
+
+    // Which months-since-start (mss) are actual principal due dates differs
+    // by repayment type. Interest still accrues every month the loan is
+    // outstanding regardless of type -- only principal due dates differ.
+    const isDueMonth = (mss: number): boolean => {
+      if (mss < grace || mss >= tenor) return false
+      if (type === 'bullet') return mss === tenor - 1
+      if (type === 'quarterly') return (mss - grace) % 3 === 0
+      if (type === 'seasonal') return (ob.seasonalMonths || []).includes(mss + 1)
+      return true // amortising (default): principal due every month
+    }
     let totalPP = 0
     for (let m = startIdx; m < Math.min(startIdx + tenor, months); m++) {
-      if ((m - startIdx) >= grace) totalPP++
+      if (isDueMonth(m - startIdx)) totalPP++
     }
+
     let bal = ob.principal || 0
     let repayCount = 0
     for (let m = startIdx; m < months; m++) {
@@ -138,9 +158,9 @@ export function buildDebtSchedule(obligations: DebtObligation[], months: number)
       const interest = bal * monthlyRate
       interestByMonth[m] = interest
       let principal = 0
-      if (mss < tenor && mss >= grace) {
-        if (ob.repaymentType === 'bullet') {
-          if (mss === tenor - 1) principal = bal
+      if (isDueMonth(mss)) {
+        if (type === 'bullet') {
+          principal = bal
         } else {
           principal = Math.min(bal / Math.max(1, totalPP - repayCount), bal)
           repayCount++
@@ -197,8 +217,18 @@ export interface ScoringResult {
   score: number
   classification: 'Stable' | 'At Risk' | 'High Risk'
   classColor: string
-  dscrAvg: number
-  dscrVals: number[]
+  // Whether any debt obligation with principal > 0 exists at all. When false,
+  // no DSCR figure should ever be shown -- there is nothing to service.
+  hasDebt: boolean
+  // The lowest DSCR across periods where a real repayment is actually due.
+  // This is NOT an average -- blending real debt-service periods with
+  // periods that have no repayment due produces a meaningless number.
+  // Null when hasDebt is false, or when hasDebt is true but no repayment
+  // has fallen due yet within the plan window (e.g. still in grace period).
+  dscrMin: number | null
+  // Per-period DSCR, one entry per month: null where no repayment is due
+  // that month (not a fake filler value), a real ratio otherwise.
+  dscrVals: (number | null)[]
   cashGaps: number
   revTrend: 'Growing' | 'Stable' | 'Declining'
   // Going Concern
@@ -231,11 +261,19 @@ export function computeScores(inputs: ScoringInputs): ScoringResult {
   // Supports multiple debt obligations (bank loans, non-bank facilities, etc) --
   // each contributes its own interest/principal schedule, summed together.
   const debtSched = buildDebtSchedule(inputs.debtObligations || [], m)
-  const dscrVals = ebitda.map((e, i) => {
+  const hasDebt = (inputs.debtObligations || []).some(ob => (ob.principal || 0) > 0)
+  // Real DSCR only exists for a period where a repayment is actually due.
+  // No placeholder value for periods without a repayment due -- that
+  // includes periods before drawdown, during a grace period, or after the
+  // loan is fully repaid.
+  const dscrVals: (number | null)[] = ebitda.map((e, i) => {
     const ds = debtSched.totalRepayment[i]
-    return ds > 0 ? e / ds : (e > 0 ? 3 : 0)
+    return ds > 0 ? e / ds : null
   })
-  const dscrAvg = dscrVals.reduce((a, b) => a + b, 0) / Math.max(1, m)
+  const realDscrVals = dscrVals.filter((v): v is number => v !== null)
+  // Minimum DSCR across periods with a real repayment due -- the standard
+  // covenant-testing figure. Never an average of real and non-existent values.
+  const dscrMin = realDscrVals.length > 0 ? Math.min(...realDscrVals) : null
   const cashGaps = cashClose.filter(v => v < 0).length
   const annualRevenue = rev.reduce((a, b) => a + b, 0)
   const annualEbitda = ebitda.reduce((a, b) => a + b, 0)
@@ -251,10 +289,15 @@ export function computeScores(inputs: ScoringInputs): ScoringResult {
   const tradeCredit = computeTradeCredit(inputs.tradeCreditLines || [], cogs, rev, m)
 
   // ── Credit Risk Score (0-100) ──
+  // Debt service is only scored when a real repayment obligation exists and
+  // has actually fallen due. No debt at all is not a credit risk factor --
+  // it's excluded from scoring, not defaulted to a fabricated "good" score.
   let score = 50
-  if (dscrAvg >= 1.5) score += 30
-  else if (dscrAvg >= 1.0) score += 15
-  else if (dscrAvg < 0.5) score -= 20
+  if (hasDebt && dscrMin !== null) {
+    if (dscrMin >= 1.5) score += 30
+    else if (dscrMin >= 1.0) score += 15
+    else if (dscrMin < 0.5) score -= 20
+  }
   if (cashGaps === 0) score += 20
   else if (cashGaps > 2) score -= 10
   if (revTrend === 'Growing') score += 10
@@ -278,8 +321,14 @@ export function computeScores(inputs: ScoringInputs): ScoringResult {
   const revenueSustainabilityScore = (tradeCredit.dso > 0 || tradeCredit.dpo > 0)
     ? (tradeCredit.cashConversionGap <= 0 ? 4 : tradeCredit.cashConversionGap <= 30 ? 3 : tradeCredit.cashConversionGap <= 60 ? 2 : 1)
     : 3 // no trade credit data entered -- default adequate
+  // Debt service factor: no debt at all scores the same as strong coverage
+  // (4/4) since it carries no default risk -- but this is an explicit rule,
+  // not a fabricated DSCR number standing in for "no debt."
+  const debtServiceFactor = !hasDebt ? 4
+    : dscrMin === null ? 3 // debt exists but nothing due yet (grace period) -- treat as adequate, not scored as if failing
+    : dscrMin >= 1.5 ? 4 : dscrMin >= 1.0 ? 3 : dscrMin >= 0.5 ? 2 : 1
   const gcScore = Math.min(20,
-    (dscrAvg >= 1.5 ? 4 : dscrAvg >= 1.0 ? 3 : dscrAvg >= 0.5 ? 2 : 1) +
+    debtServiceFactor +
     (minCash >= 0 ? 4 : minCash > -10000000 ? 1 : 0) +
     revenueSustainabilityScore +
     (annualEbitda > 0 ? 3 : 2) +
@@ -292,13 +341,16 @@ export function computeScores(inputs: ScoringInputs): ScoringResult {
   const ebitdaMargin = annualRevenue > 0 ? annualEbitda / annualRevenue : 0
   const deToEq = (totalEquity > 0) ? (totalLiabilities || 0) / totalEquity : 99
   const irFinancial = Math.min(5, (ebitdaMargin >= 0.2 ? 2 : ebitdaMargin >= 0.05 ? 1 : 0) + (annualEbitda > 0 ? 1 : 0) + (deToEq < 1 ? 2 : deToEq < 2 ? 1 : 0))
-  const irDebt = Math.min(5, Math.round(dscrAvg >= 2 ? 5 : dscrAvg >= 1.5 ? 4 : dscrAvg >= 1 ? 3 : 2))
+  // Same explicit no-debt rule as Going Concern above -- 5/5, not a fabricated ratio.
+  const irDebt = !hasDebt ? 5
+    : dscrMin === null ? 3
+    : Math.min(5, Math.round(dscrMin >= 2 ? 5 : dscrMin >= 1.5 ? 4 : dscrMin >= 1 ? 3 : 2))
   const irScore = Math.min(30, irFinancial + irDebt + (Number(assess.commercialModel) || 2) + (Number(assess.managementCapability) || 2) + (Number(assess.marketEvidence) || 2) + (Number(assess.governance) || 2))
   const irTier: 'Investment Ready'|'Near Ready'|'Development Stage'|'Pre-Investment' = irScore >= 24 ? 'Investment Ready' : irScore >= 17 ? 'Near Ready' : irScore >= 10 ? 'Development Stage' : 'Pre-Investment'
   const irColor = irTier === 'Investment Ready' ? GREEN : irTier === 'Near Ready' ? TEAL : AMBER
 
   return {
-    score, classification, classColor, dscrAvg, dscrVals, cashGaps, revTrend,
+    score, classification, classColor, hasDebt, dscrMin, dscrVals, cashGaps, revTrend,
     gcScore, gcRating, gcColor,
     irScore, irTier, irColor, irFinancial, irDebt,
     tradeCredit,
@@ -312,4 +364,17 @@ export function computeViabilityRating(gcScore: number, creditScore: number): st
   if (gcScore >= 10 && creditScore >= 40) return 'Conditionally Viable'
   if (gcScore >= 7) return 'At Risk'
   return 'Not Viable'
+}
+
+// ── DSCR display helper, shared by every dashboard ──────────────
+// Never invents a number. No debt, or debt with nothing due yet, gets a
+// plain label -- there is no such thing as an "average DSCR" in this model.
+export function dscrLabel(s: { hasDebt: boolean; dscrMin: number | null }): string {
+  if (!s.hasDebt) return 'N/A — No Debt'
+  if (s.dscrMin === null) return 'N/A — No Repayment Due Yet'
+  return `${s.dscrMin.toFixed(2)}x`
+}
+export function dscrColor(s: { hasDebt: boolean; dscrMin: number | null }, colors: { green: string; amber: string; red: string; slate: string }): string {
+  if (!s.hasDebt || s.dscrMin === null) return colors.slate
+  return s.dscrMin >= 1.5 ? colors.green : s.dscrMin >= 1.0 ? colors.amber : colors.red
 }

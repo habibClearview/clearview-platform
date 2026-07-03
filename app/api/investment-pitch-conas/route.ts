@@ -9,7 +9,7 @@ import {
   HeadingLevel, BorderStyle, WidthType, AlignmentType, ShadingType,
 } from 'docx'
 import { runCONASModel, defaultCONASInputs } from '@/lib/conas-engine'
-import { computeScores, defaultCoachAssessment } from '@/lib/scoring-engine'
+import { computeScores, defaultCoachAssessment, dscrLabel, dscrColor } from '@/lib/scoring-engine'
 
 const CONAS_CLIENT_ID = '1556298e-5fa0-4d6a-ae86-da8c708ec6ee'
 
@@ -130,7 +130,7 @@ export async function POST(req:NextRequest){
 Business: CONAS Agricultural Hub, crop aggregator, 5 Input Profit Centres, Northern Uganda
 Revenue: ${fmt(m.totalRevenue,cc)} | Gross Margin: ${pct(grossMargin)} | EBITDA: ${fmt(m.totalEBITDA,cc)} (${pct(ebitdaMargin)})
 FGEs: ${m.fgeCount} | Irrigation kits deployed across season
-Investment Readiness: ${scores.irScore}/30 (${scores.irTier}) | Credit Risk: ${scores.score}/100 (${scores.classification}) | DSCR: ${scores.dscrAvg.toFixed(2)}x
+Investment Readiness: ${scores.irScore}/30 (${scores.irTier}) | Credit Risk: ${scores.score}/100 (${scores.classification}) | DSCR: ${dscrLabel(scores)}
 ${hasMarketing?`Top channel CAC: ${channels[0]?.channel} at ${channels[0]?.cac?fmt(channels[0].cac,cc):'unquantified'}`:''}
 ${hasTCData?`DSO: ${tc.dso.toFixed(0)}d | DPO: ${tc.dpo.toFixed(0)}d | Cash conversion gap: ${tc.cashConversionGap.toFixed(0)}d`:''}
 ${coachBriefing?.briefing_text?`Coach narrative: ${coachBriefing.briefing_text.slice(0,400)}`:''}
@@ -173,7 +173,7 @@ Capital: Shareholder ${fmt(inputs.capitalStructure?.shareholderContribution||0,c
       scoreBadge('Investment Readiness',`${scores.irScore}/30`,scores.irTier,scores.irScore>=24?GREEN:scores.irScore>=17?CYAN:AMBER,w4),
       scoreBadge('Credit Risk',`${scores.score}/100`,scores.classification,scores.classification==='Stable'?GREEN:scores.classification==='At Risk'?AMBER:RED,w4),
       scoreBadge('Going Concern',`${scores.gcScore}/20`,scores.gcRating,scores.gcRating==='Strong'?GREEN:scores.gcRating==='Adequate'?CYAN:AMBER,w4),
-      scoreBadge('DSCR',`${scores.dscrAvg.toFixed(2)}x`,scores.dscrAvg>=1.5?'Strong':scores.dscrAvg>=1.0?'Adequate':'Below threshold',scores.dscrAvg>=1.5?GREEN:scores.dscrAvg>=1.0?AMBER:RED,w4),
+      scoreBadge('DSCR',dscrLabel(scores),!scores.hasDebt?'No Debt':scores.dscrMin===null?'Not Yet Due':scores.dscrMin>=1.5?'Strong':scores.dscrMin>=1.0?'Adequate':'Below threshold',dscrColor(scores,{green:GREEN,amber:AMBER,red:RED,slate:SLATE}),w4),
     ]})]}))
     children.push(spacer(0,200))
 
@@ -260,7 +260,7 @@ Capital: Shareholder ${fmt(inputs.capitalStructure?.shareholderContribution||0,c
     children.push(sectionHeader('Investment Recommendation'))
     children.push(spacer(0,80))
     if(recommendation){recommendation.split('\n').filter(Boolean).forEach((t:string)=>children.push(shortPara(t)))}
-    else{children.push(shortPara(`Investment Readiness: ${scores.irTier} (${scores.irScore}/30). Credit Risk: ${scores.classification} (${scores.score}/100). DSCR: ${scores.dscrAvg.toFixed(2)}x.`))}
+    else{children.push(shortPara(`Investment Readiness: ${scores.irTier} (${scores.irScore}/30). Credit Risk: ${scores.classification} (${scores.score}/100). DSCR: ${dscrLabel(scores)}.`))}
     children.push(spacer(0,200))
 
     // Footer
