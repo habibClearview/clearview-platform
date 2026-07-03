@@ -383,19 +383,20 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGo
 // ── Spread / Service-fee sub-rows for revenue lines in Planning ──
 // Renders the editable source-field rows (buy/sell price + volume, or fee/
 // cost + engagements) underneath a revenue line's computed revenue row.
-// Kept as separate small components so PlanningTab's main render stays readable.
-function SpreadSubRows({l,months,cc,canEdit,rowBg,colSpanBefore,onUpdate}:{
+// One shared renderer for both line types -- they differ only in which
+// fields/labels apply and which field gets a summed total (the quantity
+// field: volume or engagements; price/fee/cost fields show no total since
+// summing a price across months isn't meaningful).
+function LineFieldSubRows({l,months,cc,canEdit,rowBg,colSpanBefore,rows,totalField,onUpdate}:{
   l:GenericPlanLine, months:string[], cc:string, canEdit:boolean, rowBg:string,
-  colSpanBefore:number, onUpdate:(field:'buy_price'|'sell_price'|'volume',m:number,val:number)=>void
+  colSpanBefore:number,
+  rows: [string,string,boolean][], // [label, field, isCurrency]
+  totalField:string,
+  onUpdate:(field:string,m:number,val:number)=>void
 }) {
-  const rows: [string,'buy_price'|'sell_price'|'volume',boolean][] = [
-    ['Buy price','buy_price',true],
-    ['Sell price','sell_price',true],
-    ['Volume','volume',false],
-  ]
   return <>
     {rows.map(([label,field,isCurrency])=>{
-      const arr = (l[field] as number[]|undefined) ?? Array(months.length).fill(0)
+      const arr = ((l as any)[field] as number[]|undefined) ?? Array(months.length).fill(0)
       const total = arr.reduce((s,v)=>s+v,0)
       return (
         <tr key={field} style={{background:rowBg}}>
@@ -410,7 +411,7 @@ function SpreadSubRows({l,months,cc,canEdit,rowBg,colSpanBefore,onUpdate}:{
               }
             </td>
           ))}
-          <td style={{padding:'3px 8px',textAlign:'right',fontSize:'0.68rem',color:C.slate,borderLeft:`2px solid ${C.border}`}}>{field==='volume'?total.toLocaleString():''}</td>
+          <td style={{padding:'3px 8px',textAlign:'right',fontSize:'0.68rem',color:C.slate,borderLeft:`2px solid ${C.border}`}}>{field===totalField?total.toLocaleString():''}</td>
           {canEdit&&<td></td>}
         </tr>
       )
@@ -418,39 +419,16 @@ function SpreadSubRows({l,months,cc,canEdit,rowBg,colSpanBefore,onUpdate}:{
   </>
 }
 
-function ServiceFeeSubRows({l,months,cc,canEdit,rowBg,colSpanBefore,onUpdate}:{
-  l:GenericPlanLine, months:string[], cc:string, canEdit:boolean, rowBg:string,
-  colSpanBefore:number, onUpdate:(field:'fee_per_engagement'|'cost_per_engagement'|'engagements',m:number,val:number)=>void
-}) {
-  const rows: [string,'fee_per_engagement'|'cost_per_engagement'|'engagements',boolean][] = [
-    ['Fee per engagement','fee_per_engagement',true],
-    ['Cost per engagement','cost_per_engagement',true],
-    ['Engagements','engagements',false],
-  ]
-  return <>
-    {rows.map(([label,field,isCurrency])=>{
-      const arr = (l[field] as number[]|undefined) ?? Array(months.length).fill(0)
-      const total = arr.reduce((s,v)=>s+v,0)
-      return (
-        <tr key={field} style={{background:rowBg}}>
-          <td colSpan={colSpanBefore} style={{padding:'3px 8px 3px 24px',fontSize:'0.68rem',color:C.slate}}>↳ {label}</td>
-          {arr.map((v,m)=>(
-            <td key={m} style={{padding:'2px 4px'}}>
-              {canEdit
-                ? <input type="number" style={{width:74,padding:'2px 4px',border:`1px solid ${C.border}`,borderRadius:3,fontSize:'0.66rem',fontFamily:'monospace',textAlign:'right',background:C.lightBg,color:C.slate}}
-                    value={v??''} placeholder="0"
-                    onChange={e=>onUpdate(field,m,Number(e.target.value))}/>
-                : <span style={{display:'block',textAlign:'right',padding:'2px 4px',fontSize:'0.66rem',color:C.slate}}>{isCurrency?fmt(v,cc):v.toLocaleString()}</span>
-              }
-            </td>
-          ))}
-          <td style={{padding:'3px 8px',textAlign:'right',fontSize:'0.68rem',color:C.slate,borderLeft:`2px solid ${C.border}`}}>{field==='engagements'?total.toLocaleString():''}</td>
-          {canEdit&&<td></td>}
-        </tr>
-      )
-    })}
-  </>
-}
+const SPREAD_SUBROWS: [string,string,boolean][] = [
+  ['Buy price','buy_price',true],
+  ['Sell price','sell_price',true],
+  ['Volume','volume',false],
+]
+const SERVICE_FEE_SUBROWS: [string,string,boolean][] = [
+  ['Fee per engagement','fee_per_engagement',true],
+  ['Cost per engagement','cost_per_engagement',true],
+  ['Engagements','engagements',false],
+]
 
 function PlanningTab({config,result,months,cc,P,onSave}) {
   const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active)?.id||'')
@@ -562,8 +540,12 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
                 // For spread/service-fee lines, revenue is derived from the source
                 // fields (matches the formula in generic-engine.ts exactly) rather
                 // than monthly_plan, which the engine ignores for these line types.
+                // Spread revenue is the GROSS sale value (sell price x volume) --
+                // buy cost is a separate Cost of Sales line in the engine, not
+                // netted against revenue. Must match generic-engine.ts exactly or
+                // this row shows a different number than the Total row below it.
                 const revenueByMonth = isSpread
-                  ? (l.volume??[]).map((v,m)=>((l.sell_price?.[m]??0)-(l.buy_price?.[m]??0))*v)
+                  ? (l.volume??[]).map((v,m)=>(l.sell_price?.[m]??0)*v)
                   : isServiceFee
                   ? (l.engagements??[]).map((e,m)=>(l.fee_per_engagement?.[m]??0)*e)
                   : l.monthly_plan
@@ -612,14 +594,16 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
                     {P.canEditPlan&&<td><button style={delBtn} onClick={()=>deleteLine(l.id)}>×</button></td>}
                   </tr>
                   {isSpread && (
-                    <SpreadSubRows l={l} months={months} cc={cc} canEdit={P.canEditPlan}
+                    <LineFieldSubRows l={l} months={months} cc={cc} canEdit={P.canEditPlan}
                       rowBg={rowBg} colSpanBefore={selSection==='revenue'?2:1}
-                      onUpdate={(field,m,val)=>updateLineArrayField(l.id,field,m,val)}/>
+                      rows={SPREAD_SUBROWS} totalField="volume"
+                      onUpdate={(field,m,val)=>updateLineArrayField(l.id,field as any,m,val)}/>
                   )}
                   {isServiceFee && (
-                    <ServiceFeeSubRows l={l} months={months} cc={cc} canEdit={P.canEditPlan}
+                    <LineFieldSubRows l={l} months={months} cc={cc} canEdit={P.canEditPlan}
                       rowBg={rowBg} colSpanBefore={selSection==='revenue'?2:1}
-                      onUpdate={(field,m,val)=>updateLineArrayField(l.id,field,m,val)}/>
+                      rows={SERVICE_FEE_SUBROWS} totalField="engagements"
+                      onUpdate={(field,m,val)=>updateLineArrayField(l.id,field as any,m,val)}/>
                   )}
                   </React.Fragment>
                 )
