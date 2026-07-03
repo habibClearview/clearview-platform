@@ -2252,7 +2252,7 @@ export default function CONASDashboard({
         <div style={card}>
           <div style={secH}>Additional Debt Obligations</div>
           <p style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.85rem'}}>Use this if the business has more than one loan -- bank loans, SACCO loans, or other non-bank facilities. Each is tracked separately in DSCR.</p>
-          {(inputs.debts||[]).map((d,i)=>(
+          {(activeInputs.debts||[]).map((d,i)=>(
             <div key={d.id||i} style={{padding:'0.6rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.5rem'}}>
               <div style={{display:'grid',gridTemplateColumns:'1.5fr 1fr 1fr auto',gap:'0.5rem',alignItems:'end',marginBottom:'0.5rem'}}>
                 <div><div style={hint}>Name</div><input style={inp} value={d.name||''} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],name:e.target.value};return{...p,debts:ds}})}/></div>
@@ -2447,14 +2447,17 @@ function ConasIntelligenceTab({result, inputs, coachAssessments, onSaveAssessmen
 
   // Multiple debt obligations: use the explicit `debts` list if provided,
   // otherwise fall back to the single bankLoan field for backward compatibility.
-  const conasDebtObligations = (inputs.debts && inputs.debts.length > 0)
-    ? inputs.debts
-    : (inputs.capitalStructure?.bankLoan > 0 ? [{
+  // Reads from activeInputs (not inputs) -- in controlled mode inputs is only
+  // set once at mount and never updated when inputsProp changes, so reading
+  // inputs here would feed the DSCR calculation from stale debt data.
+  const conasDebtObligations = (activeInputs.debts && activeInputs.debts.length > 0)
+    ? activeInputs.debts
+    : (activeInputs.capitalStructure?.bankLoan > 0 ? [{
         drawdownMonth: 1,
-        annualRate: inputs.capitalStructure.annualInterestRate || 0.18,
-        tenorMonths: (inputs.capitalStructure.loanTenorYears || 2) * 12,
+        annualRate: activeInputs.capitalStructure.annualInterestRate || 0.18,
+        tenorMonths: (activeInputs.capitalStructure.loanTenorYears || 2) * 12,
         gracePeriodMonths: 0,
-        principal: inputs.capitalStructure.bankLoan,
+        principal: activeInputs.capitalStructure.bankLoan,
         repaymentType: 'amortising',
       }] : [])
   const conasTradeCreditLines = (inputs.tradeCreditLines || []).map(l => ({
