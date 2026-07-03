@@ -520,9 +520,15 @@ export function runGenericModel(
   // ── Trade credit working capital adjustment ────────────────
   // Computed before cash flow so its cash effect can be added as a proper
   // working capital line, the way real accounting treats AR/AP movements.
-  const tradeCreditCashEffect = computeTradeCredit(
+  // Outstanding payable/receivable balances are kept alongside the cash
+  // effect so the balance sheet can carry matching AR/AP lines -- without
+  // these, the cash effect moves cash with no offsetting entry and the
+  // balance sheet stops balancing as soon as any trade credit line has
+  // non-zero movement.
+  const tradeCredit = computeTradeCredit(
     settings.trade_credit_lines || [], con.cogs, con.rev, months
-  ).monthlyCashEffect
+  )
+  const tradeCreditCashEffect = tradeCredit.monthlyCashEffect
 
   // ── Cash flow ─────────────────────────────────────────────
   const cap = settings.capital_structure || { shareholder_contribution: 0, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, fixed_assets: 0 }
@@ -535,18 +541,39 @@ export function runGenericModel(
   // Fixed assets purchased with cash are an investing outflow in month 0 --
   // without this, fixed assets appear on the balance sheet with no cash
   // consequence, breaking the fundamental accounting identity (Assets = Equity + Liabilities).
-  cf.inv_cash[0] = -(cap.fixed_assets || 0)
+  cf.inv_cash[0] = -(cap.fixed_assets ?? 0)
   for (let m = 0; m < months; m++) {
-    cf.op_cash[m] = con.npat[m] + (cf.working_capital_adj[m] || 0)
+    cf.op_cash[m] = con.npat[m] + (tradeCreditCashEffect[m] ?? 0)
     cf.net[m]     = cf.op_cash[m] + cf.fin_cash[m] + cf.inv_cash[m]
-    cf.open[m]    = m === 0 ? (settings.opening_cash_balance || 0) : cf.close[m - 1]
+    cf.open[m]    = m === 0 ? (settings.opening_cash_balance ?? 0) : cf.close[m - 1]
     cf.close[m]   = cf.open[m] + cf.net[m]
   }
+
+  // ── Debt schedule ────────────────────────────────────────
+  // Used for DSCR scoring below. NOTE: the balance sheet loan_liability line
+  // intentionally stays flat (not amortised) -- neither cash flow nor P&L
+  // currently deduct loan interest/principal as an actual monthly cost, so
+  // showing a declining liability here would break Assets = Equity + Liabilities
+  // in the opposite direction. Wiring in real debt service (interest as a
+  // finance cost, principal as a financing cash outflow) is the loan repayment
+  // schedule item on the roadmap -- do that first, then flip this to
+  // debtSchedule.totalOutstanding.
+  const debtObligations: DebtObligation[] = (settings.debts && settings.debts.length > 0)
+    ? settings.debts
+    : (cap.bank_loan > 0 ? [{
+        drawdownMonth: 1,
+        annualRate: cap.annual_interest_rate ?? 0.18,
+        tenorMonths: (cap.loan_tenor_years ?? 2) * 12,
+        gracePeriodMonths: 0,
+        principal: cap.bank_loan,
+        repaymentType: 'amortising',
+      }] : [])
 
   // ── Balance sheet ─────────────────────────────────────────
   const bs = {
     cash: cf.close,
-    fixed_assets: Array(months).fill(cap.fixed_assets) as number[],
+    fixed_assets: Array(months).fill(cap.fixed_assets ?? 0) as number[],
+    accounts_receivable: tradeCredit.totalReceivableOutstanding,
     total_assets: zero(),
     share_capital: Array(months).fill(cap.shareholder_contribution) as number[],
     grant_equity: Array(months).fill(cap.grant_non_repayable) as number[],
@@ -554,19 +581,20 @@ export function runGenericModel(
     total_equity: zero(),
     grant_liability: Array(months).fill(cap.grant_recoverable) as number[],
     loan_liability: Array(months).fill(cap.bank_loan) as number[],
+    accounts_payable: tradeCredit.totalPayableOutstanding,
     total_liabilities: zero(),
     total_equity_and_liabilities: zero(),
   }
   // Opening cash balance represents pre-existing capital from before the
   // planning period -- without a source on the balance sheet, cash exists
   // with no matching equity, breaking Assets = Equity + Liabilities.
-  let cum_npat = settings.opening_cash_balance || 0
+  let cum_npat = settings.opening_cash_balance ?? 0
   for (let m = 0; m < months; m++) {
     cum_npat += con.npat[m]
     bs.retained_earnings[m] = cum_npat
-    bs.total_assets[m]       = bs.cash[m] + bs.fixed_assets[m]
+    bs.total_assets[m]       = bs.cash[m] + bs.fixed_assets[m] + bs.accounts_receivable[m]
     bs.total_equity[m]       = bs.share_capital[m] + bs.grant_equity[m] + bs.retained_earnings[m]
-    bs.total_liabilities[m]  = bs.grant_liability[m] + bs.loan_liability[m]
+    bs.total_liabilities[m]  = bs.grant_liability[m] + bs.loan_liability[m] + bs.accounts_payable[m]
     bs.total_equity_and_liabilities[m] = bs.total_equity[m] + bs.total_liabilities[m]
   }
 
@@ -603,19 +631,8 @@ export function runGenericModel(
   // Uses the same shared engine as CONAS, so every client gets the same
   // rigorous methodology, not just an AI estimate.
   const coachAssessment: CoachAssessment = settings.coach_assessment || defaultCoachAssessment()
-  // Multiple debt obligations: use the explicit `debts` list if provided (supports
-  // bank loans + non-bank facilities together), otherwise fall back to the single
-  // bank_loan field for clients with simple one-loan structures.
-  const debtObligations: DebtObligation[] = (settings.debts && settings.debts.length > 0)
-    ? settings.debts
-    : (cap.bank_loan > 0 ? [{
-        drawdownMonth: 1,
-        annualRate: cap.annual_interest_rate ?? 0.18,
-        tenorMonths: (cap.loan_tenor_years ?? 2) * 12,
-        gracePeriodMonths: 0,
-        principal: cap.bank_loan,
-        repaymentType: 'amortising',
-      }] : [])
+  // debtObligations is built earlier (ahead of the balance sheet) and reused
+  // here so scoring and the balance sheet always agree on the same debt schedule.
   const scores: ScoringResult = computeScores({
     rev: con.rev,
     ebitda: con.ebitda,

@@ -596,6 +596,16 @@ export function runCONASModel(inputs: CONASInputs) {
   // Remove sub-units that would be double-counted
   allUnits.filter(u => u.parentId).forEach(u => consolidatedUnitIds.delete(u.id))
 
+  // Approved spending requests are real, immediate expenses -- computed here
+  // (ahead of the P&L roll-up) so they can reduce npat the same month they
+  // hit cash. Previously this only reduced cash (via cf.opCash below) with
+  // no matching reduction in profit, so retained earnings never moved and
+  // the balance sheet permanently unbalanced by the approved amount.
+  const approvedCashOut = Array(MONTHS).fill(0) as number[]
+  inputs.spendingRequests.filter(r => r.status === 'approved').forEach(r => {
+    approvedCashOut[r.month] += r.amount
+  })
+
   for (let m = 0; m < MONTHS; m++) {
     consolidatedUnitIds.forEach(uid => {
       const r = unitPL[uid]
@@ -610,17 +620,14 @@ export function runCONASModel(inputs: CONASInputs) {
         ;(con.actRev[m] as number) += r.actRev[m] as number
       }
     })
+    con.ebitda[m] -= approvedCashOut[m]
     con.nbt[m]  = con.ebitda[m]
     con.tax[m]  = con.nbt[m] > 0 ? con.nbt[m] * inputs.global.corporateTaxRate : 0
     con.npat[m] = con.nbt[m] - con.tax[m]
-    if (con.actRev[m] !== null) con.actEbitda[m] = (con.actRev[m] as number) - con.cogs[m] - con.opex[m]
+    if (con.actRev[m] !== null) con.actEbitda[m] = (con.actRev[m] as number) - con.cogs[m] - con.opex[m] - approvedCashOut[m]
   }
 
   // ── Cash flow ─────────────────────────────────────────────
-  const approvedCashOut = Array(MONTHS).fill(0) as number[]
-  inputs.spendingRequests.filter(r => r.status === 'approved').forEach(r => {
-    approvedCashOut[r.month] += r.amount
-  })
 
   const irrigationOut = Array(MONTHS).fill(0) as number[]
   irrigationOut[0] = Math.round(fgeCount / 2) * 8_000_000
@@ -631,12 +638,23 @@ export function runCONASModel(inputs: CONASInputs) {
   // Trade credit working capital adjustment -- computed from real monthly
   // movements (new credit + amounts settled), not a flat estimate, and fed
   // directly into operating cash flow the way AR/AP movements work in practice.
+  // Outstanding payable/receivable balances are kept alongside the cash effect
+  // so the balance sheet can carry matching AR/AP lines -- without these, the
+  // cash effect moves cash with no offsetting entry and the balance sheet
+  // stops balancing as soon as any trade credit line has non-zero movement.
   const conasTradeCreditLines = (inputs.tradeCreditLines || []).map(l => ({
     id: l.id, name: l.name, type: l.type,
     monthly_new: l.monthlyNew || Array(MONTHS).fill(0),
     monthly_settled: l.monthlySettled || Array(MONTHS).fill(0),
   }))
-  const tradeCreditCashEffect = computeTradeCredit(conasTradeCreditLines, con.cogs, con.rev, MONTHS).monthlyCashEffect
+  const conasTradeCredit = computeTradeCredit(conasTradeCreditLines, con.cogs, con.rev, MONTHS)
+  const tradeCreditCashEffect = conasTradeCredit.monthlyCashEffect
+  // NOTE: loan_liability below intentionally stays flat (not amortised).
+  // Neither cash flow nor P&L here deduct loan interest/principal as an
+  // actual monthly cost, so a declining liability would break
+  // Assets = Equity + Liabilities the other way. Wire in real debt service
+  // first (loan repayment schedule roadmap item), then switch this to
+  // buildDebtSchedule(...).totalOutstanding, matching the generic engine.
 
   const cf = {
     opCash:  Array(MONTHS).fill(0) as number[],
@@ -655,7 +673,11 @@ export function runCONASModel(inputs: CONASInputs) {
   // consequence, breaking Assets = Equity + Liabilities.
   cf.invCash[0] = -(cap.fixedAssets || 0)
   for (let m = 0; m < MONTHS; m++) {
-    cf.opCash[m] = con.npat[m] - irrigationOut[m] - approvedCashOut[m] + (tradeCreditCashEffect[m] || 0)
+    // approvedCashOut is no longer subtracted here -- it is already folded
+    // into con.npat[m] above, which is what op_cash is built from. Subtracting
+    // it again here double-counted it: cash dropped by 2x the approved amount
+    // while equity only dropped by 1x, unbalancing the balance sheet.
+    cf.opCash[m] = con.npat[m] - irrigationOut[m] + (tradeCreditCashEffect[m] || 0)
     cf.net[m]    = cf.opCash[m] + cf.finCash[m] + cf.invCash[m]
     cf.open[m]   = m === 0 ? inputs.global.openingCashBalance : cf.close[m - 1]
     cf.close[m]  = cf.open[m] + cf.net[m]
@@ -678,6 +700,7 @@ export function runCONASModel(inputs: CONASInputs) {
     cash:           cf.close,
     irrigationKits: cumIrrigation, // cumulative kits actually deployed and paid for by each month
     fixedAssets:    Array(MONTHS).fill(cap.fixedAssets) as number[],
+    accountsReceivable: conasTradeCredit.totalReceivableOutstanding,
     totalAssets:    Array(MONTHS).fill(0) as number[],
     shareCapital:   Array(MONTHS).fill(cap.shareholderContribution) as number[],
     grantEquity:    Array(MONTHS).fill(cap.grantNonRepayable) as number[],
@@ -685,6 +708,7 @@ export function runCONASModel(inputs: CONASInputs) {
     totalEquity:    Array(MONTHS).fill(0) as number[],
     grantLiability: Array(MONTHS).fill(cap.grantRecoverable) as number[],
     loanLiability:  Array(MONTHS).fill(cap.bankLoan) as number[],
+    accountsPayable: conasTradeCredit.totalPayableOutstanding,
     totalLiabilities: Array(MONTHS).fill(0) as number[],
     totalEquityAndLiabilities: Array(MONTHS).fill(0) as number[],
   }
@@ -695,9 +719,9 @@ export function runCONASModel(inputs: CONASInputs) {
   for (let m = 0; m < MONTHS; m++) {
     cumNPAT += con.npat[m]
     bs.retainedEarnings[m] = cumNPAT
-    bs.totalAssets[m]       = bs.cash[m] + bs.irrigationKits[m] + bs.fixedAssets[m]
+    bs.totalAssets[m]       = bs.cash[m] + bs.irrigationKits[m] + bs.fixedAssets[m] + bs.accountsReceivable[m]
     bs.totalEquity[m]       = bs.shareCapital[m] + bs.grantEquity[m] + bs.retainedEarnings[m]
-    bs.totalLiabilities[m]  = bs.grantLiability[m] + bs.loanLiability[m]
+    bs.totalLiabilities[m]  = bs.grantLiability[m] + bs.loanLiability[m] + bs.accountsPayable[m]
     bs.totalEquityAndLiabilities[m] = bs.totalEquity[m] + bs.totalLiabilities[m]
   }
 
