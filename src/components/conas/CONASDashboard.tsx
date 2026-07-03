@@ -1740,6 +1740,8 @@ export default function CONASDashboard({
             {label:'Gross Profit',plan:con.gp,bold:true},
             {label:'Total Overheads & Staff',plan:con.opex,negate:true},
             {label:'EBITDA',plan:con.ebitda,actual:con.actEbitda,bold:true,highlight:true},
+            {label:'Finance Interest',plan:con.interest,negate:true},
+            {label:'Net Profit Before Tax',plan:con.nbt,bold:true},
             {label:'Tax',plan:con.tax,negate:true},
             {label:'Net Profit After Tax',plan:con.npat,bold:true},
           ]}
@@ -2006,7 +2008,7 @@ export default function CONASDashboard({
             {label:'Irrigation Kit Outflows',plan:cf.irrigation,negate:true},
             {label:'Approved Spending (posted)',plan:cf.approvedSpend,negate:true},
             {label:'Operating Cash Flow',plan:cf.opCash,bold:true},
-            {label:'Capital & Grant Inflows',plan:cf.finCash},
+            {label:'Capital & Financing',plan:cf.finCash},
             {label:'Fixed Asset Purchases',plan:cf.invCash||Array(MONTHS).fill(0)},
             {label:'Net Change in Cash',plan:cf.net,bold:true},
             {label:'Closing Cash',plan:cf.close,bold:true,highlight:true},
