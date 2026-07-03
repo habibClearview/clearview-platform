@@ -2014,6 +2014,18 @@ export default function CONASDashboard({
           months={months}
           footnote="Approved spending requests post to this statement automatically on approval."
         />
+        {result.debtSchedule && result.debtSchedule.totalPrincipal.some((v:number)=>v>0) && (
+          <PLTable
+            title="Loan Repayment Schedule"
+            rows={[
+              {label:'Interest',plan:result.debtSchedule.totalInterest},
+              {label:'Principal',plan:result.debtSchedule.totalPrincipal},
+              {label:'Total Debt Service',plan:result.debtSchedule.totalRepayment,bold:true},
+              {label:'Closing Loan Balance',plan:result.debtSchedule.totalOutstanding,bold:true,highlight:true},
+            ]}
+            months={months}
+          />
+        )}
         <div style={card}>
           <div style={secH}>Cash Position  -  Month by Month</div>
           <ResponsiveContainer width="100%" height={220}>

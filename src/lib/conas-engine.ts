@@ -6,7 +6,7 @@
 // - All figures flow: plan → unit P&L → consolidated → cash flow → balance sheet
 // ============================================================
 
-import { computeTradeCredit } from './scoring-engine'
+import { computeTradeCredit, buildDebtSchedule, type DebtObligation } from './scoring-engine'
 
 export const MONTHS = 12
 
@@ -577,12 +577,40 @@ export function runCONASModel(inputs: CONASInputs) {
     r.ebitdaMargin = r.annRev > 0 ? r.annEbitda / r.annRev : 0
   })
 
+  // ── Debt schedule ────────────────────────────────────────
+  // Built ahead of the P&L consolidation loop so interest can be deducted
+  // as a real cost before tax, and principal repayment can be booked as a
+  // real financing cash outflow below -- same treatment as the generic
+  // engine (generic-engine.ts). Uses the existing buildDebtSchedule(), which
+  // was already relied on for DSCR scoring elsewhere -- no new calculation
+  // logic, just wiring the schedule into the actual P&L and cash flow.
+  const cap = inputs.capitalStructure
+  const debtObligations: DebtObligation[] = (inputs.debts && inputs.debts.length > 0)
+    ? inputs.debts.map(d => ({
+        drawdownMonth: d.drawdownMonth ?? 1,
+        annualRate: d.annualRate ?? cap.annualInterestRate ?? 0.18,
+        tenorMonths: d.tenorMonths ?? (cap.loanTenorYears ?? 2) * 12,
+        gracePeriodMonths: d.gracePeriodMonths ?? 0,
+        principal: d.principal ?? 0,
+        repaymentType: d.repaymentType ?? 'amortising',
+      }))
+    : (cap.bankLoan > 0 ? [{
+        drawdownMonth: 1,
+        annualRate: cap.annualInterestRate ?? 0.18,
+        tenorMonths: (cap.loanTenorYears ?? 2) * 12,
+        gracePeriodMonths: 0,
+        principal: cap.bankLoan,
+        repaymentType: 'amortising' as const,
+      }] : [])
+  const debtSchedule = buildDebtSchedule(debtObligations, MONTHS)
+
   // ── Consolidated P&L ─────────────────────────────────────
   // Sum top-level units only (sub-units are included via parent consolidation)
   const con = {
     rev: Array(MONTHS).fill(0) as number[], cogs: Array(MONTHS).fill(0) as number[],
     gp:  Array(MONTHS).fill(0) as number[], opex: Array(MONTHS).fill(0) as number[],
-    ebitda: Array(MONTHS).fill(0) as number[], nbt: Array(MONTHS).fill(0) as number[],
+    ebitda: Array(MONTHS).fill(0) as number[], interest: debtSchedule.totalInterest,
+    nbt: Array(MONTHS).fill(0) as number[],
     tax: Array(MONTHS).fill(0) as number[], npat: Array(MONTHS).fill(0) as number[],
     actRev: Array(MONTHS).fill(null) as (number|null)[],
     actEbitda: Array(MONTHS).fill(null) as (number|null)[],
@@ -621,7 +649,10 @@ export function runCONASModel(inputs: CONASInputs) {
       }
     })
     con.ebitda[m] -= approvedCashOut[m]
-    con.nbt[m]  = con.ebitda[m]
+    // Interest is deducted before tax (tax-deductible finance cost). Principal
+    // is NOT deducted here -- repaying loan principal isn't an expense, it's a
+    // financing cash outflow with no P&L impact, handled below in cash flow.
+    con.nbt[m]  = con.ebitda[m] - (con.interest[m] ?? 0)
     con.tax[m]  = con.nbt[m] > 0 ? con.nbt[m] * inputs.global.corporateTaxRate : 0
     con.npat[m] = con.nbt[m] - con.tax[m]
     if (con.actRev[m] !== null) con.actEbitda[m] = (con.actRev[m] as number) - con.cogs[m] - con.opex[m] - approvedCashOut[m]
@@ -632,8 +663,6 @@ export function runCONASModel(inputs: CONASInputs) {
   const irrigationOut = Array(MONTHS).fill(0) as number[]
   irrigationOut[0] = Math.round(fgeCount / 2) * 8_000_000
   irrigationOut[1] = Math.ceil(fgeCount / 2)  * 8_000_000
-
-  const cap = inputs.capitalStructure
 
   // Trade credit working capital adjustment -- computed from real monthly
   // movements (new credit + amounts settled), not a flat estimate, and fed
@@ -649,12 +678,6 @@ export function runCONASModel(inputs: CONASInputs) {
   }))
   const conasTradeCredit = computeTradeCredit(conasTradeCreditLines, con.cogs, con.rev, MONTHS)
   const tradeCreditCashEffect = conasTradeCredit.monthlyCashEffect
-  // NOTE: loan_liability below intentionally stays flat (not amortised).
-  // Neither cash flow nor P&L here deduct loan interest/principal as an
-  // actual monthly cost, so a declining liability would break
-  // Assets = Equity + Liabilities the other way. Wire in real debt service
-  // first (loan repayment schedule roadmap item), then switch this to
-  // buildDebtSchedule(...).totalOutstanding, matching the generic engine.
 
   const cf = {
     opCash:  Array(MONTHS).fill(0) as number[],
@@ -667,12 +690,22 @@ export function runCONASModel(inputs: CONASInputs) {
     approvedSpend: approvedCashOut,
     workingCapitalAdj: tradeCreditCashEffect,
   }
-  cf.finCash[0] = cap.shareholderContribution + cap.grantNonRepayable + cap.grantRecoverable + cap.bankLoan
+  cf.finCash[0] = cap.shareholderContribution + cap.grantNonRepayable + cap.grantRecoverable
   // Fixed assets purchased with cash are an investing outflow in month 0 --
   // without this, fixed assets appear on the balance sheet with no cash
   // consequence, breaking Assets = Equity + Liabilities.
   cf.invCash[0] = -(cap.fixedAssets || 0)
+  // Each debt obligation's principal enters financing cash flow in its own
+  // drawdown month, not always lumped into month 0 -- mirrors generic-engine.ts
+  // so a loan starting after month 1 (or multiple loans) is represented correctly.
+  debtObligations.forEach(ob => {
+    const idx = Math.max(0, (ob.drawdownMonth ?? 1) - 1)
+    if (idx < MONTHS) cf.finCash[idx] += ob.principal ?? 0
+  })
   for (let m = 0; m < MONTHS; m++) {
+    // Loan principal repayment is a financing outflow -- no P&L impact.
+    // Interest is already reflected in npat above (deducted before tax).
+    cf.finCash[m] -= debtSchedule.totalPrincipal[m] ?? 0
     // approvedCashOut is no longer subtracted here -- it is already folded
     // into con.npat[m] above, which is what op_cash is built from. Subtracting
     // it again here double-counted it: cash dropped by 2x the approved amount
@@ -707,7 +740,7 @@ export function runCONASModel(inputs: CONASInputs) {
     retainedEarnings: Array(MONTHS).fill(0) as number[],
     totalEquity:    Array(MONTHS).fill(0) as number[],
     grantLiability: Array(MONTHS).fill(cap.grantRecoverable) as number[],
-    loanLiability:  Array(MONTHS).fill(cap.bankLoan) as number[],
+    loanLiability:  debtSchedule.totalOutstanding,
     accountsPayable: conasTradeCredit.totalPayableOutstanding,
     totalLiabilities: Array(MONTHS).fill(0) as number[],
     totalEquityAndLiabilities: Array(MONTHS).fill(0) as number[],
@@ -749,5 +782,6 @@ export function runCONASModel(inputs: CONASInputs) {
     allocUnits,
     subUnitsByParent,
     consolidatedUnitIds: Array.from(consolidatedUnitIds),
+    debtSchedule,
   }
 }
