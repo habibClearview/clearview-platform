@@ -145,9 +145,15 @@ export function buildDebtSchedule(obligations: DebtObligation[], months: number)
       if (type === 'seasonal') return (ob.seasonalMonths || []).includes(mss + 1)
       return true // amortising (default): principal due every month
     }
+    // Count due months across the FULL tenor, not capped at the visible
+    // projection window -- a loan can run longer than the model shows
+    // (e.g. a 36-month tenor on a 24-month projection). Capping this at
+    // `months` would undercount installments, making each one too large
+    // and paying the loan off inside the window faster than it actually
+    // would be, which then distorts totalOutstanding and DSCR.
     let totalPP = 0
-    for (let m = startIdx; m < Math.min(startIdx + tenor, months); m++) {
-      if (isDueMonth(m - startIdx)) totalPP++
+    for (let mss = 0; mss < tenor; mss++) {
+      if (isDueMonth(mss)) totalPP++
     }
 
     let bal = ob.principal || 0
@@ -377,4 +383,13 @@ export function dscrLabel(s: { hasDebt: boolean; dscrMin: number | null }): stri
 export function dscrColor(s: { hasDebt: boolean; dscrMin: number | null }, colors: { green: string; amber: string; red: string; slate: string }): string {
   if (!s.hasDebt || s.dscrMin === null) return colors.slate
   return s.dscrMin >= 1.5 ? colors.green : s.dscrMin >= 1.0 ? colors.amber : colors.red
+}
+// Single source of truth for the DSCR rating word shown alongside dscrLabel.
+// Previously this same 1.5/1.0 threshold logic was copy-pasted separately
+// into both investment-pitch routes -- if the thresholds ever changed, those
+// copies would silently drift out of sync with dscrColor above.
+export function dscrRating(s: { hasDebt: boolean; dscrMin: number | null }): string {
+  if (!s.hasDebt) return 'No Debt'
+  if (s.dscrMin === null) return 'Not Yet Due'
+  return s.dscrMin >= 1.5 ? 'Strong' : s.dscrMin >= 1.0 ? 'Adequate' : 'Below threshold'
 }

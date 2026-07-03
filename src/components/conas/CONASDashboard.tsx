@@ -2219,7 +2219,7 @@ export default function CONASDashboard({
           <div style={secH}>Additional Debt Obligations</div>
           <p style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.85rem'}}>Use this if the business has more than one loan -- bank loans, SACCO loans, or other non-bank facilities. Each is tracked separately in DSCR.</p>
           {(inputs.debts||[]).map((d,i)=>(
-            <div key={i} style={{padding:'0.6rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.5rem'}}>
+            <div key={d.id||i} style={{padding:'0.6rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.5rem'}}>
               <div style={{display:'grid',gridTemplateColumns:'1.5fr 1fr 1fr auto',gap:'0.5rem',alignItems:'end',marginBottom:'0.5rem'}}>
                 <div><div style={hint}>Name</div><input style={inp} value={d.name||''} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],name:e.target.value};return{...p,debts:ds}})}/></div>
                 <div><div style={hint}>Principal ({cc})</div><input type="number" style={inp} value={d.principal||0} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],principal:Number(e.target.value)};return{...p,debts:ds}})}/></div>
@@ -2253,7 +2253,7 @@ export default function CONASDashboard({
               )}
             </div>
           ))}
-          <button style={addBtn(true)} onClick={()=>upd(p=>({...p,debts:[...(p.debts||[]),{name:'',principal:0,annualRate:0.18,tenorMonths:12,gracePeriodMonths:0,drawdownMonth:1,repaymentType:'amortising'}]}))}>+ Add Debt Obligation</button>
+          <button style={addBtn(true)} onClick={()=>upd(p=>({...p,debts:[...(p.debts||[]),{id:`debt_${Date.now()}`,name:'',principal:0,annualRate:0.18,tenorMonths:12,gracePeriodMonths:0,drawdownMonth:1,repaymentType:'amortising'}]}))}>+ Add Debt Obligation</button>
         </div>
         <div style={card}>
           <div style={secH}>Business Units</div>
@@ -2466,7 +2466,7 @@ Financial summary:
 - Going Concern: ${gcScore}/20 (${gcRating})
 - Investment Readiness: ${irScore}/30 (${irTier})
 - Minimum cash position: ${cc} ${minCash.toLocaleString()}
-- DSCR average: ${dscrLabel({hasDebt,dscrMin})}
+- Debt service coverage (min DSCR): ${dscrLabel({hasDebt,dscrMin})}
 - Break-even revenue: ${cc} ${businessBreakeven.toLocaleString()}
 - Staff cost as % of revenue: ${(staffCostPct*100).toFixed(1)}%
 

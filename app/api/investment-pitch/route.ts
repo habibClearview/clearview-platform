@@ -10,7 +10,7 @@ import {
   HeadingLevel, BorderStyle, WidthType, AlignmentType, ShadingType,
 } from 'docx'
 import { runGenericModel, buildMonthLabels, type GenericModelConfig } from '@/lib/generic-engine'
-import { computeScores, defaultCoachAssessment, computeTradeCredit, dscrLabel, dscrColor } from '@/lib/scoring-engine'
+import { computeScores, defaultCoachAssessment, computeTradeCredit, dscrLabel, dscrColor, dscrRating } from '@/lib/scoring-engine'
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -283,7 +283,7 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
         scoreBadge('Investment Readiness', `${s.irScore}/30`, s.irTier, s.irScore >= 24 ? GREEN : s.irScore >= 17 ? CYAN : AMBER, w4),
         scoreBadge('Credit Risk Score', `${s.score}/100`, s.classification, s.classification === 'Stable' ? GREEN : s.classification === 'At Risk' ? AMBER : RED, w4),
         scoreBadge('Going Concern', `${s.gcScore}/20`, s.gcRating, s.gcRating === 'Strong' ? GREEN : s.gcRating === 'Adequate' ? CYAN : AMBER, w4),
-        scoreBadge('Debt Service (DSCR)', dscrLabel(s), !s.hasDebt ? 'No Debt' : s.dscrMin===null ? 'Not Yet Due' : s.dscrMin >= 1.5 ? 'Strong' : s.dscrMin >= 1.0 ? 'Adequate' : 'Below threshold', dscrColor(s,{green:GREEN,amber:AMBER,red:RED,slate:SLATE}), w4),
+        scoreBadge('Debt Service (DSCR)', dscrLabel(s), dscrRating(s), dscrColor(s,{green:GREEN,amber:AMBER,red:RED,slate:SLATE}), w4),
       ]})],
     }))
     children.push(spacer(0, 200))
