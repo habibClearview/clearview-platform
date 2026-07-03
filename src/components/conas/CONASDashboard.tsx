@@ -1591,13 +1591,21 @@ export default function CONASDashboard({
 
   // Controlled-mode path: inputsProp can also carry legacy debts (e.g. from
   // loadLocal() in app/dashboard/conas/page.tsx). Normalize those too.
-  useEffect(() => {
-    if (!inputsProp) return
-    const fixed = backfillDebtIds(inputsProp)
-    if (fixed !== inputsProp) onInputsChange?.(fixed)
-  }, [inputsProp])
+  // Memoized so the effect below and activeInputs use the exact same
+  // computed ids -- calling backfillDebtIds twice would generate two
+  // different random suffixes for the same legacy debt, desyncing the
+  // rendered key from what actually gets persisted via onInputsChange.
+  const normalizedInputsProp = React.useMemo(
+    () => inputsProp ? backfillDebtIds(inputsProp) : null,
+    [inputsProp]
+  )
 
-  const activeInputs = inputsProp ? backfillDebtIds(inputsProp) : inputs
+  useEffect(() => {
+    if (!inputsProp || !normalizedInputsProp) return
+    if (normalizedInputsProp !== inputsProp) onInputsChange?.(normalizedInputsProp)
+  }, [inputsProp, normalizedInputsProp])
+
+  const activeInputs = normalizedInputsProp || inputs
 
   function setInputs(newInputs: CONASInputs) {
     setInputsLocal(newInputs)
