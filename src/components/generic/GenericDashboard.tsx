@@ -1818,6 +1818,8 @@ function PLTab({config,result,months,cc,P}) {
           {label:'Gross Profit',values:con.gp,bold:true,highlight:true},
           {label:'Total Operating Costs',values:con.opex,negate:true},
           {label:'EBITDA',values:con.ebitda,bold:true,highlight:true},
+          {label:'Interest',values:con.interest,negate:true},
+          {label:'Net Profit Before Tax',values:con.nbt,bold:true},
           {label:'Tax',values:con.tax,negate:true},
           {label:'Net Profit After Tax',values:con.npat,bold:true,highlight:true},
         ]
@@ -2280,6 +2282,14 @@ function CashFlowTab({result,months,cc}) {
     {label:'Net Change in Cash',values:cf.net,bold:true},
     {label:'Closing Cash',values:cf.close,bold:true,highlight:true},
   ]
+  const debt = result.debtSchedule
+  const hasLoan = debt && debt.totalPrincipal.some((v:number)=>v>0)
+  const loanRows = hasLoan ? [
+    {label:'Interest',values:debt.totalInterest},
+    {label:'Principal',values:debt.totalPrincipal},
+    {label:'Total Debt Service',values:debt.totalRepayment,bold:true},
+    {label:'Closing Loan Balance',values:debt.totalOutstanding,bold:true,highlight:true},
+  ] : []
   return (
     <div>
       <div style={kpiGrid}>
@@ -2289,6 +2299,7 @@ function CashFlowTab({result,months,cc}) {
         <KPI label="Lowest Point" value={fmt(result.metrics.min_cash,cc)} sub={`Month ${result.metrics.min_cash_month}`} color={result.metrics.min_cash>=0?C.navy:C.red}/>
       </div>
       <PLTable title="Cash Flow Statement" rows={rows} months={months} cc={cc} showExport/>
+      {hasLoan && <PLTable title="Loan Repayment Schedule" rows={loanRows} months={months} cc={cc} showExport/>}
     </div>
   )
 }

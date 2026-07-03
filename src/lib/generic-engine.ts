@@ -495,9 +495,29 @@ export function runGenericModel(
   Object.keys(subUnitsByParent).forEach(pid => consolidatedIds.add(pid))
   activeUnits.filter(u => u.parent_id).forEach(u => consolidatedIds.delete(u.id))
 
+  // ── Debt schedule ────────────────────────────────────────
+  // Built ahead of the P&L consolidation loop so interest can be deducted
+  // as a real cost before tax, and principal repayment can be booked as a
+  // real financing cash outflow. Uses the same buildDebtSchedule() already
+  // relied on for DSCR scoring -- no new calculation logic, just wiring the
+  // existing schedule into the actual P&L and cash flow instead of only
+  // the scoring metric.
+  const cap = settings.capital_structure || { shareholder_contribution: 0, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, fixed_assets: 0 }
+  const debtObligations: DebtObligation[] = (settings.debts && settings.debts.length > 0)
+    ? settings.debts
+    : (cap.bank_loan > 0 ? [{
+        drawdownMonth: 1,
+        annualRate: cap.annual_interest_rate ?? 0.18,
+        tenorMonths: (cap.loan_tenor_years ?? 2) * 12,
+        gracePeriodMonths: 0,
+        principal: cap.bank_loan,
+        repaymentType: 'amortising',
+      }] : [])
+  const debtSchedule = buildDebtSchedule(debtObligations, months)
+
   const con = {
     rev: zero(), cogs: zero(), gp: zero(), opex: zero(),
-    ebitda: zero(), nbt: zero(), tax: zero(), npat: zero(),
+    ebitda: zero(), interest: debtSchedule.totalInterest, nbt: zero(), tax: zero(), npat: zero(),
     act_rev: nullArr(), act_ebitda: nullArr(),
   }
 
@@ -515,7 +535,11 @@ export function runGenericModel(
         ;(con.act_rev[m] as number) += r.act_rev[m] as number
       }
     })
-    con.nbt[m]  = con.ebitda[m]
+    // Interest is deducted before tax (standard treatment -- interest is a
+    // tax-deductible finance cost). Principal is NOT deducted here: repaying
+    // loan principal isn't an expense, it's a financing cash outflow with no
+    // P&L impact -- that's handled separately in the cash flow section below.
+    con.nbt[m]  = con.ebitda[m] - (con.interest[m] ?? 0)
     con.tax[m]  = con.nbt[m] > 0 ? con.nbt[m] * (settings.corporate_tax_rate ?? 0.30) : 0
     con.npat[m] = con.nbt[m] - con.tax[m]
     if (con.act_rev[m] !== null) {
@@ -537,7 +561,6 @@ export function runGenericModel(
   const tradeCreditCashEffect = tradeCredit.monthlyCashEffect
 
   // ── Cash flow ─────────────────────────────────────────────
-  const cap = settings.capital_structure || { shareholder_contribution: 0, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, fixed_assets: 0 }
   const cf = {
     op_cash:  zero(), fin_cash: zero(), inv_cash: zero(), net: zero(),
     open: zero(), close: zero(),
@@ -549,31 +572,15 @@ export function runGenericModel(
   // consequence, breaking the fundamental accounting identity (Assets = Equity + Liabilities).
   cf.inv_cash[0] = -(cap.fixed_assets ?? 0)
   for (let m = 0; m < months; m++) {
+    // Loan principal repayment is a financing outflow -- no P&L impact, since
+    // it's not an expense, just cash moving from the business to the lender.
+    // Interest is already reflected in npat above (deducted before tax).
+    cf.fin_cash[m] -= debtSchedule.totalPrincipal[m] ?? 0
     cf.op_cash[m] = con.npat[m] + (tradeCreditCashEffect[m] ?? 0)
     cf.net[m]     = cf.op_cash[m] + cf.fin_cash[m] + cf.inv_cash[m]
     cf.open[m]    = m === 0 ? (settings.opening_cash_balance ?? 0) : cf.close[m - 1]
     cf.close[m]   = cf.open[m] + cf.net[m]
   }
-
-  // ── Debt schedule ────────────────────────────────────────
-  // Used for DSCR scoring below. NOTE: the balance sheet loan_liability line
-  // intentionally stays flat (not amortised) -- neither cash flow nor P&L
-  // currently deduct loan interest/principal as an actual monthly cost, so
-  // showing a declining liability here would break Assets = Equity + Liabilities
-  // in the opposite direction. Wiring in real debt service (interest as a
-  // finance cost, principal as a financing cash outflow) is the loan repayment
-  // schedule item on the roadmap -- do that first, then flip this to
-  // debtSchedule.totalOutstanding.
-  const debtObligations: DebtObligation[] = (settings.debts && settings.debts.length > 0)
-    ? settings.debts
-    : (cap.bank_loan > 0 ? [{
-        drawdownMonth: 1,
-        annualRate: cap.annual_interest_rate ?? 0.18,
-        tenorMonths: (cap.loan_tenor_years ?? 2) * 12,
-        gracePeriodMonths: 0,
-        principal: cap.bank_loan,
-        repaymentType: 'amortising',
-      }] : [])
 
   // ── Balance sheet ─────────────────────────────────────────
   const bs = {
@@ -586,7 +593,7 @@ export function runGenericModel(
     retained_earnings: zero(),
     total_equity: zero(),
     grant_liability: Array(months).fill(cap.grant_recoverable) as number[],
-    loan_liability: Array(months).fill(cap.bank_loan) as number[],
+    loan_liability: debtSchedule.totalOutstanding,
     accounts_payable: tradeCredit.totalPayableOutstanding,
     total_liabilities: zero(),
     total_equity_and_liabilities: zero(),
@@ -659,6 +666,7 @@ export function runGenericModel(
     bs,
     metrics,
     scores,
+    debtSchedule,
     coachAssessment,
     sharedPool,
     allocUnits,
