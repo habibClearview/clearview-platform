@@ -380,10 +380,6 @@ export function dscrLabel(s: { hasDebt: boolean; dscrMin: number | null }): stri
   if (s.dscrMin === null) return 'N/A — No Repayment Due Yet'
   return `${s.dscrMin.toFixed(2)}x`
 }
-export function dscrColor(s: { hasDebt: boolean; dscrMin: number | null }, colors: { green: string; amber: string; red: string; slate: string }): string {
-  if (!s.hasDebt || s.dscrMin === null) return colors.slate
-  return s.dscrMin >= 1.5 ? colors.green : s.dscrMin >= 1.0 ? colors.amber : colors.red
-}
 // Single source of truth for the DSCR rating word shown alongside dscrLabel.
 // Previously this same 1.5/1.0 threshold logic was copy-pasted separately
 // into both investment-pitch routes -- if the thresholds ever changed, those
@@ -392,4 +388,11 @@ export function dscrRating(s: { hasDebt: boolean; dscrMin: number | null }): str
   if (!s.hasDebt) return 'No Debt'
   if (s.dscrMin === null) return 'Not Yet Due'
   return s.dscrMin >= 1.5 ? 'Strong' : s.dscrMin >= 1.0 ? 'Adequate' : 'Below threshold'
+}
+// dscrColor derives from dscrRating rather than re-checking the thresholds
+// itself, so the wording and the colour can never drift apart.
+export function dscrColor(s: { hasDebt: boolean; dscrMin: number | null }, colors: { green: string; amber: string; red: string; slate: string }): string {
+  if (!s.hasDebt || s.dscrMin === null) return colors.slate
+  const rating = dscrRating(s)
+  return rating === 'Strong' ? colors.green : rating === 'Adequate' ? colors.amber : colors.red
 }

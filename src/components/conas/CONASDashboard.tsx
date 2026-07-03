@@ -1562,7 +1562,16 @@ export default function CONASDashboard({
           .eq('client_id', CONAS_CLIENT_ID)
           .single()
         if (data?.config && Object.keys(data.config).length > 0) {
-          setInputsLocal(data.config as CONASInputs)
+          const cfg = data.config as CONASInputs
+          // Debts saved before the stable-id fix have no id and would still
+          // fall back to array-index keys (the stale input/focus-on-delete
+          // bug this was meant to fix). Backfill once on load and persist
+          // it via setInputs (not setInputsLocal) so the id is durably
+          // stable across reloads, not just for this session.
+          const needsBackfill = (cfg.debts || []).some(d => !d.id)
+          const debts = (cfg.debts || []).map((d, i) => d.id ? d : { ...d, id: `debt_legacy_${i}_${Date.now()}` })
+          if (needsBackfill) setInputs({ ...cfg, debts })
+          else setInputsLocal(cfg)
         }
       } catch {}
       setLoadingData(false)
