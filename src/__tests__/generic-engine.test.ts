@@ -185,6 +185,21 @@ describe('Generic Engine — Capital Structure', () => {
     expect(result.bs.accounts_payable[1]).toBe(0)
   })
 
+  it('REG: balance sheet still balances when a receivable is over-collected (mirrors the payable case)', () => {
+    const cfg = makeConfig()
+    cfg.settings.trade_credit_lines = [{
+      id: 'tc1', name: 'Buyer Credit', type: 'receivable',
+      // Same clamp path as the payable case above, just on the receivable side --
+      // collecting more than was ever extended should floor the receivable at 0,
+      // not go negative.
+      monthly_new:     [1_000_000, 0, ...Array(10).fill(0)],
+      monthly_settled: [0, 5_000_000, ...Array(10).fill(0)],
+    }]
+    const result = runGenericModel(cfg)
+    expectBalanceSheetBalances(result)
+    expect(result.bs.accounts_receivable[1]).toBe(0)
+  })
+
   it('REG: balance sheet still balances with an active bank loan (liability stays flat until debt service is wired into cash flow)', () => {
     const cfg = makeConfig()
     cfg.settings.capital_structure.bank_loan = 12_000_000
