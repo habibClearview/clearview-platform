@@ -566,11 +566,22 @@ export function runGenericModel(
     open: zero(), close: zero(),
     working_capital_adj: tradeCreditCashEffect,
   }
-  cf.fin_cash[0] = cap.shareholder_contribution + cap.grant_non_repayable + cap.grant_recoverable + cap.bank_loan
+  cf.fin_cash[0] = cap.shareholder_contribution + cap.grant_non_repayable + cap.grant_recoverable
   // Fixed assets purchased with cash are an investing outflow in month 0 --
   // without this, fixed assets appear on the balance sheet with no cash
   // consequence, breaking the fundamental accounting identity (Assets = Equity + Liabilities).
   cf.inv_cash[0] = -(cap.fixed_assets ?? 0)
+  // Each debt obligation's principal enters financing cash flow in its own
+  // drawdown month, not always lumped into month 0 -- settings.debts supports
+  // multiple loans with different start dates via a real UI (coach dashboard
+  // debt obligations form). Using a flat cap.bank_loan here would show a debt
+  // schedule (interest/principal/liability) that doesn't match the actual
+  // cash drawdown for any client with more than one loan, or a loan starting
+  // after month 1.
+  debtObligations.forEach(ob => {
+    const idx = Math.max(0, (ob.drawdownMonth ?? 1) - 1)
+    if (idx < months) cf.fin_cash[idx] += ob.principal ?? 0
+  })
   for (let m = 0; m < months; m++) {
     // Loan principal repayment is a financing outflow -- no P&L impact, since
     // it's not an expense, just cash moving from the business to the lender.

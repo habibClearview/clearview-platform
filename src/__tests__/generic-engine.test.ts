@@ -226,14 +226,23 @@ describe('Generic Engine — Capital Structure', () => {
     expect(npatDrop).toBeCloseTo(180_000 * (1 - 0.30), 0)
   })
 
-  it('REG: loan principal repayment reduces cash but not npat (financing outflow, not an expense)', () => {
+  it('REG: loan principal repayment reduces financing cash flow but not npat', () => {
     const cfg = makeConfig()
     cfg.settings.capital_structure.bank_loan = 12_000_000
     const result = runGenericModel(cfg)
-    // Principal repayment shows up in financing cash flow...
-    expect(result.debtSchedule.totalPrincipal[1]).toBeGreaterThan(0)
-    // ...but doesn't touch npat beyond the interest effect already tested above
-    expect(result.con.npat[1]).toBe(result.con.nbt[1] - result.con.tax[1])
+    const principalM1 = result.debtSchedule.totalPrincipal[1]
+    expect(principalM1).toBeGreaterThan(0)
+    // Principal repayment shows up directly in financing cash flow as an
+    // outflow (checked against cf.fin_cash directly, not re-derived from
+    // other engine fields)
+    expect(result.cf.fin_cash[1]).toBeCloseTo(-principalM1, 0)
+    // npat should match a reconstruction from ebitda and interest alone --
+    // if principal had leaked into the P&L, this independent reconstruction
+    // (which never references principal) would not match the engine's npat
+    const nbtExpected = result.con.ebitda[1] - result.con.interest[1]
+    const taxExpected = nbtExpected > 0 ? nbtExpected * 0.30 : 0
+    const npatExpected = nbtExpected - taxExpected
+    expect(result.con.npat[1]).toBeCloseTo(npatExpected, 0)
   })
 })
 
@@ -345,5 +354,34 @@ describe('Generic Engine — Combined balance sheet integrity', () => {
     expectBalanceSheetBalances(result)
     // Loan should still be amortizing correctly alongside everything else
     expect(result.bs.loan_liability[11]).toBeLessThan(result.bs.loan_liability[0])
+  })
+
+  it('REG: multiple debt obligations each draw down cash in their own month, not all lumped into month 0', () => {
+    const cfgOneLoan = makeConfig()
+    cfgOneLoan.settings.debts = [
+      { name: 'Bank loan', principal: 8_000_000, annualRate: 0.18, tenorMonths: 12, gracePeriodMonths: 0, drawdownMonth: 1, repaymentType: 'amortising' },
+    ]
+    const oneLoanResult = runGenericModel(cfgOneLoan)
+
+    const cfgTwoLoans = makeConfig()
+    cfgTwoLoans.settings.debts = [
+      { name: 'Bank loan', principal: 8_000_000, annualRate: 0.18, tenorMonths: 12, gracePeriodMonths: 0, drawdownMonth: 1, repaymentType: 'amortising' },
+      // gracePeriodMonths: 1 means no repayment lands in the drawdown month
+      // itself, so the month-4 cash delta below isolates the drawdown cleanly
+      // rather than netting against the SACCO loan's own first repayment.
+      { name: 'SACCO loan', principal: 3_000_000, annualRate: 0.20, tenorMonths: 12, gracePeriodMonths: 1, drawdownMonth: 4, repaymentType: 'amortising' },
+    ]
+    const twoLoanResult = runGenericModel(cfgTwoLoans)
+    expectBalanceSheetBalances(twoLoanResult)
+
+    // Month 1 (index 0): identical in both scenarios -- second loan hasn't
+    // drawn down yet, so it must not be lumped into month 0
+    expect(twoLoanResult.cf.fin_cash[0]).toBeCloseTo(oneLoanResult.cf.fin_cash[0], 0)
+    // Month 4 (index 3): with the grace period, the only difference between
+    // the two scenarios is the second loan's clean 3,000,000 drawdown
+    const fin_cash_delta = twoLoanResult.cf.fin_cash[3] - oneLoanResult.cf.fin_cash[3]
+    expect(fin_cash_delta).toBeCloseTo(3_000_000, 0)
+    // Total liability outstanding right after both drawdowns should reflect both loans
+    expect(twoLoanResult.bs.loan_liability[3]).toBeGreaterThan(oneLoanResult.bs.loan_liability[3])
   })
 })
