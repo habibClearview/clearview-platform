@@ -234,3 +234,69 @@ describe('Field Capture — transaction type derivation', () => {
     expect(deriveTransactionType('direct_opex')).toBe('expense')
   })
 })
+
+// ── Catalogue-driven sale amount + price alert (app/api/field/sync/route.ts) ──
+// Re-implements the pure pricing logic for testing without HTTP/DB. The
+// operator only ever supplies catalogue_item_id + quantity (+ an optional
+// override_price for bulk sales) -- price and amount are always computed
+// here, never trusted from the client for the standard case.
+
+const PRICE_ALERT_THRESHOLD = 0.10
+
+function computeSaleAmount(catalogueItem: { price: number }, quantity: number, overridePrice?: number) {
+  const overridden = overridePrice !== undefined
+  const priceUsed = overridden ? overridePrice : catalogueItem.price
+  const standardPrice = catalogueItem.price
+  const deviates = standardPrice > 0 && Math.abs(priceUsed - standardPrice) / standardPrice > PRICE_ALERT_THRESHOLD
+  return {
+    amount: quantity * priceUsed,
+    unit_price: priceUsed,
+    price_overridden: overridden,
+    price_alert: overridden && deviates,
+  }
+}
+
+describe('Field Capture — catalogue-driven sale amount', () => {
+  const catalogueItem = { price: 1500 }
+
+  it('REG: with no override, amount is quantity x the catalogue standard price', () => {
+    const result = computeSaleAmount(catalogueItem, 10)
+    expect(result.amount).toBe(15000)
+    expect(result.unit_price).toBe(1500)
+    expect(result.price_overridden).toBe(false)
+  })
+
+  it('REG: the operator never determines price for a standard sale -- only quantity affects amount', () => {
+    const a = computeSaleAmount(catalogueItem, 3)
+    const b = computeSaleAmount(catalogueItem, 7)
+    // Same catalogue item, different quantities -- unit_price must be identical, only amount scales.
+    expect(a.unit_price).toBe(b.unit_price)
+    expect(b.amount).toBe(a.unit_price * 7)
+  })
+
+  it('REG: bulk override uses the override price, not the catalogue price, for the amount', () => {
+    const result = computeSaleAmount(catalogueItem, 100, 1300)
+    expect(result.amount).toBe(130000)
+    expect(result.price_overridden).toBe(true)
+  })
+
+  it('REG: an override within 10% of standard price does not trigger a price alert', () => {
+    const result = computeSaleAmount(catalogueItem, 10, 1400) // ~6.7% below standard
+    expect(result.price_alert).toBe(false)
+  })
+
+  it('REG: an override more than 10% below standard price triggers a price alert', () => {
+    const result = computeSaleAmount(catalogueItem, 10, 1200) // 20% below standard
+    expect(result.price_alert).toBe(true)
+  })
+
+  it('REG: an override more than 10% above standard price also triggers a price alert', () => {
+    const result = computeSaleAmount(catalogueItem, 10, 1800) // 20% above standard
+    expect(result.price_alert).toBe(true)
+  })
+
+  it('REG: no override never triggers a price alert, regardless of catalogue price', () => {
+    const result = computeSaleAmount(catalogueItem, 10)
+    expect(result.price_alert).toBe(false)
+  })
+})

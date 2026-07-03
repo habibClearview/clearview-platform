@@ -48,15 +48,26 @@ export async function POST(req: NextRequest) {
     const businessUnits: any[] = config.business_units || []
     const unit = businessUnits.find((u: any) => u.id === operator.business_unit_id)
 
+    // Sales catalogue: priced products/services from field_catalogue. The
+    // operator only ever picks one of these and enters a volume -- price
+    // and amount are computed server-side in /api/field/sync, never
+    // entered by the operator. See supabase/migrations/2026_07_04_field_catalogue.sql.
+    const { data: catalogueItems, error: catalogueErr } = await supabase
+      .from('field_catalogue')
+      .select('id, name, item_type, price, unit_label, plan_line_id')
+      .eq('client_id', operator.client_id)
+      .eq('business_unit_id', operator.business_unit_id)
+      .eq('active', true)
+      .order('name')
+    if (catalogueErr) throw catalogueErr
+
+    // Cost/expense lines: still sourced directly from the plan, unchanged --
+    // pricing the cost side of the catalogue is a separate, later piece of
+    // work, not part of this change.
     const planLines: any[] = config.plan_lines || []
-    const catalogue = planLines
-      .filter((l: any) => l.unit_id === operator.business_unit_id && l.active)
-      .map((l: any) => ({
-        id: l.id,
-        name: l.name,
-        category: l.category,
-        line_type: l.line_type || 'standard',
-      }))
+    const costLines = planLines
+      .filter((l: any) => l.unit_id === operator.business_unit_id && l.active && l.category !== 'revenue')
+      .map((l: any) => ({ id: l.id, name: l.name, category: l.category }))
 
     const { data: customers } = await supabase
       .from('field_customers')
@@ -81,7 +92,8 @@ export async function POST(req: NextRequest) {
         start_date: config.start_date,
       },
       unit: unit || { id: operator.business_unit_id, name: 'My Unit' },
-      catalogue,
+      catalogue: catalogueItems || [],
+      cost_lines: costLines,
       customers: customers || [],
       authenticated_at: new Date().toISOString(),
     })
