@@ -1,0 +1,36 @@
+name: Validate Migration
+
+on:
+  pull_request:
+    paths:
+      - '*.sql'
+      - 'migrations/**'
+      - 'supabase/**'
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Find migration files
+        id: find
+        run: |
+          FILES=$(find . -name "*.sql" -newer HEAD~1 2>/dev/null | head -20)
+          echo "files=$FILES" >> $GITHUB_OUTPUT
+          echo "Found SQL files: $FILES"
+      
+      - name: Validate migrations
+        if: steps.find.outputs.files != ''
+        run: |
+          BLOCKED=0
+          for f in ${{ steps.find.outputs.files }}; do
+            echo "Validating: $f"
+            python3 .github/scripts/validate-migration.py "$f" || BLOCKED=1
+          done
+          if [ $BLOCKED -eq 1 ]; then
+            echo "❌ Migration validation failed -- fix critical issues before merging"
+            exit 1
+          fi
+          echo "✅ All migrations validated"
