@@ -464,18 +464,27 @@ function PLTable({rows,months,title,footnote}:{
 }
 
 // Editable monthly line
-function LineEditor({line:l,onPlanChange,onActualChange,onRename,onRemove,months,cc,planLocked,showActual}:{
-  line:PlanLine;months:string[];cc:string;planLocked:boolean;showActual:boolean
+function LineEditor({line:l,onPlanChange,onActualChange,onRename,onRemove,months,cc,planLocked,showActual,isNew}:{
+  line:PlanLine;months:string[];cc:string;planLocked:boolean;showActual:boolean;isNew?:boolean
   onPlanChange:(m:number,v:number)=>void
   onActualChange:(m:number,v:number|null)=>void
   onRename:(name:string)=>void
   onRemove:()=>void
 }){
   const total=l.monthlyPlan.reduce((a,b)=>a+b,0)
+  const nameRef = React.useRef<HTMLInputElement>(null)
+  const wrapRef = React.useRef<HTMLDivElement>(null)
+  React.useEffect(()=>{
+    if(isNew){
+      wrapRef.current?.scrollIntoView({behavior:'smooth',block:'center'})
+      nameRef.current?.focus()
+      nameRef.current?.select()
+    }
+  },[isNew])
   return(
-    <div style={{border:`1px solid ${C.border}`,borderRadius:6,padding:'0.75rem',marginBottom:'0.6rem'}}>
+    <div ref={wrapRef} style={{border:`1px solid ${isNew?C.cyan:C.border}`,borderRadius:6,padding:'0.75rem',marginBottom:'0.6rem',boxShadow:isNew?`0 0 0 2px ${C.cyan}33`:'none',transition:'box-shadow 1.2s ease, border-color 1.2s ease'}}>
       <div style={{display:'flex',gap:'0.6rem',alignItems:'center',marginBottom:'0.5rem'}}>
-        <input style={{...inp,flex:2,fontSize:'0.8rem'}} value={l.name} onChange={e=>onRename(e.target.value)}/>
+        <input ref={nameRef} style={{...inp,flex:2,fontSize:'0.8rem'}} value={l.name} onChange={e=>onRename(e.target.value)}/>
         <span style={{fontFamily:'monospace',fontSize:'0.72rem',color:C.slate,whiteSpace:'nowrap'}}>Total: {fmt(total,cc)}</span>
         <button style={delBtn} onClick={()=>{if(window.confirm(`Remove "${l.name}"?`))onRemove()}}>✕ Remove</button>
       </div>
@@ -1527,6 +1536,7 @@ export default function CONASDashboard({
 
   const [view,setView]      = useState('overview')
   const [planUnit,setPlanUnit] = useState('shop_1')
+  const [lastAddedId,setLastAddedId] = useState<string|null>(null)
   const [unitPLView,setUnitPLView] = useState('fge')
   const [showActual,setShowActual] = useState(false)
   const [coachAssessments,setCoachAssessments] = useState<Record<string,unknown>|null>(null)
@@ -1563,12 +1573,14 @@ export default function CONASDashboard({
   function addLine(uid:string,cat:PlanLine['category']){
     const nl:PlanLine={id:`l_${Date.now()}`,name:'New item',category:cat,monthlyPlan:Array(MONTHS).fill(0),monthlyActual:Array(MONTHS).fill(null),actualStatus:Array(MONTHS).fill('draft'),rejectionNote:Array(MONTHS).fill(''),isShared:false}
     upd(p=>({...p,units:p.units.map(u=>u.id!==uid?u:{...u,lines:[...u.lines,nl]})}))
+    setLastAddedId(nl.id)
   }
   function removeLine(uid:string,lid:string){upd(p=>({...p,units:p.units.map(u=>u.id!==uid?u:{...u,lines:u.lines.filter(l=>l.id!==lid)})}))}
   function renameLine(uid:string,lid:string,name:string){upd(p=>({...p,units:p.units.map(u=>u.id!==uid?u:{...u,lines:u.lines.map(l=>l.id!==lid?l:{...l,name})})}))}
   function addShared(){
     const nl:PlanLine={id:`sh_${Date.now()}`,name:'New shared cost',category:'shared',monthlyPlan:Array(MONTHS).fill(0),monthlyActual:Array(MONTHS).fill(null),actualStatus:Array(MONTHS).fill('draft'),rejectionNote:Array(MONTHS).fill(''),isShared:true}
     upd(p=>({...p,sharedLines:[...p.sharedLines,nl]}))
+    setLastAddedId(nl.id)
   }
   function toggleLock(){
     if(!window.confirm(planLocked?'Unlock the season plan?':'Lock the season plan? Unit heads cannot change plan figures after locking.'))return
@@ -1869,7 +1881,7 @@ export default function CONASDashboard({
             </div>
             <p style={{...hint,fontSize:'0.79rem',lineHeight:1.55,marginBottom:'0.85rem'}}>CEO, Finance Manager, Operations Manager, Business Development Manager, and all central overheads. Allocated {pct(inputs.global.sharedCostFixedPct)} by headcount, {pct(1-inputs.global.sharedCostFixedPct)} by revenue each month.</p>
             {inputs.sharedLines.map(l=>(
-              <LineEditor key={l.id} line={l} months={months} cc={cc} planLocked={planLocked} showActual={false}
+              <LineEditor key={l.id} line={l} months={months} cc={cc} planLocked={planLocked} showActual={false} isNew={l.id===lastAddedId}
                 onPlanChange={(m,v)=>setSharedVal(l.id,m,v)}
                 onActualChange={()=>{}}
                 onRename={name=>upd(p=>({...p,sharedLines:p.sharedLines.map(sl=>sl.id!==l.id?sl:{...sl,name})}))}
@@ -1911,7 +1923,7 @@ export default function CONASDashboard({
                   </div>
                   {lines.length===0&&<p style={{color:C.slate,fontSize:'0.82rem'}}>No lines. {!planLocked&&'Use the button above to add one.'}</p>}
                   {lines.map(l=>(
-                    <LineEditor key={l.id} line={l} months={months} cc={cc} planLocked={planLocked} showActual={showActual}
+                    <LineEditor key={l.id} line={l} months={months} cc={cc} planLocked={planLocked} showActual={showActual} isNew={l.id===lastAddedId}
                       onPlanChange={(m,v)=>setPlanVal(unitMeta.id,l.id,m,v)}
                       onActualChange={(m,v)=>setActualVal(unitMeta.id,l.id,m,v)}
                       onRename={name=>renameLine(unitMeta.id,l.id,name)}
