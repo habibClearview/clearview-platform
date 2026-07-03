@@ -1552,6 +1552,18 @@ export default function CONASDashboard({
   const [loadingData, setLoadingData] = useState(true)
   const saveTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
 
+  // Debts saved before the stable-id fix have no id and would still fall
+  // back to array-index keys (the stale input/focus-on-delete bug this was
+  // meant to fix). Used to backfill on both the load() path below and the
+  // controlled inputsProp path (app/dashboard/conas/page.tsx passes
+  // inputs={loadLocal(...)}, which can carry the same legacy data).
+  function backfillDebtIds(cfg: CONASInputs): CONASInputs {
+    const needsBackfill = (cfg.debts || []).some(d => !d.id)
+    if (!needsBackfill) return cfg
+    const debts = (cfg.debts || []).map((d, i) => d.id ? d : { ...d, id: `debt_legacy_${i}_${Date.now()}_${Math.random().toString(36).slice(2,7)}` })
+    return { ...cfg, debts }
+  }
+
   // Load saved config from Supabase on mount
   useEffect(() => {
     async function load() {
@@ -1563,14 +1575,11 @@ export default function CONASDashboard({
           .single()
         if (data?.config && Object.keys(data.config).length > 0) {
           const cfg = data.config as CONASInputs
-          // Debts saved before the stable-id fix have no id and would still
-          // fall back to array-index keys (the stale input/focus-on-delete
-          // bug this was meant to fix). Backfill once on load and persist
-          // it via setInputs (not setInputsLocal) so the id is durably
-          // stable across reloads, not just for this session.
-          const needsBackfill = (cfg.debts || []).some(d => !d.id)
-          const debts = (cfg.debts || []).map((d, i) => d.id ? d : { ...d, id: `debt_legacy_${i}_${Date.now()}` })
-          if (needsBackfill) setInputs({ ...cfg, debts })
+          const fixed = backfillDebtIds(cfg)
+          // Persist via setInputs (not setInputsLocal) when a backfill
+          // happened, so the id is durably stable across reloads, not
+          // just for this session.
+          if (fixed !== cfg) setInputs(fixed)
           else setInputsLocal(cfg)
         }
       } catch {}
@@ -1580,7 +1589,15 @@ export default function CONASDashboard({
     else setLoadingData(false)
   }, [])
 
-  const activeInputs = inputsProp || inputs
+  // Controlled-mode path: inputsProp can also carry legacy debts (e.g. from
+  // loadLocal() in app/dashboard/conas/page.tsx). Normalize those too.
+  useEffect(() => {
+    if (!inputsProp) return
+    const fixed = backfillDebtIds(inputsProp)
+    if (fixed !== inputsProp) onInputsChange?.(fixed)
+  }, [inputsProp])
+
+  const activeInputs = inputsProp ? backfillDebtIds(inputsProp) : inputs
 
   function setInputs(newInputs: CONASInputs) {
     setInputsLocal(newInputs)
@@ -2262,7 +2279,7 @@ export default function CONASDashboard({
               )}
             </div>
           ))}
-          <button style={addBtn(true)} onClick={()=>upd(p=>({...p,debts:[...(p.debts||[]),{id:`debt_${Date.now()}`,name:'',principal:0,annualRate:0.18,tenorMonths:12,gracePeriodMonths:0,drawdownMonth:1,repaymentType:'amortising'}]}))}>+ Add Debt Obligation</button>
+          <button style={addBtn(true)} onClick={()=>upd(p=>({...p,debts:[...(p.debts||[]),{id:`debt_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,name:'',principal:0,annualRate:0.18,tenorMonths:12,gracePeriodMonths:0,drawdownMonth:1,repaymentType:'amortising'}]}))}>+ Add Debt Obligation</button>
         </div>
         <div style={card}>
           <div style={secH}>Business Units</div>
