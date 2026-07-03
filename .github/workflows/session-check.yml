@@ -1,0 +1,90 @@
+name: Session Start Check
+
+on:
+  workflow_dispatch:  # Run manually at start of each session
+  schedule:
+    - cron: '0 6 * * *'  # Also runs daily at 6am to catch overnight issues
+
+jobs:
+  session-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test suite
+        id: tests
+        run: |
+          npm test 2>&1 | tee /tmp/test-output.txt
+          if grep -q "failed" /tmp/test-output.txt; then
+            echo "status=failing" >> $GITHUB_OUTPUT
+          else
+            echo "status=passing" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check deployment status
+        id: deployment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          STATUS=$(curl -s -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/commits/main/statuses" \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); print(d[0]['state'] if d else 'unknown')")
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "Deployment status: $STATUS"
+
+      - name: Check open PRs
+        id: prs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COUNT=$(curl -s -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls?state=open" \
+            | python3 -c "import json,sys; print(len(json.load(sys.stdin)))")
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          echo "Open PRs: $COUNT"
+
+      - name: Post session summary
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TEST_STATUS: ${{ steps.tests.outputs.status }}
+          DEPLOY_STATUS: ${{ steps.deployment.outputs.status }}
+          PR_COUNT: ${{ steps.prs.outputs.count }}
+        run: |
+          TEST_ICON=$([ "$TEST_STATUS" = "passing" ] && echo "✅" || echo "❌")
+          DEPLOY_ICON=$([ "$DEPLOY_STATUS" = "success" ] && echo "✅" || echo "❌")
+          
+          BODY="## Clearview Platform — Session Start Report
+          
+| Check | Status |
+|-------|--------|
+| Automated tests | $TEST_ICON $TEST_STATUS |
+| Production deployment | $DEPLOY_ICON $DEPLOY_STATUS |
+| Open PRs | $PR_COUNT pending |
+
+$([ "$TEST_STATUS" != "passing" ] && echo "⚠️ **Tests are failing — fix before starting new work**" || echo "")
+$([ "$DEPLOY_STATUS" != "success" ] && echo "⚠️ **Production deployment is broken — fix before starting new work**" || echo "")
+$([ "$TEST_STATUS" = "passing" ] && [ "$DEPLOY_STATUS" = "success" ] && echo "✅ **All clear — safe to start building**" || echo "")
+
+_Generated: $(date -u '+%Y-%m-%d %H:%M UTC')_"
+
+          gh issue create \
+            --title "Session Start Check — $(date -u '+%Y-%m-%d')" \
+            --body "$BODY" \
+            --label "session-check" 2>/dev/null || \
+          echo "Note: Could not create issue (may need 'session-check' label to exist)"
+
+          echo "$BODY"
