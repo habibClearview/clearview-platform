@@ -139,4 +139,45 @@ describe('Generic Engine — Capital Structure', () => {
     // Equity should include the grant
     expect(result.bs.total_equity_and_liabilities[0]).toBeGreaterThan(0)
   })
+
+  it('REG: balance sheet still balances with an active payable trade credit line', () => {
+    const cfg = makeConfig()
+    cfg.settings.trade_credit_lines = [{
+      id: 'tc1', name: 'Input Supplier', type: 'payable',
+      monthly_new: Array(12).fill(2_000_000),
+      monthly_settled: Array(12).fill(1_000_000),
+    }]
+    const result = runGenericModel(cfg)
+    result.bs.total_assets.forEach((assets: number, i: number) => {
+      const equity = result.bs.total_equity_and_liabilities[i]
+      expect(Math.abs(assets - equity)).toBeLessThan(1)
+    })
+    // Outstanding payable balance should build up and appear as a liability
+    expect(result.bs.accounts_payable[11]).toBeGreaterThan(0)
+  })
+
+  it('REG: balance sheet still balances with an active receivable trade credit line', () => {
+    const cfg = makeConfig()
+    cfg.settings.trade_credit_lines = [{
+      id: 'tc1', name: 'Buyer Credit', type: 'receivable',
+      monthly_new: Array(12).fill(1_500_000),
+      monthly_settled: Array(12).fill(800_000),
+    }]
+    const result = runGenericModel(cfg)
+    result.bs.total_assets.forEach((assets: number, i: number) => {
+      const equity = result.bs.total_equity_and_liabilities[i]
+      expect(Math.abs(assets - equity)).toBeLessThan(1)
+    })
+    expect(result.bs.accounts_receivable[11]).toBeGreaterThan(0)
+  })
+
+  it('REG: balance sheet still balances with an active bank loan (liability stays flat until debt service is wired into cash flow)', () => {
+    const cfg = makeConfig()
+    cfg.settings.capital_structure.bank_loan = 12_000_000
+    const result = runGenericModel(cfg)
+    result.bs.total_assets.forEach((assets: number, i: number) => {
+      const equity = result.bs.total_equity_and_liabilities[i]
+      expect(Math.abs(assets - equity)).toBeLessThan(1)
+    })
+  })
 })
