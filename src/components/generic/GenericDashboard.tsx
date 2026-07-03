@@ -1099,6 +1099,149 @@ function TeamTab({clientId,config,P}) {
   )
 }
 
+// ── FIELD OPERATORS TAB (Clearview Field mobile capture) ──────
+function FieldOperatorManager({clientId,config,P}) {
+  const [operators, setOperators] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showAdd, setShowAdd] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [copiedId, setCopiedId] = useState<string|null>(null)
+  const [form, setForm] = useState({display_name:'',phone:'',business_unit_id:'',sync_frequency:'end_of_day',expires_in_days:''})
+
+  async function load() {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/field/admin/operators?client_id=${encodeURIComponent(clientId)}`)
+      const data = await res.json()
+      setOperators(data.operators||[])
+    } catch { /* handled by empty state below */ }
+    setLoading(false)
+  }
+  useEffect(()=>{ load() },[clientId])
+
+  async function addOperator() {
+    if (!form.display_name || !form.business_unit_id) return
+    setSaving(true)
+    try {
+      await fetch('/api/field/admin/operators', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          client_id:clientId, business_unit_id:form.business_unit_id,
+          display_name:form.display_name, phone:form.phone||null,
+          sync_frequency:form.sync_frequency,
+          expires_in_days:form.expires_in_days||undefined,
+        }),
+      })
+      setForm({display_name:'',phone:'',business_unit_id:'',sync_frequency:'end_of_day',expires_in_days:''})
+      setShowAdd(false)
+      await load()
+    } catch { alert('Could not create operator. Please try again.') }
+    setSaving(false)
+  }
+
+  async function toggleActive(operatorId:string, active:boolean) {
+    await fetch('/api/field/admin/operators', {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({operator_id:operatorId, active}),
+    })
+    await load()
+  }
+
+  async function issueNewToken(operatorId:string) {
+    if (!window.confirm('Issue a new token for this operator? Their old token(s) will still work until they expire -- this adds a new one, it does not revoke existing tokens.')) return
+    await fetch('/api/field/admin/operators', {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({operator_id:operatorId, issue_new_token:true}),
+    })
+    await load()
+  }
+
+  function fieldLink(token:string) {
+    return `${typeof window!=='undefined'?window.location.origin:'https://clearview.habibonifade.com'}/field?token=${token}`
+  }
+
+  function copyLink(token:string, id:string) {
+    navigator.clipboard?.writeText(fieldLink(token))
+    setCopiedId(id)
+    setTimeout(()=>setCopiedId(null),2000)
+  }
+
+  if (loading) return <Spinner/>
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+        <div style={secH}>Clearview Field — Mobile Operators</div>
+        {P.canManageTeam&&<button style={addBtn()} onClick={()=>setShowAdd(!showAdd)}>+ Add Operator</button>}
+      </div>
+      <p style={{fontSize:'0.82rem',color:C.slate,lineHeight:1.6,marginBottom:'1.1rem'}}>
+        Each operator is tied to one business unit and gets a unique link to log sales and costs from their phone. No login required on their end -- the link itself is their access.
+      </p>
+
+      {showAdd&&(
+        <div style={{...card,border:`1px solid ${C.cyan}`}}>
+          <div style={fGrid}>
+            <div><label style={lbl}>Operator Name</label><input style={inp} value={form.display_name} onChange={e=>setForm(f=>({...f,display_name:e.target.value}))} placeholder="e.g. John Mukasa"/></div>
+            <div><label style={lbl}>Phone (optional)</label><input style={inp} value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))}/></div>
+            <div><label style={lbl}>Business Unit</label>
+              <select style={inp} value={form.business_unit_id} onChange={e=>setForm(f=>({...f,business_unit_id:e.target.value}))}>
+                <option value="">Select a unit...</option>
+                {config.business_units.filter(u=>u.active).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+            <div><label style={lbl}>Sync Frequency</label>
+              <select style={inp} value={form.sync_frequency} onChange={e=>setForm(f=>({...f,sync_frequency:e.target.value}))}>
+                <option value="real_time">Real time (when online)</option>
+                <option value="end_of_day">End of day</option>
+              </select>
+            </div>
+            <div><label style={lbl}>Link Expires In (days, optional)</label><input type="number" style={inp} value={form.expires_in_days} onChange={e=>setForm(f=>({...f,expires_in_days:e.target.value}))} placeholder="Never expires if blank"/></div>
+          </div>
+          <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
+            <button style={solidBtn()} disabled={saving} onClick={addOperator}>{saving?'Creating...':'Create Operator & Link'}</button>
+            <button style={addBtn(true,C.slate)} onClick={()=>setShowAdd(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {operators.length===0&&!showAdd&&<div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No field operators yet. Add one to start capturing sales and costs from the field.</div>}
+
+      {operators.map(op=>{
+        const unit = config.business_units.find(u=>u.id===op.business_unit_id)
+        const activeTokens = (op.tokens||[]).filter((t:any)=>!t.expires_at || new Date(t.expires_at) > new Date())
+        const latestToken = activeTokens.sort((a:any,b:any)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime())[0]
+        return (
+          <div key={op.id} style={{...card,opacity:op.active?1:0.55}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'0.6rem'}}>
+              <div>
+                <div style={{fontWeight:700,color:C.navy}}>{op.display_name}{!op.active&&<span style={{marginLeft:8}}><Badge text="Inactive" color={C.red}/></span>}</div>
+                <div style={{fontSize:'0.78rem',color:C.slate}}>{unit?.name||op.business_unit_id}{op.phone?` · ${op.phone}`:''} · {op.sync_frequency==='real_time'?'Real time':'End of day'}</div>
+              </div>
+              <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
+                {latestToken&&op.active&&(
+                  <button style={addBtn(true)} onClick={()=>copyLink(latestToken.token,op.id)}>{copiedId===op.id?'Copied!':'Copy Field Link'}</button>
+                )}
+                {op.active&&<button style={addBtn(true,C.teal)} onClick={()=>issueNewToken(op.id)}>New Link</button>}
+                {P.canManageTeam&&(
+                  op.active
+                    ? <button style={addBtn(true,C.red)} onClick={()=>toggleActive(op.id,false)}>Deactivate</button>
+                    : <button style={addBtn(true,C.green)} onClick={()=>toggleActive(op.id,true)}>Reactivate</button>
+                )}
+              </div>
+            </div>
+            {latestToken&&(
+              <div style={{marginTop:'0.6rem',fontSize:'0.7rem',color:C.slate,fontFamily:'monospace',wordBreak:'break-all'}}>
+                {fieldLink(latestToken.token)}
+                {latestToken.expires_at&&<div style={{color:C.amber,marginTop:'0.2rem'}}>Expires {new Date(latestToken.expires_at).toLocaleDateString()}</div>}
+                {latestToken.last_used_at&&<div style={{marginTop:'0.2rem'}}>Last synced {new Date(latestToken.last_used_at).toLocaleString()}</div>}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── SETTINGS TAB ─────────────────────────────────────────────
 function SettingsTab({config,P,onSave}) {
   const [form, setForm] = useState({...config})
@@ -2072,7 +2215,7 @@ function ApprovalsAndSpendTab({clientId,config,cc,P}) {
 }
 // ── SETTINGS & ADMIN TAB (Settings + Scenarios + Team merged, toggle) ──
 function SettingsAndAdminTab({config,result,months,cc,clientId,P,onSave}) {
-  const [mode, setMode] = useState<'settings'|'scenarios'|'team'>('settings')
+  const [mode, setMode] = useState<'settings'|'scenarios'|'team'|'field'>('settings')
   return (
     <div>
       <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
@@ -2088,10 +2231,15 @@ function SettingsAndAdminTab({config,result,months,cc,clientId,P,onSave}) {
           background:mode==='team'?C.navy:C.white,color:mode==='team'?C.white:C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:mode==='team'?700:400}}
           onClick={()=>setMode('team')}>Team</button>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:mode==='field'?C.navy:C.white,color:mode==='field'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:mode==='field'?700:400}}
+          onClick={()=>setMode('field')}>Clearview Field</button>
       </div>
       {mode==='settings' && <SettingsTab config={config} P={P} onSave={onSave}/>}
       {mode==='scenarios' && <ScenariosTab config={config} result={result} months={months} cc={cc} P={P} onSave={onSave}/>}
       {mode==='team' && <TeamTab clientId={clientId} config={config} P={P}/>}
+      {mode==='field' && <FieldOperatorManager clientId={clientId} config={config} P={P}/>}
     </div>
   )
 }
