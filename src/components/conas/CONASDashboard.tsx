@@ -1552,6 +1552,18 @@ export default function CONASDashboard({
   const [loadingData, setLoadingData] = useState(true)
   const saveTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
 
+  // Debts saved before the stable-id fix have no id and would still fall
+  // back to array-index keys (the stale input/focus-on-delete bug this was
+  // meant to fix). Used to backfill on both the load() path below and the
+  // controlled inputsProp path (app/dashboard/conas/page.tsx passes
+  // inputs={loadLocal(...)}, which can carry the same legacy data).
+  function backfillDebtIds(cfg: CONASInputs): CONASInputs {
+    const needsBackfill = (cfg.debts || []).some(d => !d.id)
+    if (!needsBackfill) return cfg
+    const debts = (cfg.debts || []).map((d, i) => d.id ? d : { ...d, id: `debt_legacy_${i}_${Date.now()}_${Math.random().toString(36).slice(2,7)}` })
+    return { ...cfg, debts }
+  }
+
   // Load saved config from Supabase on mount
   useEffect(() => {
     async function load() {
@@ -1562,7 +1574,13 @@ export default function CONASDashboard({
           .eq('client_id', CONAS_CLIENT_ID)
           .single()
         if (data?.config && Object.keys(data.config).length > 0) {
-          setInputsLocal(data.config as CONASInputs)
+          const cfg = data.config as CONASInputs
+          const fixed = backfillDebtIds(cfg)
+          // Persist via setInputs (not setInputsLocal) when a backfill
+          // happened, so the id is durably stable across reloads, not
+          // just for this session.
+          if (fixed !== cfg) setInputs(fixed)
+          else setInputsLocal(cfg)
         }
       } catch {}
       setLoadingData(false)
@@ -1571,7 +1589,23 @@ export default function CONASDashboard({
     else setLoadingData(false)
   }, [])
 
-  const activeInputs = inputsProp || inputs
+  // Controlled-mode path: inputsProp can also carry legacy debts (e.g. from
+  // loadLocal() in app/dashboard/conas/page.tsx). Normalize those too.
+  // Memoized so the effect below and activeInputs use the exact same
+  // computed ids -- calling backfillDebtIds twice would generate two
+  // different random suffixes for the same legacy debt, desyncing the
+  // rendered key from what actually gets persisted via onInputsChange.
+  const normalizedInputsProp = React.useMemo(
+    () => inputsProp ? backfillDebtIds(inputsProp) : null,
+    [inputsProp]
+  )
+
+  useEffect(() => {
+    if (!inputsProp || !normalizedInputsProp) return
+    if (normalizedInputsProp !== inputsProp) onInputsChange?.(normalizedInputsProp)
+  }, [inputsProp, normalizedInputsProp])
+
+  const activeInputs = normalizedInputsProp || inputs
 
   function setInputs(newInputs: CONASInputs) {
     setInputsLocal(newInputs)
@@ -2218,8 +2252,8 @@ export default function CONASDashboard({
         <div style={card}>
           <div style={secH}>Additional Debt Obligations</div>
           <p style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.85rem'}}>Use this if the business has more than one loan -- bank loans, SACCO loans, or other non-bank facilities. Each is tracked separately in DSCR.</p>
-          {(inputs.debts||[]).map((d,i)=>(
-            <div key={i} style={{padding:'0.6rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.5rem'}}>
+          {(activeInputs.debts||[]).map((d,i)=>(
+            <div key={d.id||i} style={{padding:'0.6rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.5rem'}}>
               <div style={{display:'grid',gridTemplateColumns:'1.5fr 1fr 1fr auto',gap:'0.5rem',alignItems:'end',marginBottom:'0.5rem'}}>
                 <div><div style={hint}>Name</div><input style={inp} value={d.name||''} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],name:e.target.value};return{...p,debts:ds}})}/></div>
                 <div><div style={hint}>Principal ({cc})</div><input type="number" style={inp} value={d.principal||0} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],principal:Number(e.target.value)};return{...p,debts:ds}})}/></div>
@@ -2253,7 +2287,7 @@ export default function CONASDashboard({
               )}
             </div>
           ))}
-          <button style={addBtn(true)} onClick={()=>upd(p=>({...p,debts:[...(p.debts||[]),{name:'',principal:0,annualRate:0.18,tenorMonths:12,gracePeriodMonths:0,drawdownMonth:1,repaymentType:'amortising'}]}))}>+ Add Debt Obligation</button>
+          <button style={addBtn(true)} onClick={()=>upd(p=>({...p,debts:[...(p.debts||[]),{id:`debt_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,name:'',principal:0,annualRate:0.18,tenorMonths:12,gracePeriodMonths:0,drawdownMonth:1,repaymentType:'amortising'}]}))}>+ Add Debt Obligation</button>
         </div>
         <div style={card}>
           <div style={secH}>Business Units</div>
@@ -2413,14 +2447,17 @@ function ConasIntelligenceTab({result, inputs, coachAssessments, onSaveAssessmen
 
   // Multiple debt obligations: use the explicit `debts` list if provided,
   // otherwise fall back to the single bankLoan field for backward compatibility.
-  const conasDebtObligations = (inputs.debts && inputs.debts.length > 0)
-    ? inputs.debts
-    : (inputs.capitalStructure?.bankLoan > 0 ? [{
+  // Reads from activeInputs (not inputs) -- in controlled mode inputs is only
+  // set once at mount and never updated when inputsProp changes, so reading
+  // inputs here would feed the DSCR calculation from stale debt data.
+  const conasDebtObligations = (activeInputs.debts && activeInputs.debts.length > 0)
+    ? activeInputs.debts
+    : (activeInputs.capitalStructure?.bankLoan > 0 ? [{
         drawdownMonth: 1,
-        annualRate: inputs.capitalStructure.annualInterestRate || 0.18,
-        tenorMonths: (inputs.capitalStructure.loanTenorYears || 2) * 12,
+        annualRate: activeInputs.capitalStructure.annualInterestRate || 0.18,
+        tenorMonths: (activeInputs.capitalStructure.loanTenorYears || 2) * 12,
         gracePeriodMonths: 0,
-        principal: inputs.capitalStructure.bankLoan,
+        principal: activeInputs.capitalStructure.bankLoan,
         repaymentType: 'amortising',
       }] : [])
   const conasTradeCreditLines = (inputs.tradeCreditLines || []).map(l => ({
@@ -2466,7 +2503,7 @@ Financial summary:
 - Going Concern: ${gcScore}/20 (${gcRating})
 - Investment Readiness: ${irScore}/30 (${irTier})
 - Minimum cash position: ${cc} ${minCash.toLocaleString()}
-- DSCR average: ${dscrLabel({hasDebt,dscrMin})}
+- Debt service coverage (min DSCR): ${dscrLabel({hasDebt,dscrMin})}
 - Break-even revenue: ${cc} ${businessBreakeven.toLocaleString()}
 - Staff cost as % of revenue: ${(staffCostPct*100).toFixed(1)}%
 

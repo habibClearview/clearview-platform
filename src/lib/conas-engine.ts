@@ -155,7 +155,7 @@ export interface CONASInputs {
   }
   // Multiple debt obligations (bank + non-bank facilities) -- supplements
   // capitalStructure.bankLoan for clients with more than one loan.
-  debts?: { drawdownMonth?: number; annualRate?: number; tenorMonths?: number; gracePeriodMonths?: number; principal?: number; repaymentType?: string; name?: string; seasonalMonths?: number[] }[]
+  debts?: { id?: string; drawdownMonth?: number; annualRate?: number; tenorMonths?: number; gracePeriodMonths?: number; principal?: number; repaymentType?: string; name?: string; seasonalMonths?: number[] }[]
   // Trade credit: supplier credit received and customer/partner credit given, monthly.
   tradeCreditLines?: { id: string; name: string; type: 'payable'|'receivable'; monthlyNew: number[]; monthlySettled: number[] }[]
   seasons: Season[]

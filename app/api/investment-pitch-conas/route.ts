@@ -9,7 +9,7 @@ import {
   HeadingLevel, BorderStyle, WidthType, AlignmentType, ShadingType,
 } from 'docx'
 import { runCONASModel, defaultCONASInputs } from '@/lib/conas-engine'
-import { computeScores, defaultCoachAssessment, dscrLabel, dscrColor } from '@/lib/scoring-engine'
+import { computeScores, defaultCoachAssessment, dscrLabel, dscrColor, dscrRating } from '@/lib/scoring-engine'
 
 const CONAS_CLIENT_ID = '1556298e-5fa0-4d6a-ae86-da8c708ec6ee'
 
@@ -173,7 +173,7 @@ Capital: Shareholder ${fmt(inputs.capitalStructure?.shareholderContribution||0,c
       scoreBadge('Investment Readiness',`${scores.irScore}/30`,scores.irTier,scores.irScore>=24?GREEN:scores.irScore>=17?CYAN:AMBER,w4),
       scoreBadge('Credit Risk',`${scores.score}/100`,scores.classification,scores.classification==='Stable'?GREEN:scores.classification==='At Risk'?AMBER:RED,w4),
       scoreBadge('Going Concern',`${scores.gcScore}/20`,scores.gcRating,scores.gcRating==='Strong'?GREEN:scores.gcRating==='Adequate'?CYAN:AMBER,w4),
-      scoreBadge('DSCR',dscrLabel(scores),!scores.hasDebt?'No Debt':scores.dscrMin===null?'Not Yet Due':scores.dscrMin>=1.5?'Strong':scores.dscrMin>=1.0?'Adequate':'Below threshold',dscrColor(scores,{green:GREEN,amber:AMBER,red:RED,slate:SLATE}),w4),
+      scoreBadge('DSCR',dscrLabel(scores),dscrRating(scores),dscrColor(scores,{green:GREEN,amber:AMBER,red:RED,slate:SLATE}),w4),
     ]})]}))
     children.push(spacer(0,200))
 

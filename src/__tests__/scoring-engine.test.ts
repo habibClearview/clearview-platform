@@ -92,6 +92,19 @@ describe('Scoring Engine — dscrColor', () => {
 })
 
 describe('Debt Schedule — repayment types', () => {
+  it('REG: when tenorMonths exceeds the visible projection window, installment size is still based on the FULL tenor, not the truncated window', () => {
+    // 36-month tenor, but the model only shows 24 months. Each installment
+    // must still be principal/36 (~33,333), not principal/24 (~50,000) --
+    // otherwise the loan is wrongly repaid faster than its actual tenor.
+    const sched = buildDebtSchedule([{ principal: 1200000, tenorMonths: 36, drawdownMonth: 1, repaymentType: 'amortising' }], 24)
+    const expectedInstalment = 1200000 / 36
+    for (let i = 0; i < 24; i++) expect(sched.totalPrincipal[i]).toBeCloseTo(expectedInstalment, 2)
+    // With only 24 of 36 installments visible, the loan must NOT be fully
+    // repaid within the window -- meaningful balance should remain (~400,000).
+    expect(sched.totalOutstanding[23]).toBeCloseTo(1200000 / 3, 0)
+    expect(sched.totalOutstanding[23]).toBeGreaterThan(390000)
+  })
+
   it('REG: amortising (default) spreads principal evenly across the tenor after grace', () => {
     const sched = buildDebtSchedule([{ principal: 1200000, tenorMonths: 12, drawdownMonth: 1, repaymentType: 'amortising' }], 12)
     // 12 equal principal instalments of 100,000 each.
