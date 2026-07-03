@@ -187,3 +187,50 @@ describe('Field Customers — Validation', () => {
     expect(result.customer?.phone).toBe('0777123456')
   })
 })
+
+// ── Field Operator Admin (creation, tokens, expiry) ────────────
+// Re-implements the pure transformation logic from
+// app/api/field/admin/operators/route.ts for testing without HTTP/DB.
+
+function computeExpiresAt(expiresInDays: string | number | undefined): string | null {
+  if (!expiresInDays) return null
+  return new Date(Date.now() + Number(expiresInDays) * 24 * 60 * 60 * 1000).toISOString()
+}
+
+function deriveTransactionType(category: string): 'sale' | 'expense' {
+  return category === 'revenue' ? 'sale' : 'expense'
+}
+
+describe('Field Operator Admin — token expiry', () => {
+  it('REG: no expiry given means the token never expires (null)', () => {
+    expect(computeExpiresAt(undefined)).toBeNull()
+    expect(computeExpiresAt('')).toBeNull()
+    expect(computeExpiresAt(0)).toBeNull()
+  })
+
+  it('REG: expiry in days computes a future ISO date roughly that many days out', () => {
+    const result = computeExpiresAt(30)
+    expect(result).not.toBeNull()
+    const diffDays = (new Date(result!).getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+    expect(diffDays).toBeGreaterThan(29.9)
+    expect(diffDays).toBeLessThan(30.1)
+  })
+
+  it('REG: expiry accepts a string number from a form input', () => {
+    const result = computeExpiresAt('7')
+    const diffDays = (new Date(result!).getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+    expect(diffDays).toBeGreaterThan(6.9)
+    expect(diffDays).toBeLessThan(7.1)
+  })
+})
+
+describe('Field Capture — transaction type derivation', () => {
+  it('REG: revenue category maps to "sale"', () => {
+    expect(deriveTransactionType('revenue')).toBe('sale')
+  })
+  it('REG: cost_of_sales, staff, and direct_opex all map to "expense"', () => {
+    expect(deriveTransactionType('cost_of_sales')).toBe('expense')
+    expect(deriveTransactionType('staff')).toBe('expense')
+    expect(deriveTransactionType('direct_opex')).toBe('expense')
+  })
+})
