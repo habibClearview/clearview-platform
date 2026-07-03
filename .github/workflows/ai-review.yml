@@ -84,13 +84,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REVIEW=$(cat /tmp/review.txt)
-          gh pr comment ${{ github.event.pull_request.number }} \
-            --body "## AI Code Review
-
-$REVIEW
-
----
-*CRITICAL issues block merge. WARNINGS are informational.*"
+          BODY=$(printf '## AI Code Review\n\n%s\n\n---\n*CRITICAL issues block merge. WARNINGS are informational.*' "$REVIEW")
+          gh pr comment ${{ github.event.pull_request.number }} --body "$BODY"
 
       - name: Set status check
         if: always()

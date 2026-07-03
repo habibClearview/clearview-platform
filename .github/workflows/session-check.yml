@@ -66,20 +66,15 @@ jobs:
         run: |
           TEST_ICON=$([ "$TEST_STATUS" = "passing" ] && echo "✅" || echo "❌")
           DEPLOY_ICON=$([ "$DEPLOY_STATUS" = "success" ] && echo "✅" || echo "❌")
-          
-          BODY="## Clearview Platform — Session Start Report
-          
-| Check | Status |
-|-------|--------|
-| Automated tests | $TEST_ICON $TEST_STATUS |
-| Production deployment | $DEPLOY_ICON $DEPLOY_STATUS |
-| Open PRs | $PR_COUNT pending |
 
-$([ "$TEST_STATUS" != "passing" ] && echo "⚠️ **Tests are failing — fix before starting new work**" || echo "")
-$([ "$DEPLOY_STATUS" != "success" ] && echo "⚠️ **Production deployment is broken — fix before starting new work**" || echo "")
-$([ "$TEST_STATUS" = "passing" ] && [ "$DEPLOY_STATUS" = "success" ] && echo "✅ **All clear — safe to start building**" || echo "")
+          TESTS_WARNING=$([ "$TEST_STATUS" != "passing" ] && echo "⚠️ **Tests are failing — fix before starting new work**" || echo "")
+          DEPLOY_WARNING=$([ "$DEPLOY_STATUS" != "success" ] && echo "⚠️ **Production deployment is broken — fix before starting new work**" || echo "")
+          ALL_CLEAR=$([ "$TEST_STATUS" = "passing" ] && [ "$DEPLOY_STATUS" = "success" ] && echo "✅ **All clear — safe to start building**" || echo "")
+          GENERATED_AT=$(date -u '+%Y-%m-%d %H:%M UTC')
 
-_Generated: $(date -u '+%Y-%m-%d %H:%M UTC')_"
+          BODY=$(printf '## Clearview Platform — Session Start Report\n\n| Check | Status |\n|-------|--------|\n| Automated tests | %s %s |\n| Production deployment | %s %s |\n| Open PRs | %s pending |\n\n%s\n%s\n%s\n\n_Generated: %s_' \
+            "$TEST_ICON" "$TEST_STATUS" "$DEPLOY_ICON" "$DEPLOY_STATUS" "$PR_COUNT" \
+            "$TESTS_WARNING" "$DEPLOY_WARNING" "$ALL_CLEAR" "$GENERATED_AT")
 
           gh issue create \
             --title "Session Start Check — $(date -u '+%Y-%m-%d')" \
