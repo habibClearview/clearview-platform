@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { runGenericModel, defaultGenericConfig } from '../lib/generic-engine'
 
+function expectBalanceSheetBalances(result: ReturnType<typeof runGenericModel>) {
+  result.bs.total_assets.forEach((assets: number, i: number) => {
+    const equity = result.bs.total_equity_and_liabilities[i]
+    expect(Math.abs(assets - equity)).toBeLessThan(1)
+  })
+}
+
+
 // Helper: build a simple config with known inputs
 function makeConfig(overrides: Record<string,any> = {}) {
   return defaultGenericConfig({
@@ -92,10 +100,7 @@ describe('Generic Engine — Critical Bug Regressions', () => {
 
   it('REG: balance sheet balances every month', () => {
     const result = runGenericModel(makeConfig())
-    result.bs.total_assets.forEach((assets: number, i: number) => {
-      const equity = result.bs.total_equity_and_liabilities[i]
-      expect(Math.abs(assets - equity)).toBeLessThan(1)
-    })
+    expectBalanceSheetBalances(result)
   })
 
   it('REG: fixed assets appear as inv_cash outflow in month 0', () => {
@@ -148,10 +153,7 @@ describe('Generic Engine — Capital Structure', () => {
       monthly_settled: Array(12).fill(1_000_000),
     }]
     const result = runGenericModel(cfg)
-    result.bs.total_assets.forEach((assets: number, i: number) => {
-      const equity = result.bs.total_equity_and_liabilities[i]
-      expect(Math.abs(assets - equity)).toBeLessThan(1)
-    })
+    expectBalanceSheetBalances(result)
     // Outstanding payable balance should build up and appear as a liability
     expect(result.bs.accounts_payable[11]).toBeGreaterThan(0)
   })
@@ -164,20 +166,29 @@ describe('Generic Engine — Capital Structure', () => {
       monthly_settled: Array(12).fill(800_000),
     }]
     const result = runGenericModel(cfg)
-    result.bs.total_assets.forEach((assets: number, i: number) => {
-      const equity = result.bs.total_equity_and_liabilities[i]
-      expect(Math.abs(assets - equity)).toBeLessThan(1)
-    })
+    expectBalanceSheetBalances(result)
     expect(result.bs.accounts_receivable[11]).toBeGreaterThan(0)
+  })
+
+  it('REG: balance sheet still balances when settled amount exceeds outstanding balance (over-settlement)', () => {
+    const cfg = makeConfig()
+    cfg.settings.trade_credit_lines = [{
+      id: 'tc1', name: 'Input Supplier', type: 'payable',
+      // Month 0: 1M owed. Month 1: settling 5M against only 1M outstanding --
+      // the balance should floor at 0, not go negative, and cash should only
+      // move by what was actually outstanding, not the over-entered figure.
+      monthly_new:     [1_000_000, 0, ...Array(10).fill(0)],
+      monthly_settled: [0, 5_000_000, ...Array(10).fill(0)],
+    }]
+    const result = runGenericModel(cfg)
+    expectBalanceSheetBalances(result)
+    expect(result.bs.accounts_payable[1]).toBe(0)
   })
 
   it('REG: balance sheet still balances with an active bank loan (liability stays flat until debt service is wired into cash flow)', () => {
     const cfg = makeConfig()
     cfg.settings.capital_structure.bank_loan = 12_000_000
     const result = runGenericModel(cfg)
-    result.bs.total_assets.forEach((assets: number, i: number) => {
-      const equity = result.bs.total_equity_and_liabilities[i]
-      expect(Math.abs(assets - equity)).toBeLessThan(1)
-    })
+    expectBalanceSheetBalances(result)
   })
 })

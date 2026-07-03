@@ -70,7 +70,14 @@ export function computeTradeCredit(
     let runningBalance = 0
     for (let i = 0; i < months; i++) {
       const newAmt = line.monthly_new?.[i] || 0
-      const settledAmt = line.monthly_settled?.[i] || 0
+      const rawSettledAmt = line.monthly_settled?.[i] || 0
+      // Settlement can never exceed what's actually outstanding (opening
+      // balance + this month's new amount). Without this cap, an over-entered
+      // settled figure would move more cash than the balance can account for --
+      // the outstanding balance floors at zero via Math.max below, but the
+      // cash effect would still book the full over-settlement, unbalancing
+      // the balance sheet.
+      const settledAmt = Math.min(rawSettledAmt, runningBalance + newAmt)
       runningBalance = Math.max(0, runningBalance + newAmt - settledAmt)
       balanceTarget[i] += runningBalance
 

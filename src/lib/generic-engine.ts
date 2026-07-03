@@ -572,7 +572,7 @@ export function runGenericModel(
   // ── Balance sheet ─────────────────────────────────────────
   const bs = {
     cash: cf.close,
-    fixed_assets: Array(months).fill(cap.fixed_assets) as number[],
+    fixed_assets: Array(months).fill(cap.fixed_assets ?? 0) as number[],
     accounts_receivable: tradeCredit.totalReceivableOutstanding,
     total_assets: zero(),
     share_capital: Array(months).fill(cap.shareholder_contribution) as number[],
