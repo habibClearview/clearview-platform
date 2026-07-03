@@ -16,7 +16,7 @@ import {
 import type { UserRole } from '@/lib/auth/types'
 import { roleLabel } from '@/lib/auth/types'
 import UserManagement from '@/components/auth/UserManagement'
-import { computeScores, buildDebtSchedule, defaultCoachAssessment } from '@/lib/scoring-engine'
+import { computeScores, buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor } from '@/lib/scoring-engine'
 
 // ── Permissions prop ──────────────────────────────────────────
 export interface DashboardPermissions {
@@ -96,64 +96,14 @@ function Flag({type,children}:{type:'warn'|'ok'|'info';children:React.ReactNode}
 // These go BEFORE the main CONASDashboard component export
 // ============================================================
 
-// ── DEBT SCHEDULE ENGINE (same as Wonderland, standalone) ───
-function buildConasDebtSched(obligations: {drawdownMonth?:number;annualRate?:number;tenorMonths?:number;gracePeriodMonths?:number;principal?:number;repaymentType?:string}[], months: number) {
-  months = months || 12
-  const totalInterest = Array(months).fill(0)
-  const totalPrincipal = Array(months).fill(0)
-  const totalRepayment = Array(months).fill(0)
-  const totalOutstanding = Array(months).fill(0)
-  ;(obligations || []).forEach(function(ob) {
-    const startIdx = Math.max(0, (ob.drawdownMonth || 1) - 1)
-    const monthlyRate = (ob.annualRate || 0) / 12
-    const tenor = ob.tenorMonths || 12
-    const grace = ob.gracePeriodMonths || 0
-    const interestByMonth = Array(months).fill(0)
-    const principalByMonth = Array(months).fill(0)
-    const balanceByMonth = Array(months).fill(0)
-    let totalPP = 0
-    for (let m = startIdx; m < Math.min(startIdx + tenor, months); m++) {
-      if ((m - startIdx) >= grace) totalPP++
-    }
-    let bal = ob.principal || 0
-    let repayCount = 0
-    for (let m = startIdx; m < months; m++) {
-      if (bal <= 0.01) { balanceByMonth[m] = 0; continue }
-      const mss = m - startIdx
-      const interest = bal * monthlyRate
-      interestByMonth[m] = interest
-      let principal = 0
-      if (mss < tenor && mss >= grace) {
-        if (ob.repaymentType === 'bullet') {
-          if (mss === tenor - 1) principal = bal
-        } else {
-          principal = Math.min(bal / Math.max(1, totalPP - repayCount), bal)
-          repayCount++
-        }
-      }
-      principalByMonth[m] = principal
-      bal = Math.max(0, bal - principal)
-      balanceByMonth[m] = bal
-    }
-    for (let m = 0; m < months; m++) {
-      totalInterest[m] += interestByMonth[m]
-      totalPrincipal[m] += principalByMonth[m]
-      totalRepayment[m] += interestByMonth[m] + principalByMonth[m]
-      totalOutstanding[m] += balanceByMonth[m]
-    }
-  })
-  return { totalInterest, totalPrincipal, totalRepayment, totalOutstanding,
-    annualY1: totalRepayment.reduce(function(a:number,b:number){return a+b},0) }
-}
-
 // ── ENGAGEMENT CLOSE (CONAS version) ────────────────────────
-function ConasEngagementClose({score,classification,classColor,gcScore,gcRating,gcColor,irScore,irTier,irColor,dscrAvg,cashGaps,assess,cc}:{score:number;classification:string;classColor:string;gcScore:number;gcRating:string;gcColor:string;irScore:number;irTier:string;irColor:string;dscrAvg:number;cashGaps:number;assess:Record<string,unknown>;cc:string}) {
+function ConasEngagementClose({score,classification,classColor,gcScore,gcRating,gcColor,irScore,irTier,irColor,hasDebt,dscrMin,cashGaps,assess,cc}:{score:number;classification:string;classColor:string;gcScore:number;gcRating:string;gcColor:string;irScore:number;irTier:string;irColor:string;hasDebt:boolean;dscrMin:number|null;cashGaps:number;assess:Record<string,unknown>;cc:string}) {
   const viabilityRating = gcScore>=15&&score>=65?'Viable':gcScore>=10&&score>=40?'Conditionally Viable':gcScore>=7?'At Risk':'Not Viable'
-  const repaymentOutlook = dscrAvg>=1.5&&cashGaps===0?'On Track':dscrAvg>=1.0?'Watch':dscrAvg>=0.5?'At Risk':'Default Risk'
+  const repaymentOutlook = !hasDebt?'No Debt':dscrMin===null?'Not Yet Due':dscrMin>=1.5&&cashGaps===0?'On Track':dscrMin>=1.0?'Watch':dscrMin>=0.5?'At Risk':'Default Risk'
   const viabilityColor = viabilityRating==='Viable'?C.green:viabilityRating==='Conditionally Viable'?C.teal:viabilityRating==='At Risk'?C.amber:C.red
-  const repayColor = repaymentOutlook==='On Track'?C.green:repaymentOutlook==='Watch'?C.amber:C.red
+  const repayColor = repaymentOutlook==='On Track'||repaymentOutlook==='No Debt'?C.green:repaymentOutlook==='Watch'||repaymentOutlook==='Not Yet Due'?C.amber:C.red
   const exitRec = viabilityRating==='Viable'?'Business is viable for independent operation. Maintain agreed monitoring rhythm.':viabilityRating==='Conditionally Viable'?'Business can close engagement with conditions. Specific actions below must be completed before the consultant fully exits.':viabilityRating==='At Risk'?'Engagement close requires an active support plan. Business needs structured follow-on support for at least 6 months post-engagement.':'Do not close without a remediation plan in place.'
-  const immediateList = assess.immediateActions?(assess.immediateActions as string).split('\n').filter(Boolean):[cashGaps>0?'Identify short-term liquidity facility to cover cash-negative months.':null,dscrAvg<1.0?'Review and renegotiate repayment schedule with financing partners.':null,score<40?'Convene management session to review cashflow and cost structure.':null].filter(Boolean)
+  const immediateList = assess.immediateActions?(assess.immediateActions as string).split('\n').filter(Boolean):[cashGaps>0?'Identify short-term liquidity facility to cover cash-negative months.':null,(hasDebt&&dscrMin!==null&&dscrMin<1.0)?'Review and renegotiate repayment schedule with financing partners.':null,score<40?'Convene management session to review cashflow and cost structure.':null].filter(Boolean)
   const nearList = assess.nearTermActions?(assess.nearTermActions as string).split('\n').filter(Boolean):['Implement monthly cashflow tracking using Clearview.','Establish quarterly management accounts review process.',irScore<17?'Develop investment readiness improvement plan.':null].filter(Boolean)
   const followList = assess.followUp?(assess.followUp as string).split('\n').filter(Boolean):['Monthly Clearview review for 6 months post-engagement.','Annual commercial readiness reassessment.'].filter(Boolean)
   const cs = {background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}
@@ -2167,13 +2117,38 @@ export default function CONASDashboard({
           <div style={secH}>Additional Debt Obligations</div>
           <p style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.85rem'}}>Use this if the business has more than one loan -- bank loans, SACCO loans, or other non-bank facilities. Each is tracked separately in DSCR.</p>
           {(inputs.debts||[]).map((d,i)=>(
-            <div key={i} style={{display:'grid',gridTemplateColumns:'1.5fr 1fr 1fr 1fr 1fr auto',gap:'0.5rem',alignItems:'end',padding:'0.6rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.5rem'}}>
-              <div><div style={hint}>Name</div><input style={inp} value={d.name||''} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],name:e.target.value};return{...p,debts:ds}})}/></div>
-              <div><div style={hint}>Principal ({cc})</div><input type="number" style={inp} value={d.principal||0} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],principal:Number(e.target.value)};return{...p,debts:ds}})}/></div>
-              <div><div style={hint}>Annual Rate %</div><input type="number" step="0.5" style={inp} value={((d.annualRate||0)*100).toFixed(1)} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],annualRate:Number(e.target.value)/100};return{...p,debts:ds}})}/></div>
-              <div><div style={hint}>Tenor (months)</div><input type="number" style={inp} value={d.tenorMonths||12} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],tenorMonths:Number(e.target.value)};return{...p,debts:ds}})}/></div>
-              <div><div style={hint}>Grace (months)</div><input type="number" style={inp} value={d.gracePeriodMonths||0} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],gracePeriodMonths:Number(e.target.value)};return{...p,debts:ds}})}/></div>
-              <button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>upd(p=>({...p,debts:(p.debts||[]).filter((_,j)=>j!==i)}))}>×</button>
+            <div key={i} style={{padding:'0.6rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.5rem'}}>
+              <div style={{display:'grid',gridTemplateColumns:'1.5fr 1fr 1fr auto',gap:'0.5rem',alignItems:'end',marginBottom:'0.5rem'}}>
+                <div><div style={hint}>Name</div><input style={inp} value={d.name||''} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],name:e.target.value};return{...p,debts:ds}})}/></div>
+                <div><div style={hint}>Principal ({cc})</div><input type="number" style={inp} value={d.principal||0} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],principal:Number(e.target.value)};return{...p,debts:ds}})}/></div>
+                <div><div style={hint}>Annual Rate %</div><input type="number" step="0.5" style={inp} value={((d.annualRate||0)*100).toFixed(1)} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],annualRate:Number(e.target.value)/100};return{...p,debts:ds}})}/></div>
+                <button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>upd(p=>({...p,debts:(p.debts||[]).filter((_,j)=>j!==i)}))}>×</button>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1.3fr',gap:'0.5rem'}}>
+                <div><div style={hint}>Tenor (months)</div><input type="number" style={inp} value={d.tenorMonths||12} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],tenorMonths:Number(e.target.value)};return{...p,debts:ds}})}/></div>
+                <div><div style={hint}>Grace (months)</div><input type="number" style={inp} value={d.gracePeriodMonths||0} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],gracePeriodMonths:Number(e.target.value)};return{...p,debts:ds}})}/></div>
+                <div><div style={hint}>Drawdown Month (1 = season's first month)</div><input type="number" min="1" style={inp} value={d.drawdownMonth||1} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],drawdownMonth:Number(e.target.value)};return{...p,debts:ds}})}/></div>
+                <div><div style={hint}>Repayment Type</div>
+                  <select style={inp} value={d.repaymentType||'amortising'} onChange={e=>upd(p=>{const ds=[...(p.debts||[])];ds[i]={...ds[i],repaymentType:e.target.value};return{...p,debts:ds}})}>
+                    <option value="amortising">Amortising (equal principal each month)</option>
+                    <option value="bullet">Bullet (full principal at end of tenor)</option>
+                    <option value="quarterly">Quarterly (equal principal every 3 months)</option>
+                    <option value="seasonal">Seasonal (specific months only)</option>
+                  </select>
+                </div>
+              </div>
+              {d.repaymentType==='seasonal'&&(
+                <div style={{marginTop:'0.5rem'}}>
+                  <div style={hint}>Repayment months (comma-separated, 1 = season's first month, e.g. "6, 12" for a twice-yearly harvest schedule)</div>
+                  <input style={inp} value={(d.seasonalMonths||[]).join(', ')}
+                    onChange={e=>upd(p=>{
+                      const ds=[...(p.debts||[])]
+                      const months=e.target.value.split(',').map((x:string)=>parseInt(x.trim(),10)).filter((n:number)=>!isNaN(n)&&n>0)
+                      ds[i]={...ds[i],seasonalMonths:months}
+                      return{...p,debts:ds}
+                    })}/>
+                </div>
+              )}
             </div>
           ))}
           <button style={addBtn(true)} onClick={()=>upd(p=>({...p,debts:[...(p.debts||[]),{name:'',principal:0,annualRate:0.18,tenorMonths:12,gracePeriodMonths:0,drawdownMonth:1,repaymentType:'amortising'}]}))}>+ Add Debt Obligation</button>
@@ -2358,7 +2333,7 @@ function ConasIntelligenceTab({result, inputs, coachAssessments, onSaveAssessmen
     totalLiabilities: bs.totalLiabilities?.[bs.totalLiabilities.length-1]||0,
     months: m, debtObligations: conasDebtObligations, tradeCreditLines: conasTradeCreditLines, assess,
   })
-  const { score, classification, classColor, dscrAvg, dscrVals, cashGaps, revTrend,
+  const { score, classification, classColor, hasDebt, dscrMin, dscrVals, cashGaps, revTrend,
     gcScore, gcRating, gcColor, irScore, irTier, irColor, irFinancial, irDebt,
     tradeCredit, annualRevenue, annualEbitda, minCash, ebitdaMargin, deToEq } = scores
 
@@ -2389,7 +2364,7 @@ Financial summary:
 - Going Concern: ${gcScore}/20 (${gcRating})
 - Investment Readiness: ${irScore}/30 (${irTier})
 - Minimum cash position: ${cc} ${minCash.toLocaleString()}
-- DSCR average: ${dscrAvg.toFixed(2)}x
+- DSCR average: ${dscrLabel({hasDebt,dscrMin})}
 - Break-even revenue: ${cc} ${businessBreakeven.toLocaleString()}
 - Staff cost as % of revenue: ${(staffCostPct*100).toFixed(1)}%
 
@@ -2417,7 +2392,7 @@ Write a clear, plain-English health check report for the CEO. Include: 1) Overal
 Data:
 - Revenue: ${cc} ${annualRevenue.toLocaleString()}, EBITDA margin: ${(ebitdaMargin*100).toFixed(1)}%
 - Credit Risk: ${score}/100 (${classification}); Going Concern: ${gcScore}/20 (${gcRating}); Investment Readiness: ${irScore}/30 (${irTier})
-- DSCR: ${dscrAvg.toFixed(2)}x
+- DSCR: ${dscrLabel({hasDebt,dscrMin})}
 - Break-even revenue: ${cc} ${businessBreakeven.toLocaleString()}
 - Cash shortfall months: ${cashWarnings.length>0?cashWarnings.map((w:any)=>w.month).join(', '):'none'}
 - Staff cost ratio: ${(staffCostPct*100).toFixed(1)}%
@@ -2477,7 +2452,7 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
             <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'1rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>Credit Risk</div><Badge label={classification} color={classColor}/><div style={{fontSize:'0.75rem',color:C.slate,marginTop:'0.3rem'}}>Score {score}/100</div></div>
             <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'1rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>Going Concern</div><Badge label={gcRating} color={gcColor}/><div style={{fontSize:'0.75rem',color:C.slate,marginTop:'0.3rem'}}>{gcScore}/20</div></div>
             <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'1rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>Investment Readiness</div><Badge label={irTier} color={irColor}/><div style={{fontSize:'0.75rem',color:C.slate,marginTop:'0.3rem'}}>{irScore}/30</div></div>
-            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'1rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>Avg DSCR</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:dscrAvg>=1.5?C.green:dscrAvg>=1.0?C.amber:C.red}}>{dscrAvg.toFixed(2)}x</div></div>
+            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'1rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>Minimum DSCR</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:dscrColor({hasDebt,dscrMin},C)}}>{dscrLabel({hasDebt,dscrMin})}</div></div>
             <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'1rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>Cash-Negative Months</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:cashGaps===0?C.green:C.red}}>{cashGaps}</div><div style={{fontSize:'0.75rem',color:C.slate}}>of {m} months</div></div>
             <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'1rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>Revenue Trend</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:revTrend==='Growing'?C.green:revTrend==='Stable'?C.amber:C.red}}>{revTrend}</div></div>
             <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'1rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>Break-Even Revenue</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.amber}}>{fmt(businessBreakeven,cc)}</div></div>
@@ -2489,7 +2464,8 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
           <div style={{background:C.navy,borderRadius:8,padding:'1rem 1.25rem',marginBottom:'1.25rem'}}>
             <div style={{fontFamily:'monospace',fontSize:'0.65rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.75rem'}}>READING THE PICTURE</div>
             {[
-              [dscrAvg>=1.5?'ok':dscrAvg>=1.0?'info':'warn', `Debt service coverage: DSCR ${dscrAvg.toFixed(2)}x. ${dscrAvg>=1.5?'Strong.':dscrAvg>=1.0?'Adequate but watch closely.':'Weak: not generating enough to service obligations.'}`],
+              [!hasDebt?'info':dscrMin===null?'info':dscrMin>=1.5?'ok':dscrMin>=1.0?'info':'warn',
+                `Debt service coverage: ${!hasDebt?'No debt obligations on this plan.':dscrMin===null?'Debt exists but no repayment has fallen due yet.':`Minimum DSCR ${dscrMin.toFixed(2)}x across periods with a repayment due. ${dscrMin>=1.5?'Strong.':dscrMin>=1.0?'Adequate but watch closely.':'Weak: not generating enough to service obligations in the tightest period.'}`}`],
               [cashGaps===0?'ok':'warn', `Cash position: ${cashGaps===0?'Positive throughout the season.':'Negative in '+cashGaps+' month(s).'}`],
               [revTrend==='Growing'?'ok':revTrend==='Stable'?'info':'warn', `Revenue trend: ${revTrend} from start to end of season.`],
               [irScore>=17?'ok':'info', `Investment readiness: ${irTier} (${irScore}/30).`],
@@ -2564,7 +2540,7 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
             </div>
           </div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'1rem',marginBottom:'1.25rem'}}>
-            <div style={{background:'#F0F4F8',borderRadius:6,padding:'0.85rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,marginBottom:'0.3rem'}}>DSCR AVERAGE</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:dscrAvg>=1.5?C.green:dscrAvg>=1.0?C.amber:C.red}}>{dscrAvg.toFixed(2)}x</div></div>
+            <div style={{background:'#F0F4F8',borderRadius:6,padding:'0.85rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,marginBottom:'0.3rem'}}>MINIMUM DSCR</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:dscrColor({hasDebt,dscrMin},C)}}>{dscrLabel({hasDebt,dscrMin})}</div></div>
             <div style={{background:'#F0F4F8',borderRadius:6,padding:'0.85rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,marginBottom:'0.3rem'}}>REVENUE TREND</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:revTrend==='Growing'?C.green:revTrend==='Stable'?C.amber:C.red}}>{revTrend}</div></div>
             <div style={{background:'#F0F4F8',borderRadius:6,padding:'0.85rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,marginBottom:'0.3rem'}}>CASH-NEGATIVE MONTHS</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:cashGaps===0?C.green:C.red}}>{cashGaps}</div></div>
             <div style={{background:'#F0F4F8',borderRadius:6,padding:'0.85rem'}}><div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.slate,marginBottom:'0.3rem'}}>SEASON EBITDA</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:annualEbitda>=0?C.green:C.red}}>{fmt(annualEbitda,cc)}</div></div>
@@ -2574,7 +2550,7 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
             <tbody>
               <tr style={{background:'#F8F4EE'}}><td style={{padding:'6px 10px',fontWeight:600}}>EBITDA</td>{con.ebitda.map((v:number,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right',color:v>=0?C.green:C.red}}>{fmt(v,cc)}</td>)}</tr>
               <tr><td style={{padding:'6px 10px',fontWeight:600}}>Debt Service</td>{debtSched.totalRepayment.map((v:number,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right'}}>{fmt(v,cc)}</td>)}</tr>
-              <tr style={{background:'#F0F4F8'}}><td style={{padding:'6px 10px',fontWeight:700}}>DSCR</td>{dscrVals.map((v:number,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:v>=1.5?C.green:v>=1.0?C.amber:C.red}}>{v.toFixed(2)}x</td>)}</tr>
+              <tr style={{background:'#F0F4F8'}}><td style={{padding:'6px 10px',fontWeight:700}}>DSCR</td>{dscrVals.map((v:number|null,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:v===null?C.slate:v>=1.5?C.green:v>=1.0?C.amber:C.red}}>{v===null?'–':`${v.toFixed(2)}x`}</td>)}</tr>
             </tbody>
           </table></div>
         </div>
@@ -2587,7 +2563,7 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
             <div style={{display:'flex',alignItems:'center',gap:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:gcColor,lineHeight:1}}>{gcScore}</div><div><div style={{fontSize:'0.75rem',color:C.slate}}>out of 20</div><Badge label={gcRating} color={gcColor}/></div></div>
           </div>
           {[
-            {name:'Debt Service Coverage',sc:dscrAvg>=1.5?4:dscrAvg>=1.0?3:dscrAvg>=0.5?2:1,max:4,ev:'DSCR '+dscrAvg.toFixed(2)+'x',field:null},
+            {name:'Debt Service Coverage',sc:!hasDebt?4:dscrMin===null?3:dscrMin>=1.5?4:dscrMin>=1.0?3:dscrMin>=0.5?2:1,max:4,ev:dscrLabel({hasDebt,dscrMin}),field:null},
             {name:'Liquidity Position',sc:minCash>=0?4:minCash>-10000000?1:0,max:4,ev:'Min cash: '+fmt(minCash,cc),field:null},
             {name:'Revenue Sustainability',sc:3,max:4,ev:'Season revenue trend: '+revTrend,field:null},
             {name:'Operational Profitability',sc:annualEbitda>0?3:2,max:4,ev:'Season EBITDA: '+fmt(annualEbitda,cc),field:null},
@@ -2615,7 +2591,7 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
           <ConasPitchDownload/>
           {[
             {name:'Financial Viability',sc:irFinancial,max:5,ev:'EBITDA margin '+(ebitdaMargin*100).toFixed(1)+'%',field:null},
-            {name:'Debt Serviceability',sc:irDebt,max:5,ev:'DSCR '+dscrAvg.toFixed(2)+'x',field:null},
+            {name:'Debt Serviceability',sc:irDebt,max:5,ev:dscrLabel({hasDebt,dscrMin}),field:null},
             {name:'Commercial Model Clarity',sc:Number(assess.commercialModel)||2,max:5,ev:'Coach assessment',field:'commercialModel'},
             {name:'Management Capability',sc:Number(assess.managementCapability)||2,max:5,ev:'Coach assessment',field:'managementCapability'},
             {name:'Market Evidence',sc:Number(assess.marketEvidence)||2,max:5,ev:'Coach assessment',field:'marketEvidence'},
@@ -2668,7 +2644,7 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
       )}
 
       {activeSection==='close'&&(
-        <ConasEngagementClose score={score} classification={classification} classColor={classColor} gcScore={gcScore} gcRating={gcRating} gcColor={gcColor} irScore={irScore} irTier={irTier} irColor={irColor} dscrAvg={dscrAvg} cashGaps={cashGaps} assess={assess} cc={cc}/>
+        <ConasEngagementClose score={score} classification={classification} classColor={classColor} gcScore={gcScore} gcRating={gcRating} gcColor={gcColor} irScore={irScore} irTier={irTier} irColor={irColor} hasDebt={hasDebt} dscrMin={dscrMin} cashGaps={cashGaps} assess={assess} cc={cc}/>
       )}
     </div>
   )
