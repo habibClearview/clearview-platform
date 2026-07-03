@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { runCONASModel, defaultCONASInputs, MONTHS } from '../lib/conas-engine'
+import { runCONASModel, defaultCONASInputs, MONTHS, type PlanLine } from '../lib/conas-engine'
 
 function makeInputs(overrides: Record<string, any> = {}) {
   const base = defaultCONASInputs()
@@ -119,5 +119,92 @@ describe('CONAS Engine — Balance Sheet Integrity', () => {
     }))
     expect(declined.cf.close[11]).toBe(withoutSpend.cf.close[11])
     expect(declined.con.npat[2]).toBe(withoutSpend.con.npat[2])
+  })
+})
+
+describe('CONAS Engine — Spread & Service-Fee Revenue Lines', () => {
+  function withExtraLine(unitId: string, line: PlanLine) {
+    return makeInputs({
+      units: defaultCONASInputs().units.map(u =>
+        u.id !== unitId ? u : { ...u, lines: [...u.lines, line] }
+      ),
+    })
+  }
+
+  it('REG: spread line revenue is sell price x volume (gross sale value), not net margin', () => {
+    const spreadLine: PlanLine = {
+      id: 'test_spread', name: 'Test Spread', category: 'revenue', lineType: 'spread',
+      buyPrice: Array(MONTHS).fill(1000), sellPrice: Array(MONTHS).fill(1500), volume: Array(MONTHS).fill(100),
+      monthlyPlan: Array(MONTHS).fill(0), monthlyActual: Array(MONTHS).fill(null),
+      actualStatus: Array(MONTHS).fill('draft'), rejectionNote: Array(MONTHS).fill(''), isShared: false,
+    }
+    const withSpread = runCONASModel(withExtraLine('shop_1', spreadLine))
+    const baseline = runCONASModel(makeInputs())
+    // Revenue should increase by sellPrice x volume = 1500 x 100 = 150,000 per month.
+    expect(withSpread.unitPL['shop_1'].rev[0] - baseline.unitPL['shop_1'].rev[0]).toBeCloseTo(150000, 0)
+  })
+
+  it('REG: spread line buy cost is booked as cost of sales, separate from revenue', () => {
+    const spreadLine: PlanLine = {
+      id: 'test_spread', name: 'Test Spread', category: 'revenue', lineType: 'spread',
+      buyPrice: Array(MONTHS).fill(1000), sellPrice: Array(MONTHS).fill(1500), volume: Array(MONTHS).fill(100),
+      monthlyPlan: Array(MONTHS).fill(0), monthlyActual: Array(MONTHS).fill(null),
+      actualStatus: Array(MONTHS).fill('draft'), rejectionNote: Array(MONTHS).fill(''), isShared: false,
+    }
+    const withSpread = runCONASModel(withExtraLine('shop_1', spreadLine))
+    const baseline = runCONASModel(makeInputs())
+    // Cost of sales should increase by buyPrice x volume = 1000 x 100 = 100,000 per month.
+    expect(withSpread.unitPL['shop_1'].cogs[0] - baseline.unitPL['shop_1'].cogs[0]).toBeCloseTo(100000, 0)
+    // Gross profit therefore increases by exactly the spread: (1500-1000) x 100 = 50,000.
+    expect(withSpread.unitPL['shop_1'].gp[0] - baseline.unitPL['shop_1'].gp[0]).toBeCloseTo(50000, 0)
+  })
+
+  it('REG: spreadAnalysis reports the correct spread per unit and total spread', () => {
+    const spreadLine: PlanLine = {
+      id: 'test_spread', name: 'Test Spread', category: 'revenue', lineType: 'spread',
+      buyPrice: Array(MONTHS).fill(1000), sellPrice: Array(MONTHS).fill(1500), volume: Array(MONTHS).fill(100),
+      monthlyPlan: Array(MONTHS).fill(0), monthlyActual: Array(MONTHS).fill(null),
+      actualStatus: Array(MONTHS).fill('draft'), rejectionNote: Array(MONTHS).fill(''), isShared: false,
+    }
+    const result = runCONASModel(withExtraLine('shop_1', spreadLine))
+    const analysis = result.unitPL['shop_1'].spreadAnalysis.find(a => a.lineId === 'test_spread')
+    expect(analysis).toBeDefined()
+    expect(analysis!.spreadPerUnit[0]).toBeCloseTo(500, 0)
+    expect(analysis!.totalSpread[0]).toBeCloseTo(50000, 0)
+  })
+
+  it('REG: service_fee line revenue is fee x engagements, cost is cost x engagements', () => {
+    const serviceLine: PlanLine = {
+      id: 'test_service', name: 'Test Service', category: 'revenue', lineType: 'service_fee',
+      feePerEngagement: Array(MONTHS).fill(50000), costPerEngagement: Array(MONTHS).fill(20000), engagements: Array(MONTHS).fill(10),
+      monthlyPlan: Array(MONTHS).fill(0), monthlyActual: Array(MONTHS).fill(null),
+      actualStatus: Array(MONTHS).fill('draft'), rejectionNote: Array(MONTHS).fill(''), isShared: false,
+    }
+    const withService = runCONASModel(withExtraLine('shop_1', serviceLine))
+    const baseline = runCONASModel(makeInputs())
+    expect(withService.unitPL['shop_1'].rev[0] - baseline.unitPL['shop_1'].rev[0]).toBeCloseTo(500000, 0)
+    expect(withService.unitPL['shop_1'].cogs[0] - baseline.unitPL['shop_1'].cogs[0]).toBeCloseTo(200000, 0)
+  })
+
+  it('REG: a standard line (no lineType, or lineType "standard") behaves exactly as before -- monthlyPlan used directly', () => {
+    const standardLine: PlanLine = {
+      id: 'test_standard', name: 'Test Standard', category: 'revenue',
+      monthlyPlan: Array(MONTHS).fill(75000), monthlyActual: Array(MONTHS).fill(null),
+      actualStatus: Array(MONTHS).fill('draft'), rejectionNote: Array(MONTHS).fill(''), isShared: false,
+    }
+    const withStandard = runCONASModel(withExtraLine('shop_1', standardLine))
+    const baseline = runCONASModel(makeInputs())
+    expect(withStandard.unitPL['shop_1'].rev[0] - baseline.unitPL['shop_1'].rev[0]).toBeCloseTo(75000, 0)
+  })
+
+  it('REG: balance sheet still balances with spread and service-fee lines present', () => {
+    const spreadLine: PlanLine = {
+      id: 'test_spread', name: 'Test Spread', category: 'revenue', lineType: 'spread',
+      buyPrice: Array(MONTHS).fill(1000), sellPrice: Array(MONTHS).fill(1500), volume: Array(MONTHS).fill(100),
+      monthlyPlan: Array(MONTHS).fill(0), monthlyActual: Array(MONTHS).fill(null),
+      actualStatus: Array(MONTHS).fill('draft'), rejectionNote: Array(MONTHS).fill(''), isShared: false,
+    }
+    const result = runCONASModel(withExtraLine('shop_1', spreadLine))
+    expectBalanceSheetBalances(result)
   })
 })

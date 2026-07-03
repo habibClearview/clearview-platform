@@ -11,7 +11,8 @@ import {
 import {
   defaultCONASInputs, runCONASModel, buildMonthLabels,
   fmt, fmtFull, pct, MONTHS,
-  type CONASInputs, type PlanLine, type SpendingRequest, type BusinessUnit,
+  blankPlanLine, spreadPlanLine, serviceFeePlanLine,
+  type CONASInputs, type PlanLine, type PlanLineType, type SpendingRequest, type BusinessUnit,
 } from '@/lib/conas-engine'
 import type { UserRole } from '@/lib/auth/types'
 import { roleLabel } from '@/lib/auth/types'
@@ -464,14 +465,26 @@ function PLTable({rows,months,title,footnote}:{
 }
 
 // Editable monthly line
-function LineEditor({line:l,onPlanChange,onActualChange,onRename,onRemove,months,cc,planLocked,showActual,isNew}:{
+function LineEditor({line:l,onPlanChange,onActualChange,onRename,onRemove,onLineTypeChange,onArrayFieldChange,months,cc,planLocked,showActual,isNew}:{
   line:PlanLine;months:string[];cc:string;planLocked:boolean;showActual:boolean;isNew?:boolean
   onPlanChange:(m:number,v:number)=>void
   onActualChange:(m:number,v:number|null)=>void
   onRename:(name:string)=>void
   onRemove:()=>void
+  onLineTypeChange?:(t:PlanLineType)=>void
+  onArrayFieldChange?:(field:'buyPrice'|'sellPrice'|'volume'|'feePerEngagement'|'costPerEngagement'|'engagements',m:number,v:number)=>void
 }){
-  const total=l.monthlyPlan.reduce((a,b)=>a+b,0)
+  const isSpread = l.category==='revenue' && l.lineType==='spread'
+  const isServiceFee = l.category==='revenue' && l.lineType==='service_fee'
+  // For spread/service-fee lines, the displayed and totalled revenue is
+  // derived from the source fields -- matches conas-engine.ts's calcUnitRaw
+  // exactly, so this row never shows a different number than the engine uses.
+  const computedRevenue = isSpread
+    ? (l.volume??[]).map((v,m)=>(l.sellPrice?.[m]??0)*v)
+    : isServiceFee
+    ? (l.engagements??[]).map((e,m)=>(l.feePerEngagement?.[m]??0)*e)
+    : l.monthlyPlan
+  const total=computedRevenue.reduce((a,b)=>a+b,0)
   const nameRef = React.useRef<HTMLInputElement>(null)
   const wrapRef = React.useRef<HTMLDivElement>(null)
   React.useEffect(()=>{
@@ -481,38 +494,82 @@ function LineEditor({line:l,onPlanChange,onActualChange,onRename,onRemove,months
       nameRef.current?.select()
     }
   },[isNew])
+  const subRow = (label:string, field:'buyPrice'|'sellPrice'|'volume'|'feePerEngagement'|'costPerEngagement'|'engagements', values:number[]|undefined, isCurrency:boolean) => (
+    <tr>
+      <td style={{padding:'0.18rem 0.4rem',fontSize:'0.68rem',color:C.slate,whiteSpace:'nowrap'}}>{label}</td>
+      {(values??Array(months.length).fill(0)).map((v,m)=>(
+        <td key={m} style={{padding:'0.18rem 0.2rem'}}>
+          <input type="number" min="0" disabled={planLocked}
+            style={{...inp,width:84,fontSize:'0.72rem',padding:'0.24rem 0.28rem',textAlign:'right',background:planLocked?'#EEF4F8':'#F4F8FC'}}
+            value={v===0?'':v} placeholder="0"
+            onChange={e=>onArrayFieldChange?.(field,m,e.target.value===''?0:Number(e.target.value))}/>
+        </td>
+      ))}
+    </tr>
+  )
   return(
     <div ref={wrapRef} style={{border:`1px solid ${isNew?C.cyan:C.border}`,borderRadius:6,padding:'0.75rem',marginBottom:'0.6rem',boxShadow:isNew?`0 0 0 2px ${C.cyan}33`:'none',transition:'box-shadow 1.2s ease, border-color 1.2s ease'}}>
-      <div style={{display:'flex',gap:'0.6rem',alignItems:'center',marginBottom:'0.5rem'}}>
-        <input ref={nameRef} style={{...inp,flex:2,fontSize:'0.8rem'}} value={l.name} onChange={e=>onRename(e.target.value)}/>
+      <div style={{display:'flex',gap:'0.6rem',alignItems:'center',marginBottom:'0.5rem',flexWrap:'wrap'}}>
+        <input ref={nameRef} style={{...inp,flex:2,fontSize:'0.8rem',minWidth:140}} value={l.name} onChange={e=>onRename(e.target.value)}/>
+        {l.category==='revenue'&&onLineTypeChange&&(
+          <select style={{...inp,width:140,fontSize:'0.7rem',padding:'0.3rem 0.4rem'}}
+            value={l.lineType||'standard'} onChange={e=>onLineTypeChange(e.target.value as PlanLineType)}>
+            <option value="standard">Standard</option>
+            <option value="spread">Spread</option>
+            <option value="service_fee">Service fee</option>
+          </select>
+        )}
         <span style={{fontFamily:'monospace',fontSize:'0.72rem',color:C.slate,whiteSpace:'nowrap'}}>Total: {fmt(total,cc)}</span>
         <button style={delBtn} onClick={()=>{if(window.confirm(`Remove "${l.name}"?`))onRemove()}}>✕ Remove</button>
       </div>
       <div style={{overflowX:'auto'}}>
         <table style={{borderCollapse:'collapse',fontSize:'0.76rem',fontFamily:'monospace'}}>
-          <thead><tr>{months.map((m,i)=><th key={i} style={{textAlign:'center',padding:'0.2rem 0.3rem',color:C.slate,fontWeight:600,fontSize:'0.68rem',minWidth:88}}>{m}</th>)}</tr></thead>
+          <thead><tr>{(isSpread||isServiceFee)&&<th></th>}{months.map((m,i)=><th key={i} style={{textAlign:'center',padding:'0.2rem 0.3rem',color:C.slate,fontWeight:600,fontSize:'0.68rem',minWidth:88}}>{m}</th>)}</tr></thead>
           <tbody>
-            <tr>{l.monthlyPlan.map((v,m)=>(
-              <td key={m} style={{padding:'0.18rem 0.2rem'}}>
-                <input type="number" min="0" disabled={planLocked}
-                  style={{...inp,width:84,fontSize:'0.74rem',padding:'0.26rem 0.3rem',textAlign:'right',background:planLocked?'#EEF4F8':'#F4F8FC'}}
-                  value={v===0?'':v} placeholder="0"
-                  onChange={e=>onPlanChange(m,e.target.value===''?0:Number(e.target.value))}/>
-              </td>
-            ))}</tr>
-            {showActual&&<tr style={{background:C.actualBg}}>{l.monthlyActual.map((v,m)=>(
+            {isSpread ? (
+              <>
+                {subRow('Buy Price',  'buyPrice',  l.buyPrice,  true)}
+                {subRow('Sell Price', 'sellPrice', l.sellPrice, true)}
+                {subRow('Volume',     'volume',    l.volume,    false)}
+                <tr style={{background:C.lightBg}}>
+                  <td style={{padding:'0.18rem 0.4rem',fontSize:'0.68rem',color:C.navy,fontWeight:700}}>Revenue</td>
+                  {computedRevenue.map((v,m)=><td key={m} style={{padding:'0.18rem 0.2rem',textAlign:'right',fontSize:'0.72rem',color:C.navy}}>{fmt(v,cc)}</td>)}
+                </tr>
+              </>
+            ) : isServiceFee ? (
+              <>
+                {subRow('Fee / Engagement',  'feePerEngagement',  l.feePerEngagement,  true)}
+                {subRow('Cost / Engagement', 'costPerEngagement', l.costPerEngagement, true)}
+                {subRow('Engagements',       'engagements',       l.engagements,       false)}
+                <tr style={{background:C.lightBg}}>
+                  <td style={{padding:'0.18rem 0.4rem',fontSize:'0.68rem',color:C.navy,fontWeight:700}}>Revenue</td>
+                  {computedRevenue.map((v,m)=><td key={m} style={{padding:'0.18rem 0.2rem',textAlign:'right',fontSize:'0.72rem',color:C.navy}}>{fmt(v,cc)}</td>)}
+                </tr>
+              </>
+            ) : (
+              <tr>{l.monthlyPlan.map((v,m)=>(
+                <td key={m} style={{padding:'0.18rem 0.2rem'}}>
+                  <input type="number" min="0" disabled={planLocked}
+                    style={{...inp,width:84,fontSize:'0.74rem',padding:'0.26rem 0.3rem',textAlign:'right',background:planLocked?'#EEF4F8':'#F4F8FC'}}
+                    value={v===0?'':v} placeholder="0"
+                    onChange={e=>onPlanChange(m,e.target.value===''?0:Number(e.target.value))}/>
+                </td>
+              ))}</tr>
+            )}
+            {showActual&&<tr style={{background:C.actualBg}}>{(isSpread||isServiceFee)&&<td></td>}{l.monthlyActual.map((v,m)=>(
               <td key={m} style={{padding:'0.18rem 0.2rem'}}>
                 <input type="number" min="0"
                   style={{...inp,width:84,fontSize:'0.73rem',padding:'0.24rem 0.3rem',textAlign:'right',background:v!==null?'#D0EEF2':'#EAF7F8',border:`1px solid ${v!==null?C.teal:C.border}`}}
-                  value={v!==null&&v!==undefined?v:''} placeholder={String(Math.round(l.monthlyPlan[m]))}
+                  value={v!==null&&v!==undefined?v:''} placeholder={String(Math.round(computedRevenue[m]||0))}
                   onChange={e=>onActualChange(m,e.target.value===''?null:Number(e.target.value))}/>
-                {v!==null&&v!==undefined&&<div style={{fontSize:'0.63rem',color:v-l.monthlyPlan[m]>=0?C.green:C.red,textAlign:'right'}}>{v-l.monthlyPlan[m]>=0?'+':''}{fmt(v-l.monthlyPlan[m])}</div>}
+                {v!==null&&v!==undefined&&<div style={{fontSize:'0.63rem',color:v-(computedRevenue[m]||0)>=0?C.green:C.red,textAlign:'right'}}>{v-(computedRevenue[m]||0)>=0?'+':''}{fmt(v-(computedRevenue[m]||0))}</div>}
               </td>
             ))}</tr>}
           </tbody>
         </table>
       </div>
-      {showActual&&<div style={{fontSize:'0.68rem',color:C.teal,marginTop:'0.35rem'}}>Row 1 = Plan · Row 2 (teal) = Actual for closed months</div>}
+      {(isSpread||isServiceFee)&&<div style={{fontSize:'0.68rem',color:C.slate,marginTop:'0.35rem'}}>Revenue is calculated from the fields above -- it isn't entered directly.</div>}
+      {showActual&&<div style={{fontSize:'0.68rem',color:C.teal,marginTop:'0.35rem'}}>{isSpread||isServiceFee?'Actual row (teal) = actual revenue for closed months':'Row 1 = Plan · Row 2 (teal) = Actual for closed months'}</div>}
     </div>
   )
 }
@@ -1571,14 +1628,45 @@ export default function CONASDashboard({
     upd(p=>({...p,sharedLines:p.sharedLines.map(l=>l.id!==lid?l:{...l,monthlyPlan:l.monthlyPlan.map((x,i)=>i===m?v:x)})}))
   }
   function addLine(uid:string,cat:PlanLine['category']){
-    const nl:PlanLine={id:`l_${Date.now()}`,name:'New item',category:cat,monthlyPlan:Array(MONTHS).fill(0),monthlyActual:Array(MONTHS).fill(null),actualStatus:Array(MONTHS).fill('draft'),rejectionNote:Array(MONTHS).fill(''),isShared:false}
+    const nl:PlanLine=blankPlanLine(`l_${Date.now()}`,'New item',cat,MONTHS)
     upd(p=>({...p,units:p.units.map(u=>u.id!==uid?u:{...u,lines:[...u.lines,nl]})}))
     setLastAddedId(nl.id)
   }
   function removeLine(uid:string,lid:string){upd(p=>({...p,units:p.units.map(u=>u.id!==uid?u:{...u,lines:u.lines.filter(l=>l.id!==lid)})}))}
   function renameLine(uid:string,lid:string,name:string){upd(p=>({...p,units:p.units.map(u=>u.id!==uid?u:{...u,lines:u.lines.map(l=>l.id!==lid?l:{...l,name})})}))}
+  // Switching a revenue line's type resets its type-specific numbers to zero --
+  // a flat monthly figure from Standard doesn't map meaningfully onto buy/sell/
+  // volume, so starting clean avoids silently carrying over a wrong number.
+  // Mirrors generic-engine.ts's changeLineType exactly.
+  function changeLineType(uid:string,lid:string,newType:PlanLineType){
+    upd(p=>({...p,units:p.units.map(u=>{
+      if(u.id!==uid) return u
+      return {...u,lines:u.lines.map(l=>{
+        if(l.id!==lid) return l
+        const rebuilt = newType==='spread' ? spreadPlanLine(l.id,l.name,MONTHS)
+          : newType==='service_fee' ? serviceFeePlanLine(l.id,l.name,MONTHS)
+          : blankPlanLine(l.id,l.name,l.category,MONTHS)
+        // Preserve actuals -- those were entered against real transactions and
+        // aren't tied to how the plan side is structured.
+        return {...rebuilt, monthlyActual:l.monthlyActual, actualStatus:l.actualStatus, rejectionNote:l.rejectionNote}
+      })}
+    })}))
+  }
+  // Generic updater for the monthly array fields used by spread and
+  // service-fee lines (buyPrice, sellPrice, volume, feePerEngagement,
+  // costPerEngagement, engagements) -- all share monthlyPlan's per-month shape.
+  function updateLineArrayField(uid:string,lid:string,field:'buyPrice'|'sellPrice'|'volume'|'feePerEngagement'|'costPerEngagement'|'engagements',m:number,val:number){
+    upd(p=>({...p,units:p.units.map(u=>{
+      if(u.id!==uid) return u
+      return {...u,lines:u.lines.map(l=>{
+        if(l.id!==lid) return l
+        const arr = (l[field] as number[]|undefined) ?? Array(MONTHS).fill(0)
+        return {...l,[field]:arr.map((v,i)=>i===m?val:v)}
+      })}
+    })}))
+  }
   function addShared(){
-    const nl:PlanLine={id:`sh_${Date.now()}`,name:'New shared cost',category:'shared',monthlyPlan:Array(MONTHS).fill(0),monthlyActual:Array(MONTHS).fill(null),actualStatus:Array(MONTHS).fill('draft'),rejectionNote:Array(MONTHS).fill(''),isShared:true}
+    const nl:PlanLine={...blankPlanLine(`sh_${Date.now()}`,'New shared cost','shared',MONTHS),isShared:true}
     upd(p=>({...p,sharedLines:[...p.sharedLines,nl]}))
     setLastAddedId(nl.id)
   }
@@ -1928,6 +2016,8 @@ export default function CONASDashboard({
                       onActualChange={(m,v)=>setActualVal(unitMeta.id,l.id,m,v)}
                       onRename={name=>renameLine(unitMeta.id,l.id,name)}
                       onRemove={()=>removeLine(unitMeta.id,l.id)}
+                      onLineTypeChange={t=>changeLineType(unitMeta.id,l.id,t)}
+                      onArrayFieldChange={(field,m,v)=>updateLineArrayField(unitMeta.id,l.id,field,m,v)}
                     />
                   ))}
                 </div>

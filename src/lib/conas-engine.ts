@@ -33,15 +33,65 @@ export function buildMonthLabels(startDate: string): string[] {
 // ============================================================
 // TYPES
 // ============================================================
+export type PlanLineType = 'standard' | 'spread' | 'service_fee'
+
 export interface PlanLine {
   id: string
   name: string
   category: 'revenue' | 'cost_of_sales' | 'staff' | 'direct_opex' | 'shared'
+  // Only meaningful for category === 'revenue'. Defaults to 'standard' when
+  // absent -- monthlyPlan is entered directly and used as-is. 'spread' and
+  // 'service_fee' derive monthlyPlan from source fields below instead; see
+  // calcUnitRaw in runCONASModel, which mirrors generic-engine.ts exactly so
+  // both models produce the same revenue for the same inputs.
+  lineType?: PlanLineType
   monthlyPlan: number[]
   monthlyActual: (number | null)[]
   actualStatus: ('draft' | 'submitted' | 'approved' | 'rejected')[]
   rejectionNote: string[]
   isShared: boolean
+  // For spread lines: buy price, sell price, volume (monthly arrays).
+  // Revenue = sellPrice x volume (gross sale value); buy cost is booked
+  // separately as cost of sales, not netted against revenue.
+  buyPrice?: number[]
+  sellPrice?: number[]
+  volume?: number[]
+  // For service_fee lines: fee/cost per engagement, number of engagements.
+  feePerEngagement?: number[]
+  costPerEngagement?: number[]
+  engagements?: number[]
+}
+
+// ── Helpers: create a blank / spread / service-fee plan line ──
+// Mirror generic-engine.ts's blankLine/spreadLine/serviceFeeLine exactly so
+// both models offer the same line-building behaviour.
+export function blankPlanLine(id: string, name: string, category: PlanLine['category'], months = MONTHS): PlanLine {
+  return {
+    id, name, category, lineType: 'standard',
+    monthlyPlan: Array(months).fill(0),
+    monthlyActual: Array(months).fill(null),
+    actualStatus: Array(months).fill('draft'),
+    rejectionNote: Array(months).fill(''),
+    isShared: false,
+  }
+}
+export function spreadPlanLine(id: string, name: string, months = MONTHS): PlanLine {
+  return {
+    ...blankPlanLine(id, name, 'revenue', months),
+    lineType: 'spread',
+    buyPrice: Array(months).fill(0),
+    sellPrice: Array(months).fill(0),
+    volume: Array(months).fill(0),
+  }
+}
+export function serviceFeePlanLine(id: string, name: string, months = MONTHS): PlanLine {
+  return {
+    ...blankPlanLine(id, name, 'revenue', months),
+    lineType: 'service_fee',
+    feePerEngagement: Array(months).fill(0),
+    costPerEngagement: Array(months).fill(0),
+    engagements: Array(months).fill(0),
+  }
 }
 
 export interface BusinessUnit {
@@ -384,6 +434,17 @@ export interface UnitPL {
   annEbitda: number
   gpMargin: number
   ebitdaMargin: number
+  // Reporting detail for revenue lines with lineType 'spread' or 'service_fee'.
+  // Mirrors generic-engine.ts's spread_analysis/service_margins exactly.
+  spreadAnalysis: {
+    lineId: string; name: string
+    buyPrice: number[]; sellPrice: number[]; volume: number[]
+    spreadPerUnit: number[]; totalSpread: number[]; spreadMarginPct: number[]
+  }[]
+  serviceMargins: {
+    lineId: string; name: string
+    fee: number[]; cost: number[]; margin: number[]; marginPct: number[]; engagements: number[]
+  }[]
 }
 
 // ============================================================
@@ -423,10 +484,44 @@ export function runCONASModel(inputs: CONASInputs) {
     const actCogs  = Array(MONTHS).fill(null) as (number | null)[]
     const actStaff = Array(MONTHS).fill(null) as (number | null)[]
     const actOpex  = Array(MONTHS).fill(null) as (number | null)[]
+    const spreadAnalysis: UnitPL['spreadAnalysis'] = []
+    const serviceMargins: UnitPL['serviceMargins'] = []
 
     u.lines.forEach(l => {
       const mult = l.category === 'revenue' ? revMult : costMult
-      l.monthlyPlan.forEach((v, m) => {
+      const isSpread = l.category === 'revenue' && l.lineType === 'spread' && l.buyPrice && l.sellPrice && l.volume
+      const isServiceFee = l.category === 'revenue' && l.lineType === 'service_fee' && l.feePerEngagement && l.costPerEngagement && l.engagements
+
+      // For spread/service_fee lines, monthlyPlan is ignored -- the effective
+      // plan is derived from the source fields, exactly matching how
+      // generic-engine.ts treats these line types. This keeps both engines
+      // producing identical revenue for identical inputs.
+      let effectivePlan = l.monthlyPlan
+      if (isSpread) {
+        effectivePlan = l.volume!.map((v, m) => (l.sellPrice![m] || 0) * v)
+        const buyCost = l.volume!.map((v, m) => (l.buyPrice![m] || 0) * v)
+        buyCost.forEach((v, m) => cogs[m] += v * costMult)
+        const spreadPerUnit = l.volume!.map((_, m) => (l.sellPrice![m] || 0) - (l.buyPrice![m] || 0))
+        const totalSpread = l.volume!.map((v, m) => spreadPerUnit[m] * v)
+        const spreadMarginPct = l.sellPrice!.map((sp, m) => sp > 0 ? spreadPerUnit[m] / sp : 0)
+        spreadAnalysis.push({
+          lineId: l.id, name: l.name,
+          buyPrice: l.buyPrice!, sellPrice: l.sellPrice!, volume: l.volume!,
+          spreadPerUnit, totalSpread, spreadMarginPct,
+        })
+      } else if (isServiceFee) {
+        effectivePlan = l.engagements!.map((e, m) => (l.feePerEngagement![m] || 0) * e)
+        const costPlan = l.engagements!.map((e, m) => (l.costPerEngagement![m] || 0) * e)
+        costPlan.forEach((v, m) => cogs[m] += v * costMult)
+        const margin = l.engagements!.map((e, m) => ((l.feePerEngagement![m] || 0) - (l.costPerEngagement![m] || 0)) * e)
+        const marginPct = l.feePerEngagement!.map((f, m) => f > 0 ? ((f - (l.costPerEngagement![m] || 0)) / f) : 0)
+        serviceMargins.push({
+          lineId: l.id, name: l.name,
+          fee: l.feePerEngagement!, cost: l.costPerEngagement!, margin, marginPct, engagements: l.engagements!,
+        })
+      }
+
+      effectivePlan.forEach((v, m) => {
         const val = v * mult
         if (l.category === 'revenue')        rev[m]   += val
         else if (l.category === 'cost_of_sales') cogs[m] += val
@@ -456,7 +551,7 @@ export function runCONASModel(inputs: CONASInputs) {
     const annRev = yr(rev), annCogs = yr(cogs), annGP = yr(gp)
     const annStaff = yr(staff), annOpex = yr(opex)
 
-    return { rev, cogs, gp, staff, opex, actRev, actCogs, actStaff, actOpex, annRev, annCogs, annGP, annStaff, annOpex, gpMargin: annRev > 0 ? annGP / annRev : 0 }
+    return { rev, cogs, gp, staff, opex, actRev, actCogs, actStaff, actOpex, annRev, annCogs, annGP, annStaff, annOpex, gpMargin: annRev > 0 ? annGP / annRev : 0, spreadAnalysis, serviceMargins }
   }
 
   // ── Build per-unit results ─────────────────────────────────
@@ -515,6 +610,9 @@ export function runCONASModel(inputs: CONASInputs) {
       annStaff: yr(consolidated.staff), annOpex: yr(consolidated.opex),
       gpMargin: yr(consolidated.rev) > 0 ? yr(consolidated.gp) / yr(consolidated.rev) : 0,
       annShared: 0, annEbitda: 0, ebitdaMargin: 0,
+      // Spread/service-fee detail lives at the sub-unit level where it was
+      // entered -- not duplicated here to avoid double-counting in reports.
+      spreadAnalysis: [], serviceMargins: [],
     }
   })
 
