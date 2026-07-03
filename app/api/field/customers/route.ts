@@ -1,15 +1,15 @@
-// GET  /api/field/customers?token=xxx  -- list customers for operator's unit
-// POST /api/field/customers            -- create new customer
-
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) throw new Error('Supabase environment variables not configured')
+  return createClient(url, key)
+}
 
 async function validateToken(token: string) {
+  const supabase = getSupabase()
   const { data, error } = await supabase
     .from('field_operator_tokens')
     .select('*, operator:field_operators(*)')
@@ -26,22 +26,19 @@ export async function GET(req: NextRequest) {
     const token = req.nextUrl.searchParams.get('token')
     if (!token) return NextResponse.json({ error: 'Token required' }, { status: 400 })
 
+    const supabase = getSupabase()
     const operator = await validateToken(token)
     if (!operator) return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
 
     const { data: customers, error } = await supabase
       .from('field_customers')
-      .select(`
-        id, name, phone, village, location_notes, created_at,
-        balances:field_customer_balances(outstanding_balance, last_transaction_date)
-      `)
+      .select('id, name, phone, village, location_notes, created_at')
       .eq('client_id', operator.client_id)
       .eq('business_unit_id', operator.business_unit_id)
       .eq('active', true)
       .order('name')
 
     if (error) throw error
-
     return NextResponse.json({ customers: customers || [] })
 
   } catch (err: any) {
@@ -58,6 +55,7 @@ export async function POST(req: NextRequest) {
     if (!token) return NextResponse.json({ error: 'Token required' }, { status: 400 })
     if (!name) return NextResponse.json({ error: 'Customer name required' }, { status: 400 })
 
+    const supabase = getSupabase()
     const operator = await validateToken(token)
     if (!operator) return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
 
@@ -76,7 +74,6 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (error) throw error
-
     return NextResponse.json({ customer }, { status: 201 })
 
   } catch (err: any) {
