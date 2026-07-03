@@ -135,6 +135,7 @@ export interface GenericPermissions {
   canSubmitRequest: boolean
   canEnterActuals: boolean
   canManageTeam: boolean
+  canManageCatalogue: boolean
   canViewAI: boolean
   onSignOut: () => void
 }
@@ -142,7 +143,7 @@ export interface GenericPermissions {
 const FULL_PERMISSIONS: GenericPermissions = {
   role:'super_coach', userId:'', fullName:'Coach', clientId:'',
   unitIds:[], canEditPlan:true, canApprove:true, canSubmitRequest:true,
-  canEnterActuals:true, canManageTeam:true, canViewAI:true, onSignOut:()=>{},
+  canEnterActuals:true, canManageTeam:true, canManageCatalogue:true, canViewAI:true, onSignOut:()=>{},
 }
 
 // ── Main dashboard component ─────────────────────────────────
@@ -1026,7 +1027,7 @@ function TeamTab({clientId,config,P}) {
   const [saving, setSaving] = useState(false)
 
   useEffect(()=>{
-    supabase.from('user_profiles').select('id,role,full_name,email,assigned_unit_ids,status')
+    supabase.from('user_profiles').select('id,role,full_name,email,assigned_unit_ids,status,can_manage_catalogue')
       .eq('client_id',clientId)
       .then(({data})=>{ setMembers(data||[]); setLoading(false) })
   },[clientId])
@@ -1090,6 +1091,16 @@ function TeamTab({clientId,config,P}) {
               <div style={{fontSize:'0.75rem',color:C.slate,marginTop:'0.2rem'}}>
                 Units: {m.assigned_unit_ids.map((id:string)=>config.business_units.find(u=>u.id===id)?.name||id).join(', ')}
               </div>
+            )}
+            {(P.role==='ceo'||P.role==='finance_manager'||P.canManageTeam)&&m.role!=='ceo'&&m.role!=='finance_manager'&&(
+              <label style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'0.75rem',color:C.slate,marginTop:'0.35rem',cursor:'pointer'}}>
+                <input type="checkbox" checked={!!m.can_manage_catalogue}
+                  onChange={async e=>{
+                    await supabase.from('user_profiles').update({can_manage_catalogue:e.target.checked}).eq('id',m.id)
+                    setMembers(ms=>ms.map(x=>x.id!==m.id?x:{...x,can_manage_catalogue:e.target.checked}))
+                  }}/>
+                Can manage Field Catalogue (prices & products)
+              </label>
             )}
           </div>
           <Badge text={m.status||'active'} color={m.status==='invited'?C.amber:C.green}/>
@@ -1235,6 +1246,170 @@ function FieldOperatorManager({clientId,config,P}) {
                 {latestToken.last_used_at&&<div style={{marginTop:'0.2rem'}}>Last synced {new Date(latestToken.last_used_at).toLocaleString()}</div>}
               </div>
             )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── CATALOGUE (products & services, with pricing) ──────────────
+// This is the business's own price list, not the coach's. The CEO or
+// Finance Manager grants specific staff (via the "Manage Field Catalogue"
+// permission in Team) the right to edit it. Field operators never see or
+// enter a price -- they pick an item from here and record a volume; the
+// price and revenue amount are always calculated from what's set here.
+function CatalogueManager({clientId,config,P}) {
+  const [items, setItems] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showAdd, setShowAdd] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState<string|null>(null)
+  const [editPrice, setEditPrice] = useState('')
+  const [form, setForm] = useState({name:'',item_type:'product',price:'',unit_label:'',business_unit_id:'',plan_line_id:''})
+
+  async function load() {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/field/admin/catalogue?client_id=${encodeURIComponent(clientId)}`)
+      const data = await res.json()
+      setItems(data.items||[])
+    } catch { /* handled by empty state below */ }
+    setLoading(false)
+  }
+  useEffect(()=>{ load() },[clientId])
+
+  const revenueLinesForUnit = (unitId:string) =>
+    (config.plan_lines||[]).filter((l:any)=>l.unit_id===unitId && l.category==='revenue' && l.active)
+
+  async function addItem() {
+    if (!form.name || !form.business_unit_id || !form.plan_line_id || form.price==='') return
+    setSaving(true)
+    try {
+      await fetch('/api/field/admin/catalogue', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          client_id: clientId, business_unit_id: form.business_unit_id, plan_line_id: form.plan_line_id,
+          name: form.name, item_type: form.item_type, price: Number(form.price), unit_label: form.unit_label||null,
+          created_by: P.userId,
+        }),
+      })
+      setForm({name:'',item_type:'product',price:'',unit_label:'',business_unit_id:'',plan_line_id:''})
+      setShowAdd(false)
+      await load()
+    } catch { alert('Could not save this catalogue item. Please try again.') }
+    setSaving(false)
+  }
+
+  async function savePrice(id:string) {
+    if (editPrice==='' || Number(editPrice)<0) return
+    await fetch('/api/field/admin/catalogue', {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id, price: Number(editPrice) }),
+    })
+    setEditingId(null)
+    await load()
+  }
+
+  async function toggleActive(id:string, active:boolean) {
+    await fetch('/api/field/admin/catalogue', {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id, active }),
+    })
+    await load()
+  }
+
+  const canEdit = P.canManageTeam || P.canManageCatalogue
+
+  if (loading) return <Spinner/>
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+        <div style={secH}>Catalogue — Products &amp; Services</div>
+        {canEdit&&<button style={addBtn()} onClick={()=>setShowAdd(!showAdd)}>+ Add Item</button>}
+      </div>
+      <p style={{fontSize:'0.82rem',color:C.slate,lineHeight:1.6,marginBottom:'1.1rem'}}>
+        This is your price list. Field operators pick an item from here and record how much was sold -- the price shown here is what's used automatically. They never enter a price themselves. The CEO or Finance Manager can grant other staff permission to edit this list from the Team tab.
+      </p>
+
+      {!canEdit && <div style={{...card,background:'#FFF8E8',border:`1px solid ${C.amber}`,fontSize:'0.82rem',color:C.navy,marginBottom:'1rem'}}>You can view the catalogue but don't have permission to edit it. Ask your CEO or Finance Manager to grant you "Manage Field Catalogue" access in Team if you need to make changes.</div>}
+
+      {showAdd&&canEdit&&(
+        <div style={{...card,border:`1px solid ${C.cyan}`}}>
+          <div style={fGrid}>
+            <div><label style={lbl}>Item Name</label><input style={inp} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Maize 90kg bag"/></div>
+            <div><label style={lbl}>Type</label>
+              <select style={inp} value={form.item_type} onChange={e=>setForm(f=>({...f,item_type:e.target.value}))}>
+                <option value="product">Product</option>
+                <option value="service">Service</option>
+              </select>
+            </div>
+            <div><label style={lbl}>Business Unit</label>
+              <select style={inp} value={form.business_unit_id} onChange={e=>setForm(f=>({...f,business_unit_id:e.target.value,plan_line_id:''}))}>
+                <option value="">Select a unit...</option>
+                {config.business_units.filter((u:any)=>u.active).map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+            <div><label style={lbl}>Category</label>
+              <select style={inp} value={form.plan_line_id} disabled={!form.business_unit_id} onChange={e=>setForm(f=>({...f,plan_line_id:e.target.value}))}>
+                <option value="">{form.business_unit_id?'Select a category...':'Select a unit first'}</option>
+                {revenueLinesForUnit(form.business_unit_id).map((l:any)=><option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+              <div style={{fontSize:'0.7rem',color:C.slate,marginTop:'0.25rem'}}>Different brands or sizes of the same thing (e.g. two fertiliser brands) should share one category -- that's what rolls up into a single revenue figure.</div>
+            </div>
+            <div><label style={lbl}>Price</label><input type="number" style={inp} value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} placeholder="0"/></div>
+            <div><label style={lbl}>Unit Label (optional)</label><input style={inp} value={form.unit_label} onChange={e=>setForm(f=>({...f,unit_label:e.target.value}))} placeholder="e.g. bag, kg, session"/></div>
+          </div>
+          <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
+            <button style={solidBtn()} disabled={saving} onClick={addItem}>{saving?'Saving...':'Add to Catalogue'}</button>
+            <button style={addBtn(true,C.slate)} onClick={()=>setShowAdd(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {items.length===0&&!showAdd&&<div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No catalogue items yet. Add your products and services with their prices so field operators can start logging sales.</div>}
+
+      {config.business_units.filter((u:any)=>items.some((i:any)=>i.business_unit_id===u.id)).map((unit:any)=>{
+        const unitItems = items.filter((i:any)=>i.business_unit_id===unit.id)
+        const categoryIds = Array.from(new Set(unitItems.map((i:any)=>i.plan_line_id)))
+        return (
+          <div key={unit.id} style={{marginBottom:'1.5rem'}}>
+            <div style={{fontFamily:'monospace',fontSize:'0.75rem',letterSpacing:'0.06em',color:C.navy,fontWeight:700,marginBottom:'0.6rem',paddingBottom:'0.35rem',borderBottom:`2px solid ${C.navy}`}}>{unit.name}</div>
+            {categoryIds.map((catId:any)=>{
+              const line = (config.plan_lines||[]).find((l:any)=>l.id===catId)
+              const catItems = unitItems.filter((i:any)=>i.plan_line_id===catId)
+              return (
+                <div key={catId} style={{marginBottom:'0.85rem',marginLeft:'0.5rem'}}>
+                  <div style={{fontSize:'0.78rem',color:C.teal,fontWeight:600,marginBottom:'0.4rem'}}>{line?.name||catId} <span style={{color:C.slate,fontWeight:400}}>({catItems.length} {catItems.length===1?'brand':'brands'})</span></div>
+                  {catItems.map((item:any)=>(
+                    <div key={item.id} style={{...card,opacity:item.active?1:0.55,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem',marginLeft:'0.75rem'}}>
+                      <div>
+                        <div style={{fontWeight:700,color:C.navy}}>{item.name}{!item.active&&<span style={{marginLeft:8}}><Badge text="Inactive" color={C.red}/></span>}</div>
+                        <div style={{fontSize:'0.78rem',color:C.slate}}>{item.item_type==='service'?'Service':'Product'}</div>
+                      </div>
+                      <div style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
+                        {editingId===item.id ? (
+                          <>
+                            <input type="number" style={{...inp,width:110,marginBottom:0}} value={editPrice} onChange={e=>setEditPrice(e.target.value)} autoFocus/>
+                            <button style={addBtn(true,C.green)} onClick={()=>savePrice(item.id)}>Save</button>
+                            <button style={addBtn(true,C.slate)} onClick={()=>setEditingId(null)}>Cancel</button>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{fontFamily:'monospace',fontWeight:700,color:C.navy}}>{fmt(item.price,config.currency)}{item.unit_label?<span style={{color:C.slate,fontWeight:400}}> / {item.unit_label}</span>:null}</div>
+                            {canEdit&&<button style={addBtn(true)} onClick={()=>{setEditingId(item.id);setEditPrice(String(item.price))}}>Edit Price</button>}
+                            {canEdit&&(item.active
+                              ? <button style={addBtn(true,C.red)} onClick={()=>toggleActive(item.id,false)}>Deactivate</button>
+                              : <button style={addBtn(true,C.green)} onClick={()=>toggleActive(item.id,true)}>Reactivate</button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            })}
           </div>
         )
       })}
@@ -2215,7 +2390,7 @@ function ApprovalsAndSpendTab({clientId,config,cc,P}) {
 }
 // ── SETTINGS & ADMIN TAB (Settings + Scenarios + Team merged, toggle) ──
 function SettingsAndAdminTab({config,result,months,cc,clientId,P,onSave}) {
-  const [mode, setMode] = useState<'settings'|'scenarios'|'team'|'field'>('settings')
+  const [mode, setMode] = useState<'settings'|'scenarios'|'team'|'catalogue'|'field'>('settings')
   return (
     <div>
       <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
@@ -2232,6 +2407,10 @@ function SettingsAndAdminTab({config,result,months,cc,clientId,P,onSave}) {
           borderRadius:4,cursor:'pointer',fontWeight:mode==='team'?700:400}}
           onClick={()=>setMode('team')}>Team</button>
         <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:mode==='catalogue'?C.navy:C.white,color:mode==='catalogue'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:mode==='catalogue'?700:400}}
+          onClick={()=>setMode('catalogue')}>Catalogue</button>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
           background:mode==='field'?C.navy:C.white,color:mode==='field'?C.white:C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:mode==='field'?700:400}}
           onClick={()=>setMode('field')}>Clearview Field</button>
@@ -2239,6 +2418,7 @@ function SettingsAndAdminTab({config,result,months,cc,clientId,P,onSave}) {
       {mode==='settings' && <SettingsTab config={config} P={P} onSave={onSave}/>}
       {mode==='scenarios' && <ScenariosTab config={config} result={result} months={months} cc={cc} P={P} onSave={onSave}/>}
       {mode==='team' && <TeamTab clientId={clientId} config={config} P={P}/>}
+      {mode==='catalogue' && <CatalogueManager clientId={clientId} config={config} P={P}/>}
       {mode==='field' && <FieldOperatorManager clientId={clientId} config={config} P={P}/>}
     </div>
   )

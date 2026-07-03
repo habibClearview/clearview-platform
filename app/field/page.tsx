@@ -7,24 +7,37 @@ const C = {
   red:'#C0392B', green:'#1A7A4A', amber:'#B8860B',
 }
 
-interface CatalogueItem { id:string; name:string; category:string; line_type:string }
+interface CatalogueItem { id:string; name:string; item_type:'product'|'service'; price:number; unit_label?:string; plan_line_id:string }
+interface CostLine { id:string; name:string; category:string }
 interface Customer { id:string; name:string; phone?:string; village?:string }
 interface AuthData {
   operator: { id:string; display_name:string; phone?:string; role:string; sync_frequency:string }
   client: { id:string; name:string; currency:string }
   unit: { id:string; name:string }
   catalogue: CatalogueItem[]
+  cost_lines: CostLine[]
   customers: Customer[]
 }
-interface QueuedTx {
-  local_id:string; plan_line_id:string; plan_line_name:string; transaction_type:string;
-  category:string; amount:number; quantity?:number; unit_price?:number;
+// A sale queued from the catalogue: operator picked an item and a volume.
+// Price is never entered by the operator -- it's the catalogue's price,
+// unless they explicitly flagged a bulk override.
+interface QueuedSale {
+  local_id:string; catalogue_item_id:string; item_name:string; item_type:'product'|'service'
+  standard_price:number; quantity:number
+  override_price?:number
   payment_method?:string; customer_id?:string; transaction_date:string; notes?:string
+}
+// A cost/expense entry: operator picks a cost line and enters an amount
+// directly -- unchanged from before, catalogue pricing doesn't apply here.
+interface QueuedCost {
+  local_id:string; plan_line_id:string; plan_line_name:string
+  amount:number; transaction_date:string; notes?:string
 }
 
 const STORAGE_TOKEN = 'clearview_field_token'
 const STORAGE_AUTH = 'clearview_field_auth'
-const STORAGE_QUEUE = 'clearview_field_queue'
+const STORAGE_SALES_QUEUE = 'clearview_field_sales_queue'
+const STORAGE_COSTS_QUEUE = 'clearview_field_costs_queue'
 
 function fmt(n:number, cc='UGX') {
   return `${cc} ${Math.round(n).toLocaleString()}`
@@ -34,25 +47,26 @@ export default function FieldCapturePage() {
   const [tokenInput, setTokenInput] = useState('')
   const [token, setToken] = useState<string|null>(null)
   const [auth, setAuth] = useState<AuthData|null>(null)
-  const [queue, setQueue] = useState<QueuedTx[]>([])
+  const [salesQueue, setSalesQueue] = useState<QueuedSale[]>([])
+  const [costsQueue, setCostsQueue] = useState<QueuedCost[]>([])
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState('')
   const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState<string|null>(null)
   const [lastSync, setLastSync] = useState<string|null>(null)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({
-    plan_line_id:'', amount:'', quantity:'', unit_price:'',
-    payment_method:'cash', customer_id:'', notes:'',
-    transaction_date: new Date().toISOString().split('T')[0],
-  })
+  const [mode, setMode] = useState<'grid'|'sale-detail'|'cost-form'>('grid')
+  const [selectedItem, setSelectedItem] = useState<CatalogueItem|null>(null)
+  const [saleForm, setSaleForm] = useState({quantity:'', payment_method:'cash', customer_id:'', notes:'', override:false, override_price:''})
+  const [costForm, setCostForm] = useState({plan_line_id:'', amount:'', notes:''})
 
-  // ── Load token from URL or localStorage on mount ──
   useEffect(()=>{
     const urlToken = new URLSearchParams(window.location.search).get('token')
     const savedToken = urlToken || localStorage.getItem(STORAGE_TOKEN)
     const savedAuth = localStorage.getItem(STORAGE_AUTH)
-    const savedQueue = localStorage.getItem(STORAGE_QUEUE)
-    if (savedQueue) { try { setQueue(JSON.parse(savedQueue)) } catch {} }
+    const savedSales = localStorage.getItem(STORAGE_SALES_QUEUE)
+    const savedCosts = localStorage.getItem(STORAGE_COSTS_QUEUE)
+    if (savedSales) { try { setSalesQueue(JSON.parse(savedSales)) } catch {} }
+    if (savedCosts) { try { setCostsQueue(JSON.parse(savedCosts)) } catch {} }
     if (savedToken) {
       setToken(savedToken)
       if (urlToken) localStorage.setItem(STORAGE_TOKEN, urlToken)
@@ -84,77 +98,106 @@ export default function FieldCapturePage() {
       localStorage.setItem(STORAGE_TOKEN, t)
       localStorage.setItem(STORAGE_AUTH, JSON.stringify(data))
     } catch {
-      // Offline on first load with no cached auth -- nothing we can do but
-      // tell them plainly rather than fail silently.
       setAuthError('No connection right now. If you have used this link before on this phone, your data is still saved -- try again once you have signal.')
     }
     setLoading(false)
   }, [])
 
-  function saveQueue(next: QueuedTx[]) {
-    setQueue(next)
-    localStorage.setItem(STORAGE_QUEUE, JSON.stringify(next))
+  function saveSalesQueue(next: QueuedSale[]) {
+    setSalesQueue(next)
+    localStorage.setItem(STORAGE_SALES_QUEUE, JSON.stringify(next))
+  }
+  function saveCostsQueue(next: QueuedCost[]) {
+    setCostsQueue(next)
+    localStorage.setItem(STORAGE_COSTS_QUEUE, JSON.stringify(next))
   }
 
-  function addToQueue() {
-    if (!form.plan_line_id || !form.amount) return
-    const line = auth?.catalogue.find(c=>c.id===form.plan_line_id)
-    if (!line) return
-    const tx: QueuedTx = {
+  function openSaleDetail(item: CatalogueItem) {
+    setSelectedItem(item)
+    setSaleForm({quantity:'', payment_method:'cash', customer_id:'', notes:'', override:false, override_price:String(item.price)})
+    setMode('sale-detail')
+  }
+
+  function addSaleToQueue() {
+    if (!selectedItem || !saleForm.quantity || Number(saleForm.quantity)<=0) return
+    const tx: QueuedSale = {
+      local_id: `local_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+      catalogue_item_id: selectedItem.id, item_name: selectedItem.name, item_type: selectedItem.item_type,
+      standard_price: selectedItem.price,
+      quantity: Number(saleForm.quantity),
+      override_price: saleForm.override ? Number(saleForm.override_price) : undefined,
+      payment_method: saleForm.payment_method || undefined,
+      customer_id: saleForm.customer_id || undefined,
+      transaction_date: new Date().toISOString().split('T')[0],
+      notes: saleForm.notes || undefined,
+    }
+    saveSalesQueue([...salesQueue, tx])
+    setMode('grid')
+    setSelectedItem(null)
+  }
+
+  function addCostToQueue() {
+    const line = auth?.cost_lines.find(l=>l.id===costForm.plan_line_id)
+    if (!line || !costForm.amount) return
+    const tx: QueuedCost = {
       local_id: `local_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
       plan_line_id: line.id, plan_line_name: line.name,
-      transaction_type: line.category==='revenue' ? 'sale' : 'expense',
-      category: line.category,
-      amount: Number(form.amount),
-      quantity: form.quantity ? Number(form.quantity) : undefined,
-      unit_price: form.unit_price ? Number(form.unit_price) : undefined,
-      payment_method: form.payment_method || undefined,
-      customer_id: form.customer_id || undefined,
-      transaction_date: form.transaction_date,
-      notes: form.notes || undefined,
+      amount: Number(costForm.amount),
+      transaction_date: new Date().toISOString().split('T')[0],
+      notes: costForm.notes || undefined,
     }
-    saveQueue([...queue, tx])
-    setForm(f=>({...f, plan_line_id:'', amount:'', quantity:'', unit_price:'', notes:''}))
-    setShowForm(false)
+    saveCostsQueue([...costsQueue, tx])
+    setCostForm({plan_line_id:'', amount:'', notes:''})
+    setMode('grid')
   }
 
-  function removeFromQueue(localId:string) {
-    saveQueue(queue.filter(q=>q.local_id!==localId))
-  }
+  function removeSale(localId:string) { saveSalesQueue(salesQueue.filter(q=>q.local_id!==localId)) }
+  function removeCost(localId:string) { saveCostsQueue(costsQueue.filter(q=>q.local_id!==localId)) }
 
   async function syncNow() {
-    if (!token || queue.length===0) return
+    if (!token || (salesQueue.length===0 && costsQueue.length===0)) return
     setSyncing(true)
+    setSyncMsg(null)
     try {
+      const deviceId = localStorage.getItem('clearview_device_id') || (()=>{ const id = Math.random().toString(36).slice(2,10); localStorage.setItem('clearview_device_id', id); return id })()
+      const transactions = [
+        ...salesQueue.map(s=>({
+          catalogue_item_id: s.catalogue_item_id, quantity: s.quantity,
+          override_price: s.override_price, payment_method: s.payment_method,
+          customer_id: s.customer_id, transaction_date: s.transaction_date, notes: s.notes,
+        })),
+        ...costsQueue.map(c=>({
+          plan_line_id: c.plan_line_id, plan_line_name: c.plan_line_name,
+          transaction_type: 'expense', category: 'direct_opex', amount: c.amount,
+          transaction_date: c.transaction_date, notes: c.notes,
+        })),
+      ]
       const res = await fetch('/api/field/sync', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
-          token,
-          device_id: 'web_' + (localStorage.getItem('clearview_device_id') || (()=>{ const id = Math.random().toString(36).slice(2,10); localStorage.setItem('clearview_device_id', id); return id })()),
-          transactions: queue.map(({local_id, ...rest})=>rest),
-        }),
+        body: JSON.stringify({ token, device_id: 'web_'+deviceId, transactions }),
       })
       const data = await res.json()
       if (res.ok && data.success) {
-        saveQueue([])
+        saveSalesQueue([])
+        saveCostsQueue([])
         setLastSync(new Date().toLocaleString())
+        setSyncMsg(data.price_alerts?.length ? `Synced, but flagged: ${data.price_alerts.join('; ')}` : 'Synced successfully.')
       } else {
-        alert(data.error || 'Sync failed -- your entries are still saved on this phone, try again.')
+        setSyncMsg(data.error || 'Sync failed -- your entries are still saved on this phone, try again.')
       }
     } catch {
-      alert('No connection -- your entries are still saved on this phone. Try syncing again once you have signal.')
+      setSyncMsg('No connection -- your entries are still saved on this phone. Try syncing again once you have signal.')
     }
     setSyncing(false)
   }
 
-  // ── No token yet: entry screen ──
   if (!token) {
     return (
       <div style={{minHeight:'100vh',background:C.cream,display:'flex',alignItems:'center',justifyContent:'center',padding:'1.5rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
         <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:10,padding:'1.75rem',maxWidth:380,width:'100%'}}>
           <div style={{fontFamily:'monospace',fontSize:'0.68rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.5rem'}}>CLEARVIEW FIELD</div>
           <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',color:C.navy,margin:'0 0 1rem'}}>Enter your access link</h1>
-          <p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.6,marginBottom:'1.2rem'}}>Paste the code your coach sent you, or open this page using the link they gave you.</p>
+          <p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.6,marginBottom:'1.2rem'}}>Paste the code you were given, or open this page using the link directly.</p>
           <input style={{width:'100%',padding:'0.75rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'0.95rem',boxSizing:'border-box',marginBottom:'0.85rem'}}
             placeholder="Paste your access code here" value={tokenInput} onChange={e=>setTokenInput(e.target.value)}/>
           {authError && <div style={{color:C.red,fontSize:'0.82rem',marginBottom:'0.85rem'}}>{authError}</div>}
@@ -181,14 +224,14 @@ export default function FieldCapturePage() {
     )
   }
 
-  const revenueLines = auth.catalogue.filter(c=>c.category==='revenue')
-  const costLines = auth.catalogue.filter(c=>c.category!=='revenue')
-  const queueTotal = queue.reduce((s,q)=>s + (q.transaction_type==='sale' ? q.amount : -q.amount), 0)
   const inp: React.CSSProperties = {width:'100%',padding:'0.65rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'0.9rem',boxSizing:'border-box',marginBottom:'0.7rem'}
   const lbl: React.CSSProperties = {display:'block',fontSize:'0.78rem',fontWeight:600,color:C.navy,marginBottom:'0.25rem'}
+  const pendingCount = salesQueue.length + costsQueue.length
+  const products = auth.catalogue.filter(c=>c.item_type==='product')
+  const services = auth.catalogue.filter(c=>c.item_type==='service')
 
   return (
-    <div style={{minHeight:'100vh',background:C.cream,fontFamily:"'Segoe UI',system-ui,sans-serif",paddingBottom:'6rem'}}>
+    <div style={{minHeight:'100vh',background:C.cream,fontFamily:"'Segoe UI',system-ui,sans-serif",paddingBottom:'2rem'}}>
       <header style={{background:C.navy,padding:'1rem 1.1rem',color:C.white}}>
         <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:C.cyan}}>CLEARVIEW FIELD</div>
         <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',marginTop:'0.15rem'}}>{auth.unit.name}</div>
@@ -196,74 +239,116 @@ export default function FieldCapturePage() {
       </header>
 
       <div style={{padding:'1rem'}}>
-        {/* Queue summary */}
         <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1rem',marginBottom:'1rem'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
             <div>
               <div style={{fontSize:'0.68rem',color:C.slate,fontFamily:'monospace'}}>PENDING TO SYNC</div>
-              <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy}}>{queue.length} entr{queue.length===1?'y':'ies'}</div>
+              <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy}}>{pendingCount} entr{pendingCount===1?'y':'ies'}</div>
             </div>
-            <button disabled={syncing||queue.length===0} onClick={syncNow}
-              style={{padding:'0.65rem 1.1rem',background:queue.length===0?C.border:C.teal,color:C.white,border:'none',borderRadius:6,fontWeight:600,cursor:queue.length===0?'default':'pointer',fontSize:'0.85rem'}}>
+            <button disabled={syncing||pendingCount===0} onClick={syncNow}
+              style={{padding:'0.65rem 1.1rem',background:pendingCount===0?C.border:C.teal,color:C.white,border:'none',borderRadius:6,fontWeight:600,cursor:pendingCount===0?'default':'pointer',fontSize:'0.85rem'}}>
               {syncing?'Syncing...':'Sync Now'}
             </button>
           </div>
           {lastSync && <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.5rem'}}>Last synced {lastSync}</div>}
+          {syncMsg && <div style={{fontSize:'0.75rem',color:syncMsg.startsWith('Synced')?C.green:C.red,marginTop:'0.4rem'}}>{syncMsg}</div>}
         </div>
 
-        {/* Queued entries */}
-        {queue.length>0 && (
+        {pendingCount>0 && (
           <div style={{marginBottom:'1rem'}}>
-            {queue.map(q=>(
+            {salesQueue.map(q=>(
+              <div key={q.local_id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div>
+                  <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{q.item_name}</div>
+                  <div style={{fontSize:'0.72rem',color:C.slate}}>{q.quantity} {q.override_price?'(price overridden)':`× ${fmt(q.standard_price,auth.client.currency)}`}</div>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
+                  <div style={{fontFamily:'monospace',fontWeight:700,color:C.green}}>+{fmt(q.quantity*(q.override_price??q.standard_price),auth.client.currency)}</div>
+                  <button onClick={()=>removeSale(q.local_id)} style={{background:'transparent',border:'none',color:C.red,fontSize:'1.1rem',cursor:'pointer'}}>×</button>
+                </div>
+              </div>
+            ))}
+            {costsQueue.map(q=>(
               <div key={q.local_id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                 <div>
                   <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{q.plan_line_name}</div>
-                  <div style={{fontSize:'0.72rem',color:C.slate}}>{q.transaction_date} · {q.payment_method||'—'}</div>
+                  <div style={{fontSize:'0.72rem',color:C.slate}}>{q.transaction_date}</div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
-                  <div style={{fontFamily:'monospace',fontWeight:700,color:q.transaction_type==='sale'?C.green:C.red}}>{q.transaction_type==='sale'?'+':'-'}{fmt(q.amount,auth.client.currency)}</div>
-                  <button onClick={()=>removeFromQueue(q.local_id)} style={{background:'transparent',border:'none',color:C.red,fontSize:'1.1rem',cursor:'pointer'}}>×</button>
+                  <div style={{fontFamily:'monospace',fontWeight:700,color:C.red}}>-{fmt(q.amount,auth.client.currency)}</div>
+                  <button onClick={()=>removeCost(q.local_id)} style={{background:'transparent',border:'none',color:C.red,fontSize:'1.1rem',cursor:'pointer'}}>×</button>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {!showForm && (
-          <button onClick={()=>setShowForm(true)} style={{width:'100%',padding:'1rem',background:C.navy,color:C.white,border:'none',borderRadius:8,fontSize:'1rem',fontWeight:700,cursor:'pointer'}}>
-            + Log a Sale or Cost
-          </button>
+        {mode==='grid' && (
+          <>
+            {products.length>0 && <>
+              <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:C.slate,marginBottom:'0.5rem',marginTop:'0.5rem'}}>PRODUCTS</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.6rem',marginBottom:'1rem'}}>
+                {products.map(item=>(
+                  <button key={item.id} onClick={()=>openSaleDetail(item)}
+                    style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1rem 0.75rem',textAlign:'left',cursor:'pointer'}}>
+                    <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy}}>{item.name}</div>
+                    <div style={{fontSize:'0.75rem',color:C.slate,marginTop:'0.2rem'}}>{fmt(item.price,auth.client.currency)}{item.unit_label?` / ${item.unit_label}`:''}</div>
+                  </button>
+                ))}
+              </div>
+            </>}
+            {services.length>0 && <>
+              <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:C.slate,marginBottom:'0.5rem'}}>SERVICES</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.6rem',marginBottom:'1rem'}}>
+                {services.map(item=>(
+                  <button key={item.id} onClick={()=>openSaleDetail(item)}
+                    style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1rem 0.75rem',textAlign:'left',cursor:'pointer'}}>
+                    <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy}}>{item.name}</div>
+                    <div style={{fontSize:'0.75rem',color:C.slate,marginTop:'0.2rem'}}>{fmt(item.price,auth.client.currency)}{item.unit_label?` / ${item.unit_label}`:''}</div>
+                  </button>
+                ))}
+              </div>
+            </>}
+            {products.length===0 && services.length===0 && (
+              <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.2rem',textAlign:'center',color:C.slate,fontSize:'0.85rem',marginBottom:'1rem'}}>
+                No products or services set up for this unit yet. Ask your CEO or Finance Manager to add them to the Catalogue.
+              </div>
+            )}
+            {auth.cost_lines.length>0 && (
+              <button onClick={()=>setMode('cost-form')} style={{width:'100%',padding:'0.85rem',background:'transparent',color:C.navy,border:`1px solid ${C.navy}`,borderRadius:8,fontSize:'0.9rem',fontWeight:600,cursor:'pointer'}}>
+                + Record a Cost or Expense
+              </button>
+            )}
+          </>
         )}
 
-        {showForm && (
+        {mode==='sale-detail' && selectedItem && (
           <div style={{background:C.white,border:`1px solid ${C.cyan}`,borderRadius:8,padding:'1.1rem'}}>
-            <label style={lbl}>What is this for?</label>
-            <select style={inp} value={form.plan_line_id} onChange={e=>setForm(f=>({...f,plan_line_id:e.target.value}))}>
-              <option value="">Select...</option>
-              {revenueLines.length>0 && <optgroup label="Sales">
-                {revenueLines.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
-              </optgroup>}
-              {costLines.length>0 && <optgroup label="Costs">
-                {costLines.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
-              </optgroup>}
-            </select>
+            <div style={{fontWeight:700,fontSize:'1rem',color:C.navy,marginBottom:'0.2rem'}}>{selectedItem.name}</div>
+            <div style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.9rem'}}>Standard price: {fmt(selectedItem.price,auth.client.currency)}{selectedItem.unit_label?` / ${selectedItem.unit_label}`:''}</div>
 
-            <label style={lbl}>Amount ({auth.client.currency})</label>
-            <input type="number" inputMode="numeric" style={inp} value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} placeholder="0"/>
+            <label style={lbl}>Volume {selectedItem.unit_label?`(${selectedItem.unit_label})`:'sold'}</label>
+            <input type="number" inputMode="numeric" style={inp} value={saleForm.quantity} onChange={e=>setSaleForm(f=>({...f,quantity:e.target.value}))} placeholder="0" autoFocus/>
 
-            <div style={{display:'flex',gap:'0.6rem'}}>
-              <div style={{flex:1}}>
-                <label style={lbl}>Quantity (optional)</label>
-                <input type="number" inputMode="numeric" style={inp} value={form.quantity} onChange={e=>setForm(f=>({...f,quantity:e.target.value}))}/>
+            {saleForm.quantity && Number(saleForm.quantity)>0 && (
+              <div style={{background:'#F0F4F8',borderRadius:6,padding:'0.6rem 0.8rem',marginBottom:'0.7rem',fontSize:'0.85rem',color:C.navy}}>
+                Total: <span style={{fontWeight:700}}>{fmt(Number(saleForm.quantity)*(saleForm.override?Number(saleForm.override_price||0):selectedItem.price),auth.client.currency)}</span>
               </div>
-              <div style={{flex:1}}>
-                <label style={lbl}>Unit Price (optional)</label>
-                <input type="number" inputMode="numeric" style={inp} value={form.unit_price} onChange={e=>setForm(f=>({...f,unit_price:e.target.value}))}/>
-              </div>
-            </div>
+            )}
+
+            <label style={{display:'flex',alignItems:'center',gap:'0.5rem',fontSize:'0.8rem',color:C.slate,marginBottom:'0.7rem',cursor:'pointer'}}>
+              <input type="checkbox" checked={saleForm.override} onChange={e=>setSaleForm(f=>({...f,override:e.target.checked}))}/>
+              This was a bulk sale at a different price
+            </label>
+            {saleForm.override && (
+              <>
+                <label style={lbl}>Actual Price Used</label>
+                <input type="number" inputMode="numeric" style={inp} value={saleForm.override_price} onChange={e=>setSaleForm(f=>({...f,override_price:e.target.value}))}/>
+              </>
+            )}
 
             <label style={lbl}>Payment Method</label>
-            <select style={inp} value={form.payment_method} onChange={e=>setForm(f=>({...f,payment_method:e.target.value}))}>
+            <select style={inp} value={saleForm.payment_method} onChange={e=>setSaleForm(f=>({...f,payment_method:e.target.value}))}>
               <option value="cash">Cash</option>
               <option value="mobile_money">Mobile Money</option>
               <option value="bank">Bank Transfer</option>
@@ -273,23 +358,39 @@ export default function FieldCapturePage() {
             {auth.customers.length>0 && (
               <>
                 <label style={lbl}>Customer (optional)</label>
-                <select style={inp} value={form.customer_id} onChange={e=>setForm(f=>({...f,customer_id:e.target.value}))}>
+                <select style={inp} value={saleForm.customer_id} onChange={e=>setSaleForm(f=>({...f,customer_id:e.target.value}))}>
                   <option value="">None</option>
                   {auth.customers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </>
             )}
 
-            <label style={lbl}>Date</label>
-            <input type="date" style={inp} value={form.transaction_date} onChange={e=>setForm(f=>({...f,transaction_date:e.target.value}))}/>
-
             <label style={lbl}>Notes (optional)</label>
-            <input style={inp} value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/>
+            <input style={inp} value={saleForm.notes} onChange={e=>setSaleForm(f=>({...f,notes:e.target.value}))}/>
 
             <div style={{display:'flex',gap:'0.6rem',marginTop:'0.5rem'}}>
-              <button onClick={addToQueue} disabled={!form.plan_line_id||!form.amount}
+              <button onClick={addSaleToQueue} disabled={!saleForm.quantity||Number(saleForm.quantity)<=0}
                 style={{flex:1,padding:'0.85rem',background:C.teal,color:C.white,border:'none',borderRadius:6,fontWeight:700,cursor:'pointer'}}>Add to Queue</button>
-              <button onClick={()=>setShowForm(false)} style={{padding:'0.85rem 1rem',background:'transparent',color:C.slate,border:`1px solid ${C.border}`,borderRadius:6,cursor:'pointer'}}>Cancel</button>
+              <button onClick={()=>{setMode('grid');setSelectedItem(null)}} style={{padding:'0.85rem 1rem',background:'transparent',color:C.slate,border:`1px solid ${C.border}`,borderRadius:6,cursor:'pointer'}}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {mode==='cost-form' && (
+          <div style={{background:C.white,border:`1px solid ${C.cyan}`,borderRadius:8,padding:'1.1rem'}}>
+            <label style={lbl}>What is this for?</label>
+            <select style={inp} value={costForm.plan_line_id} onChange={e=>setCostForm(f=>({...f,plan_line_id:e.target.value}))}>
+              <option value="">Select...</option>
+              {auth.cost_lines.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+            <label style={lbl}>Amount ({auth.client.currency})</label>
+            <input type="number" inputMode="numeric" style={inp} value={costForm.amount} onChange={e=>setCostForm(f=>({...f,amount:e.target.value}))} placeholder="0"/>
+            <label style={lbl}>Notes (optional)</label>
+            <input style={inp} value={costForm.notes} onChange={e=>setCostForm(f=>({...f,notes:e.target.value}))}/>
+            <div style={{display:'flex',gap:'0.6rem',marginTop:'0.5rem'}}>
+              <button onClick={addCostToQueue} disabled={!costForm.plan_line_id||!costForm.amount}
+                style={{flex:1,padding:'0.85rem',background:C.teal,color:C.white,border:'none',borderRadius:6,fontWeight:700,cursor:'pointer'}}>Add to Queue</button>
+              <button onClick={()=>setMode('grid')} style={{padding:'0.85rem 1rem',background:'transparent',color:C.slate,border:`1px solid ${C.border}`,borderRadius:6,cursor:'pointer'}}>Cancel</button>
             </div>
           </div>
         )}

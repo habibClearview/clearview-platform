@@ -21,6 +21,12 @@ async function validateToken(token: string) {
   return data.operator
 }
 
+// A bulk override is flagged if it deviates from the catalogue's standard
+// price by more than this fraction -- surfaced back to the operator's app
+// as a warning, and stored on the row for the CEO/coach to review later.
+// Mirrors "Price alert" (spec section 8, item 4).
+const PRICE_ALERT_THRESHOLD = 0.10
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -35,18 +41,78 @@ export async function POST(req: NextRequest) {
     const errors: string[] = []
     let txSynced = 0
     let creditSynced = 0
+    const priceAlerts: string[] = []
 
     if (transactions.length > 0) {
-      const validTx = transactions.filter((t: any) => {
-        if (!t.plan_line_id) { errors.push('Transaction missing plan_line_id'); return false }
-        if (t.amount === undefined || t.amount === null) { errors.push('Transaction missing amount'); return false }
-        if (!t.transaction_type) { errors.push('Transaction missing transaction_type'); return false }
-        if (!t.category) { errors.push('Transaction missing category'); return false }
+      // Split into catalogue-driven sales (operator picked a product/service
+      // and entered a volume -- price comes from the catalogue, never from
+      // the operator) and manual cost/expense entries (operator picks a
+      // cost line and enters an amount directly -- unchanged behaviour).
+      const saleEntries = transactions.filter((t: any) => t.catalogue_item_id)
+      const costEntries = transactions.filter((t: any) => !t.catalogue_item_id)
+
+      const rows: any[] = []
+
+      if (saleEntries.length > 0) {
+        const catalogueIds = Array.from(new Set(saleEntries.map((t: any) => t.catalogue_item_id)))
+        const { data: catalogueItems, error: catErr } = await supabase
+          .from('field_catalogue')
+          .select('id, name, price, plan_line_id')
+          .in('id', catalogueIds)
+          .eq('client_id', operator.client_id)
+          .eq('business_unit_id', operator.business_unit_id)
+        if (catErr) errors.push(`Catalogue lookup error: ${catErr.message}`)
+        const catalogueById = new Map((catalogueItems || []).map((c: any) => [c.id, c]))
+
+        for (const t of saleEntries) {
+          const item = catalogueById.get(t.catalogue_item_id)
+          if (!item) { errors.push(`Unknown or inactive catalogue item: ${t.catalogue_item_id}`); continue }
+          if (t.quantity === undefined || t.quantity === null || Number(t.quantity) <= 0) {
+            errors.push(`Sale of "${item.name}" missing a valid volume`); continue
+          }
+          const quantity = Number(t.quantity)
+          const overridden = !!t.override_price
+          const priceUsed = overridden ? Number(t.override_price) : Number(item.price)
+          if (overridden && (isNaN(priceUsed) || priceUsed < 0)) {
+            errors.push(`Sale of "${item.name}" has an invalid override price`); continue
+          }
+          const standardPrice = Number(item.price)
+          const deviates = standardPrice > 0 && Math.abs(priceUsed - standardPrice) / standardPrice > PRICE_ALERT_THRESHOLD
+          if (overridden && deviates) priceAlerts.push(`${item.name}: override ${priceUsed} vs standard ${standardPrice}`)
+
+          rows.push({
+            client_id: operator.client_id,
+            business_unit_id: operator.business_unit_id,
+            plan_line_id: item.plan_line_id,
+            plan_line_name: item.name,
+            transaction_type: 'sale',
+            category: 'revenue',
+            amount: quantity * priceUsed,
+            quantity,
+            unit_price: priceUsed,
+            payment_method: t.payment_method || null,
+            customer_id: t.customer_id || null,
+            transaction_date: t.transaction_date || new Date().toISOString().split('T')[0],
+            operator_id: operator.id,
+            notes: t.notes || null,
+            device_id: device_id || null,
+            synced_at: new Date().toISOString(),
+            catalogue_item_id: item.id,
+            price_overridden: overridden,
+            price_alert: overridden && deviates,
+          })
+        }
+      }
+
+      const validCostEntries = costEntries.filter((t: any) => {
+        if (!t.plan_line_id) { errors.push('Cost entry missing plan_line_id'); return false }
+        if (t.amount === undefined || t.amount === null) { errors.push('Cost entry missing amount'); return false }
+        if (!t.transaction_type) { errors.push('Cost entry missing transaction_type'); return false }
+        if (!t.category) { errors.push('Cost entry missing category'); return false }
         return true
       })
-
-      if (validTx.length > 0) {
-        const rows = validTx.map((t: any) => ({
+      for (const t of validCostEntries) {
+        rows.push({
           client_id: operator.client_id,
           business_unit_id: operator.business_unit_id,
           plan_line_id: t.plan_line_id,
@@ -63,8 +129,10 @@ export async function POST(req: NextRequest) {
           notes: t.notes || null,
           device_id: device_id || null,
           synced_at: new Date().toISOString(),
-        }))
+        })
+      }
 
+      if (rows.length > 0) {
         const { error: txErr } = await supabase.from('field_transactions').insert(rows)
         if (txErr) errors.push(`Transaction insert error: ${txErr.message}`)
         else txSynced = rows.length
@@ -117,7 +185,7 @@ export async function POST(req: NextRequest) {
       sync_type: 'manual',
       transactions_synced: txSynced,
       credit_synced: creditSynced,
-      errors: errors.length > 0 ? errors.join('; ') : null,
+      errors: [...errors, ...priceAlerts.map(a => `Price alert: ${a}`)].join('; ') || null,
     })
 
     return NextResponse.json({
@@ -125,6 +193,7 @@ export async function POST(req: NextRequest) {
       transactions_synced: txSynced,
       credit_synced: creditSynced,
       errors: errors.length > 0 ? errors : undefined,
+      price_alerts: priceAlerts.length > 0 ? priceAlerts : undefined,
       synced_at: new Date().toISOString(),
     })
 

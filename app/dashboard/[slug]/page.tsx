@@ -66,7 +66,7 @@ export default function GenericClientPage() {
       if (!session) { setChecking(false); return }
       // Load user profile
       const {data:profile} = await supabase.from('user_profiles')
-        .select('id,role,full_name,email,client_id,assigned_unit_ids')
+        .select('id,role,full_name,email,client_id,assigned_unit_ids,can_manage_catalogue')
         .eq('id',session.user.id).single()
       if (profile) setUser({...profile, email:session.user.email})
       // Find client by slug from engagement_clients
@@ -101,6 +101,9 @@ export default function GenericClientPage() {
     canSubmitRequest: ['super_coach','finance_manager','unit_head','accounts_assistant'].includes(user.role),
     canEnterActuals: true,
     canManageTeam: ['super_coach','ceo'].includes(user.role),
+    // The CEO and Finance Manager always have this; anyone else needs it
+    // explicitly delegated via the "Manage Field Catalogue" toggle in Team.
+    canManageCatalogue: ['super_coach','ceo','finance_manager'].includes(user.role) || !!user.can_manage_catalogue,
     canViewAI: ['super_coach','coach','ceo'].includes(user.role),
     onSignOut: async () => { await supabase.auth.signOut(); window.location.href='/' },
   }
