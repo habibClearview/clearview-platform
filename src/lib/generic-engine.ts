@@ -295,7 +295,13 @@ export function runGenericModel(
       let plan = [...l.monthly_plan]
 
       if (l.line_type === 'spread' && l.buy_price && l.sell_price && l.volume) {
-        plan = l.volume.map((v, m) => (l.sell_price![m] - l.buy_price![m]) * v)
+        // Revenue is the gross sale value (sell price x volume) -- these clients
+        // buy and resell as principals, bearing inventory and price risk, so
+        // standard revenue recognition is gross sales, not net margin. Buy cost
+        // is booked separately below as cost of sales. Using net margin here
+        // would double-count the buy cost: once implicitly (revenue already net)
+        // and once explicitly in COGS, understating both revenue and gross profit.
+        plan = l.volume.map((v, m) => (l.sell_price![m] || 0) * v)
         // Build spread analysis
         const spread_per_unit = l.volume.map((_, m) => (l.sell_price![m] || 0) - (l.buy_price![m] || 0))
         const total_spread = l.volume.map((v, m) => spread_per_unit[m] * v)
@@ -357,7 +363,7 @@ export function runGenericModel(
     const total_fixed = yr(staff) + yr(opex)
     rev_lines.filter(l => !l.name.startsWith('Add ')).forEach(l => {
       const line_rev = l.line_type === 'spread' && l.volume && l.sell_price && l.buy_price
-        ? l.volume.reduce((s, v, m) => s + (l.sell_price![m] - l.buy_price![m]) * v * rev_mult, 0)
+        ? l.volume.reduce((s, v, m) => s + (l.sell_price![m] || 0) * v * rev_mult, 0)
         : yr(l.monthly_plan) * rev_mult
       const line_share = yr(rev) > 0 ? line_rev / yr(rev) : 1 / Math.max(1, rev_lines.length)
       const allocated_fixed = total_fixed * line_share

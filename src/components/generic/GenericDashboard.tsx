@@ -7,7 +7,7 @@ import {
   runGenericModel, defaultGenericConfig,
   blankLine, spreadLine, serviceFeeLine,
   type GenericModelConfig, type GenericBusinessUnit,
-  type GenericPlanLine, type LineCategory, type UnitType,
+  type GenericPlanLine, type LineCategory, type LineType, type UnitType,
 } from '@/lib/generic-engine'
 import { buildDebtSchedule, defaultCoachAssessment } from '@/lib/scoring-engine'
 
@@ -380,6 +380,56 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGo
 }
 
 // ── PLANNING TAB ─────────────────────────────────────────────
+// ── Spread / Service-fee sub-rows for revenue lines in Planning ──
+// Renders the editable source-field rows (buy/sell price + volume, or fee/
+// cost + engagements) underneath a revenue line's computed revenue row.
+// One shared renderer for both line types -- they differ only in which
+// fields/labels apply and which field gets a summed total (the quantity
+// field: volume or engagements; price/fee/cost fields show no total since
+// summing a price across months isn't meaningful).
+function LineFieldSubRows({l,months,cc,canEdit,rowBg,colSpanBefore,rows,totalField,onUpdate}:{
+  l:GenericPlanLine, months:string[], cc:string, canEdit:boolean, rowBg:string,
+  colSpanBefore:number,
+  rows: [string,string,boolean][], // [label, field, isCurrency]
+  totalField:string,
+  onUpdate:(field:string,m:number,val:number)=>void
+}) {
+  return <>
+    {rows.map(([label,field,isCurrency])=>{
+      const arr = ((l as any)[field] as number[]|undefined) ?? Array(months.length).fill(0)
+      const total = arr.reduce((s,v)=>s+v,0)
+      return (
+        <tr key={field} style={{background:rowBg}}>
+          <td colSpan={colSpanBefore} style={{padding:'3px 8px 3px 24px',fontSize:'0.68rem',color:C.slate}}>↳ {label}</td>
+          {arr.map((v,m)=>(
+            <td key={m} style={{padding:'2px 4px'}}>
+              {canEdit
+                ? <input type="number" style={{width:74,padding:'2px 4px',border:`1px solid ${C.border}`,borderRadius:3,fontSize:'0.66rem',fontFamily:'monospace',textAlign:'right',background:C.lightBg,color:C.slate}}
+                    value={v??''} placeholder="0"
+                    onChange={e=>onUpdate(field,m,Number(e.target.value))}/>
+                : <span style={{display:'block',textAlign:'right',padding:'2px 4px',fontSize:'0.66rem',color:C.slate}}>{isCurrency?fmt(v,cc):v.toLocaleString()}</span>
+              }
+            </td>
+          ))}
+          <td style={{padding:'3px 8px',textAlign:'right',fontSize:'0.68rem',color:C.slate,borderLeft:`2px solid ${C.border}`}}>{field===totalField?total.toLocaleString():''}</td>
+          {canEdit&&<td></td>}
+        </tr>
+      )
+    })}
+  </>
+}
+
+const SPREAD_SUBROWS: [string,string,boolean][] = [
+  ['Buy price','buy_price',true],
+  ['Sell price','sell_price',true],
+  ['Volume','volume',false],
+]
+const SERVICE_FEE_SUBROWS: [string,string,boolean][] = [
+  ['Fee per engagement','fee_per_engagement',true],
+  ['Cost per engagement','cost_per_engagement',true],
+  ['Engagements','engagements',false],
+]
+
 function PlanningTab({config,result,months,cc,P,onSave}) {
   const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active)?.id||'')
   const [selSection, setSelSection] = useState<LineCategory>('revenue')
@@ -403,6 +453,29 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
 
   function updateLineName(lineId:string, name:string) {
     onSave({...config, plan_lines:config.plan_lines.map(l=>l.id===lineId?{...l,name}:l)})
+  }
+
+  // Switching a revenue line's type resets its type-specific numbers to zero --
+  // a flat monthly figure from Standard doesn't map meaningfully onto buy/sell/
+  // volume, so starting clean avoids silently carrying over a wrong number.
+  function changeLineType(lineId:string, newType:LineType) {
+    const l = config.plan_lines.find(pl=>pl.id===lineId)
+    if (!l) return
+    const rebuilt = newType==='spread' ? spreadLine(l.id,l.unit_id,l.name,config.planning_months)
+      : newType==='service_fee' ? serviceFeeLine(l.id,l.unit_id,l.name,config.planning_months)
+      : blankLine(l.id,l.unit_id,l.name,l.category,config.planning_months,'standard')
+    onSave({...config, plan_lines:config.plan_lines.map(pl=>pl.id===lineId?rebuilt:pl)})
+  }
+
+  // Generic updater for the monthly array fields used by spread and service-fee
+  // lines (buy_price, sell_price, volume, fee_per_engagement, cost_per_engagement,
+  // engagements) -- all follow the same per-month array shape as monthly_plan.
+  function updateLineArrayField(lineId:string, field:'buy_price'|'sell_price'|'volume'|'fee_per_engagement'|'cost_per_engagement'|'engagements', mIdx:number, val:number) {
+    onSave({...config, plan_lines: config.plan_lines.map(l => {
+      if (l.id!==lineId) return l
+      const arr = (l[field] as number[]|undefined) ?? Array(config.planning_months).fill(0)
+      return {...l, [field]: arr.map((v,i)=>i===mIdx?val:v)}
+    })})
   }
 
   function deleteLine(lineId:string) {
@@ -454,6 +527,7 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
             <thead>
               <tr style={{background:C.lightBg}}>
                 <th style={{textAlign:'left',padding:'6px 8px',fontWeight:600,color:C.navy,minWidth:180,fontSize:'0.75rem'}}>Line</th>
+                {selSection==='revenue'&&<th style={{textAlign:'left',padding:'6px 8px',fontWeight:600,color:C.navy,minWidth:110,fontSize:'0.75rem'}}>Type</th>}
                 {months.map((m,i)=><th key={i} style={{textAlign:'right',padding:'6px 6px',color:C.slate,whiteSpace:'nowrap',fontSize:'0.68rem'}}>{m}</th>)}
                 <th style={{textAlign:'right',padding:'6px 8px',color:C.navy,fontWeight:700,borderLeft:`2px solid ${C.border}`,fontSize:'0.72rem'}}>Total</th>
                 {P.canEditPlan&&<th style={{width:30}}></th>}
@@ -461,9 +535,25 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
             </thead>
             <tbody>
               {lines.map((l,ri)=>{
-                const total = l.monthly_plan.reduce((s,v)=>s+v,0)
+                const isSpread = selSection==='revenue' && l.line_type==='spread'
+                const isServiceFee = selSection==='revenue' && l.line_type==='service_fee'
+                // For spread/service-fee lines, revenue is derived from the source
+                // fields (matches the formula in generic-engine.ts exactly) rather
+                // than monthly_plan, which the engine ignores for these line types.
+                // Spread revenue is the GROSS sale value (sell price x volume) --
+                // buy cost is a separate Cost of Sales line in the engine, not
+                // netted against revenue. Must match generic-engine.ts exactly or
+                // this row shows a different number than the Total row below it.
+                const revenueByMonth = isSpread
+                  ? (l.volume??[]).map((v,m)=>(l.sell_price?.[m]??0)*v)
+                  : isServiceFee
+                  ? (l.engagements??[]).map((e,m)=>(l.fee_per_engagement?.[m]??0)*e)
+                  : l.monthly_plan
+                const total = revenueByMonth.reduce((s,v)=>s+v,0)
+                const rowBg = ri%2===0?C.cream:C.white
                 return (
-                  <tr key={l.id} style={{background:ri%2===0?C.cream:C.white}}>
+                  <React.Fragment key={l.id}>
+                  <tr style={{background:rowBg}}>
                     <td style={{padding:'5px 8px'}}>
                       {P.canEditPlan
                         ? <input style={{...inp,background:'transparent',border:'none',padding:0,fontSize:'0.8rem',fontFamily:'inherit'}}
@@ -471,7 +561,26 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
                         : <span style={{fontSize:'0.8rem',color:C.navy}}>{l.name}</span>
                       }
                     </td>
-                    {l.monthly_plan.map((v,m)=>(
+                    {selSection==='revenue'&&(
+                      <td style={{padding:'5px 8px'}}>
+                        {P.canEditPlan
+                          ? <select style={{...inp,padding:'0.3rem 0.4rem',fontSize:'0.72rem'}}
+                              value={l.line_type} onChange={e=>changeLineType(l.id,e.target.value as LineType)}>
+                              <option value="standard">Standard</option>
+                              <option value="spread">Spread</option>
+                              <option value="service_fee">Service fee</option>
+                            </select>
+                          : <span style={{fontSize:'0.72rem',color:C.slate}}>{l.line_type==='spread'?'Spread':l.line_type==='service_fee'?'Service fee':'Standard'}</span>
+                        }
+                      </td>
+                    )}
+                    {(isSpread||isServiceFee) ? (
+                      revenueByMonth.map((v,m)=>(
+                        <td key={m} style={{padding:'4px 4px'}}>
+                          <span style={{display:'block',textAlign:'right',padding:'3px 5px',fontSize:'0.72rem',fontFamily:'monospace',color:C.slate}}>{fmt(v,cc)}</span>
+                        </td>
+                      ))
+                    ) : l.monthly_plan.map((v,m)=>(
                       <td key={m} style={{padding:'4px 4px'}}>
                         {P.canEditPlan
                           ? <input type="number" style={{width:80,padding:'3px 5px',border:`1px solid ${C.border}`,borderRadius:3,fontSize:'0.72rem',fontFamily:'monospace',textAlign:'right',background:C.white,color:C.navy}}
@@ -484,12 +593,26 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
                     <td style={{padding:'5px 8px',textAlign:'right',fontWeight:700,color:C.navy,borderLeft:`2px solid ${C.border}`}}>{fmt(total,cc)}</td>
                     {P.canEditPlan&&<td><button style={delBtn} onClick={()=>deleteLine(l.id)}>×</button></td>}
                   </tr>
+                  {isSpread && (
+                    <LineFieldSubRows l={l} months={months} cc={cc} canEdit={P.canEditPlan}
+                      rowBg={rowBg} colSpanBefore={selSection==='revenue'?2:1}
+                      rows={SPREAD_SUBROWS} totalField="volume"
+                      onUpdate={(field,m,val)=>updateLineArrayField(l.id,field as any,m,val)}/>
+                  )}
+                  {isServiceFee && (
+                    <LineFieldSubRows l={l} months={months} cc={cc} canEdit={P.canEditPlan}
+                      rowBg={rowBg} colSpanBefore={selSection==='revenue'?2:1}
+                      rows={SERVICE_FEE_SUBROWS} totalField="engagements"
+                      onUpdate={(field,m,val)=>updateLineArrayField(l.id,field as any,m,val)}/>
+                  )}
+                  </React.Fragment>
                 )
               })}
               {/* Total row */}
               {totals&&(
                 <tr style={{background:C.navy}}>
                   <td style={{padding:'6px 8px',fontWeight:700,color:C.white,fontSize:'0.78rem'}}>Total</td>
+                  {selSection==='revenue'&&<td></td>}
                   {totals.map((v,i)=><td key={i} style={{padding:'6px 6px',textAlign:'right',fontFamily:'monospace',fontSize:'0.72rem',color:C.cyan,fontWeight:700}}>{fmt(v,cc)}</td>)}
                   <td style={{padding:'6px 8px',textAlign:'right',fontFamily:'monospace',fontWeight:700,color:C.cyan,borderLeft:`2px solid rgba(255,255,255,0.2)`}}>{fmt(totals.reduce((s,v)=>s+v,0),cc)}</td>
                   {P.canEditPlan&&<td></td>}
