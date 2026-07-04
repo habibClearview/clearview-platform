@@ -811,16 +811,23 @@ function ActualsTab({config,months,cc,P,onSave}) {
       .then(({data})=>setAllActuals(data||[]))
   },[selPeriod,canSeeAll])
 
-  // Month-end close data: only fetched for roles who can actually close a
-  // period. Catalogue items are fetched client-wide (not per-unit) since
-  // the 90-day cost-price review gate applies to the whole company, and
-  // period close is a single company-wide action, not per business unit.
+  // periodClose MUST be fetched for every user, not just canSeeAll roles --
+  // it drives both the save() guard and the input disabled state below.
+  // Gating this fetch behind canSeeAll left periodClose permanently null
+  // for regular unit-level users, meaning a CLOSED period stayed fully
+  // editable and submittable for them -- the hard lock was silently
+  // bypassed for exactly the users it's most meant to constrain.
   useEffect(()=>{
-    if (!canSeeAll) return
     supabase.from('generic_period_close').select('*')
       .eq('client_id',config.client_id).eq('period',selPeriod)
       .maybeSingle()
       .then(({data})=>setPeriodClose(data))
+  },[selPeriod,config.client_id])
+
+  // Catalogue staleness data is genuinely FM/CEO/coach-only -- it feeds
+  // the exception report, which only those roles act on.
+  useEffect(()=>{
+    if (!canSeeAll) return
     supabase.from('field_catalogue').select('id,name,cost_price,cost_price_updated_at')
       .eq('client_id',config.client_id).eq('active',true).not('cost_price','is',null)
       .then(({data})=>setStaleCatalogue(data||[]))
@@ -894,10 +901,11 @@ function ActualsTab({config,months,cc,P,onSave}) {
   // with the SAME cost_price value, which refreshes cost_price_updated_at
   // to now() without changing the actual price. No separate endpoint needed.
   async function confirmCostPriceStillAccurate(itemId: string, currentCostPrice: number) {
-    await fetch('/api/field/admin/catalogue', {
+    const res = await fetch('/api/field/admin/catalogue', {
       method: 'PATCH', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ id: itemId, cost_price: currentCostPrice }),
     })
+    if (!res.ok) { alert('Could not confirm this cost price. Please try again.'); return }
     const {data} = await supabase.from('field_catalogue').select('id,name,cost_price,cost_price_updated_at')
       .eq('client_id',config.client_id).eq('active',true).not('cost_price','is',null)
     setStaleCatalogue(data||[])

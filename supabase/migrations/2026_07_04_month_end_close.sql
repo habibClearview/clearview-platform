@@ -27,5 +27,34 @@ create table if not exists generic_period_close (
   unique (client_id, period)
 );
 
-create index if not exists idx_generic_period_close_client_period
-  on generic_period_close (client_id, period);
+-- No separate index on (client_id, period): the unique constraint above
+-- already creates a btree index on exactly these columns, in this order.
+-- A second explicit index would just add write overhead for nothing.
+
+-- RLS: matches the existing "auth_all" pattern already used on every
+-- sibling generic_* table (generic_actuals, generic_model_config,
+-- generic_spend_requests). Without ANY policy, this table would be
+-- reachable by the service role key (used in this session's live
+-- verification) but NOT by the browser's authenticated client -- meaning
+-- the actual coach/CEO/Finance Manager users in the app would get
+-- "permission denied" trying to use this feature at all.
+--
+-- IMPORTANT, flagged but deliberately NOT fixed here (out of scope for
+-- this step): the existing "auth_all" pattern only checks
+-- auth.role() = 'authenticated' -- it does NOT scope by client_id. Any
+-- authenticated user can currently read or write ANY client's rows in
+-- generic_actuals, generic_model_config, generic_spend_requests, and now
+-- generic_period_close too -- isolation between different clients
+-- (CONAS, Wonderland, Kenali, etc.) relies entirely on the application
+-- code filtering by client_id, never enforced at the database level.
+-- This is a genuine, pre-existing, cross-cutting gap spanning multiple
+-- tables built across earlier sessions, not something introduced by this
+-- migration -- matching the existing pattern here keeps this table
+-- consistent and working, but the underlying gap needs its own dedicated
+-- fix across all of these tables together, not a one-off patch on the
+-- newest table only.
+alter table generic_period_close enable row level security;
+
+drop policy if exists auth_all on generic_period_close;
+create policy auth_all on generic_period_close
+  for all using (auth.role() = 'authenticated');
