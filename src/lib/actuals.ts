@@ -49,3 +49,17 @@ export function computeActualsTotals(
   const netResult = totalRev - totalCost
   return { totalRev, totalCOGS, totalOtherCosts, totalCost, grossProfit, netResult }
 }
+
+// Used by the Consolidated P&L's Total Operating Costs row. Must derive
+// from the HYBRID (actual-or-plan) Gross Profit figure, not raw act_gp
+// directly -- if a caller passed act_gp instead of the hybrid row's
+// value, a future case where they diverge would silently regress back
+// to a planned figure without this being caught. Deriving via
+// hybridGrossProfit - actEbitda (both already correctly treat a
+// category with zero plan lines anywhere as zero, not "missing") means
+// this always reconciles exactly by construction: GP - Operating Costs
+// = EBITDA, with no separate category-presence check of its own that
+// could drift out of sync with the engine's.
+export function deriveActualOperatingCosts(hybridGrossProfit: number, actEbitda: number | null): number | null {
+  return actEbitda !== null ? hybridGrossProfit - actEbitda : null
+}

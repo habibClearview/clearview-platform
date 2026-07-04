@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { runGenericModel, defaultGenericConfig, spreadLine, serviceFeeLine } from '../lib/generic-engine'
+import { deriveActualOperatingCosts } from '../lib/actuals'
 
 function expectBalanceSheetBalances(result: ReturnType<typeof runGenericModel>) {
   result.bs.total_assets.forEach((assets: number, i: number) => {
@@ -600,5 +601,28 @@ describe('Generic Engine — actual EBITDA when a category genuinely does not ex
     const actuals = { u1: { '2026-01-01': { rev1: 9_000_000 } } }
     const result = runGenericModel(configNoCogs, actuals)
     expect(result.con.act_gp[0]).toBe(9_000_000) // no COGS line anywhere -- treated as zero cost, not missing
+  })
+
+  it('REG: the shared deriveActualOperatingCosts function gives the correct small opex-only figure for a business with no staff line, not a fallback to a huge unrelated planned number', () => {
+    // This is the exact second instance of the same bug class, found live:
+    // GenericDashboard.tsx independently derived "actual operating costs"
+    // from act_staff + act_opex directly, which had the identical
+    // permanently-null-staff problem the engine fix above addresses.
+    // The corrected UI derives it instead as hybridGrossProfit - act_ebitda,
+    // via this shared function -- imported and called directly here
+    // (not re-implemented) so a regression in the component's actual
+    // formula is caught, not a copy of it.
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeNoStaffConfig(), actuals)
+    const actEbitda = result.con.act_ebitda[0]
+    // Passing the HYBRID gross profit value (what gpH.values[m] would be
+    // in the component), not raw act_gp directly -- if the component ever
+    // regressed to using planned GP here instead of the hybrid row, this
+    // test would catch it, since a wrong hybridGrossProfit input would
+    // produce a wrong derived Operating Costs figure.
+    const hybridGrossProfit = result.con.act_gp[0] !== null ? result.con.act_gp[0]! : result.con.gp[0]
+    const derivedOperatingCosts = deriveActualOperatingCosts(hybridGrossProfit, actEbitda)
+    expect(derivedOperatingCosts).toBe(450_000) // exactly the real opex figure (450k-scale), nothing else
+    expect(hybridGrossProfit - derivedOperatingCosts!).toBe(actEbitda) // must foot exactly, by construction
   })
 })

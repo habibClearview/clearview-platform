@@ -10,7 +10,7 @@ import {
   type GenericPlanLine, type LineCategory, type LineType, type UnitType,
 } from '@/lib/generic-engine'
 import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor } from '@/lib/scoring-engine'
-import { combinedActual, computeActualsTotals } from '@/lib/actuals'
+import { combinedActual, computeActualsTotals, deriveActualOperatingCosts } from '@/lib/actuals'
 import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
 import { getFiscalYears, canCloseYear, computeAnnualPL, computeAnnualCashFlow, computeYearEndBalanceSheet } from '@/lib/annual-close'
 
@@ -2513,14 +2513,25 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
         const cogsH = hybridRow(con.cogs, con.act_cogs)
         const gpH = hybridRow(con.gp, con.act_gp)
         // Total Operating Costs must use the SAME actual coverage as
-        // act_ebitda (act_staff and act_opex both present), not stay
-        // plan-only -- otherwise a month showing actual Gross Profit and
-        // actual EBITDA would display a plan-sourced cost figure between
-        // them, and GP minus Operating Costs would not equal EBITDA on
-        // screen. This keeps every marked-actual month reconciling exactly:
-        // act_gp - actOpexTotal = act_ebitda, by construction.
-        const actOpexTotal: (number|null)[] = con.act_staff.map((s:number|null, m:number) =>
-          (s !== null && con.act_opex[m] !== null) ? (s + (con.act_opex[m] as number)) : null
+        // act_ebitda, not stay plan-only -- otherwise a month showing
+        // actual Gross Profit and actual EBITDA would display a
+        // plan-sourced cost figure between them, and GP minus Operating
+        // Costs would not equal EBITDA on screen.
+        //
+        // This must mirror the engine's own act_ebitda gate exactly
+        // (generic-engine.ts): a category with ZERO active plan lines
+        // anywhere in the business (e.g. no staff line at all) is
+        // treated as zero, not as "missing forever". The first version
+        // of this required BOTH act_staff and act_opex to be non-null
+        // unconditionally -- for a business with no staff line, act_staff
+        // can never be anything but null, so this row silently fell back
+        // to the full PLANNED operating costs even in a month where
+        // act_ebitda itself was correctly actual. That mismatch is
+        // exactly what looked broken: an actual Gross Profit sitting
+        // above an actual EBITDA, with a planned (and unrelated-looking)
+        // cost figure in between them.
+        const actOpexTotal: (number|null)[] = con.act_ebitda.map((eb, m) =>
+          deriveActualOperatingCosts(gpH.values[m], eb)
         )
         const opexH = hybridRow(con.opex, actOpexTotal)
         const ebitdaH = hybridRow(con.ebitda, con.act_ebitda)
