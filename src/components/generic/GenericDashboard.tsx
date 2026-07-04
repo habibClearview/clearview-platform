@@ -10,7 +10,7 @@ import {
   type GenericPlanLine, type LineCategory, type LineType, type UnitType,
 } from '@/lib/generic-engine'
 import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor } from '@/lib/scoring-engine'
-import { combinedActual, computeActualsTotals } from '@/lib/actuals'
+import { combinedActual, computeActualsTotals, deriveActualOperatingCosts } from '@/lib/actuals'
 import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
 import { getFiscalYears, canCloseYear, computeAnnualPL, computeAnnualCashFlow, computeYearEndBalanceSheet } from '@/lib/annual-close'
 
@@ -2531,7 +2531,7 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
         // above an actual EBITDA, with a planned (and unrelated-looking)
         // cost figure in between them.
         const actOpexTotal: (number|null)[] = con.act_ebitda.map((eb, m) =>
-          eb !== null ? (gpH.values[m] - eb) : null
+          deriveActualOperatingCosts(gpH.values[m], eb)
         )
         const opexH = hybridRow(con.opex, actOpexTotal)
         const ebitdaH = hybridRow(con.ebitda, con.act_ebitda)
