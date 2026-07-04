@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   isCostPriceStale, computeExceptionReport, canClosePeriod,
+  periodForMonthIndex, monthIndexForPeriod,
   COST_PRICE_STALENESS_DAYS, REVENUE_ANOMALY_THRESHOLD,
   type CatalogueItemForStaleness, type UnitRevenueCheck,
 } from '../lib/month-end-close'
@@ -109,5 +110,35 @@ describe('Month-End Close — the hard gate', () => {
 
   it('REG: a period with zero exceptions can close', () => {
     expect(canClosePeriod([])).toBe(true)
+  })
+})
+
+describe('Month-End Close — UTC-safe period/month-index arithmetic', () => {
+  it('REG: periodForMonthIndex returns the exact start period at index 0', () => {
+    expect(periodForMonthIndex('2026-01-01', 0)).toBe('2026-01-01')
+  })
+
+  it('REG: periodForMonthIndex advances months correctly, including across a year boundary', () => {
+    expect(periodForMonthIndex('2026-11-01', 0)).toBe('2026-11-01')
+    expect(periodForMonthIndex('2026-11-01', 1)).toBe('2026-12-01')
+    expect(periodForMonthIndex('2026-11-01', 2)).toBe('2027-01-01') // crosses into the next year
+  })
+
+  it('REG: monthIndexForPeriod is the exact inverse of periodForMonthIndex', () => {
+    const start = '2026-03-01'
+    for (let i = 0; i < 15; i++) {
+      const period = periodForMonthIndex(start, i)
+      expect(monthIndexForPeriod(start, period)).toBe(i)
+    }
+  })
+
+  it('REG: date-only strings never shift by a day regardless of local timezone -- both functions use UTC parts consistently', () => {
+    // This is the exact bug CodeRabbit caught: new Date('2026-01-01') is
+    // UTC midnight, but local getFullYear()/getMonth() can reinterpret
+    // that a day earlier in negative UTC offsets, landing in the wrong
+    // month. Using UTC parts throughout avoids this regardless of which
+    // timezone the test runner (or a user's browser) happens to be in.
+    expect(periodForMonthIndex('2026-01-01', 0)).toBe('2026-01-01')
+    expect(monthIndexForPeriod('2026-01-01', '2026-01-01')).toBe(0)
   })
 })

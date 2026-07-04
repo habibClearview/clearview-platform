@@ -91,3 +91,27 @@ export function computeExceptionReport(
 export function canClosePeriod(exceptions: ExceptionItem[]): boolean {
   return !exceptions.some(e => e.severity === 'blocking')
 }
+
+// Given a plan's start date and a month index (0-based, months after
+// start), returns the period key (YYYY-MM-01) generic_period_close and
+// generic_actuals use. UTC-safe deliberately: a date-only string like
+// '2026-01-01' parses as UTC midnight, but local Date methods
+// (getFullYear/getMonth) can reinterpret that a day earlier in negative
+// UTC offset timezones, landing in the wrong month and silently failing
+// to match the right period.
+export function periodForMonthIndex(startDate: string, monthIndex: number): string {
+  const start = new Date(startDate)
+  const monthsSinceEpoch = start.getUTCFullYear() * 12 + start.getUTCMonth() + monthIndex
+  const year = Math.floor(monthsSinceEpoch / 12)
+  const month = monthsSinceEpoch % 12
+  return `${year}-${String(month + 1).padStart(2, '0')}-01`
+}
+
+// Inverse of periodForMonthIndex -- given a plan's start date and a
+// period string, returns which month index that period falls at. Same
+// UTC-safety reasoning applies.
+export function monthIndexForPeriod(startDate: string, period: string): number {
+  const start = new Date(startDate)
+  const p = new Date(period)
+  return (p.getUTCFullYear() - start.getUTCFullYear()) * 12 + (p.getUTCMonth() - start.getUTCMonth())
+}

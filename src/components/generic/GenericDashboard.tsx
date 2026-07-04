@@ -11,7 +11,7 @@ import {
 } from '@/lib/generic-engine'
 import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor } from '@/lib/scoring-engine'
 import { combinedActual, computeActualsTotals } from '@/lib/actuals'
-import { computeExceptionReport, canClosePeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
+import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
@@ -231,11 +231,20 @@ export default function GenericDashboard({
       })
   }, [clientId])
 
-  useEffect(() => {
+  const loadClosedPeriods = useCallback(() => {
     if (!clientId) return
     supabase.from('generic_period_close').select('period').eq('client_id', clientId).eq('closed', true)
-      .then(({data}) => setClosedPeriods(new Set((data||[]).map((r:any) => r.period))))
+      .then(({data, error}) => {
+        // Explicit error handling -- a silent fallback to an empty set on
+        // error would make every period appear open/live in the P&L even
+        // if some are genuinely closed, which is the wrong direction to
+        // fail for a "what's final vs still live" display.
+        if (error) { console.error('Failed to load closed periods:', error); return }
+        setClosedPeriods(new Set((data||[]).map((r:any) => r.period)))
+      })
   }, [clientId])
+
+  useEffect(() => { loadClosedPeriods() }, [loadClosedPeriods])
 
   // Load config from Supabase
   useEffect(() => {
@@ -759,7 +768,7 @@ function ScenariosTab({config,result,months,cc,P,onSave}) {
   )
 }
 // ── ACTUALS TAB ───────────────────────────────────────────────
-function ActualsTab({config,months,cc,P,onSave}) {
+function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
   const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active&&(!P.unitIds.length||P.unitIds.includes(u.id)))?.id||'')
   const [selPeriod, setSelPeriod] = useState(()=>{
     const d=new Date(); d.setDate(1)
@@ -874,14 +883,12 @@ function ActualsTab({config,months,cc,P,onSave}) {
   // planned revenue for this period. See docs/ACCOUNTING_ARCHITECTURE.md
   // section 5. Uses the shared, tested src/lib/month-end-close.ts so this
   // exact logic (not a copy) is what tests exercise.
-  function monthIndexForPeriod(period: string): number {
-    const start = new Date(config.start_date)
-    const p = new Date(period)
-    return (p.getFullYear() - start.getFullYear()) * 12 + (p.getMonth() - start.getMonth())
-  }
+  // Uses the shared, tested src/lib/month-end-close.ts monthIndexForPeriod
+  // instead of a local copy -- both this and closedMask above rely on the
+  // same UTC-safe period<->month-index arithmetic.
 
   const unitRevenueChecks: UnitRevenueCheck[] = canSeeAll ? visibleUnits.map(u => {
-    const mIdx = monthIndexForPeriod(selPeriod)
+    const mIdx = monthIndexForPeriod(config.start_date, selPeriod)
     const revLines = config.plan_lines.filter((l:any) => l.unit_id === u.id && l.category === 'revenue' && l.active)
     const plannedRevenue = revLines.reduce((s:number,l:any) => s + (mIdx >= 0 && mIdx < (l.monthly_plan||[]).length ? (l.monthly_plan[mIdx]||0) : 0), 0)
     const unitRow = allActuals.find((a:any) => a.unit_id === u.id)
@@ -904,7 +911,7 @@ function ActualsTab({config,months,cc,P,onSave}) {
       closed_at: new Date().toISOString(), closed_by: P.fullName,
       exception_report: exceptionReport,
     }, {onConflict:'client_id,period'})
-    if (!error) setPeriodClose({ closed: true, closed_at: new Date().toISOString(), closed_by: P.fullName })
+    if (!error) { setPeriodClose({ closed: true, closed_at: new Date().toISOString(), closed_by: P.fullName }); onCloseStatusChanged?.() }
     else alert('Could not close this period. Please try again.')
     setClosing(false)
   }
@@ -915,7 +922,7 @@ function ActualsTab({config,months,cc,P,onSave}) {
     setClosing(true)
     const {error} = await supabase.from('generic_period_close')
       .update({ closed: false }).eq('client_id', config.client_id).eq('period', selPeriod)
-    if (!error) setPeriodClose((prev:any) => ({ ...prev, closed: false }))
+    if (!error) { setPeriodClose((prev:any) => ({ ...prev, closed: false })); onCloseStatusChanged?.() }
     else alert('Could not reopen this period. Please try again.')
     setClosing(false)
   }
@@ -2415,11 +2422,9 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
   // "has actual data" (actualMask below). A month can have actual data
   // and still be open/live; once closed, it's final.
   // docs/ACCOUNTING_ARCHITECTURE.md section 5.
-  const closedMask: boolean[] = months.map((_:string, i:number) => {
-    const d = new Date(config.start_date); d.setMonth(d.getMonth() + i); d.setDate(1)
-    const period = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`
-    return closedPeriods?.has(period) ?? false
-  })
+  const closedMask: boolean[] = months.map((_:string, i:number) =>
+    closedPeriods?.has(periodForMonthIndex(config.start_date, i)) ?? false
+  )
 
   // Hybrid: use the actual figure for a month where one exists, plan
   // otherwise. actualMask marks which months in the row are real data, so
@@ -2728,7 +2733,7 @@ function ActualsAndWorkingCapitalTab({config,result,months,cc,P,onSave}) {
           borderRadius:4,cursor:'pointer',fontWeight:mode==='workingcapital'?700:400}}
           onClick={()=>setMode('workingcapital')}>Working Capital (Trade Credit)</button>
       </div>
-      {mode==='actuals' && <ActualsTab config={config} months={months} cc={cc} P={P} onSave={onSave}/>}
+      {mode==='actuals' && <ActualsTab config={config} months={months} cc={cc} P={P} onSave={onSave} onCloseStatusChanged={loadClosedPeriods}/>}
       {mode==='workingcapital' && <WorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={onSave}/>}
     </div>
   )
