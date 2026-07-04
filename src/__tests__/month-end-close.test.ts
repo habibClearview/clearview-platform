@@ -132,6 +132,15 @@ describe('Month-End Close — UTC-safe period/month-index arithmetic', () => {
     }
   })
 
+  it('REG: negative month indices work correctly too, crossing backward across a year boundary', () => {
+    // A period before the plan's start date should still resolve
+    // correctly -- e.g. closing a month that predates when the plan
+    // config's start_date was set.
+    expect(periodForMonthIndex('2026-01-01', -1)).toBe('2025-12-01')
+    expect(periodForMonthIndex('2026-01-01', -2)).toBe('2025-11-01')
+    expect(monthIndexForPeriod('2026-01-01', '2025-12-01')).toBe(-1)
+  })
+
   it('REG: date-only strings never shift by a day regardless of local timezone -- both functions use UTC parts consistently', () => {
     // This is the exact bug CodeRabbit caught: new Date('2026-01-01') is
     // UTC midnight, but local getFullYear()/getMonth() can reinterpret

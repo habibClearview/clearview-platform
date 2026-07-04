@@ -375,7 +375,7 @@ export default function GenericDashboard({
         {view==='cashflow'    && <CashFlowTab result={result} months={months} cc={cc}/>}
         {view==='balancesheet'&& <BalanceSheetTab result={result} months={months} cc={cc}/>}
         {view==='margins'     && <MarginsTab config={config} result={result} months={months} cc={cc}/>}
-        {view==='actuals_wc'  && <ActualsAndWorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
+        {view==='actuals_wc'  && <ActualsAndWorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} onCloseStatusChanged={loadClosedPeriods}/>}
         {view==='settings'    && <SettingsAndAdminTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={saveConfig}/>}
       </main>
 
@@ -2719,7 +2719,7 @@ function MarginsTab({config,result,months,cc}) {
   )
 }
 // ── ACTUALS & WORKING CAPITAL TAB (toggle between two existing components) ──
-function ActualsAndWorkingCapitalTab({config,result,months,cc,P,onSave}) {
+function ActualsAndWorkingCapitalTab({config,result,months,cc,P,onSave,onCloseStatusChanged}) {
   const [mode, setMode] = useState<'actuals'|'workingcapital'>('actuals')
   return (
     <div>
@@ -2733,7 +2733,7 @@ function ActualsAndWorkingCapitalTab({config,result,months,cc,P,onSave}) {
           borderRadius:4,cursor:'pointer',fontWeight:mode==='workingcapital'?700:400}}
           onClick={()=>setMode('workingcapital')}>Working Capital (Trade Credit)</button>
       </div>
-      {mode==='actuals' && <ActualsTab config={config} months={months} cc={cc} P={P} onSave={onSave} onCloseStatusChanged={loadClosedPeriods}/>}
+      {mode==='actuals' && <ActualsTab config={config} months={months} cc={cc} P={P} onSave={onSave} onCloseStatusChanged={onCloseStatusChanged}/>}
       {mode==='workingcapital' && <WorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={onSave}/>}
     </div>
   )
