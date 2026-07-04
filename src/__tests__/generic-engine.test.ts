@@ -448,4 +448,16 @@ describe('Generic Engine — Actuals (hybrid P&L, docs/ACCOUNTING_ARCHITECTURE.m
     const actuals = { u1: { '2030-01-01': { rev1: 9_000_000 } } }
     expect(() => runGenericModel(makeActualsConfig(), actuals)).not.toThrow()
   })
+
+  it('REG: act_gp minus (act_staff + act_opex) reconciles exactly to act_ebitda -- this is what the P&L displays, and it must foot', () => {
+    // CodeRabbit caught that the Consolidated P&L could show actual Gross
+    // Profit and actual EBITDA in the same month with a plan-sourced
+    // Operating Costs figure between them, so the displayed column didn't
+    // add up. The fix hybridizes Operating Costs from act_staff+act_opex.
+    // This confirms the underlying arithmetic actually reconciles.
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeActualsConfig(), actuals)
+    const actOpexTotal = (result.con.act_staff[0] as number) + (result.con.act_opex[0] as number)
+    expect((result.con.act_gp[0] as number) - actOpexTotal).toBe(result.con.act_ebitda[0])
+  })
 })

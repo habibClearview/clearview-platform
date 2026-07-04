@@ -198,7 +198,8 @@ export default function GenericDashboard({
     if (!clientId) return
     supabase.from('generic_actuals').select('unit_id,period,line_values,field_line_values')
       .eq('client_id', clientId)
-      .then(({data}) => {
+      .then(({data, error}) => {
+        if (error) { console.error('Failed to load generic_actuals for P&L hybrid mode:', error); return }
         const byUnit: Record<string, Record<string, Record<string, number>>> = {}
         ;(data||[]).forEach((row:any) => {
           const lineValues = row.line_values || {}
@@ -2201,6 +2202,12 @@ function PLTab({config,result,months,cc,P}) {
           {label:'Gross Profit',values:gpH.values,bold:true,highlight:true,actualMask:gpH.actualMask},
           {label:'Staff Costs',values:staffH.values,negate:true,actualMask:staffH.actualMask},
           {label:'Direct Overheads',values:opexH.values,negate:true,actualMask:opexH.actualMask},
+          // Shared Costs and EBITDA stay plan-only here, deliberately not
+          // actual-marked -- there's no per-unit actual EBITDA yet (shared
+          // cost allocation has no actuals equivalent), and marking EBITDA
+          // as actual while it's still built from a plan-only Shared Costs
+          // figure would repeat the exact reconciliation bug fixed in the
+          // consolidated view below.
           {label:'Shared Costs',values:pl.shared,negate:true},
           {label:'EBITDA',values:pl.ebitda,bold:true,highlight:true},
         ]
@@ -2233,12 +2240,23 @@ function PLTab({config,result,months,cc,P}) {
         const revH = hybridRow(con.rev, con.act_rev)
         const cogsH = hybridRow(con.cogs, con.act_cogs)
         const gpH = hybridRow(con.gp, con.act_gp)
+        // Total Operating Costs must use the SAME actual coverage as
+        // act_ebitda (act_staff and act_opex both present), not stay
+        // plan-only -- otherwise a month showing actual Gross Profit and
+        // actual EBITDA would display a plan-sourced cost figure between
+        // them, and GP minus Operating Costs would not equal EBITDA on
+        // screen. This keeps every marked-actual month reconciling exactly:
+        // act_gp - actOpexTotal = act_ebitda, by construction.
+        const actOpexTotal: (number|null)[] = con.act_staff.map((s:number|null, m:number) =>
+          (s !== null && con.act_opex[m] !== null) ? (s + (con.act_opex[m] as number)) : null
+        )
+        const opexH = hybridRow(con.opex, actOpexTotal)
         const ebitdaH = hybridRow(con.ebitda, con.act_ebitda)
         const rows = [
           {label:'Revenue',values:revH.values,bold:true,actualMask:revH.actualMask},
           {label:'Cost of Sales',values:cogsH.values,negate:true,actualMask:cogsH.actualMask},
           {label:'Gross Profit',values:gpH.values,bold:true,highlight:true,actualMask:gpH.actualMask},
-          {label:'Total Operating Costs',values:con.opex,negate:true},
+          {label:'Total Operating Costs',values:opexH.values,negate:true,actualMask:opexH.actualMask},
           {label:'EBITDA',values:ebitdaH.values,bold:true,highlight:true,actualMask:ebitdaH.actualMask},
           {label:'Interest',values:con.interest,negate:true},
           {label:'Net Profit Before Tax',values:con.nbt,bold:true},
