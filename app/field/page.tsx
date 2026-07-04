@@ -81,16 +81,26 @@ export default function FieldCapturePage() {
       // (including the coach/CEO financial dashboard). Scoping it to
       // /field means it only ever affects this page.
       navigator.serviceWorker.register('/field-sw.js', { scope: '/field' }).catch(()=>{})
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data?.type === 'field-sync-complete') {
-          listQueuedSales().then(setSalesQueue).catch(()=>{})
-          listQueuedCosts().then(setCostsQueue).catch(()=>{})
-          setLastSync(new Date(event.data.synced_at).toLocaleString())
-          setSyncMsg('Synced automatically in the background.')
-        }
-      })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[])
+
+  // Separate effect (with proper cleanup) for the Service Worker message
+  // listener -- if this component ever unmounts and remounts (client-side
+  // navigation away and back), an uncleaned listener would accumulate and
+  // a single background sync would fire "Synced automatically" more than once.
+  useEffect(()=>{
+    if (!('serviceWorker' in navigator)) return
+    function handleMessage(event: MessageEvent) {
+      if (event.data?.type === 'field-sync-complete') {
+        listQueuedSales().then(setSalesQueue).catch(()=>{})
+        listQueuedCosts().then(setCostsQueue).catch(()=>{})
+        setLastSync(new Date(event.data.synced_at).toLocaleString())
+        setSyncMsg('Synced automatically in the background.')
+      }
+    }
+    navigator.serviceWorker.addEventListener('message', handleMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', handleMessage)
   },[])
 
   // Fallback for browsers without Background Sync support: try syncing
