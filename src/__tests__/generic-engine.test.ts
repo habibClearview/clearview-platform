@@ -626,3 +626,63 @@ describe('Generic Engine — actual EBITDA when a category genuinely does not ex
     expect(hybridGrossProfit - derivedOperatingCosts!).toBe(actEbitda) // must foot exactly, by construction
   })
 })
+
+describe('Generic Engine — per-unit actual EBITDA (the By Business Unit tab)', () => {
+  // Found live, right after the consolidated-level fix shipped: the
+  // consolidated view was correct, but the By Business Unit tab (the
+  // default/most commonly viewed one) still showed a stale, purely
+  // planned EBITDA for any unit -- because unit-level act_ebitda was
+  // never actually computed as hybrid at all, by an earlier deliberate
+  // design choice that turned out to be wrong. This directly caused the
+  // exact "EBITDA looks nowhere close to Gross Profit" symptom reported.
+  function makeNoStaffConfig(overrides: Record<string,any> = {}) {
+    return defaultGenericConfig({
+      client_id: 'test', business_name: 'Test Co', currency: 'UGX', planning_months: 12,
+      business_units: [{ id: 'u1', name: 'Main Unit', short: 'MU', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 0 }],
+      plan_lines: [
+        { id: 'rev1', unit_id: 'u1', name: 'Sales', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(10_000_000), active: true },
+        { id: 'cogs1', unit_id: 'u1', name: 'COGS', category: 'cost_of_sales', line_type: 'standard', monthly_plan: Array(12).fill(4_000_000), active: true },
+        { id: 'opex1', unit_id: 'u1', name: 'Overheads', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(500_000), active: true },
+      ],
+      settings: {
+        shared_cost_fixed_pct: 0, corporate_tax_rate: 0.30, opening_cash_balance: 5_000_000,
+        capital_structure: { shareholder_contribution: 10_000_000, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, grace_period_months: 0, fixed_assets: 0 },
+      },
+      start_date: '2026-01-01',
+      ...overrides,
+    })
+  }
+
+  it('REG: unit-level actual EBITDA computes correctly for a unit with no staff line, instead of permanently showing the planned figure', () => {
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeNoStaffConfig(), actuals)
+    const pl = result.unitPL['u1']
+    expect(pl.act_ebitda[0]).not.toBeNull()
+    expect(pl.act_ebitda[0]).toBe(9_000_000 - 3_500_000 - 450_000) // 5,050,000 -- staff treated as zero, shared is zero here too
+  })
+
+  it('REG: unit-level actual EBITDA still correctly withholds for a unit that DOES have a staff line, until its actual data arrives', () => {
+    const configWithStaff = makeNoStaffConfig({
+      plan_lines: [
+        { id: 'rev1', unit_id: 'u1', name: 'Sales', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(10_000_000), active: true },
+        { id: 'cogs1', unit_id: 'u1', name: 'COGS', category: 'cost_of_sales', line_type: 'standard', monthly_plan: Array(12).fill(4_000_000), active: true },
+        { id: 'staff1', unit_id: 'u1', name: 'Staff', category: 'staff', line_type: 'standard', monthly_plan: Array(12).fill(1_500_000), active: true },
+        { id: 'opex1', unit_id: 'u1', name: 'Overheads', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(500_000), active: true },
+      ],
+    })
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } } // staff actual missing
+    const result = runGenericModel(configWithStaff, actuals)
+    expect(result.unitPL['u1'].act_ebitda[0]).toBeNull()
+  })
+
+  it('REG: unit-level EBITDA correctly reconciles: Gross Profit minus Staff minus Overheads minus Shared equals EBITDA, using actual figures', () => {
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeNoStaffConfig(), actuals)
+    const pl = result.unitPL['u1']
+    const gp = pl.act_gp[0] as number
+    const staff = pl.act_staff[0] ?? 0 // null here (no staff line) -- treated as zero for reconciliation
+    const opex = pl.act_opex[0] as number
+    const shared = pl.shared[0] // always planned/allocated -- no actuals concept of its own
+    expect(gp - staff - opex - shared).toBe(pl.act_ebitda[0])
+  })
+})

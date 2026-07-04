@@ -2468,20 +2468,23 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
         const gpH = hybridRow(pl.gp, pl.act_gp)
         const staffH = hybridRow(pl.staff, pl.act_staff)
         const opexH = hybridRow(pl.opex, pl.act_opex)
+        const ebitdaH = hybridRow(pl.ebitda, pl.act_ebitda)
         const rows = [
           {label:'Revenue',values:revH.values,bold:true,actualMask:revH.actualMask},
           {label:'Cost of Sales',values:cogsH.values,negate:true,actualMask:cogsH.actualMask},
           {label:'Gross Profit',values:gpH.values,bold:true,highlight:true,actualMask:gpH.actualMask},
           {label:'Staff Costs',values:staffH.values,negate:true,actualMask:staffH.actualMask},
           {label:'Direct Overheads',values:opexH.values,negate:true,actualMask:opexH.actualMask},
-          // Shared Costs and EBITDA stay plan-only here, deliberately not
-          // actual-marked -- there's no per-unit actual EBITDA yet (shared
-          // cost allocation has no actuals equivalent), and marking EBITDA
-          // as actual while it's still built from a plan-only Shared Costs
-          // figure would repeat the exact reconciliation bug fixed in the
-          // consolidated view below.
-          {label:'Shared Costs',values:pl.shared,negate:true},
-          {label:'EBITDA',values:pl.ebitda,bold:true,highlight:true},
+          // Shared Costs always uses its planned/allocated value, even in
+          // a month where EBITDA is shown as actual -- that allocation is
+          // an internal planning mechanism (headcount/revenue-share split
+          // of a pooled cost) with no independent actual-tracking source
+          // of its own, unlike revenue/COGS/staff/opex. Marked actual
+          // alongside EBITDA whenever EBITDA is, so the reconciling chain
+          // (GP - Staff - Overheads - Shared = EBITDA) reads consistently
+          // rather than one row breaking the visual pattern.
+          {label:'Shared Costs',values:pl.shared,negate:true,actualMask:ebitdaH.actualMask},
+          {label:'EBITDA',values:ebitdaH.values,bold:true,highlight:true,actualMask:ebitdaH.actualMask},
         ]
         return (
           <div>

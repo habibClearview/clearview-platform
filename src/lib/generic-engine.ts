@@ -214,6 +214,13 @@ export interface GenericUnitPL {
   // present for that month -- never blends an actual figure with a planned
   // one. Null means not enough actual data yet, not zero.
   act_gp: (number | null)[]
+  // Actual EBITDA at the unit level -- treats Shared Costs using their
+  // planned/allocated value always (that allocation is an internal
+  // planning construct with no independent actual-tracking mechanism of
+  // its own, unlike revenue/COGS/staff/opex which get real transaction
+  // data). Staff and opex are treated as zero, not "missing", when this
+  // unit genuinely has no plan line in that category at all.
+  act_ebitda: (number | null)[]
   // Spread analysis per line
   spread_analysis: {
     line_id: string
@@ -395,7 +402,7 @@ export function runGenericModel(
     return {
       rev, cogs, gp, staff, opex,
       shared: zero(), total_opex: zero(), ebitda: zero(),
-      act_rev, act_cogs, act_staff, act_opex, act_gp,
+      act_rev, act_cogs, act_staff, act_opex, act_gp, act_ebitda: nullArr(),
       spread_analysis, service_margins, breakeven,
       ann_rev, ann_cogs, ann_gp, ann_staff, ann_opex,
       ann_shared: 0, ann_ebitda: 0,
@@ -442,7 +449,7 @@ export function runGenericModel(
     const ann_staff = yr(c.staff), ann_opex = yr(c.opex)
     const parentUnit = activeUnits.find(u => u.id === parentId)
     unitPL[parentId] = {
-      ...c, act_gp, shared: zero(), total_opex: zero(), ebitda: zero(),
+      ...c, act_gp, act_ebitda: nullArr(), shared: zero(), total_opex: zero(), ebitda: zero(),
       ann_rev, ann_cogs, ann_gp, ann_staff, ann_opex,
       ann_shared: 0, ann_ebitda: 0,
       gp_margin: ann_rev > 0 ? ann_gp / ann_rev : 0, ebitda_margin: 0,
@@ -490,9 +497,33 @@ export function runGenericModel(
   allUnitIds.forEach(uid => {
     const r = unitPL[uid]
     if (!r) return
+    // For a parent unit, its own plan lines AND every sub-unit's plan
+    // lines are all relevant to "does staff/opex apply here" -- a parent
+    // rollup's staff cost could live entirely on a sub-unit's own lines.
+    const relevantIds = new Set([uid, ...(subUnitsByParent[uid] || []).map(su => su.id)])
+    const relevantLines = config.plan_lines.filter(l => l.active && relevantIds.has(l.unit_id))
+    const unitHasStaffLines = relevantLines.some(l => l.category === 'staff')
+    const unitHasOpexLines  = relevantLines.some(l => l.category === 'direct_opex')
     for (let m = 0; m < months; m++) {
       r.total_opex[m] = r.staff[m] + r.opex[m] + r.shared[m]
       r.ebitda[m]     = r.gp[m] - r.total_opex[m]
+      // Actual EBITDA: same "zero when the category genuinely doesn't
+      // apply, not blocking" treatment already fixed at the consolidated
+      // level -- found and fixed there first, but this exact tab (By
+      // Business Unit) was still showing a stale planned EBITDA for any
+      // unit with no staff line, regardless of that fix, since unit-level
+      // EBITDA was never actually computed as hybrid at all until now.
+      // Shared Costs use their planned/allocated value unconditionally --
+      // that allocation is an internal planning mechanism with no
+      // independent actual-tracking source of its own.
+      const staffOk = !unitHasStaffLines || r.act_staff[m] !== null
+      const opexOk  = !unitHasOpexLines  || r.act_opex[m]  !== null
+      if (r.act_gp[m] !== null && staffOk && opexOk) {
+        r.act_ebitda[m] = (r.act_gp[m] as number)
+          - ((unitHasStaffLines ? r.act_staff[m] : 0) as number)
+          - ((unitHasOpexLines ? r.act_opex[m] : 0) as number)
+          - r.shared[m]
+      }
     }
     r.ann_shared  = yr(r.shared)
     r.ann_ebitda  = yr(r.ebitda)
