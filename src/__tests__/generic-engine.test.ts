@@ -601,4 +601,22 @@ describe('Generic Engine — actual EBITDA when a category genuinely does not ex
     const result = runGenericModel(configNoCogs, actuals)
     expect(result.con.act_gp[0]).toBe(9_000_000) // no COGS line anywhere -- treated as zero cost, not missing
   })
+
+  it('REG: the UI\'s Total Operating Costs reconciliation formula (act_gp - act_ebitda) gives the correct small opex-only figure for a business with no staff line, not a fallback to a huge unrelated planned number', () => {
+    // This is the exact second instance of the same bug class, found live:
+    // GenericDashboard.tsx independently derived "actual operating costs"
+    // from act_staff + act_opex directly, which had the identical
+    // permanently-null-staff problem the engine fix above addresses.
+    // The corrected UI derives it instead as act_gp - act_ebitda, which
+    // is what's verified here: it must equal the real, tiny opex figure
+    // (20,000-scale), not fall back to a multi-trillion planned number
+    // unrelated to what actually happened this month.
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeNoStaffConfig(), actuals)
+    const actGp = result.con.act_gp[0] as number
+    const actEbitda = result.con.act_ebitda[0] as number
+    const derivedOperatingCosts = actGp - actEbitda
+    expect(derivedOperatingCosts).toBe(450_000) // exactly the real opex figure, nothing else
+    expect(actGp - derivedOperatingCosts).toBe(actEbitda) // must foot exactly, by construction
+  })
 })
