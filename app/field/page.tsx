@@ -51,6 +51,10 @@ export default function FieldCapturePage() {
   const [selectedItem, setSelectedItem] = useState<CatalogueItem|null>(null)
   const [saleForm, setSaleForm] = useState({quantity:'', payment_method:'cash', customer_id:'', notes:'', override:false, override_price:''})
   const [costForm, setCostForm] = useState({plan_line_id:'', amount:'', notes:''})
+  const [search, setSearch] = useState('')
+  const [queueOpen, setQueueOpen] = useState(false)
+  const [editingSaleId, setEditingSaleId] = useState<string|null>(null)
+  const [editingCostId, setEditingCostId] = useState<string|null>(null)
   const syncNowRef = useRef<()=>void>(()=>{})
 
   useEffect(()=>{
@@ -152,14 +156,35 @@ export default function FieldCapturePage() {
 
   function openSaleDetail(item: CatalogueItem) {
     setSelectedItem(item)
+    setEditingSaleId(null)
     setSaleForm({quantity:'', payment_method:'cash', customer_id:'', notes:'', override:false, override_price:String(item.price)})
     setMode('sale-detail')
   }
 
+  function openSaleEdit(q: QueuedSale) {
+    const item = auth?.catalogue.find(c=>c.id===q.catalogue_item_id)
+    if (!item) return // catalogue item no longer exists -- can't safely edit, only delete
+    setSelectedItem(item)
+    setEditingSaleId(q.local_id)
+    setSaleForm({
+      quantity: String(q.quantity), payment_method: q.payment_method||'cash',
+      customer_id: q.customer_id||'', notes: q.notes||'',
+      override: q.override_price!==undefined, override_price: String(q.override_price ?? item.price),
+    })
+    setMode('sale-detail')
+  }
+
+  function openCostEdit(q: QueuedCost) {
+    setEditingCostId(q.local_id)
+    setCostForm({plan_line_id: q.plan_line_id, amount: String(q.amount), notes: q.notes||''})
+    setMode('cost-form')
+  }
+
   async function addSaleToQueue() {
     if (!selectedItem || !saleForm.quantity || Number(saleForm.quantity)<=0) return
+    if (editingSaleId) await removeQueuedSale(editingSaleId)
     const tx: Omit<QueuedSale,'queued_at'> = {
-      local_id: `local_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+      local_id: editingSaleId || `local_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
       catalogue_item_id: selectedItem.id, item_name: selectedItem.name, item_type: selectedItem.item_type,
       standard_price: selectedItem.price,
       quantity: Number(saleForm.quantity),
@@ -174,13 +199,15 @@ export default function FieldCapturePage() {
     requestBackgroundSync()
     setMode('grid')
     setSelectedItem(null)
+    setEditingSaleId(null)
   }
 
   async function addCostToQueue() {
     const line = auth?.cost_lines.find(l=>l.id===costForm.plan_line_id)
     if (!line || !costForm.amount) return
+    if (editingCostId) await removeQueuedCost(editingCostId)
     const tx: Omit<QueuedCost,'queued_at'> = {
-      local_id: `local_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+      local_id: editingCostId || `local_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
       plan_line_id: line.id, plan_line_name: line.name,
       amount: Number(costForm.amount),
       transaction_date: new Date().toISOString().split('T')[0],
@@ -191,6 +218,7 @@ export default function FieldCapturePage() {
     requestBackgroundSync()
     setCostForm({plan_line_id:'', amount:'', notes:''})
     setMode('grid')
+    setEditingCostId(null)
   }
 
   async function removeSale(localId:string) { await removeQueuedSale(localId); setSalesQueue(await listQueuedSales()) }
@@ -293,8 +321,9 @@ export default function FieldCapturePage() {
   const inp: React.CSSProperties = {width:'100%',padding:'0.65rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'0.9rem',boxSizing:'border-box',marginBottom:'0.7rem'}
   const lbl: React.CSSProperties = {display:'block',fontSize:'0.78rem',fontWeight:600,color:C.navy,marginBottom:'0.25rem'}
   const pendingCount = salesQueue.length + costsQueue.length
-  const products = auth.catalogue.filter(c=>c.item_type==='product')
-  const services = auth.catalogue.filter(c=>c.item_type==='service')
+  const searchLower = search.trim().toLowerCase()
+  const products = auth.catalogue.filter(c=>c.item_type==='product' && (!searchLower || c.name.toLowerCase().includes(searchLower)))
+  const services = auth.catalogue.filter(c=>c.item_type==='service' && (!searchLower || c.name.toLowerCase().includes(searchLower)))
 
   return (
     <div style={{minHeight:'100vh',background:C.cream,fontFamily:"'Segoe UI',system-ui,sans-serif",paddingBottom:'2rem'}}>
@@ -305,58 +334,39 @@ export default function FieldCapturePage() {
       </header>
 
       <div style={{padding:'1rem'}}>
-        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1rem',marginBottom:'1rem'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <div>
-              <div style={{fontSize:'0.68rem',color:C.slate,fontFamily:'monospace'}}>PENDING TO SYNC</div>
-              <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy}}>{pendingCount} entr{pendingCount===1?'y':'ies'}</div>
-            </div>
-            <button disabled={syncing||pendingCount===0} onClick={syncNow}
-              style={{padding:'0.65rem 1.1rem',background:pendingCount===0?C.border:C.teal,color:C.white,border:'none',borderRadius:6,fontWeight:600,cursor:pendingCount===0?'default':'pointer',fontSize:'0.85rem'}}>
-              {syncing?'Syncing...':'Sync Now'}
-            </button>
-          </div>
-          {lastSync && <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.5rem'}}>Last synced {lastSync}</div>}
-          {syncMsg && <div style={{fontSize:'0.75rem',color:syncMsg.startsWith('Synced')?C.green:C.red,marginTop:'0.4rem'}}>{syncMsg}</div>}
+        {/* Compact sync bar -- kept short so it never pushes the product grid down */}
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'0.75rem 1rem',marginBottom:'0.85rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.6rem'}}>
+          <button onClick={()=>setQueueOpen(o=>!o)} style={{background:'none',border:'none',padding:0,cursor:'pointer',textAlign:'left'}}>
+            <div style={{fontSize:'0.65rem',color:C.slate,fontFamily:'monospace'}}>PENDING TO SYNC {queueOpen?'▾':'▸'}</div>
+            <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',fontWeight:700,color:C.navy}}>{pendingCount} entr{pendingCount===1?'y':'ies'}</div>
+          </button>
+          <button disabled={syncing||pendingCount===0} onClick={syncNow}
+            style={{padding:'0.6rem 1rem',background:pendingCount===0?C.border:C.teal,color:C.white,border:'none',borderRadius:6,fontWeight:600,cursor:pendingCount===0?'default':'pointer',fontSize:'0.82rem',whiteSpace:'nowrap'}}>
+            {syncing?'Syncing...':'Sync Now'}
+          </button>
         </div>
-
-        {pendingCount>0 && (
-          <div style={{marginBottom:'1rem'}}>
-            {salesQueue.map(q=>(
-              <div key={q.local_id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                <div>
-                  <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{q.item_name}</div>
-                  <div style={{fontSize:'0.72rem',color:C.slate}}>{q.quantity} {q.override_price?'(price overridden)':`× ${fmt(q.standard_price,auth.client.currency)}`}</div>
-                </div>
-                <div style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
-                  <div style={{fontFamily:'monospace',fontWeight:700,color:C.green}}>+{fmt(q.quantity*(q.override_price??q.standard_price),auth.client.currency)}</div>
-                  <button onClick={()=>removeSale(q.local_id)} style={{background:'transparent',border:'none',color:C.red,fontSize:'1.1rem',cursor:'pointer'}}>×</button>
-                </div>
-              </div>
-            ))}
-            {costsQueue.map(q=>(
-              <div key={q.local_id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                <div>
-                  <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{q.plan_line_name}</div>
-                  <div style={{fontSize:'0.72rem',color:C.slate}}>{q.transaction_date}</div>
-                </div>
-                <div style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
-                  <div style={{fontFamily:'monospace',fontWeight:700,color:C.red}}>-{fmt(q.amount,auth.client.currency)}</div>
-                  <button onClick={()=>removeCost(q.local_id)} style={{background:'transparent',border:'none',color:C.red,fontSize:'1.1rem',cursor:'pointer'}}>×</button>
-                </div>
-              </div>
-            ))}
+        {(lastSync || syncMsg) && (
+          <div style={{marginBottom:'0.85rem',fontSize:'0.75rem'}}>
+            {lastSync && <div style={{color:C.slate}}>Last synced {lastSync}</div>}
+            {syncMsg && <div style={{color:syncMsg.startsWith('Synced')?C.green:C.red,marginTop:'0.2rem'}}>{syncMsg}</div>}
           </div>
         )}
 
         {mode==='grid' && (
           <>
+            {/* Search -- always visible, right above the products it filters */}
+            <input
+              style={{...inp,marginBottom:'0.85rem',fontSize:'0.95rem',padding:'0.75rem'}}
+              placeholder="🔍 Search products or services..."
+              value={search} onChange={e=>setSearch(e.target.value)}
+            />
+
             {products.length>0 && <>
-              <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:C.slate,marginBottom:'0.5rem',marginTop:'0.5rem'}}>PRODUCTS</div>
+              <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:C.slate,marginBottom:'0.5rem'}}>PRODUCTS</div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.6rem',marginBottom:'1rem'}}>
                 {products.map(item=>(
                   <button key={item.id} onClick={()=>openSaleDetail(item)}
-                    style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1rem 0.75rem',textAlign:'left',cursor:'pointer'}}>
+                    style={{background:C.white,border:`1px solid ${C.border}`,borderLeft:`4px solid ${C.green}`,borderRadius:8,padding:'1rem 0.75rem',textAlign:'left',cursor:'pointer'}}>
                     <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy}}>{item.name}</div>
                     <div style={{fontSize:'0.75rem',color:C.slate,marginTop:'0.2rem'}}>{fmt(item.price,auth.client.currency)}{item.unit_label?` / ${item.unit_label}`:''}</div>
                   </button>
@@ -368,29 +378,69 @@ export default function FieldCapturePage() {
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.6rem',marginBottom:'1rem'}}>
                 {services.map(item=>(
                   <button key={item.id} onClick={()=>openSaleDetail(item)}
-                    style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1rem 0.75rem',textAlign:'left',cursor:'pointer'}}>
+                    style={{background:C.white,border:`1px solid ${C.border}`,borderLeft:`4px solid ${C.green}`,borderRadius:8,padding:'1rem 0.75rem',textAlign:'left',cursor:'pointer'}}>
                     <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy}}>{item.name}</div>
                     <div style={{fontSize:'0.75rem',color:C.slate,marginTop:'0.2rem'}}>{fmt(item.price,auth.client.currency)}{item.unit_label?` / ${item.unit_label}`:''}</div>
                   </button>
                 ))}
               </div>
             </>}
-            {products.length===0 && services.length===0 && (
+            {products.length===0 && services.length===0 && searchLower && (
+              <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.2rem',textAlign:'center',color:C.slate,fontSize:'0.85rem',marginBottom:'1rem'}}>
+                No products or services match "{search}".
+              </div>
+            )}
+            {products.length===0 && services.length===0 && !searchLower && (
               <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.2rem',textAlign:'center',color:C.slate,fontSize:'0.85rem',marginBottom:'1rem'}}>
                 No products or services set up for this unit yet. Ask your CEO or Finance Manager to add them to the Catalogue.
               </div>
             )}
             {auth.cost_lines.length>0 && (
-              <button onClick={()=>setMode('cost-form')} style={{width:'100%',padding:'0.85rem',background:'transparent',color:C.navy,border:`1px solid ${C.navy}`,borderRadius:8,fontSize:'0.9rem',fontWeight:600,cursor:'pointer'}}>
-                + Record a Cost or Expense
+              <button onClick={()=>{setEditingCostId(null);setCostForm({plan_line_id:'',amount:'',notes:''});setMode('cost-form')}}
+                style={{width:'100%',padding:'0.85rem',background:'#FDF2F0',color:C.red,border:`1px solid ${C.red}`,borderRadius:8,fontSize:'0.9rem',fontWeight:600,cursor:'pointer',marginBottom:'1.25rem'}}>
+                − Record a Cost or Expense
               </button>
+            )}
+
+            {/* Queue: collapsed by default so it never buries the products above it.
+                Tap the sync bar's chevron to expand and review/edit/remove entries. */}
+            {queueOpen && pendingCount>0 && (
+              <div style={{marginBottom:'1rem'}}>
+                <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:C.slate,marginBottom:'0.5rem'}}>QUEUED ENTRIES</div>
+                {salesQueue.map(q=>(
+                  <div key={q.local_id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.item_name}</div>
+                      <div style={{fontSize:'0.72rem',color:C.slate}}>{q.quantity} {q.override_price?'(price overridden)':`× ${fmt(q.standard_price,auth.client.currency)}`}</div>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
+                      <div style={{fontFamily:'monospace',fontWeight:700,color:C.green,whiteSpace:'nowrap'}}>+{fmt(q.quantity*(q.override_price??q.standard_price),auth.client.currency)}</div>
+                      <button onClick={()=>openSaleEdit(q)} style={{background:'transparent',border:'none',color:C.teal,fontSize:'0.78rem',cursor:'pointer',fontWeight:600}}>Edit</button>
+                      <button onClick={()=>removeSale(q.local_id)} style={{background:'transparent',border:'none',color:C.red,fontSize:'1.1rem',cursor:'pointer'}}>×</button>
+                    </div>
+                  </div>
+                ))}
+                {costsQueue.map(q=>(
+                  <div key={q.local_id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.plan_line_name}</div>
+                      <div style={{fontSize:'0.72rem',color:C.slate}}>{q.transaction_date}</div>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
+                      <div style={{fontFamily:'monospace',fontWeight:700,color:C.red,whiteSpace:'nowrap'}}>-{fmt(q.amount,auth.client.currency)}</div>
+                      <button onClick={()=>openCostEdit(q)} style={{background:'transparent',border:'none',color:C.teal,fontSize:'0.78rem',cursor:'pointer',fontWeight:600}}>Edit</button>
+                      <button onClick={()=>removeCost(q.local_id)} style={{background:'transparent',border:'none',color:C.red,fontSize:'1.1rem',cursor:'pointer'}}>×</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </>
         )}
 
         {mode==='sale-detail' && selectedItem && (
           <div style={{background:C.white,border:`1px solid ${C.cyan}`,borderRadius:8,padding:'1.1rem'}}>
-            <div style={{fontWeight:700,fontSize:'1rem',color:C.navy,marginBottom:'0.2rem'}}>{selectedItem.name}</div>
+            <div style={{fontWeight:700,fontSize:'1rem',color:C.navy,marginBottom:'0.2rem'}}>{editingSaleId?'Edit: ':''}{selectedItem.name}</div>
             <div style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.9rem'}}>Standard price: {fmt(selectedItem.price,auth.client.currency)}{selectedItem.unit_label?` / ${selectedItem.unit_label}`:''}</div>
 
             <label style={lbl}>Volume {selectedItem.unit_label?`(${selectedItem.unit_label})`:'sold'}</label>
@@ -436,14 +486,15 @@ export default function FieldCapturePage() {
 
             <div style={{display:'flex',gap:'0.6rem',marginTop:'0.5rem'}}>
               <button onClick={addSaleToQueue} disabled={!saleForm.quantity||Number(saleForm.quantity)<=0}
-                style={{flex:1,padding:'0.85rem',background:C.teal,color:C.white,border:'none',borderRadius:6,fontWeight:700,cursor:'pointer'}}>Add to Queue</button>
-              <button onClick={()=>{setMode('grid');setSelectedItem(null)}} style={{padding:'0.85rem 1rem',background:'transparent',color:C.slate,border:`1px solid ${C.border}`,borderRadius:6,cursor:'pointer'}}>Cancel</button>
+                style={{flex:1,padding:'0.85rem',background:C.teal,color:C.white,border:'none',borderRadius:6,fontWeight:700,cursor:'pointer'}}>{editingSaleId?'Save Changes':'Add to Queue'}</button>
+              <button onClick={()=>{setMode('grid');setSelectedItem(null);setEditingSaleId(null)}} style={{padding:'0.85rem 1rem',background:'transparent',color:C.slate,border:`1px solid ${C.border}`,borderRadius:6,cursor:'pointer'}}>Cancel</button>
             </div>
           </div>
         )}
 
         {mode==='cost-form' && (
-          <div style={{background:C.white,border:`1px solid ${C.cyan}`,borderRadius:8,padding:'1.1rem'}}>
+          <div style={{background:C.white,border:`1px solid ${C.red}`,borderRadius:8,padding:'1.1rem'}}>
+            <div style={{fontWeight:700,fontSize:'1rem',color:C.navy,marginBottom:'0.7rem'}}>{editingCostId?'Edit Cost / Expense':'Record a Cost or Expense'}</div>
             <label style={lbl}>What is this for?</label>
             <select style={inp} value={costForm.plan_line_id} onChange={e=>setCostForm(f=>({...f,plan_line_id:e.target.value}))}>
               <option value="">Select...</option>
@@ -455,8 +506,8 @@ export default function FieldCapturePage() {
             <input style={inp} value={costForm.notes} onChange={e=>setCostForm(f=>({...f,notes:e.target.value}))}/>
             <div style={{display:'flex',gap:'0.6rem',marginTop:'0.5rem'}}>
               <button onClick={addCostToQueue} disabled={!costForm.plan_line_id||!costForm.amount}
-                style={{flex:1,padding:'0.85rem',background:C.teal,color:C.white,border:'none',borderRadius:6,fontWeight:700,cursor:'pointer'}}>Add to Queue</button>
-              <button onClick={()=>setMode('grid')} style={{padding:'0.85rem 1rem',background:'transparent',color:C.slate,border:`1px solid ${C.border}`,borderRadius:6,cursor:'pointer'}}>Cancel</button>
+                style={{flex:1,padding:'0.85rem',background:C.red,color:C.white,border:'none',borderRadius:6,fontWeight:700,cursor:'pointer'}}>{editingCostId?'Save Changes':'Add to Queue'}</button>
+              <button onClick={()=>{setMode('grid');setEditingCostId(null)}} style={{padding:'0.85rem 1rem',background:'transparent',color:C.slate,border:`1px solid ${C.border}`,borderRadius:6,cursor:'pointer'}}>Cancel</button>
             </div>
           </div>
         )}
