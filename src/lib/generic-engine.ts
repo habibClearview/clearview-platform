@@ -525,6 +525,19 @@ export function runGenericModel(
       }] : [])
   const debtSchedule = buildDebtSchedule(debtObligations, months)
 
+  // Which categories genuinely exist anywhere in this business at all --
+  // a real bug found from live data: a unit (or an entire business) with
+  // no 'staff' category plan line at all would NEVER get an actual
+  // EBITDA/NPAT, regardless of how complete its real revenue/cost/opex
+  // data is, because the gate below required ALL FOUR categories to be
+  // non-null unconditionally. If a category has zero active plan lines
+  // anywhere in the consolidation, there is genuinely nothing to wait
+  // for -- its contribution is correctly zero, not "missing".
+  const activeLinesInScope = config.plan_lines.filter(l => l.active && activeUnits.some(u => u.id === l.unit_id))
+  const hasCogsLines  = activeLinesInScope.some(l => l.category === 'cost_of_sales')
+  const hasStaffLines = activeLinesInScope.some(l => l.category === 'staff')
+  const hasOpexLines  = activeLinesInScope.some(l => l.category === 'direct_opex')
+
   const con = {
     rev: zero(), cogs: zero(), gp: zero(), opex: zero(),
     ebitda: zero(), interest: debtSchedule.totalInterest, nbt: zero(), tax: zero(), npat: zero(),
@@ -563,17 +576,31 @@ export function runGenericModel(
     con.nbt[m]  = con.ebitda[m] - (con.interest[m] ?? 0)
     con.tax[m]  = con.nbt[m] > 0 ? con.nbt[m] * (settings.corporate_tax_rate ?? 0.30) : 0
     con.npat[m] = con.nbt[m] - con.tax[m]
-    // Actual Gross Profit: only when both act_rev and act_cogs exist.
-    if (con.act_rev[m] !== null && con.act_cogs[m] !== null) {
-      con.act_gp[m] = (con.act_rev[m] as number) - (con.act_cogs[m] as number)
+    // Actual Gross Profit: only when both act_rev and act_cogs exist
+    // (or cost_of_sales genuinely doesn't apply anywhere in this business).
+    if (con.act_rev[m] !== null && (con.act_cogs[m] !== null || !hasCogsLines)) {
+      con.act_gp[m] = (con.act_rev[m] as number) - ((hasCogsLines ? con.act_cogs[m] : 0) as number)
     }
-    // Actual EBITDA: only when ALL FOUR actual categories are present for
-    // this month -- never substitutes a planned figure for a missing
-    // actual one. If, say, actual revenue has synced from the field but
-    // actual opex hasn't been entered yet, this stays null rather than
-    // showing a number that's part real, part invented.
-    if (con.act_rev[m] !== null && con.act_cogs[m] !== null && con.act_staff[m] !== null && con.act_opex[m] !== null) {
-      con.act_ebitda[m] = (con.act_rev[m] as number) - (con.act_cogs[m] as number) - (con.act_staff[m] as number) - (con.act_opex[m] as number)
+    // Actual EBITDA: only when every category that ACTUALLY APPLIES to
+    // this business has actual data for this month -- never substitutes
+    // a planned figure for a missing actual one. If, say, actual revenue
+    // has synced from the field but actual opex hasn't been entered yet
+    // (and opex genuinely does apply), this stays null rather than
+    // showing a number that's part real, part invented. A category with
+    // ZERO active plan lines anywhere in the business (e.g. no staff
+    // line at all) is treated as zero, not "missing" -- there's nothing
+    // to wait for, and requiring it unconditionally would mean actual
+    // EBITDA could never compute at all for a business with no staff
+    // costs, no matter how complete its real data otherwise is.
+    const revOk   = con.act_rev[m] !== null
+    const cogsOk  = !hasCogsLines  || con.act_cogs[m]  !== null
+    const staffOk = !hasStaffLines || con.act_staff[m] !== null
+    const opexOk  = !hasOpexLines  || con.act_opex[m]  !== null
+    if (revOk && cogsOk && staffOk && opexOk) {
+      con.act_ebitda[m] = (con.act_rev[m] as number)
+        - ((hasCogsLines ? con.act_cogs[m] : 0) as number)
+        - ((hasStaffLines ? con.act_staff[m] : 0) as number)
+        - ((hasOpexLines ? con.act_opex[m] : 0) as number)
     }
     // Actual NBT/tax/NPAT cascade from act_ebitda the same way the planned
     // figures cascade from planned ebitda -- interest itself is NOT a
