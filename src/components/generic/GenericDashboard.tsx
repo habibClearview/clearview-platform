@@ -3074,7 +3074,8 @@ function AnnualTab({config,result,cc,P,closedPeriods,onCloseStatusChanged}) {
 
   useEffect(()=>{
     supabase.from('generic_year_close').select('*').eq('client_id',config.client_id)
-      .then(({data})=>{
+      .then(({data,error})=>{
+        if (error) { console.error('Failed to load year closes:', error); return }
         const byPeriod: Record<string,any> = {}
         ;(data||[]).forEach((r:any)=>{ byPeriod[r.year_start_period] = r })
         setYearCloses(byPeriod)
@@ -3110,7 +3111,7 @@ function AnnualTab({config,result,cc,P,closedPeriods,onCloseStatusChanged}) {
       {years.map(year => {
         const pl = computeAnnualPL(result.con, year)
         const cf = computeAnnualCashFlow(result.cf, year)
-        const yearLabel = new Date(year.startPeriod).toLocaleString('en-GB',{year:'numeric'}) + (year.isComplete ? '' : ' (partial)')
+        const yearLabel = new Date(year.startPeriod).toLocaleString('en-GB',{year:'numeric',timeZone:'UTC'}) + (year.isComplete ? '' : ' (partial)')
         const yc = yearCloses[year.startPeriod]
         const canClose = year.isComplete && canCloseYear(year, closedPeriods||new Set(), periodForMonthIndex, config.start_date)
         return (
@@ -3139,7 +3140,7 @@ function AnnualTab({config,result,cc,P,closedPeriods,onCloseStatusChanged}) {
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginTop:'0.5rem'}}>
               <div>
                 <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:C.slate,marginBottom:'0.5rem'}}>CASH FLOW</div>
-                {[['Opening Cash',cf.openingCash],['Operating Cash Flow',cf.operatingCash],['Capital & Financing',cf.financingCash],['Net Change',cf.netChange],['Closing Cash',cf.closingCash]].map(([l,v]:any)=>(
+                {[['Opening Cash',cf.openingCash],['Operating Cash Flow',cf.operatingCash],['Capital & Financing',cf.financingCash],['Investing (Fixed Assets)',cf.investingCash],['Net Change',cf.netChange],['Closing Cash',cf.closingCash]].map(([l,v]:any)=>(
                   <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'0.35rem 0',borderBottom:`1px solid ${C.border}`,fontSize:'0.8rem'}}>
                     <span style={{color:C.slate}}>{l}</span><span style={{fontFamily:'monospace',fontWeight:600,color:C.navy}}>{fmt(v,cc)}</span>
                   </div>

@@ -36,7 +36,21 @@ create table if not exists generic_year_close (
 
 alter table generic_year_close enable row level security;
 drop policy if exists client_scoped on generic_year_close;
-create policy client_scoped on generic_year_close
-  for all using (
+
+-- Read access: same client-scoping as every other table.
+create policy client_scoped_read on generic_year_close
+  for select using (
     my_role() = 'super_coach' or client_id = my_engagement_client_id()
+  );
+
+-- Write access is deliberately narrower than read: the AnnualTab UI only
+-- shows the Close/Reopen action to super_coach/ceo/finance_manager, but
+-- that alone only hides the button -- it doesn't stop a request being
+-- sent directly. Closing a year is a significant, once-only ceremony
+-- (see docs/ACCOUNTING_ARCHITECTURE.md section 6), not something every
+-- role with client access should be able to trigger.
+create policy client_scoped_write on generic_year_close
+  for all using (
+    my_role() = ANY (ARRAY['super_coach','ceo','finance_manager'])
+    and (my_role() = 'super_coach' or client_id = my_engagement_client_id())
   );
