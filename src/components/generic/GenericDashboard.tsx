@@ -12,6 +12,7 @@ import {
 import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor } from '@/lib/scoring-engine'
 import { combinedActual, computeActualsTotals } from '@/lib/actuals'
 import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
+import { getFiscalYears, canCloseYear, computeAnnualPL, computeAnnualCashFlow, computeYearEndBalanceSheet } from '@/lib/annual-close'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
@@ -331,6 +332,7 @@ export default function GenericDashboard({
     ['pl','P&L'],
     ['cashflow','Cash Flow'],
     ['balancesheet','Balance Sheet'],
+    ['annual','Annual'],
     ['margins','Margins & Break-Even'],
     ['actuals_wc','Actuals & Working Capital'],
     ['settings','Settings'],
@@ -374,6 +376,7 @@ export default function GenericDashboard({
         {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods}/>}
         {view==='cashflow'    && <CashFlowTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
         {view==='balancesheet'&& <BalanceSheetTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
+        {view==='annual'      && <AnnualTab config={config} result={result} cc={cc} P={P} closedPeriods={closedPeriods} onCloseStatusChanged={loadClosedPeriods}/>}
         {view==='margins'     && <MarginsTab config={config} result={result} months={months} cc={cc}/>}
         {view==='actuals_wc'  && <ActualsAndWorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} onCloseStatusChanged={loadClosedPeriods}/>}
         {view==='settings'    && <SettingsAndAdminTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={saveConfig}/>}
@@ -3053,4 +3056,111 @@ function BalanceSheetTab({config,result,months,cc,closedPeriods}) {
     {label:'Total Equity & Liabilities',values:bs.total_equity_and_liabilities,bold:true,highlight:true,actualMask:bs.act_mask},
   ]
   return <PLTable title="Balance Sheet" rows={rows} months={months} cc={cc} showExport closedMask={closedMask}/>
+}
+
+// ── ANNUAL TAB ───────────────────────────────────────────────
+// Per docs/ACCOUNTING_ARCHITECTURE.md section 6. Deliberately not a new
+// parallel calculation -- Annual P&L sums, Annual Cash Flow sums, and
+// Year-End Balance Sheet snapshots the already-correct monthly figures
+// the engine produces (see src/lib/annual-close.ts). Year-End Close is
+// a bigger, separate ceremony on top of month-end close, which already
+// individually locks each month at the database level -- this requires
+// every month in the year to already be closed, then permanently
+// records the year itself as closed with a snapshot.
+function AnnualTab({config,result,cc,P,closedPeriods,onCloseStatusChanged}) {
+  const [yearCloses, setYearCloses] = useState<Record<string,any>>({})
+  const [closing, setClosing] = useState<string|null>(null)
+  const canSeeAll = ['super_coach','ceo','finance_manager'].includes(P.role)
+
+  useEffect(()=>{
+    supabase.from('generic_year_close').select('*').eq('client_id',config.client_id)
+      .then(({data,error})=>{
+        if (error) { console.error('Failed to load year closes:', error); return }
+        const byPeriod: Record<string,any> = {}
+        ;(data||[]).forEach((r:any)=>{ byPeriod[r.year_start_period] = r })
+        setYearCloses(byPeriod)
+      })
+  },[config.client_id])
+
+  if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
+
+  const years = getFiscalYears(config.start_date, config.planning_months, periodForMonthIndex)
+
+  async function closeYear(year: any) {
+    const yc = yearCloses[year.startPeriod]
+    if (yc?.closed) return
+    if (!canCloseYear(year, closedPeriods||new Set(), periodForMonthIndex, config.start_date)) {
+      alert('Every month in this year must be individually closed first (Actuals & Working Capital tab).')
+      return
+    }
+    setClosing(year.startPeriod)
+    const snapshot = computeYearEndBalanceSheet(result.bs, year)
+    const { error } = await supabase.from('generic_year_close').upsert({
+      client_id: config.client_id, year_start_period: year.startPeriod, closed: true,
+      closed_at: new Date().toISOString(), closed_by: P.fullName, closing_snapshot: snapshot,
+    }, { onConflict: 'client_id,year_start_period' })
+    if (!error) {
+      setYearCloses(prev => ({...prev, [year.startPeriod]: { closed:true, closed_at:new Date().toISOString(), closed_by:P.fullName, closing_snapshot:snapshot }}))
+      onCloseStatusChanged?.()
+    } else alert('Could not close this year. Please try again.')
+    setClosing(null)
+  }
+
+  return (
+    <div>
+      {years.map(year => {
+        const pl = computeAnnualPL(result.con, year)
+        const cf = computeAnnualCashFlow(result.cf, year)
+        const yearLabel = new Date(year.startPeriod).toLocaleString('en-GB',{year:'numeric',timeZone:'UTC'}) + (year.isComplete ? '' : ' (partial)')
+        const yc = yearCloses[year.startPeriod]
+        const canClose = year.isComplete && canCloseYear(year, closedPeriods||new Set(), periodForMonthIndex, config.start_date)
+        return (
+          <div key={year.startPeriod} style={{...card,borderLeft:`4px solid ${yc?.closed?C.navy:C.teal}`,marginBottom:'1.25rem'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.85rem'}}>
+              <div>
+                <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',fontWeight:700,color:C.navy}}>Year {year.yearIndex+1} — {yearLabel}</div>
+                {yc?.closed && <div style={{fontSize:'0.75rem',color:C.slate,marginTop:'0.2rem'}}>Closed by {yc.closed_by} on {new Date(yc.closed_at).toLocaleDateString()} — figures are final</div>}
+              </div>
+              {canSeeAll && !year.isComplete && <Badge text="Incomplete year" color={C.amber}/>}
+              {canSeeAll && year.isComplete && !yc?.closed && (
+                <button style={addBtn(true,canClose?C.green:C.border)} onClick={()=>closeYear(year)} disabled={!canClose||closing===year.startPeriod}>
+                  {closing===year.startPeriod?'Closing...':canClose?'Close This Year':'All 12 months must be closed first'}
+                </button>
+              )}
+              {canSeeAll && yc?.closed && <Badge text="Closed" color={C.navy}/>}
+            </div>
+
+            <div style={kpiGrid}>
+              <KPI label="Annual Revenue" value={fmt(pl.rev,cc)}/>
+              <KPI label="Gross Profit" value={fmt(pl.gp,cc)} sub={pl.rev>0?pct(pl.gp/pl.rev):undefined} color={pl.gp>=0?C.green:C.red}/>
+              <KPI label="Annual EBITDA" value={fmt(pl.ebitda,cc)} color={pl.ebitda>=0?C.teal:C.red}/>
+              <KPI label="Net Profit After Tax" value={fmt(pl.npat,cc)} color={pl.npat>=0?C.navy:C.red}/>
+            </div>
+
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginTop:'0.5rem'}}>
+              <div>
+                <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:C.slate,marginBottom:'0.5rem'}}>CASH FLOW</div>
+                {[['Opening Cash',cf.openingCash],['Operating Cash Flow',cf.operatingCash],['Capital & Financing',cf.financingCash],['Investing (Fixed Assets)',cf.investingCash],['Net Change',cf.netChange],['Closing Cash',cf.closingCash]].map(([l,v]:any)=>(
+                  <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'0.35rem 0',borderBottom:`1px solid ${C.border}`,fontSize:'0.8rem'}}>
+                    <span style={{color:C.slate}}>{l}</span><span style={{fontFamily:'monospace',fontWeight:600,color:C.navy}}>{fmt(v,cc)}</span>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:C.slate,marginBottom:'0.5rem'}}>YEAR-END BALANCE SHEET</div>
+                {(()=>{
+                  const bsSnap = yc?.closing_snapshot || computeYearEndBalanceSheet(result.bs, year)
+                  return [['Cash & Bank',bsSnap.cash],['Total Assets',bsSnap.totalAssets],['Retained Earnings',bsSnap.retainedEarnings],['Total Equity',bsSnap.totalEquity],['Total Liabilities',bsSnap.totalLiabilities]].map(([l,v]:any)=>(
+                    <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'0.35rem 0',borderBottom:`1px solid ${C.border}`,fontSize:'0.8rem'}}>
+                      <span style={{color:C.slate}}>{l}</span><span style={{fontFamily:'monospace',fontWeight:600,color:C.navy}}>{fmt(v,cc)}</span>
+                    </div>
+                  ))
+                })()}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
