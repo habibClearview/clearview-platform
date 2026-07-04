@@ -59,6 +59,7 @@ export default function GenericClientPage() {
   const [user, setUser] = useState<any>(null)
   const [clientId, setClientId] = useState<string|null>(null)
   const [checking, setChecking] = useState(true)
+  const [authError, setAuthError] = useState(false)
 
   useEffect(()=>{
     async function init() {
@@ -66,13 +67,22 @@ export default function GenericClientPage() {
       if (!session) { setChecking(false); return }
       // Load user profile
       const {data:profile} = await supabase.from('user_profiles')
-        .select('id,role,full_name,email,client_id,assigned_unit_ids,can_manage_catalogue')
+        .select('id,role,full_name,email,client_id,engagement_client_id,assigned_unit_ids,can_manage_catalogue')
         .eq('id',session.user.id).single()
       if (profile) setUser({...profile, email:session.user.email})
       // Find client by slug from engagement_clients
       const {data:client} = await supabase.from('engagement_clients')
         .select('id').eq('slug',slug).single()
-      if (client) setClientId(client.id)
+      // Authorization check: does this user actually belong to the client
+      // resolved from the URL? Previously there was NONE at all -- any
+      // authenticated user could navigate to any client's URL slug and
+      // see that client's full dashboard, using their own role's
+      // permissions. super_coach is the deliberate exception (sees every
+      // client); everyone else must have a matching engagement_client_id.
+      const isSuperCoach = profile?.role === 'super_coach'
+      const isAuthorized = isSuperCoach || (!!profile?.engagement_client_id && profile.engagement_client_id === client?.id)
+      if (client && isAuthorized) setClientId(client.id)
+      else if (client && !isAuthorized) setAuthError(true)
       setChecking(false)
     }
     init()
@@ -88,6 +98,7 @@ export default function GenericClientPage() {
 
   if (checking) return <Loading/>
   if (!user) return <LoginPrompt onLogin={handleLogin}/>
+  if (authError) return <div style={{padding:'2rem',fontFamily:'Georgia,serif',color:'#C0392B'}}>You don't have access to this client's dashboard. Contact your administrator if you believe this is a mistake.</div>
   if (!clientId) return <div style={{padding:'2rem',fontFamily:'Georgia,serif',color:'#C0392B'}}>Client not found.</div>
 
   const permissions: GenericPermissions = {

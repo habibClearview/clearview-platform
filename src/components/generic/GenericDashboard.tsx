@@ -1284,20 +1284,26 @@ function TeamTab({clientId,config,P}) {
 
   useEffect(()=>{
     supabase.from('user_profiles').select('id,role,full_name,email,assigned_unit_ids,status,can_manage_catalogue')
-      .eq('client_id',clientId)
+      .eq('engagement_client_id',clientId)
       .then(({data})=>{ setMembers(data||[]); setLoading(false) })
   },[clientId])
 
   async function invite() {
     if (!inviteForm.email||!inviteForm.full_name) return
     setSaving(true)
-    // Insert pending profile -- actual auth invite handled separately
+    // Insert pending profile -- actual auth invite handled separately.
+    // Uses engagement_client_id, not client_id: client_id has a foreign
+    // key to the legacy `clients` table (UUID ids), but clientId here is
+    // the text engagement_clients id -- inserting it into client_id would
+    // fail the FK constraint outright for every client. See
+    // supabase/migrations/2026_07_04_user_profiles_engagement_client_bridge.sql.
     const {data,error} = await supabase.from('user_profiles').insert([{
-      client_id:clientId, email:inviteForm.email, full_name:inviteForm.full_name,
+      engagement_client_id:clientId, email:inviteForm.email, full_name:inviteForm.full_name,
       role:inviteForm.role, assigned_unit_ids:inviteForm.unit_ids,
       status:'invited', invited_at:new Date().toISOString(), invited_by:P.userId,
     }]).select().single()
     if (!error&&data) { setMembers(m=>[...m,data]); setShowInvite(false) }
+    else if (error) alert('Could not invite this person. Please try again.')
     setSaving(false)
   }
 
