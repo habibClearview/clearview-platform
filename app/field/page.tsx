@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   addQueuedSale, addQueuedCost, listQueuedSales, listQueuedCosts,
   removeQueuedSale, removeQueuedCost, clearSyncedSales, clearSyncedCosts,
-  setStoredToken, type QueuedSale, type QueuedCost,
+  setStoredToken, shouldClearQueue, type QueuedSale, type QueuedCost,
 } from '@/lib/field-db'
 
 const C = {
@@ -224,7 +224,7 @@ export default function FieldCapturePage() {
         // server dedupes on it, it's always safe to leave the queue intact
         // and retry the whole batch next time; already-saved rows are
         // silently skipped, not duplicated.
-        if (!data.errors || data.errors.length === 0) {
+        if (shouldClearQueue(data)) {
           await clearSyncedSales(salesSnapshot.map(s=>s.local_id))
           await clearSyncedCosts(costsSnapshot.map(c=>c.local_id))
           setSalesQueue(await listQueuedSales())

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { shouldClearQueue } from '../lib/field-db'
 
 // Tests for Clearview Field API route logic
 // Tests the validation and transformation logic without HTTP or DB
@@ -302,15 +303,12 @@ describe('Field Capture — catalogue-driven sale amount', () => {
 })
 
 // ── Sync queue-clearing decision (app/field/page.tsx, public/field-sw.js) ──
-// Both the manual sync button and the Service Worker's Background Sync
-// handler must only clear the local offline queue when the server reports
-// a fully clean sync. The server can return success:true with a populated
-// errors array for a partial failure (e.g. one bad catalogue_item_id in
-// a batch) -- clearing the whole queue in that case would silently delete
-// entries the server never actually saved.
-function shouldClearQueue(response: { success: boolean; errors?: string[] }): boolean {
-  return response.success && (!response.errors || response.errors.length === 0)
-}
+// Imports the real shouldClearQueue from src/lib/field-db.ts rather than
+// re-implementing the check here -- a regression in the actual guard
+// against silent data loss will now fail this test, not just a copy of it.
+// public/field-sw.js applies the identical condition inline (it's a plain
+// static file and can't import this shared helper); see the cross-reference
+// comment there.
 
 describe('Field Sync — queue-clearing decision', () => {
   it('REG: a fully successful sync (no errors) clears the queue', () => {

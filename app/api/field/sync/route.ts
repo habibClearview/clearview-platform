@@ -146,11 +146,16 @@ export async function POST(req: NextRequest) {
         // creating a duplicate transaction. Rows with local_id null (older
         // clients that haven't updated yet) always insert normally, since
         // the unique index excludes NULLs.
-        const { error: txErr } = await supabase
+        // .select() after upsert returns only the rows actually written --
+        // ignoreDuplicates means a repeat local_id is silently skipped and
+        // won't appear here. Counting rows.length instead would overstate
+        // how many records were really inserted on a retry.
+        const { data: insertedTx, error: txErr } = await supabase
           .from('field_transactions')
           .upsert(rows, { onConflict: 'client_id,local_id', ignoreDuplicates: true })
+          .select('id')
         if (txErr) errors.push(`Transaction insert error: ${txErr.message}`)
-        else txSynced = rows.length
+        else txSynced = insertedTx?.length ?? 0
       }
     }
 
@@ -182,11 +187,12 @@ export async function POST(req: NextRequest) {
           local_id: c.local_id || null,
         }))
 
-        const { error: creditErr } = await supabase
+        const { data: insertedCredit, error: creditErr } = await supabase
           .from('field_credit_transactions')
           .upsert(rows, { onConflict: 'client_id,local_id', ignoreDuplicates: true })
+          .select('id')
         if (creditErr) errors.push(`Credit insert error: ${creditErr.message}`)
-        else creditSynced = rows.length
+        else creditSynced = insertedCredit?.length ?? 0
       }
     }
 

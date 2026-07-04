@@ -151,6 +151,10 @@ async function flushQueue() {
       body: JSON.stringify({ token, device_id: 'sw_background_sync', transactions }),
     })
     const data = await res.json()
+    // This condition must stay identical to shouldClearQueue() in
+    // src/lib/field-db.ts -- field-sw.js is a plain static file and can't
+    // import that shared helper directly, so if the decision logic ever
+    // changes there, update this line to match.
     // Only clear the queue when the server reports zero errors. A response
     // can be success:true with a populated errors array (e.g. one bad
     // catalogue_item_id in the batch) -- clearing everything in that case
