@@ -163,7 +163,10 @@ export default function FieldCapturePage() {
 
   function openSaleEdit(q: QueuedSale) {
     const item = auth?.catalogue.find(c=>c.id===q.catalogue_item_id)
-    if (!item) return // catalogue item no longer exists -- can't safely edit, only delete
+    if (!item) {
+      alert(`"${q.item_name}" is no longer in the catalogue, so this entry can't be edited. You can still remove it if needed.`)
+      return
+    }
     setSelectedItem(item)
     setEditingSaleId(q.local_id)
     setSaleForm({
@@ -358,6 +361,7 @@ export default function FieldCapturePage() {
             <input
               style={{...inp,marginBottom:'0.85rem',fontSize:'0.95rem',padding:'0.75rem'}}
               placeholder="🔍 Search products or services..."
+              aria-label="Search products or services"
               value={search} onChange={e=>setSearch(e.target.value)}
             />
 
