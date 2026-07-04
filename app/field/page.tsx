@@ -198,11 +198,13 @@ export default function FieldCapturePage() {
       const deviceId = localStorage.getItem('clearview_device_id') || (()=>{ const id = Math.random().toString(36).slice(2,10); localStorage.setItem('clearview_device_id', id); return id })()
       const transactions = [
         ...salesSnapshot.map(s=>({
+          local_id: s.local_id,
           catalogue_item_id: s.catalogue_item_id, quantity: s.quantity,
           override_price: s.override_price, payment_method: s.payment_method,
           customer_id: s.customer_id, transaction_date: s.transaction_date, notes: s.notes,
         })),
         ...costsSnapshot.map(c=>({
+          local_id: c.local_id,
           plan_line_id: c.plan_line_id, plan_line_name: c.plan_line_name,
           transaction_type: 'expense', category: 'direct_opex', amount: c.amount,
           transaction_date: c.transaction_date, notes: c.notes,
@@ -214,12 +216,26 @@ export default function FieldCapturePage() {
       })
       const data = await res.json()
       if (res.ok && data.success) {
-        await clearSyncedSales(salesSnapshot.map(s=>s.local_id))
-        await clearSyncedCosts(costsSnapshot.map(c=>c.local_id))
-        setSalesQueue(await listQueuedSales())
-        setCostsQueue(await listQueuedCosts())
+        // Only clear the queue when the server reported zero errors. A
+        // response can be success:true with a populated errors array (e.g.
+        // one bad catalogue_item_id in the batch) -- clearing everything in
+        // that case would silently delete entries the server never actually
+        // saved. Since every row now carries a stable local_id and the
+        // server dedupes on it, it's always safe to leave the queue intact
+        // and retry the whole batch next time; already-saved rows are
+        // silently skipped, not duplicated.
+        if (!data.errors || data.errors.length === 0) {
+          await clearSyncedSales(salesSnapshot.map(s=>s.local_id))
+          await clearSyncedCosts(costsSnapshot.map(c=>c.local_id))
+          setSalesQueue(await listQueuedSales())
+          setCostsQueue(await listQueuedCosts())
+        }
         setLastSync(new Date().toLocaleString())
-        setSyncMsg(data.price_alerts?.length ? `Synced, but flagged: ${data.price_alerts.join('; ')}` : 'Synced successfully.')
+        setSyncMsg(
+          data.errors?.length ? `Some entries need attention and were not cleared: ${data.errors.join('; ')}`
+          : data.price_alerts?.length ? `Synced, but flagged: ${data.price_alerts.join('; ')}`
+          : 'Synced successfully.'
+        )
       } else {
         setSyncMsg(data.error || 'Sync failed -- your entries are still saved on this phone, try again.')
       }

@@ -47,6 +47,13 @@ class FieldQueueDB extends Dexie {
   costs!: Table<QueuedCost, string>
   meta!: Table<{ key: string; value: string }, string>
 
+  // ⚠️ SCHEMA MUST STAY IN SYNC WITH public/field-sw.js ⚠️
+  // public/field-sw.js is a plain static file, not bundled, so it opens
+  // this same IndexedDB database with the raw IndexedDB API instead of
+  // Dexie. If you change the version number or store names below, update
+  // DB_VERSION and EXPECTED_STORES in field-sw.js to match -- its openDB()
+  // check will throw a clear "schema drift" error if they fall out of
+  // sync, rather than silently missing data.
   constructor() {
     super('clearview_field_queue')
     this.version(1).stores({

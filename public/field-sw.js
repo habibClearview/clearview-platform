@@ -15,8 +15,17 @@
 // plain static file and Dexie's page-side build isn't meant to run inside
 // one. Both operate on the identical underlying object stores.
 
+// ⚠️ SCHEMA MUST STAY IN SYNC WITH src/lib/field-db.ts ⚠️
+// This is a plain static file, not bundled, so it can't import the Dexie
+// schema directly -- these constants are manually kept identical to the
+// version() call and store names in field-db.ts. If you change either
+// there, update DB_VERSION and the store names below to match, or this
+// Service Worker will open a stale/incompatible version of the database.
+// The openDB() check below fails loudly (throws, logged to the SW console)
+// rather than silently missing data if the two ever drift apart.
 const DB_NAME = 'clearview_field_queue'
 const DB_VERSION = 1
+const EXPECTED_STORES = ['sales', 'costs', 'meta'] // must match field-db.ts's stores: {...} keys
 const CACHE_NAME = 'clearview-field-shell-v1'
 const SYNC_TAG = 'clearview-field-sync'
 
@@ -68,7 +77,18 @@ self.addEventListener('sync', (event) => {
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION)
-    req.onsuccess = () => resolve(req.result)
+    req.onsuccess = () => {
+      const db = req.result
+      const missing = EXPECTED_STORES.filter((name) => !db.objectStoreNames.contains(name))
+      if (missing.length > 0) {
+        // field-db.ts's Dexie schema changed without this file being
+        // updated to match -- fail loudly instead of silently missing
+        // data on whatever store(s) no longer exist here.
+        reject(new Error(`field-sw.js schema drift: missing object store(s) [${missing.join(', ')}]. Update EXPECTED_STORES/DB_VERSION in public/field-sw.js to match src/lib/field-db.ts.`))
+        return
+      }
+      resolve(db)
+    }
     req.onerror = () => reject(req.error)
   })
 }
@@ -111,11 +131,13 @@ async function flushQueue() {
 
   const transactions = [
     ...sales.map((s) => ({
+      local_id: s.local_id,
       catalogue_item_id: s.catalogue_item_id, quantity: s.quantity,
       override_price: s.override_price, payment_method: s.payment_method,
       customer_id: s.customer_id, transaction_date: s.transaction_date, notes: s.notes,
     })),
     ...costs.map((c) => ({
+      local_id: c.local_id,
       plan_line_id: c.plan_line_id, plan_line_name: c.plan_line_name,
       transaction_type: 'expense', category: 'direct_opex', amount: c.amount,
       transaction_date: c.transaction_date, notes: c.notes,
@@ -129,15 +151,21 @@ async function flushQueue() {
       body: JSON.stringify({ token, device_id: 'sw_background_sync', transactions }),
     })
     const data = await res.json()
-    if (res.ok && data.success) {
+    // Only clear the queue when the server reports zero errors. A response
+    // can be success:true with a populated errors array (e.g. one bad
+    // catalogue_item_id in the batch) -- clearing everything in that case
+    // would silently delete entries the server never actually saved. Every
+    // row carries a stable local_id and the server dedupes on it (see
+    // app/api/field/sync/route.ts), so it's always safe to leave the queue
+    // intact and retry the whole batch next time -- already-saved rows are
+    // silently skipped server-side, not duplicated.
+    if (res.ok && data.success && (!data.errors || data.errors.length === 0)) {
       await deleteMany(db, 'sales', sales.map((s) => s.local_id))
       await deleteMany(db, 'costs', costs.map((c) => c.local_id))
-      // Let any open tab know a background sync just completed, so the UI
-      // can refresh its queue count without the operator doing anything.
       const clients = await self.clients.matchAll()
       clients.forEach((client) => client.postMessage({ type: 'field-sync-complete', synced_at: new Date().toISOString() }))
     }
-    // If the request failed or the server rejected some rows, the queue is
+    // If the request failed, or the server reported errors, the queue is
     // left as-is -- nothing is lost, and the next sync attempt (background
     // or manual) will retry the same entries.
   } catch (err) {

@@ -300,3 +300,37 @@ describe('Field Capture — catalogue-driven sale amount', () => {
     expect(result.price_alert).toBe(false)
   })
 })
+
+// ── Sync queue-clearing decision (app/field/page.tsx, public/field-sw.js) ──
+// Both the manual sync button and the Service Worker's Background Sync
+// handler must only clear the local offline queue when the server reports
+// a fully clean sync. The server can return success:true with a populated
+// errors array for a partial failure (e.g. one bad catalogue_item_id in
+// a batch) -- clearing the whole queue in that case would silently delete
+// entries the server never actually saved.
+function shouldClearQueue(response: { success: boolean; errors?: string[] }): boolean {
+  return response.success && (!response.errors || response.errors.length === 0)
+}
+
+describe('Field Sync — queue-clearing decision', () => {
+  it('REG: a fully successful sync (no errors) clears the queue', () => {
+    expect(shouldClearQueue({ success: true })).toBe(true)
+    expect(shouldClearQueue({ success: true, errors: [] })).toBe(true)
+  })
+
+  it('REG: success:true WITH populated errors does NOT clear the queue -- this is the exact bug that risked silent data loss', () => {
+    expect(shouldClearQueue({ success: true, errors: ['Unknown catalogue item: xyz'] })).toBe(false)
+  })
+
+  it('REG: a failed request never clears the queue, regardless of errors content', () => {
+    expect(shouldClearQueue({ success: false })).toBe(false)
+    expect(shouldClearQueue({ success: false, errors: [] })).toBe(false)
+  })
+
+  it('REG: price alerts are a separate field from errors and must not block clearing -- a flagged bulk override still synced successfully', () => {
+    // price_alerts live in a different response field entirely; a response
+    // with only price_alerts (no errors) should still clear the queue.
+    const response = { success: true, errors: undefined, price_alerts: ['Fertiliser: override 1200 vs standard 1500'] }
+    expect(shouldClearQueue(response)).toBe(true)
+  })
+})

@@ -100,6 +100,12 @@ export async function POST(req: NextRequest) {
             catalogue_item_id: item.id,
             price_overridden: overridden,
             price_alert: overridden && deviates,
+            // Stable per-entry id set client-side when the operator queued
+            // this transaction. Lets the unique index on
+            // (client_id, local_id) silently ignore a duplicate insert if
+            // the same entry gets sent twice -- e.g. the manual "Sync Now"
+            // button and a Background Sync firing for the same queued item.
+            local_id: t.local_id || null,
           })
         }
       }
@@ -129,11 +135,20 @@ export async function POST(req: NextRequest) {
           notes: t.notes || null,
           device_id: device_id || null,
           synced_at: new Date().toISOString(),
+          local_id: t.local_id || null,
         })
       }
 
       if (rows.length > 0) {
-        const { error: txErr } = await supabase.from('field_transactions').insert(rows)
+        // Upsert with ignoreDuplicates instead of a plain insert: if a row
+        // with the same (client_id, local_id) already landed from an
+        // earlier sync attempt, this silently skips it rather than
+        // creating a duplicate transaction. Rows with local_id null (older
+        // clients that haven't updated yet) always insert normally, since
+        // the unique index excludes NULLs.
+        const { error: txErr } = await supabase
+          .from('field_transactions')
+          .upsert(rows, { onConflict: 'client_id,local_id', ignoreDuplicates: true })
         if (txErr) errors.push(`Transaction insert error: ${txErr.message}`)
         else txSynced = rows.length
       }
@@ -164,9 +179,12 @@ export async function POST(req: NextRequest) {
           notes: c.notes || null,
           device_id: device_id || null,
           synced_at: new Date().toISOString(),
+          local_id: c.local_id || null,
         }))
 
-        const { error: creditErr } = await supabase.from('field_credit_transactions').insert(rows)
+        const { error: creditErr } = await supabase
+          .from('field_credit_transactions')
+          .upsert(rows, { onConflict: 'client_id,local_id', ignoreDuplicates: true })
         if (creditErr) errors.push(`Credit insert error: ${creditErr.message}`)
         else creditSynced = rows.length
       }
