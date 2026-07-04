@@ -310,6 +310,43 @@ describe('Field Capture — catalogue-driven sale amount', () => {
 // static file and can't import this shared helper); see the cross-reference
 // comment there.
 
+describe('Field Sync — friendly error messages', () => {
+  function friendlyDbError(rawMessage: string): string {
+    if (rawMessage.includes('field_transactions_payment_method_check')) {
+      return 'One of your entries has a payment method the system doesn\'t recognise yet. Please check the payment method on your recent entries and try again.'
+    }
+    if (rawMessage.includes('violates check constraint')) {
+      return 'One of your entries has a value that isn\'t allowed. Please check the details on your recent entries and try again.'
+    }
+    if (rawMessage.includes('violates foreign key constraint')) {
+      return 'One of your entries refers to something that no longer exists (e.g. a product or customer that was removed). Please check the entry and try again.'
+    }
+    if (rawMessage.includes('violates not-null constraint')) {
+      return 'One of your entries is missing required information. Please check the entry and try again.'
+    }
+    return 'Something went wrong saving one or more entries. Your data is still safe on this phone -- please try syncing again, and let your coach know if this keeps happening.'
+  }
+
+  it('REG: a raw Postgres check-constraint error never reaches the operator as-is', () => {
+    const raw = 'new row for relation "field_transactions" violates check constraint "field_transactions_payment_method_check"'
+    const friendly = friendlyDbError(raw)
+    expect(friendly).not.toContain('relation')
+    expect(friendly).not.toContain('field_transactions_payment_method_check')
+    expect(friendly.toLowerCase()).toContain('payment method')
+  })
+
+  it('REG: a foreign key violation gets a plain-English explanation', () => {
+    const raw = 'insert or update on table "field_transactions" violates foreign key constraint "field_transactions_customer_id_fkey"'
+    expect(friendlyDbError(raw).toLowerCase()).toContain('no longer exists')
+  })
+
+  it('REG: an unrecognised error still gets a non-technical, reassuring fallback', () => {
+    const friendly = friendlyDbError('some completely unexpected database error XKCD1234')
+    expect(friendly).not.toContain('XKCD1234')
+    expect(friendly.toLowerCase()).toContain('safe')
+  })
+})
+
 describe('Field Sync — queue-clearing decision', () => {
   it('REG: a fully successful sync (no errors) clears the queue', () => {
     expect(shouldClearQueue({ success: true })).toBe(true)
