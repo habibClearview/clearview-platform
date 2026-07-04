@@ -3000,7 +3000,7 @@ function CashFlowTab({config,result,months,cc,closedPeriods}) {
   )
   const rows = [
     {label:'Opening Cash',values:cf.open,bold:true,actualMask:cf.act_mask},
-    {label:'Net Profit After Tax',values:result.con.npat.map((v:number,i:number)=>cf.act_mask[i]?result.con.act_npat[i]:v),actualMask:cf.act_mask},
+    {label:'Net Profit After Tax',values:result.con.npat.map((v:number,i:number)=>result.con.act_npat[i]!==null?result.con.act_npat[i]:v),actualMask:cf.act_mask},
     {label:'Operating Cash Flow',values:cf.op_cash,bold:true,actualMask:cf.act_mask},
     {label:'Capital & Financing',values:cf.fin_cash},
     {label:'Fixed Asset Purchases',values:cf.inv_cash||Array(months.length).fill(0),negate:false},
