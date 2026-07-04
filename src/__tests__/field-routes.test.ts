@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { shouldClearQueue } from '../lib/field-db'
 
 // Tests for Clearview Field API route logic
 // Tests the validation and transformation logic without HTTP or DB
@@ -298,5 +299,36 @@ describe('Field Capture — catalogue-driven sale amount', () => {
   it('REG: no override never triggers a price alert, regardless of catalogue price', () => {
     const result = computeSaleAmount(catalogueItem, 10)
     expect(result.price_alert).toBe(false)
+  })
+})
+
+// ── Sync queue-clearing decision (app/field/page.tsx, public/field-sw.js) ──
+// Imports the real shouldClearQueue from src/lib/field-db.ts rather than
+// re-implementing the check here -- a regression in the actual guard
+// against silent data loss will now fail this test, not just a copy of it.
+// public/field-sw.js applies the identical condition inline (it's a plain
+// static file and can't import this shared helper); see the cross-reference
+// comment there.
+
+describe('Field Sync — queue-clearing decision', () => {
+  it('REG: a fully successful sync (no errors) clears the queue', () => {
+    expect(shouldClearQueue({ success: true })).toBe(true)
+    expect(shouldClearQueue({ success: true, errors: [] })).toBe(true)
+  })
+
+  it('REG: success:true WITH populated errors does NOT clear the queue -- this is the exact bug that risked silent data loss', () => {
+    expect(shouldClearQueue({ success: true, errors: ['Unknown catalogue item: xyz'] })).toBe(false)
+  })
+
+  it('REG: a failed request never clears the queue, regardless of errors content', () => {
+    expect(shouldClearQueue({ success: false })).toBe(false)
+    expect(shouldClearQueue({ success: false, errors: [] })).toBe(false)
+  })
+
+  it('REG: price alerts are a separate field from errors and must not block clearing -- a flagged bulk override still synced successfully', () => {
+    // price_alerts live in a different response field entirely; a response
+    // with only price_alerts (no errors) should still clear the queue.
+    const response = { success: true, errors: undefined, price_alerts: ['Fertiliser: override 1200 vs standard 1500'] }
+    expect(shouldClearQueue(response)).toBe(true)
   })
 })

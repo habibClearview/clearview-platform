@@ -1,5 +1,10 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import {
+  addQueuedSale, addQueuedCost, listQueuedSales, listQueuedCosts,
+  removeQueuedSale, removeQueuedCost, clearSyncedSales, clearSyncedCosts,
+  setStoredToken, shouldClearQueue, type QueuedSale, type QueuedCost,
+} from '@/lib/field-db'
 
 const C = {
   navy:'#1B2A4A', cyan:'#00B4D8', cream:'#F8F4EE', white:'#FFFFFF',
@@ -21,23 +26,11 @@ interface AuthData {
 // A sale queued from the catalogue: operator picked an item and a volume.
 // Price is never entered by the operator -- it's the catalogue's price,
 // unless they explicitly flagged a bulk override.
-interface QueuedSale {
-  local_id:string; catalogue_item_id:string; item_name:string; item_type:'product'|'service'
-  standard_price:number; quantity:number
-  override_price?:number
-  payment_method?:string; customer_id?:string; transaction_date:string; notes?:string
-}
-// A cost/expense entry: operator picks a cost line and enters an amount
-// directly -- unchanged from before, catalogue pricing doesn't apply here.
-interface QueuedCost {
-  local_id:string; plan_line_id:string; plan_line_name:string
-  amount:number; transaction_date:string; notes?:string
-}
+// QueuedSale and QueuedCost types now come from src/lib/field-db.ts (they
+// include a queued_at timestamp used for IndexedDB ordering).
 
 const STORAGE_TOKEN = 'clearview_field_token'
 const STORAGE_AUTH = 'clearview_field_auth'
-const STORAGE_SALES_QUEUE = 'clearview_field_sales_queue'
-const STORAGE_COSTS_QUEUE = 'clearview_field_costs_queue'
 
 function fmt(n:number, cc='UGX') {
   return `${cc} ${Math.round(n).toLocaleString()}`
@@ -58,15 +51,17 @@ export default function FieldCapturePage() {
   const [selectedItem, setSelectedItem] = useState<CatalogueItem|null>(null)
   const [saleForm, setSaleForm] = useState({quantity:'', payment_method:'cash', customer_id:'', notes:'', override:false, override_price:''})
   const [costForm, setCostForm] = useState({plan_line_id:'', amount:'', notes:''})
+  const syncNowRef = useRef<()=>void>(()=>{})
 
   useEffect(()=>{
     const urlToken = new URLSearchParams(window.location.search).get('token')
     const savedToken = urlToken || localStorage.getItem(STORAGE_TOKEN)
     const savedAuth = localStorage.getItem(STORAGE_AUTH)
-    const savedSales = localStorage.getItem(STORAGE_SALES_QUEUE)
-    const savedCosts = localStorage.getItem(STORAGE_COSTS_QUEUE)
-    if (savedSales) { try { setSalesQueue(JSON.parse(savedSales)) } catch {} }
-    if (savedCosts) { try { setCostsQueue(JSON.parse(savedCosts)) } catch {} }
+    // Queue now lives in IndexedDB, not localStorage -- larger capacity,
+    // reliable on iOS Safari (which clears localStorage aggressively), and
+    // readable by the Service Worker for Background Sync (see below).
+    listQueuedSales().then(setSalesQueue).catch(()=>{})
+    listQueuedCosts().then(setCostsQueue).catch(()=>{})
     if (savedToken) {
       setToken(savedToken)
       if (urlToken) localStorage.setItem(STORAGE_TOKEN, urlToken)
@@ -75,7 +70,36 @@ export default function FieldCapturePage() {
     } else {
       setLoading(false)
     }
+
+    // Register the Service Worker for offline app-shell loading and
+    // Background Sync. Not all browsers support this (notably iOS Safari
+    // lacks the Background Sync API) -- the manual "Sync Now" button and
+    // the online-event listener below remain the fallback regardless.
+    if ('serviceWorker' in navigator) {
+      // Explicit scope: /field-sw.js is served from the site root, which
+      // would otherwise give it a default scope covering the ENTIRE app
+      // (including the coach/CEO financial dashboard). Scoping it to
+      // /field means it only ever affects this page.
+      navigator.serviceWorker.register('/field-sw.js', { scope: '/field' }).catch(()=>{})
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data?.type === 'field-sync-complete') {
+          listQueuedSales().then(setSalesQueue).catch(()=>{})
+          listQueuedCosts().then(setCostsQueue).catch(()=>{})
+          setLastSync(new Date(event.data.synced_at).toLocaleString())
+          setSyncMsg('Synced automatically in the background.')
+        }
+      })
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[])
+
+  // Fallback for browsers without Background Sync support: try syncing
+  // automatically the moment the device comes back online, in addition to
+  // the manual button.
+  useEffect(()=>{
+    function handleOnline() { syncNowRef.current() }
+    window.addEventListener('online', handleOnline)
+    return () => window.removeEventListener('online', handleOnline)
   },[])
 
   const authenticate = useCallback(async (t:string) => {
@@ -97,19 +121,23 @@ export default function FieldCapturePage() {
       setToken(t)
       localStorage.setItem(STORAGE_TOKEN, t)
       localStorage.setItem(STORAGE_AUTH, JSON.stringify(data))
+      // Service Workers can't read localStorage -- mirror the token into
+      // IndexedDB so the Background Sync handler in public/field-sw.js can
+      // authenticate a sync that happens while this tab is closed.
+      setStoredToken(t).catch(()=>{})
     } catch {
       setAuthError('No connection right now. If you have used this link before on this phone, your data is still saved -- try again once you have signal.')
     }
     setLoading(false)
   }, [])
 
-  function saveSalesQueue(next: QueuedSale[]) {
-    setSalesQueue(next)
-    localStorage.setItem(STORAGE_SALES_QUEUE, JSON.stringify(next))
-  }
-  function saveCostsQueue(next: QueuedCost[]) {
-    setCostsQueue(next)
-    localStorage.setItem(STORAGE_COSTS_QUEUE, JSON.stringify(next))
+  const SYNC_TAG = 'clearview-field-sync'
+  function requestBackgroundSync() {
+    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+      navigator.serviceWorker.ready
+        .then((reg: any) => reg.sync.register(SYNC_TAG))
+        .catch(()=>{}) // Background Sync unsupported (e.g. iOS Safari) -- manual/online-event sync remains the fallback.
+    }
   }
 
   function openSaleDetail(item: CatalogueItem) {
@@ -118,9 +146,9 @@ export default function FieldCapturePage() {
     setMode('sale-detail')
   }
 
-  function addSaleToQueue() {
+  async function addSaleToQueue() {
     if (!selectedItem || !saleForm.quantity || Number(saleForm.quantity)<=0) return
-    const tx: QueuedSale = {
+    const tx: Omit<QueuedSale,'queued_at'> = {
       local_id: `local_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
       catalogue_item_id: selectedItem.id, item_name: selectedItem.name, item_type: selectedItem.item_type,
       standard_price: selectedItem.price,
@@ -131,42 +159,52 @@ export default function FieldCapturePage() {
       transaction_date: new Date().toISOString().split('T')[0],
       notes: saleForm.notes || undefined,
     }
-    saveSalesQueue([...salesQueue, tx])
+    await addQueuedSale(tx)
+    setSalesQueue(await listQueuedSales())
+    requestBackgroundSync()
     setMode('grid')
     setSelectedItem(null)
   }
 
-  function addCostToQueue() {
+  async function addCostToQueue() {
     const line = auth?.cost_lines.find(l=>l.id===costForm.plan_line_id)
     if (!line || !costForm.amount) return
-    const tx: QueuedCost = {
+    const tx: Omit<QueuedCost,'queued_at'> = {
       local_id: `local_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
       plan_line_id: line.id, plan_line_name: line.name,
       amount: Number(costForm.amount),
       transaction_date: new Date().toISOString().split('T')[0],
       notes: costForm.notes || undefined,
     }
-    saveCostsQueue([...costsQueue, tx])
+    await addQueuedCost(tx)
+    setCostsQueue(await listQueuedCosts())
+    requestBackgroundSync()
     setCostForm({plan_line_id:'', amount:'', notes:''})
     setMode('grid')
   }
 
-  function removeSale(localId:string) { saveSalesQueue(salesQueue.filter(q=>q.local_id!==localId)) }
-  function removeCost(localId:string) { saveCostsQueue(costsQueue.filter(q=>q.local_id!==localId)) }
+  async function removeSale(localId:string) { await removeQueuedSale(localId); setSalesQueue(await listQueuedSales()) }
+  async function removeCost(localId:string) { await removeQueuedCost(localId); setCostsQueue(await listQueuedCosts()) }
 
   async function syncNow() {
     if (!token || (salesQueue.length===0 && costsQueue.length===0)) return
     setSyncing(true)
     setSyncMsg(null)
+    // Snapshot exactly which local_ids are being synced -- if a new item
+    // gets queued mid-request, only the ones actually sent get cleared.
+    const salesSnapshot = salesQueue
+    const costsSnapshot = costsQueue
     try {
       const deviceId = localStorage.getItem('clearview_device_id') || (()=>{ const id = Math.random().toString(36).slice(2,10); localStorage.setItem('clearview_device_id', id); return id })()
       const transactions = [
-        ...salesQueue.map(s=>({
+        ...salesSnapshot.map(s=>({
+          local_id: s.local_id,
           catalogue_item_id: s.catalogue_item_id, quantity: s.quantity,
           override_price: s.override_price, payment_method: s.payment_method,
           customer_id: s.customer_id, transaction_date: s.transaction_date, notes: s.notes,
         })),
-        ...costsQueue.map(c=>({
+        ...costsSnapshot.map(c=>({
+          local_id: c.local_id,
           plan_line_id: c.plan_line_id, plan_line_name: c.plan_line_name,
           transaction_type: 'expense', category: 'direct_opex', amount: c.amount,
           transaction_date: c.transaction_date, notes: c.notes,
@@ -178,10 +216,26 @@ export default function FieldCapturePage() {
       })
       const data = await res.json()
       if (res.ok && data.success) {
-        saveSalesQueue([])
-        saveCostsQueue([])
+        // Only clear the queue when the server reported zero errors. A
+        // response can be success:true with a populated errors array (e.g.
+        // one bad catalogue_item_id in the batch) -- clearing everything in
+        // that case would silently delete entries the server never actually
+        // saved. Since every row now carries a stable local_id and the
+        // server dedupes on it, it's always safe to leave the queue intact
+        // and retry the whole batch next time; already-saved rows are
+        // silently skipped, not duplicated.
+        if (shouldClearQueue(data)) {
+          await clearSyncedSales(salesSnapshot.map(s=>s.local_id))
+          await clearSyncedCosts(costsSnapshot.map(c=>c.local_id))
+          setSalesQueue(await listQueuedSales())
+          setCostsQueue(await listQueuedCosts())
+        }
         setLastSync(new Date().toLocaleString())
-        setSyncMsg(data.price_alerts?.length ? `Synced, but flagged: ${data.price_alerts.join('; ')}` : 'Synced successfully.')
+        setSyncMsg(
+          data.errors?.length ? `Some entries need attention and were not cleared: ${data.errors.join('; ')}`
+          : data.price_alerts?.length ? `Synced, but flagged: ${data.price_alerts.join('; ')}`
+          : 'Synced successfully.'
+        )
       } else {
         setSyncMsg(data.error || 'Sync failed -- your entries are still saved on this phone, try again.')
       }
@@ -190,6 +244,8 @@ export default function FieldCapturePage() {
     }
     setSyncing(false)
   }
+
+  useEffect(()=>{ syncNowRef.current = syncNow })
 
   if (!token) {
     return (
