@@ -8,6 +8,29 @@ function getSupabase() {
   return createClient(url, key)
 }
 
+// Translates raw Postgres error text into something an operator with no
+// technical background can actually understand and act on. Raw messages
+// like a check-constraint violation are meaningless to someone in the
+// field -- this is the difference between "something went wrong, figure
+// it out yourself" and telling them what to actually fix.
+function friendlyDbError(rawMessage: string): string {
+  if (rawMessage.includes('field_transactions_payment_method_check')) {
+    return 'One of your entries has a payment method the system doesn\'t recognise yet. Please check the payment method on your recent entries and try again.'
+  }
+  if (rawMessage.includes('violates check constraint')) {
+    return 'One of your entries has a value that isn\'t allowed. Please check the details on your recent entries and try again.'
+  }
+  if (rawMessage.includes('violates foreign key constraint')) {
+    return 'One of your entries refers to something that no longer exists (e.g. a product or customer that was removed). Please check the entry and try again.'
+  }
+  if (rawMessage.includes('violates not-null constraint')) {
+    return 'One of your entries is missing required information. Please check the entry and try again.'
+  }
+  // Fall back to a generic, still-non-technical message rather than ever
+  // showing raw database text on screen.
+  return 'Something went wrong saving one or more entries. Your data is still safe on this phone -- please try syncing again, and let your coach know if this keeps happening.'
+}
+
 async function validateToken(token: string) {
   const supabase = getSupabase()
   const { data, error } = await supabase
@@ -39,6 +62,10 @@ export async function POST(req: NextRequest) {
     if (!operator) return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
 
     const errors: string[] = []
+    // Kept separately for field_sync_log so you or I can actually diagnose
+    // what happened later -- the operator only ever sees the friendly
+    // versions pushed into `errors` above.
+    const technicalErrors: string[] = []
     let txSynced = 0
     let creditSynced = 0
     const priceAlerts: string[] = []
@@ -154,7 +181,7 @@ export async function POST(req: NextRequest) {
           .from('field_transactions')
           .upsert(rows, { onConflict: 'client_id,local_id', ignoreDuplicates: true })
           .select('id')
-        if (txErr) errors.push(`Transaction insert error: ${txErr.message}`)
+        if (txErr) { technicalErrors.push(`Transaction insert error: ${txErr.message}`); errors.push(friendlyDbError(txErr.message)) }
         else txSynced = insertedTx?.length ?? 0
       }
     }
@@ -191,7 +218,7 @@ export async function POST(req: NextRequest) {
           .from('field_credit_transactions')
           .upsert(rows, { onConflict: 'client_id,local_id', ignoreDuplicates: true })
           .select('id')
-        if (creditErr) errors.push(`Credit insert error: ${creditErr.message}`)
+        if (creditErr) { technicalErrors.push(`Credit insert error: ${creditErr.message}`); errors.push(friendlyDbError(creditErr.message)) }
         else creditSynced = insertedCredit?.length ?? 0
       }
     }
@@ -199,7 +226,7 @@ export async function POST(req: NextRequest) {
     if (txSynced > 0) {
       const { error: aggErr } = await supabase
         .rpc('aggregate_field_transactions', { p_client_id: operator.client_id })
-      if (aggErr) errors.push(`Aggregation error: ${aggErr.message}`)
+      if (aggErr) { technicalErrors.push(`Aggregation error: ${aggErr.message}`); errors.push('Your entries were saved, but the summary figures haven\'t updated yet. They\'ll catch up automatically -- no need to re-enter anything.') }
     }
 
     await supabase.from('field_sync_log').insert({
@@ -209,7 +236,7 @@ export async function POST(req: NextRequest) {
       sync_type: 'manual',
       transactions_synced: txSynced,
       credit_synced: creditSynced,
-      errors: [...errors, ...priceAlerts.map(a => `Price alert: ${a}`)].join('; ') || null,
+      errors: [...technicalErrors, ...priceAlerts.map(a => `Price alert: ${a}`)].join('; ') || null,
     })
 
     return NextResponse.json({
