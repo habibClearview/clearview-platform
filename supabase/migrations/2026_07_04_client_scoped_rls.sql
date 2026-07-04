@@ -17,6 +17,7 @@
 -- ============================================================
 
 drop policy if exists auth_all on generic_actuals;
+drop policy if exists client_scoped on generic_actuals;
 create policy client_scoped on generic_actuals
   for all using (
     exists (
@@ -27,6 +28,7 @@ create policy client_scoped on generic_actuals
   );
 
 drop policy if exists auth_all on generic_model_config;
+drop policy if exists client_scoped on generic_model_config;
 create policy client_scoped on generic_model_config
   for all using (
     exists (
@@ -37,6 +39,7 @@ create policy client_scoped on generic_model_config
   );
 
 drop policy if exists auth_all on generic_spend_requests;
+drop policy if exists client_scoped on generic_spend_requests;
 create policy client_scoped on generic_spend_requests
   for all using (
     exists (
@@ -47,6 +50,7 @@ create policy client_scoped on generic_spend_requests
   );
 
 drop policy if exists auth_all on generic_period_close;
+drop policy if exists client_scoped on generic_period_close;
 create policy client_scoped on generic_period_close
   for all using (
     exists (
@@ -55,3 +59,23 @@ create policy client_scoped on generic_period_close
         and (up.role = 'super_coach' or up.engagement_client_id = generic_period_close.client_id)
     )
   );
+
+-- Safety net for this cutover and any future one: warn loudly (not
+-- silently) if any non-super_coach user still has no engagement_client_id
+-- -- that user would lose all access to generic_* tables the moment
+-- these policies take effect. Verified empirically at the time this
+-- migration was written: only 2 real user_profiles rows exist
+-- (super_coach, exempted; one CONAS CEO, already correctly backfilled)
+-- -- but this check makes that fact self-verifying on every future run,
+-- not just a one-time assertion that happened to be true.
+do $$
+declare
+  unmigrated_count int;
+begin
+  select count(*) into unmigrated_count
+  from user_profiles
+  where role != 'super_coach' and engagement_client_id is null;
+  if unmigrated_count > 0 then
+    raise warning 'RLS cutover: % non-super_coach user_profiles row(s) still have no engagement_client_id and will lose access to generic_* tables under these policies. Backfill them before relying on this migration.', unmigrated_count;
+  end if;
+end $$;
