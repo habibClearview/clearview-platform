@@ -210,8 +210,11 @@ export async function POST(req: NextRequest) {
     // never trigger aggregation again, permanently stranding them in
     // field_transactions without ever reaching generic_actuals.
     // aggregate_field_transactions() recomputes full sums each time, so
-    // calling it again is always safe, never double-counts.
-    if (transactions.length > 0) {
+    // calling it again is always safe, never double-counts. Also covers a
+    // sync that contains only credit_transactions with no regular
+    // transactions -- must run after every sync, not just when standard
+    // transactions happen to be present.
+    if (transactions.length > 0 || credit_transactions.length > 0) {
       const { error: aggErr } = await supabase
         .rpc('aggregate_field_transactions', { p_client_id: operator.client_id })
       if (aggErr) { technicalErrors.push(`Aggregation error: ${aggErr.message}`); errors.push('Your entries were saved, but the summary figures haven\'t updated yet. They\'ll catch up automatically -- no need to re-enter anything.') }
