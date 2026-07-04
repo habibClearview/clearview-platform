@@ -210,6 +210,10 @@ export interface GenericUnitPL {
   act_cogs: (number | null)[]
   act_staff: (number | null)[]
   act_opex: (number | null)[]
+  // Actual Gross Profit: only computed when BOTH act_rev and act_cogs are
+  // present for that month -- never blends an actual figure with a planned
+  // one. Null means not enough actual data yet, not zero.
+  act_gp: (number | null)[]
   // Spread analysis per line
   spread_analysis: {
     line_id: string
@@ -356,6 +360,11 @@ export function runGenericModel(
     })
 
     const gp = rev.map((r, m) => r - cogs[m])
+    // Actual Gross Profit: only when BOTH act_rev and act_cogs exist for
+    // that month -- this is the exact class of bug already fixed once
+    // (mixing actual revenue with planned cost) and must not be
+    // reintroduced here. Null means "not enough actual data yet", not zero.
+    const act_gp = act_rev.map((r, m) => (r !== null && act_cogs[m] !== null) ? r - (act_cogs[m] as number) : null)
 
     // Break-even per revenue line
     const breakeven: GenericUnitPL['breakeven'] = []
@@ -386,7 +395,7 @@ export function runGenericModel(
     return {
       rev, cogs, gp, staff, opex,
       shared: zero(), total_opex: zero(), ebitda: zero(),
-      act_rev, act_cogs, act_staff, act_opex,
+      act_rev, act_cogs, act_staff, act_opex, act_gp,
       spread_analysis, service_margins, breakeven,
       ann_rev, ann_cogs, ann_gp, ann_staff, ann_opex,
       ann_shared: 0, ann_ebitda: 0,
@@ -428,11 +437,12 @@ export function runGenericModel(
       c.service_margins.push(...r.service_margins)
     })
     c.gp = c.rev.map((r, m) => r - c.cogs[m])
+    const act_gp = c.act_rev.map((r, m) => (r !== null && c.act_cogs[m] !== null) ? r - (c.act_cogs[m] as number) : null)
     const ann_rev = yr(c.rev), ann_cogs = yr(c.cogs), ann_gp = yr(c.gp)
     const ann_staff = yr(c.staff), ann_opex = yr(c.opex)
     const parentUnit = activeUnits.find(u => u.id === parentId)
     unitPL[parentId] = {
-      ...c, shared: zero(), total_opex: zero(), ebitda: zero(),
+      ...c, act_gp, shared: zero(), total_opex: zero(), ebitda: zero(),
       ann_rev, ann_cogs, ann_gp, ann_staff, ann_opex,
       ann_shared: 0, ann_ebitda: 0,
       gp_margin: ann_rev > 0 ? ann_gp / ann_rev : 0, ebitda_margin: 0,
@@ -518,7 +528,8 @@ export function runGenericModel(
   const con = {
     rev: zero(), cogs: zero(), gp: zero(), opex: zero(),
     ebitda: zero(), interest: debtSchedule.totalInterest, nbt: zero(), tax: zero(), npat: zero(),
-    act_rev: nullArr(), act_ebitda: nullArr(),
+    act_rev: nullArr(), act_cogs: nullArr(), act_staff: nullArr(), act_opex: nullArr(),
+    act_gp: nullArr(), act_ebitda: nullArr(),
   }
 
   for (let m = 0; m < months; m++) {
@@ -530,10 +541,19 @@ export function runGenericModel(
       con.gp[m]     += r.gp[m]
       con.opex[m]   += r.total_opex[m]
       con.ebitda[m] += r.ebitda[m]
-      if (r.act_rev[m] !== null) {
-        if (con.act_rev[m] === null) con.act_rev[m] = 0
-        ;(con.act_rev[m] as number) += r.act_rev[m] as number
+      // Consolidate EVERY actual category, not just revenue -- the
+      // previous version only summed act_rev, then computed act_ebitda
+      // as act_rev minus PLANNED cogs/opex. That silently blended a real
+      // actual figure with a fabricated one. Fixed: all four actual
+      // categories are now consolidated the same way, and act_ebitda
+      // below only computes once all of them are genuinely present.
+      const mergeAct = (key: 'act_rev'|'act_cogs'|'act_staff'|'act_opex') => {
+        if (r[key][m] !== null) {
+          if (con[key][m] === null) con[key][m] = 0
+          ;(con[key][m] as number) += r[key][m] as number
+        }
       }
+      mergeAct('act_rev'); mergeAct('act_cogs'); mergeAct('act_staff'); mergeAct('act_opex')
     })
     // Interest is deducted before tax (standard treatment -- interest is a
     // tax-deductible finance cost). Principal is NOT deducted here: repaying
@@ -542,8 +562,17 @@ export function runGenericModel(
     con.nbt[m]  = con.ebitda[m] - (con.interest[m] ?? 0)
     con.tax[m]  = con.nbt[m] > 0 ? con.nbt[m] * (settings.corporate_tax_rate ?? 0.30) : 0
     con.npat[m] = con.nbt[m] - con.tax[m]
-    if (con.act_rev[m] !== null) {
-      con.act_ebitda[m] = (con.act_rev[m] as number) - con.cogs[m] - con.opex[m]
+    // Actual Gross Profit: only when both act_rev and act_cogs exist.
+    if (con.act_rev[m] !== null && con.act_cogs[m] !== null) {
+      con.act_gp[m] = (con.act_rev[m] as number) - (con.act_cogs[m] as number)
+    }
+    // Actual EBITDA: only when ALL FOUR actual categories are present for
+    // this month -- never substitutes a planned figure for a missing
+    // actual one. If, say, actual revenue has synced from the field but
+    // actual opex hasn't been entered yet, this stays null rather than
+    // showing a number that's part real, part invented.
+    if (con.act_rev[m] !== null && con.act_cogs[m] !== null && con.act_staff[m] !== null && con.act_opex[m] !== null) {
+      con.act_ebitda[m] = (con.act_rev[m] as number) - (con.act_cogs[m] as number) - (con.act_staff[m] as number) - (con.act_opex[m] as number)
     }
   }
 

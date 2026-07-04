@@ -385,3 +385,79 @@ describe('Generic Engine — Combined balance sheet integrity', () => {
     expect(twoLoanResult.bs.loan_liability[3]).toBeGreaterThan(oneLoanResult.bs.loan_liability[3])
   })
 })
+
+describe('Generic Engine — Actuals (hybrid P&L, docs/ACCOUNTING_ARCHITECTURE.md)', () => {
+  function makeActualsConfig(overrides: Record<string,any> = {}) {
+    return makeConfig({ start_date: '2026-01-01', ...overrides })
+  }
+
+  it('REG: with no actuals passed, act_rev/act_cogs/act_gp/act_ebitda are all null -- never fabricated', () => {
+    const result = runGenericModel(makeActualsConfig())
+    expect(result.con.act_rev.every(v => v === null)).toBe(true)
+    expect(result.con.act_gp.every(v => v === null)).toBe(true)
+    expect(result.con.act_ebitda.every(v => v === null)).toBe(true)
+  })
+
+  it('REG: act_gp is null unless BOTH act_rev and act_cogs exist for that month -- this is the exact bug class already found once', () => {
+    // Only revenue actual entered for month 0 (index 0 = Jan 2026) -- no
+    // cost_of_sales actual yet. act_gp must stay null, not silently use
+    // planned COGS to "fill in the gap".
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000 } } }
+    const result = runGenericModel(makeActualsConfig(), actuals)
+    expect(result.unitPL['u1'].act_rev[0]).toBe(9_000_000)
+    expect(result.unitPL['u1'].act_gp[0]).toBeNull()
+    expect(result.con.act_gp[0]).toBeNull()
+  })
+
+  it('REG: act_gp computes correctly once both act_rev and act_cogs exist', () => {
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000 } } }
+    const result = runGenericModel(makeActualsConfig(), actuals)
+    expect(result.unitPL['u1'].act_gp[0]).toBe(5_500_000)
+    expect(result.con.act_gp[0]).toBe(5_500_000)
+  })
+
+  it('REG: act_ebitda stays null unless ALL FOUR actual categories exist -- never blends actual revenue with planned costs (the original bug)', () => {
+    // Revenue and COGS actuals exist, but staff/opex actuals haven't been
+    // entered yet for this month. Previously this would have silently
+    // computed act_ebitda using PLANNED staff/opex instead -- a real bug
+    // already found and must not regress.
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000 } } }
+    const result = runGenericModel(makeActualsConfig(), actuals)
+    expect(result.con.act_ebitda[0]).toBeNull()
+  })
+
+  it('REG: act_ebitda computes correctly once all four actual categories exist for the month, using ONLY actual figures', () => {
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeActualsConfig(), actuals)
+    // 9,000,000 - 3,500,000 - 1,400,000 - 450,000 = 3,650,000
+    expect(result.con.act_ebitda[0]).toBe(3_650_000)
+    // Must NOT equal what you'd get by mixing actual revenue with planned
+    // costs (10,000,000 - 4,000,000 - 1,500,000 - 500,000 = 4,000,000) --
+    // proves the fix actually uses the real actual figures, not plan.
+    expect(result.con.act_ebitda[0]).not.toBe(4_000_000)
+  })
+
+  it('REG: a month with no actuals entered at all stays fully null, independent of other months that do have actuals', () => {
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeActualsConfig(), actuals)
+    expect(result.con.act_ebitda[0]).not.toBeNull()
+    expect(result.con.act_ebitda[1]).toBeNull() // February -- no actuals entered
+  })
+
+  it('REG: actuals for a month outside the planning window are ignored, not out-of-bounds errors', () => {
+    const actuals = { u1: { '2030-01-01': { rev1: 9_000_000 } } }
+    expect(() => runGenericModel(makeActualsConfig(), actuals)).not.toThrow()
+  })
+
+  it('REG: act_gp minus (act_staff + act_opex) reconciles exactly to act_ebitda -- this is what the P&L displays, and it must foot', () => {
+    // CodeRabbit caught that the Consolidated P&L could show actual Gross
+    // Profit and actual EBITDA in the same month with a plan-sourced
+    // Operating Costs figure between them, so the displayed column didn't
+    // add up. The fix hybridizes Operating Costs from act_staff+act_opex.
+    // This confirms the underlying arithmetic actually reconciles.
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeActualsConfig(), actuals)
+    const actOpexTotal = (result.con.act_staff[0] as number) + (result.con.act_opex[0] as number)
+    expect((result.con.act_gp[0] as number) - actOpexTotal).toBe(result.con.act_ebitda[0])
+  })
+})
