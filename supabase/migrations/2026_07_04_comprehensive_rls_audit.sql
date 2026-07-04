@@ -61,6 +61,17 @@ as $$
   select client_id from user_profiles where id = auth.uid();
 $$;
 
+-- CREATE FUNCTION grants EXECUTE to PUBLIC by default. These are safe
+-- regardless (they only ever return the calling user's own facts), but
+-- tightening the surface explicitly to authenticated-only is cheap and
+-- removes any reliance on that default being harmless.
+revoke execute on function my_role() from public;
+revoke execute on function my_engagement_client_id() from public;
+revoke execute on function my_legacy_client_id() from public;
+grant execute on function my_role() to authenticated;
+grant execute on function my_engagement_client_id() to authenticated;
+grant execute on function my_legacy_client_id() to authenticated;
+
 -- ── user_profiles: a user always sees their own row, plus every
 --    teammate sharing their engagement_client_id; super_coach sees all.
 --    Uses the helper functions above specifically to avoid the
