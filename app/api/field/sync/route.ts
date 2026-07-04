@@ -255,7 +255,19 @@ export async function POST(req: NextRequest) {
     if (transactions.length > 0 || credit_transactions.length > 0) {
       const { error: aggErr } = await supabase
         .rpc('aggregate_field_transactions', { p_client_id: operator.client_id })
-      if (aggErr) { technicalErrors.push(`Aggregation error: ${aggErr.message}`); errors.push('Your entries were saved, but the summary figures haven\'t updated yet. They\'ll catch up automatically -- no need to re-enter anything.') }
+      if (aggErr) {
+        technicalErrors.push(`Aggregation error: ${aggErr.message}`)
+        // A closed period rejects aggregation permanently (by design --
+        // see supabase/migrations/2026_07_04_month_end_close.sql's
+        // trigger) -- this will NEVER "catch up automatically", unlike a
+        // genuine transient failure, so the message must say something
+        // different rather than implying a retry will eventually fix it.
+        errors.push(
+          aggErr.message.includes('is closed and cannot be edited')
+            ? 'Your entries were saved, but the period they belong to has already been closed by your Finance Manager. Ask them to reopen it if these figures need to be included.'
+            : 'Your entries were saved, but the summary figures haven\'t updated yet. They\'ll catch up automatically -- no need to re-enter anything.'
+        )
+      }
     }
 
     await supabase.from('field_sync_log').insert({
