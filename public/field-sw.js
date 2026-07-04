@@ -32,6 +32,17 @@ const SYNC_TAG = 'clearview-field-sync'
 // ── App shell caching ──────────────────────────────────────────
 self.addEventListener('install', (event) => {
   self.skipWaiting()
+  // Precache the shell document itself so the very first visit after
+  // install can load with zero connectivity -- without this, "zero
+  // connectivity" only actually worked starting from the SECOND visit
+  // (the fetch handler below caches lazily, after a successful online
+  // load). Next.js's per-build hashed JS/CSS filenames aren't known
+  // statically here without a build-time manifest, so those still cache
+  // lazily on first successful fetch -- but the page itself, which is
+  // what actually renders the offline-capable UI, is guaranteed available.
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.add('/field').catch(() => {}))
+  )
 })
 
 self.addEventListener('activate', (event) => {

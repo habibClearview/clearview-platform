@@ -20,6 +20,7 @@
 create or replace function aggregate_field_transactions(p_client_id text)
 returns void
 language plpgsql
+set search_path = public
 as $$
 declare
   r record;

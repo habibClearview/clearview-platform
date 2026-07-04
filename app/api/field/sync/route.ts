@@ -1,34 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { friendlyDbError } from '@/lib/field-errors'
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) throw new Error('Supabase environment variables not configured')
   return createClient(url, key)
-}
-
-// Translates raw Postgres error text into something an operator with no
-// technical background can actually understand and act on. Raw messages
-// like a check-constraint violation are meaningless to someone in the
-// field -- this is the difference between "something went wrong, figure
-// it out yourself" and telling them what to actually fix.
-function friendlyDbError(rawMessage: string): string {
-  if (rawMessage.includes('field_transactions_payment_method_check')) {
-    return 'One of your entries has a payment method the system doesn\'t recognise yet. Please check the payment method on your recent entries and try again.'
-  }
-  if (rawMessage.includes('violates check constraint')) {
-    return 'One of your entries has a value that isn\'t allowed. Please check the details on your recent entries and try again.'
-  }
-  if (rawMessage.includes('violates foreign key constraint')) {
-    return 'One of your entries refers to something that no longer exists (e.g. a product or customer that was removed). Please check the entry and try again.'
-  }
-  if (rawMessage.includes('violates not-null constraint')) {
-    return 'One of your entries is missing required information. Please check the entry and try again.'
-  }
-  // Fall back to a generic, still-non-technical message rather than ever
-  // showing raw database text on screen.
-  return 'Something went wrong saving one or more entries. Your data is still safe on this phone -- please try syncing again, and let your coach know if this keeps happening.'
 }
 
 async function validateToken(token: string) {
@@ -223,7 +201,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (txSynced > 0) {
+    // Runs whenever ANY transaction was attempted, not just newly-inserted
+    // ones (txSynced > 0 would miss this). Why it matters: if aggregation
+    // fails once (e.g. a transient DB error) after rows were successfully
+    // inserted, a later retry of the exact same batch will have txSynced=0
+    // -- every row already exists and gets silently skipped by the
+    // idempotency dedup. Gating on txSynced > 0 would mean those rows can
+    // never trigger aggregation again, permanently stranding them in
+    // field_transactions without ever reaching generic_actuals.
+    // aggregate_field_transactions() recomputes full sums each time, so
+    // calling it again is always safe, never double-counts.
+    if (transactions.length > 0) {
       const { error: aggErr } = await supabase
         .rpc('aggregate_field_transactions', { p_client_id: operator.client_id })
       if (aggErr) { technicalErrors.push(`Aggregation error: ${aggErr.message}`); errors.push('Your entries were saved, but the summary figures haven\'t updated yet. They\'ll catch up automatically -- no need to re-enter anything.') }
