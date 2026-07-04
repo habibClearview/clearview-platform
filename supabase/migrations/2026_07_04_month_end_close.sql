@@ -58,3 +58,31 @@ alter table generic_period_close enable row level security;
 drop policy if exists auth_all on generic_period_close;
 create policy auth_all on generic_period_close
   for all using (auth.role() = 'authenticated');
+
+-- Defense in depth: the app's save() function checks periodClose.closed
+-- client-side, but that alone can be bypassed by a stale client (cached
+-- state from before a period closed), a direct API call, or any other
+-- write path (including aggregate_field_transactions(), which writes to
+-- generic_actuals too). This trigger rejects the write at the database
+-- level regardless of how it was attempted, closing that gap properly
+-- rather than relying on the UI to be the only thing enforcing it.
+create or replace function reject_write_to_closed_period()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if exists (
+    select 1 from generic_period_close
+    where client_id = NEW.client_id and period = NEW.period and closed = true
+  ) then
+    raise exception 'This period (%) is closed and cannot be edited. Ask your Finance Manager to reopen it first.', NEW.period;
+  end if;
+  return NEW;
+end;
+$$;
+
+drop trigger if exists trg_reject_write_to_closed_period on generic_actuals;
+create trigger trg_reject_write_to_closed_period
+  before insert or update on generic_actuals
+  for each row execute function reject_write_to_closed_period();

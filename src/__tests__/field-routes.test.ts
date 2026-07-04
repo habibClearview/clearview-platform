@@ -337,6 +337,30 @@ describe('Field Sync — friendly error messages', () => {
   })
 })
 
+describe('Field Sync — aggregation error messaging distinguishes permanent vs transient failures', () => {
+  // Re-implements the branch from app/api/field/sync/route.ts: a closed
+  // period rejects aggregation permanently (via the DB trigger in
+  // supabase/migrations/2026_07_04_month_end_close.sql) and will NEVER
+  // "catch up automatically" -- unlike a genuine transient failure, so
+  // the message shown must not imply a retry will eventually fix it.
+  function aggregationErrorMessage(rawMessage: string): string {
+    return rawMessage.includes('is closed and cannot be edited')
+      ? 'Your entries were saved, but the period they belong to has already been closed by your Finance Manager. Ask them to reopen it if these figures need to be included.'
+      : 'Your entries were saved, but the summary figures haven\'t updated yet. They\'ll catch up automatically -- no need to re-enter anything.'
+  }
+
+  it('REG: a closed-period rejection tells the operator it needs a Finance Manager, not a wait', () => {
+    const msg = aggregationErrorMessage('This period (2026-06-01) is closed and cannot be edited. Ask your Finance Manager to reopen it first.')
+    expect(msg.toLowerCase()).toContain('finance manager')
+    expect(msg.toLowerCase()).not.toContain('automatically')
+  })
+
+  it('REG: a genuine transient aggregation error still says it will catch up automatically', () => {
+    const msg = aggregationErrorMessage('connection timeout')
+    expect(msg.toLowerCase()).toContain('automatically')
+  })
+})
+
 describe('Field Sync — queue-clearing decision', () => {
   it('REG: a fully successful sync (no errors) clears the queue', () => {
     expect(shouldClearQueue({ success: true })).toBe(true)
