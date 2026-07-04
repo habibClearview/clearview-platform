@@ -772,6 +772,7 @@ function ActualsTab({config,months,cc,P,onSave}) {
   const [submitted, setSubmitted] = useState(false)
   const [allActuals, setAllActuals] = useState<any[]>([])
   const [periodClose, setPeriodClose] = useState<any>(null)
+  const [periodCloseVerified, setPeriodCloseVerified] = useState(false)
   const [staleCatalogue, setStaleCatalogue] = useState<any[]>([])
   const [closing, setClosing] = useState(false)
 
@@ -818,10 +819,29 @@ function ActualsTab({config,months,cc,P,onSave}) {
   // editable and submittable for them -- the hard lock was silently
   // bypassed for exactly the users it's most meant to constrain.
   useEffect(()=>{
+    let active = true
+    // Fail closed: while this fetch is in flight (or if it errors), treat
+    // the period as NOT verified -- both save() and the input disabled
+    // state must refuse to assume "open" during that window. A user
+    // selecting a closed month and saving before the lookup returns, or a
+    // stale response from a previously-selected period landing late and
+    // applying the wrong lock state, would otherwise bypass the whole
+    // point of a hard gate.
+    setPeriodClose(null)
+    setPeriodCloseVerified(false)
     supabase.from('generic_period_close').select('*')
       .eq('client_id',config.client_id).eq('period',selPeriod)
       .maybeSingle()
-      .then(({data})=>setPeriodClose(data))
+      .then(({data,error})=>{
+        if (!active) return // a newer selPeriod/client_id change already superseded this request
+        if (error) {
+          alert('Could not verify whether this period is closed. Editing is disabled until it can be verified.')
+          return
+        }
+        setPeriodClose(data)
+        setPeriodCloseVerified(true)
+      })
+    return () => { active = false }
   },[selPeriod,config.client_id])
 
   // Catalogue staleness data is genuinely FM/CEO/coach-only -- it feeds
@@ -834,6 +854,7 @@ function ActualsTab({config,months,cc,P,onSave}) {
   },[selPeriod,canSeeAll,config.client_id])
 
   async function save(submit=false) {
+    if (!periodCloseVerified) { alert('Close status is still loading. Please try again in a moment.'); return }
     if (periodClose?.closed) { alert('This period is closed and cannot be edited. Ask your Finance Manager to reopen it first.'); return }
     setSaving(true)
     const {error} = await supabase.from('generic_actuals').upsert({
@@ -875,6 +896,7 @@ function ActualsTab({config,months,cc,P,onSave}) {
   const canClose = canClosePeriod(exceptionReport)
 
   async function closePeriod() {
+    if (!periodCloseVerified) { alert('Close status is still loading. Please try again in a moment.'); return }
     if (!canClose) return
     setClosing(true)
     const {error} = await supabase.from('generic_period_close').upsert({
@@ -888,6 +910,7 @@ function ActualsTab({config,months,cc,P,onSave}) {
   }
 
   async function reopenPeriod() {
+    if (!periodCloseVerified) { alert('Close status is still loading. Please try again in a moment.'); return }
     if (!confirm('Reopen this period for editing? This should only be done to correct a genuine mistake.')) return
     setClosing(true)
     const {error} = await supabase.from('generic_period_close')
@@ -901,14 +924,19 @@ function ActualsTab({config,months,cc,P,onSave}) {
   // with the SAME cost_price value, which refreshes cost_price_updated_at
   // to now() without changing the actual price. No separate endpoint needed.
   async function confirmCostPriceStillAccurate(itemId: string, currentCostPrice: number) {
-    const res = await fetch('/api/field/admin/catalogue', {
-      method: 'PATCH', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ id: itemId, cost_price: currentCostPrice }),
-    })
-    if (!res.ok) { alert('Could not confirm this cost price. Please try again.'); return }
-    const {data} = await supabase.from('field_catalogue').select('id,name,cost_price,cost_price_updated_at')
-      .eq('client_id',config.client_id).eq('active',true).not('cost_price','is',null)
-    setStaleCatalogue(data||[])
+    try {
+      const res = await fetch('/api/field/admin/catalogue', {
+        method: 'PATCH', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ id: itemId, cost_price: currentCostPrice }),
+      })
+      if (!res.ok) throw new Error('confirm failed')
+      const {data,error} = await supabase.from('field_catalogue').select('id,name,cost_price,cost_price_updated_at')
+        .eq('client_id',config.client_id).eq('active',true).not('cost_price','is',null)
+      if (error) throw error
+      setStaleCatalogue(data||[])
+    } catch {
+      alert('Could not confirm this cost price. Please try again.')
+    }
   }
 
   const lines = config.plan_lines.filter(l=>l.unit_id===selUnit&&l.active&&!l.name.startsWith('Add '))
@@ -945,7 +973,9 @@ function ActualsTab({config,months,cc,P,onSave}) {
         <div style={{...card,borderLeft:`4px solid ${periodClose?.closed?C.navy:blockingExceptions.length>0?C.red:C.green}`,marginBottom:'1.25rem'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.5rem'}}>
             <div style={{fontWeight:700,color:C.navy,fontSize:'0.88rem'}}>Month-End Close — {periodMonths.find(m=>m.value===selPeriod)?.label}</div>
-            {periodClose?.closed ? (
+            {!periodCloseVerified ? (
+              <span style={{fontSize:'0.75rem',color:C.slate}}>Checking close status...</span>
+            ) : periodClose?.closed ? (
               <button style={addBtn(true,C.slate)} onClick={reopenPeriod} disabled={closing}>{closing?'...':'Reopen Period'}</button>
             ) : (
               <button style={addBtn(true,canClose?C.green:C.border)} onClick={closePeriod} disabled={!canClose||closing}>
@@ -1036,9 +1066,9 @@ function ActualsTab({config,months,cc,P,onSave}) {
                       <div style={{display:'grid',gridTemplateColumns:'1fr 180px',alignItems:'center',gap:'0.75rem'}}>
                         <label htmlFor={`actual-${l.id}`} style={{fontWeight:600,fontSize:'0.82rem',color:C.navy,lineHeight:1.3}}>{l.name}</label>
                         <input id={`actual-${l.id}`} type="number"
-                          style={{width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'monospace',background:(periodClose?.closed||(submitted&&!canSeeAll))?'#F5F5F5':C.white,color:C.navy,textAlign:'right',boxSizing:'border-box'}}
+                          style={{width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'monospace',background:(!periodCloseVerified||periodClose?.closed||(submitted&&!canSeeAll))?'#F5F5F5':C.white,color:C.navy,textAlign:'right',boxSizing:'border-box'}}
                           value={lineValues[l.id]??''} placeholder="0"
-                          disabled={periodClose?.closed||(submitted&&!canSeeAll)}
+                          disabled={!periodCloseVerified||periodClose?.closed||(submitted&&!canSeeAll)}
                           onChange={e=>setLineValues(v=>({...v,[l.id]:Number(e.target.value)}))}/>
                       </div>
                       {/* Field-app figure is read-only here -- it's written exclusively
