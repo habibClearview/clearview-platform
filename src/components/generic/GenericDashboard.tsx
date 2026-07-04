@@ -10,6 +10,7 @@ import {
   type GenericPlanLine, type LineCategory, type LineType, type UnitType,
 } from '@/lib/generic-engine'
 import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor } from '@/lib/scoring-engine'
+import { combinedActual, computeActualsTotals } from '@/lib/actuals'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
@@ -703,6 +704,7 @@ function ActualsTab({config,months,cc,P,onSave}) {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`
   })
   const [lineValues, setLineValues] = useState<Record<string,number>>({})
+  const [fieldLineValues, setFieldLineValues] = useState<Record<string,number>>({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -725,7 +727,13 @@ function ActualsTab({config,months,cc,P,onSave}) {
       .eq('client_id',config.client_id).eq('unit_id',selUnit).eq('period',selPeriod)
       .maybeSingle()
       .then(({data})=>{
+        // line_values = manually entered (accountant); field_line_values =
+        // written exclusively by aggregate_field_transactions(). Kept
+        // separate so a field sync can never overwrite a manual entry, and
+        // an accountant's save can never erase field data. Combined only
+        // for display -- see docs/ACCOUNTING_ARCHITECTURE.md section 4.
         setLineValues(data?.line_values||{})
+        setFieldLineValues(data?.field_line_values||{})
         setSubmitted(data?.submitted||false)
         setLoading(false)
       })
@@ -755,8 +763,12 @@ function ActualsTab({config,months,cc,P,onSave}) {
   const lines = config.plan_lines.filter(l=>l.unit_id===selUnit&&l.active&&!l.name.startsWith('Add '))
   const sections:[string,string][] = [['revenue','Revenue'],['cost_of_sales','Cost of Sales'],['staff','Staff'],['direct_opex','Overheads']]
 
-  const totalRev = lines.filter(l=>l.category==='revenue').reduce((s,l)=>s+Number(lineValues[l.id]||0),0)
-  const totalCost = lines.filter(l=>l.category!=='revenue').reduce((s,l)=>s+Number(lineValues[l.id]||0),0)
+  // Combined = manually entered + field-app-derived, for the same line.
+  // Never sourced from a single shared value -- see docs/ACCOUNTING_ARCHITECTURE.md
+  // section 4 for why these must stay in separate columns internally.
+  // Uses the shared src/lib/actuals.ts so tests exercise the same function.
+  const combined = (lineId:string) => combinedActual(lineId, lineValues, fieldLineValues)
+  const { totalRev, totalCOGS, totalCost, grossProfit, netResult } = computeActualsTotals(lines, lineValues, fieldLineValues)
 
   return (
     <div>
@@ -782,13 +794,15 @@ function ActualsTab({config,months,cc,P,onSave}) {
           <div style={{overflowX:'auto'}}>
             <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.78rem',fontFamily:'monospace'}}>
               <thead><tr style={{background:C.navy,color:C.white}}>
-                {['Business Unit','Revenue','Costs','Gross Profit','Status'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600}}>{h}</th>)}
+                {['Business Unit','Revenue','Total Costs','Gross Profit','Status'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600}}>{h}</th>)}
               </tr></thead>
               <tbody>{allActuals.map((a,i)=>{
                 const aLines = config.plan_lines.filter(l=>l.unit_id===a.unit_id&&l.active)
-                const rev = aLines.filter(l=>l.category==='revenue').reduce((s,l)=>s+Number(a.line_values?.[l.id]||0),0)
-                const cost = aLines.filter(l=>l.category!=='revenue').reduce((s,l)=>s+Number(a.line_values?.[l.id]||0),0)
-                const gp = rev-cost
+                const aCombined = (lineId:string) => combinedActual(lineId, a.line_values||{}, a.field_line_values||{})
+                const rev = aLines.filter(l=>l.category==='revenue').reduce((s,l)=>s+aCombined(l.id),0)
+                const cogs = aLines.filter(l=>l.category==='cost_of_sales').reduce((s,l)=>s+aCombined(l.id),0)
+                const cost = aLines.filter(l=>l.category!=='revenue').reduce((s,l)=>s+aCombined(l.id),0)
+                const gp = rev-cogs
                 return (
                   <tr key={a.id} style={{background:i%2===0?C.cream:C.white,cursor:'pointer'}} onClick={()=>setSelUnit(a.unit_id)}>
                     <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{config.business_units.find(u=>u.id===a.unit_id)?.name||a.unit_id}</td>
@@ -809,7 +823,7 @@ function ActualsTab({config,months,cc,P,onSave}) {
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem',flexWrap:'wrap',gap:'0.5rem'}}>
           <div style={{fontWeight:700,color:C.navy,fontSize:'0.9rem'}}>{config.business_units.find(u=>u.id===selUnit)?.name}</div>
           <div style={{display:'flex',gap:'0.5rem'}}>
-            <div style={{fontFamily:'monospace',fontSize:'0.75rem',color:C.slate}}>Revenue: <strong style={{color:C.green}}>{fmt(totalRev,cc)}</strong> · Costs: <strong style={{color:C.red}}>{fmt(totalCost,cc)}</strong> · GP: <strong style={{color:totalRev-totalCost>=0?C.green:C.red}}>{fmt(totalRev-totalCost,cc)}</strong></div>
+            <div style={{fontFamily:'monospace',fontSize:'0.75rem',color:C.slate}}>Revenue: <strong style={{color:C.green}}>{fmt(totalRev,cc)}</strong> · Total Costs: <strong style={{color:C.red}}>{fmt(totalCost,cc)}</strong> · Gross Profit: <strong style={{color:grossProfit>=0?C.green:C.red}}>{fmt(grossProfit,cc)}</strong> · Net Result: <strong style={{color:netResult>=0?C.green:C.red}}>{fmt(netResult,cc)}</strong></div>
           </div>
         </div>
         {loading?<Spinner/>:(
@@ -817,23 +831,37 @@ function ActualsTab({config,months,cc,P,onSave}) {
             {sections.map(([cat,label])=>{
               const sLines = lines.filter(l=>l.category===cat)
               if (sLines.length===0) return null
-              const sTotal = sLines.reduce((s,l)=>s+Number(lineValues[l.id]||0),0)
+              const sTotal = sLines.reduce((s,l)=>s+combined(l.id),0)
               return (
                 <div key={cat} style={{marginBottom:'1.5rem'}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:`2px solid ${cat==='revenue'?C.green:C.red}`,paddingBottom:'0.4rem',marginBottom:'0.75rem'}}>
                     <div style={{fontFamily:'monospace',fontSize:'0.68rem',letterSpacing:'0.1em',color:cat==='revenue'?C.green:C.red,textTransform:'uppercase',fontWeight:700}}>{label}</div>
                     <div style={{fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,color:cat==='revenue'?C.green:C.red}}>{fmt(sTotal,cc)}</div>
                   </div>
-                  {sLines.map(l=>(
-                    <div key={l.id} style={{display:'grid',gridTemplateColumns:'1fr 180px',alignItems:'center',gap:'0.75rem',marginBottom:'0.5rem',padding:'0.45rem 0.75rem',background:C.cream,borderRadius:4}}>
-                      <label style={{fontWeight:600,fontSize:'0.82rem',color:C.navy,lineHeight:1.3}}>{l.name}</label>
-                      <input type="number"
-                        style={{width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'monospace',background:submitted&&!canSeeAll?'#F5F5F5':C.white,color:C.navy,textAlign:'right',boxSizing:'border-box'}}
-                        value={lineValues[l.id]??''} placeholder="0"
-                        disabled={submitted&&!canSeeAll}
-                        onChange={e=>setLineValues(v=>({...v,[l.id]:Number(e.target.value)}))}/>
+                  {sLines.map(l=>{
+                    const fieldAmt = Number(fieldLineValues[l.id]||0)
+                    return (
+                    <div key={l.id} style={{padding:'0.45rem 0.75rem',background:C.cream,borderRadius:4,marginBottom:'0.5rem'}}>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 180px',alignItems:'center',gap:'0.75rem'}}>
+                        <label htmlFor={`actual-${l.id}`} style={{fontWeight:600,fontSize:'0.82rem',color:C.navy,lineHeight:1.3}}>{l.name}</label>
+                        <input id={`actual-${l.id}`} type="number"
+                          style={{width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'monospace',background:submitted&&!canSeeAll?'#F5F5F5':C.white,color:C.navy,textAlign:'right',boxSizing:'border-box'}}
+                          value={lineValues[l.id]??''} placeholder="0"
+                          disabled={submitted&&!canSeeAll}
+                          onChange={e=>setLineValues(v=>({...v,[l.id]:Number(e.target.value)}))}/>
+                      </div>
+                      {/* Field-app figure is read-only here -- it's written exclusively
+                          by aggregate_field_transactions(), never editable by hand.
+                          The input above is manual entry only (e.g. a paper-only store);
+                          the two are added together for every total on this page. */}
+                      {fieldAmt!==0 && (
+                        <div style={{fontSize:'0.7rem',color:C.teal,marginTop:'0.3rem',fontFamily:'monospace'}}>
+                          + {fmt(fieldAmt,cc)} from Clearview Field · Total: {fmt(combined(l.id),cc)}
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )
             })}
