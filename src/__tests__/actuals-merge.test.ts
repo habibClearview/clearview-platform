@@ -1,28 +1,12 @@
 import { describe, it, expect } from 'vitest'
+import { combinedActual as combined, computeActualsTotals as computeTotals, type ActualsPlanLine as PlanLine } from '../lib/actuals'
 
-// Re-implements the pure combine/aggregate logic from ActualsTab in
-// GenericDashboard.tsx for testing without a full component render.
+// Tests the real src/lib/actuals.ts functions -- the exact ones
+// GenericDashboard.tsx's ActualsTab imports and uses, not a copy.
 // Per docs/ACCOUNTING_ARCHITECTURE.md section 4: line_values (manual,
 // accountant-entered) and field_line_values (written exclusively by
 // aggregate_field_transactions()) must never overwrite each other --
 // they're summed only at display/read time.
-
-interface PlanLine { id: string; category: string }
-
-function combined(lineId: string, lineValues: Record<string, number>, fieldLineValues: Record<string, number>): number {
-  return Number(lineValues[lineId] || 0) + Number(fieldLineValues[lineId] || 0)
-}
-
-function computeTotals(lines: PlanLine[], lineValues: Record<string, number>, fieldLineValues: Record<string, number>) {
-  const c = (id: string) => combined(id, lineValues, fieldLineValues)
-  const totalRev = lines.filter(l => l.category === 'revenue').reduce((s, l) => s + c(l.id), 0)
-  const totalCOGS = lines.filter(l => l.category === 'cost_of_sales').reduce((s, l) => s + c(l.id), 0)
-  const totalOtherCosts = lines.filter(l => l.category !== 'revenue' && l.category !== 'cost_of_sales').reduce((s, l) => s + c(l.id), 0)
-  const totalCost = totalCOGS + totalOtherCosts
-  const grossProfit = totalRev - totalCOGS
-  const netResult = totalRev - totalCost
-  return { totalRev, totalCOGS, totalOtherCosts, totalCost, grossProfit, netResult }
-}
 
 describe('Actuals — manual and field-derived figures combine without collision', () => {
   it('REG: a line with only a manual entry uses just that value', () => {

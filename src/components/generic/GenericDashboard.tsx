@@ -10,6 +10,7 @@ import {
   type GenericPlanLine, type LineCategory, type LineType, type UnitType,
 } from '@/lib/generic-engine'
 import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor } from '@/lib/scoring-engine'
+import { combinedActual, computeActualsTotals } from '@/lib/actuals'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
@@ -765,18 +766,9 @@ function ActualsTab({config,months,cc,P,onSave}) {
   // Combined = manually entered + field-app-derived, for the same line.
   // Never sourced from a single shared value -- see docs/ACCOUNTING_ARCHITECTURE.md
   // section 4 for why these must stay in separate columns internally.
-  const combined = (lineId:string) => Number(lineValues[lineId]||0) + Number(fieldLineValues[lineId]||0)
-
-  const totalRev = lines.filter(l=>l.category==='revenue').reduce((s,l)=>s+combined(l.id),0)
-  const totalCOGS = lines.filter(l=>l.category==='cost_of_sales').reduce((s,l)=>s+combined(l.id),0)
-  const totalOtherCosts = lines.filter(l=>l.category!=='revenue'&&l.category!=='cost_of_sales').reduce((s,l)=>s+combined(l.id),0)
-  const totalCost = totalCOGS + totalOtherCosts
-  // True Gross Profit: revenue less cost of sales ONLY -- staff and
-  // overheads are real costs but are not part of gross profit. Labeling
-  // "revenue minus every cost" as Gross Profit was actively misleading
-  // (flagged directly, and confirmed as a real bug, not a naming nitpick).
-  const grossProfit = totalRev - totalCOGS
-  const netResult = totalRev - totalCost
+  // Uses the shared src/lib/actuals.ts so tests exercise the same function.
+  const combined = (lineId:string) => combinedActual(lineId, lineValues, fieldLineValues)
+  const { totalRev, totalCOGS, totalCost, grossProfit, netResult } = computeActualsTotals(lines, lineValues, fieldLineValues)
 
   return (
     <div>
@@ -806,7 +798,7 @@ function ActualsTab({config,months,cc,P,onSave}) {
               </tr></thead>
               <tbody>{allActuals.map((a,i)=>{
                 const aLines = config.plan_lines.filter(l=>l.unit_id===a.unit_id&&l.active)
-                const aCombined = (lineId:string) => Number(a.line_values?.[lineId]||0) + Number(a.field_line_values?.[lineId]||0)
+                const aCombined = (lineId:string) => combinedActual(lineId, a.line_values||{}, a.field_line_values||{})
                 const rev = aLines.filter(l=>l.category==='revenue').reduce((s,l)=>s+aCombined(l.id),0)
                 const cogs = aLines.filter(l=>l.category==='cost_of_sales').reduce((s,l)=>s+aCombined(l.id),0)
                 const cost = aLines.filter(l=>l.category!=='revenue').reduce((s,l)=>s+aCombined(l.id),0)
@@ -851,8 +843,8 @@ function ActualsTab({config,months,cc,P,onSave}) {
                     return (
                     <div key={l.id} style={{padding:'0.45rem 0.75rem',background:C.cream,borderRadius:4,marginBottom:'0.5rem'}}>
                       <div style={{display:'grid',gridTemplateColumns:'1fr 180px',alignItems:'center',gap:'0.75rem'}}>
-                        <label style={{fontWeight:600,fontSize:'0.82rem',color:C.navy,lineHeight:1.3}}>{l.name}</label>
-                        <input type="number"
+                        <label htmlFor={`actual-${l.id}`} style={{fontWeight:600,fontSize:'0.82rem',color:C.navy,lineHeight:1.3}}>{l.name}</label>
+                        <input id={`actual-${l.id}`} type="number"
                           style={{width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'monospace',background:submitted&&!canSeeAll?'#F5F5F5':C.white,color:C.navy,textAlign:'right',boxSizing:'border-box'}}
                           value={lineValues[l.id]??''} placeholder="0"
                           disabled={submitted&&!canSeeAll}
@@ -864,7 +856,7 @@ function ActualsTab({config,months,cc,P,onSave}) {
                           the two are added together for every total on this page. */}
                       {fieldAmt!==0 && (
                         <div style={{fontSize:'0.7rem',color:C.teal,marginTop:'0.3rem',fontFamily:'monospace'}}>
-                          + {fmt(fieldAmt,cc)} from Clearview Field · Total: {fmt(fieldAmt+Number(lineValues[l.id]||0),cc)}
+                          + {fmt(fieldAmt,cc)} from Clearview Field · Total: {fmt(combined(l.id),cc)}
                         </div>
                       )}
                     </div>
