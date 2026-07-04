@@ -1335,7 +1335,10 @@ function CatalogueManager({clientId,config,P}) {
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string|null>(null)
   const [editPrice, setEditPrice] = useState('')
-  const [form, setForm] = useState({name:'',item_type:'product',price:'',unit_label:'',business_unit_id:'',plan_line_id:''})
+  const [editingCostId, setEditingCostId] = useState<string|null>(null)
+  const [editCostPrice, setEditCostPrice] = useState('')
+  const [editCostLine, setEditCostLine] = useState('')
+  const [form, setForm] = useState({name:'',item_type:'product',price:'',unit_label:'',business_unit_id:'',plan_line_id:'',cost_price:'',cogs_plan_line_id:''})
 
   async function load() {
     setLoading(true)
@@ -1350,9 +1353,12 @@ function CatalogueManager({clientId,config,P}) {
 
   const revenueLinesForUnit = (unitId:string) =>
     (config.plan_lines||[]).filter((l:any)=>l.unit_id===unitId && l.category==='revenue' && l.active)
+  const cogsLinesForUnit = (unitId:string) =>
+    (config.plan_lines||[]).filter((l:any)=>l.unit_id===unitId && l.category==='cost_of_sales' && l.active)
 
   async function addItem() {
     if (!form.name || !form.business_unit_id || !form.plan_line_id || form.price==='') return
+    if (form.cost_price!=='' && !form.cogs_plan_line_id) { alert('Select a COGS category to go with the cost price.'); return }
     setSaving(true)
     try {
       await fetch('/api/field/admin/catalogue', {
@@ -1361,9 +1367,11 @@ function CatalogueManager({clientId,config,P}) {
           client_id: clientId, business_unit_id: form.business_unit_id, plan_line_id: form.plan_line_id,
           name: form.name, item_type: form.item_type, price: Number(form.price), unit_label: form.unit_label||null,
           created_by: P.userId,
+          cost_price: form.cost_price===''?null:Number(form.cost_price),
+          cogs_plan_line_id: form.cogs_plan_line_id||null,
         }),
       })
-      setForm({name:'',item_type:'product',price:'',unit_label:'',business_unit_id:'',plan_line_id:''})
+      setForm({name:'',item_type:'product',price:'',unit_label:'',business_unit_id:'',plan_line_id:'',cost_price:'',cogs_plan_line_id:''})
       setShowAdd(false)
       await load()
     } catch { alert('Could not save this catalogue item. Please try again.') }
@@ -1378,6 +1386,28 @@ function CatalogueManager({clientId,config,P}) {
     })
     setEditingId(null)
     await load()
+  }
+
+  async function saveCostPrice(id:string) {
+    if (editCostPrice!=='' && Number(editCostPrice)<0) { alert('Cost price cannot be negative.'); return }
+    if (editCostPrice!=='' && !editCostLine) { alert('Select a COGS category to go with the cost price.'); return }
+    try {
+      const res = await fetch('/api/field/admin/catalogue', {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          id,
+          cost_price: editCostPrice===''?null:Number(editCostPrice),
+          cogs_plan_line_id: editCostPrice===''?null:editCostLine,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(()=>({}))
+        alert(data.error || 'Could not save the cost price. Please try again.')
+        return
+      }
+      setEditingCostId(null)
+      await load()
+    } catch { alert('Could not save the cost price. Please try again.') }
   }
 
   async function toggleActive(id:string, active:boolean) {
@@ -1428,6 +1458,17 @@ function CatalogueManager({clientId,config,P}) {
             </div>
             <div><label style={lbl}>Price</label><input type="number" style={inp} value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} placeholder="0"/></div>
             <div><label style={lbl}>Unit Label (optional)</label><input style={inp} value={form.unit_label} onChange={e=>setForm(f=>({...f,unit_label:e.target.value}))} placeholder="e.g. bag, kg, session"/></div>
+            <div><label htmlFor="new-item-cost-price" style={lbl}>Cost Price (optional)</label><input id="new-item-cost-price" type="number" style={inp} value={form.cost_price} onChange={e=>setForm(f=>({...f,cost_price:e.target.value}))} placeholder="Leave blank if unknown"/>
+              <div style={{fontSize:'0.7rem',color:C.slate,marginTop:'0.25rem'}}>What this actually costs to procure. Never shown to field operators -- when set, every sale automatically books a matching cost-of-sales entry.</div>
+            </div>
+            {form.cost_price!=='' && (
+              <div><label htmlFor="new-item-cogs-line" style={lbl}>COGS Category</label>
+                <select id="new-item-cogs-line" style={inp} disabled={!form.business_unit_id} value={form.cogs_plan_line_id} onChange={e=>setForm(f=>({...f,cogs_plan_line_id:e.target.value}))}>
+                  <option value="">{form.business_unit_id?'Select a COGS category...':'Select a unit first'}</option>
+                  {cogsLinesForUnit(form.business_unit_id).map((l:any)=><option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+              </div>
+            )}
           </div>
           <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
             <button style={solidBtn()} disabled={saving} onClick={addItem}>{saving?'Saving...':'Add to Catalogue'}</button>
@@ -1451,26 +1492,53 @@ function CatalogueManager({clientId,config,P}) {
                 <div key={catId} style={{marginBottom:'0.85rem',marginLeft:'0.5rem'}}>
                   <div style={{fontSize:'0.78rem',color:C.teal,fontWeight:600,marginBottom:'0.4rem'}}>{line?.name||catId} <span style={{color:C.slate,fontWeight:400}}>({catItems.length} {catItems.length===1?'brand':'brands'})</span></div>
                   {catItems.map((item:any)=>(
-                    <div key={item.id} style={{...card,opacity:item.active?1:0.55,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem',marginLeft:'0.75rem'}}>
-                      <div>
-                        <div style={{fontWeight:700,color:C.navy}}>{item.name}{!item.active&&<span style={{marginLeft:8}}><Badge text="Inactive" color={C.red}/></span>}</div>
-                        <div style={{fontSize:'0.78rem',color:C.slate}}>{item.item_type==='service'?'Service':'Product'}</div>
+                    <div key={item.id} style={{...card,opacity:item.active?1:0.55,marginLeft:'0.75rem'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem'}}>
+                        <div>
+                          <div style={{fontWeight:700,color:C.navy}}>{item.name}{!item.active&&<span style={{marginLeft:8}}><Badge text="Inactive" color={C.red}/></span>}</div>
+                          <div style={{fontSize:'0.78rem',color:C.slate}}>{item.item_type==='service'?'Service':'Product'}</div>
+                        </div>
+                        <div style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
+                          {editingId===item.id ? (
+                            <>
+                              <input type="number" style={{...inp,width:110,marginBottom:0}} value={editPrice} onChange={e=>setEditPrice(e.target.value)} autoFocus/>
+                              <button style={addBtn(true,C.green)} onClick={()=>savePrice(item.id)}>Save</button>
+                              <button style={addBtn(true,C.slate)} onClick={()=>setEditingId(null)}>Cancel</button>
+                            </>
+                          ) : (
+                            <>
+                              <div style={{fontFamily:'monospace',fontWeight:700,color:C.navy}}>{fmt(item.price,config.currency)}{item.unit_label?<span style={{color:C.slate,fontWeight:400}}> / {item.unit_label}</span>:null}</div>
+                              {canEdit&&<button style={addBtn(true)} onClick={()=>{setEditingId(item.id);setEditPrice(String(item.price))}}>Edit Price</button>}
+                              {canEdit&&(item.active
+                                ? <button style={addBtn(true,C.red)} onClick={()=>toggleActive(item.id,false)}>Deactivate</button>
+                                : <button style={addBtn(true,C.green)} onClick={()=>toggleActive(item.id,true)}>Reactivate</button>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
-                        {editingId===item.id ? (
+                      {/* Cost price -- for automatic Gross Profit / COGS
+                          (docs/ACCOUNTING_ARCHITECTURE.md section 3). Never
+                          shown to field operators; this view is only ever
+                          reached by roles who can already see this page. */}
+                      <div style={{marginTop:'0.5rem',paddingTop:'0.5rem',borderTop:`1px solid ${C.border}`,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.5rem'}}>
+                        {editingCostId===item.id ? (
                           <>
-                            <input type="number" style={{...inp,width:110,marginBottom:0}} value={editPrice} onChange={e=>setEditPrice(e.target.value)} autoFocus/>
-                            <button style={addBtn(true,C.green)} onClick={()=>savePrice(item.id)}>Save</button>
-                            <button style={addBtn(true,C.slate)} onClick={()=>setEditingId(null)}>Cancel</button>
+                            <input type="number" aria-label="Cost price" style={{...inp,width:110,marginBottom:0}} value={editCostPrice} onChange={e=>setEditCostPrice(e.target.value)} placeholder="Leave blank for none" autoFocus/>
+                            <select aria-label="COGS category" style={{...inp,width:200,marginBottom:0}} value={editCostLine} onChange={e=>setEditCostLine(e.target.value)}>
+                              <option value="">Select COGS category...</option>
+                              {cogsLinesForUnit(item.business_unit_id).map((l:any)=><option key={l.id} value={l.id}>{l.name}</option>)}
+                            </select>
+                            <button style={addBtn(true,C.green)} onClick={()=>saveCostPrice(item.id)}>Save</button>
+                            <button style={addBtn(true,C.slate)} onClick={()=>setEditingCostId(null)}>Cancel</button>
                           </>
                         ) : (
                           <>
-                            <div style={{fontFamily:'monospace',fontWeight:700,color:C.navy}}>{fmt(item.price,config.currency)}{item.unit_label?<span style={{color:C.slate,fontWeight:400}}> / {item.unit_label}</span>:null}</div>
-                            {canEdit&&<button style={addBtn(true)} onClick={()=>{setEditingId(item.id);setEditPrice(String(item.price))}}>Edit Price</button>}
-                            {canEdit&&(item.active
-                              ? <button style={addBtn(true,C.red)} onClick={()=>toggleActive(item.id,false)}>Deactivate</button>
-                              : <button style={addBtn(true,C.green)} onClick={()=>toggleActive(item.id,true)}>Reactivate</button>
-                            )}
+                            <div style={{fontSize:'0.78rem',color:C.slate}}>
+                              Cost price: <span style={{fontFamily:'monospace',fontWeight:700,color:item.cost_price!==null&&item.cost_price!==undefined?C.navy:C.amber}}>{item.cost_price!==null&&item.cost_price!==undefined?fmt(item.cost_price,config.currency):'Not set — no automatic COGS'}</span>
+                              {item.cost_price_updated_at&&<span style={{marginLeft:8}}>· reviewed {new Date(item.cost_price_updated_at).toLocaleDateString()}</span>}
+                            </div>
+                            {canEdit&&<button style={addBtn(true)} onClick={()=>{setEditingCostId(item.id);setEditCostPrice(item.cost_price!==null&&item.cost_price!==undefined?String(item.cost_price):'');setEditCostLine(item.cogs_plan_line_id||'')}}>{item.cost_price!==null&&item.cost_price!==undefined?'Edit Cost Price':'Set Cost Price'}</button>}
                           </>
                         )}
                       </div>
