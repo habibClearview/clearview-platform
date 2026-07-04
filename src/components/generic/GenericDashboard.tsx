@@ -67,17 +67,21 @@ function SectionHeader({title,action}:{title:string;action?:React.ReactNode}) {
   )
 }
 
-function PLRow({label,values,bold,highlight,negate,months,cc}:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;months:string[];cc:string}) {
+function PLRow({label,values,bold,highlight,negate,months,cc,actualMask}:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;months:string[];cc:string;actualMask?:boolean[]}) {
   const total = values.reduce((s,v)=>s+v,0)
   const display = (v:number) => negate ? fmt(-Math.abs(v),cc) : fmt(v,cc)
   return (
     <tr style={{background:highlight?'#EBF8FF':bold?C.lightBg:C.white}}>
       <td style={{padding:'7px 10px',fontWeight:bold?700:400,color:C.navy,minWidth:160,fontSize:'0.8rem'}}>{label}</td>
-      {values.map((v,i)=>(
-        <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',color:negate?C.red:v<0?C.red:C.navy,fontWeight:bold?700:400}}>
+      {values.map((v,i)=>{
+        const isActual = actualMask?.[i]
+        return (
+        <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',color:negate?C.red:v<0?C.red:C.navy,fontWeight:bold?700:400,
+          background:isActual?'#EAFAF6':undefined,borderBottom:isActual?`2px solid ${C.teal}`:undefined}}>
           {display(v)}
         </td>
-      ))}
+        )
+      })}
       <td style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:700,color:negate?C.red:total<0?C.red:C.navy,borderLeft:`2px solid ${C.border}`}}>
         {display(total)}
       </td>
@@ -85,7 +89,7 @@ function PLRow({label,values,bold,highlight,negate,months,cc}:{label:string;valu
   )
 }
 
-function PLTable({title,rows,months,cc,showExport}:{title?:string;rows:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean}[];months:string[];cc:string;showExport?:boolean}) {
+function PLTable({title,rows,months,cc,showExport}:{title?:string;rows:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;actualMask?:boolean[]}[];months:string[];cc:string;showExport?:boolean}) {
   function exportCSV() {
     const headers = ['',  ...months, 'Total']
     const data = rows.map(r => [r.label, ...r.values.map(v=>String(Math.round(v))), String(Math.round(r.values.reduce((s,v)=>s+v,0)))])
@@ -95,6 +99,7 @@ function PLTable({title,rows,months,cc,showExport}:{title?:string;rows:{label:st
     const a = document.createElement('a'); a.href=url; a.download=`${title||'export'}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
+  const hasActuals = rows.some(r=>r.actualMask?.some(Boolean))
   return (
     <div style={{...card,padding:0,overflow:'hidden'}}>
       {title&&(
@@ -104,6 +109,12 @@ function PLTable({title,rows,months,cc,showExport}:{title?:string;rows:{label:st
             <button style={addBtn(true)} onClick={()=>window.print()}>Print</button>
             <button style={addBtn(true)} onClick={exportCSV}>Export CSV</button>
           </div>}
+        </div>
+      )}
+      {hasActuals&&(
+        <div style={{padding:'0.5rem 1.1rem',fontSize:'0.68rem',fontFamily:'monospace',color:C.teal,display:'flex',alignItems:'center',gap:'0.4rem',background:'#F4FDFB'}}>
+          <span style={{width:10,height:10,borderRadius:2,background:'#EAFAF6',border:`2px solid ${C.teal}`,display:'inline-block'}}></span>
+          Teal-bordered months show real Clearview Field / Actuals data, not plan
         </div>
       )}
       <div style={{overflowX:'auto'}}>
@@ -167,6 +178,10 @@ export default function GenericDashboard({
   const [view, setView] = useState('overview')
   const [saving, setSaving] = useState(false)
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0)
+  // unit_id -> period -> line_id -> combined (manual + field) value.
+  // Feeds runGenericModel's hybrid mode: months with actuals show actuals,
+  // months ahead still show plan. See docs/ACCOUNTING_ARCHITECTURE.md.
+  const [modelActuals, setModelActuals] = useState<Record<string, Record<string, Record<string, number>>>>({})
 
   useEffect(() => {
     if (!clientId) return
@@ -174,6 +189,31 @@ export default function GenericDashboard({
       .eq('client_id',clientId).in('status',['pending_fm','pending_ceo'])
       .then(({count}) => setPendingApprovalCount(count||0))
   }, [clientId, view])
+
+  // Fetch actuals for the P&L's hybrid mode: real data for months that
+  // have it, plan for months ahead. Combines line_values (manual) and
+  // field_line_values (from Clearview Field) here -- these must never be
+  // treated as one shared value, see docs/ACCOUNTING_ARCHITECTURE.md sec 4.
+  useEffect(() => {
+    if (!clientId) return
+    supabase.from('generic_actuals').select('unit_id,period,line_values,field_line_values')
+      .eq('client_id', clientId)
+      .then(({data}) => {
+        const byUnit: Record<string, Record<string, Record<string, number>>> = {}
+        ;(data||[]).forEach((row:any) => {
+          const lineValues = row.line_values || {}
+          const fieldLineValues = row.field_line_values || {}
+          const lineIds = new Set([...Object.keys(lineValues), ...Object.keys(fieldLineValues)])
+          if (lineIds.size === 0) return
+          if (!byUnit[row.unit_id]) byUnit[row.unit_id] = {}
+          byUnit[row.unit_id][row.period] = {}
+          lineIds.forEach(lineId => {
+            byUnit[row.unit_id][row.period][lineId] = combinedActual(lineId, lineValues, fieldLineValues)
+          })
+        })
+        setModelActuals(byUnit)
+      })
+  }, [clientId])
 
   // Load config from Supabase
   useEffect(() => {
@@ -238,7 +278,7 @@ export default function GenericDashboard({
   }, [P.userId])
 
   const months = useMemo(() => config ? buildMonthLabels(config.start_date, config.planning_months) : [], [config])
-  const result = useMemo(() => config && config.business_units.length > 0 ? runGenericModel(config) : null, [config])
+  const result = useMemo(() => config && config.business_units.length > 0 ? runGenericModel(config, modelActuals) : null, [config, modelActuals])
   const cc = config?.currency || 'UGX'
 
   if (loading) return <Spinner/>
@@ -2122,6 +2162,18 @@ function PLTab({config,result,months,cc,P}) {
   const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active)?.id||'')
   if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
 
+  // Hybrid: use the actual figure for a month where one exists, plan
+  // otherwise. actualMask marks which months in the row are real data, so
+  // PLRow can highlight them distinctly. Each row's own actual field
+  // (act_rev, act_gp, act_ebitda, etc) determines availability
+  // independently -- e.g. actual revenue can exist for a month before
+  // actual EBITDA does, if opex actuals haven't been entered yet.
+  function hybridRow(planValues:number[], actualValues:(number|null)[]) {
+    const values = planValues.map((v,i)=> actualValues[i] !== null ? (actualValues[i] as number) : v)
+    const actualMask = actualValues.map(v => v !== null)
+    return { values, actualMask }
+  }
+
   return (
     <div>
       <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
@@ -2138,12 +2190,17 @@ function PLTab({config,result,months,cc,P}) {
       {viewMode==='unit' && (() => {
         const pl = result.unitPL[selUnit]
         if (!pl) return <div style={card}><p style={{color:C.slate}}>No data for this unit.</p></div>
+        const revH = hybridRow(pl.rev, pl.act_rev)
+        const cogsH = hybridRow(pl.cogs, pl.act_cogs)
+        const gpH = hybridRow(pl.gp, pl.act_gp)
+        const staffH = hybridRow(pl.staff, pl.act_staff)
+        const opexH = hybridRow(pl.opex, pl.act_opex)
         const rows = [
-          {label:'Revenue',values:pl.rev,bold:true},
-          {label:'Cost of Sales',values:pl.cogs,negate:true},
-          {label:'Gross Profit',values:pl.gp,bold:true,highlight:true},
-          {label:'Staff Costs',values:pl.staff,negate:true},
-          {label:'Direct Overheads',values:pl.opex,negate:true},
+          {label:'Revenue',values:revH.values,bold:true,actualMask:revH.actualMask},
+          {label:'Cost of Sales',values:cogsH.values,negate:true,actualMask:cogsH.actualMask},
+          {label:'Gross Profit',values:gpH.values,bold:true,highlight:true,actualMask:gpH.actualMask},
+          {label:'Staff Costs',values:staffH.values,negate:true,actualMask:staffH.actualMask},
+          {label:'Direct Overheads',values:opexH.values,negate:true,actualMask:opexH.actualMask},
           {label:'Shared Costs',values:pl.shared,negate:true},
           {label:'EBITDA',values:pl.ebitda,bold:true,highlight:true},
         ]
@@ -2173,12 +2230,16 @@ function PLTab({config,result,months,cc,P}) {
 
       {viewMode==='consolidated' && (() => {
         const con = result.con
+        const revH = hybridRow(con.rev, con.act_rev)
+        const cogsH = hybridRow(con.cogs, con.act_cogs)
+        const gpH = hybridRow(con.gp, con.act_gp)
+        const ebitdaH = hybridRow(con.ebitda, con.act_ebitda)
         const rows = [
-          {label:'Revenue',values:con.rev,bold:true},
-          {label:'Cost of Sales',values:con.cogs,negate:true},
-          {label:'Gross Profit',values:con.gp,bold:true,highlight:true},
+          {label:'Revenue',values:revH.values,bold:true,actualMask:revH.actualMask},
+          {label:'Cost of Sales',values:cogsH.values,negate:true,actualMask:cogsH.actualMask},
+          {label:'Gross Profit',values:gpH.values,bold:true,highlight:true,actualMask:gpH.actualMask},
           {label:'Total Operating Costs',values:con.opex,negate:true},
-          {label:'EBITDA',values:con.ebitda,bold:true,highlight:true},
+          {label:'EBITDA',values:ebitdaH.values,bold:true,highlight:true,actualMask:ebitdaH.actualMask},
           {label:'Interest',values:con.interest,negate:true},
           {label:'Net Profit Before Tax',values:con.nbt,bold:true},
           {label:'Tax',values:con.tax,negate:true},
