@@ -141,6 +141,17 @@ export async function POST(req: NextRequest) {
           device_id: device_id || null,
           synced_at: new Date().toISOString(),
           local_id: t.local_id || null,
+          // Explicit values, not omitted: when a batch upsert mixes rows
+          // that set a key (sale rows set price_overridden/price_alert)
+          // with rows that don't, PostgREST uses the union of keys across
+          // the WHOLE batch as the column list -- rows missing a key get
+          // an explicit NULL for it, not the column's default. price_overridden
+          // is NOT NULL with no meaningful value for a cost entry, so it
+          // must be set explicitly here or every cost row in a mixed
+          // sale+cost batch fails the constraint.
+          catalogue_item_id: null,
+          price_overridden: false,
+          price_alert: false,
         })
       }
 
