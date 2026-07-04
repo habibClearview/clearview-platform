@@ -11,6 +11,7 @@ import {
 } from '@/lib/generic-engine'
 import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor } from '@/lib/scoring-engine'
 import { combinedActual, computeActualsTotals } from '@/lib/actuals'
+import { computeExceptionReport, canClosePeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
@@ -67,7 +68,7 @@ function SectionHeader({title,action}:{title:string;action?:React.ReactNode}) {
   )
 }
 
-function PLRow({label,values,bold,highlight,negate,months,cc,actualMask}:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;months:string[];cc:string;actualMask?:boolean[]}) {
+function PLRow({label,values,bold,highlight,negate,months,cc,actualMask,closedMask}:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;months:string[];cc:string;actualMask?:boolean[];closedMask?:boolean[]}) {
   const total = values.reduce((s,v)=>s+v,0)
   const display = (v:number) => negate ? fmt(-Math.abs(v),cc) : fmt(v,cc)
   return (
@@ -75,9 +76,12 @@ function PLRow({label,values,bold,highlight,negate,months,cc,actualMask}:{label:
       <td style={{padding:'7px 10px',fontWeight:bold?700:400,color:C.navy,minWidth:160,fontSize:'0.8rem'}}>{label}</td>
       {values.map((v,i)=>{
         const isActual = actualMask?.[i]
+        const isClosed = isActual && closedMask?.[i]
         return (
-        <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',color:negate?C.red:v<0?C.red:C.navy,fontWeight:bold?700:400,
-          background:isActual?'#EAFAF6':undefined,borderBottom:isActual?`2px solid ${C.teal}`:undefined}}>
+        <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',
+          color:isClosed?C.white:negate?C.red:v<0?C.red:C.navy,fontWeight:bold?700:400,
+          background:isClosed?C.navy:isActual?'#EAFAF6':undefined,
+          borderBottom:isActual&&!isClosed?`2px solid ${C.teal}`:undefined}}>
           {display(v)}
         </td>
         )
@@ -89,7 +93,7 @@ function PLRow({label,values,bold,highlight,negate,months,cc,actualMask}:{label:
   )
 }
 
-function PLTable({title,rows,months,cc,showExport}:{title?:string;rows:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;actualMask?:boolean[]}[];months:string[];cc:string;showExport?:boolean}) {
+function PLTable({title,rows,months,cc,showExport,closedMask}:{title?:string;rows:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;actualMask?:boolean[]}[];months:string[];cc:string;showExport?:boolean;closedMask?:boolean[]}) {
   function exportCSV() {
     const headers = ['',  ...months, 'Total']
     const data = rows.map(r => [r.label, ...r.values.map(v=>String(Math.round(v))), String(Math.round(r.values.reduce((s,v)=>s+v,0)))])
@@ -112,9 +116,15 @@ function PLTable({title,rows,months,cc,showExport}:{title?:string;rows:{label:st
         </div>
       )}
       {hasActuals&&(
-        <div style={{padding:'0.5rem 1.1rem',fontSize:'0.68rem',fontFamily:'monospace',color:C.teal,display:'flex',alignItems:'center',gap:'0.4rem',background:'#F4FDFB'}}>
-          <span style={{width:10,height:10,borderRadius:2,background:'#EAFAF6',border:`2px solid ${C.teal}`,display:'inline-block'}}></span>
-          Teal-bordered months show real Clearview Field / Actuals data, not plan
+        <div style={{padding:'0.5rem 1.1rem',fontSize:'0.68rem',fontFamily:'monospace',color:C.teal,display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap',background:'#F4FDFB'}}>
+          <span style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
+            <span style={{width:10,height:10,borderRadius:2,background:'#EAFAF6',border:`2px solid ${C.teal}`,display:'inline-block'}}></span>
+            Real data, still updating (live)
+          </span>
+          <span style={{display:'flex',alignItems:'center',gap:'0.4rem',color:C.navy}}>
+            <span style={{width:10,height:10,borderRadius:2,background:C.navy,display:'inline-block'}}></span>
+            Closed -- final, locked at month-end
+          </span>
         </div>
       )}
       <div style={{overflowX:'auto'}}>
@@ -127,7 +137,7 @@ function PLTable({title,rows,months,cc,showExport}:{title?:string;rows:{label:st
             </tr>
           </thead>
           <tbody>
-            {rows.map((r,i)=><PLRow key={i} {...r} months={months} cc={cc}/>)}
+            {rows.map((r,i)=><PLRow key={i} {...r} months={months} cc={cc} closedMask={closedMask}/>)}
           </tbody>
         </table>
       </div>
@@ -182,6 +192,11 @@ export default function GenericDashboard({
   // Feeds runGenericModel's hybrid mode: months with actuals show actuals,
   // months ahead still show plan. See docs/ACCOUNTING_ARCHITECTURE.md.
   const [modelActuals, setModelActuals] = useState<Record<string, Record<string, Record<string, number>>>>({})
+  // Which periods (YYYY-MM-01 strings) have been closed via month-end
+  // close -- lets the P&L distinguish a "live, still updating" actual
+  // month from a "closed, final" one (docs/ACCOUNTING_ARCHITECTURE.md
+  // section 5: the live highlight moves to the new current month at close).
+  const [closedPeriods, setClosedPeriods] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!clientId) return
@@ -214,6 +229,12 @@ export default function GenericDashboard({
         })
         setModelActuals(byUnit)
       })
+  }, [clientId])
+
+  useEffect(() => {
+    if (!clientId) return
+    supabase.from('generic_period_close').select('period').eq('client_id', clientId).eq('closed', true)
+      .then(({data}) => setClosedPeriods(new Set((data||[]).map((r:any) => r.period))))
   }, [clientId])
 
   // Load config from Supabase
@@ -341,7 +362,7 @@ export default function GenericDashboard({
         {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P}/>}
         {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
         {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
-        {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P}/>}
+        {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods}/>}
         {view==='cashflow'    && <CashFlowTab result={result} months={months} cc={cc}/>}
         {view==='balancesheet'&& <BalanceSheetTab result={result} months={months} cc={cc}/>}
         {view==='margins'     && <MarginsTab config={config} result={result} months={months} cc={cc}/>}
@@ -750,6 +771,9 @@ function ActualsTab({config,months,cc,P,onSave}) {
   const [saving, setSaving] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [allActuals, setAllActuals] = useState<any[]>([])
+  const [periodClose, setPeriodClose] = useState<any>(null)
+  const [staleCatalogue, setStaleCatalogue] = useState<any[]>([])
+  const [closing, setClosing] = useState(false)
 
   // Rolling 24 months
   const periodMonths = Array.from({length:24},(_,i)=>{
@@ -787,7 +811,23 @@ function ActualsTab({config,months,cc,P,onSave}) {
       .then(({data})=>setAllActuals(data||[]))
   },[selPeriod,canSeeAll])
 
+  // Month-end close data: only fetched for roles who can actually close a
+  // period. Catalogue items are fetched client-wide (not per-unit) since
+  // the 90-day cost-price review gate applies to the whole company, and
+  // period close is a single company-wide action, not per business unit.
+  useEffect(()=>{
+    if (!canSeeAll) return
+    supabase.from('generic_period_close').select('*')
+      .eq('client_id',config.client_id).eq('period',selPeriod)
+      .maybeSingle()
+      .then(({data})=>setPeriodClose(data))
+    supabase.from('field_catalogue').select('id,name,cost_price,cost_price_updated_at')
+      .eq('client_id',config.client_id).eq('active',true).not('cost_price','is',null)
+      .then(({data})=>setStaleCatalogue(data||[]))
+  },[selPeriod,canSeeAll,config.client_id])
+
   async function save(submit=false) {
+    if (periodClose?.closed) { alert('This period is closed and cannot be edited. Ask your Finance Manager to reopen it first.'); return }
     setSaving(true)
     const {error} = await supabase.from('generic_actuals').upsert({
       client_id:config.client_id, unit_id:selUnit, period:selPeriod,
@@ -799,6 +839,68 @@ function ActualsTab({config,months,cc,P,onSave}) {
     },{onConflict:'client_id,unit_id,period'})
     if (!error) { if(submit) setSubmitted(true) }
     setSaving(false)
+  }
+
+  // Month-end close: computes the exception report from real data --
+  // stale cost prices (client-wide) and, per unit, actual revenue vs
+  // planned revenue for this period. See docs/ACCOUNTING_ARCHITECTURE.md
+  // section 5. Uses the shared, tested src/lib/month-end-close.ts so this
+  // exact logic (not a copy) is what tests exercise.
+  function monthIndexForPeriod(period: string): number {
+    const start = new Date(config.start_date)
+    const p = new Date(period)
+    return (p.getFullYear() - start.getFullYear()) * 12 + (p.getMonth() - start.getMonth())
+  }
+
+  const unitRevenueChecks: UnitRevenueCheck[] = canSeeAll ? visibleUnits.map(u => {
+    const mIdx = monthIndexForPeriod(selPeriod)
+    const revLines = config.plan_lines.filter((l:any) => l.unit_id === u.id && l.category === 'revenue' && l.active)
+    const plannedRevenue = revLines.reduce((s:number,l:any) => s + (mIdx >= 0 && mIdx < (l.monthly_plan||[]).length ? (l.monthly_plan[mIdx]||0) : 0), 0)
+    const unitRow = allActuals.find((a:any) => a.unit_id === u.id)
+    const actualRevenue = unitRow
+      ? revLines.reduce((s:number,l:any) => s + combinedActual(l.id, unitRow.line_values||{}, unitRow.field_line_values||{}), 0)
+      : null
+    return { unit_id: u.id, unit_name: u.name, planned_revenue: plannedRevenue, actual_revenue: actualRevenue }
+  }) : []
+
+  const exceptionReport = canSeeAll ? computeExceptionReport(staleCatalogue, unitRevenueChecks) : []
+  const blockingExceptions = exceptionReport.filter(e => e.severity === 'blocking')
+  const canClose = canClosePeriod(exceptionReport)
+
+  async function closePeriod() {
+    if (!canClose) return
+    setClosing(true)
+    const {error} = await supabase.from('generic_period_close').upsert({
+      client_id: config.client_id, period: selPeriod, closed: true,
+      closed_at: new Date().toISOString(), closed_by: P.fullName,
+      exception_report: exceptionReport,
+    }, {onConflict:'client_id,period'})
+    if (!error) setPeriodClose({ closed: true, closed_at: new Date().toISOString(), closed_by: P.fullName })
+    else alert('Could not close this period. Please try again.')
+    setClosing(false)
+  }
+
+  async function reopenPeriod() {
+    if (!confirm('Reopen this period for editing? This should only be done to correct a genuine mistake.')) return
+    setClosing(true)
+    const {error} = await supabase.from('generic_period_close')
+      .update({ closed: false }).eq('client_id', config.client_id).eq('period', selPeriod)
+    if (!error) setPeriodClose((prev:any) => ({ ...prev, closed: false }))
+    else alert('Could not reopen this period. Please try again.')
+    setClosing(false)
+  }
+
+  // "Confirm still accurate" -- reuses the existing catalogue PATCH route
+  // with the SAME cost_price value, which refreshes cost_price_updated_at
+  // to now() without changing the actual price. No separate endpoint needed.
+  async function confirmCostPriceStillAccurate(itemId: string, currentCostPrice: number) {
+    await fetch('/api/field/admin/catalogue', {
+      method: 'PATCH', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ id: itemId, cost_price: currentCostPrice }),
+    })
+    const {data} = await supabase.from('field_catalogue').select('id,name,cost_price,cost_price_updated_at')
+      .eq('client_id',config.client_id).eq('active',true).not('cost_price','is',null)
+    setStaleCatalogue(data||[])
   }
 
   const lines = config.plan_lines.filter(l=>l.unit_id===selUnit&&l.active&&!l.name.startsWith('Add '))
@@ -826,7 +928,47 @@ function ActualsTab({config,months,cc,P,onSave}) {
           {periodMonths.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}
         </select>
         {submitted&&<Badge text="Submitted" color={C.green}/>}
+        {periodClose?.closed&&<Badge text="Closed" color={C.navy}/>}
       </div>
+
+      {/* Month-End Close -- docs/ACCOUNTING_ARCHITECTURE.md section 5.
+          Only shown to roles who can actually close a period. */}
+      {canSeeAll&&(
+        <div style={{...card,borderLeft:`4px solid ${periodClose?.closed?C.navy:blockingExceptions.length>0?C.red:C.green}`,marginBottom:'1.25rem'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.5rem'}}>
+            <div style={{fontWeight:700,color:C.navy,fontSize:'0.88rem'}}>Month-End Close — {periodMonths.find(m=>m.value===selPeriod)?.label}</div>
+            {periodClose?.closed ? (
+              <button style={addBtn(true,C.slate)} onClick={reopenPeriod} disabled={closing}>{closing?'...':'Reopen Period'}</button>
+            ) : (
+              <button style={addBtn(true,canClose?C.green:C.border)} onClick={closePeriod} disabled={!canClose||closing}>
+                {closing?'Closing...':'Close This Month'}
+              </button>
+            )}
+          </div>
+          {periodClose?.closed ? (
+            <div style={{fontSize:'0.78rem',color:C.slate}}>Closed by {periodClose.closed_by} on {new Date(periodClose.closed_at).toLocaleDateString()}. Figures are final -- reopen only to correct a genuine mistake.</div>
+          ) : exceptionReport.length===0 ? (
+            <div style={{fontSize:'0.78rem',color:C.green}}>No exceptions found. This month is ready to close.</div>
+          ) : (
+            <div>
+              <div style={{fontSize:'0.78rem',color:C.slate,marginBottom:'0.5rem'}}>
+                {blockingExceptions.length>0
+                  ? `${blockingExceptions.length} item${blockingExceptions.length===1?'':'s'} must be resolved before this month can close:`
+                  : 'For your review -- these do not block closing:'}
+              </div>
+              {exceptionReport.map((exc,i)=>(
+                <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.5rem 0.75rem',background:exc.severity==='blocking'?'#FDF2F0':'#FFFBEB',borderRadius:4,marginBottom:'0.4rem',gap:'0.5rem'}}>
+                  <div style={{fontSize:'0.78rem',color:exc.severity==='blocking'?C.red:C.amber}}>{exc.message}</div>
+                  {exc.type==='stale_cost_price'&&(()=>{
+                    const item = staleCatalogue.find((c:any)=>c.id===exc.ref_id)
+                    return item ? <button style={addBtn(true)} onClick={()=>confirmCostPriceStillAccurate(item.id, item.cost_price)}>Confirm Still Accurate</button> : null
+                  })()}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* All units summary */}
       {canSeeAll&&allActuals.length>0&&(
@@ -886,9 +1028,9 @@ function ActualsTab({config,months,cc,P,onSave}) {
                       <div style={{display:'grid',gridTemplateColumns:'1fr 180px',alignItems:'center',gap:'0.75rem'}}>
                         <label htmlFor={`actual-${l.id}`} style={{fontWeight:600,fontSize:'0.82rem',color:C.navy,lineHeight:1.3}}>{l.name}</label>
                         <input id={`actual-${l.id}`} type="number"
-                          style={{width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'monospace',background:submitted&&!canSeeAll?'#F5F5F5':C.white,color:C.navy,textAlign:'right',boxSizing:'border-box'}}
+                          style={{width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'monospace',background:(periodClose?.closed||(submitted&&!canSeeAll))?'#F5F5F5':C.white,color:C.navy,textAlign:'right',boxSizing:'border-box'}}
                           value={lineValues[l.id]??''} placeholder="0"
-                          disabled={submitted&&!canSeeAll}
+                          disabled={periodClose?.closed||(submitted&&!canSeeAll)}
                           onChange={e=>setLineValues(v=>({...v,[l.id]:Number(e.target.value)}))}/>
                       </div>
                       {/* Field-app figure is read-only here -- it's written exclusively
@@ -2226,10 +2368,20 @@ function TradeCreditLineGrid({line,months,cc,canEdit,updateLineName,removeLine,u
   )
 }
 // ── P&L TAB (Unit + Consolidated merged with toggle) ─────────
-function PLTab({config,result,months,cc,P}) {
+function PLTab({config,result,months,cc,P,closedPeriods}) {
   const [viewMode, setViewMode] = useState<'unit'|'consolidated'>('unit')
   const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active)?.id||'')
   if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
+
+  // Which month indices correspond to a CLOSED period -- distinct from
+  // "has actual data" (actualMask below). A month can have actual data
+  // and still be open/live; once closed, it's final.
+  // docs/ACCOUNTING_ARCHITECTURE.md section 5.
+  const closedMask: boolean[] = months.map((_:string, i:number) => {
+    const d = new Date(config.start_date); d.setMonth(d.getMonth() + i); d.setDate(1)
+    const period = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`
+    return closedPeriods?.has(period) ?? false
+  })
 
   // Hybrid: use the actual figure for a month where one exists, plan
   // otherwise. actualMask marks which months in the row are real data, so
@@ -2292,7 +2444,7 @@ function PLTab({config,result,months,cc,P}) {
                 </button>
               ))}
             </div>
-            <PLTable title={`${config.business_units.find(u=>u.id===selUnit)?.name} — P&L`} rows={rows} months={months} cc={cc} showExport/>
+            <PLTable title={`${config.business_units.find(u=>u.id===selUnit)?.name} — P&L`} rows={rows} months={months} cc={cc} showExport closedMask={closedMask}/>
             <div style={kpiGrid}>
               <KPI label="Annual Revenue" value={fmt(pl.ann_rev,cc)}/>
               <KPI label="Gross Profit" value={fmt(pl.ann_gp,cc)} sub={pct(pl.gp_margin)} color={pl.ann_gp>=0?C.green:C.red}/>
@@ -2331,7 +2483,7 @@ function PLTab({config,result,months,cc,P}) {
           {label:'Tax',values:con.tax,negate:true},
           {label:'Net Profit After Tax',values:con.npat,bold:true,highlight:true},
         ]
-        return <PLTable title={`${config.business_name} — Consolidated P&L`} rows={rows} months={months} cc={cc} showExport/>
+        return <PLTable title={`${config.business_name} — Consolidated P&L`} rows={rows} months={months} cc={cc} showExport closedMask={closedMask}/>
       })()}
     </div>
   )
