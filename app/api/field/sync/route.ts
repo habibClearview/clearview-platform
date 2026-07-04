@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
         const catalogueIds = Array.from(new Set(saleEntries.map((t: any) => t.catalogue_item_id)))
         const { data: catalogueItems, error: catErr } = await supabase
           .from('field_catalogue')
-          .select('id, name, price, plan_line_id')
+          .select('id, name, price, plan_line_id, cost_price, cogs_plan_line_id')
           .in('id', catalogueIds)
           .eq('client_id', operator.client_id)
           .eq('business_unit_id', operator.business_unit_id)
@@ -112,6 +112,43 @@ export async function POST(req: NextRequest) {
             // button and a Background Sync firing for the same queued item.
             local_id: t.local_id || null,
           })
+
+          // Standard costing (docs/ACCOUNTING_ARCHITECTURE.md section 3):
+          // if this catalogue item has a cost price set, automatically
+          // book a matching COGS entry -- volume actually sold x standard
+          // cost price. This always uses the STANDARD cost price, never
+          // the sale's sell price (even if that was bulk-overridden) --
+          // what the goods cost the business doesn't change just because
+          // they were sold at a discount. Zero extra input from the
+          // operator, matching how price already works.
+          if (item.cost_price !== null && item.cost_price !== undefined && item.cogs_plan_line_id) {
+            rows.push({
+              client_id: operator.client_id,
+              business_unit_id: operator.business_unit_id,
+              plan_line_id: item.cogs_plan_line_id,
+              plan_line_name: `${item.name} (COGS)`,
+              transaction_type: 'cogs_auto',
+              category: 'cost_of_sales',
+              amount: quantity * Number(item.cost_price),
+              quantity,
+              unit_price: Number(item.cost_price),
+              payment_method: null,
+              customer_id: null,
+              transaction_date: t.transaction_date || new Date().toISOString().split('T')[0],
+              operator_id: operator.id,
+              notes: null,
+              device_id: device_id || null,
+              synced_at: new Date().toISOString(),
+              catalogue_item_id: item.id,
+              price_overridden: false,
+              price_alert: false,
+              // Deterministic, derived from the sale's own local_id -- a
+              // retry of the same sale must produce the same COGS
+              // local_id too, or the idempotency dedup on the sale
+              // wouldn't protect the COGS side from duplicating.
+              local_id: t.local_id ? `${t.local_id}_cogs` : null,
+            })
+          }
         }
       }
 

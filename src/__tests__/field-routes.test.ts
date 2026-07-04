@@ -358,3 +358,70 @@ describe('Field Sync — queue-clearing decision', () => {
     expect(shouldClearQueue(response)).toBe(true)
   })
 })
+
+// ── Standard costing: automatic COGS generation (app/api/field/sync/route.ts) ──
+// Re-implements the pure decision logic for testing without HTTP/DB.
+// Per docs/ACCOUNTING_ARCHITECTURE.md section 3: standard costing means
+// COGS is always quantity x the catalogue's STANDARD cost price, never
+// affected by a sale-side bulk override on the sell price -- what the
+// goods actually cost the business doesn't change just because they were
+// sold at a discount.
+
+interface CatalogueItemForCogs { id: string; name: string; cost_price: number | null; cogs_plan_line_id: string | null }
+
+function buildAutoCogsRow(item: CatalogueItemForCogs, quantity: number, saleLocalId: string | null) {
+  if (item.cost_price === null || item.cost_price === undefined || !item.cogs_plan_line_id) return null
+  return {
+    plan_line_id: item.cogs_plan_line_id,
+    category: 'cost_of_sales',
+    transaction_type: 'cogs_auto',
+    amount: quantity * item.cost_price,
+    unit_price: item.cost_price,
+    catalogue_item_id: item.id,
+    local_id: saleLocalId ? `${saleLocalId}_cogs` : null,
+  }
+}
+
+describe('Standard Costing — automatic COGS generation', () => {
+  it('REG: no COGS row is generated when the catalogue item has no cost price set -- never fabricates a cost that was never provided', () => {
+    const item: CatalogueItemForCogs = { id: 'c1', name: 'Maize', cost_price: null, cogs_plan_line_id: null }
+    expect(buildAutoCogsRow(item, 10, 'local_1')).toBeNull()
+  })
+
+  it('REG: a COGS row is generated when cost_price and cogs_plan_line_id are both set', () => {
+    const item: CatalogueItemForCogs = { id: 'c1', name: 'Maize', cost_price: 8000, cogs_plan_line_id: 'cogs_line_1' }
+    const row = buildAutoCogsRow(item, 10, 'local_1')
+    expect(row).not.toBeNull()
+    expect(row!.amount).toBe(80000)
+    expect(row!.plan_line_id).toBe('cogs_line_1')
+    expect(row!.category).toBe('cost_of_sales')
+  })
+
+  it('REG: COGS uses the STANDARD cost price, completely independent of any sell-side bulk override -- the goods did not get cheaper to buy just because they were sold at a discount', () => {
+    const item: CatalogueItemForCogs = { id: 'c1', name: 'Maize', cost_price: 8000, cogs_plan_line_id: 'cogs_line_1' }
+    // Same quantity, regardless of what sell-price override was used for
+    // the revenue side -- buildAutoCogsRow doesn't even take a sell price,
+    // by design, because it's irrelevant to what COGS should be.
+    const row = buildAutoCogsRow(item, 10, 'local_1')
+    expect(row!.unit_price).toBe(8000)
+    expect(row!.amount).toBe(80000)
+  })
+
+  it('REG: the COGS local_id is deterministically derived from the sale local_id -- a retry of the same sale must produce the identical COGS local_id, or idempotency dedup would not protect the COGS side', () => {
+    const item: CatalogueItemForCogs = { id: 'c1', name: 'Maize', cost_price: 8000, cogs_plan_line_id: 'cogs_line_1' }
+    const first = buildAutoCogsRow(item, 10, 'local_abc')
+    const retry = buildAutoCogsRow(item, 10, 'local_abc')
+    expect(first!.local_id).toBe(retry!.local_id)
+    expect(first!.local_id).toBe('local_abc_cogs')
+  })
+
+  it('REG: cost_price of exactly zero is still a valid, deliberately-set cost -- must not be treated the same as "not set"', () => {
+    // A donated or free-of-cost input is a real business scenario --
+    // 0 is a real answer, not the absence of one. Only null/undefined
+    // means "not set".
+    const item: CatalogueItemForCogs = { id: 'c1', name: 'Free Sample', cost_price: 0, cogs_plan_line_id: 'cogs_line_1' }
+    const row = buildAutoCogsRow(item, 10, 'local_1')
+    expect(row).not.toBeNull()
+    expect(row!.amount).toBe(0)
+  })
+})
