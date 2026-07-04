@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { shouldClearQueue } from '../lib/field-db'
+import { friendlyDbError } from '../lib/field-errors'
 
 // Tests for Clearview Field API route logic
 // Tests the validation and transformation logic without HTTP or DB
@@ -309,6 +310,31 @@ describe('Field Capture — catalogue-driven sale amount', () => {
 // public/field-sw.js applies the identical condition inline (it's a plain
 // static file and can't import this shared helper); see the cross-reference
 // comment there.
+
+describe('Field Sync — friendly error messages', () => {
+  // Imports the real friendlyDbError from src/lib/field-errors.ts rather
+  // than re-implementing it here -- same reasoning as shouldClearQueue
+  // above: a regression in the actual translation is caught, not a copy.
+
+  it('REG: a raw Postgres check-constraint error never reaches the operator as-is', () => {
+    const raw = 'new row for relation "field_transactions" violates check constraint "field_transactions_payment_method_check"'
+    const friendly = friendlyDbError(raw)
+    expect(friendly).not.toContain('relation')
+    expect(friendly).not.toContain('field_transactions_payment_method_check')
+    expect(friendly.toLowerCase()).toContain('payment method')
+  })
+
+  it('REG: a foreign key violation gets a plain-English explanation', () => {
+    const raw = 'insert or update on table "field_transactions" violates foreign key constraint "field_transactions_customer_id_fkey"'
+    expect(friendlyDbError(raw).toLowerCase()).toContain('no longer exists')
+  })
+
+  it('REG: an unrecognised error still gets a non-technical, reassuring fallback', () => {
+    const friendly = friendlyDbError('some completely unexpected database error XKCD1234')
+    expect(friendly).not.toContain('XKCD1234')
+    expect(friendly.toLowerCase()).toContain('safe')
+  })
+})
 
 describe('Field Sync — queue-clearing decision', () => {
   it('REG: a fully successful sync (no errors) clears the queue', () => {

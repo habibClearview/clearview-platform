@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { friendlyDbError } from '@/lib/field-errors'
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -39,6 +40,10 @@ export async function POST(req: NextRequest) {
     if (!operator) return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
 
     const errors: string[] = []
+    // Kept separately for field_sync_log so you or I can actually diagnose
+    // what happened later -- the operator only ever sees the friendly
+    // versions pushed into `errors` above.
+    const technicalErrors: string[] = []
     let txSynced = 0
     let creditSynced = 0
     const priceAlerts: string[] = []
@@ -154,7 +159,7 @@ export async function POST(req: NextRequest) {
           .from('field_transactions')
           .upsert(rows, { onConflict: 'client_id,local_id', ignoreDuplicates: true })
           .select('id')
-        if (txErr) errors.push(`Transaction insert error: ${txErr.message}`)
+        if (txErr) { technicalErrors.push(`Transaction insert error: ${txErr.message}`); errors.push(friendlyDbError(txErr.message)) }
         else txSynced = insertedTx?.length ?? 0
       }
     }
@@ -191,15 +196,28 @@ export async function POST(req: NextRequest) {
           .from('field_credit_transactions')
           .upsert(rows, { onConflict: 'client_id,local_id', ignoreDuplicates: true })
           .select('id')
-        if (creditErr) errors.push(`Credit insert error: ${creditErr.message}`)
+        if (creditErr) { technicalErrors.push(`Credit insert error: ${creditErr.message}`); errors.push(friendlyDbError(creditErr.message)) }
         else creditSynced = insertedCredit?.length ?? 0
       }
     }
 
-    if (txSynced > 0) {
+    // Runs whenever ANY transaction was attempted, not just newly-inserted
+    // ones (txSynced > 0 would miss this). Why it matters: if aggregation
+    // fails once (e.g. a transient DB error) after rows were successfully
+    // inserted, a later retry of the exact same batch will have txSynced=0
+    // -- every row already exists and gets silently skipped by the
+    // idempotency dedup. Gating on txSynced > 0 would mean those rows can
+    // never trigger aggregation again, permanently stranding them in
+    // field_transactions without ever reaching generic_actuals.
+    // aggregate_field_transactions() recomputes full sums each time, so
+    // calling it again is always safe, never double-counts. Also covers a
+    // sync that contains only credit_transactions with no regular
+    // transactions -- must run after every sync, not just when standard
+    // transactions happen to be present.
+    if (transactions.length > 0 || credit_transactions.length > 0) {
       const { error: aggErr } = await supabase
         .rpc('aggregate_field_transactions', { p_client_id: operator.client_id })
-      if (aggErr) errors.push(`Aggregation error: ${aggErr.message}`)
+      if (aggErr) { technicalErrors.push(`Aggregation error: ${aggErr.message}`); errors.push('Your entries were saved, but the summary figures haven\'t updated yet. They\'ll catch up automatically -- no need to re-enter anything.') }
     }
 
     await supabase.from('field_sync_log').insert({
@@ -209,7 +227,7 @@ export async function POST(req: NextRequest) {
       sync_type: 'manual',
       transactions_synced: txSynced,
       credit_synced: creditSynced,
-      errors: [...errors, ...priceAlerts.map(a => `Price alert: ${a}`)].join('; ') || null,
+      errors: [...technicalErrors, ...priceAlerts.map(a => `Price alert: ${a}`)].join('; ') || null,
     })
 
     return NextResponse.json({
