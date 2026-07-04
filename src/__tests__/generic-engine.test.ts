@@ -532,3 +532,73 @@ describe('Generic Engine — hybrid Cash Flow and Balance Sheet', () => {
     expect(result.cf.op_cash[1]).toBeCloseTo(result.con.npat[1] + (result.cf.working_capital_adj[1] || 0), 2)
   })
 })
+
+describe('Generic Engine — actual EBITDA when a category genuinely does not exist in the business', () => {
+  // Found from real live data: a real client unit had revenue and
+  // cost_of_sales plan lines, but no 'staff' category line at all (no
+  // employees costed separately from overheads). The original gate
+  // required ALL FOUR categories to have actual data before computing
+  // actual EBITDA -- meaning a business with no staff line could NEVER
+  // get an actual EBITDA, no matter how complete its real data was for
+  // the categories that actually applied to it.
+  function makeNoStaffConfig(overrides: Record<string,any> = {}) {
+    return defaultGenericConfig({
+      client_id: 'test', business_name: 'Test Co', currency: 'UGX', planning_months: 12,
+      business_units: [{ id: 'u1', name: 'Main Unit', short: 'MU', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 0 }],
+      plan_lines: [
+        { id: 'rev1', unit_id: 'u1', name: 'Sales', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(10_000_000), active: true },
+        { id: 'cogs1', unit_id: 'u1', name: 'COGS', category: 'cost_of_sales', line_type: 'standard', monthly_plan: Array(12).fill(4_000_000), active: true },
+        { id: 'opex1', unit_id: 'u1', name: 'Overheads', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(500_000), active: true },
+        // Deliberately NO staff-category plan line at all.
+      ],
+      settings: {
+        shared_cost_fixed_pct: 0, corporate_tax_rate: 0.30, opening_cash_balance: 5_000_000,
+        capital_structure: { shareholder_contribution: 10_000_000, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, grace_period_months: 0, fixed_assets: 0 },
+      },
+      start_date: '2026-01-01',
+      ...overrides,
+    })
+  }
+
+  it('REG: with revenue, cogs, and opex actuals present, actual EBITDA computes even though staff can never have actual data (no staff line exists)', () => {
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeNoStaffConfig(), actuals)
+    expect(result.con.act_staff[0]).toBeNull() // never gets data -- there's no staff line to report against
+    expect(result.con.act_ebitda[0]).not.toBeNull() // must NOT be blocked by the permanently-null staff figure
+    expect(result.con.act_ebitda[0]).toBe(9_000_000 - 3_500_000 - 450_000) // = 5,050,000, treating absent staff as zero, not missing
+  })
+
+  it('REG: actual NPAT and hybrid cash flow also activate correctly when staff genuinely does not apply', () => {
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeNoStaffConfig(), actuals)
+    expect(result.con.act_npat[0]).not.toBeNull()
+    expect(result.cf.act_mask[0]).toBe(true)
+  })
+
+  it('REG: a business that DOES have a staff line still correctly withholds actual EBITDA until staff actual data is entered -- this fix does not weaken the existing safeguard for businesses that do have the category', () => {
+    const configWithStaff = makeNoStaffConfig({
+      plan_lines: [
+        { id: 'rev1', unit_id: 'u1', name: 'Sales', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(10_000_000), active: true },
+        { id: 'cogs1', unit_id: 'u1', name: 'COGS', category: 'cost_of_sales', line_type: 'standard', monthly_plan: Array(12).fill(4_000_000), active: true },
+        { id: 'staff1', unit_id: 'u1', name: 'Staff', category: 'staff', line_type: 'standard', monthly_plan: Array(12).fill(1_500_000), active: true },
+        { id: 'opex1', unit_id: 'u1', name: 'Overheads', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(500_000), active: true },
+      ],
+    })
+    // Staff line exists, but no actual staff figure was entered this month.
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } }
+    const result = runGenericModel(configWithStaff, actuals)
+    expect(result.con.act_ebitda[0]).toBeNull() // correctly still withheld -- staff DOES apply here and its actual is genuinely missing
+  })
+
+  it('REG: actual Gross Profit similarly treats a missing cost_of_sales line as zero, not blocking, when the business genuinely has none', () => {
+    const configNoCogs = makeNoStaffConfig({
+      plan_lines: [
+        { id: 'rev1', unit_id: 'u1', name: 'Sales', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(10_000_000), active: true },
+        { id: 'opex1', unit_id: 'u1', name: 'Overheads', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(500_000), active: true },
+      ],
+    })
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000 } } }
+    const result = runGenericModel(configNoCogs, actuals)
+    expect(result.con.act_gp[0]).toBe(9_000_000) // no COGS line anywhere -- treated as zero cost, not missing
+  })
+})
