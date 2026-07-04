@@ -20,7 +20,7 @@ The Actuals tab is currently a dead end, not a pass-through.
 
 ## 2. How data is meant to flow (agreed design)
 
-```
+```text
 Field App (operator)
   -> picks a catalogue item (sale) or an existing P&L cost line (expense)
   -> operator NEVER sees price, cost, or profit figures -- volume/amount only
