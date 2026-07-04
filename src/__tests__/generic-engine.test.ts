@@ -461,3 +461,68 @@ describe('Generic Engine — Actuals (hybrid P&L, docs/ACCOUNTING_ARCHITECTURE.m
     expect((result.con.act_gp[0] as number) - actOpexTotal).toBe(result.con.act_ebitda[0])
   })
 })
+
+describe('Generic Engine — hybrid Cash Flow and Balance Sheet', () => {
+  function makeCFBSConfig(overrides: Record<string,any> = {}) {
+    return makeConfig({ start_date: '2026-01-01', ...overrides })
+  }
+
+  it('REG: with no actuals, cash flow and balance sheet are unaffected -- act_mask is all false', () => {
+    const result = runGenericModel(makeCFBSConfig())
+    expect(result.cf.act_mask.every((v:boolean) => v === false)).toBe(true)
+    expect(result.bs.act_mask.every((v:boolean) => v === false)).toBe(true)
+  })
+
+  it('REG: a month with actual EBITDA produces actual NPAT, which feeds into operating cash flow for that month', () => {
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeCFBSConfig(), actuals)
+    expect(result.con.act_npat[0]).not.toBeNull()
+    // Operating cash for month 0 should reflect the ACTUAL npat, not planned
+    const expectedOpCash = (result.con.act_npat[0] as number) + (result.cf.working_capital_adj[0] || 0)
+    expect(result.cf.op_cash[0]).toBeCloseTo(expectedOpCash, 2)
+  })
+
+  it('REG: cash flow act_mask bleeds forward from the first actual month onward, not just that one month -- cash is cumulative', () => {
+    const actuals = { u1: { '2026-03-01': { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } } // March = month index 2
+    const result = runGenericModel(makeCFBSConfig(), actuals)
+    expect(result.cf.act_mask[0]).toBe(false) // Jan -- before the actual month
+    expect(result.cf.act_mask[1]).toBe(false) // Feb -- before the actual month
+    expect(result.cf.act_mask[2]).toBe(true)  // March -- the actual month itself
+    expect(result.cf.act_mask[3]).toBe(true)  // April -- carries forward, even with no actual data of its own
+    expect(result.cf.act_mask[11]).toBe(true) // December -- still carries forward to the end
+  })
+
+  it('REG: balance sheet act_mask matches cash flow act_mask exactly -- same underlying cumulative NPAT', () => {
+    const actuals = { u1: { '2026-06-01': { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeCFBSConfig(), actuals)
+    expect(result.bs.act_mask).toEqual(result.cf.act_mask)
+  })
+
+  it('REG: retained earnings correctly uses the actual NPAT for a closed month instead of the planned figure', () => {
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeCFBSConfig(), actuals)
+    const openingCash = 5_000_000 // makeConfig's actual default opening_cash_balance
+    const expectedRetainedEarnings = openingCash + (result.con.act_npat[0] as number)
+    expect(result.bs.retained_earnings[0]).toBeCloseTo(expectedRetainedEarnings, 2)
+    // Must NOT equal what it would be using the planned figure instead
+    expect(result.bs.retained_earnings[0]).not.toBeCloseTo(openingCash + result.con.npat[0], 2)
+  })
+
+  it('REG: the fundamental accounting identity (Assets = Equity + Liabilities) still holds when actuals are present, not just in the pure-plan case', () => {
+    const actuals = { u1: { '2026-04-01': { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeCFBSConfig(), actuals)
+    for (let m = 0; m < 12; m++) {
+      expect(result.bs.total_assets[m]).toBeCloseTo(result.bs.total_equity_and_liabilities[m], 2)
+    }
+  })
+
+  it('REG: a month with actual revenue but not yet actual EBITDA (missing cost data) does NOT affect cash flow -- never blends partial actual data', () => {
+    // Only revenue actual entered -- act_npat must stay null, so hybrid
+    // NPAT correctly falls back to the planned figure for this month.
+    const actuals = { u1: { '2026-02-01': { rev1: 9_000_000 } } }
+    const result = runGenericModel(makeCFBSConfig(), actuals)
+    expect(result.con.act_npat[1]).toBeNull()
+    expect(result.cf.act_mask[1]).toBe(false)
+    expect(result.cf.op_cash[1]).toBeCloseTo(result.con.npat[1] + (result.cf.working_capital_adj[1] || 0), 2)
+  })
+})

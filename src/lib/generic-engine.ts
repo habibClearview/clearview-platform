@@ -530,6 +530,7 @@ export function runGenericModel(
     ebitda: zero(), interest: debtSchedule.totalInterest, nbt: zero(), tax: zero(), npat: zero(),
     act_rev: nullArr(), act_cogs: nullArr(), act_staff: nullArr(), act_opex: nullArr(),
     act_gp: nullArr(), act_ebitda: nullArr(),
+    act_nbt: nullArr(), act_tax: nullArr(), act_npat: nullArr(),
   }
 
   for (let m = 0; m < months; m++) {
@@ -574,6 +575,19 @@ export function runGenericModel(
     if (con.act_rev[m] !== null && con.act_cogs[m] !== null && con.act_staff[m] !== null && con.act_opex[m] !== null) {
       con.act_ebitda[m] = (con.act_rev[m] as number) - (con.act_cogs[m] as number) - (con.act_staff[m] as number) - (con.act_opex[m] as number)
     }
+    // Actual NBT/tax/NPAT cascade from act_ebitda the same way the planned
+    // figures cascade from planned ebitda -- interest itself is NOT a
+    // plan-vs-actual figure (it's computed from the real loan's actual
+    // terms regardless of which month is "closed"), so it's safe to
+    // reuse con.interest[m] here rather than needing a separate actual
+    // interest concept. Cash Flow and Balance Sheet below both derive
+    // from NPAT, so making NPAT hybrid here is what makes them hybrid
+    // too, without needing a separate parallel calculation for each.
+    if (con.act_ebitda[m] !== null) {
+      con.act_nbt[m] = (con.act_ebitda[m] as number) - (con.interest[m] ?? 0)
+      con.act_tax[m] = con.act_nbt[m]! > 0 ? con.act_nbt[m]! * (settings.corporate_tax_rate ?? 0.30) : 0
+      con.act_npat[m] = con.act_nbt[m]! - con.act_tax[m]!
+    }
   }
 
   // ── Trade credit working capital adjustment ────────────────
@@ -590,10 +604,26 @@ export function runGenericModel(
   const tradeCreditCashEffect = tradeCredit.monthlyCashEffect
 
   // ── Cash flow ─────────────────────────────────────────────
+  // Hybrid NPAT: actual where available, planned otherwise. This single
+  // substitution is what makes Cash Flow and Balance Sheet hybrid too --
+  // both are built directly from NPAT below, the same way they're built
+  // from planned NPAT today, so correctness cascades automatically
+  // rather than needing a separate parallel actual calculation for each.
+  const hybridNpat = con.npat.map((v, m) => con.act_npat[m] !== null ? (con.act_npat[m] as number) : v)
+  // Per-month: does THIS month's operating cash reflect real data?
+  const npatIsActual = con.act_npat.map(v => v !== null)
+
   const cf = {
     op_cash:  zero(), fin_cash: zero(), inv_cash: zero(), net: zero(),
     open: zero(), close: zero(),
     working_capital_adj: tradeCreditCashEffect,
+    // Cash is cumulative -- once one month's operating cash reflects real
+    // data, every month from there onward carries that real figure
+    // forward into its opening balance, even if that later month's OWN
+    // op_cash hasn't been closed yet. act_mask marks exactly that: true
+    // from the first actual month through to the end, not just the
+    // individual months that each have their own actual data.
+    act_mask: Array(months).fill(false) as boolean[],
   }
   cf.fin_cash[0] = cap.shareholder_contribution + cap.grant_non_repayable + cap.grant_recoverable
   // Fixed assets purchased with cash are an investing outflow in month 0 --
@@ -611,15 +641,18 @@ export function runGenericModel(
     const idx = Math.max(0, (ob.drawdownMonth ?? 1) - 1)
     if (idx < months) cf.fin_cash[idx] += ob.principal ?? 0
   })
+  let cashIsActualFromHere = false
   for (let m = 0; m < months; m++) {
     // Loan principal repayment is a financing outflow -- no P&L impact, since
     // it's not an expense, just cash moving from the business to the lender.
     // Interest is already reflected in npat above (deducted before tax).
     cf.fin_cash[m] -= debtSchedule.totalPrincipal[m] ?? 0
-    cf.op_cash[m] = con.npat[m] + (tradeCreditCashEffect[m] ?? 0)
+    cf.op_cash[m] = hybridNpat[m] + (tradeCreditCashEffect[m] ?? 0)
     cf.net[m]     = cf.op_cash[m] + cf.fin_cash[m] + cf.inv_cash[m]
     cf.open[m]    = m === 0 ? (settings.opening_cash_balance ?? 0) : cf.close[m - 1]
     cf.close[m]   = cf.open[m] + cf.net[m]
+    if (npatIsActual[m]) cashIsActualFromHere = true
+    cf.act_mask[m] = cashIsActualFromHere
   }
 
   // ── Balance sheet ─────────────────────────────────────────
@@ -637,13 +670,18 @@ export function runGenericModel(
     accounts_payable: tradeCredit.totalPayableOutstanding,
     total_liabilities: zero(),
     total_equity_and_liabilities: zero(),
+    // Same cumulative reasoning as cf.act_mask -- retained earnings (and
+    // everything derived from it: total assets, total equity, total
+    // equity+liabilities) carries real data forward from the first
+    // actual month onward.
+    act_mask: cf.act_mask,
   }
   // Opening cash balance represents pre-existing capital from before the
   // planning period -- without a source on the balance sheet, cash exists
   // with no matching equity, breaking Assets = Equity + Liabilities.
   let cum_npat = settings.opening_cash_balance ?? 0
   for (let m = 0; m < months; m++) {
-    cum_npat += con.npat[m]
+    cum_npat += hybridNpat[m]
     bs.retained_earnings[m] = cum_npat
     bs.total_assets[m]       = bs.cash[m] + bs.fixed_assets[m] + bs.accounts_receivable[m]
     bs.total_equity[m]       = bs.share_capital[m] + bs.grant_equity[m] + bs.retained_earnings[m]
