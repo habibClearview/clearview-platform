@@ -1389,17 +1389,25 @@ function CatalogueManager({clientId,config,P}) {
   }
 
   async function saveCostPrice(id:string) {
+    if (editCostPrice!=='' && Number(editCostPrice)<0) { alert('Cost price cannot be negative.'); return }
     if (editCostPrice!=='' && !editCostLine) { alert('Select a COGS category to go with the cost price.'); return }
-    await fetch('/api/field/admin/catalogue', {
-      method:'PATCH', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        id,
-        cost_price: editCostPrice===''?null:Number(editCostPrice),
-        cogs_plan_line_id: editCostPrice===''?null:editCostLine,
-      }),
-    })
-    setEditingCostId(null)
-    await load()
+    try {
+      const res = await fetch('/api/field/admin/catalogue', {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          id,
+          cost_price: editCostPrice===''?null:Number(editCostPrice),
+          cogs_plan_line_id: editCostPrice===''?null:editCostLine,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(()=>({}))
+        alert(data.error || 'Could not save the cost price. Please try again.')
+        return
+      }
+      setEditingCostId(null)
+      await load()
+    } catch { alert('Could not save the cost price. Please try again.') }
   }
 
   async function toggleActive(id:string, active:boolean) {
@@ -1450,12 +1458,12 @@ function CatalogueManager({clientId,config,P}) {
             </div>
             <div><label style={lbl}>Price</label><input type="number" style={inp} value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} placeholder="0"/></div>
             <div><label style={lbl}>Unit Label (optional)</label><input style={inp} value={form.unit_label} onChange={e=>setForm(f=>({...f,unit_label:e.target.value}))} placeholder="e.g. bag, kg, session"/></div>
-            <div><label style={lbl}>Cost Price (optional)</label><input type="number" style={inp} value={form.cost_price} onChange={e=>setForm(f=>({...f,cost_price:e.target.value}))} placeholder="Leave blank if unknown"/>
+            <div><label htmlFor="new-item-cost-price" style={lbl}>Cost Price (optional)</label><input id="new-item-cost-price" type="number" style={inp} value={form.cost_price} onChange={e=>setForm(f=>({...f,cost_price:e.target.value}))} placeholder="Leave blank if unknown"/>
               <div style={{fontSize:'0.7rem',color:C.slate,marginTop:'0.25rem'}}>What this actually costs to procure. Never shown to field operators -- when set, every sale automatically books a matching cost-of-sales entry.</div>
             </div>
             {form.cost_price!=='' && (
-              <div><label style={lbl}>COGS Category</label>
-                <select style={inp} disabled={!form.business_unit_id} value={form.cogs_plan_line_id} onChange={e=>setForm(f=>({...f,cogs_plan_line_id:e.target.value}))}>
+              <div><label htmlFor="new-item-cogs-line" style={lbl}>COGS Category</label>
+                <select id="new-item-cogs-line" style={inp} disabled={!form.business_unit_id} value={form.cogs_plan_line_id} onChange={e=>setForm(f=>({...f,cogs_plan_line_id:e.target.value}))}>
                   <option value="">{form.business_unit_id?'Select a COGS category...':'Select a unit first'}</option>
                   {cogsLinesForUnit(form.business_unit_id).map((l:any)=><option key={l.id} value={l.id}>{l.name}</option>)}
                 </select>
@@ -1516,8 +1524,8 @@ function CatalogueManager({clientId,config,P}) {
                       <div style={{marginTop:'0.5rem',paddingTop:'0.5rem',borderTop:`1px solid ${C.border}`,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.5rem'}}>
                         {editingCostId===item.id ? (
                           <>
-                            <input type="number" style={{...inp,width:110,marginBottom:0}} value={editCostPrice} onChange={e=>setEditCostPrice(e.target.value)} placeholder="Leave blank for none" autoFocus/>
-                            <select style={{...inp,width:200,marginBottom:0}} value={editCostLine} onChange={e=>setEditCostLine(e.target.value)}>
+                            <input type="number" aria-label="Cost price" style={{...inp,width:110,marginBottom:0}} value={editCostPrice} onChange={e=>setEditCostPrice(e.target.value)} placeholder="Leave blank for none" autoFocus/>
+                            <select aria-label="COGS category" style={{...inp,width:200,marginBottom:0}} value={editCostLine} onChange={e=>setEditCostLine(e.target.value)}>
                               <option value="">Select COGS category...</option>
                               {cogsLinesForUnit(item.business_unit_id).map((l:any)=><option key={l.id} value={l.id}>{l.name}</option>)}
                             </select>
@@ -1527,10 +1535,10 @@ function CatalogueManager({clientId,config,P}) {
                         ) : (
                           <>
                             <div style={{fontSize:'0.78rem',color:C.slate}}>
-                              Cost price: <span style={{fontFamily:'monospace',fontWeight:700,color:item.cost_price?C.navy:C.amber}}>{item.cost_price?fmt(item.cost_price,config.currency):'Not set — no automatic COGS'}</span>
+                              Cost price: <span style={{fontFamily:'monospace',fontWeight:700,color:item.cost_price!==null&&item.cost_price!==undefined?C.navy:C.amber}}>{item.cost_price!==null&&item.cost_price!==undefined?fmt(item.cost_price,config.currency):'Not set — no automatic COGS'}</span>
                               {item.cost_price_updated_at&&<span style={{marginLeft:8}}>· reviewed {new Date(item.cost_price_updated_at).toLocaleDateString()}</span>}
                             </div>
-                            {canEdit&&<button style={addBtn(true)} onClick={()=>{setEditingCostId(item.id);setEditCostPrice(item.cost_price?String(item.cost_price):'');setEditCostLine(item.cogs_plan_line_id||'')}}>{item.cost_price?'Edit Cost Price':'Set Cost Price'}</button>}
+                            {canEdit&&<button style={addBtn(true)} onClick={()=>{setEditingCostId(item.id);setEditCostPrice(item.cost_price!==null&&item.cost_price!==undefined?String(item.cost_price):'');setEditCostLine(item.cogs_plan_line_id||'')}}>{item.cost_price!==null&&item.cost_price!==undefined?'Edit Cost Price':'Set Cost Price'}</button>}
                           </>
                         )}
                       </div>

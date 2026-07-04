@@ -35,3 +35,17 @@ comment on column field_catalogue.cost_price is
   'Standard cost per unit, set by CEO/Finance Manager only. Never returned to the field operator (see app/api/field/auth/route.ts explicit column select). Null means no automatic COGS entry is created for this item.';
 comment on column field_catalogue.cogs_plan_line_id is
   'The cost_of_sales-category plan line this item''s automatic COGS entries post against. Explicit, since a unit can have more than one COGS line.';
+
+-- Enforced at the schema level, not just in application code: a set cost
+-- price always needs a COGS category to post against, and can never be
+-- negative. Without this, a bad write from any future code path (or a
+-- direct SQL edit) could leave a costed item silently unable to generate
+-- COGS on sync, with no obvious symptom until someone notices margins
+-- look wrong.
+alter table field_catalogue drop constraint if exists field_catalogue_cost_price_nonneg;
+alter table field_catalogue add constraint field_catalogue_cost_price_nonneg
+  check (cost_price is null or cost_price >= 0);
+
+alter table field_catalogue drop constraint if exists field_catalogue_cost_price_needs_cogs_line;
+alter table field_catalogue add constraint field_catalogue_cost_price_needs_cogs_line
+  check (cost_price is null or cogs_plan_line_id is not null);

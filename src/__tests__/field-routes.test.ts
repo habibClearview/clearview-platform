@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { shouldClearQueue } from '../lib/field-db'
 import { friendlyDbError } from '../lib/field-errors'
+import { buildAutoCogsRow, type CatalogueItemForCogs } from '../lib/field-cogs'
 
 // Tests for Clearview Field API route logic
 // Tests the validation and transformation logic without HTTP or DB
@@ -360,27 +361,13 @@ describe('Field Sync — queue-clearing decision', () => {
 })
 
 // ── Standard costing: automatic COGS generation (app/api/field/sync/route.ts) ──
-// Re-implements the pure decision logic for testing without HTTP/DB.
-// Per docs/ACCOUNTING_ARCHITECTURE.md section 3: standard costing means
-// COGS is always quantity x the catalogue's STANDARD cost price, never
-// affected by a sale-side bulk override on the sell price -- what the
-// goods actually cost the business doesn't change just because they were
-// sold at a discount.
-
-interface CatalogueItemForCogs { id: string; name: string; cost_price: number | null; cogs_plan_line_id: string | null }
-
-function buildAutoCogsRow(item: CatalogueItemForCogs, quantity: number, saleLocalId: string | null) {
-  if (item.cost_price === null || item.cost_price === undefined || !item.cogs_plan_line_id) return null
-  return {
-    plan_line_id: item.cogs_plan_line_id,
-    category: 'cost_of_sales',
-    transaction_type: 'cogs_auto',
-    amount: quantity * item.cost_price,
-    unit_price: item.cost_price,
-    catalogue_item_id: item.id,
-    local_id: saleLocalId ? `${saleLocalId}_cogs` : null,
-  }
-}
+// Imports the real buildAutoCogsRow from src/lib/field-cogs.ts rather than
+// re-implementing it here -- a regression in the actual COGS-generation
+// logic is now caught, not a copy of it. Per docs/ACCOUNTING_ARCHITECTURE.md
+// section 3: standard costing means COGS is always quantity x the
+// catalogue's STANDARD cost price, never affected by a sale-side bulk
+// override on the sell price -- what the goods actually cost the business
+// doesn't change just because they were sold at a discount.
 
 describe('Standard Costing — automatic COGS generation', () => {
   it('REG: no COGS row is generated when the catalogue item has no cost price set -- never fabricates a cost that was never provided', () => {
@@ -423,5 +410,60 @@ describe('Standard Costing — automatic COGS generation', () => {
     const row = buildAutoCogsRow(item, 10, 'local_1')
     expect(row).not.toBeNull()
     expect(row!.amount).toBe(0)
+  })
+})
+
+// ── Catalogue PATCH: cost_price/cogs_plan_line_id atomicity ──────────────
+// Re-implements the effective-state validation from
+// app/api/field/admin/catalogue/route.ts's PATCH handler: a set cost
+// price always needs a COGS category, checked against what the update
+// would ACTUALLY produce (existing value merged with the incoming
+// change), not just the fields present in a single request.
+
+function computeEffectiveCostState(
+  existing: { cost_price: number | null; cogs_plan_line_id: string | null },
+  patch: { cost_price?: number | null; cogs_plan_line_id?: string | null }
+) {
+  const effectiveCostPrice = patch.cost_price !== undefined ? patch.cost_price : existing.cost_price
+  const effectiveCogsLine = patch.cogs_plan_line_id !== undefined ? patch.cogs_plan_line_id : existing.cogs_plan_line_id
+  const valid = !(effectiveCostPrice !== null && effectiveCostPrice !== undefined && !effectiveCogsLine)
+  return { effectiveCostPrice, effectiveCogsLine, valid }
+}
+
+describe('Catalogue PATCH — cost_price/cogs_plan_line_id atomicity', () => {
+  it('REG: setting cost_price without cogs_plan_line_id, when neither existed before, is invalid', () => {
+    const result = computeEffectiveCostState({ cost_price: null, cogs_plan_line_id: null }, { cost_price: 5000 })
+    expect(result.valid).toBe(false)
+  })
+
+  it('REG: clearing cogs_plan_line_id while an existing cost_price remains is invalid -- this is the exact gap CodeRabbit caught', () => {
+    // Item already has both set; a PATCH that only touches
+    // cogs_plan_line_id (clearing it) must be rejected because it would
+    // leave a costed item with nowhere for COGS to post -- checking only
+    // the fields present in THIS request would miss this entirely.
+    const result = computeEffectiveCostState({ cost_price: 5000, cogs_plan_line_id: 'line_a' }, { cogs_plan_line_id: null })
+    expect(result.valid).toBe(false)
+  })
+
+  it('REG: setting cost_price when cogs_plan_line_id already exists on the record is valid', () => {
+    const result = computeEffectiveCostState({ cost_price: null, cogs_plan_line_id: 'line_a' }, { cost_price: 5000 })
+    expect(result.valid).toBe(true)
+  })
+
+  it('REG: providing both cost_price and cogs_plan_line_id together in one request is valid', () => {
+    const result = computeEffectiveCostState({ cost_price: null, cogs_plan_line_id: null }, { cost_price: 5000, cogs_plan_line_id: 'line_a' })
+    expect(result.valid).toBe(true)
+  })
+
+  it('REG: clearing cost_price entirely is always valid, regardless of cogs_plan_line_id', () => {
+    const result = computeEffectiveCostState({ cost_price: 5000, cogs_plan_line_id: 'line_a' }, { cost_price: null })
+    expect(result.valid).toBe(true)
+  })
+
+  it('REG: a patch touching unrelated fields (e.g. just active status) does not disturb an already-valid cost/COGS pairing', () => {
+    const result = computeEffectiveCostState({ cost_price: 5000, cogs_plan_line_id: 'line_a' }, {})
+    expect(result.valid).toBe(true)
+    expect(result.effectiveCostPrice).toBe(5000)
+    expect(result.effectiveCogsLine).toBe('line_a')
   })
 })

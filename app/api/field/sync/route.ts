@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { friendlyDbError } from '@/lib/field-errors'
+import { buildAutoCogsRow } from '@/lib/field-cogs'
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -121,32 +122,21 @@ export async function POST(req: NextRequest) {
           // what the goods cost the business doesn't change just because
           // they were sold at a discount. Zero extra input from the
           // operator, matching how price already works.
-          if (item.cost_price !== null && item.cost_price !== undefined && item.cogs_plan_line_id) {
+          const cogsRow = buildAutoCogsRow(item, quantity, t.local_id)
+          if (cogsRow) {
             rows.push({
               client_id: operator.client_id,
               business_unit_id: operator.business_unit_id,
-              plan_line_id: item.cogs_plan_line_id,
-              plan_line_name: `${item.name} (COGS)`,
-              transaction_type: 'cogs_auto',
-              category: 'cost_of_sales',
-              amount: quantity * Number(item.cost_price),
-              quantity,
-              unit_price: Number(item.cost_price),
-              payment_method: null,
-              customer_id: null,
               transaction_date: t.transaction_date || new Date().toISOString().split('T')[0],
               operator_id: operator.id,
               notes: null,
               device_id: device_id || null,
               synced_at: new Date().toISOString(),
-              catalogue_item_id: item.id,
               price_overridden: false,
               price_alert: false,
-              // Deterministic, derived from the sale's own local_id -- a
-              // retry of the same sale must produce the same COGS
-              // local_id too, or the idempotency dedup on the sale
-              // wouldn't protect the COGS side from duplicating.
-              local_id: t.local_id ? `${t.local_id}_cogs` : null,
+              payment_method: null,
+              customer_id: null,
+              ...cogsRow,
             })
           }
         }

@@ -39,13 +39,16 @@ export async function POST(req: NextRequest) {
     if (!business_unit_id) return NextResponse.json({ error: 'business_unit_id required' }, { status: 400 })
     if (!plan_line_id) return NextResponse.json({ error: 'plan_line_id required -- every catalogue item must roll up into a revenue line' }, { status: 400 })
     if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 })
-    if (price === undefined || price === null || Number(price) < 0) return NextResponse.json({ error: 'A valid price is required -- this is the number field operators will never have to enter themselves' }, { status: 400 })
+    const parsedPrice = Number(price)
+    if (price === undefined || price === null || !Number.isFinite(parsedPrice) || parsedPrice < 0) return NextResponse.json({ error: 'A valid price is required -- this is the number field operators will never have to enter themselves' }, { status: 400 })
     // cost_price is optional -- if provided, a matching cogs_plan_line_id
     // is required too, since automatic COGS entries need somewhere to post
     // (see docs/ACCOUNTING_ARCHITECTURE.md section 3). If cost_price is
     // never set, no COGS is fabricated for this item -- that's deliberate.
+    let parsedCostPrice: number | null = null
     if (cost_price !== undefined && cost_price !== null) {
-      if (Number(cost_price) < 0) return NextResponse.json({ error: 'Cost price cannot be negative' }, { status: 400 })
+      parsedCostPrice = Number(cost_price)
+      if (!Number.isFinite(parsedCostPrice) || parsedCostPrice < 0) return NextResponse.json({ error: 'Cost price must be a valid, non-negative number' }, { status: 400 })
       if (!cogs_plan_line_id) return NextResponse.json({ error: 'A COGS category is required when setting a cost price' }, { status: 400 })
     }
 
@@ -56,11 +59,11 @@ export async function POST(req: NextRequest) {
         client_id, business_unit_id, plan_line_id,
         name: String(name).trim(),
         item_type: item_type === 'service' ? 'service' : 'product',
-        price: Number(price),
+        price: parsedPrice,
         unit_label: unit_label || null,
         active: true,
         created_by: created_by || null,
-        cost_price: (cost_price !== undefined && cost_price !== null) ? Number(cost_price) : null,
+        cost_price: parsedCostPrice,
         cogs_plan_line_id: cogs_plan_line_id || null,
         cost_price_updated_at: (cost_price !== undefined && cost_price !== null) ? new Date().toISOString() : null,
       })
@@ -82,26 +85,59 @@ export async function PATCH(req: NextRequest) {
     const { id, name, price, unit_label, active, cost_price, cogs_plan_line_id } = body
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
+    const supabase = getSupabase()
+
+    // Fetch current state first: cost_price and cogs_plan_line_id must
+    // stay atomic (a costed item always has a COGS category, never one
+    // without the other) -- validating only the fields present in THIS
+    // request would miss the case where, say, cogs_plan_line_id is being
+    // cleared while a cost_price from an earlier PATCH still remains, or
+    // vice versa. Validate the EFFECTIVE state after this update applies.
+    const { data: existing, error: fetchErr } = await supabase
+      .from('field_catalogue').select('cost_price, cogs_plan_line_id').eq('id', id).single()
+    if (fetchErr) return NextResponse.json({ error: 'Catalogue item not found' }, { status: 404 })
+
     const updates: Record<string, any> = { updated_at: new Date().toISOString() }
     if (name !== undefined) updates.name = String(name).trim()
     if (price !== undefined) {
-      if (Number(price) < 0) return NextResponse.json({ error: 'Price cannot be negative' }, { status: 400 })
-      updates.price = Number(price)
+      const parsedPrice = Number(price)
+      if (!Number.isFinite(parsedPrice) || parsedPrice < 0) return NextResponse.json({ error: 'Price must be a valid, non-negative number' }, { status: 400 })
+      updates.price = parsedPrice
     }
     if (unit_label !== undefined) updates.unit_label = unit_label || null
     if (active !== undefined) updates.active = !!active
+
+    let effectiveCostPrice = existing.cost_price
+    let effectiveCogsLine = existing.cogs_plan_line_id
     // cost_price_updated_at is set here automatically, never passed in by
     // the caller -- this is the timestamp the eventual 90-day staleness
     // check reads, so it must reflect exactly when the price was actually
     // changed, not something the client could set to whatever it wants.
     if (cost_price !== undefined) {
-      if (cost_price !== null && Number(cost_price) < 0) return NextResponse.json({ error: 'Cost price cannot be negative' }, { status: 400 })
-      updates.cost_price = cost_price === null ? null : Number(cost_price)
+      if (cost_price !== null) {
+        const parsedCost = Number(cost_price)
+        if (!Number.isFinite(parsedCost) || parsedCost < 0) return NextResponse.json({ error: 'Cost price must be a valid, non-negative number' }, { status: 400 })
+        updates.cost_price = parsedCost
+        effectiveCostPrice = parsedCost
+      } else {
+        updates.cost_price = null
+        effectiveCostPrice = null
+      }
       updates.cost_price_updated_at = cost_price === null ? null : new Date().toISOString()
     }
-    if (cogs_plan_line_id !== undefined) updates.cogs_plan_line_id = cogs_plan_line_id || null
+    if (cogs_plan_line_id !== undefined) {
+      updates.cogs_plan_line_id = cogs_plan_line_id || null
+      effectiveCogsLine = cogs_plan_line_id || null
+    }
 
-    const supabase = getSupabase()
+    // The atomic invariant, checked against the state this update would
+    // actually produce: a set cost price always needs a COGS category to
+    // post against, or sync silently skips generating COGS for a costed
+    // item with no obvious symptom until someone notices margins are wrong.
+    if (effectiveCostPrice !== null && effectiveCostPrice !== undefined && !effectiveCogsLine) {
+      return NextResponse.json({ error: 'A COGS category is required whenever a cost price is set' }, { status: 400 })
+    }
+
     const { data: item, error } = await supabase
       .from('field_catalogue')
       .update(updates)
