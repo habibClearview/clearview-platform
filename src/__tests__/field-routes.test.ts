@@ -491,3 +491,39 @@ describe('Catalogue PATCH — cost_price/cogs_plan_line_id atomicity', () => {
     expect(result.effectiveCogsLine).toBe('line_a')
   })
 })
+
+// ── Catalogue PATCH: business_unit_id change auto-clears cost_price/cogs_plan_line_id ──
+// Re-implements the auto-clear logic from the PATCH handler: moving an
+// item to a different business unit invalidates any existing
+// cogs_plan_line_id, since a COGS category belongs to one specific
+// unit's plan lines.
+
+function computeStateAfterUnitMove(
+  existing: { cost_price: number | null; cogs_plan_line_id: string | null },
+  businessUnitIdChanging: boolean
+) {
+  if (businessUnitIdChanging && existing.cost_price !== null) {
+    return { cost_price: null, cogs_plan_line_id: null }
+  }
+  return { cost_price: existing.cost_price, cogs_plan_line_id: existing.cogs_plan_line_id }
+}
+
+describe('Catalogue PATCH — business_unit_id change clears stale cost/COGS pairing', () => {
+  it('REG: moving a costed item to a different unit clears both cost_price and cogs_plan_line_id', () => {
+    const result = computeStateAfterUnitMove({ cost_price: 5000, cogs_plan_line_id: 'line_a' }, true)
+    expect(result.cost_price).toBeNull()
+    expect(result.cogs_plan_line_id).toBeNull()
+  })
+
+  it('REG: moving an item with no cost price set is a no-op for cost/COGS fields', () => {
+    const result = computeStateAfterUnitMove({ cost_price: null, cogs_plan_line_id: null }, true)
+    expect(result.cost_price).toBeNull()
+    expect(result.cogs_plan_line_id).toBeNull()
+  })
+
+  it('REG: NOT moving business unit leaves an existing cost/COGS pairing untouched', () => {
+    const result = computeStateAfterUnitMove({ cost_price: 5000, cogs_plan_line_id: 'line_a' }, false)
+    expect(result.cost_price).toBe(5000)
+    expect(result.cogs_plan_line_id).toBe('line_a')
+  })
+})

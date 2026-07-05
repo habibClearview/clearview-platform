@@ -1534,6 +1534,9 @@ function CatalogueManager({clientId,config,P}) {
   const [editingCostId, setEditingCostId] = useState<string|null>(null)
   const [editCostPrice, setEditCostPrice] = useState('')
   const [editCostLine, setEditCostLine] = useState('')
+  const [editingFullId, setEditingFullId] = useState<string|null>(null)
+  const [editFull, setEditFull] = useState({name:'',item_type:'product',unit_label:'',business_unit_id:'',plan_line_id:''})
+  const [savingFull, setSavingFull] = useState(false)
   const [form, setForm] = useState({name:'',item_type:'product',price:'',unit_label:'',business_unit_id:'',plan_line_id:'',cost_price:'',cogs_plan_line_id:''})
 
   async function load() {
@@ -1582,6 +1585,35 @@ function CatalogueManager({clientId,config,P}) {
     })
     setEditingId(null)
     await load()
+  }
+
+  function startFullEdit(item:any) {
+    setEditingFullId(item.id)
+    setEditFull({name:item.name, item_type:item.item_type, unit_label:item.unit_label||'', business_unit_id:item.business_unit_id, plan_line_id:item.plan_line_id})
+  }
+
+  async function saveFullEdit(id:string) {
+    if (!editFull.name.trim()) { alert('Item name is required.'); return }
+    if (!editFull.business_unit_id || !editFull.plan_line_id) { alert('Business unit and category are required.'); return }
+    setSavingFull(true)
+    try {
+      const res = await fetch('/api/field/admin/catalogue', {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          id, name: editFull.name.trim(), item_type: editFull.item_type,
+          unit_label: editFull.unit_label || null,
+          business_unit_id: editFull.business_unit_id, plan_line_id: editFull.plan_line_id,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(()=>({}))
+        alert(data.error || 'Could not save these changes. Please try again.')
+        return
+      }
+      setEditingFullId(null)
+      await load()
+    } catch { alert('Could not save these changes. Please try again.') }
+    setSavingFull(false)
   }
 
   async function saveCostPrice(id:string) {
@@ -1705,6 +1737,7 @@ function CatalogueManager({clientId,config,P}) {
                             <>
                               <div style={{fontFamily:'monospace',fontWeight:700,color:C.navy}}>{fmt(item.price,config.currency)}{item.unit_label?<span style={{color:C.slate,fontWeight:400}}> / {item.unit_label}</span>:null}</div>
                               {canEdit&&<button style={addBtn(true)} onClick={()=>{setEditingId(item.id);setEditPrice(String(item.price))}}>Edit Price</button>}
+                              {canEdit&&<button style={addBtn(true)} onClick={()=>startFullEdit(item)}>Edit Item</button>}
                               {canEdit&&(item.active
                                 ? <button style={addBtn(true,C.red)} onClick={()=>toggleActive(item.id,false)}>Deactivate</button>
                                 : <button style={addBtn(true,C.green)} onClick={()=>toggleActive(item.id,true)}>Reactivate</button>
@@ -1738,6 +1771,35 @@ function CatalogueManager({clientId,config,P}) {
                           </>
                         )}
                       </div>
+                      {editingFullId===item.id&&(
+                        <div style={{marginTop:'0.6rem',paddingTop:'0.6rem',borderTop:`1px solid ${C.border}`}}>
+                          <div style={fGrid}>
+                            <div><label style={lbl}>Item Name</label><input style={inp} value={editFull.name} onChange={e=>setEditFull(f=>({...f,name:e.target.value}))}/></div>
+                            <div><label style={lbl}>Type</label>
+                              <select style={inp} value={editFull.item_type} onChange={e=>setEditFull(f=>({...f,item_type:e.target.value}))}>
+                                <option value="product">Product</option>
+                                <option value="service">Service</option>
+                              </select>
+                            </div>
+                            <div><label style={lbl}>Business Unit</label>
+                              <select style={inp} value={editFull.business_unit_id} onChange={e=>setEditFull(f=>({...f,business_unit_id:e.target.value,plan_line_id:''}))}>
+                                {config.business_units.filter((u:any)=>u.active).map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}
+                              </select>
+                            </div>
+                            <div><label style={lbl}>Category</label>
+                              <select style={inp} value={editFull.plan_line_id} onChange={e=>setEditFull(f=>({...f,plan_line_id:e.target.value}))}>
+                                <option value="">Select a category...</option>
+                                {revenueLinesForUnit(editFull.business_unit_id).map((l:any)=><option key={l.id} value={l.id}>{l.name}</option>)}
+                              </select>
+                            </div>
+                            <div><label style={lbl}>Unit Label (optional)</label><input style={inp} value={editFull.unit_label} onChange={e=>setEditFull(f=>({...f,unit_label:e.target.value}))} placeholder="e.g. bag, kg, session"/></div>
+                          </div>
+                          <div style={{display:'flex',gap:'0.6rem',marginTop:'0.6rem'}}>
+                            <button style={solidBtn()} disabled={savingFull} onClick={()=>saveFullEdit(item.id)}>{savingFull?'Saving...':'Save Changes'}</button>
+                            <button style={addBtn(true,C.slate)} onClick={()=>setEditingFullId(null)}>Cancel</button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

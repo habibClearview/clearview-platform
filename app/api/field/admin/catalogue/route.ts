@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json()
-    const { id, name, price, unit_label, active, cost_price, cogs_plan_line_id } = body
+    const { id, name, price, unit_label, active, cost_price, cogs_plan_line_id, item_type, plan_line_id, business_unit_id } = body
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
     const supabase = getSupabase()
@@ -106,9 +106,40 @@ export async function PATCH(req: NextRequest) {
     }
     if (unit_label !== undefined) updates.unit_label = unit_label || null
     if (active !== undefined) updates.active = !!active
+    if (item_type !== undefined) updates.item_type = item_type === 'service' ? 'service' : 'product'
 
     let effectiveCostPrice = existing.cost_price
     let effectiveCogsLine = existing.cogs_plan_line_id
+
+    // plan_line_id (the revenue category) and business_unit_id can move
+    // together -- moving an item to a different unit requires re-picking
+    // a category that actually belongs to that unit, so the client sends
+    // both together whenever business_unit_id changes. plan_line_id can
+    // also change on its own (recategorising within the same unit).
+    if (plan_line_id !== undefined) {
+      if (!plan_line_id) return NextResponse.json({ error: 'A category is required -- every catalogue item must roll up into a revenue line' }, { status: 400 })
+      updates.plan_line_id = plan_line_id
+    }
+    if (business_unit_id !== undefined) {
+      if (!business_unit_id) return NextResponse.json({ error: 'A business unit is required' }, { status: 400 })
+      updates.business_unit_id = business_unit_id
+      // Moving an item to a different unit invalidates any existing
+      // cogs_plan_line_id (a COGS category belongs to one specific unit's
+      // plan lines) -- clearing both rather than silently leaving a cost
+      // price pointing at a COGS category from the unit it just left.
+      // Updates the effective-state tracking variables too (not just
+      // `updates` directly), so the atomic invariant check below
+      // correctly reflects this auto-clear even when the request body
+      // itself never mentions cost_price/cogs_plan_line_id at all.
+      if (effectiveCostPrice !== null) {
+        updates.cost_price = null
+        updates.cogs_plan_line_id = null
+        updates.cost_price_updated_at = null
+        effectiveCostPrice = null
+        effectiveCogsLine = null
+      }
+    }
+
     // cost_price_updated_at is set here automatically, never passed in by
     // the caller -- this is the timestamp the eventual 90-day staleness
     // check reads, so it must reflect exactly when the price was actually
