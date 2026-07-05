@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { isPlanLineValidForUnit } from '@/lib/catalogue-validation'
 
 // Lazy init -- must never call createClient() at module level on Vercel.
 function getSupabase() {
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json()
-    const { id, name, price, unit_label, active, cost_price, cogs_plan_line_id } = body
+    const { id, name, price, unit_label, active, cost_price, cogs_plan_line_id, item_type, plan_line_id, business_unit_id } = body
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
     const supabase = getSupabase()
@@ -94,7 +95,7 @@ export async function PATCH(req: NextRequest) {
     // cleared while a cost_price from an earlier PATCH still remains, or
     // vice versa. Validate the EFFECTIVE state after this update applies.
     const { data: existing, error: fetchErr } = await supabase
-      .from('field_catalogue').select('cost_price, cogs_plan_line_id').eq('id', id).single()
+      .from('field_catalogue').select('cost_price, cogs_plan_line_id, client_id, business_unit_id, plan_line_id').eq('id', id).single()
     if (fetchErr) return NextResponse.json({ error: 'Catalogue item not found' }, { status: 404 })
 
     const updates: Record<string, any> = { updated_at: new Date().toISOString() }
@@ -106,9 +107,59 @@ export async function PATCH(req: NextRequest) {
     }
     if (unit_label !== undefined) updates.unit_label = unit_label || null
     if (active !== undefined) updates.active = !!active
+    if (item_type !== undefined) updates.item_type = item_type === 'service' ? 'service' : 'product'
 
     let effectiveCostPrice = existing.cost_price
     let effectiveCogsLine = existing.cogs_plan_line_id
+
+    // plan_line_id (the revenue category) and business_unit_id can move
+    // together -- moving an item to a different unit requires re-picking
+    // a category that actually belongs to that unit, so the client sends
+    // both together whenever business_unit_id changes. plan_line_id can
+    // also change on its own (recategorising within the same unit).
+    if (plan_line_id !== undefined) {
+      if (!plan_line_id) return NextResponse.json({ error: 'A category is required -- every catalogue item must roll up into a revenue line' }, { status: 400 })
+      updates.plan_line_id = plan_line_id
+    }
+    if (business_unit_id !== undefined) {
+      if (!business_unit_id) return NextResponse.json({ error: 'A business unit is required' }, { status: 400 })
+      updates.business_unit_id = business_unit_id
+      // Moving an item to a different unit invalidates any existing
+      // cogs_plan_line_id (a COGS category belongs to one specific unit's
+      // plan lines) -- clearing both rather than silently leaving a cost
+      // price pointing at a COGS category from the unit it just left.
+      // Updates the effective-state tracking variables too (not just
+      // `updates` directly), so the atomic invariant check below
+      // correctly reflects this auto-clear even when the request body
+      // itself never mentions cost_price/cogs_plan_line_id at all.
+      if (effectiveCostPrice !== null) {
+        updates.cost_price = null
+        updates.cogs_plan_line_id = null
+        updates.cost_price_updated_at = null
+        effectiveCostPrice = null
+        effectiveCogsLine = null
+      }
+    }
+
+    // Cross-check that plan_line_id genuinely belongs to the EFFECTIVE
+    // business_unit_id (the new one if it's changing, else the existing
+    // one) -- the comment above only describes what the client is
+    // expected to send together; without this, a caller (or a client-side
+    // bug) could set business_unit_id to one unit while leaving
+    // plan_line_id pointing at a revenue line that belongs to a
+    // completely different one, silently misattributing every future
+    // sale's revenue to the wrong unit's P&L.
+    if (plan_line_id !== undefined || business_unit_id !== undefined) {
+      const effectiveUnitId = business_unit_id !== undefined ? business_unit_id : existing.business_unit_id
+      const effectivePlanLineId = plan_line_id !== undefined ? plan_line_id : existing.plan_line_id
+      const { data: configRow, error: configErr } = await supabase
+        .from('generic_model_config').select('plan_lines').eq('client_id', existing.client_id).single()
+      if (configErr) return NextResponse.json({ error: 'Could not verify the category against this client\'s plan' }, { status: 500 })
+      if (!isPlanLineValidForUnit(configRow.plan_lines, effectivePlanLineId, effectiveUnitId)) {
+        return NextResponse.json({ error: 'That category does not belong to the selected business unit, or is not an active revenue line' }, { status: 400 })
+      }
+    }
+
     // cost_price_updated_at is set here automatically, never passed in by
     // the caller -- this is the timestamp the eventual 90-day staleness
     // check reads, so it must reflect exactly when the price was actually

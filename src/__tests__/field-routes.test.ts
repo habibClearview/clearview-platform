@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { shouldClearQueue } from '../lib/field-db'
 import { friendlyDbError } from '../lib/field-errors'
 import { buildAutoCogsRow, type CatalogueItemForCogs } from '../lib/field-cogs'
+import { isPlanLineValidForUnit } from '../lib/catalogue-validation'
 
 // Tests for Clearview Field API route logic
 // Tests the validation and transformation logic without HTTP or DB
@@ -489,5 +490,76 @@ describe('Catalogue PATCH — cost_price/cogs_plan_line_id atomicity', () => {
     expect(result.valid).toBe(true)
     expect(result.effectiveCostPrice).toBe(5000)
     expect(result.effectiveCogsLine).toBe('line_a')
+  })
+})
+
+// ── Catalogue PATCH: business_unit_id change auto-clears cost_price/cogs_plan_line_id ──
+// Re-implements the auto-clear logic from the PATCH handler: moving an
+// item to a different business unit invalidates any existing
+// cogs_plan_line_id, since a COGS category belongs to one specific
+// unit's plan lines.
+
+function computeStateAfterUnitMove(
+  existing: { cost_price: number | null; cogs_plan_line_id: string | null },
+  businessUnitIdChanging: boolean
+) {
+  if (businessUnitIdChanging && existing.cost_price !== null) {
+    return { cost_price: null, cogs_plan_line_id: null }
+  }
+  return { cost_price: existing.cost_price, cogs_plan_line_id: existing.cogs_plan_line_id }
+}
+
+describe('Catalogue PATCH — business_unit_id change clears stale cost/COGS pairing', () => {
+  it('REG: moving a costed item to a different unit clears both cost_price and cogs_plan_line_id', () => {
+    const result = computeStateAfterUnitMove({ cost_price: 5000, cogs_plan_line_id: 'line_a' }, true)
+    expect(result.cost_price).toBeNull()
+    expect(result.cogs_plan_line_id).toBeNull()
+  })
+
+  it('REG: moving an item with no cost price set is a no-op for cost/COGS fields', () => {
+    const result = computeStateAfterUnitMove({ cost_price: null, cogs_plan_line_id: null }, true)
+    expect(result.cost_price).toBeNull()
+    expect(result.cogs_plan_line_id).toBeNull()
+  })
+
+  it('REG: NOT moving business unit leaves an existing cost/COGS pairing untouched', () => {
+    const result = computeStateAfterUnitMove({ cost_price: 5000, cogs_plan_line_id: 'line_a' }, false)
+    expect(result.cost_price).toBe(5000)
+    expect(result.cogs_plan_line_id).toBe('line_a')
+  })
+})
+
+// ── Catalogue PATCH: plan_line_id must actually belong to business_unit_id ──
+// Imports and exercises the real isPlanLineValidForUnit directly (not a
+// reimplementation) -- a regression in the route's own cross-unit check
+// is now caught, not a copy of it.
+
+describe('Catalogue PATCH — plan_line_id must belong to the effective business_unit_id', () => {
+  const planLines = [
+    { id: 'rev_a', unit_id: 'unit_a', category: 'revenue', active: true },
+    { id: 'rev_b', unit_id: 'unit_b', category: 'revenue', active: true },
+    { id: 'cogs_a', unit_id: 'unit_a', category: 'cost_of_sales', active: true },
+    { id: 'rev_a_inactive', unit_id: 'unit_a', category: 'revenue', active: false },
+  ]
+
+  it('REG: a revenue line that genuinely belongs to the given unit is valid', () => {
+    expect(isPlanLineValidForUnit(planLines, 'rev_a', 'unit_a')).toBe(true)
+  })
+
+  it('REG: a revenue line belonging to a DIFFERENT unit is rejected -- the exact cross-unit mismatch this check exists for', () => {
+    expect(isPlanLineValidForUnit(planLines, 'rev_a', 'unit_b')).toBe(false)
+    expect(isPlanLineValidForUnit(planLines, 'rev_b', 'unit_a')).toBe(false)
+  })
+
+  it('REG: a cost_of_sales line is rejected even for the right unit -- catalogue items only roll up into revenue', () => {
+    expect(isPlanLineValidForUnit(planLines, 'cogs_a', 'unit_a')).toBe(false)
+  })
+
+  it('REG: an inactive revenue line is rejected even for the right unit', () => {
+    expect(isPlanLineValidForUnit(planLines, 'rev_a_inactive', 'unit_a')).toBe(false)
+  })
+
+  it('REG: a nonexistent plan_line_id is rejected', () => {
+    expect(isPlanLineValidForUnit(planLines, 'does_not_exist', 'unit_a')).toBe(false)
   })
 })
