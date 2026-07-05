@@ -710,3 +710,67 @@ describe('Generic Engine — CodeRabbit findings on the per-unit EBITDA fix', ()
     expect(unitActEbitda).not.toBeNull()
   })
 })
+
+describe('Generic Engine — parent rollup completeness with multiple sub-units', () => {
+  // The exact case CodeRabbit flagged: a parent with multiple sub-units,
+  // where one sub-unit HAS a cost_of_sales line but hasn't reported an
+  // actual for it this month. merge() only adds a contribution when a
+  // sub actually reports -- so the combined parent-level total could
+  // otherwise look "complete" (non-null) using only the reporting sub's
+  // figure, silently treating the non-reporting sub's real cost as zero.
+  function makeParentWithSubsConfig(overrides: Record<string,any> = {}) {
+    return defaultGenericConfig({
+      client_id: 'test', business_name: 'Test Co', currency: 'UGX', planning_months: 12,
+      business_units: [
+        { id: 'parent1', name: 'Parent', short: 'PA', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 0 },
+        { id: 'subA', name: 'Sub A', short: 'SA', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 1, parent_id: 'parent1' },
+        { id: 'subB', name: 'Sub B', short: 'SB', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 2, parent_id: 'parent1' },
+      ],
+      plan_lines: [
+        { id: 'revA', unit_id: 'subA', name: 'Sales A', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(5_000_000), active: true },
+        { id: 'cogsA', unit_id: 'subA', name: 'COGS A', category: 'cost_of_sales', line_type: 'standard', monthly_plan: Array(12).fill(2_000_000), active: true },
+        { id: 'revB', unit_id: 'subB', name: 'Sales B', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(5_000_000), active: true },
+        { id: 'cogsB', unit_id: 'subB', name: 'COGS B', category: 'cost_of_sales', line_type: 'standard', monthly_plan: Array(12).fill(2_000_000), active: true },
+      ],
+      settings: {
+        shared_cost_fixed_pct: 0, corporate_tax_rate: 0.30, opening_cash_balance: 5_000_000,
+        capital_structure: { shareholder_contribution: 10_000_000, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, grace_period_months: 0, fixed_assets: 0 },
+      },
+      start_date: '2026-01-01',
+      ...overrides,
+    })
+  }
+
+  it('REG: parent act_gp stays null when one sub-unit with a cost_of_sales line has not reported its actual, even though the other sub has', () => {
+    // Sub A fully reports (revenue + cogs). Sub B reports revenue but NOT
+    // cogs -- Sub B genuinely HAS a cogs line, it just hasn't been
+    // entered for this month.
+    const actuals = {
+      subA: { '2026-01-01': { revA: 4_500_000, cogsA: 1_800_000 } },
+      subB: { '2026-01-01': { revB: 4_800_000 } }, // cogsB missing
+    }
+    const result = runGenericModel(makeParentWithSubsConfig(), actuals)
+    const parentPL = result.unitPL['parent1']
+    expect(parentPL.act_gp[0]).toBeNull() // must NOT silently use only Sub A's cogs
+  })
+
+  it('REG: parent act_gp correctly computes once BOTH sub-units have reported their cogs actuals', () => {
+    const actuals = {
+      subA: { '2026-01-01': { revA: 4_500_000, cogsA: 1_800_000 } },
+      subB: { '2026-01-01': { revB: 4_800_000, cogsB: 1_900_000 } },
+    }
+    const result = runGenericModel(makeParentWithSubsConfig(), actuals)
+    const parentPL = result.unitPL['parent1']
+    expect(parentPL.act_gp[0]).toBe((4_500_000 + 4_800_000) - (1_800_000 + 1_900_000))
+  })
+
+  it('REG: the same incompleteness correctly propagates to the consolidated level too, not just the parent rollup', () => {
+    const actuals = {
+      subA: { '2026-01-01': { revA: 4_500_000, cogsA: 1_800_000 } },
+      subB: { '2026-01-01': { revB: 4_800_000 } }, // cogsB still missing
+    }
+    const result = runGenericModel(makeParentWithSubsConfig(), actuals)
+    expect(result.con.act_gp[0]).toBeNull()
+    expect(result.con.act_ebitda[0]).toBeNull()
+  })
+})
