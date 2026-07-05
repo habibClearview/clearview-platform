@@ -109,4 +109,11 @@ describe('applyPeriodActual — one decision per period, never a per-line blend'
     expect(revenueDisplayed[1]).toBe(1000); expect(costDisplayed[1]).toBe(400) // both planned
     expect(revenueDisplayed[2]).toBe(900);  expect(costDisplayed[2]).toBe(410) // both actual
   })
+
+  it('REG: when the period is actual but this series has no actual figure for that month, does not silently emit null', () => {
+    const plan = [100, 200, 300]
+    const actual = [90, null, null] // actual for month 2 is missing despite the period being "actual"
+    const periodIsActual = [true, false, true]
+    expect(applyPeriodActual(plan, actual, periodIsActual)).toEqual([90, 200, 300])
+  })
 })

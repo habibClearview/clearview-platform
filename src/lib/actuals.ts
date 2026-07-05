@@ -72,5 +72,5 @@ export function deriveActualOperatingCosts(actGrossProfit: number, actEbitda: nu
 // computes once every category with real data requirements is complete)
 // and applied uniformly here.
 export function applyPeriodActual(planValues: number[], actualValues: (number | null)[], periodIsActual: boolean[]): number[] {
-  return planValues.map((v, m) => periodIsActual[m] ? (actualValues[m] as number) : v)
+  return planValues.map((v, m) => (periodIsActual[m] && actualValues[m] !== null) ? (actualValues[m] as number) : v)
 }
