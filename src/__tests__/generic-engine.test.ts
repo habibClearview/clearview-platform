@@ -752,6 +752,7 @@ describe('Generic Engine — parent rollup completeness with multiple sub-units'
     const result = runGenericModel(makeParentWithSubsConfig(), actuals)
     const parentPL = result.unitPL['parent1']
     expect(parentPL.act_gp[0]).toBeNull() // must NOT silently use only Sub A's cogs
+    expect(parentPL.act_ebitda[0]).toBeNull() // depends on act_gp -- must also stay null, not just the intermediate figure
   })
 
   it('REG: parent act_gp correctly computes once BOTH sub-units have reported their cogs actuals', () => {
