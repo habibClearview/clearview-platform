@@ -9,6 +9,15 @@ function getSupabase() {
   return createClient(url, key)
 }
 
+// Extracted so it's directly testable without a database -- checks that
+// a plan_line_id genuinely belongs to a given business_unit_id, is
+// active, and is a revenue-category line (the only kind a catalogue
+// item can roll up into).
+export function isPlanLineValidForUnit(planLines: any[], planLineId: string, unitId: string): boolean {
+  const matchingLine = (planLines || []).find((l: any) => l.id === planLineId)
+  return !!matchingLine && !!matchingLine.active && matchingLine.category === 'revenue' && matchingLine.unit_id === unitId
+}
+
 // ── GET: list catalogue items for a client (optionally one unit) ──
 export async function GET(req: NextRequest) {
   try {
@@ -94,7 +103,7 @@ export async function PATCH(req: NextRequest) {
     // cleared while a cost_price from an earlier PATCH still remains, or
     // vice versa. Validate the EFFECTIVE state after this update applies.
     const { data: existing, error: fetchErr } = await supabase
-      .from('field_catalogue').select('cost_price, cogs_plan_line_id').eq('id', id).single()
+      .from('field_catalogue').select('cost_price, cogs_plan_line_id, client_id, business_unit_id, plan_line_id').eq('id', id).single()
     if (fetchErr) return NextResponse.json({ error: 'Catalogue item not found' }, { status: 404 })
 
     const updates: Record<string, any> = { updated_at: new Date().toISOString() }
@@ -137,6 +146,25 @@ export async function PATCH(req: NextRequest) {
         updates.cost_price_updated_at = null
         effectiveCostPrice = null
         effectiveCogsLine = null
+      }
+    }
+
+    // Cross-check that plan_line_id genuinely belongs to the EFFECTIVE
+    // business_unit_id (the new one if it's changing, else the existing
+    // one) -- the comment above only describes what the client is
+    // expected to send together; without this, a caller (or a client-side
+    // bug) could set business_unit_id to one unit while leaving
+    // plan_line_id pointing at a revenue line that belongs to a
+    // completely different one, silently misattributing every future
+    // sale's revenue to the wrong unit's P&L.
+    if (plan_line_id !== undefined || business_unit_id !== undefined) {
+      const effectiveUnitId = business_unit_id !== undefined ? business_unit_id : existing.business_unit_id
+      const effectivePlanLineId = plan_line_id !== undefined ? plan_line_id : existing.plan_line_id
+      const { data: configRow, error: configErr } = await supabase
+        .from('generic_model_config').select('plan_lines').eq('client_id', existing.client_id).single()
+      if (configErr) return NextResponse.json({ error: 'Could not verify the category against this client\'s plan' }, { status: 500 })
+      if (!isPlanLineValidForUnit(configRow.plan_lines, effectivePlanLineId, effectiveUnitId)) {
+        return NextResponse.json({ error: 'That category does not belong to the selected business unit, or is not an active revenue line' }, { status: 400 })
       }
     }
 

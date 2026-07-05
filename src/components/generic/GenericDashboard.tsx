@@ -1613,7 +1613,7 @@ function CatalogueManager({clientId,config,P}) {
       setEditingFullId(null)
       await load()
     } catch { alert('Could not save these changes. Please try again.') }
-    setSavingFull(false)
+    finally { setSavingFull(false) }
   }
 
   async function saveCostPrice(id:string) {
@@ -1774,25 +1774,28 @@ function CatalogueManager({clientId,config,P}) {
                       {editingFullId===item.id&&(
                         <div style={{marginTop:'0.6rem',paddingTop:'0.6rem',borderTop:`1px solid ${C.border}`}}>
                           <div style={fGrid}>
-                            <div><label style={lbl}>Item Name</label><input style={inp} value={editFull.name} onChange={e=>setEditFull(f=>({...f,name:e.target.value}))}/></div>
-                            <div><label style={lbl}>Type</label>
-                              <select style={inp} value={editFull.item_type} onChange={e=>setEditFull(f=>({...f,item_type:e.target.value}))}>
+                            <div><label htmlFor={`edit-name-${item.id}`} style={lbl}>Item Name</label><input id={`edit-name-${item.id}`} style={inp} value={editFull.name} onChange={e=>setEditFull(f=>({...f,name:e.target.value}))}/></div>
+                            <div><label htmlFor={`edit-type-${item.id}`} style={lbl}>Type</label>
+                              <select id={`edit-type-${item.id}`} style={inp} value={editFull.item_type} onChange={e=>setEditFull(f=>({...f,item_type:e.target.value}))}>
                                 <option value="product">Product</option>
                                 <option value="service">Service</option>
                               </select>
                             </div>
-                            <div><label style={lbl}>Business Unit</label>
-                              <select style={inp} value={editFull.business_unit_id} onChange={e=>setEditFull(f=>({...f,business_unit_id:e.target.value,plan_line_id:''}))}>
+                            <div><label htmlFor={`edit-unit-${item.id}`} style={lbl}>Business Unit</label>
+                              <select id={`edit-unit-${item.id}`} style={inp} value={editFull.business_unit_id} onChange={e=>setEditFull(f=>({...f,business_unit_id:e.target.value,plan_line_id:''}))}>
                                 {config.business_units.filter((u:any)=>u.active).map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}
                               </select>
+                              {editFull.business_unit_id!==item.business_unit_id&&item.cost_price!==null&&item.cost_price!==undefined&&(
+                                <div style={{fontSize:'0.7rem',color:C.amber,marginTop:'0.25rem'}}>Changing the business unit will clear this item's cost price and COGS category, since those belong to the unit it's leaving. You'll need to set them again for the new unit.</div>
+                              )}
                             </div>
-                            <div><label style={lbl}>Category</label>
-                              <select style={inp} value={editFull.plan_line_id} onChange={e=>setEditFull(f=>({...f,plan_line_id:e.target.value}))}>
+                            <div><label htmlFor={`edit-category-${item.id}`} style={lbl}>Category</label>
+                              <select id={`edit-category-${item.id}`} style={inp} value={editFull.plan_line_id} onChange={e=>setEditFull(f=>({...f,plan_line_id:e.target.value}))}>
                                 <option value="">Select a category...</option>
                                 {revenueLinesForUnit(editFull.business_unit_id).map((l:any)=><option key={l.id} value={l.id}>{l.name}</option>)}
                               </select>
                             </div>
-                            <div><label style={lbl}>Unit Label (optional)</label><input style={inp} value={editFull.unit_label} onChange={e=>setEditFull(f=>({...f,unit_label:e.target.value}))} placeholder="e.g. bag, kg, session"/></div>
+                            <div><label htmlFor={`edit-unitlabel-${item.id}`} style={lbl}>Unit Label (optional)</label><input id={`edit-unitlabel-${item.id}`} style={inp} value={editFull.unit_label} onChange={e=>setEditFull(f=>({...f,unit_label:e.target.value}))} placeholder="e.g. bag, kg, session"/></div>
                           </div>
                           <div style={{display:'flex',gap:'0.6rem',marginTop:'0.6rem'}}>
                             <button style={solidBtn()} disabled={savingFull} onClick={()=>saveFullEdit(item.id)}>{savingFull?'Saving...':'Save Changes'}</button>
