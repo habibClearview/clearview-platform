@@ -293,6 +293,29 @@ export function runGenericModel(
   const zero = () => Array(months).fill(0) as number[]
   const nullArr = () => Array(months).fill(null) as (number | null)[]
 
+  // Used everywhere multiple units' actual data gets merged together
+  // (parent rollups from sub-units, and the top-level consolidated
+  // total across all units). merge()/mergeAct() only add a unit's
+  // contribution when THAT unit actually reported non-null for a given
+  // month -- so if Unit A (which has a cost_of_sales line) reports 100
+  // this month but Unit B (which ALSO has a cost_of_sales line) reports
+  // nothing, the combined total would show only Unit A's 100, silently
+  // treating Unit B's real, unreported cost as zero rather than as
+  // "still missing". This checks EVERY unit that has an active line in
+  // the given category individually, so a rollup with one
+  // incompletely-reporting unit correctly stays incomplete rather than
+  // understating the true cost.
+  function categoryCompleteAcrossUnits(unitIds: string[], category: string, m: number): boolean {
+    const actKey = category === 'cost_of_sales' ? 'act_cogs' : category === 'staff' ? 'act_staff' : category === 'direct_opex' ? 'act_opex' : null
+    if (!actKey) return true
+    return unitIds.every(uid => {
+      const hasLine = config.plan_lines.some(l => l.active && l.unit_id === uid && l.category === category)
+      if (!hasLine) return true
+      const r = unitPL[uid]
+      return !r || (r as any)[actKey][m] !== null
+    })
+  }
+
   // ── Calculate unit P&L ────────────────────────────────────
   function calcUnit(unit: GenericBusinessUnit): GenericUnitPL {
     const lines = config.plan_lines.filter(l => l.unit_id === unit.id && l.active)
@@ -453,8 +476,24 @@ export function runGenericModel(
     // calcUnit's own act_gp -- checked across every sub-unit's plan
     // lines, since a parent rollup's cost_of_sales could live entirely
     // on one particular sub-unit rather than the parent itself.
+    //
+    // Critically, this must NOT stop at "does the combined c.act_cogs[m]
+    // have any value at all" -- merge() only adds a sub's contribution
+    // when that sub actually reported for this month, so if Sub A (which
+    // has a cogs line) reports 100 and Sub B (which ALSO has a cogs line)
+    // reports nothing this month, c.act_cogs[m] would show only Sub A's
+    // 100 -- silently treating Sub B's real, unreported cost as zero,
+    // not as "still missing". cogsCompleteByMonth checks EVERY qualifying
+    // sub individually, so a parent with an incompletely-reporting sub
+    // correctly stays null rather than understating cost.
     const parentHasCogsLines = subs.some(su => config.plan_lines.some(l => l.active && l.unit_id === su.id && l.category === 'cost_of_sales'))
-    const act_gp = c.act_rev.map((r, m) => (r !== null && (c.act_cogs[m] !== null || !parentHasCogsLines)) ? r - ((parentHasCogsLines ? c.act_cogs[m] : 0) as number) : null)
+    const subIds = subs.map(su => su.id)
+    const act_gp = c.act_rev.map((r, m) => {
+      if (r === null) return null
+      if (!parentHasCogsLines) return r
+      if (!categoryCompleteAcrossUnits(subIds, 'cost_of_sales', m)) return null
+      return r - (c.act_cogs[m] as number)
+    })
     const ann_rev = yr(c.rev), ann_cogs = yr(c.cogs), ann_gp = yr(c.gp)
     const ann_staff = yr(c.staff), ann_opex = yr(c.opex)
     const parentUnit = activeUnits.find(u => u.id === parentId)
@@ -526,8 +565,17 @@ export function runGenericModel(
       // Shared Costs use their planned/allocated value unconditionally --
       // that allocation is an internal planning mechanism with no
       // independent actual-tracking source of its own.
-      const staffOk = !unitHasStaffLines || r.act_staff[m] !== null
-      const opexOk  = !unitHasOpexLines  || r.act_opex[m]  !== null
+      //
+      // Uses categoryCompleteAcrossUnits rather than a bare
+      // r.act_staff[m] !== null check -- for a standalone unit these are
+      // equivalent (relevantIds is just {uid}), but for a PARENT unit
+      // r.act_staff[m] was itself populated by merging multiple
+      // sub-units together, and a bare null check can't tell "no sub has
+      // a staff line" apart from "one sub with a staff line just hasn't
+      // reported this month" -- the second case must stay incomplete,
+      // not silently understate cost.
+      const staffOk = categoryCompleteAcrossUnits(Array.from(relevantIds), 'staff', m)
+      const opexOk  = categoryCompleteAcrossUnits(Array.from(relevantIds), 'direct_opex', m)
       if (r.act_gp[m] !== null && staffOk && opexOk) {
         r.act_ebitda[m] = (r.act_gp[m] as number)
           - ((unitHasStaffLines ? r.act_staff[m] : 0) as number)
@@ -575,6 +623,10 @@ export function runGenericModel(
   // anywhere in the consolidation, there is genuinely nothing to wait
   // for -- its contribution is correctly zero, not "missing".
   const activeLinesInScope = config.plan_lines.filter(l => l.active && activeUnits.some(u => u.id === l.unit_id))
+  // Every leaf-level (atomic) unit -- both standalone top-level units and
+  // sub-units -- used by categoryCompleteAcrossUnits to check completeness
+  // at the whole-business consolidated level.
+  const allAtomicUnitIds = activeUnits.map(u => u.id)
   const hasCogsLines  = activeLinesInScope.some(l => l.category === 'cost_of_sales')
   const hasStaffLines = activeLinesInScope.some(l => l.category === 'staff')
   const hasOpexLines  = activeLinesInScope.some(l => l.category === 'direct_opex')
@@ -630,7 +682,13 @@ export function runGenericModel(
     con.npat[m] = con.nbt[m] - con.tax[m]
     // Actual Gross Profit: only when both act_rev and act_cogs exist
     // (or cost_of_sales genuinely doesn't apply anywhere in this business).
-    if (con.act_rev[m] !== null && (con.act_cogs[m] !== null || !hasCogsLines)) {
+    // categoryCompleteAcrossUnits checks every ATOMIC unit individually
+    // (not just whether the combined con.act_cogs[m] happens to be
+    // non-null) -- two units can both have cogs lines, and if only one
+    // reports this month, the combined total would otherwise silently
+    // look complete while actually missing the other unit's real cost.
+    const cogsCompleteThisMonth = categoryCompleteAcrossUnits(allAtomicUnitIds, 'cost_of_sales', m)
+    if (con.act_rev[m] !== null && (cogsCompleteThisMonth || !hasCogsLines)) {
       con.act_gp[m] = (con.act_rev[m] as number) - ((hasCogsLines ? con.act_cogs[m] : 0) as number)
     }
     // Actual EBITDA: only when every category that ACTUALLY APPLIES to
@@ -645,9 +703,9 @@ export function runGenericModel(
     // EBITDA could never compute at all for a business with no staff
     // costs, no matter how complete its real data otherwise is.
     const revOk   = con.act_rev[m] !== null
-    const cogsOk  = !hasCogsLines  || con.act_cogs[m]  !== null
-    const staffOk = !hasStaffLines || con.act_staff[m] !== null
-    const opexOk  = !hasOpexLines  || con.act_opex[m]  !== null
+    const cogsOk  = !hasCogsLines  || cogsCompleteThisMonth
+    const staffOk = !hasStaffLines || categoryCompleteAcrossUnits(allAtomicUnitIds, 'staff', m)
+    const opexOk  = !hasOpexLines  || categoryCompleteAcrossUnits(allAtomicUnitIds, 'direct_opex', m)
     if (revOk && cogsOk && staffOk && opexOk) {
       con.act_ebitda[m] = (con.act_rev[m] as number)
         - ((hasCogsLines ? con.act_cogs[m] : 0) as number)
