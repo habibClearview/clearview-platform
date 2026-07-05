@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { combinedActual as combined, computeActualsTotals as computeTotals, type ActualsPlanLine as PlanLine } from '../lib/actuals'
+import { combinedActual as combined, computeActualsTotals as computeTotals, applyPeriodActual, type ActualsPlanLine as PlanLine } from '../lib/actuals'
 
 // Tests the real src/lib/actuals.ts functions -- the exact ones
 // GenericDashboard.tsx's ActualsTab imports and uses, not a copy.
@@ -76,5 +76,37 @@ describe('Actuals — Gross Profit is revenue minus cost of sales ONLY', () => {
     expect(totals.totalRev).toBe(1000)
     expect(totals.totalCOGS).toBe(300)
     expect(totals.grossProfit).toBe(700)
+  })
+})
+
+describe('applyPeriodActual — one decision per period, never a per-line blend', () => {
+  it('REG: when the period is actual, uses the actual value even if it differs wildly from plan', () => {
+    const plan = [100, 200, 300]
+    const actual = [90, null, 310]
+    const periodIsActual = [true, false, true]
+    expect(applyPeriodActual(plan, actual, periodIsActual)).toEqual([90, 200, 310])
+  })
+
+  it('REG: when the period is NOT actual, uses the planned value even if an actual figure happens to exist for that month', () => {
+    // This is the exact case that matters: a row might have SOME actual
+    // data available on its own, but if the period overall isn't
+    // complete, it must not leak through -- the whole column shows plan
+    // together, never a partial blend.
+    const plan = [100, 200, 300]
+    const actual = [999, 999, 999] // present, but period says not complete
+    const periodIsActual = [false, false, false]
+    expect(applyPeriodActual(plan, actual, periodIsActual)).toEqual([100, 200, 300])
+  })
+
+  it('REG: every row given the SAME periodIsActual mask produces a fully consistent period -- never revenue actual while cost stays planned', () => {
+    // Directly modeling the reported bug: Revenue and Cost of Sales must
+    // switch together, in the same months, because they share one mask.
+    const periodIsActual = [true, false, true]
+    const revenueDisplayed = applyPeriodActual([1000, 1000, 1000], [1200, null, 900], periodIsActual)
+    const costDisplayed    = applyPeriodActual([400, 400, 400], [380, null, 410], periodIsActual)
+    // Month 0 and 2: both actual. Month 1: both planned. Never mixed.
+    expect(revenueDisplayed[0]).toBe(1200); expect(costDisplayed[0]).toBe(380) // both actual
+    expect(revenueDisplayed[1]).toBe(1000); expect(costDisplayed[1]).toBe(400) // both planned
+    expect(revenueDisplayed[2]).toBe(900);  expect(costDisplayed[2]).toBe(410) // both actual
   })
 })
