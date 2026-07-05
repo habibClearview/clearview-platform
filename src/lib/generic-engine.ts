@@ -306,7 +306,11 @@ export function runGenericModel(
   // incompletely-reporting unit correctly stays incomplete rather than
   // understating the true cost.
   function categoryCompleteAcrossUnits(unitIds: string[], category: string, m: number): boolean {
-    const actKey = category === 'cost_of_sales' ? 'act_cogs' : category === 'staff' ? 'act_staff' : category === 'direct_opex' ? 'act_opex' : null
+    const actKey = category === 'revenue' ? 'act_rev'
+      : category === 'cost_of_sales' ? 'act_cogs'
+      : category === 'staff' ? 'act_staff'
+      : category === 'direct_opex' ? 'act_opex'
+      : null
     if (!actKey) return true
     return unitIds.every(uid => {
       const hasLine = config.plan_lines.some(l => l.active && l.unit_id === uid && l.category === category)
@@ -490,6 +494,12 @@ export function runGenericModel(
     const subIds = subs.map(su => su.id)
     const act_gp = c.act_rev.map((r, m) => {
       if (r === null) return null
+      // Revenue needs the same completeness gate as costs: if two subs
+      // both have revenue lines and only one reports this month, r
+      // would still be non-null (just missing the other sub's real
+      // revenue) -- silently understating GP rather than staying
+      // incomplete.
+      if (!categoryCompleteAcrossUnits(subIds, 'revenue', m)) return null
       if (!parentHasCogsLines) return r
       if (!categoryCompleteAcrossUnits(subIds, 'cost_of_sales', m)) return null
       return r - (c.act_cogs[m] as number)
@@ -700,8 +710,13 @@ export function runGenericModel(
     // non-null) -- two units can both have cogs lines, and if only one
     // reports this month, the combined total would otherwise silently
     // look complete while actually missing the other unit's real cost.
+    // Revenue needs the identical gate: con.act_rev[m] !== null alone
+    // isn't sufficient -- two revenue-bearing units could both
+    // contribute, and if only one reports, the combined total would
+    // still be non-null while silently missing the other's real revenue.
+    const revCompleteThisMonth = categoryCompleteAcrossUnits(allAtomicUnitIds, 'revenue', m)
     const cogsCompleteThisMonth = categoryCompleteAcrossUnits(allAtomicUnitIds, 'cost_of_sales', m)
-    if (con.act_rev[m] !== null && (cogsCompleteThisMonth || !hasCogsLines)) {
+    if (con.act_rev[m] !== null && revCompleteThisMonth && (cogsCompleteThisMonth || !hasCogsLines)) {
       con.act_gp[m] = (con.act_rev[m] as number) - ((hasCogsLines ? con.act_cogs[m] : 0) as number)
     }
     // Actual EBITDA: only when every category that ACTUALLY APPLIES to
@@ -715,7 +730,7 @@ export function runGenericModel(
     // to wait for, and requiring it unconditionally would mean actual
     // EBITDA could never compute at all for a business with no staff
     // costs, no matter how complete its real data otherwise is.
-    const revOk   = con.act_rev[m] !== null
+    const revOk   = con.act_rev[m] !== null && revCompleteThisMonth
     const cogsOk  = !hasCogsLines  || cogsCompleteThisMonth
     const staffOk = !hasStaffLines || categoryCompleteAcrossUnits(allAtomicUnitIds, 'staff', m)
     const opexOk  = !hasOpexLines  || categoryCompleteAcrossUnits(allAtomicUnitIds, 'direct_opex', m)

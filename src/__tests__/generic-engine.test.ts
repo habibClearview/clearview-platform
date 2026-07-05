@@ -58,6 +58,14 @@ function makeActualsConfig(overrides: Record<string,any> = {}) {
   return makeConfig({ start_date: '2026-01-01', ...overrides })
 }
 
+// Shared across every describe block that needs a minimal, otherwise-
+// default settings block -- avoids reintroducing the same duplication
+// pattern makeNoStaffConfig was already extracted to avoid.
+const DEFAULT_TEST_SETTINGS = {
+  shared_cost_fixed_pct: 0, corporate_tax_rate: 0.30, opening_cash_balance: 5_000_000,
+  capital_structure: { shareholder_contribution: 10_000_000, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, grace_period_months: 0, fixed_assets: 0 },
+}
+
 // Also shared across describe blocks -- was duplicated identically in
 // two places, risking silent drift if one copy were updated without the
 // other.
@@ -71,10 +79,7 @@ function makeNoStaffConfig(overrides: Record<string,any> = {}) {
       { id: 'opex1', unit_id: 'u1', name: 'Overheads', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(500_000), active: true },
       // Deliberately NO staff-category plan line at all.
     ],
-    settings: {
-      shared_cost_fixed_pct: 0, corporate_tax_rate: 0.30, opening_cash_balance: 5_000_000,
-      capital_structure: { shareholder_contribution: 10_000_000, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, grace_period_months: 0, fixed_assets: 0 },
-    },
+    settings: DEFAULT_TEST_SETTINGS,
     start_date: '2026-01-01',
     ...overrides,
   })
@@ -732,10 +737,7 @@ describe('Generic Engine — parent rollup completeness with multiple sub-units'
         { id: 'revB', unit_id: 'subB', name: 'Sales B', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(5_000_000), active: true },
         { id: 'cogsB', unit_id: 'subB', name: 'COGS B', category: 'cost_of_sales', line_type: 'standard', monthly_plan: Array(12).fill(2_000_000), active: true },
       ],
-      settings: {
-        shared_cost_fixed_pct: 0, corporate_tax_rate: 0.30, opening_cash_balance: 5_000_000,
-        capital_structure: { shareholder_contribution: 10_000_000, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, grace_period_months: 0, fixed_assets: 0 },
-      },
+      settings: DEFAULT_TEST_SETTINGS,
       start_date: '2026-01-01',
       ...overrides,
     })
@@ -773,5 +775,50 @@ describe('Generic Engine — parent rollup completeness with multiple sub-units'
     const result = runGenericModel(makeParentWithSubsConfig(), actuals)
     expect(result.con.act_gp[0]).toBeNull()
     expect(result.con.act_ebitda[0]).toBeNull()
+  })
+})
+
+describe('Generic Engine — revenue needs the same completeness gate as costs', () => {
+  // Found live during CodeRabbit review: categoryCompleteAcrossUnits
+  // handled cost_of_sales/staff/direct_opex, but not revenue itself --
+  // meaning con.act_rev[m] !== null alone was treated as "revenue is
+  // complete", even when two revenue-bearing units both contribute and
+  // only one has actually reported. This silently understates GP/EBITDA
+  // rather than correctly staying incomplete -- the same class of risk,
+  // just on the revenue side instead of costs.
+  function makeTwoRevUnitsConfig(overrides: Record<string,any> = {}) {
+    return defaultGenericConfig({
+      client_id: 'test', business_name: 'Test Co', currency: 'UGX', planning_months: 12,
+      business_units: [
+        { id: 'u1', name: 'Unit 1', short: 'U1', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 0 },
+        { id: 'u2', name: 'Unit 2', short: 'U2', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 1 },
+      ],
+      plan_lines: [
+        { id: 'rev1', unit_id: 'u1', name: 'Sales 1', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(5_000_000), active: true },
+        { id: 'rev2', unit_id: 'u2', name: 'Sales 2', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(5_000_000), active: true },
+      ],
+      settings: DEFAULT_TEST_SETTINGS,
+      start_date: '2026-01-01',
+      ...overrides,
+    })
+  }
+
+  it('REG: consolidated act_gp stays null when one revenue-bearing unit has not reported, even though another has', () => {
+    // Only u1 reports revenue this month -- u2 genuinely has a revenue
+    // line, it just hasn't been entered.
+    const actuals = { u1: { '2026-01-01': { rev1: 4_800_000 } } }
+    const result = runGenericModel(makeTwoRevUnitsConfig(), actuals)
+    expect(result.con.act_rev[0]).not.toBeNull() // the raw merged total IS non-null (this is exactly what made the bug possible)
+    expect(result.con.act_gp[0]).toBeNull() // but act_gp must correctly stay incomplete
+    expect(result.con.act_ebitda[0]).toBeNull()
+  })
+
+  it('REG: consolidated act_gp correctly computes once every revenue-bearing unit has reported', () => {
+    const actuals = {
+      u1: { '2026-01-01': { rev1: 4_800_000 } },
+      u2: { '2026-01-01': { rev2: 5_100_000 } },
+    }
+    const result = runGenericModel(makeTwoRevUnitsConfig(), actuals)
+    expect(result.con.act_gp[0]).toBe(4_800_000 + 5_100_000)
   })
 })
