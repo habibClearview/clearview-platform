@@ -10,7 +10,7 @@ import {
   type GenericPlanLine, type LineCategory, type LineType, type UnitType,
 } from '@/lib/generic-engine'
 import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor } from '@/lib/scoring-engine'
-import { combinedActual, computeActualsTotals, deriveActualOperatingCosts } from '@/lib/actuals'
+import { combinedActual, computeActualsTotals, deriveActualOperatingCosts, applyPeriodActual } from '@/lib/actuals'
 import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
 import { getFiscalYears, canCloseYear, computeAnnualPL, computeAnnualCashFlow, computeYearEndBalanceSheet } from '@/lib/annual-close'
 
@@ -2435,17 +2435,15 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
     closedPeriods?.has(periodForMonthIndex(config.start_date, i)) ?? false
   )
 
-  // Hybrid: use the actual figure for a month where one exists, plan
-  // otherwise. actualMask marks which months in the row are real data, so
-  // PLRow can highlight them distinctly. Each row's own actual field
-  // (act_rev, act_gp, act_ebitda, etc) determines availability
-  // independently -- e.g. actual revenue can exist for a month before
-  // actual EBITDA does, if opex actuals haven't been entered yet.
-  function hybridRow(planValues:number[], actualValues:(number|null)[]) {
-    const values = planValues.map((v,i)=> actualValues[i] !== null ? (actualValues[i] as number) : v)
-    const actualMask = actualValues.map(v => v !== null)
-    return { values, actualMask }
-  }
+  // hybridRow (per-row independent actual/plan blending) was removed
+  // here. It let each row (Revenue, Cost, GP, EBITDA...) decide actual
+  // vs plan independently, which could show some rows as actual and
+  // others as plan within the SAME month's column -- not a real
+  // accounting practice, and not what a Budget vs Actual comparison
+  // does. Replaced with a single per-month completeness signal
+  // (periodIsActual, derived from act_ebitda/act_gp) applied uniformly
+  // to every row, so a period is either entirely actual or entirely
+  // plan, never a blend.
 
   return (
     <div>
@@ -2463,28 +2461,34 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
       {viewMode==='unit' && (() => {
         const pl = result.unitPL[selUnit]
         if (!pl) return <div style={card}><p style={{color:C.slate}}>No data for this unit.</p></div>
-        const revH = hybridRow(pl.rev, pl.act_rev)
-        const cogsH = hybridRow(pl.cogs, pl.act_cogs)
-        const gpH = hybridRow(pl.gp, pl.act_gp)
-        const staffH = hybridRow(pl.staff, pl.act_staff)
-        const opexH = hybridRow(pl.opex, pl.act_opex)
-        const ebitdaH = hybridRow(pl.ebitda, pl.act_ebitda)
+        // Same principle as the Consolidated view: one signal per month
+        // for this unit -- is its data genuinely complete? If not, the
+        // WHOLE column shows plan, never some rows actual and others
+        // plan in the same period. pl.act_ebitda[m] !== null is correct
+        // by construction as that signal, since it only computes once
+        // every category this unit actually has data for is complete.
+        const periodIsActual: boolean[] = pl.act_ebitda.map(v => v !== null)
+        const revValues    = applyPeriodActual(pl.rev, pl.act_rev, periodIsActual)
+        const cogsValues   = applyPeriodActual(pl.cogs, pl.act_cogs, periodIsActual)
+        const gpValues     = applyPeriodActual(pl.gp, pl.act_gp, periodIsActual)
+        const staffValues  = applyPeriodActual(pl.staff, pl.act_staff.map(v => v ?? 0), periodIsActual)
+        const opexValues   = applyPeriodActual(pl.opex, pl.act_opex.map(v => v ?? 0), periodIsActual)
+        const ebitdaValues = applyPeriodActual(pl.ebitda, pl.act_ebitda, periodIsActual)
         const rows = [
-          {label:'Revenue',values:revH.values,bold:true,actualMask:revH.actualMask},
-          {label:'Cost of Sales',values:cogsH.values,negate:true,actualMask:cogsH.actualMask},
-          {label:'Gross Profit',values:gpH.values,bold:true,highlight:true,actualMask:gpH.actualMask},
-          {label:'Staff Costs',values:staffH.values,negate:true,actualMask:staffH.actualMask},
-          {label:'Direct Overheads',values:opexH.values,negate:true,actualMask:opexH.actualMask},
-          // Shared Costs always uses its planned/allocated value, even in
-          // a month where EBITDA is shown as actual -- that allocation is
-          // an internal planning mechanism (headcount/revenue-share split
-          // of a pooled cost) with no independent actual-tracking source
-          // of its own, unlike revenue/COGS/staff/opex. Marked actual
-          // alongside EBITDA whenever EBITDA is, so the reconciling chain
-          // (GP - Staff - Overheads - Shared = EBITDA) reads consistently
-          // rather than one row breaking the visual pattern.
-          {label:'Shared Costs',values:pl.shared,negate:true,actualMask:ebitdaH.actualMask},
-          {label:'EBITDA',values:ebitdaH.values,bold:true,highlight:true,actualMask:ebitdaH.actualMask},
+          {label:'Revenue',values:revValues,bold:true,actualMask:periodIsActual},
+          {label:'Cost of Sales',values:cogsValues,negate:true,actualMask:periodIsActual},
+          {label:'Gross Profit',values:gpValues,bold:true,highlight:true,actualMask:periodIsActual},
+          {label:'Staff Costs',values:staffValues,negate:true,actualMask:periodIsActual},
+          {label:'Direct Overheads',values:opexValues,negate:true,actualMask:periodIsActual},
+          // Shared Costs always uses its planned/allocated value even in
+          // an actual period -- that allocation is an internal planning
+          // mechanism (headcount/revenue-share split of a pooled cost)
+          // with no independent actual-tracking source of its own. Still
+          // marked with the same period-level signal as every other row,
+          // so the whole column reads as one consistent period, not a
+          // mix.
+          {label:'Shared Costs',values:pl.shared,negate:true,actualMask:periodIsActual},
+          {label:'EBITDA',values:ebitdaValues,bold:true,highlight:true,actualMask:periodIsActual},
         ]
         return (
           <div>
@@ -2512,42 +2516,38 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
 
       {viewMode==='consolidated' && (() => {
         const con = result.con
-        const revH = hybridRow(con.rev, con.act_rev)
-        const cogsH = hybridRow(con.cogs, con.act_cogs)
-        const gpH = hybridRow(con.gp, con.act_gp)
-        // Total Operating Costs must use the SAME actual coverage as
-        // act_ebitda, not stay plan-only -- otherwise a month showing
-        // actual Gross Profit and actual EBITDA would display a
-        // plan-sourced cost figure between them, and GP minus Operating
-        // Costs would not equal EBITDA on screen.
-        //
-        // This must mirror the engine's own act_ebitda gate exactly
-        // (generic-engine.ts): a category with ZERO active plan lines
-        // anywhere in the business (e.g. no staff line at all) is
-        // treated as zero, not as "missing forever". The first version
-        // of this required BOTH act_staff and act_opex to be non-null
-        // unconditionally -- for a business with no staff line, act_staff
-        // can never be anything but null, so this row silently fell back
-        // to the full PLANNED operating costs even in a month where
-        // act_ebitda itself was correctly actual. That mismatch is
-        // exactly what looked broken: an actual Gross Profit sitting
-        // above an actual EBITDA, with a planned (and unrelated-looking)
-        // cost figure in between them.
-        const actOpexTotal: (number|null)[] = con.act_ebitda.map((eb, m) =>
-          deriveActualOperatingCosts(gpH.values[m], eb)
-        )
-        const opexH = hybridRow(con.opex, actOpexTotal)
-        const ebitdaH = hybridRow(con.ebitda, con.act_ebitda)
+        // A single signal per month: is EVERY category this whole
+        // business needs (revenue, and whichever cost categories
+        // genuinely apply) actually complete for this month? If not,
+        // the ENTIRE column shows plan -- never some rows actual and
+        // others plan in the same period. Real Budget vs Actual practice
+        // treats a period as either done (actual) or not yet (budget/
+        // plan) -- it never blends the two within one column. Using
+        // con.act_ebitda[m] !== null as that single signal is correct
+        // by construction: act_ebitda only computes once revenue and
+        // every applicable cost category has real data for that month
+        // (see generic-engine.ts) -- exactly the same completeness this
+        // needs.
+        const periodIsActual: boolean[] = con.act_ebitda.map(v => v !== null)
+        const actOpexTotal = con.act_ebitda.map((eb, m) => deriveActualOperatingCosts(con.act_gp[m] as number, eb))
+        const revValues    = applyPeriodActual(con.rev, con.act_rev, periodIsActual)
+        const cogsValues   = applyPeriodActual(con.cogs, con.act_cogs, periodIsActual)
+        const gpValues     = applyPeriodActual(con.gp, con.act_gp, periodIsActual)
+        const opexValues   = applyPeriodActual(con.opex, actOpexTotal, periodIsActual)
+        const ebitdaValues = applyPeriodActual(con.ebitda, con.act_ebitda, periodIsActual)
+        const nbtValues    = applyPeriodActual(con.nbt, con.act_nbt, periodIsActual)
+        const taxValues    = applyPeriodActual(con.tax, con.act_tax, periodIsActual)
+        const npatValues   = applyPeriodActual(con.npat, con.act_npat, periodIsActual)
         const rows = [
-          {label:'Revenue',values:revH.values,bold:true,actualMask:revH.actualMask},
-          {label:'Cost of Sales',values:cogsH.values,negate:true,actualMask:cogsH.actualMask},
-          {label:'Gross Profit',values:gpH.values,bold:true,highlight:true,actualMask:gpH.actualMask},
-          {label:'Total Operating Costs',values:opexH.values,negate:true,actualMask:opexH.actualMask},
-          {label:'EBITDA',values:ebitdaH.values,bold:true,highlight:true,actualMask:ebitdaH.actualMask},
+          {label:'Revenue',values:revValues,bold:true,actualMask:periodIsActual},
+          {label:'Cost of Sales',values:cogsValues,negate:true,actualMask:periodIsActual},
+          {label:'Gross Profit',values:gpValues,bold:true,highlight:true,actualMask:periodIsActual},
+          {label:'Total Operating Costs',values:opexValues,negate:true,actualMask:periodIsActual},
+          {label:'EBITDA',values:ebitdaValues,bold:true,highlight:true,actualMask:periodIsActual},
           {label:'Interest',values:con.interest,negate:true},
-          {label:'Net Profit Before Tax',values:con.nbt,bold:true},
-          {label:'Tax',values:con.tax,negate:true},
-          {label:'Net Profit After Tax',values:con.npat,bold:true,highlight:true},
+          {label:'Net Profit Before Tax',values:nbtValues,bold:true,actualMask:periodIsActual},
+          {label:'Tax',values:taxValues,negate:true,actualMask:periodIsActual},
+          {label:'Net Profit After Tax',values:npatValues,bold:true,highlight:true,actualMask:periodIsActual},
         ]
         return <PLTable title={`${config.business_name} — Consolidated P&L`} rows={rows} months={months} cc={cc} showExport closedMask={closedMask}/>
       })()}

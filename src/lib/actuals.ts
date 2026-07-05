@@ -51,15 +51,26 @@ export function computeActualsTotals(
 }
 
 // Used by the Consolidated P&L's Total Operating Costs row. Must derive
-// from the HYBRID (actual-or-plan) Gross Profit figure, not raw act_gp
-// directly -- if a caller passed act_gp instead of the hybrid row's
-// value, a future case where they diverge would silently regress back
-// to a planned figure without this being caught. Deriving via
-// hybridGrossProfit - actEbitda (both already correctly treat a
-// category with zero plan lines anywhere as zero, not "missing") means
+// from the actual Gross Profit figure, not a hybrid/plan-blended one --
+// deriving via actGrossProfit - actEbitda (both already correctly treat
+// a category with zero plan lines anywhere as zero, not "missing") means
 // this always reconciles exactly by construction: GP - Operating Costs
 // = EBITDA, with no separate category-presence check of its own that
 // could drift out of sync with the engine's.
-export function deriveActualOperatingCosts(hybridGrossProfit: number, actEbitda: number | null): number | null {
-  return actEbitda !== null ? hybridGrossProfit - actEbitda : null
+export function deriveActualOperatingCosts(actGrossProfit: number, actEbitda: number | null): number | null {
+  return actEbitda !== null ? actGrossProfit - actEbitda : null
+}
+
+// Used by both the by-unit and Consolidated P&L views. A period (month)
+// is either ENTIRELY actual or ENTIRELY plan -- never a blend of some
+// rows actual and others plan within the same column. That blend is not
+// a real accounting practice (Budget vs Actual compares two full,
+// separate figures side by side; it never merges them into one number
+// per line) and reads as broken even when each individual figure is
+// technically correct. periodIsActual is computed once per month
+// (typically from whether act_ebitda is non-null, since that only
+// computes once every category with real data requirements is complete)
+// and applied uniformly here.
+export function applyPeriodActual(planValues: number[], actualValues: (number | null)[], periodIsActual: boolean[]): number[] {
+  return planValues.map((v, m) => (periodIsActual[m] && actualValues[m] !== null) ? (actualValues[m] as number) : v)
 }
