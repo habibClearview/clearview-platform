@@ -623,10 +623,15 @@ export function runGenericModel(
   // anywhere in the consolidation, there is genuinely nothing to wait
   // for -- its contribution is correctly zero, not "missing".
   const activeLinesInScope = config.plan_lines.filter(l => l.active && activeUnits.some(u => u.id === l.unit_id))
-  // Every leaf-level (atomic) unit -- both standalone top-level units and
-  // sub-units -- used by categoryCompleteAcrossUnits to check completeness
-  // at the whole-business consolidated level.
-  const allAtomicUnitIds = activeUnits.map(u => u.id)
+  // Every leaf-level (atomic) unit -- standalone top-level units AND
+  // sub-units, but explicitly excluding parent ids. A parent's own
+  // unitPL[id] is already a merged rollup from its sub-units, not an
+  // atomic per-unit figure -- passing a parent id into
+  // categoryCompleteAcrossUnits would check the already-summed total
+  // instead of a real leaf unit's own reporting, defeating the point of
+  // checking each contributor individually.
+  const parentIds = new Set(Object.keys(subUnitsByParent))
+  const allAtomicUnitIds = activeUnits.filter(u => !parentIds.has(u.id)).map(u => u.id)
   const hasCogsLines  = activeLinesInScope.some(l => l.category === 'cost_of_sales')
   const hasStaffLines = activeLinesInScope.some(l => l.category === 'staff')
   const hasOpexLines  = activeLinesInScope.some(l => l.category === 'direct_opex')
