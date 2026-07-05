@@ -1,3 +1,22 @@
+# Dependencies
+node_modules/
 
 # Next.js build output -- never committed
 .next/
+out/
+
+# Environment variables -- never committed, contain real secrets
+.env
+.env.local
+.env.*.local
+
+# Build/test artifacts
+*.tsbuildinfo
+coverage/
+
+# OS/editor files
+.DS_Store
+*.swp
+
+# Vercel
+.vercel
