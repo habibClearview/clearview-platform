@@ -58,6 +58,33 @@ function makeActualsConfig(overrides: Record<string,any> = {}) {
   return makeConfig({ start_date: '2026-01-01', ...overrides })
 }
 
+// Shared across every describe block that needs a minimal, otherwise-
+// default settings block -- avoids reintroducing the same duplication
+// pattern makeNoStaffConfig was already extracted to avoid.
+const DEFAULT_TEST_SETTINGS = {
+  shared_cost_fixed_pct: 0, corporate_tax_rate: 0.30, opening_cash_balance: 5_000_000,
+  capital_structure: { shareholder_contribution: 10_000_000, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, grace_period_months: 0, fixed_assets: 0 },
+}
+
+// Also shared across describe blocks -- was duplicated identically in
+// two places, risking silent drift if one copy were updated without the
+// other.
+function makeNoStaffConfig(overrides: Record<string,any> = {}) {
+  return defaultGenericConfig({
+    client_id: 'test', business_name: 'Test Co', currency: 'UGX', planning_months: 12,
+    business_units: [{ id: 'u1', name: 'Main Unit', short: 'MU', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 0 }],
+    plan_lines: [
+      { id: 'rev1', unit_id: 'u1', name: 'Sales', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(10_000_000), active: true },
+      { id: 'cogs1', unit_id: 'u1', name: 'COGS', category: 'cost_of_sales', line_type: 'standard', monthly_plan: Array(12).fill(4_000_000), active: true },
+      { id: 'opex1', unit_id: 'u1', name: 'Overheads', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(500_000), active: true },
+      // Deliberately NO staff-category plan line at all.
+    ],
+    settings: DEFAULT_TEST_SETTINGS,
+    start_date: '2026-01-01',
+    ...overrides,
+  })
+}
+
 describe('Generic Engine — Revenue & P&L', () => {
   it('calculates total revenue correctly', () => {
     const result = runGenericModel(makeConfig())
@@ -542,24 +569,6 @@ describe('Generic Engine — actual EBITDA when a category genuinely does not ex
   // actual EBITDA -- meaning a business with no staff line could NEVER
   // get an actual EBITDA, no matter how complete its real data was for
   // the categories that actually applied to it.
-  function makeNoStaffConfig(overrides: Record<string,any> = {}) {
-    return defaultGenericConfig({
-      client_id: 'test', business_name: 'Test Co', currency: 'UGX', planning_months: 12,
-      business_units: [{ id: 'u1', name: 'Main Unit', short: 'MU', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 0 }],
-      plan_lines: [
-        { id: 'rev1', unit_id: 'u1', name: 'Sales', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(10_000_000), active: true },
-        { id: 'cogs1', unit_id: 'u1', name: 'COGS', category: 'cost_of_sales', line_type: 'standard', monthly_plan: Array(12).fill(4_000_000), active: true },
-        { id: 'opex1', unit_id: 'u1', name: 'Overheads', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(500_000), active: true },
-        // Deliberately NO staff-category plan line at all.
-      ],
-      settings: {
-        shared_cost_fixed_pct: 0, corporate_tax_rate: 0.30, opening_cash_balance: 5_000_000,
-        capital_structure: { shareholder_contribution: 10_000_000, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, grace_period_months: 0, fixed_assets: 0 },
-      },
-      start_date: '2026-01-01',
-      ...overrides,
-    })
-  }
 
   it('REG: with revenue, cogs, and opex actuals present, actual EBITDA computes even though staff can never have actual data (no staff line exists)', () => {
     const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } }
@@ -624,5 +633,192 @@ describe('Generic Engine — actual EBITDA when a category genuinely does not ex
     const derivedOperatingCosts = deriveActualOperatingCosts(hybridGrossProfit, actEbitda)
     expect(derivedOperatingCosts).toBe(450_000) // exactly the real opex figure (450k-scale), nothing else
     expect(hybridGrossProfit - derivedOperatingCosts!).toBe(actEbitda) // must foot exactly, by construction
+  })
+})
+
+describe('Generic Engine — per-unit actual EBITDA (the By Business Unit tab)', () => {
+  // Found live, right after the consolidated-level fix shipped: the
+  // consolidated view was correct, but the By Business Unit tab (the
+  // default/most commonly viewed one) still showed a stale, purely
+  // planned EBITDA for any unit -- because unit-level act_ebitda was
+  // never actually computed as hybrid at all, by an earlier deliberate
+  // design choice that turned out to be wrong. This directly caused the
+  // exact "EBITDA looks nowhere close to Gross Profit" symptom reported.
+
+  it('REG: unit-level actual EBITDA computes correctly for a unit with no staff line, instead of permanently showing the planned figure', () => {
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeNoStaffConfig(), actuals)
+    const pl = result.unitPL['u1']
+    expect(pl.act_ebitda[0]).not.toBeNull()
+    expect(pl.act_ebitda[0]).toBe(9_000_000 - 3_500_000 - 450_000) // 5,050,000 -- staff treated as zero, shared is zero here too
+  })
+
+  it('REG: unit-level actual EBITDA still correctly withholds for a unit that DOES have a staff line, until its actual data arrives', () => {
+    const configWithStaff = makeNoStaffConfig({
+      plan_lines: [
+        { id: 'rev1', unit_id: 'u1', name: 'Sales', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(10_000_000), active: true },
+        { id: 'cogs1', unit_id: 'u1', name: 'COGS', category: 'cost_of_sales', line_type: 'standard', monthly_plan: Array(12).fill(4_000_000), active: true },
+        { id: 'staff1', unit_id: 'u1', name: 'Staff', category: 'staff', line_type: 'standard', monthly_plan: Array(12).fill(1_500_000), active: true },
+        { id: 'opex1', unit_id: 'u1', name: 'Overheads', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(500_000), active: true },
+      ],
+    })
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } } // staff actual missing
+    const result = runGenericModel(configWithStaff, actuals)
+    expect(result.unitPL['u1'].act_ebitda[0]).toBeNull()
+  })
+
+  it('REG: unit-level EBITDA correctly reconciles: Gross Profit minus Staff minus Overheads minus Shared equals EBITDA, using actual figures', () => {
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeNoStaffConfig(), actuals)
+    const pl = result.unitPL['u1']
+    const gp = pl.act_gp[0] as number
+    const staff = pl.act_staff[0] ?? 0 // null here (no staff line) -- treated as zero for reconciliation
+    const opex = pl.act_opex[0] as number
+    const shared = pl.shared[0] // always planned/allocated -- no actuals concept of its own
+    expect(gp - staff - opex - shared).toBe(pl.act_ebitda[0])
+  })
+})
+
+describe('Generic Engine — CodeRabbit findings on the per-unit EBITDA fix', () => {
+  it('REG: per-unit act_gp treats a missing cost_of_sales line as zero, not blocking -- same fix as consolidated, previously missed at the unit level', () => {
+    const configNoCogs = makeNoStaffConfig({
+      plan_lines: [
+        { id: 'rev1', unit_id: 'u1', name: 'Sales', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(10_000_000), active: true },
+        { id: 'opex1', unit_id: 'u1', name: 'Overheads', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(500_000), active: true },
+      ],
+    })
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, opex1: 450_000 } } }
+    const result = runGenericModel(configNoCogs, actuals)
+    expect(result.unitPL['u1'].act_gp[0]).toBe(9_000_000) // no COGS line anywhere for this unit -- zero cost, not missing
+    expect(result.unitPL['u1'].act_ebitda[0]).toBe(9_000_000 - 450_000) // and act_ebitda now reachable too
+  })
+
+  it('REG: consolidated and per-unit actual EBITDA treat Shared Costs identically -- previously diverged by the whole shared pool', () => {
+    const configWithShared = makeNoStaffConfig({
+      settings: {
+        shared_cost_fixed_pct: 0.5, corporate_tax_rate: 0.30, opening_cash_balance: 5_000_000,
+        capital_structure: { shareholder_contribution: 10_000_000, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, grace_period_months: 0, fixed_assets: 0 },
+      },
+      shared_lines: [
+        { id: 'shared1', unit_id: '', name: 'Head Office', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(300_000), active: true },
+      ],
+    })
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } }
+    const result = runGenericModel(configWithShared, actuals)
+    const unitActEbitda = result.unitPL['u1'].act_ebitda[0]
+    const consActEbitda = result.con.act_ebitda[0]
+    // With a single unit consolidated, the consolidated figure must equal
+    // the unit's own figure exactly -- previously the consolidated path
+    // omitted the shared cost deduction entirely, so these would have
+    // differed by the full shared pool (300,000 here).
+    expect(consActEbitda).toBe(unitActEbitda)
+    expect(unitActEbitda).not.toBeNull()
+  })
+})
+
+describe('Generic Engine — parent rollup completeness with multiple sub-units', () => {
+  // The exact case CodeRabbit flagged: a parent with multiple sub-units,
+  // where one sub-unit HAS a cost_of_sales line but hasn't reported an
+  // actual for it this month. merge() only adds a contribution when a
+  // sub actually reports -- so the combined parent-level total could
+  // otherwise look "complete" (non-null) using only the reporting sub's
+  // figure, silently treating the non-reporting sub's real cost as zero.
+  function makeParentWithSubsConfig(overrides: Record<string,any> = {}) {
+    return defaultGenericConfig({
+      client_id: 'test', business_name: 'Test Co', currency: 'UGX', planning_months: 12,
+      business_units: [
+        { id: 'parent1', name: 'Parent', short: 'PA', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 0 },
+        { id: 'subA', name: 'Sub A', short: 'SA', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 1, parent_id: 'parent1' },
+        { id: 'subB', name: 'Sub B', short: 'SB', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 2, parent_id: 'parent1' },
+      ],
+      plan_lines: [
+        { id: 'revA', unit_id: 'subA', name: 'Sales A', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(5_000_000), active: true },
+        { id: 'cogsA', unit_id: 'subA', name: 'COGS A', category: 'cost_of_sales', line_type: 'standard', monthly_plan: Array(12).fill(2_000_000), active: true },
+        { id: 'revB', unit_id: 'subB', name: 'Sales B', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(5_000_000), active: true },
+        { id: 'cogsB', unit_id: 'subB', name: 'COGS B', category: 'cost_of_sales', line_type: 'standard', monthly_plan: Array(12).fill(2_000_000), active: true },
+      ],
+      settings: DEFAULT_TEST_SETTINGS,
+      start_date: '2026-01-01',
+      ...overrides,
+    })
+  }
+
+  it('REG: parent act_gp stays null when one sub-unit with a cost_of_sales line has not reported its actual, even though the other sub has', () => {
+    // Sub A fully reports (revenue + cogs). Sub B reports revenue but NOT
+    // cogs -- Sub B genuinely HAS a cogs line, it just hasn't been
+    // entered for this month.
+    const actuals = {
+      subA: { '2026-01-01': { revA: 4_500_000, cogsA: 1_800_000 } },
+      subB: { '2026-01-01': { revB: 4_800_000 } }, // cogsB missing
+    }
+    const result = runGenericModel(makeParentWithSubsConfig(), actuals)
+    const parentPL = result.unitPL['parent1']
+    expect(parentPL.act_gp[0]).toBeNull() // must NOT silently use only Sub A's cogs
+    expect(parentPL.act_ebitda[0]).toBeNull() // depends on act_gp -- must also stay null, not just the intermediate figure
+  })
+
+  it('REG: parent act_gp correctly computes once BOTH sub-units have reported their cogs actuals', () => {
+    const actuals = {
+      subA: { '2026-01-01': { revA: 4_500_000, cogsA: 1_800_000 } },
+      subB: { '2026-01-01': { revB: 4_800_000, cogsB: 1_900_000 } },
+    }
+    const result = runGenericModel(makeParentWithSubsConfig(), actuals)
+    const parentPL = result.unitPL['parent1']
+    expect(parentPL.act_gp[0]).toBe((4_500_000 + 4_800_000) - (1_800_000 + 1_900_000))
+  })
+
+  it('REG: the same incompleteness correctly propagates to the consolidated level too, not just the parent rollup', () => {
+    const actuals = {
+      subA: { '2026-01-01': { revA: 4_500_000, cogsA: 1_800_000 } },
+      subB: { '2026-01-01': { revB: 4_800_000 } }, // cogsB still missing
+    }
+    const result = runGenericModel(makeParentWithSubsConfig(), actuals)
+    expect(result.con.act_gp[0]).toBeNull()
+    expect(result.con.act_ebitda[0]).toBeNull()
+  })
+})
+
+describe('Generic Engine — revenue needs the same completeness gate as costs', () => {
+  // Found live during CodeRabbit review: categoryCompleteAcrossUnits
+  // handled cost_of_sales/staff/direct_opex, but not revenue itself --
+  // meaning con.act_rev[m] !== null alone was treated as "revenue is
+  // complete", even when two revenue-bearing units both contribute and
+  // only one has actually reported. This silently understates GP/EBITDA
+  // rather than correctly staying incomplete -- the same class of risk,
+  // just on the revenue side instead of costs.
+  function makeTwoRevUnitsConfig(overrides: Record<string,any> = {}) {
+    return defaultGenericConfig({
+      client_id: 'test', business_name: 'Test Co', currency: 'UGX', planning_months: 12,
+      business_units: [
+        { id: 'u1', name: 'Unit 1', short: 'U1', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 0 },
+        { id: 'u2', name: 'Unit 2', short: 'U2', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 1 },
+      ],
+      plan_lines: [
+        { id: 'rev1', unit_id: 'u1', name: 'Sales 1', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(5_000_000), active: true },
+        { id: 'rev2', unit_id: 'u2', name: 'Sales 2', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(5_000_000), active: true },
+      ],
+      settings: DEFAULT_TEST_SETTINGS,
+      start_date: '2026-01-01',
+      ...overrides,
+    })
+  }
+
+  it('REG: consolidated act_gp stays null when one revenue-bearing unit has not reported, even though another has', () => {
+    // Only u1 reports revenue this month -- u2 genuinely has a revenue
+    // line, it just hasn't been entered.
+    const actuals = { u1: { '2026-01-01': { rev1: 4_800_000 } } }
+    const result = runGenericModel(makeTwoRevUnitsConfig(), actuals)
+    expect(result.con.act_rev[0]).not.toBeNull() // the raw merged total IS non-null (this is exactly what made the bug possible)
+    expect(result.con.act_gp[0]).toBeNull() // but act_gp must correctly stay incomplete
+    expect(result.con.act_ebitda[0]).toBeNull()
+  })
+
+  it('REG: consolidated act_gp correctly computes once every revenue-bearing unit has reported', () => {
+    const actuals = {
+      u1: { '2026-01-01': { rev1: 4_800_000 } },
+      u2: { '2026-01-01': { rev2: 5_100_000 } },
+    }
+    const result = runGenericModel(makeTwoRevUnitsConfig(), actuals)
+    expect(result.con.act_gp[0]).toBe(4_800_000 + 5_100_000)
   })
 })
