@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { isPlanLineValidForUnit } from '@/lib/catalogue-validation'
 
 // Lazy init -- must never call createClient() at module level on Vercel.
 function getSupabase() {
@@ -7,15 +8,6 @@ function getSupabase() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) throw new Error('Supabase environment variables not configured')
   return createClient(url, key)
-}
-
-// Extracted so it's directly testable without a database -- checks that
-// a plan_line_id genuinely belongs to a given business_unit_id, is
-// active, and is a revenue-category line (the only kind a catalogue
-// item can roll up into).
-export function isPlanLineValidForUnit(planLines: any[], planLineId: string, unitId: string): boolean {
-  const matchingLine = (planLines || []).find((l: any) => l.id === planLineId)
-  return !!matchingLine && !!matchingLine.active && matchingLine.category === 'revenue' && matchingLine.unit_id === unitId
 }
 
 // ── GET: list catalogue items for a client (optionally one unit) ──

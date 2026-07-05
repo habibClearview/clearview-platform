@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { shouldClearQueue } from '../lib/field-db'
 import { friendlyDbError } from '../lib/field-errors'
 import { buildAutoCogsRow, type CatalogueItemForCogs } from '../lib/field-cogs'
-import { isPlanLineValidForUnit } from '../../app/api/field/admin/catalogue/route'
+import { isPlanLineValidForUnit } from '../lib/catalogue-validation'
 
 // Tests for Clearview Field API route logic
 // Tests the validation and transformation logic without HTTP or DB
