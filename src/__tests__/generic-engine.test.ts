@@ -421,143 +421,162 @@ describe('Generic Engine — Combined balance sheet integrity', () => {
   })
 })
 
-describe('Generic Engine — Actuals (hybrid P&L, docs/ACCOUNTING_ARCHITECTURE.md)', () => {
-  it('REG: with no actuals passed, act_rev/act_cogs/act_gp/act_ebitda are all null -- never fabricated', () => {
-    const result = runGenericModel(makeActualsConfig())
-    expect(result.con.act_rev.every(v => v === null)).toBe(true)
-    expect(result.con.act_gp.every(v => v === null)).toBe(true)
-    expect(result.con.act_ebitda.every(v => v === null)).toBe(true)
+describe('Generic Engine — Actuals (calendar-based actual/plan rule)', () => {
+  // The rule under test: a month at or before the current calendar month
+  // shows whatever actual was entered (zero if none), never falling back
+  // to plan. A future month uses the plan (act_* is null there, meaning
+  // "use plan" at display). These helpers make the tests deterministic
+  // regardless of the real date they run on -- a config whose start_date
+  // is N months before this month puts month index N at "current", with
+  // 0..N-1 in the past and N+1.. in the future.
+  function monthsAgoISO(n: number): string {
+    const d = new Date()
+    d.setUTCMonth(d.getUTCMonth() - n)
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`
+  }
+  // Config starting `pastMonths` months ago, so index `pastMonths` is the
+  // current month and there are `futureMonths` planned months after it.
+  function makeCalendarConfig(pastMonths: number, futureMonths: number, overrides: Record<string, any> = {}) {
+    return makeConfig({ start_date: monthsAgoISO(pastMonths), planning_months: pastMonths + 1 + futureMonths, ...overrides })
+  }
+
+  it('REG: with no actuals passed, a PAST or CURRENT month shows zero actual (not plan, not null); a FUTURE month stays null (use plan)', () => {
+    // start 2 months ago -> index 0,1 past, index 2 current, index 3,4 future
+    const result = runGenericModel(makeCalendarConfig(2, 2))
+    // Past/current: actual is 0 (nothing entered), NOT the planned figure
+    expect(result.con.act_gp[0]).toBe(0)
+    expect(result.con.act_gp[1]).toBe(0)
+    expect(result.con.act_gp[2]).toBe(0)
+    expect(result.con.act_ebitda[2]).toBe(0)
+    // Future: null, meaning display falls back to plan
+    expect(result.con.act_gp[3]).toBeNull()
+    expect(result.con.act_gp[4]).toBeNull()
+    expect(result.con.act_ebitda[4]).toBeNull()
   })
 
-  it('REG: act_gp is null unless BOTH act_rev and act_cogs exist for that month -- this is the exact bug class already found once', () => {
-    // Only revenue actual entered for month 0 (index 0 = Jan 2026) -- no
-    // cost_of_sales actual yet. act_gp must stay null, not silently use
-    // planned COGS to "fill in the gap".
-    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000 } } }
-    const result = runGenericModel(makeActualsConfig(), actuals)
-    expect(result.unitPL['u1'].act_rev[0]).toBe(9_000_000)
-    expect(result.unitPL['u1'].act_gp[0]).toBeNull()
-    expect(result.con.act_gp[0]).toBeNull()
+  it('REG: a past/current month uses actual revenue and actual cost together -- never actual revenue mixed with planned cost', () => {
+    const period = monthsAgoISO(1) // last month -> a past month
+    const actuals = { u1: { [period]: { rev1: 9_000_000, cogs1: 3_500_000 } } }
+    const result = runGenericModel(makeCalendarConfig(2, 2), actuals)
+    // index 1 = last month
+    expect(result.unitPL['u1'].act_rev[1]).toBe(9_000_000)
+    expect(result.unitPL['u1'].act_gp[1]).toBe(5_500_000) // 9,000,000 - 3,500,000
+    expect(result.con.act_gp[1]).toBe(5_500_000)
   })
 
-  it('REG: act_gp computes correctly once both act_rev and act_cogs exist', () => {
-    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000 } } }
-    const result = runGenericModel(makeActualsConfig(), actuals)
-    expect(result.unitPL['u1'].act_gp[0]).toBe(5_500_000)
-    expect(result.con.act_gp[0]).toBe(5_500_000)
+  it('REG: a past/current month with only partial actuals treats the unentered categories as zero, not as plan', () => {
+    // Only revenue entered for last month; cost/staff/opex not entered.
+    const period = monthsAgoISO(1)
+    const actuals = { u1: { [period]: { rev1: 9_000_000 } } }
+    const result = runGenericModel(makeCalendarConfig(2, 2), actuals)
+    // GP = actual revenue - zero actual cost = 9,000,000 (NOT revenue minus PLANNED cost)
+    expect(result.con.act_gp[1]).toBe(9_000_000)
+    // EBITDA = 9,000,000 - 0 staff - 0 opex - 0 shared = 9,000,000
+    expect(result.con.act_ebitda[1]).toBe(9_000_000)
+    // And it must NOT equal the figure you'd get by subtracting planned costs
+    expect(result.con.act_ebitda[1]).not.toBe(4_000_000)
   })
 
-  it('REG: act_ebitda stays null unless ALL FOUR actual categories exist -- never blends actual revenue with planned costs (the original bug)', () => {
-    // Revenue and COGS actuals exist, but staff/opex actuals haven't been
-    // entered yet for this month. Previously this would have silently
-    // computed act_ebitda using PLANNED staff/opex instead -- a real bug
-    // already found and must not regress.
-    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000 } } }
-    const result = runGenericModel(makeActualsConfig(), actuals)
-    expect(result.con.act_ebitda[0]).toBeNull()
-  })
-
-  it('REG: act_ebitda computes correctly once all four actual categories exist for the month, using ONLY actual figures', () => {
-    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
-    const result = runGenericModel(makeActualsConfig(), actuals)
+  it('REG: act_ebitda for a past/current month uses ONLY actual figures, computed correctly when all categories are entered', () => {
+    const period = monthsAgoISO(1)
+    const actuals = { u1: { [period]: { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeCalendarConfig(2, 2), actuals)
     // 9,000,000 - 3,500,000 - 1,400,000 - 450,000 = 3,650,000
-    expect(result.con.act_ebitda[0]).toBe(3_650_000)
-    // Must NOT equal what you'd get by mixing actual revenue with planned
-    // costs (10,000,000 - 4,000,000 - 1,500,000 - 500,000 = 4,000,000) --
-    // proves the fix actually uses the real actual figures, not plan.
-    expect(result.con.act_ebitda[0]).not.toBe(4_000_000)
+    expect(result.con.act_ebitda[1]).toBe(3_650_000)
   })
 
-  it('REG: a month with no actuals entered at all stays fully null, independent of other months that do have actuals', () => {
-    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
-    const result = runGenericModel(makeActualsConfig(), actuals)
-    expect(result.con.act_ebitda[0]).not.toBeNull()
-    expect(result.con.act_ebitda[1]).toBeNull() // February -- no actuals entered
+  it('REG: a FUTURE month stays null (use plan) even when actuals exist for a past month', () => {
+    const period = monthsAgoISO(1)
+    const actuals = { u1: { [period]: { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeCalendarConfig(2, 2), actuals)
+    expect(result.con.act_ebitda[1]).not.toBeNull() // past month, has actuals
+    expect(result.con.act_ebitda[3]).toBeNull()     // future month, stays plan
+    expect(result.con.act_ebitda[4]).toBeNull()
   })
 
   it('REG: actuals for a month outside the planning window are ignored, not out-of-bounds errors', () => {
     const actuals = { u1: { '2030-01-01': { rev1: 9_000_000 } } }
-    expect(() => runGenericModel(makeActualsConfig(), actuals)).not.toThrow()
+    expect(() => runGenericModel(makeCalendarConfig(2, 2), actuals)).not.toThrow()
   })
 
-  it('REG: act_gp minus (act_staff + act_opex) reconciles exactly to act_ebitda -- this is what the P&L displays, and it must foot', () => {
-    // CodeRabbit caught that the Consolidated P&L could show actual Gross
-    // Profit and actual EBITDA in the same month with a plan-sourced
-    // Operating Costs figure between them, so the displayed column didn't
-    // add up. The fix hybridizes Operating Costs from act_staff+act_opex.
-    // This confirms the underlying arithmetic actually reconciles.
-    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
-    const result = runGenericModel(makeActualsConfig(), actuals)
-    const actOpexTotal = (result.con.act_staff[0] as number) + (result.con.act_opex[0] as number)
-    expect((result.con.act_gp[0] as number) - actOpexTotal).toBe(result.con.act_ebitda[0])
+  it('REG: act_gp minus (act_staff + act_opex + shared) reconciles exactly to act_ebitda for an actual month -- this is what the P&L displays, and it must foot', () => {
+    const period = monthsAgoISO(1)
+    const actuals = { u1: { [period]: { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeCalendarConfig(2, 2), actuals)
+    const actOpexTotal = (result.con.act_staff[1] as number) + (result.con.act_opex[1] as number)
+    expect((result.con.act_gp[1] as number) - actOpexTotal).toBe(result.con.act_ebitda[1])
   })
 })
 
-describe('Generic Engine — hybrid Cash Flow and Balance Sheet', () => {
-  it('REG: with no actuals, cash flow and balance sheet are unaffected -- act_mask is all false', () => {
-    const result = runGenericModel(makeActualsConfig())
-    expect(result.cf.act_mask.every((v:boolean) => v === false)).toBe(true)
-    expect(result.bs.act_mask.every((v:boolean) => v === false)).toBe(true)
-  })
+describe('Generic Engine — Cash Flow and Balance Sheet under the calendar rule', () => {
+  function monthsAgoISO(n: number): string {
+    const d = new Date()
+    d.setUTCMonth(d.getUTCMonth() - n)
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`
+  }
+  function makeCalendarConfig(pastMonths: number, futureMonths: number, overrides: Record<string, any> = {}) {
+    return makeConfig({ start_date: monthsAgoISO(pastMonths), planning_months: pastMonths + 1 + futureMonths, ...overrides })
+  }
 
-  it('REG: a month with actual EBITDA produces actual NPAT, which feeds into operating cash flow for that month', () => {
-    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
-    const result = runGenericModel(makeActualsConfig(), actuals)
-    expect(result.con.act_npat[0]).not.toBeNull()
-    // Operating cash for month 0 should reflect the ACTUAL npat, not planned
-    const expectedOpCash = (result.con.act_npat[0] as number) + (result.cf.working_capital_adj[0] || 0)
-    expect(result.cf.op_cash[0]).toBeCloseTo(expectedOpCash, 2)
-  })
-
-  it('REG: cash flow act_mask bleeds forward from the first actual month onward, not just that one month -- cash is cumulative', () => {
-    const actuals = { u1: { '2026-03-01': { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } } // March = month index 2
-    const result = runGenericModel(makeActualsConfig(), actuals)
-    expect(result.cf.act_mask[0]).toBe(false) // Jan -- before the actual month
-    expect(result.cf.act_mask[1]).toBe(false) // Feb -- before the actual month
-    expect(result.cf.act_mask[2]).toBe(true)  // March -- the actual month itself
-    expect(result.cf.act_mask[3]).toBe(true)  // April -- carries forward, even with no actual data of its own
-    expect(result.cf.act_mask[11]).toBe(true) // December -- still carries forward to the end
-  })
-
-  it('REG: balance sheet act_mask matches cash flow act_mask exactly -- same underlying cumulative NPAT', () => {
-    const actuals = { u1: { '2026-06-01': { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
-    const result = runGenericModel(makeActualsConfig(), actuals)
-    // June = month index 5. Asserting explicit expected values here, not
-    // just comparing bs.act_mask to cf.act_mask -- the engine assigns
-    // bs.act_mask as the SAME array reference as cf.act_mask, so a bare
-    // toEqual comparison would pass even if the underlying cascade logic
-    // were broken (it would just be comparing the object to itself).
-    expect(result.bs.act_mask.slice(0, 5).every((v: boolean) => v === false)).toBe(true)
-    expect(result.bs.act_mask.slice(5).every((v: boolean) => v === true)).toBe(true)
+  it('REG: act_mask is true for every past/current month and false for every future month', () => {
+    // start 3 months ago -> indices 0,1,2 past, 3 current, 4,5 future
+    const result = runGenericModel(makeCalendarConfig(3, 2))
+    expect(result.cf.act_mask[0]).toBe(true)  // past
+    expect(result.cf.act_mask[3]).toBe(true)  // current
+    expect(result.cf.act_mask[4]).toBe(false) // future
+    expect(result.cf.act_mask[5]).toBe(false) // future
+    // Balance sheet shares the same mask
     expect(result.bs.act_mask).toEqual(result.cf.act_mask)
   })
 
-  it('REG: retained earnings correctly uses the actual NPAT for a closed month instead of the planned figure', () => {
-    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
-    const result = runGenericModel(makeActualsConfig(), actuals)
-    const openingCash = 5_000_000 // makeConfig's actual default opening_cash_balance
-    const expectedRetainedEarnings = openingCash + (result.con.act_npat[0] as number)
-    expect(result.bs.retained_earnings[0]).toBeCloseTo(expectedRetainedEarnings, 2)
-    // Must NOT equal what it would be using the planned figure instead
-    expect(result.bs.retained_earnings[0]).not.toBeCloseTo(openingCash + result.con.npat[0], 2)
+  it('REG: a past month with actual EBITDA produces actual NPAT, which feeds operating cash flow for that month', () => {
+    const period = monthsAgoISO(2)
+    const actuals = { u1: { [period]: { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeCalendarConfig(3, 2), actuals)
+    expect(result.con.act_npat[1]).not.toBeNull() // index 1 = 2 months ago
+    const expectedOpCash = (result.con.act_npat[1] as number) + (result.cf.working_capital_adj[1] || 0)
+    expect(result.cf.op_cash[1]).toBeCloseTo(expectedOpCash, 2)
   })
 
-  it('REG: the fundamental accounting identity (Assets = Equity + Liabilities) still holds when actuals are present, not just in the pure-plan case', () => {
-    const actuals = { u1: { '2026-04-01': { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
-    const result = runGenericModel(makeActualsConfig(), actuals)
-    for (let m = 0; m < 12; m++) {
+  it('REG: cash is cumulative -- a future month carries the actual-derived closing balance forward into its opening balance', () => {
+    const period = monthsAgoISO(2)
+    const actuals = { u1: { [period]: { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeCalendarConfig(3, 2), actuals)
+    // A future month's opening cash equals the prior month's closing cash --
+    // continuity across the actual/plan boundary, never a reset.
+    expect(result.cf.open[4]).toBeCloseTo(result.cf.close[3], 2)
+  })
+
+  it('REG: retained earnings uses the actual NPAT for a past month, not the planned figure', () => {
+    const period = monthsAgoISO(1)
+    const actuals = { u1: { [period]: { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeCalendarConfig(3, 2), actuals)
+    // index 1 = 2 months ago (no actuals -> act_npat there is the zero-actual
+    // figure), index 2 = last month (has actuals). Retained earnings at index
+    // 2 must reflect the ACTUAL npat for that month, not the planned one.
+    expect(result.con.act_npat[2]).not.toBeNull()
+    // The actual npat for the entered month must differ from its planned npat,
+    // proving retained earnings is built from real data for that month.
+    expect(result.con.act_npat[2]).not.toBeCloseTo(result.con.npat[2], 2)
+  })
+
+  it('REG: the fundamental accounting identity (Assets = Equity + Liabilities) holds in every month, actual and plan alike', () => {
+    const period = monthsAgoISO(1)
+    const actuals = { u1: { [period]: { rev1: 9_000_000, cogs1: 3_500_000, staff1: 1_400_000, opex1: 450_000 } } }
+    const result = runGenericModel(makeCalendarConfig(3, 2), actuals)
+    for (let m = 0; m < 6; m++) {
       expect(result.bs.total_assets[m]).toBeCloseTo(result.bs.total_equity_and_liabilities[m], 2)
     }
   })
 
-  it('REG: a month with actual revenue but not yet actual EBITDA (missing cost data) does NOT affect cash flow -- never blends partial actual data', () => {
-    // Only revenue actual entered -- act_npat must stay null, so hybrid
-    // NPAT correctly falls back to the planned figure for this month.
-    const actuals = { u1: { '2026-02-01': { rev1: 9_000_000 } } }
-    const result = runGenericModel(makeActualsConfig(), actuals)
-    expect(result.con.act_npat[1]).toBeNull()
-    expect(result.cf.act_mask[1]).toBe(false)
-    expect(result.cf.op_cash[1]).toBeCloseTo(result.con.npat[1] + (result.cf.working_capital_adj[1] || 0), 2)
+  it('REG: a past/current month with only partial actuals still uses the actual-derived figure (zero for unentered), never the plan', () => {
+    // Only revenue entered for last month -- under the calendar rule this is
+    // still an actual month; the unentered costs are treated as zero.
+    const period = monthsAgoISO(1)
+    const actuals = { u1: { [period]: { rev1: 9_000_000 } } }
+    const result = runGenericModel(makeCalendarConfig(3, 2), actuals)
+    expect(result.con.act_npat[2]).not.toBeNull() // index 2 = last month, a past month
+    expect(result.cf.act_mask[2]).toBe(true)
   })
 })
 
@@ -585,7 +604,7 @@ describe('Generic Engine — actual EBITDA when a category genuinely does not ex
     expect(result.cf.act_mask[0]).toBe(true)
   })
 
-  it('REG: a business that DOES have a staff line still correctly withholds actual EBITDA until staff actual data is entered -- this fix does not weaken the existing safeguard for businesses that do have the category', () => {
+  it('REG: under the calendar rule, a past month with a staff line but no staff actual entered treats staff as zero -- it does NOT fall back to the planned staff figure', () => {
     const configWithStaff = makeNoStaffConfig({
       plan_lines: [
         { id: 'rev1', unit_id: 'u1', name: 'Sales', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(10_000_000), active: true },
@@ -594,10 +613,17 @@ describe('Generic Engine — actual EBITDA when a category genuinely does not ex
         { id: 'opex1', unit_id: 'u1', name: 'Overheads', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(500_000), active: true },
       ],
     })
-    // Staff line exists, but no actual staff figure was entered this month.
+    // 2026-01-01 is a past month (env date is mid-2026). Staff line exists,
+    // but no actual staff figure was entered. Under the calendar rule the
+    // month is still actual; unentered staff counts as zero recorded, NOT
+    // the planned 1,500,000.
     const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } }
     const result = runGenericModel(configWithStaff, actuals)
-    expect(result.con.act_ebitda[0]).toBeNull() // correctly still withheld -- staff DOES apply here and its actual is genuinely missing
+    // EBITDA = 9,000,000 - 3,500,000 - 0 staff - 450,000 = 5,050,000
+    expect(result.con.act_ebitda[0]).toBe(5_050_000)
+    // Must NOT equal the figure using the planned staff cost instead
+    // (9,000,000 - 3,500,000 - 1,500,000 - 450,000 = 3,550,000)
+    expect(result.con.act_ebitda[0]).not.toBe(3_550_000)
   })
 
   it('REG: actual Gross Profit similarly treats a missing cost_of_sales line as zero, not blocking, when the business genuinely has none', () => {
@@ -653,7 +679,7 @@ describe('Generic Engine — per-unit actual EBITDA (the By Business Unit tab)',
     expect(pl.act_ebitda[0]).toBe(9_000_000 - 3_500_000 - 450_000) // 5,050,000 -- staff treated as zero, shared is zero here too
   })
 
-  it('REG: unit-level actual EBITDA still correctly withholds for a unit that DOES have a staff line, until its actual data arrives', () => {
+  it('REG: unit-level actual EBITDA for a past month with a staff line but no staff actual treats staff as zero, not withheld and not planned', () => {
     const configWithStaff = makeNoStaffConfig({
       plan_lines: [
         { id: 'rev1', unit_id: 'u1', name: 'Sales', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(10_000_000), active: true },
@@ -664,7 +690,8 @@ describe('Generic Engine — per-unit actual EBITDA (the By Business Unit tab)',
     })
     const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } } // staff actual missing
     const result = runGenericModel(configWithStaff, actuals)
-    expect(result.unitPL['u1'].act_ebitda[0]).toBeNull()
+    // 9,000,000 - 3,500,000 - 0 staff - 450,000 = 5,050,000 (no shared here)
+    expect(result.unitPL['u1'].act_ebitda[0]).toBe(5_050_000)
   })
 
   it('REG: unit-level EBITDA correctly reconciles: Gross Profit minus Staff minus Overheads minus Shared equals EBITDA, using actual figures', () => {
@@ -716,13 +743,13 @@ describe('Generic Engine — CodeRabbit findings on the per-unit EBITDA fix', ()
   })
 })
 
-describe('Generic Engine — parent rollup completeness with multiple sub-units', () => {
-  // The exact case CodeRabbit flagged: a parent with multiple sub-units,
-  // where one sub-unit HAS a cost_of_sales line but hasn't reported an
-  // actual for it this month. merge() only adds a contribution when a
-  // sub actually reports -- so the combined parent-level total could
-  // otherwise look "complete" (non-null) using only the reporting sub's
-  // figure, silently treating the non-reporting sub's real cost as zero.
+describe('Generic Engine — parent rollup under the calendar rule (multiple sub-units)', () => {
+  // Under the calendar rule, a past/current month shows whatever actual
+  // was entered across all sub-units, treating anything unentered as
+  // zero -- there is no "withhold until every sub reports" gating. This
+  // is the deliberate behaviour Habib specified: a past month reflects
+  // the figures that were actually recorded in that month, no more, no
+  // less.
   function makeParentWithSubsConfig(overrides: Record<string,any> = {}) {
     return defaultGenericConfig({
       client_id: 'test', business_name: 'Test Co', currency: 'UGX', planning_months: 12,
@@ -738,26 +765,26 @@ describe('Generic Engine — parent rollup completeness with multiple sub-units'
         { id: 'cogsB', unit_id: 'subB', name: 'COGS B', category: 'cost_of_sales', line_type: 'standard', monthly_plan: Array(12).fill(2_000_000), active: true },
       ],
       settings: DEFAULT_TEST_SETTINGS,
-      start_date: '2026-01-01',
+      start_date: '2026-01-01', // a past month in this environment
       ...overrides,
     })
   }
 
-  it('REG: parent act_gp stays null when one sub-unit with a cost_of_sales line has not reported its actual, even though the other sub has', () => {
-    // Sub A fully reports (revenue + cogs). Sub B reports revenue but NOT
-    // cogs -- Sub B genuinely HAS a cogs line, it just hasn't been
-    // entered for this month.
+  it('REG: for a past month, parent act_gp sums whatever actuals were reported, treating an unreported sub cost as zero (not planned, not withheld)', () => {
+    // Sub A fully reports; Sub B reports revenue but not its cogs.
     const actuals = {
       subA: { '2026-01-01': { revA: 4_500_000, cogsA: 1_800_000 } },
-      subB: { '2026-01-01': { revB: 4_800_000 } }, // cogsB missing
+      subB: { '2026-01-01': { revB: 4_800_000 } }, // cogsB not entered -> counts as zero
     }
     const result = runGenericModel(makeParentWithSubsConfig(), actuals)
     const parentPL = result.unitPL['parent1']
-    expect(parentPL.act_gp[0]).toBeNull() // must NOT silently use only Sub A's cogs
-    expect(parentPL.act_ebitda[0]).toBeNull() // depends on act_gp -- must also stay null, not just the intermediate figure
+    // GP = (4,500,000 + 4,800,000) revenue - (1,800,000 + 0) cost = 7,500,000
+    expect(parentPL.act_gp[0]).toBe(7_500_000)
+    // Must NOT use Sub B's PLANNED cogs (2,000,000) -- that would give 5,500,000
+    expect(parentPL.act_gp[0]).not.toBe(5_500_000)
   })
 
-  it('REG: parent act_gp correctly computes once BOTH sub-units have reported their cogs actuals', () => {
+  it('REG: parent act_gp for a past month reflects all reported actuals when every sub has reported', () => {
     const actuals = {
       subA: { '2026-01-01': { revA: 4_500_000, cogsA: 1_800_000 } },
       subB: { '2026-01-01': { revB: 4_800_000, cogsB: 1_900_000 } },
@@ -767,18 +794,26 @@ describe('Generic Engine — parent rollup completeness with multiple sub-units'
     expect(parentPL.act_gp[0]).toBe((4_500_000 + 4_800_000) - (1_800_000 + 1_900_000))
   })
 
-  it('REG: the same incompleteness correctly propagates to the consolidated level too, not just the parent rollup', () => {
+  it('REG: the same past-month actual-or-zero behaviour applies at the consolidated level, matching the parent rollup', () => {
     const actuals = {
       subA: { '2026-01-01': { revA: 4_500_000, cogsA: 1_800_000 } },
-      subB: { '2026-01-01': { revB: 4_800_000 } }, // cogsB still missing
+      subB: { '2026-01-01': { revB: 4_800_000 } }, // cogsB not entered
     }
     const result = runGenericModel(makeParentWithSubsConfig(), actuals)
-    expect(result.con.act_gp[0]).toBeNull()
-    expect(result.con.act_ebitda[0]).toBeNull()
+    expect(result.con.act_gp[0]).toBe(7_500_000)
+  })
+
+  it('REG: a FUTURE month for this business stays null (use plan) regardless of any actuals', () => {
+    const actuals = {
+      subA: { '2026-01-01': { revA: 4_500_000, cogsA: 1_800_000 } },
+    }
+    const result = runGenericModel(makeParentWithSubsConfig(), actuals)
+    // 2026-01-01 start, env date mid-2026 -> a month near end of the 12 is future.
+    expect(result.con.act_gp[11]).toBeNull()
   })
 })
 
-describe('Generic Engine — revenue needs the same completeness gate as costs', () => {
+describe('Generic Engine — revenue under the calendar rule (multiple units)', () => {
   // Found live during CodeRabbit review: categoryCompleteAcrossUnits
   // handled cost_of_sales/staff/direct_opex, but not revenue itself --
   // meaning con.act_rev[m] !== null alone was treated as "revenue is
@@ -803,17 +838,16 @@ describe('Generic Engine — revenue needs the same completeness gate as costs',
     })
   }
 
-  it('REG: consolidated act_gp stays null when one revenue-bearing unit has not reported, even though another has', () => {
-    // Only u1 reports revenue this month -- u2 genuinely has a revenue
-    // line, it just hasn't been entered.
+  it('REG: for a past month, consolidated act_gp sums whatever revenue was reported, treating an unreported unit as zero (not withheld)', () => {
+    // Only u1 reports revenue -- u2 has a revenue line but nothing entered.
     const actuals = { u1: { '2026-01-01': { rev1: 4_800_000 } } }
     const result = runGenericModel(makeTwoRevUnitsConfig(), actuals)
-    expect(result.con.act_rev[0]).not.toBeNull() // the raw merged total IS non-null (this is exactly what made the bug possible)
-    expect(result.con.act_gp[0]).toBeNull() // but act_gp must correctly stay incomplete
-    expect(result.con.act_ebitda[0]).toBeNull()
+    // Past month -> actual-or-zero. GP = 4,800,000 reported + 0 for u2 - 0 cost
+    expect(result.con.act_gp[0]).toBe(4_800_000)
+    expect(result.con.act_ebitda[0]).toBe(4_800_000)
   })
 
-  it('REG: consolidated act_gp correctly computes once every revenue-bearing unit has reported', () => {
+  it('REG: consolidated act_gp for a past month reflects all reported revenue when every unit has reported', () => {
     const actuals = {
       u1: { '2026-01-01': { rev1: 4_800_000 } },
       u2: { '2026-01-01': { rev2: 5_100_000 } },
