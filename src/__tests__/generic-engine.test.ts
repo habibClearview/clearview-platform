@@ -58,6 +58,28 @@ function makeActualsConfig(overrides: Record<string,any> = {}) {
   return makeConfig({ start_date: '2026-01-01', ...overrides })
 }
 
+// Also shared across describe blocks -- was duplicated identically in
+// two places, risking silent drift if one copy were updated without the
+// other.
+function makeNoStaffConfig(overrides: Record<string,any> = {}) {
+  return defaultGenericConfig({
+    client_id: 'test', business_name: 'Test Co', currency: 'UGX', planning_months: 12,
+    business_units: [{ id: 'u1', name: 'Main Unit', short: 'MU', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 0 }],
+    plan_lines: [
+      { id: 'rev1', unit_id: 'u1', name: 'Sales', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(10_000_000), active: true },
+      { id: 'cogs1', unit_id: 'u1', name: 'COGS', category: 'cost_of_sales', line_type: 'standard', monthly_plan: Array(12).fill(4_000_000), active: true },
+      { id: 'opex1', unit_id: 'u1', name: 'Overheads', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(500_000), active: true },
+      // Deliberately NO staff-category plan line at all.
+    ],
+    settings: {
+      shared_cost_fixed_pct: 0, corporate_tax_rate: 0.30, opening_cash_balance: 5_000_000,
+      capital_structure: { shareholder_contribution: 10_000_000, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, grace_period_months: 0, fixed_assets: 0 },
+    },
+    start_date: '2026-01-01',
+    ...overrides,
+  })
+}
+
 describe('Generic Engine — Revenue & P&L', () => {
   it('calculates total revenue correctly', () => {
     const result = runGenericModel(makeConfig())
@@ -542,24 +564,6 @@ describe('Generic Engine — actual EBITDA when a category genuinely does not ex
   // actual EBITDA -- meaning a business with no staff line could NEVER
   // get an actual EBITDA, no matter how complete its real data was for
   // the categories that actually applied to it.
-  function makeNoStaffConfig(overrides: Record<string,any> = {}) {
-    return defaultGenericConfig({
-      client_id: 'test', business_name: 'Test Co', currency: 'UGX', planning_months: 12,
-      business_units: [{ id: 'u1', name: 'Main Unit', short: 'MU', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 0 }],
-      plan_lines: [
-        { id: 'rev1', unit_id: 'u1', name: 'Sales', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(10_000_000), active: true },
-        { id: 'cogs1', unit_id: 'u1', name: 'COGS', category: 'cost_of_sales', line_type: 'standard', monthly_plan: Array(12).fill(4_000_000), active: true },
-        { id: 'opex1', unit_id: 'u1', name: 'Overheads', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(500_000), active: true },
-        // Deliberately NO staff-category plan line at all.
-      ],
-      settings: {
-        shared_cost_fixed_pct: 0, corporate_tax_rate: 0.30, opening_cash_balance: 5_000_000,
-        capital_structure: { shareholder_contribution: 10_000_000, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, grace_period_months: 0, fixed_assets: 0 },
-      },
-      start_date: '2026-01-01',
-      ...overrides,
-    })
-  }
 
   it('REG: with revenue, cogs, and opex actuals present, actual EBITDA computes even though staff can never have actual data (no staff line exists)', () => {
     const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } }
@@ -635,23 +639,6 @@ describe('Generic Engine — per-unit actual EBITDA (the By Business Unit tab)',
   // never actually computed as hybrid at all, by an earlier deliberate
   // design choice that turned out to be wrong. This directly caused the
   // exact "EBITDA looks nowhere close to Gross Profit" symptom reported.
-  function makeNoStaffConfig(overrides: Record<string,any> = {}) {
-    return defaultGenericConfig({
-      client_id: 'test', business_name: 'Test Co', currency: 'UGX', planning_months: 12,
-      business_units: [{ id: 'u1', name: 'Main Unit', short: 'MU', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 0 }],
-      plan_lines: [
-        { id: 'rev1', unit_id: 'u1', name: 'Sales', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(10_000_000), active: true },
-        { id: 'cogs1', unit_id: 'u1', name: 'COGS', category: 'cost_of_sales', line_type: 'standard', monthly_plan: Array(12).fill(4_000_000), active: true },
-        { id: 'opex1', unit_id: 'u1', name: 'Overheads', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(500_000), active: true },
-      ],
-      settings: {
-        shared_cost_fixed_pct: 0, corporate_tax_rate: 0.30, opening_cash_balance: 5_000_000,
-        capital_structure: { shareholder_contribution: 10_000_000, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, grace_period_months: 0, fixed_assets: 0 },
-      },
-      start_date: '2026-01-01',
-      ...overrides,
-    })
-  }
 
   it('REG: unit-level actual EBITDA computes correctly for a unit with no staff line, instead of permanently showing the planned figure', () => {
     const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } }
@@ -684,5 +671,42 @@ describe('Generic Engine — per-unit actual EBITDA (the By Business Unit tab)',
     const opex = pl.act_opex[0] as number
     const shared = pl.shared[0] // always planned/allocated -- no actuals concept of its own
     expect(gp - staff - opex - shared).toBe(pl.act_ebitda[0])
+  })
+})
+
+describe('Generic Engine — CodeRabbit findings on the per-unit EBITDA fix', () => {
+  it('REG: per-unit act_gp treats a missing cost_of_sales line as zero, not blocking -- same fix as consolidated, previously missed at the unit level', () => {
+    const configNoCogs = makeNoStaffConfig({
+      plan_lines: [
+        { id: 'rev1', unit_id: 'u1', name: 'Sales', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(10_000_000), active: true },
+        { id: 'opex1', unit_id: 'u1', name: 'Overheads', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(500_000), active: true },
+      ],
+    })
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, opex1: 450_000 } } }
+    const result = runGenericModel(configNoCogs, actuals)
+    expect(result.unitPL['u1'].act_gp[0]).toBe(9_000_000) // no COGS line anywhere for this unit -- zero cost, not missing
+    expect(result.unitPL['u1'].act_ebitda[0]).toBe(9_000_000 - 450_000) // and act_ebitda now reachable too
+  })
+
+  it('REG: consolidated and per-unit actual EBITDA treat Shared Costs identically -- previously diverged by the whole shared pool', () => {
+    const configWithShared = makeNoStaffConfig({
+      settings: {
+        shared_cost_fixed_pct: 0.5, corporate_tax_rate: 0.30, opening_cash_balance: 5_000_000,
+        capital_structure: { shareholder_contribution: 10_000_000, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, grace_period_months: 0, fixed_assets: 0 },
+      },
+      shared_lines: [
+        { id: 'shared1', unit_id: '', name: 'Head Office', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(300_000), active: true },
+      ],
+    })
+    const actuals = { u1: { '2026-01-01': { rev1: 9_000_000, cogs1: 3_500_000, opex1: 450_000 } } }
+    const result = runGenericModel(configWithShared, actuals)
+    const unitActEbitda = result.unitPL['u1'].act_ebitda[0]
+    const consActEbitda = result.con.act_ebitda[0]
+    // With a single unit consolidated, the consolidated figure must equal
+    // the unit's own figure exactly -- previously the consolidated path
+    // omitted the shared cost deduction entirely, so these would have
+    // differed by the full shared pool (300,000 here).
+    expect(consActEbitda).toBe(unitActEbitda)
+    expect(unitActEbitda).not.toBeNull()
   })
 })

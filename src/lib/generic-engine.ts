@@ -367,11 +367,16 @@ export function runGenericModel(
     })
 
     const gp = rev.map((r, m) => r - cogs[m])
-    // Actual Gross Profit: only when BOTH act_rev and act_cogs exist for
+    const hasCogsLines = lines.some(l => l.category === 'cost_of_sales')
+    // Actual Gross Profit: only when both act_rev and act_cogs exist for
     // that month -- this is the exact class of bug already fixed once
     // (mixing actual revenue with planned cost) and must not be
-    // reintroduced here. Null means "not enough actual data yet", not zero.
-    const act_gp = act_rev.map((r, m) => (r !== null && act_cogs[m] !== null) ? r - (act_cogs[m] as number) : null)
+    // reintroduced here. Null means "not enough actual data yet", not
+    // zero. A unit with ZERO cost_of_sales plan lines at all is treated
+    // as zero cost, not "missing" -- otherwise a unit with no COGS line
+    // could never get an actual Gross Profit (or the actual EBITDA that
+    // depends on it below) no matter how complete its real revenue data is.
+    const act_gp = act_rev.map((r, m) => (r !== null && (act_cogs[m] !== null || !hasCogsLines)) ? r - ((hasCogsLines ? act_cogs[m] : 0) as number) : null)
 
     // Break-even per revenue line
     const breakeven: GenericUnitPL['breakeven'] = []
@@ -444,7 +449,12 @@ export function runGenericModel(
       c.service_margins.push(...r.service_margins)
     })
     c.gp = c.rev.map((r, m) => r - c.cogs[m])
-    const act_gp = c.act_rev.map((r, m) => (r !== null && c.act_cogs[m] !== null) ? r - (c.act_cogs[m] as number) : null)
+    // Same "zero when genuinely absent, not missing" treatment as
+    // calcUnit's own act_gp -- checked across every sub-unit's plan
+    // lines, since a parent rollup's cost_of_sales could live entirely
+    // on one particular sub-unit rather than the parent itself.
+    const parentHasCogsLines = subs.some(su => config.plan_lines.some(l => l.active && l.unit_id === su.id && l.category === 'cost_of_sales'))
+    const act_gp = c.act_rev.map((r, m) => (r !== null && (c.act_cogs[m] !== null || !parentHasCogsLines)) ? r - ((parentHasCogsLines ? c.act_cogs[m] : 0) as number) : null)
     const ann_rev = yr(c.rev), ann_cogs = yr(c.cogs), ann_gp = yr(c.gp)
     const ann_staff = yr(c.staff), ann_opex = yr(c.opex)
     const parentUnit = activeUnits.find(u => u.id === parentId)
@@ -578,6 +588,7 @@ export function runGenericModel(
   }
 
   for (let m = 0; m < months; m++) {
+    let sharedPoolThisMonth = 0
     consolidatedIds.forEach(uid => {
       const r = unitPL[uid]
       if (!r) return
@@ -599,6 +610,16 @@ export function runGenericModel(
         }
       }
       mergeAct('act_rev'); mergeAct('act_cogs'); mergeAct('act_staff'); mergeAct('act_opex')
+      // Shared Costs always use their planned/allocated value -- that
+      // internal allocation (headcount/revenue-share split of a pooled
+      // cost) has no independent actual-tracking source of its own,
+      // unlike revenue/COGS/staff/opex. Summed here the same way
+      // con.ebitda[m] already implicitly includes it via r.ebitda[m]
+      // above, so the actual and planned consolidated views treat
+      // shared costs identically -- matching the per-unit actual
+      // EBITDA treatment exactly, rather than diverging by the whole
+      // shared pool between the two views.
+      sharedPoolThisMonth += r.shared[m]
     })
     // Interest is deducted before tax (standard treatment -- interest is a
     // tax-deductible finance cost). Principal is NOT deducted here: repaying
@@ -632,6 +653,7 @@ export function runGenericModel(
         - ((hasCogsLines ? con.act_cogs[m] : 0) as number)
         - ((hasStaffLines ? con.act_staff[m] : 0) as number)
         - ((hasOpexLines ? con.act_opex[m] : 0) as number)
+        - sharedPoolThisMonth
     }
     // Actual NBT/tax/NPAT cascade from act_ebitda the same way the planned
     // figures cascade from planned ebitda -- interest itself is NOT a
