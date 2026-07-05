@@ -622,7 +622,6 @@ export function runGenericModel(
   // non-null unconditionally. If a category has zero active plan lines
   // anywhere in the consolidation, there is genuinely nothing to wait
   // for -- its contribution is correctly zero, not "missing".
-  const activeLinesInScope = config.plan_lines.filter(l => l.active && activeUnits.some(u => u.id === l.unit_id))
   // Every leaf-level (atomic) unit -- standalone top-level units AND
   // sub-units, but explicitly excluding parent ids. A parent's own
   // unitPL[id] is already a merged rollup from its sub-units, not an
@@ -632,6 +631,15 @@ export function runGenericModel(
   // checking each contributor individually.
   const parentIds = new Set(Object.keys(subUnitsByParent))
   const allAtomicUnitIds = activeUnits.filter(u => !parentIds.has(u.id)).map(u => u.id)
+  // activeLinesInScope MUST use this same atomic unit set, not the
+  // broader activeUnits (which includes parent ids) -- otherwise a plan
+  // line attached directly to a parent unit could make hasStaffLines/
+  // hasOpexLines true, while categoryCompleteAcrossUnits (which only
+  // ever iterates atomic units) would find no matching line on any of
+  // them and vacuously report "complete", letting actual EBITDA compute
+  // without ever checking whether that parent-attached line's actual
+  // data was reported at all.
+  const activeLinesInScope = config.plan_lines.filter(l => l.active && allAtomicUnitIds.includes(l.unit_id))
   const hasCogsLines  = activeLinesInScope.some(l => l.category === 'cost_of_sales')
   const hasStaffLines = activeLinesInScope.some(l => l.category === 'staff')
   const hasOpexLines  = activeLinesInScope.some(l => l.category === 'direct_opex')
