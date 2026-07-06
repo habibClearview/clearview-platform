@@ -2568,6 +2568,23 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
           {label:'Shared Costs',values:pl.shared,negate:true,actualMask:periodIsActual},
           {label:'EBITDA',values:ebitdaValues,bold:true,highlight:true,actualMask:periodIsActual},
         ]
+        // The summary cards below MUST be built from these exact same
+        // hybrid arrays, not the engine's pl.ann_rev/ann_gp/ann_ebitda
+        // (which are pure planned-only sums, computed once and never
+        // touched by any actual data). Using the stale planned totals
+        // here produced a real, visible bug: Annual Revenue showed a
+        // modest planned figure while Gross Profit/EBITDA showed a
+        // wildly different, much larger negative figure -- two
+        // completely different data sources on the same screen, driven
+        // by a single corrupted planning cell that only reached the
+        // GP/EBITDA sums, not the revenue sum. Summing the displayed
+        // rows instead guarantees the cards can never diverge from the
+        // table above them, because they're the same numbers.
+        const sum = (arr: number[]) => arr.reduce((s, v) => s + v, 0)
+        const hybridAnnRev = sum(revValues)
+        const hybridAnnGp = sum(gpValues)
+        const hybridAnnEbitda = sum(ebitdaValues)
+        const hybridAnnStaff = sum(staffValues)
         return (
           <div>
             <div style={{display:'flex',gap:'0.45rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
@@ -2583,10 +2600,10 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
             </div>
             <PLTable title={`${config.business_units.find(u=>u.id===selUnit)?.name} — P&L`} rows={rows} months={months} cc={cc} showExport closedMask={closedMask}/>
             <div style={kpiGrid}>
-              <KPI label="Annual Revenue" value={fmt(pl.ann_rev,cc)}/>
-              <KPI label="Gross Profit" value={fmt(pl.ann_gp,cc)} sub={pct(pl.gp_margin)} color={pl.ann_gp>=0?C.green:C.red}/>
-              <KPI label="EBITDA" value={fmt(pl.ann_ebitda,cc)} sub={pct(pl.ebitda_margin)} color={pl.ann_ebitda>=0?C.teal:C.red}/>
-              <KPI label="Staff Cost %" value={pct(pl.staff_efficiency.staff_cost_pct)} sub={`${pl.staff_efficiency.headcount} staff`} color={C.amber}/>
+              <KPI label="Annual Revenue" value={fmt(hybridAnnRev,cc)}/>
+              <KPI label="Gross Profit" value={fmt(hybridAnnGp,cc)} sub={pct(hybridAnnRev>0?hybridAnnGp/hybridAnnRev:0)} color={hybridAnnGp>=0?C.green:C.red}/>
+              <KPI label="EBITDA" value={fmt(hybridAnnEbitda,cc)} sub={pct(hybridAnnRev>0?hybridAnnEbitda/hybridAnnRev:0)} color={hybridAnnEbitda>=0?C.teal:C.red}/>
+              <KPI label="Staff Cost %" value={pct(hybridAnnRev>0?hybridAnnStaff/hybridAnnRev:0)} sub={`${pl.staff_efficiency.headcount} staff`} color={C.amber}/>
             </div>
           </div>
         )
@@ -3182,6 +3199,27 @@ function AnnualTab({config,result,cc,P,closedPeriods,onCloseStatusChanged}) {
 
   const years = getFiscalYears(config.start_date, config.planning_months, periodForMonthIndex)
 
+  // computeAnnualPL sums whatever arrays it's given -- passing
+  // result.con directly means it sums the PURE PLANNED figures only,
+  // the same bug just fixed on the P&L tab (Annual Revenue and Gross
+  // Profit ending up computed from two completely different sources).
+  // Building the same hybrid (actual-or-plan, per the calendar rule)
+  // arrays here, once, so every year's annual figures are summed from
+  // the same real numbers the P&L tab itself shows.
+  const hybridPeriodIsActual: boolean[] = result.con.act_ebitda.map((v: number | null) => v !== null)
+  const hybridActOpexTotal = result.con.act_ebitda.map((eb: number | null, m: number) => deriveActualOperatingCosts(result.con.act_gp[m] as number, eb))
+  const hybridCon = {
+    rev: applyPeriodActual(result.con.rev, result.con.act_rev.map((v: number | null) => v ?? 0), hybridPeriodIsActual),
+    cogs: applyPeriodActual(result.con.cogs, result.con.act_cogs.map((v: number | null) => v ?? 0), hybridPeriodIsActual),
+    gp: applyPeriodActual(result.con.gp, result.con.act_gp, hybridPeriodIsActual),
+    opex: applyPeriodActual(result.con.opex, hybridActOpexTotal, hybridPeriodIsActual),
+    ebitda: applyPeriodActual(result.con.ebitda, result.con.act_ebitda, hybridPeriodIsActual),
+    interest: result.con.interest,
+    nbt: applyPeriodActual(result.con.nbt, result.con.act_nbt, hybridPeriodIsActual),
+    tax: applyPeriodActual(result.con.tax, result.con.act_tax, hybridPeriodIsActual),
+    npat: applyPeriodActual(result.con.npat, result.con.act_npat, hybridPeriodIsActual),
+  }
+
   async function closeYear(year: any) {
     const yc = yearCloses[year.startPeriod]
     if (yc?.closed) return
@@ -3205,7 +3243,7 @@ function AnnualTab({config,result,cc,P,closedPeriods,onCloseStatusChanged}) {
   return (
     <div>
       {years.map(year => {
-        const pl = computeAnnualPL(result.con, year)
+        const pl = computeAnnualPL(hybridCon, year)
         const cf = computeAnnualCashFlow(result.cf, year)
         const yearLabel = new Date(year.startPeriod).toLocaleString('en-GB',{year:'numeric',timeZone:'UTC'}) + (year.isComplete ? '' : ' (partial)')
         const yc = yearCloses[year.startPeriod]
