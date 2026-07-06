@@ -172,4 +172,22 @@ describe('buildHybridConsolidated — single source of truth for the P&L and Ann
     expect(hybrid.gp[0]).toBe(600_000)
     expect(hybrid.npat[0]).toBe(350_000)
   })
+
+  it('REG: if act_ebitda is somehow non-null while act_gp is null (an invariant violation the current engine never produces, but the type system does not prevent), Operating Costs falls back to plan instead of silently computing a wrong negative figure', () => {
+    const con = {
+      rev: [1_000_000], cogs: [400_000], gp: [600_000], opex: [100_000], ebitda: [500_000], interest: [0],
+      nbt: [500_000], tax: [150_000], npat: [350_000],
+      act_rev: [900_000] as (number | null)[], act_cogs: [350_000] as (number | null)[],
+      act_gp: [null] as (number | null)[], // violates the usual pairing with act_ebitda below
+      act_ebitda: [400_000] as (number | null)[],
+      act_nbt: [400_000] as (number | null)[], act_tax: [120_000] as (number | null)[], act_npat: [280_000] as (number | null)[],
+    }
+    const hybrid = buildHybridConsolidated(con)
+    // Without the guard, this would silently compute 0 - 400,000 = -400,000
+    // (JS coerces the null cast to 0 in subtraction) and display it as if
+    // it were a real Operating Costs figure. With the guard, Operating
+    // Costs correctly falls back to the planned 100,000 instead.
+    expect(hybrid.opex[0]).toBe(100_000)
+    expect(hybrid.opex[0]).not.toBe(-400_000)
+  })
 })

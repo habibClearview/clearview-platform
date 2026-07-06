@@ -90,7 +90,18 @@ export function buildHybridConsolidated(con: {
   act_nbt: (number | null)[]; act_tax: (number | null)[]; act_npat: (number | null)[];
 }) {
   const periodIsActual: boolean[] = con.act_ebitda.map(v => v !== null)
-  const actOpexTotal = con.act_ebitda.map((eb, m) => deriveActualOperatingCosts(con.act_gp[m] as number, eb))
+  // Guards against act_gp[m] being null even when act_ebitda[m] is
+  // non-null -- under the current engine this pair is always set
+  // together (act_ebitda is computed FROM act_gp in the same
+  // conditional), so this shouldn't occur today. But the `as number`
+  // cast on act_gp gave no RUNTIME protection if that invariant were
+  // ever violated by a future engine change: deriveActualOperatingCosts
+  // would silently compute 0 - actEbitda (JS coerces null to 0 in
+  // subtraction) instead of the real operating cost figure. Checking
+  // explicitly here means a violated invariant produces a visibly
+  // missing figure (null, falls back to plan) rather than a silently
+  // wrong negative one.
+  const actOpexTotal = con.act_ebitda.map((eb, m) => con.act_gp[m] !== null ? deriveActualOperatingCosts(con.act_gp[m] as number, eb) : null)
   return {
     periodIsActual,
     rev: applyPeriodActual(con.rev, con.act_rev.map(v => v ?? 0), periodIsActual),
