@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { combinedActual as combined, computeActualsTotals as computeTotals, applyPeriodActual, type ActualsPlanLine as PlanLine } from '../lib/actuals'
+import { combinedActual as combined, computeActualsTotals as computeTotals, applyPeriodActual, buildHybridConsolidated, type ActualsPlanLine as PlanLine } from '../lib/actuals'
 
 // Tests the real src/lib/actuals.ts functions -- the exact ones
 // GenericDashboard.tsx's ActualsTab imports and uses, not a copy.
@@ -139,5 +139,37 @@ describe('applyPeriodActual — one decision per period, never a per-line blend'
     const fixedRevValues = applyPeriodActual(planRev, rawActRev.map(v => v ?? 0), periodIsActual)
     expect(fixedRevValues[0]).toBe(0)
     expect(fixedRevValues[0]).toBe(gp[0]) // now consistent with GP
+  })
+})
+
+describe('buildHybridConsolidated — single source of truth for the P&L and Annual tabs', () => {
+  it('REG: Revenue uses the real actual figure even when Cost of Sales was not entered this month -- never falls back to the planned Revenue', () => {
+    const con = {
+      rev: [1_000_000], cogs: [400_000], gp: [600_000], opex: [100_000], ebitda: [500_000], interest: [0],
+      nbt: [500_000], tax: [150_000], npat: [350_000],
+      act_rev: [900_000] as (number | null)[], act_cogs: [null] as (number | null)[], // cost not entered this month
+      act_gp: [900_000] as (number | null)[], act_ebitda: [800_000] as (number | null)[],
+      act_nbt: [800_000] as (number | null)[], act_tax: [240_000] as (number | null)[], act_npat: [560_000] as (number | null)[],
+    }
+    const hybrid = buildHybridConsolidated(con)
+    expect(hybrid.periodIsActual[0]).toBe(true)
+    expect(hybrid.rev[0]).toBe(900_000)
+    // Cost of Sales, unreported, is treated as zero (not the planned 400,000)
+    expect(hybrid.cogs[0]).toBe(0)
+  })
+
+  it('REG: a future month (act_ebitda null) uses the planned figures for every field, consistently', () => {
+    const con = {
+      rev: [1_000_000], cogs: [400_000], gp: [600_000], opex: [100_000], ebitda: [500_000], interest: [0],
+      nbt: [500_000], tax: [150_000], npat: [350_000],
+      act_rev: [null] as (number | null)[], act_cogs: [null] as (number | null)[],
+      act_gp: [null] as (number | null)[], act_ebitda: [null] as (number | null)[],
+      act_nbt: [null] as (number | null)[], act_tax: [null] as (number | null)[], act_npat: [null] as (number | null)[],
+    }
+    const hybrid = buildHybridConsolidated(con)
+    expect(hybrid.periodIsActual[0]).toBe(false)
+    expect(hybrid.rev[0]).toBe(1_000_000)
+    expect(hybrid.gp[0]).toBe(600_000)
+    expect(hybrid.npat[0]).toBe(350_000)
   })
 })

@@ -10,7 +10,7 @@ import {
   type GenericPlanLine, type LineCategory, type LineType, type UnitType,
 } from '@/lib/generic-engine'
 import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor } from '@/lib/scoring-engine'
-import { combinedActual, computeActualsTotals, deriveActualOperatingCosts, applyPeriodActual } from '@/lib/actuals'
+import { combinedActual, computeActualsTotals, applyPeriodActual, buildHybridConsolidated } from '@/lib/actuals'
 import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
 import { getFiscalYears, canCloseYear, computeAnnualPL, computeAnnualCashFlow, computeYearEndBalanceSheet } from '@/lib/annual-close'
 
@@ -2610,33 +2610,13 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
       })()}
 
       {viewMode==='consolidated' && (() => {
-        const con = result.con
-        // A single signal per month, under the calendar rule: a past/
-        // current month is actual, a future month is plan -- the ENTIRE
-        // column switches together, never some rows actual and others
-        // plan in the same period. Using con.act_ebitda[m] !== null as
-        // that single signal is correct by construction: under the
-        // calendar rule act_ebitda is non-null for exactly the past/
-        // current months (see generic-engine.ts).
-        const periodIsActual: boolean[] = con.act_ebitda.map(v => v !== null)
-        const actOpexTotal = con.act_ebitda.map((eb, m) => deriveActualOperatingCosts(con.act_gp[m] as number, eb))
-        // Revenue and Cost of Sales need the same actual-or-zero fallback
-        // GP/EBITDA already have baked in internally -- the RAW
-        // con.act_rev/con.act_cogs arrays are still null whenever nothing
-        // was entered for that category this month, even in a past/
-        // current period (e.g. a unit that simply hasn't reported yet).
-        // Without ?? 0 here, Revenue could fall back to the PLANNED
-        // figure in the very same column where GP/EBITDA showed the
-        // actual-derived figure (zero) -- the exact mixing bug this tab
-        // exists to prevent, just relocated to Revenue/Cost of Sales.
-        const revValues    = applyPeriodActual(con.rev, con.act_rev.map(v => v ?? 0), periodIsActual)
-        const cogsValues   = applyPeriodActual(con.cogs, con.act_cogs.map(v => v ?? 0), periodIsActual)
-        const gpValues     = applyPeriodActual(con.gp, con.act_gp, periodIsActual)
-        const opexValues   = applyPeriodActual(con.opex, actOpexTotal, periodIsActual)
-        const ebitdaValues = applyPeriodActual(con.ebitda, con.act_ebitda, periodIsActual)
-        const nbtValues    = applyPeriodActual(con.nbt, con.act_nbt, periodIsActual)
-        const taxValues    = applyPeriodActual(con.tax, con.act_tax, periodIsActual)
-        const npatValues   = applyPeriodActual(con.npat, con.act_npat, periodIsActual)
+        // buildHybridConsolidated is the single source of truth for
+        // turning the consolidated P&L into hybrid (actual-or-plan, per
+        // the calendar rule) arrays -- also used by the Annual tab, so
+        // both can't silently diverge the way they did before (Annual
+        // Revenue vs Gross Profit reading from two different sources).
+        const { periodIsActual, rev: revValues, cogs: cogsValues, gp: gpValues, opex: opexValues,
+                ebitda: ebitdaValues, nbt: nbtValues, tax: taxValues, npat: npatValues } = buildHybridConsolidated(result.con)
         const rows = [
           {label:'Revenue',values:revValues,bold:true,actualMask:periodIsActual},
           {label:'Cost of Sales',values:cogsValues,negate:true,actualMask:periodIsActual},
@@ -3203,22 +3183,10 @@ function AnnualTab({config,result,cc,P,closedPeriods,onCloseStatusChanged}) {
   // result.con directly means it sums the PURE PLANNED figures only,
   // the same bug just fixed on the P&L tab (Annual Revenue and Gross
   // Profit ending up computed from two completely different sources).
-  // Building the same hybrid (actual-or-plan, per the calendar rule)
-  // arrays here, once, so every year's annual figures are summed from
-  // the same real numbers the P&L tab itself shows.
-  const hybridPeriodIsActual: boolean[] = result.con.act_ebitda.map((v: number | null) => v !== null)
-  const hybridActOpexTotal = result.con.act_ebitda.map((eb: number | null, m: number) => deriveActualOperatingCosts(result.con.act_gp[m] as number, eb))
-  const hybridCon = {
-    rev: applyPeriodActual(result.con.rev, result.con.act_rev.map((v: number | null) => v ?? 0), hybridPeriodIsActual),
-    cogs: applyPeriodActual(result.con.cogs, result.con.act_cogs.map((v: number | null) => v ?? 0), hybridPeriodIsActual),
-    gp: applyPeriodActual(result.con.gp, result.con.act_gp, hybridPeriodIsActual),
-    opex: applyPeriodActual(result.con.opex, hybridActOpexTotal, hybridPeriodIsActual),
-    ebitda: applyPeriodActual(result.con.ebitda, result.con.act_ebitda, hybridPeriodIsActual),
-    interest: result.con.interest,
-    nbt: applyPeriodActual(result.con.nbt, result.con.act_nbt, hybridPeriodIsActual),
-    tax: applyPeriodActual(result.con.tax, result.con.act_tax, hybridPeriodIsActual),
-    npat: applyPeriodActual(result.con.npat, result.con.act_npat, hybridPeriodIsActual),
-  }
+  // buildHybridConsolidated is the same shared helper the P&L tab's
+  // Consolidated view uses, so both tabs derive from one source of
+  // truth and can't silently diverge again.
+  const hybridCon = buildHybridConsolidated(result.con)
 
   async function closeYear(year: any) {
     const yc = yearCloses[year.startPeriod]
