@@ -205,21 +205,23 @@ export interface GenericUnitPL {
   shared: number[]
   total_opex: number[]
   ebitda: number[]
-  // Actuals (null = not yet entered)
+  // Actuals under the calendar rule: non-null for a past/current month
+  // (actual value, zero if nothing was entered for that category), null
+  // for a future month (meaning "use the plan" at display time).
   act_rev: (number | null)[]
   act_cogs: (number | null)[]
   act_staff: (number | null)[]
   act_opex: (number | null)[]
-  // Actual Gross Profit: only computed when BOTH act_rev and act_cogs are
-  // present for that month -- never blends an actual figure with a planned
-  // one. Null means not enough actual data yet, not zero.
+  // Actual Gross Profit: for a past/current month, act_rev minus act_cogs
+  // (each already zero rather than null where nothing was entered for
+  // that category this month). Null for a future month -- display falls
+  // back to the plan.
   act_gp: (number | null)[]
-  // Actual EBITDA at the unit level -- treats Shared Costs using their
-  // planned/allocated value always (that allocation is an internal
+  // Actual EBITDA at the unit level: for a past/current month, act_gp
+  // minus act_staff minus act_opex minus Shared Costs. Shared Costs always
+  // use their planned/allocated value -- that allocation is an internal
   // planning construct with no independent actual-tracking mechanism of
-  // its own, unlike revenue/COGS/staff/opex which get real transaction
-  // data). Staff and opex are treated as zero, not "missing", when this
-  // unit genuinely has no plan line in that category at all.
+  // its own, unlike revenue/COGS/staff/opex. Null for a future month.
   act_ebitda: (number | null)[]
   // Spread analysis per line
   spread_analysis: {
@@ -293,32 +295,20 @@ export function runGenericModel(
   const zero = () => Array(months).fill(0) as number[]
   const nullArr = () => Array(months).fill(null) as (number | null)[]
 
-  // Used everywhere multiple units' actual data gets merged together
-  // (parent rollups from sub-units, and the top-level consolidated
-  // total across all units). merge()/mergeAct() only add a unit's
-  // contribution when THAT unit actually reported non-null for a given
-  // month -- so if Unit A (which has a cost_of_sales line) reports 100
-  // this month but Unit B (which ALSO has a cost_of_sales line) reports
-  // nothing, the combined total would show only Unit A's 100, silently
-  // treating Unit B's real, unreported cost as zero rather than as
-  // "still missing". This checks EVERY unit that has an active line in
-  // the given category individually, so a rollup with one
-  // incompletely-reporting unit correctly stays incomplete rather than
-  // understating the true cost.
-  function categoryCompleteAcrossUnits(unitIds: string[], category: string, m: number): boolean {
-    const actKey = category === 'revenue' ? 'act_rev'
-      : category === 'cost_of_sales' ? 'act_cogs'
-      : category === 'staff' ? 'act_staff'
-      : category === 'direct_opex' ? 'act_opex'
-      : null
-    if (!actKey) return true
-    return unitIds.every(uid => {
-      const hasLine = config.plan_lines.some(l => l.active && l.unit_id === uid && l.category === category)
-      if (!hasLine) return true
-      const r = unitPL[uid]
-      return !r || (r as any)[actKey][m] !== null
-    })
-  }
+  // The ONE rule for actual vs. plan, everywhere in this model: a month
+  // at or before the current calendar month shows whatever actual data
+  // was entered (zero if none was -- never silently substituted with
+  // plan). A future month shows the planned figure. This is a pure
+  // calendar fact, computed once and used identically for every unit,
+  // the consolidated total, cash flow, and the balance sheet -- there is
+  // no separate "is the data complete enough" question. If nothing was
+  // entered for a past or current month, that month is empty/zero: it
+  // is real information (nothing has been recorded yet), not something
+  // to paper over with a forecast.
+  const startD = new Date(config.start_date)
+  const today = new Date()
+  const todayMonthIndex = (today.getUTCFullYear() - startD.getUTCFullYear()) * 12 + (today.getUTCMonth() - startD.getUTCMonth())
+  const isPastOrCurrentMonth: boolean[] = Array.from({length: months}, (_, m) => m <= todayMonthIndex)
 
   // ── Calculate unit P&L ────────────────────────────────────
   function calcUnit(unit: GenericBusinessUnit): GenericUnitPL {
@@ -394,16 +384,14 @@ export function runGenericModel(
     })
 
     const gp = rev.map((r, m) => r - cogs[m])
-    const hasCogsLines = lines.some(l => l.category === 'cost_of_sales')
-    // Actual Gross Profit: only when both act_rev and act_cogs exist for
-    // that month -- this is the exact class of bug already fixed once
-    // (mixing actual revenue with planned cost) and must not be
-    // reintroduced here. Null means "not enough actual data yet", not
-    // zero. A unit with ZERO cost_of_sales plan lines at all is treated
-    // as zero cost, not "missing" -- otherwise a unit with no COGS line
-    // could never get an actual Gross Profit (or the actual EBITDA that
-    // depends on it below) no matter how complete its real revenue data is.
-    const act_gp = act_rev.map((r, m) => (r !== null && (act_cogs[m] !== null || !hasCogsLines)) ? r - ((hasCogsLines ? act_cogs[m] : 0) as number) : null)
+    // Actual Gross Profit: a past or current month uses whatever actual
+    // was entered, treating anything not entered as zero -- never
+    // silently substituting the planned figure. A future month is null
+    // here, meaning "use the plan" at display time. There is no
+    // "complete enough" question; it's purely which side of today the
+    // month falls on.
+    const act_gp = rev.map((_, m) => isPastOrCurrentMonth[m] ? (act_rev[m] ?? 0) - (act_cogs[m] ?? 0) : null)
+
 
     // Break-even per revenue line
     const breakeven: GenericUnitPL['breakeven'] = []
@@ -476,34 +464,11 @@ export function runGenericModel(
       c.service_margins.push(...r.service_margins)
     })
     c.gp = c.rev.map((r, m) => r - c.cogs[m])
-    // Same "zero when genuinely absent, not missing" treatment as
-    // calcUnit's own act_gp -- checked across every sub-unit's plan
-    // lines, since a parent rollup's cost_of_sales could live entirely
-    // on one particular sub-unit rather than the parent itself.
-    //
-    // Critically, this must NOT stop at "does the combined c.act_cogs[m]
-    // have any value at all" -- merge() only adds a sub's contribution
-    // when that sub actually reported for this month, so if Sub A (which
-    // has a cogs line) reports 100 and Sub B (which ALSO has a cogs line)
-    // reports nothing this month, c.act_cogs[m] would show only Sub A's
-    // 100 -- silently treating Sub B's real, unreported cost as zero,
-    // not as "still missing". cogsCompleteByMonth checks EVERY qualifying
-    // sub individually, so a parent with an incompletely-reporting sub
-    // correctly stays null rather than understating cost.
-    const parentHasCogsLines = subs.some(su => config.plan_lines.some(l => l.active && l.unit_id === su.id && l.category === 'cost_of_sales'))
-    const subIds = subs.map(su => su.id)
-    const act_gp = c.act_rev.map((r, m) => {
-      if (r === null) return null
-      // Revenue needs the same completeness gate as costs: if two subs
-      // both have revenue lines and only one reports this month, r
-      // would still be non-null (just missing the other sub's real
-      // revenue) -- silently understating GP rather than staying
-      // incomplete.
-      if (!categoryCompleteAcrossUnits(subIds, 'revenue', m)) return null
-      if (!parentHasCogsLines) return r
-      if (!categoryCompleteAcrossUnits(subIds, 'cost_of_sales', m)) return null
-      return r - (c.act_cogs[m] as number)
-    })
+    // Actual Gross Profit: same calendar rule as everywhere else -- a
+    // past or current month sums whatever actual was entered across all
+    // sub-units, treating anything not entered as zero. A future month
+    // is null here, meaning "use the plan" at display time.
+    const act_gp = c.act_rev.map((_, m) => isPastOrCurrentMonth[m] ? (c.act_rev[m] ?? 0) - (c.act_cogs[m] ?? 0) : null)
     const ann_rev = yr(c.rev), ann_cogs = yr(c.cogs), ann_gp = yr(c.gp)
     const ann_staff = yr(c.staff), ann_opex = yr(c.opex)
     const parentUnit = activeUnits.find(u => u.id === parentId)
@@ -556,41 +521,16 @@ export function runGenericModel(
   allUnitIds.forEach(uid => {
     const r = unitPL[uid]
     if (!r) return
-    // For a parent unit, its own plan lines AND every sub-unit's plan
-    // lines are all relevant to "does staff/opex apply here" -- a parent
-    // rollup's staff cost could live entirely on a sub-unit's own lines.
-    const relevantIds = new Set([uid, ...(subUnitsByParent[uid] || []).map(su => su.id)])
-    const relevantLines = config.plan_lines.filter(l => l.active && relevantIds.has(l.unit_id))
-    const unitHasStaffLines = relevantLines.some(l => l.category === 'staff')
-    const unitHasOpexLines  = relevantLines.some(l => l.category === 'direct_opex')
     for (let m = 0; m < months; m++) {
       r.total_opex[m] = r.staff[m] + r.opex[m] + r.shared[m]
       r.ebitda[m]     = r.gp[m] - r.total_opex[m]
-      // Actual EBITDA: same "zero when the category genuinely doesn't
-      // apply, not blocking" treatment already fixed at the consolidated
-      // level -- found and fixed there first, but this exact tab (By
-      // Business Unit) was still showing a stale planned EBITDA for any
-      // unit with no staff line, regardless of that fix, since unit-level
-      // EBITDA was never actually computed as hybrid at all until now.
-      // Shared Costs use their planned/allocated value unconditionally --
-      // that allocation is an internal planning mechanism with no
+      // Actual EBITDA: same calendar rule as act_gp -- a past or current
+      // month uses whatever actual was entered (zero if nothing was),
+      // never falling back to plan. Shared Costs always use their
+      // planned/allocated value -- that internal allocation has no
       // independent actual-tracking source of its own.
-      //
-      // Uses categoryCompleteAcrossUnits rather than a bare
-      // r.act_staff[m] !== null check -- for a standalone unit these are
-      // equivalent (relevantIds is just {uid}), but for a PARENT unit
-      // r.act_staff[m] was itself populated by merging multiple
-      // sub-units together, and a bare null check can't tell "no sub has
-      // a staff line" apart from "one sub with a staff line just hasn't
-      // reported this month" -- the second case must stay incomplete,
-      // not silently understate cost.
-      const staffOk = categoryCompleteAcrossUnits(Array.from(relevantIds), 'staff', m)
-      const opexOk  = categoryCompleteAcrossUnits(Array.from(relevantIds), 'direct_opex', m)
-      if (r.act_gp[m] !== null && staffOk && opexOk) {
-        r.act_ebitda[m] = (r.act_gp[m] as number)
-          - ((unitHasStaffLines ? r.act_staff[m] : 0) as number)
-          - ((unitHasOpexLines ? r.act_opex[m] : 0) as number)
-          - r.shared[m]
+      if (isPastOrCurrentMonth[m] && r.act_gp[m] !== null) {
+        r.act_ebitda[m] = (r.act_gp[m] as number) - (r.act_staff[m] ?? 0) - (r.act_opex[m] ?? 0) - r.shared[m]
       }
     }
     r.ann_shared  = yr(r.shared)
@@ -623,36 +563,6 @@ export function runGenericModel(
         repaymentType: 'amortising',
       }] : [])
   const debtSchedule = buildDebtSchedule(debtObligations, months)
-
-  // Which categories genuinely exist anywhere in this business at all --
-  // a real bug found from live data: a unit (or an entire business) with
-  // no 'staff' category plan line at all would NEVER get an actual
-  // EBITDA/NPAT, regardless of how complete its real revenue/cost/opex
-  // data is, because the gate below required ALL FOUR categories to be
-  // non-null unconditionally. If a category has zero active plan lines
-  // anywhere in the consolidation, there is genuinely nothing to wait
-  // for -- its contribution is correctly zero, not "missing".
-  // Every leaf-level (atomic) unit -- standalone top-level units AND
-  // sub-units, but explicitly excluding parent ids. A parent's own
-  // unitPL[id] is already a merged rollup from its sub-units, not an
-  // atomic per-unit figure -- passing a parent id into
-  // categoryCompleteAcrossUnits would check the already-summed total
-  // instead of a real leaf unit's own reporting, defeating the point of
-  // checking each contributor individually.
-  const parentIds = new Set(Object.keys(subUnitsByParent))
-  const allAtomicUnitIds = activeUnits.filter(u => !parentIds.has(u.id)).map(u => u.id)
-  // activeLinesInScope MUST use this same atomic unit set, not the
-  // broader activeUnits (which includes parent ids) -- otherwise a plan
-  // line attached directly to a parent unit could make hasStaffLines/
-  // hasOpexLines true, while categoryCompleteAcrossUnits (which only
-  // ever iterates atomic units) would find no matching line on any of
-  // them and vacuously report "complete", letting actual EBITDA compute
-  // without ever checking whether that parent-attached line's actual
-  // data was reported at all.
-  const activeLinesInScope = config.plan_lines.filter(l => l.active && allAtomicUnitIds.includes(l.unit_id))
-  const hasCogsLines  = activeLinesInScope.some(l => l.category === 'cost_of_sales')
-  const hasStaffLines = activeLinesInScope.some(l => l.category === 'staff')
-  const hasOpexLines  = activeLinesInScope.some(l => l.category === 'direct_opex')
 
   const con = {
     rev: zero(), cogs: zero(), gp: zero(), opex: zero(),
@@ -703,43 +613,16 @@ export function runGenericModel(
     con.nbt[m]  = con.ebitda[m] - (con.interest[m] ?? 0)
     con.tax[m]  = con.nbt[m] > 0 ? con.nbt[m] * (settings.corporate_tax_rate ?? 0.30) : 0
     con.npat[m] = con.nbt[m] - con.tax[m]
-    // Actual Gross Profit: only when both act_rev and act_cogs exist
-    // (or cost_of_sales genuinely doesn't apply anywhere in this business).
-    // categoryCompleteAcrossUnits checks every ATOMIC unit individually
-    // (not just whether the combined con.act_cogs[m] happens to be
-    // non-null) -- two units can both have cogs lines, and if only one
-    // reports this month, the combined total would otherwise silently
-    // look complete while actually missing the other unit's real cost.
-    // Revenue needs the identical gate: con.act_rev[m] !== null alone
-    // isn't sufficient -- two revenue-bearing units could both
-    // contribute, and if only one reports, the combined total would
-    // still be non-null while silently missing the other's real revenue.
-    const revCompleteThisMonth = categoryCompleteAcrossUnits(allAtomicUnitIds, 'revenue', m)
-    const cogsCompleteThisMonth = categoryCompleteAcrossUnits(allAtomicUnitIds, 'cost_of_sales', m)
-    if (con.act_rev[m] !== null && revCompleteThisMonth && (cogsCompleteThisMonth || !hasCogsLines)) {
-      con.act_gp[m] = (con.act_rev[m] as number) - ((hasCogsLines ? con.act_cogs[m] : 0) as number)
-    }
-    // Actual EBITDA: only when every category that ACTUALLY APPLIES to
-    // this business has actual data for this month -- never substitutes
-    // a planned figure for a missing actual one. If, say, actual revenue
-    // has synced from the field but actual opex hasn't been entered yet
-    // (and opex genuinely does apply), this stays null rather than
-    // showing a number that's part real, part invented. A category with
-    // ZERO active plan lines anywhere in the business (e.g. no staff
-    // line at all) is treated as zero, not "missing" -- there's nothing
-    // to wait for, and requiring it unconditionally would mean actual
-    // EBITDA could never compute at all for a business with no staff
-    // costs, no matter how complete its real data otherwise is.
-    const revOk   = con.act_rev[m] !== null && revCompleteThisMonth
-    const cogsOk  = !hasCogsLines  || cogsCompleteThisMonth
-    const staffOk = !hasStaffLines || categoryCompleteAcrossUnits(allAtomicUnitIds, 'staff', m)
-    const opexOk  = !hasOpexLines  || categoryCompleteAcrossUnits(allAtomicUnitIds, 'direct_opex', m)
-    if (revOk && cogsOk && staffOk && opexOk) {
-      con.act_ebitda[m] = (con.act_rev[m] as number)
-        - ((hasCogsLines ? con.act_cogs[m] : 0) as number)
-        - ((hasStaffLines ? con.act_staff[m] : 0) as number)
-        - ((hasOpexLines ? con.act_opex[m] : 0) as number)
-        - sharedPoolThisMonth
+    // Actual Gross Profit and EBITDA: the same calendar rule as
+    // everywhere else in this model -- a past or current month sums
+    // whatever actual was entered across every unit (zero where nothing
+    // was), never falling back to plan. A future month is null here,
+    // meaning "use the plan" at display time. Shared Costs always use
+    // their planned/allocated value -- that internal allocation has no
+    // independent actual-tracking source of its own.
+    if (isPastOrCurrentMonth[m]) {
+      con.act_gp[m] = (con.act_rev[m] ?? 0) - (con.act_cogs[m] ?? 0)
+      con.act_ebitda[m] = con.act_gp[m]! - (con.act_staff[m] ?? 0) - (con.act_opex[m] ?? 0) - sharedPoolThisMonth
     }
     // Actual NBT/tax/NPAT cascade from act_ebitda the same way the planned
     // figures cascade from planned ebitda -- interest itself is NOT a
@@ -776,19 +659,13 @@ export function runGenericModel(
   // from planned NPAT today, so correctness cascades automatically
   // rather than needing a separate parallel actual calculation for each.
   const hybridNpat = con.npat.map((v, m) => con.act_npat[m] !== null ? (con.act_npat[m] as number) : v)
-  // Per-month: does THIS month's operating cash reflect real data?
-  const npatIsActual = con.act_npat.map(v => v !== null)
 
   const cf = {
     op_cash:  zero(), fin_cash: zero(), inv_cash: zero(), net: zero(),
     open: zero(), close: zero(),
     working_capital_adj: tradeCreditCashEffect,
-    // Cash is cumulative -- once one month's operating cash reflects real
-    // data, every month from there onward carries that real figure
-    // forward into its opening balance, even if that later month's OWN
-    // op_cash hasn't been closed yet. act_mask marks exactly that: true
-    // from the first actual month through to the end, not just the
-    // individual months that each have their own actual data.
+    // act_mask marks which months are actual (past/current) vs plan
+    // (future) under the single calendar rule used throughout the model.
     act_mask: Array(months).fill(false) as boolean[],
   }
   cf.fin_cash[0] = cap.shareholder_contribution + cap.grant_non_repayable + cap.grant_recoverable
@@ -807,7 +684,6 @@ export function runGenericModel(
     const idx = Math.max(0, (ob.drawdownMonth ?? 1) - 1)
     if (idx < months) cf.fin_cash[idx] += ob.principal ?? 0
   })
-  let cashIsActualFromHere = false
   for (let m = 0; m < months; m++) {
     // Loan principal repayment is a financing outflow -- no P&L impact, since
     // it's not an expense, just cash moving from the business to the lender.
@@ -817,8 +693,13 @@ export function runGenericModel(
     cf.net[m]     = cf.op_cash[m] + cf.fin_cash[m] + cf.inv_cash[m]
     cf.open[m]    = m === 0 ? (settings.opening_cash_balance ?? 0) : cf.close[m - 1]
     cf.close[m]   = cf.open[m] + cf.net[m]
-    if (npatIsActual[m]) cashIsActualFromHere = true
-    cf.act_mask[m] = cashIsActualFromHere
+    // act_mask marks which months are actual under the calendar rule --
+    // exactly the past/current months. Cash figures still flow
+    // continuously across the actual/plan boundary (each month's opening
+    // balance is the prior month's close, always), but the mask itself
+    // reflects the real data-vs-plan status of each month, not a
+    // cumulative "actual from here on" bleed-forward.
+    cf.act_mask[m] = isPastOrCurrentMonth[m]
   }
 
   // ── Balance sheet ─────────────────────────────────────────
@@ -836,10 +717,8 @@ export function runGenericModel(
     accounts_payable: tradeCredit.totalPayableOutstanding,
     total_liabilities: zero(),
     total_equity_and_liabilities: zero(),
-    // Same cumulative reasoning as cf.act_mask -- retained earnings (and
-    // everything derived from it: total assets, total equity, total
-    // equity+liabilities) carries real data forward from the first
-    // actual month onward.
+    // Same calendar-rule mask as cash flow -- past/current months are
+    // actual, future months are plan.
     act_mask: cf.act_mask,
   }
   // Opening cash balance represents pre-existing capital from before the
