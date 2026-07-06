@@ -205,21 +205,23 @@ export interface GenericUnitPL {
   shared: number[]
   total_opex: number[]
   ebitda: number[]
-  // Actuals (null = not yet entered)
+  // Actuals under the calendar rule: non-null for a past/current month
+  // (actual value, zero if nothing was entered for that category), null
+  // for a future month (meaning "use the plan" at display time).
   act_rev: (number | null)[]
   act_cogs: (number | null)[]
   act_staff: (number | null)[]
   act_opex: (number | null)[]
-  // Actual Gross Profit: only computed when BOTH act_rev and act_cogs are
-  // present for that month -- never blends an actual figure with a planned
-  // one. Null means not enough actual data yet, not zero.
+  // Actual Gross Profit: for a past/current month, act_rev minus act_cogs
+  // (each already zero rather than null where nothing was entered for
+  // that category this month). Null for a future month -- display falls
+  // back to the plan.
   act_gp: (number | null)[]
-  // Actual EBITDA at the unit level -- treats Shared Costs using their
-  // planned/allocated value always (that allocation is an internal
+  // Actual EBITDA at the unit level: for a past/current month, act_gp
+  // minus act_staff minus act_opex minus Shared Costs. Shared Costs always
+  // use their planned/allocated value -- that allocation is an internal
   // planning construct with no independent actual-tracking mechanism of
-  // its own, unlike revenue/COGS/staff/opex which get real transaction
-  // data). Staff and opex are treated as zero, not "missing", when this
-  // unit genuinely has no plan line in that category at all.
+  // its own, unlike revenue/COGS/staff/opex. Null for a future month.
   act_ebitda: (number | null)[]
   // Spread analysis per line
   spread_analysis: {

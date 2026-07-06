@@ -9,6 +9,21 @@ function expectBalanceSheetBalances(result: ReturnType<typeof runGenericModel>) 
   })
 }
 
+// Shared date-relative helpers for calendar-rule tests, so they stay
+// deterministic regardless of the real date they run on -- a config
+// whose start_date is N months before "now" puts month index N at
+// "current", with 0..N-1 in the past and N+1.. in the future. Hoisted
+// here (rather than redefined per describe block) to avoid drift
+// between copies.
+function monthsAgoISO(n: number): string {
+  const d = new Date()
+  d.setUTCMonth(d.getUTCMonth() - n)
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`
+}
+function makeCalendarConfig(pastMonths: number, futureMonths: number, overrides: Record<string, any> = {}) {
+  return makeConfig({ start_date: monthsAgoISO(pastMonths), planning_months: pastMonths + 1 + futureMonths, ...overrides })
+}
+
 
 // Helper: build a simple config with known inputs
 function makeConfig(overrides: Record<string,any> = {}) {
@@ -425,20 +440,9 @@ describe('Generic Engine — Actuals (calendar-based actual/plan rule)', () => {
   // The rule under test: a month at or before the current calendar month
   // shows whatever actual was entered (zero if none), never falling back
   // to plan. A future month uses the plan (act_* is null there, meaning
-  // "use plan" at display). These helpers make the tests deterministic
-  // regardless of the real date they run on -- a config whose start_date
-  // is N months before this month puts month index N at "current", with
-  // 0..N-1 in the past and N+1.. in the future.
-  function monthsAgoISO(n: number): string {
-    const d = new Date()
-    d.setUTCMonth(d.getUTCMonth() - n)
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`
-  }
-  // Config starting `pastMonths` months ago, so index `pastMonths` is the
-  // current month and there are `futureMonths` planned months after it.
-  function makeCalendarConfig(pastMonths: number, futureMonths: number, overrides: Record<string, any> = {}) {
-    return makeConfig({ start_date: monthsAgoISO(pastMonths), planning_months: pastMonths + 1 + futureMonths, ...overrides })
-  }
+  // "use plan" at display). monthsAgoISO/makeCalendarConfig (module-level,
+  // above) make these tests deterministic regardless of the real date
+  // they run on.
 
   it('REG: with no actuals passed, a PAST or CURRENT month shows zero actual (not plan, not null); a FUTURE month stays null (use plan)', () => {
     // start 2 months ago -> index 0,1 past, index 2 current, index 3,4 future
@@ -509,14 +513,6 @@ describe('Generic Engine — Actuals (calendar-based actual/plan rule)', () => {
 })
 
 describe('Generic Engine — Cash Flow and Balance Sheet under the calendar rule', () => {
-  function monthsAgoISO(n: number): string {
-    const d = new Date()
-    d.setUTCMonth(d.getUTCMonth() - n)
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`
-  }
-  function makeCalendarConfig(pastMonths: number, futureMonths: number, overrides: Record<string, any> = {}) {
-    return makeConfig({ start_date: monthsAgoISO(pastMonths), planning_months: pastMonths + 1 + futureMonths, ...overrides })
-  }
 
   it('REG: act_mask is true for every past/current month and false for every future month', () => {
     // start 3 months ago -> indices 0,1,2 past, 3 current, 4,5 future
@@ -750,6 +746,10 @@ describe('Generic Engine — parent rollup under the calendar rule (multiple sub
   // is the deliberate behaviour Habib specified: a past month reflects
   // the figures that were actually recorded in that month, no more, no
   // less.
+
+  // start 1 month ago -> index 0 is the only past/current month within a
+  // 12-month window; index 11 is always comfortably future, regardless of
+  // the real date this test runs on.
   function makeParentWithSubsConfig(overrides: Record<string,any> = {}) {
     return defaultGenericConfig({
       client_id: 'test', business_name: 'Test Co', currency: 'UGX', planning_months: 12,
@@ -765,16 +765,17 @@ describe('Generic Engine — parent rollup under the calendar rule (multiple sub
         { id: 'cogsB', unit_id: 'subB', name: 'COGS B', category: 'cost_of_sales', line_type: 'standard', monthly_plan: Array(12).fill(2_000_000), active: true },
       ],
       settings: DEFAULT_TEST_SETTINGS,
-      start_date: '2026-01-01', // a past month in this environment
+      start_date: monthsAgoISO(1),
       ...overrides,
     })
   }
 
   it('REG: for a past month, parent act_gp sums whatever actuals were reported, treating an unreported sub cost as zero (not planned, not withheld)', () => {
     // Sub A fully reports; Sub B reports revenue but not its cogs.
+    const period = monthsAgoISO(1)
     const actuals = {
-      subA: { '2026-01-01': { revA: 4_500_000, cogsA: 1_800_000 } },
-      subB: { '2026-01-01': { revB: 4_800_000 } }, // cogsB not entered -> counts as zero
+      subA: { [period]: { revA: 4_500_000, cogsA: 1_800_000 } },
+      subB: { [period]: { revB: 4_800_000 } }, // cogsB not entered -> counts as zero
     }
     const result = runGenericModel(makeParentWithSubsConfig(), actuals)
     const parentPL = result.unitPL['parent1']
@@ -785,9 +786,10 @@ describe('Generic Engine — parent rollup under the calendar rule (multiple sub
   })
 
   it('REG: parent act_gp for a past month reflects all reported actuals when every sub has reported', () => {
+    const period = monthsAgoISO(1)
     const actuals = {
-      subA: { '2026-01-01': { revA: 4_500_000, cogsA: 1_800_000 } },
-      subB: { '2026-01-01': { revB: 4_800_000, cogsB: 1_900_000 } },
+      subA: { [period]: { revA: 4_500_000, cogsA: 1_800_000 } },
+      subB: { [period]: { revB: 4_800_000, cogsB: 1_900_000 } },
     }
     const result = runGenericModel(makeParentWithSubsConfig(), actuals)
     const parentPL = result.unitPL['parent1']
@@ -795,20 +797,23 @@ describe('Generic Engine — parent rollup under the calendar rule (multiple sub
   })
 
   it('REG: the same past-month actual-or-zero behaviour applies at the consolidated level, matching the parent rollup', () => {
+    const period = monthsAgoISO(1)
     const actuals = {
-      subA: { '2026-01-01': { revA: 4_500_000, cogsA: 1_800_000 } },
-      subB: { '2026-01-01': { revB: 4_800_000 } }, // cogsB not entered
+      subA: { [period]: { revA: 4_500_000, cogsA: 1_800_000 } },
+      subB: { [period]: { revB: 4_800_000 } }, // cogsB not entered
     }
     const result = runGenericModel(makeParentWithSubsConfig(), actuals)
     expect(result.con.act_gp[0]).toBe(7_500_000)
   })
 
-  it('REG: a FUTURE month for this business stays null (use plan) regardless of any actuals', () => {
+  it('REG: a FUTURE month for this business stays null (use plan) regardless of any actuals -- stable regardless of the real date this test runs on', () => {
+    const period = monthsAgoISO(1)
     const actuals = {
-      subA: { '2026-01-01': { revA: 4_500_000, cogsA: 1_800_000 } },
+      subA: { [period]: { revA: 4_500_000, cogsA: 1_800_000 } },
     }
     const result = runGenericModel(makeParentWithSubsConfig(), actuals)
-    // 2026-01-01 start, env date mid-2026 -> a month near end of the 12 is future.
+    // start = 1 month ago -> index 0 is the current month, index 11 is 10
+    // months into the future -- always future, never drifts to past.
     expect(result.con.act_gp[11]).toBeNull()
   })
 })
