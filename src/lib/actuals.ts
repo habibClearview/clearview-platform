@@ -89,18 +89,19 @@ export function buildHybridConsolidated(con: {
   act_rev: (number | null)[]; act_cogs: (number | null)[]; act_gp: (number | null)[]; act_ebitda: (number | null)[];
   act_nbt: (number | null)[]; act_tax: (number | null)[]; act_npat: (number | null)[];
 }) {
-  const periodIsActual: boolean[] = con.act_ebitda.map(v => v !== null)
-  // Guards against act_gp[m] being null even when act_ebitda[m] is
-  // non-null -- under the current engine this pair is always set
-  // together (act_ebitda is computed FROM act_gp in the same
-  // conditional), so this shouldn't occur today. But the `as number`
-  // cast on act_gp gave no RUNTIME protection if that invariant were
-  // ever violated by a future engine change: deriveActualOperatingCosts
-  // would silently compute 0 - actEbitda (JS coerces null to 0 in
-  // subtraction) instead of the real operating cost figure. Checking
-  // explicitly here means a violated invariant produces a visibly
-  // missing figure (null, falls back to plan) rather than a silently
-  // wrong negative one.
+  // periodIsActual requires BOTH act_ebitda AND act_gp non-null, not just
+  // act_ebitda. Under the current engine these are always set together
+  // (act_ebitda is computed FROM act_gp in the same conditional), so in
+  // practice this is identical to checking act_ebitda alone. But if that
+  // pairing were ever violated by a future engine change -- act_gp null
+  // while act_ebitda somehow isn't -- checking only act_ebitda would let
+  // gp fall back to plan (via applyPeriodActual's own null-check) while
+  // ebitda still showed the actual figure, in the very same period: the
+  // exact "some rows actual, some plan, same column" bug this function
+  // exists to prevent, just triggered by an anomalous input instead of a
+  // normal one. Requiring both means a violated invariant makes the
+  // WHOLE period consistently fall back to plan, never a partial mix.
+  const periodIsActual: boolean[] = con.act_ebitda.map((v, m) => v !== null && con.act_gp[m] !== null)
   const actOpexTotal = con.act_ebitda.map((eb, m) => con.act_gp[m] !== null ? deriveActualOperatingCosts(con.act_gp[m] as number, eb) : null)
   return {
     periodIsActual,

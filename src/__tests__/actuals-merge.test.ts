@@ -173,7 +173,7 @@ describe('buildHybridConsolidated — single source of truth for the P&L and Ann
     expect(hybrid.npat[0]).toBe(350_000)
   })
 
-  it('REG: if act_ebitda is somehow non-null while act_gp is null (an invariant violation the current engine never produces, but the type system does not prevent), Operating Costs falls back to plan instead of silently computing a wrong negative figure', () => {
+  it('REG: if act_ebitda is somehow non-null while act_gp is null (an invariant violation the current engine never produces, but the type system does not prevent), the WHOLE period falls back to plan consistently -- never GP/opex on plan while EBITDA shows actual', () => {
     const con = {
       rev: [1_000_000], cogs: [400_000], gp: [600_000], opex: [100_000], ebitda: [500_000], interest: [0],
       nbt: [500_000], tax: [150_000], npat: [350_000],
@@ -183,11 +183,14 @@ describe('buildHybridConsolidated — single source of truth for the P&L and Ann
       act_nbt: [400_000] as (number | null)[], act_tax: [120_000] as (number | null)[], act_npat: [280_000] as (number | null)[],
     }
     const hybrid = buildHybridConsolidated(con)
-    // Without the guard, this would silently compute 0 - 400,000 = -400,000
-    // (JS coerces the null cast to 0 in subtraction) and display it as if
-    // it were a real Operating Costs figure. With the guard, Operating
-    // Costs correctly falls back to the planned 100,000 instead.
-    expect(hybrid.opex[0]).toBe(100_000)
-    expect(hybrid.opex[0]).not.toBe(-400_000)
+    // periodIsActual requires BOTH act_ebitda and act_gp non-null, so this
+    // anomalous input correctly falls back to plan for the WHOLE period --
+    // not just opex, and not leaving ebitda showing an actual figure while
+    // gp/opex show plan (which would be the exact same-period mixing bug
+    // this function exists to prevent).
+    expect(hybrid.periodIsActual[0]).toBe(false)
+    expect(hybrid.gp[0]).toBe(600_000)     // planned GP, not null and not a bogus actual figure
+    expect(hybrid.ebitda[0]).toBe(500_000) // planned EBITDA -- NOT the anomalous actual 400,000
+    expect(hybrid.opex[0]).toBe(100_000)   // planned Operating Costs, not a bogus -400,000
   })
 })
