@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { shouldClearQueue } from '../lib/field-db'
 import { friendlyDbError } from '../lib/field-errors'
 import { buildAutoCogsRow, type CatalogueItemForCogs } from '../lib/field-cogs'
-import { isPlanLineValidForUnit } from '../lib/catalogue-validation'
+import { isPlanLineValidForUnit, isValidCostCategory } from '../lib/catalogue-validation'
 
 // Tests for Clearview Field API route logic
 // Tests the validation and transformation logic without HTTP or DB
@@ -642,5 +642,25 @@ describe('isPlanLineValidForUnit — generalized expectedCategory (used by field
 
   it('REG: a line with the right unit but the wrong category is rejected -- a cost entry cannot reference a revenue line', () => {
     expect(isPlanLineValidForUnit(planLines, 'rev_a', 'unit_a', 'direct_opex')).toBe(false)
+  })
+})
+
+describe('isValidCostCategory — the cost-category allowlist for field sync cost entries', () => {
+  it('REG: cost_of_sales and direct_opex are the only valid cost categories', () => {
+    expect(isValidCostCategory('cost_of_sales')).toBe(true)
+    expect(isValidCostCategory('direct_opex')).toBe(true)
+  })
+
+  it('REG: revenue is rejected as a cost category -- this is the exact attack CodeRabbit flagged: a direct API caller sending category:"revenue" with a genuinely-valid revenue plan_line_id must not pass as a cost entry', () => {
+    expect(isValidCostCategory('revenue')).toBe(false)
+  })
+
+  it('REG: staff is rejected -- not a category a manual field cost/expense entry is allowed to claim', () => {
+    expect(isValidCostCategory('staff')).toBe(false)
+  })
+
+  it('REG: an unrecognized or empty category is rejected', () => {
+    expect(isValidCostCategory('')).toBe(false)
+    expect(isValidCostCategory('made_up_category')).toBe(false)
   })
 })

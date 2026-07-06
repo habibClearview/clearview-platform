@@ -14,3 +14,17 @@ export function isPlanLineValidForUnit(planLines: any[], planLineId: string, uni
   const matchingLine = (planLines || []).find((l: any) => l.id === planLineId)
   return !!matchingLine && !!matchingLine.active && matchingLine.category === expectedCategory && matchingLine.unit_id === unitId
 }
+
+// The only categories a manual cost/expense entry (field sync's
+// cost-entry path) is legitimately allowed to claim. Restricting this
+// before trusting a caller-supplied category as the "expected category"
+// passed to isPlanLineValidForUnit above matters: without it, a direct
+// API caller (not the actual field app client, which only ever sends
+// direct_opex) could submit category: 'revenue' alongside a
+// plan_line_id that genuinely IS a revenue line belonging to their own
+// unit -- isPlanLineValidForUnit would correctly report that pairing as
+// valid FOR THAT CATEGORY, letting a revenue line through the "cost"
+// insert path and misclassifying real revenue as an expense.
+export function isValidCostCategory(category: string): boolean {
+  return category === 'cost_of_sales' || category === 'direct_opex'
+}

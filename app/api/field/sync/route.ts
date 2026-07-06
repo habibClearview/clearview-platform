@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { friendlyDbError } from '@/lib/field-errors'
 import { buildAutoCogsRow } from '@/lib/field-cogs'
-import { isPlanLineValidForUnit } from '@/lib/catalogue-validation'
+import { isPlanLineValidForUnit, isValidCostCategory } from '@/lib/catalogue-validation'
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -178,6 +178,9 @@ export async function POST(req: NextRequest) {
         if (t.amount === undefined || t.amount === null) { errors.push('Cost entry missing amount'); return false }
         if (!t.transaction_type) { errors.push('Cost entry missing transaction_type'); return false }
         if (!t.category) { errors.push('Cost entry missing category'); return false }
+        if (!isValidCostCategory(t.category)) {
+          errors.push('Cost entry has an invalid category'); return false
+        }
         if (!isPlanLineValidForUnit(planLines, t.plan_line_id, operator.business_unit_id, t.category)) {
           errors.push(`Cost line "${t.plan_line_name || t.plan_line_id}" does not belong to this business unit`); return false
         }
