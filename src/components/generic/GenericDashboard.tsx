@@ -2526,15 +2526,28 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
       {viewMode==='unit' && (() => {
         const pl = result.unitPL[selUnit]
         if (!pl) return <div style={card}><p style={{color:C.slate}}>No data for this unit.</p></div>
-        // Same principle as the Consolidated view: one signal per month
-        // for this unit -- is its data genuinely complete? If not, the
-        // WHOLE column shows plan, never some rows actual and others
-        // plan in the same period. pl.act_ebitda[m] !== null is correct
-        // by construction as that signal, since it only computes once
-        // every category this unit actually has data for is complete.
+        // One signal per month for this unit, under the calendar rule: a
+        // past/current month is actual, a future month is plan -- the
+        // WHOLE column switches together, never some rows actual and
+        // others plan in the same period. pl.act_ebitda[m] !== null is
+        // correct by construction as that signal: under the calendar
+        // rule act_ebitda is non-null for exactly the past/current
+        // months (see generic-engine.ts).
         const periodIsActual: boolean[] = pl.act_ebitda.map(v => v !== null)
-        const revValues    = applyPeriodActual(pl.rev, pl.act_rev, periodIsActual)
-        const cogsValues   = applyPeriodActual(pl.cogs, pl.act_cogs, periodIsActual)
+        // Every row must use the SAME actual-or-zero treatment for a
+        // past/current period -- act_gp/act_ebitda already compute this
+        // correctly internally (?? 0 baked into the engine's own
+        // calculation), but the RAW act_rev/act_cogs arrays are still
+        // null whenever nothing was entered for that specific category
+        // this month, even in a past/current period. Passing them to
+        // applyPeriodActual without ?? 0 meant Revenue could fall back
+        // to the PLANNED figure (since its own actual was null) in the
+        // very same column where GP/EBITDA showed the actual-derived
+        // figure (zero) -- recreating the exact mixing bug this tab
+        // exists to prevent, just relocated to Revenue/Cost of Sales
+        // instead of Staff/Overheads.
+        const revValues    = applyPeriodActual(pl.rev, pl.act_rev.map(v => v ?? 0), periodIsActual)
+        const cogsValues   = applyPeriodActual(pl.cogs, pl.act_cogs.map(v => v ?? 0), periodIsActual)
         const gpValues     = applyPeriodActual(pl.gp, pl.act_gp, periodIsActual)
         const staffValues  = applyPeriodActual(pl.staff, pl.act_staff.map(v => v ?? 0), periodIsActual)
         const opexValues   = applyPeriodActual(pl.opex, pl.act_opex.map(v => v ?? 0), periodIsActual)
@@ -2581,22 +2594,26 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
 
       {viewMode==='consolidated' && (() => {
         const con = result.con
-        // A single signal per month: is EVERY category this whole
-        // business needs (revenue, and whichever cost categories
-        // genuinely apply) actually complete for this month? If not,
-        // the ENTIRE column shows plan -- never some rows actual and
-        // others plan in the same period. Real Budget vs Actual practice
-        // treats a period as either done (actual) or not yet (budget/
-        // plan) -- it never blends the two within one column. Using
-        // con.act_ebitda[m] !== null as that single signal is correct
-        // by construction: act_ebitda only computes once revenue and
-        // every applicable cost category has real data for that month
-        // (see generic-engine.ts) -- exactly the same completeness this
-        // needs.
+        // A single signal per month, under the calendar rule: a past/
+        // current month is actual, a future month is plan -- the ENTIRE
+        // column switches together, never some rows actual and others
+        // plan in the same period. Using con.act_ebitda[m] !== null as
+        // that single signal is correct by construction: under the
+        // calendar rule act_ebitda is non-null for exactly the past/
+        // current months (see generic-engine.ts).
         const periodIsActual: boolean[] = con.act_ebitda.map(v => v !== null)
         const actOpexTotal = con.act_ebitda.map((eb, m) => deriveActualOperatingCosts(con.act_gp[m] as number, eb))
-        const revValues    = applyPeriodActual(con.rev, con.act_rev, periodIsActual)
-        const cogsValues   = applyPeriodActual(con.cogs, con.act_cogs, periodIsActual)
+        // Revenue and Cost of Sales need the same actual-or-zero fallback
+        // GP/EBITDA already have baked in internally -- the RAW
+        // con.act_rev/con.act_cogs arrays are still null whenever nothing
+        // was entered for that category this month, even in a past/
+        // current period (e.g. a unit that simply hasn't reported yet).
+        // Without ?? 0 here, Revenue could fall back to the PLANNED
+        // figure in the very same column where GP/EBITDA showed the
+        // actual-derived figure (zero) -- the exact mixing bug this tab
+        // exists to prevent, just relocated to Revenue/Cost of Sales.
+        const revValues    = applyPeriodActual(con.rev, con.act_rev.map(v => v ?? 0), periodIsActual)
+        const cogsValues   = applyPeriodActual(con.cogs, con.act_cogs.map(v => v ?? 0), periodIsActual)
         const gpValues     = applyPeriodActual(con.gp, con.act_gp, periodIsActual)
         const opexValues   = applyPeriodActual(con.opex, actOpexTotal, periodIsActual)
         const ebitdaValues = applyPeriodActual(con.ebitda, con.act_ebitda, periodIsActual)

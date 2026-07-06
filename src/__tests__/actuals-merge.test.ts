@@ -116,4 +116,28 @@ describe('applyPeriodActual — one decision per period, never a per-line blend'
     const periodIsActual = [true, false, true]
     expect(applyPeriodActual(plan, actual, periodIsActual)).toEqual([90, 200, 300])
   })
+
+  it('REG: the exact composition bug found live -- calling applyPeriodActual with a RAW nullable array (no ?? 0 first) falls back to PLAN for that one row, even while a sibling row correctly shows the actual-derived zero', () => {
+    // This models Revenue vs Gross Profit for a unit that has genuinely
+    // recorded nothing this month. GP is computed by the engine with
+    // ?? 0 already baked in (never null for a past/current period), but
+    // the raw act_rev is still null when nothing was entered -- passing
+    // it to applyPeriodActual WITHOUT mapping null -> 0 first falls back
+    // to the planned revenue, while GP (already zero-safe) correctly
+    // shows zero. Same period, two different sources -- the bug.
+    const periodIsActual = [true]
+    const planRev = [1_000_000]
+    const rawActRev: (number | null)[] = [null] // nothing entered this month
+    const gp = [0] // the engine's own actual-derived GP for this month (zero)
+
+    const buggyRevValues = applyPeriodActual(planRev, rawActRev, periodIsActual)
+    expect(buggyRevValues[0]).toBe(1_000_000) // WRONG if this were shipped: falls back to plan
+    expect(buggyRevValues[0]).not.toBe(gp[0]) // proves the mismatch: Revenue (plan) vs GP (actual zero)
+
+    // The fix: map null -> 0 before calling, so Revenue and GP always
+    // share the same source for the same period.
+    const fixedRevValues = applyPeriodActual(planRev, rawActRev.map(v => v ?? 0), periodIsActual)
+    expect(fixedRevValues[0]).toBe(0)
+    expect(fixedRevValues[0]).toBe(gp[0]) // now consistent with GP
+  })
 })
