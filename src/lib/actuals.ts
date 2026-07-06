@@ -74,3 +74,45 @@ export function deriveActualOperatingCosts(actGrossProfit: number, actEbitda: nu
 export function applyPeriodActual(planValues: number[], actualValues: (number | null)[], periodIsActual: boolean[]): number[] {
   return planValues.map((v, m) => (periodIsActual[m] && actualValues[m] !== null) ? (actualValues[m] as number) : v)
 }
+
+// Builds the consolidated P&L as one consistent set of hybrid (actual-
+// or-plan, per the calendar rule) arrays -- Revenue, Cost of Sales, GP,
+// Operating Costs, EBITDA, NBT, Tax, NPAT. Used by both the P&L tab's
+// Consolidated view and the Annual tab, so the calendar-rule/opex-
+// derivation pattern lives in exactly one place rather than being
+// copied at each call site, where one copy could silently drift from
+// the other (which is exactly how the Annual tab ended up summing pure
+// planned figures while the P&L tab correctly summed hybrid ones).
+export function buildHybridConsolidated(con: {
+  rev: number[]; cogs: number[]; gp: number[]; opex: number[]; ebitda: number[]; interest: number[];
+  nbt: number[]; tax: number[]; npat: number[];
+  act_rev: (number | null)[]; act_cogs: (number | null)[]; act_gp: (number | null)[]; act_ebitda: (number | null)[];
+  act_nbt: (number | null)[]; act_tax: (number | null)[]; act_npat: (number | null)[];
+}) {
+  // periodIsActual requires BOTH act_ebitda AND act_gp non-null, not just
+  // act_ebitda. Under the current engine these are always set together
+  // (act_ebitda is computed FROM act_gp in the same conditional), so in
+  // practice this is identical to checking act_ebitda alone. But if that
+  // pairing were ever violated by a future engine change -- act_gp null
+  // while act_ebitda somehow isn't -- checking only act_ebitda would let
+  // gp fall back to plan (via applyPeriodActual's own null-check) while
+  // ebitda still showed the actual figure, in the very same period: the
+  // exact "some rows actual, some plan, same column" bug this function
+  // exists to prevent, just triggered by an anomalous input instead of a
+  // normal one. Requiring both means a violated invariant makes the
+  // WHOLE period consistently fall back to plan, never a partial mix.
+  const periodIsActual: boolean[] = con.act_ebitda.map((v, m) => v !== null && con.act_gp[m] !== null)
+  const actOpexTotal = con.act_ebitda.map((eb, m) => con.act_gp[m] !== null ? deriveActualOperatingCosts(con.act_gp[m] as number, eb) : null)
+  return {
+    periodIsActual,
+    rev: applyPeriodActual(con.rev, con.act_rev.map(v => v ?? 0), periodIsActual),
+    cogs: applyPeriodActual(con.cogs, con.act_cogs.map(v => v ?? 0), periodIsActual),
+    gp: applyPeriodActual(con.gp, con.act_gp, periodIsActual),
+    opex: applyPeriodActual(con.opex, actOpexTotal, periodIsActual),
+    ebitda: applyPeriodActual(con.ebitda, con.act_ebitda, periodIsActual),
+    interest: con.interest,
+    nbt: applyPeriodActual(con.nbt, con.act_nbt, periodIsActual),
+    tax: applyPeriodActual(con.tax, con.act_tax, periodIsActual),
+    npat: applyPeriodActual(con.npat, con.act_npat, periodIsActual),
+  }
+}
