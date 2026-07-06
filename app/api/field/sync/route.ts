@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { friendlyDbError } from '@/lib/field-errors'
 import { buildAutoCogsRow } from '@/lib/field-cogs'
+import { isPlanLineValidForUnit } from '@/lib/catalogue-validation'
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -48,6 +49,15 @@ export async function POST(req: NextRequest) {
     let txSynced = 0
     let creditSynced = 0
     const priceAlerts: string[] = []
+    // Every original transaction's local_id that passed validation and was
+    // added to `rows` -- used to tell the client exactly which queued
+    // entries to clear, rather than an all-or-nothing decision for the
+    // whole batch. A permanently bad entry (e.g. a catalogue item that
+    // belongs to a different business unit) would otherwise block every
+    // other entry in the same sync from ever clearing, since it will keep
+    // failing validation on every retry no matter how many times "Sync
+    // Now" is pressed.
+    const syncedLocalIds: string[] = []
 
     if (transactions.length > 0) {
       // Split into catalogue-driven sales (operator picked a product/service
@@ -113,6 +123,7 @@ export async function POST(req: NextRequest) {
             // button and a Background Sync firing for the same queued item.
             local_id: t.local_id || null,
           })
+          if (t.local_id) syncedLocalIds.push(t.local_id)
 
           // Standard costing (docs/ACCOUNTING_ARCHITECTURE.md section 3):
           // if this catalogue item has a cost price set, automatically
@@ -142,11 +153,34 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Cost entries specify their own plan_line_id directly (no
+      // catalogue lookup), so nothing was checking that line actually
+      // belongs to this operator's business unit and category -- unlike
+      // the sale/catalogue path above, which correctly scopes its lookup
+      // by business_unit_id. Without this, an operator's cost entry could
+      // reference a plan line belonging to a DIFFERENT business unit,
+      // silently misfiling that amount under the wrong unit's actuals
+      // (the row is still stored under operator.business_unit_id, but
+      // the plan_line_id inside it belongs to another unit entirely,
+      // so neither unit's own actuals ever pick it up correctly).
+      // Only fetched when there are actual cost entries to validate --
+      // a pure-sales sync has no need for this query at all.
+      let planLines: any[] = []
+      if (costEntries.length > 0) {
+        const { data: configRow, error: configErr } = await supabase
+          .from('generic_model_config').select('plan_lines').eq('client_id', operator.client_id).single()
+        if (configErr) errors.push('Could not verify plan lines for this client')
+        planLines = configRow?.plan_lines || []
+      }
+
       const validCostEntries = costEntries.filter((t: any) => {
         if (!t.plan_line_id) { errors.push('Cost entry missing plan_line_id'); return false }
         if (t.amount === undefined || t.amount === null) { errors.push('Cost entry missing amount'); return false }
         if (!t.transaction_type) { errors.push('Cost entry missing transaction_type'); return false }
         if (!t.category) { errors.push('Cost entry missing category'); return false }
+        if (!isPlanLineValidForUnit(planLines, t.plan_line_id, operator.business_unit_id, t.category)) {
+          errors.push(`Cost line "${t.plan_line_name || t.plan_line_id}" does not belong to this business unit`); return false
+        }
         return true
       })
       for (const t of validCostEntries) {
@@ -180,6 +214,7 @@ export async function POST(req: NextRequest) {
           price_overridden: false,
           price_alert: false,
         })
+        if (t.local_id) syncedLocalIds.push(t.local_id)
       }
 
       if (rows.length > 0) {
@@ -197,7 +232,14 @@ export async function POST(req: NextRequest) {
           .from('field_transactions')
           .upsert(rows, { onConflict: 'client_id,local_id', ignoreDuplicates: true })
           .select('id')
-        if (txErr) { technicalErrors.push(`Transaction insert error: ${txErr.message}`); errors.push(friendlyDbError(txErr.message)) }
+        if (txErr) {
+          technicalErrors.push(`Transaction insert error: ${txErr.message}`); errors.push(friendlyDbError(txErr.message))
+          // The rows that passed validation never actually got written --
+          // don't tell the client to clear entries that failed at the
+          // database step, only ones that failed validation are meant to
+          // stay queued.
+          syncedLocalIds.length = 0
+        }
         else txSynced = insertedTx?.length ?? 0
       }
     }
@@ -234,8 +276,12 @@ export async function POST(req: NextRequest) {
           .from('field_credit_transactions')
           .upsert(rows, { onConflict: 'client_id,local_id', ignoreDuplicates: true })
           .select('id')
-        if (creditErr) { technicalErrors.push(`Credit insert error: ${creditErr.message}`); errors.push(friendlyDbError(creditErr.message)) }
-        else creditSynced = insertedCredit?.length ?? 0
+        if (creditErr) {
+          technicalErrors.push(`Credit insert error: ${creditErr.message}`); errors.push(friendlyDbError(creditErr.message))
+        } else {
+          creditSynced = insertedCredit?.length ?? 0
+          for (const c of validCredit) { if (c.local_id) syncedLocalIds.push(c.local_id) }
+        }
       }
     }
 
@@ -287,6 +333,7 @@ export async function POST(req: NextRequest) {
       errors: errors.length > 0 ? errors : undefined,
       price_alerts: priceAlerts.length > 0 ? priceAlerts : undefined,
       synced_at: new Date().toISOString(),
+      synced_local_ids: syncedLocalIds,
     })
 
   } catch (err: any) {

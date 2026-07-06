@@ -385,6 +385,58 @@ describe('Field Sync — queue-clearing decision', () => {
   })
 })
 
+// ── Field Sync — per-entry queue clearing via synced_local_ids ──
+// Models the exact scenario reported live: a sync batch with some entries
+// that succeeded and others that permanently fail validation (e.g. a
+// queued sale referencing a catalogue item that belongs to a different
+// business unit -- it will keep failing on every retry, forever, no
+// matter how many times "Sync Now" is pressed). The old all-or-nothing
+// rule meant the good entries never cleared either, since the batch
+// always had at least one error. This re-implements the same filtering
+// logic used in both app/field/page.tsx and public/field-sw.js.
+
+function selectEntriesToClear(queuedLocalIds: string[], syncedLocalIds: string[]): string[] {
+  const synced = new Set(syncedLocalIds)
+  return queuedLocalIds.filter(id => synced.has(id))
+}
+
+describe('Field Sync — per-entry clearing via synced_local_ids', () => {
+  it('REG: entries the server confirms synced are cleared even when other entries in the same batch failed', () => {
+    const queued = ['good-1', 'good-2', 'bad-wrong-unit-1', 'bad-wrong-unit-2']
+    const synced = ['good-1', 'good-2'] // the 2 bad ones never made it into synced_local_ids
+    const toClear = selectEntriesToClear(queued, synced)
+    expect(toClear).toEqual(['good-1', 'good-2'])
+    // Critically, the bad ones are NOT in the result -- they stay queued
+    expect(toClear).not.toContain('bad-wrong-unit-1')
+    expect(toClear).not.toContain('bad-wrong-unit-2')
+  })
+
+  it('REG: a permanently bad entry does not block genuinely good entries from clearing on repeated retries', () => {
+    // Simulates pressing "Sync Now" three times in a row -- the 2 bad
+    // entries never leave the queue (they fail the same way every time),
+    // but they must not prevent the good ones from clearing on attempt 1.
+    let queued = ['good-1', 'good-2', 'bad-1', 'bad-2']
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const synced = queued.filter(id => id.startsWith('good')) // server always accepts the good ones, rejects the bad ones
+      const toClear = selectEntriesToClear(queued, synced)
+      queued = queued.filter(id => !toClear.includes(id))
+    }
+    expect(queued).toEqual(['bad-1', 'bad-2']) // only the permanently bad ones remain, not stuck good ones
+  })
+
+  it('REG: if the server reports zero synced_local_ids (e.g. the whole batch failed at the database step), nothing is cleared', () => {
+    const queued = ['a', 'b', 'c']
+    const toClear = selectEntriesToClear(queued, [])
+    expect(toClear).toEqual([])
+  })
+
+  it('REG: an entry with no local_id (older client) is never mistakenly matched against another entry\'s id', () => {
+    const queued = ['real-id-1', undefined as any].filter(Boolean)
+    const synced = ['real-id-1']
+    expect(selectEntriesToClear(queued, synced)).toEqual(['real-id-1'])
+  })
+})
+
 // ── Standard costing: automatic COGS generation (app/api/field/sync/route.ts) ──
 // Imports the real buildAutoCogsRow from src/lib/field-cogs.ts rather than
 // re-implementing it here -- a regression in the actual COGS-generation
@@ -561,5 +613,34 @@ describe('Catalogue PATCH — plan_line_id must belong to the effective business
 
   it('REG: a nonexistent plan_line_id is rejected', () => {
     expect(isPlanLineValidForUnit(planLines, 'does_not_exist', 'unit_a')).toBe(false)
+  })
+})
+
+describe('isPlanLineValidForUnit — generalized expectedCategory (used by field sync cost entries)', () => {
+  const planLines = [
+    { id: 'rev_a', unit_id: 'unit_a', category: 'revenue', active: true },
+    { id: 'cogs_a', unit_id: 'unit_a', category: 'cost_of_sales', active: true },
+    { id: 'opex_livestock', unit_id: 'unit_livestock', category: 'direct_opex', active: true },
+    { id: 'opex_cropfarm', unit_id: 'unit_cropfarm', category: 'direct_opex', active: true },
+  ]
+
+  it('REG: a cost_of_sales line is valid for its own unit when cost_of_sales is the expected category', () => {
+    expect(isPlanLineValidForUnit(planLines, 'cogs_a', 'unit_a', 'cost_of_sales')).toBe(true)
+  })
+
+  it('REG: the exact live scenario -- a cost entry submitted under the Livestock operator referencing a Crop Farm plan line is rejected', () => {
+    // This is what was found live: a cost entry synced under
+    // operator.business_unit_id = unit_livestock, but referencing
+    // opex_cropfarm (a direct_opex line that genuinely belongs to Crop
+    // Farm) -- silently misfiling that amount under the wrong unit's
+    // actuals, since neither unit's own actuals lookup would ever find
+    // it in the right place.
+    expect(isPlanLineValidForUnit(planLines, 'opex_cropfarm', 'unit_livestock', 'direct_opex')).toBe(false)
+    // The genuinely correct pairing must still be valid
+    expect(isPlanLineValidForUnit(planLines, 'opex_livestock', 'unit_livestock', 'direct_opex')).toBe(true)
+  })
+
+  it('REG: a line with the right unit but the wrong category is rejected -- a cost entry cannot reference a revenue line', () => {
+    expect(isPlanLineValidForUnit(planLines, 'rev_a', 'unit_a', 'direct_opex')).toBe(false)
   })
 })
