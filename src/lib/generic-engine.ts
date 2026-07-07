@@ -272,6 +272,7 @@ export function defaultGenericConfig(overrides: Partial<GenericModelConfig> = {}
 // pre-existing corruption by appending to whatever length happens to be
 // there.
 export function extendPlanningHorizon(config: GenericModelConfig, additionalMonths: number): GenericModelConfig {
+  if (!Number.isInteger(additionalMonths)) throw new Error(`additionalMonths must be a whole number, got ${additionalMonths}`)
   if (additionalMonths <= 0) return config
 
   // Refuses to extend a config that's already inconsistent -- appending

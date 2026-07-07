@@ -1952,17 +1952,20 @@ function CatalogueManager({clientId,config,P}) {
 // already has real plan data -- for a brand-new, empty client the
 // ordinary Planning Horizon dropdown above is enough, since there's
 // nothing yet that could fall out of sync.
-function ExtendHorizonControl({form,setForm}:{form:GenericModelConfig;setForm:(fn:(f:GenericModelConfig)=>GenericModelConfig)=>void}) {
+function ExtendHorizonControl({form,setForm}:{form:GenericModelConfig;setForm:(next:GenericModelConfig)=>void}) {
   const [addMonths, setAddMonths] = useState(12)
   const [confirming, setConfirming] = useState(false)
 
   function apply() {
+    let next: GenericModelConfig
     try {
-      setForm(f => extendPlanningHorizon(f, addMonths))
-      setConfirming(false)
+      next = extendPlanningHorizon(form, addMonths)
     } catch (e: any) {
       alert(e?.message || 'Could not extend the planning horizon -- some of this client\'s data may be inconsistent. Please contact support.')
+      return
     }
+    setForm(next)
+    setConfirming(false)
   }
 
   return (

@@ -1140,4 +1140,13 @@ describe('extendPlanningHorizon — growing a client\'s planning horizon indefin
   it('REG: a genuinely consistent config (the normal case) is never rejected by the guard', () => {
     expect(() => extendPlanningHorizon(makeConfigWithEverything(), 12)).not.toThrow()
   })
+
+  it('REG: a fractional additionalMonths is rejected with a clear error, not an obscure RangeError from Array(2.5)', () => {
+    expect(() => extendPlanningHorizon(makeConfigWithEverything(), 2.5)).toThrow(/whole number/)
+  })
+
+  it('REG: non-finite additionalMonths (NaN, Infinity) is also rejected', () => {
+    expect(() => extendPlanningHorizon(makeConfigWithEverything(), NaN)).toThrow(/whole number/)
+    expect(() => extendPlanningHorizon(makeConfigWithEverything(), Infinity)).toThrow(/whole number/)
+  })
 })
