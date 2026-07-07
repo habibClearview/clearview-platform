@@ -5,6 +5,25 @@
 // scores (Credit Risk/Going Concern/Investment Readiness) -- these are
 // raw financial metrics an analyst would compute directly, not scores.
 
+// ── Converting between annual and monthly rates ──────────────
+// computeNPV/computeIRR operate on whatever periodicity the cash flow
+// series actually uses -- one entry per period, discounted by (1+r)^t.
+// The cash flows this module builds (buildInvestmentCashFlows, from
+// the engine's monthly op_cash/inv_cash arrays) are MONTHLY, so the
+// rate fed into computeNPV must be the MONTHLY-equivalent rate, not
+// the raw annual discount rate a user actually thinks in terms of --
+// otherwise a 15% "annual" rate would compound to roughly (1.15)^12,
+// over 400% annually, massively over-discounting later months.
+// Likewise, computeIRR run on monthly cash flows returns a MONTHLY
+// rate, which must be annualized before it's compared against an
+// annual hurdle rate or shown to a user as an annual return.
+export function annualRateToMonthlyRate(annualRate: number): number {
+  return Math.pow(1 + annualRate, 1 / 12) - 1
+}
+export function monthlyRateToAnnualRate(monthlyRate: number): number {
+  return Math.pow(1 + monthlyRate, 12) - 1
+}
+
 // ── Net Present Value ────────────────────────────────────────
 // Standard NPV formula: NPV = sum over t of CF[t] / (1+r)^t, where
 // CF[0] is conventionally the initial investment (negative -- money

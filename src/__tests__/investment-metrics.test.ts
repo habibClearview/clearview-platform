@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeNPV, computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary } from '../lib/investment-metrics'
+import { computeNPV, computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary, annualRateToMonthlyRate, monthlyRateToAnnualRate } from '../lib/investment-metrics'
 
 describe('computeNPV — standard discounted cash flow formula', () => {
   it('REG: a zero discount rate is just the plain sum of cash flows', () => {
@@ -62,6 +62,41 @@ describe('computeIRR — the rate at which NPV = 0', () => {
     expect(irr).not.toBeNull()
     expect(computeNPV(cashFlows, irr!)).toBeCloseTo(0, 2)
     expect(irr!).toBeCloseTo(4.0, 2) // 5000/1000 = 5x return in one period => (5-1) = 400% IRR
+  })
+})
+
+describe('annualRateToMonthlyRate / monthlyRateToAnnualRate — matching the discount rate to the cash flow series periodicity', () => {
+  it('REG: converting an annual rate to monthly and back to annual returns the original rate -- the conversion is a true inverse', () => {
+    const annual = 0.15
+    const monthly = annualRateToMonthlyRate(annual)
+    const backToAnnual = monthlyRateToAnnualRate(monthly)
+    expect(backToAnnual).toBeCloseTo(annual, 10)
+  })
+
+  it('REG: a 0% annual rate converts to a 0% monthly rate', () => {
+    expect(annualRateToMonthlyRate(0)).toBe(0)
+  })
+
+  it('REG: the monthly equivalent of a 15% annual rate is meaningfully smaller than 15%/12 -- compounding, not a naive divide', () => {
+    const monthly = annualRateToMonthlyRate(0.15)
+    expect(monthly).toBeGreaterThan(0)
+    expect(monthly).toBeLessThan(0.15 / 12 * 1.1) // sanity: in the right ballpark, not wildly different
+    expect(monthly).not.toBeCloseTo(0.15 / 12, 5) // but NOT the naive division either -- must be the compounding formula
+  })
+
+  it('REG: this is the exact bug CodeRabbit caught -- applying a raw 15% annual rate per MONTH compounds to a wildly different effective annual rate than intended', () => {
+    const naiveAnnualEquivalent = monthlyRateToAnnualRate(0.15) // what happens if 15% is wrongly used AS the monthly rate
+    expect(naiveAnnualEquivalent).toBeGreaterThan(4) // over 400% effective annual -- exactly the over-discounting bug
+    // The correct monthly rate, by contrast, compounds back to exactly 15% annual
+    const correctMonthlyRate = annualRateToMonthlyRate(0.15)
+    expect(monthlyRateToAnnualRate(correctMonthlyRate)).toBeCloseTo(0.15, 10)
+  })
+
+  it('REG: a monthly IRR correctly annualizes using the same compounding formula, verified against a hand-calculable example', () => {
+    // A monthly return of exactly 10% compounds to (1.10)^12 - 1 = 213.8...% annually
+    const annualized = monthlyRateToAnnualRate(0.10)
+    expect(annualized).toBeCloseTo(Math.pow(1.10, 12) - 1, 10)
+    expect(annualized).toBeCloseTo(2.138, 2)
   })
 })
 

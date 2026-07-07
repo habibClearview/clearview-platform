@@ -10,7 +10,7 @@ import {
   type GenericPlanLine, type LineCategory, type LineType, type UnitType,
 } from '@/lib/generic-engine'
 import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor } from '@/lib/scoring-engine'
-import { computeNPV, computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary } from '@/lib/investment-metrics'
+import { computeNPV, computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary, annualRateToMonthlyRate, monthlyRateToAnnualRate } from '@/lib/investment-metrics'
 import { combinedActual, computeActualsTotals, applyPeriodActual, buildHybridConsolidated } from '@/lib/actuals'
 import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
 import { yearStartPeriod, canCloseCalendarYear, computeYearEndBalanceSheet } from '@/lib/annual-close'
@@ -2251,7 +2251,7 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave}) {
     Promise.all([
       supabase.from('ai_health_checks').select('*').eq('client_id',clientId).order('period',{ascending:false}).limit(1),
       supabase.from('investment_readiness').select('*').eq('client_id',clientId).order('generated_at',{ascending:false}).limit(1),
-      supabase.from('management_events').select('*').eq('client_id',clientId).order('date',{ascending:false}).limit(5),
+      supabase.from('management_events').select('*').eq('client_id',clientId).order('date',{ascending:false}).limit(1000),
       supabase.from('coach_briefings').select('*').eq('client_id',clientId).order('generated_at',{ascending:false}).limit(1),
     ]).then(([h,i,e,n])=>{
       setHealthReports(h.data||[])
@@ -2555,8 +2555,19 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
         // one judgment call in an otherwise standard NPV/IRR calculation.
         const capitalAtRisk = (capital?.shareholder_contribution||0) + (capital?.grant_recoverable||0)
         const cashFlows = buildInvestmentCashFlows(capitalAtRisk, result.cf.op_cash, result.cf.inv_cash)
-        const npv = computeNPV(cashFlows, discountRate)
-        const irr = computeIRR(cashFlows)
+        // cashFlows is a MONTHLY series (one entry per month, from
+        // op_cash/inv_cash) -- discountRate is what the user thinks of
+        // as an ANNUAL rate, so it must be converted to its monthly
+        // equivalent before feeding computeNPV, which discounts by
+        // (1+r) per ENTRY in the array, not per year. Likewise,
+        // computeIRR run on monthly cash flows returns a monthly rate,
+        // which must be annualized before comparison/display -- both
+        // conversions use the same standard compounding formula, not a
+        // naive divide/multiply by 12.
+        const monthlyDiscountRate = annualRateToMonthlyRate(discountRate)
+        const npv = computeNPV(cashFlows, monthlyDiscountRate)
+        const monthlyIrr = computeIRR(cashFlows)
+        const irr = monthlyIrr !== null ? monthlyRateToAnnualRate(monthlyIrr) : null
         const growth = computeCustomerGrowthSummary(events)
         return (
           <div style={card}>
@@ -2568,8 +2579,8 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
               Cash Flow less spend on Fixed Assets).
             </p>
             <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'1rem'}}>
-              <label style={{fontSize:'0.8rem',color:C.slate}}>Discount rate assumption:</label>
-              <input type="number" min={1} max={100} value={Math.round(discountRate*100)} onChange={e=>setDiscountRate(Number(e.target.value)/100)} style={{width:70,padding:'0.3rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily:'monospace'}}/>
+              <label htmlFor="discount-rate" style={{fontSize:'0.8rem',color:C.slate}}>Discount rate assumption:</label>
+              <input id="discount-rate" type="number" min={1} max={100} value={Math.round(discountRate*100)} onChange={e=>setDiscountRate(Number(e.target.value)/100)} style={{width:70,padding:'0.3rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily:'monospace'}}/>
               <span style={{fontSize:'0.8rem',color:C.slate}}>% -- adjust to your own cost of capital or required return</span>
             </div>
             <div style={kpiGrid}>
