@@ -10,6 +10,7 @@ import {
   type GenericPlanLine, type LineCategory, type LineType, type UnitType,
 } from '@/lib/generic-engine'
 import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor } from '@/lib/scoring-engine'
+import { computeNPV, computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary, annualRateToMonthlyRate, monthlyRateToAnnualRate } from '@/lib/investment-metrics'
 import { combinedActual, computeActualsTotals, applyPeriodActual, buildHybridConsolidated } from '@/lib/actuals'
 import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
 import { yearStartPeriod, canCloseCalendarYear, computeYearEndBalanceSheet } from '@/lib/annual-close'
@@ -2244,12 +2245,13 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave}) {
   const [loading, setLoading] = useState(true)
   const [generatingNarrative, setGeneratingNarrative] = useState(false)
   const [generatingHealth, setGeneratingHealth] = useState(false)
+  const [discountRate, setDiscountRate] = useState(0.15) // 15% default -- a reasonable starting assumption for an African SME's cost of capital, but always adjustable, never presented as definitive
 
   useEffect(()=>{
     Promise.all([
       supabase.from('ai_health_checks').select('*').eq('client_id',clientId).order('period',{ascending:false}).limit(1),
       supabase.from('investment_readiness').select('*').eq('client_id',clientId).order('generated_at',{ascending:false}).limit(1),
-      supabase.from('management_events').select('*').eq('client_id',clientId).order('date',{ascending:false}).limit(5),
+      supabase.from('management_events').select('*').eq('client_id',clientId).order('date',{ascending:false}).limit(1000),
       supabase.from('coach_briefings').select('*').eq('client_id',clientId).order('generated_at',{ascending:false}).limit(1),
     ]).then(([h,i,e,n])=>{
       setHealthReports(h.data||[])
@@ -2359,7 +2361,7 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
 
   const tabList:[string,string][] = [
     ['summary','Summary'],['narrative',"This Month's Story"],['credit','Credit Risk'],
-    ['going_concern','Going Concern'],['investment','Investment Readiness'],
+    ['going_concern','Going Concern'],['investment','Investment Readiness'],['investment_metrics','Investment Metrics'],
     ['coach','Coach Assessment'],['events','Marketing Events'],
   ]
 
@@ -2543,6 +2545,67 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
           )}
         </div>
       )}
+
+      {activeSection==='investment_metrics'&&(() => {
+        const capital = config.settings.capital_structure
+        // Capital genuinely at risk for an equity-style return -- share-
+        // holder contributions and recoverable (repayable) grants.
+        // Non-repayable grants and bank loan principal are deliberately
+        // excluded (see investment-metrics.ts for why) -- this is the
+        // one judgment call in an otherwise standard NPV/IRR calculation.
+        const capitalAtRisk = (capital?.shareholder_contribution||0) + (capital?.grant_recoverable||0)
+        const cashFlows = buildInvestmentCashFlows(capitalAtRisk, result.cf.op_cash, result.cf.inv_cash)
+        // cashFlows is a MONTHLY series (one entry per month, from
+        // op_cash/inv_cash) -- discountRate is what the user thinks of
+        // as an ANNUAL rate, so it must be converted to its monthly
+        // equivalent before feeding computeNPV, which discounts by
+        // (1+r) per ENTRY in the array, not per year. Likewise,
+        // computeIRR run on monthly cash flows returns a monthly rate,
+        // which must be annualized before comparison/display -- both
+        // conversions use the same standard compounding formula, not a
+        // naive divide/multiply by 12.
+        const monthlyDiscountRate = annualRateToMonthlyRate(discountRate)
+        const npv = computeNPV(cashFlows, monthlyDiscountRate)
+        const monthlyIrr = computeIRR(cashFlows)
+        const irr = monthlyIrr !== null ? monthlyRateToAnnualRate(monthlyIrr) : null
+        const growth = computeCustomerGrowthSummary(events)
+        return (
+          <div style={card}>
+            <div style={secH}>Investment Metrics</div>
+            <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1rem',lineHeight:1.6}}>
+              Net Present Value and Internal Rate of Return, calculated against the capital genuinely at risk for a return
+              (shareholder contributions and recoverable grants -- not non-repayable grants or loan principal, which have their own
+              separate return: interest, already reflected in Credit Risk) and the business's projected Free Cash Flow (Operating
+              Cash Flow less spend on Fixed Assets).
+            </p>
+            <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'1rem'}}>
+              <label htmlFor="discount-rate" style={{fontSize:'0.8rem',color:C.slate}}>Discount rate assumption:</label>
+              <input id="discount-rate" type="number" min={1} max={100} value={Math.round(discountRate*100)} onChange={e=>setDiscountRate(Number(e.target.value)/100)} style={{width:70,padding:'0.3rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily:'monospace'}}/>
+              <span style={{fontSize:'0.8rem',color:C.slate}}>% -- adjust to your own cost of capital or required return</span>
+            </div>
+            <div style={kpiGrid}>
+              <KPI label="Capital at Risk" value={fmt(capitalAtRisk,cc)} sub="Shareholder + recoverable grant"/>
+              <KPI label="Net Present Value" value={fmt(npv,cc)} sub={`at ${(discountRate*100).toFixed(0)}%`} color={npv>=0?C.green:C.red}/>
+              <KPI label="Internal Rate of Return" value={irr!==null?pct(irr):'N/A'} sub={irr===null?'No real IRR (check cash flow signs)':'Annualised'} color={irr!==null&&irr>discountRate?C.green:C.red}/>
+            </div>
+            {capitalAtRisk===0&&(
+              <div style={{background:'#FFF8E8',border:`1px solid ${C.amber}`,borderRadius:6,padding:'0.75rem 1rem',marginBottom:'1rem',fontSize:'0.8rem',color:C.navy}}>
+                No shareholder contribution or recoverable grant is recorded in Capital Structure (Settings) -- NPV/IRR above are
+                calculated against zero capital at risk, which makes them of limited meaning. Enter the real capital structure for
+                an accurate result.
+              </div>
+            )}
+            <div style={{marginTop:'1.25rem',paddingTop:'1.25rem',borderTop:`1px solid ${C.border}`}}>
+              <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy,marginBottom:'0.75rem'}}>Customer Growth (whole business, all recorded marketing events)</div>
+              <div style={kpiGrid}>
+                <KPI label="Customers Acquired" value={growth.totalCustomersAcquired.toLocaleString()}/>
+                <KPI label="Blended CAC" value={growth.blendedCAC!==null?fmt(growth.blendedCAC,cc):'N/A'} sub={growth.blendedCAC===null?'No customers recorded yet':undefined}/>
+                <KPI label="Revenue Lift" value={fmt(growth.totalRevenueLift,cc)} sub="From tracked events"/>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {activeSection==='coach'&&(
         <div style={card}>
