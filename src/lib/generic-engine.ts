@@ -243,6 +243,97 @@ export function defaultGenericConfig(overrides: Partial<GenericModelConfig> = {}
   }
 }
 
+// Extends every month-sized array in the config by additionalMonths,
+// all together, in one operation -- this is what makes "add another
+// year" safe. There are five distinct places a monthly array lives in
+// this config, and if even one were missed, the engine would either
+// error (mismatched array lengths) or silently produce wrong figures
+// for the newly-added months in whichever array wasn't extended:
+//   1. plan_lines[].monthly_plan (every line, every business unit)
+//   2. plan_lines[].buy_price/sell_price/volume (spread-type lines only)
+//   3. plan_lines[].fee_per_engagement/cost_per_engagement/engagements
+//      (service_fee-type lines only)
+//   4. shared_lines[].monthly_plan
+//   5. settings.trade_credit_lines[].monthly_new/monthly_settled
+// Debt obligations and capital structure are deliberately NOT touched --
+// they're scalar (a single rate, tenor, principal), with the actual
+// month-by-month repayment schedule computed dynamically by
+// buildDebtSchedule() for however many months exist, so they're already
+// compatible with any horizon with no changes needed.
+//
+// Pure: returns a new config object, never mutates the one passed in
+// (matching how the rest of this file and the React state that holds
+// this config expect immutability). New months are always zero-filled;
+// every existing month's value is preserved exactly as-is -- this is
+// purely additive, never a truncation or edit of anything already there.
+//
+// Throws if any array is already out of sync with config.planning_months
+// -- see the mismatch check below -- rather than silently compounding a
+// pre-existing corruption by appending to whatever length happens to be
+// there.
+export function extendPlanningHorizon(config: GenericModelConfig, additionalMonths: number): GenericModelConfig {
+  if (!Number.isInteger(additionalMonths)) throw new Error(`additionalMonths must be a whole number, got ${additionalMonths}`)
+  if (additionalMonths <= 0) return config
+
+  // Refuses to extend a config that's already inconsistent -- appending
+  // additionalMonths to whatever length an array currently happens to
+  // be would silently carry a pre-existing corruption forward (and
+  // potentially mask it further, since the array would now be a
+  // different, but still wrong, length). Throwing here surfaces the
+  // problem clearly, with exactly which array is mismatched, rather
+  // than compounding it invisibly.
+  const mismatches: string[] = []
+  const checkLen = (label: string, arr: number[] | undefined) => {
+    if (arr && arr.length !== config.planning_months) mismatches.push(`${label} (${arr.length} months, expected ${config.planning_months})`)
+  }
+  config.plan_lines.forEach(l => {
+    checkLen(`plan line "${l.name}"`, l.monthly_plan)
+    checkLen(`plan line "${l.name}" buy_price`, l.buy_price)
+    checkLen(`plan line "${l.name}" sell_price`, l.sell_price)
+    checkLen(`plan line "${l.name}" volume`, l.volume)
+    checkLen(`plan line "${l.name}" fee_per_engagement`, l.fee_per_engagement)
+    checkLen(`plan line "${l.name}" cost_per_engagement`, l.cost_per_engagement)
+    checkLen(`plan line "${l.name}" engagements`, l.engagements)
+  })
+  config.shared_lines.forEach(l => checkLen(`shared line "${l.name}"`, l.monthly_plan))
+  config.settings.trade_credit_lines?.forEach(t => {
+    checkLen(`trade credit line "${t.name}" monthly_new`, t.monthly_new)
+    checkLen(`trade credit line "${t.name}" monthly_settled`, t.monthly_settled)
+  })
+  if (mismatches.length > 0) {
+    throw new Error(`Cannot extend planning horizon: the following are already out of sync with planning_months (${config.planning_months}) and must be fixed first: ${mismatches.join('; ')}`)
+  }
+
+  const extendArr = (arr: number[] | undefined): number[] | undefined =>
+    arr ? [...arr, ...Array(additionalMonths).fill(0)] : arr
+
+  const extendLine = (l: GenericPlanLine): GenericPlanLine => ({
+    ...l,
+    monthly_plan: extendArr(l.monthly_plan) as number[],
+    buy_price: extendArr(l.buy_price),
+    sell_price: extendArr(l.sell_price),
+    volume: extendArr(l.volume),
+    fee_per_engagement: extendArr(l.fee_per_engagement),
+    cost_per_engagement: extendArr(l.cost_per_engagement),
+    engagements: extendArr(l.engagements),
+  })
+
+  return {
+    ...config,
+    planning_months: config.planning_months + additionalMonths,
+    plan_lines: config.plan_lines.map(extendLine),
+    shared_lines: config.shared_lines.map(extendLine),
+    settings: {
+      ...config.settings,
+      trade_credit_lines: config.settings.trade_credit_lines?.map(t => ({
+        ...t,
+        monthly_new: extendArr(t.monthly_new) as number[],
+        monthly_settled: extendArr(t.monthly_settled) as number[],
+      })),
+    },
+  }
+}
+
 // ── Helper: create a blank plan line ────────────────────────
 export function blankLine(
   id: string, unit_id: string, name: string,

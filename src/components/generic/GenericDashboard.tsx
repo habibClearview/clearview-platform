@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import {
-  fmt, fmtFull, pct, buildMonthLabels, buildYearGroups, collapseYear, defaultExpandedYears, type YearAggregation,
+  fmt, fmtFull, pct, buildMonthLabels, buildYearGroups, collapseYear, defaultExpandedYears, extendPlanningHorizon, type YearAggregation,
   runGenericModel, defaultGenericConfig,
   blankLine, spreadLine, serviceFeeLine,
   type GenericModelConfig, type GenericBusinessUnit,
@@ -1945,6 +1945,62 @@ function CatalogueManager({clientId,config,P}) {
 }
 
 // ── SETTINGS TAB ─────────────────────────────────────────────
+// Lets a coach grow an existing client's planning horizon by a chosen
+// number of additional months, using extendPlanningHorizon() so every
+// month-sized array in the config (plan lines, shared costs, trade
+// credit) extends together, atomically. Only shown once a client
+// already has real plan data -- for a brand-new, empty client the
+// ordinary Planning Horizon dropdown above is enough, since there's
+// nothing yet that could fall out of sync.
+function ExtendHorizonControl({form,setForm}:{form:GenericModelConfig;setForm:(next:GenericModelConfig)=>void}) {
+  const [addMonths, setAddMonths] = useState(12)
+  const [confirming, setConfirming] = useState(false)
+
+  function apply() {
+    let next: GenericModelConfig
+    try {
+      next = extendPlanningHorizon(form, addMonths)
+    } catch (e: any) {
+      alert(e?.message || 'Could not extend the planning horizon -- some of this client\'s data may be inconsistent. Please contact support.')
+      return
+    }
+    setForm(next)
+    setConfirming(false)
+  }
+
+  return (
+    <div style={{marginTop:'1.25rem',paddingTop:'1.25rem',borderTop:`1px solid ${C.border}`}}>
+      <div style={{fontWeight:700,color:C.navy,marginBottom:'0.5rem',fontSize:'0.9rem'}}>Extend Planning Horizon</div>
+      <p style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.75rem',lineHeight:1.5}}>
+        Add more months to this client's plan without disturbing anything already entered. Currently {form.planning_months} months
+        (through {buildMonthLabels(form.start_date, form.planning_months).slice(-1)[0]}). New months start at zero, ready to plan.
+      </p>
+      {!confirming ? (
+        <div style={{display:'flex',gap:'0.6rem',alignItems:'center'}}>
+          <select style={{...inp,width:'auto'}} value={addMonths} onChange={e=>setAddMonths(Number(e.target.value))}>
+            <option value={12}>+ 12 months (1 year)</option>
+            <option value={24}>+ 24 months (2 years)</option>
+            <option value={36}>+ 36 months (3 years)</option>
+            <option value={60}>+ 60 months (5 years)</option>
+          </select>
+          <button style={addBtn(true)} onClick={()=>setConfirming(true)}>Extend Horizon</button>
+        </div>
+      ) : (
+        <div style={{background:'#FDF6E3',border:`1px solid ${C.amber}`,borderRadius:6,padding:'0.85rem'}}>
+          <p style={{fontSize:'0.8rem',color:C.navy,marginBottom:'0.6rem'}}>
+            This will extend the plan to {form.planning_months + addMonths} months (through {buildMonthLabels(form.start_date, form.planning_months + addMonths).slice(-1)[0]}).
+            You'll still need to press Save below for this to take effect.
+          </p>
+          <div style={{display:'flex',gap:'0.5rem'}}>
+            <button style={addBtn(true,C.amber)} onClick={apply}>Confirm — Extend by {addMonths} Months</button>
+            <button style={addBtn(true,C.slate)} onClick={()=>setConfirming(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function SettingsTab({config,P,onSave}) {
   const [form, setForm] = useState({...config})
   const [saving, setSaving] = useState(false)
@@ -1994,11 +2050,18 @@ function SettingsTab({config,P,onSave}) {
               {['UGX','KES','NGN','GHS','USD','GBP'].map(c=><option key={c} value={c}>{c}</option>)}
             </select></div>
             <div><label style={lbl}>Planning Start Month</label><input type="date" style={inp} value={form.start_date} onChange={e=>setForm(f=>({...f,start_date:e.target.value}))}/></div>
-            <div><label style={lbl}>Planning Horizon (months)</label><select style={inp} value={form.planning_months} onChange={e=>setForm(f=>({...f,planning_months:Number(e.target.value)}))}>
-              <option value={12}>12 months</option>
-              <option value={24}>24 months</option>
-              <option value={36}>36 months</option>
-            </select></div>
+            {form.plan_lines.length===0 ? (
+              <div><label style={lbl}>Planning Horizon (months)</label><select style={inp} value={form.planning_months} onChange={e=>setForm(f=>({...f,planning_months:Number(e.target.value)}))}>
+                <option value={12}>12 months</option>
+                <option value={24}>24 months</option>
+                <option value={36}>36 months</option>
+              </select></div>
+            ) : (
+              <div>
+                <label style={lbl}>Planning Horizon</label>
+                <div style={{...inp,display:'flex',alignItems:'center',color:C.slate,background:C.lightBg}}>{form.planning_months} months (extend below)</div>
+              </div>
+            )}
             <div><label style={lbl}>Shared Cost Allocation (% by headcount)</label>
               <input type="number" min={0} max={100} style={inp} value={Math.round((form.settings.shared_cost_fixed_pct||0.5)*100)} onChange={e=>setForm(f=>({...f,settings:{...f.settings,shared_cost_fixed_pct:Number(e.target.value)/100}}))}/>
               <div style={hint}>Remainder allocated by revenue share</div>
@@ -2008,6 +2071,7 @@ function SettingsTab({config,P,onSave}) {
             </div>
             <div><label style={lbl}>Opening Cash Balance</label><input type="number" style={inp} value={form.settings.opening_cash_balance||0} onChange={e=>setForm(f=>({...f,settings:{...f.settings,opening_cash_balance:Number(e.target.value)}}))}/></div>
           </div>
+          {form.plan_lines.length>0 && <ExtendHorizonControl form={form} setForm={setForm}/>}
         </div>
       )}
 

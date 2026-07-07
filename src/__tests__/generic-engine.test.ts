@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { runGenericModel, defaultGenericConfig, spreadLine, serviceFeeLine, buildYearGroups, collapseYear, defaultExpandedYears } from '../lib/generic-engine'
+import { runGenericModel, defaultGenericConfig, spreadLine, serviceFeeLine, buildYearGroups, collapseYear, defaultExpandedYears, extendPlanningHorizon } from '../lib/generic-engine'
 import { deriveActualOperatingCosts } from '../lib/actuals'
 
 function expectBalanceSheetBalances(result: ReturnType<typeof runGenericModel>) {
@@ -999,5 +999,154 @@ describe('defaultExpandedYears — which year starts expanded', () => {
     const groups = [{year: 2030, label: '2030', monthIndices: [0]}]
     const result = defaultExpandedYears(groups, 2026)
     expect(result[2030]).toBe(true)
+  })
+})
+
+describe('extendPlanningHorizon — growing a client\'s planning horizon indefinitely', () => {
+  function makeConfigWithEverything() {
+    return defaultGenericConfig({
+      client_id: 'test', business_name: 'Test Co', currency: 'UGX', planning_months: 12,
+      business_units: [{ id: 'u1', name: 'Main Unit', short: 'MU', type: 'mixed', color: '#00B4D8', headcount: 0, active: true, sort_order: 0 }],
+      plan_lines: [
+        { id: 'rev1', unit_id: 'u1', name: 'Sales', category: 'revenue', line_type: 'standard', monthly_plan: Array(12).fill(1_000_000), active: true },
+        {
+          id: 'spread1', unit_id: 'u1', name: 'Trading', category: 'revenue', line_type: 'spread', monthly_plan: Array(12).fill(0), active: true,
+          buy_price: Array(12).fill(100), sell_price: Array(12).fill(150), volume: Array(12).fill(10),
+        },
+        {
+          id: 'fee1', unit_id: 'u1', name: 'Advisory', category: 'revenue', line_type: 'service_fee', monthly_plan: Array(12).fill(0), active: true,
+          fee_per_engagement: Array(12).fill(500), cost_per_engagement: Array(12).fill(100), engagements: Array(12).fill(5),
+        },
+      ],
+      shared_lines: [
+        { id: 'shared1', unit_id: '', name: 'Head Office', category: 'direct_opex', line_type: 'standard', monthly_plan: Array(12).fill(300_000), active: true },
+      ],
+      settings: {
+        shared_cost_fixed_pct: 0.5, corporate_tax_rate: 0.30, opening_cash_balance: 5_000_000,
+        capital_structure: { shareholder_contribution: 10_000_000, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, grace_period_months: 0, fixed_assets: 0 },
+        trade_credit_lines: [
+          { id: 'tc1', name: 'Input Supplier', type: 'payable', monthly_new: Array(12).fill(200_000), monthly_settled: Array(12).fill(180_000) },
+        ],
+      },
+      start_date: '2026-01-01',
+    })
+  }
+
+  it('REG: planning_months increases by exactly the number of additional months requested', () => {
+    const extended = extendPlanningHorizon(makeConfigWithEverything(), 12)
+    expect(extended.planning_months).toBe(24)
+  })
+
+  it('REG: every plan line\'s monthly_plan grows to the new total length, existing values preserved exactly, new months zero-filled', () => {
+    const extended = extendPlanningHorizon(makeConfigWithEverything(), 12)
+    const rev1 = extended.plan_lines.find(l => l.id === 'rev1')!
+    expect(rev1.monthly_plan.length).toBe(24)
+    expect(rev1.monthly_plan.slice(0, 12)).toEqual(Array(12).fill(1_000_000)) // untouched
+    expect(rev1.monthly_plan.slice(12)).toEqual(Array(12).fill(0)) // new months, zero-filled
+  })
+
+  it('REG: a spread-type line\'s buy_price/sell_price/volume all extend together, not just monthly_plan', () => {
+    const extended = extendPlanningHorizon(makeConfigWithEverything(), 12)
+    const spread1 = extended.plan_lines.find(l => l.id === 'spread1')!
+    expect(spread1.buy_price!.length).toBe(24)
+    expect(spread1.sell_price!.length).toBe(24)
+    expect(spread1.volume!.length).toBe(24)
+    expect(spread1.buy_price!.slice(0, 12)).toEqual(Array(12).fill(100))
+  })
+
+  it('REG: a service_fee-type line\'s fee_per_engagement/cost_per_engagement/engagements all extend together', () => {
+    const extended = extendPlanningHorizon(makeConfigWithEverything(), 12)
+    const fee1 = extended.plan_lines.find(l => l.id === 'fee1')!
+    expect(fee1.fee_per_engagement!.length).toBe(24)
+    expect(fee1.cost_per_engagement!.length).toBe(24)
+    expect(fee1.engagements!.length).toBe(24)
+  })
+
+  it('REG: shared_lines extend the same way as plan_lines -- this is exactly the array that would silently fall out of sync if missed', () => {
+    const extended = extendPlanningHorizon(makeConfigWithEverything(), 12)
+    const shared1 = extended.shared_lines.find(l => l.id === 'shared1')!
+    expect(shared1.monthly_plan.length).toBe(24)
+    expect(shared1.monthly_plan.slice(0, 12)).toEqual(Array(12).fill(300_000))
+  })
+
+  it('REG: trade_credit_lines monthly_new/monthly_settled both extend together', () => {
+    const extended = extendPlanningHorizon(makeConfigWithEverything(), 12)
+    const tc1 = extended.settings.trade_credit_lines!.find(t => t.id === 'tc1')!
+    expect(tc1.monthly_new.length).toBe(24)
+    expect(tc1.monthly_settled.length).toBe(24)
+    expect(tc1.monthly_new.slice(0, 12)).toEqual(Array(12).fill(200_000))
+  })
+
+  it('REG: is a pure function -- the original config object is never mutated', () => {
+    const original = makeConfigWithEverything()
+    const originalPlanningMonths = original.planning_months
+    const originalRev1Length = original.plan_lines.find(l => l.id === 'rev1')!.monthly_plan.length
+    extendPlanningHorizon(original, 12)
+    expect(original.planning_months).toBe(originalPlanningMonths)
+    expect(original.plan_lines.find(l => l.id === 'rev1')!.monthly_plan.length).toBe(originalRev1Length)
+  })
+
+  it('REG: the extended config actually runs correctly through the engine -- the whole point of this function', () => {
+    const extended = extendPlanningHorizon(makeConfigWithEverything(), 12)
+    const result = runGenericModel(extended)
+    expect(result.con.rev.length).toBe(24)
+    // Months 13-24 (the newly added ones) should reflect zero-filled plan
+    // lines for rev1, but the spread/fee lines' own computed monthly_plan
+    // depends on buy/sell/volume or fee/engagements, which were ALSO
+    // zero-filled -- so total revenue for the new months should be 0.
+    expect(result.con.rev[12]).toBe(0)
+  })
+
+  it('REG: a client with no trade_credit_lines at all extends without error', () => {
+    const config = defaultGenericConfig({ planning_months: 12, plan_lines: [], shared_lines: [] })
+    expect(() => extendPlanningHorizon(config, 12)).not.toThrow()
+    expect(extendPlanningHorizon(config, 12).planning_months).toBe(24)
+  })
+
+  it('REG: requesting zero or negative additional months is a no-op, returning the config unchanged', () => {
+    const original = makeConfigWithEverything()
+    expect(extendPlanningHorizon(original, 0)).toBe(original)
+    expect(extendPlanningHorizon(original, -5)).toBe(original)
+  })
+
+  it('REG: refuses to extend a config where an array is already out of sync with planning_months, rather than silently compounding the corruption', () => {
+    const config = makeConfigWithEverything() // planning_months: 12, every array correctly 12 months
+    // Corrupt one line's monthly_plan to 10 months, simulating a
+    // pre-existing bug or manual data edit that desynced it from
+    // planning_months.
+    const corrupted = {
+      ...config,
+      plan_lines: config.plan_lines.map(l => l.id === 'rev1' ? { ...l, monthly_plan: l.monthly_plan.slice(0, 10) } : l),
+    }
+    expect(() => extendPlanningHorizon(corrupted, 12)).toThrow(/out of sync/)
+    expect(() => extendPlanningHorizon(corrupted, 12)).toThrow(/rev1|Sales/) // identifies which line specifically
+  })
+
+  it('REG: the mismatch check covers the optional spread/service_fee/trade-credit arrays too, not just monthly_plan', () => {
+    const config = makeConfigWithEverything()
+    const corruptedSpread = {
+      ...config,
+      plan_lines: config.plan_lines.map(l => l.id === 'spread1' ? { ...l, buy_price: l.buy_price!.slice(0, 5) } : l),
+    }
+    expect(() => extendPlanningHorizon(corruptedSpread, 12)).toThrow(/out of sync/)
+
+    const corruptedTradeCredit = {
+      ...config,
+      settings: { ...config.settings, trade_credit_lines: config.settings.trade_credit_lines!.map(t => ({ ...t, monthly_settled: t.monthly_settled.slice(0, 3) })) },
+    }
+    expect(() => extendPlanningHorizon(corruptedTradeCredit, 12)).toThrow(/out of sync/)
+  })
+
+  it('REG: a genuinely consistent config (the normal case) is never rejected by the guard', () => {
+    expect(() => extendPlanningHorizon(makeConfigWithEverything(), 12)).not.toThrow()
+  })
+
+  it('REG: a fractional additionalMonths is rejected with a clear error, not an obscure RangeError from Array(2.5)', () => {
+    expect(() => extendPlanningHorizon(makeConfigWithEverything(), 2.5)).toThrow(/whole number/)
+  })
+
+  it('REG: non-finite additionalMonths (NaN, Infinity) is also rejected', () => {
+    expect(() => extendPlanningHorizon(makeConfigWithEverything(), NaN)).toThrow(/whole number/)
+    expect(() => extendPlanningHorizon(makeConfigWithEverything(), Infinity)).toThrow(/whole number/)
   })
 })
