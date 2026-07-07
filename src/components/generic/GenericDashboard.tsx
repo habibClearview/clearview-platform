@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import {
-  fmt, fmtFull, pct, buildMonthLabels,
+  fmt, fmtFull, pct, buildMonthLabels, buildYearGroups, collapseYear, defaultExpandedYears,
   runGenericModel, defaultGenericConfig,
   blankLine, spreadLine, serviceFeeLine,
   type GenericModelConfig, type GenericBusinessUnit,
@@ -139,6 +139,135 @@ function PLTable({title,rows,months,cc,showExport,closedMask}:{title?:string;row
           </thead>
           <tbody>
             {rows.map((r,i)=><PLRow key={i} {...r} months={months} cc={cc} closedMask={closedMask}/>)}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// Collapsible year/month P&L presentation. Year columns are entirely
+// data-driven (buildYearGroups derives however many calendar years the
+// model's start_date + months span) -- there is no fixed list of years
+// anywhere in this component, so a model later extended to cover more
+// years renders more columns automatically, with no code change needed
+// here. Each year defaults to collapsed except the one containing
+// today's date, which starts expanded (the year someone is most likely
+// checking in on right now).
+function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMask}:{title?:string;rows:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;actualMask?:boolean[]}[];months:string[];startDate:string;cc:string;showExport?:boolean;closedMask?:boolean[]}) {
+  const yearGroups = useMemo(() => buildYearGroups(startDate, months.length), [startDate, months.length])
+  const currentYear = new Date().getUTCFullYear()
+  const [expanded, setExpanded] = useState<Record<number, boolean>>(() => defaultExpandedYears(yearGroups, currentYear))
+  function toggle(year: number) { setExpanded(e => ({...e, [year]: !e[year]})) }
+  function toggleKeyHandler(year: number) {
+    return (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(year) } }
+  }
+
+  function exportCSV() {
+    // Export always includes full monthly detail regardless of the
+    // current expand/collapse state on screen -- collapsing a year is a
+    // display convenience, not a reason to omit real data from an export.
+    const headers = ['', ...months, ...yearGroups.map(g => `FY ${g.label}`)]
+    const data = rows.map(r => {
+      const yearTotals = yearGroups.map(g => String(Math.round(collapseYear(r.values, r.actualMask, g.monthIndices).value)))
+      return [r.label, ...r.values.map(v => String(Math.round(v))), ...yearTotals]
+    })
+    const csv = [headers, ...data].map(r => r.map(c => `"${c}"`).join(',')).join('\n')
+    const blob = new Blob([csv], {type: 'text/csv'})
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = `${title || 'export'}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const hasActuals = rows.some(r => r.actualMask?.some(Boolean))
+
+  return (
+    <div style={{...card,padding:0,overflow:'hidden'}}>
+      {title&&(
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.85rem 1.1rem',borderBottom:`1px solid ${C.border}`}}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy}}>{title}</div>
+          {showExport&&<div style={{display:'flex',gap:'0.5rem'}}>
+            <button style={addBtn(true)} onClick={()=>window.print()}>Print</button>
+            <button style={addBtn(true)} onClick={exportCSV}>Export CSV</button>
+          </div>}
+        </div>
+      )}
+      {hasActuals&&(
+        <div style={{padding:'0.5rem 1.1rem',fontSize:'0.68rem',fontFamily:'monospace',color:C.teal,display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap',background:'#F4FDFB'}}>
+          <span style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
+            <span style={{width:10,height:10,borderRadius:2,background:'#EAFAF6',border:`2px solid ${C.teal}`,display:'inline-block'}}></span>
+            Real data, still updating (live)
+          </span>
+          <span style={{display:'flex',alignItems:'center',gap:'0.4rem',color:C.navy}}>
+            <span style={{width:10,height:10,borderRadius:2,background:C.navy,display:'inline-block'}}></span>
+            Closed -- final, locked at month-end
+          </span>
+          <span style={{display:'flex',alignItems:'center',gap:'0.4rem',color:C.amber}}>
+            <span style={{width:10,height:10,borderRadius:2,background:'#FDF6E3',border:`2px solid ${C.amber}`,display:'inline-block'}}></span>
+            Year in progress -- part actual, part plan
+          </span>
+        </div>
+      )}
+      <div style={{overflowX:'auto'}}>
+        <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.77rem',fontFamily:'monospace'}}>
+          <thead>
+            <tr style={{background:C.navy}}>
+              <th style={{textAlign:'left',padding:'8px 10px',color:C.white,minWidth:160,fontSize:'0.75rem',position:'sticky',left:0,background:C.navy}}></th>
+              {yearGroups.map(g => expanded[g.year] ? (
+                <React.Fragment key={g.year}>
+                  {g.monthIndices.map(i => (
+                    <th key={i} style={{textAlign:'right',padding:'8px 8px',color:'rgba(255,255,255,0.75)',whiteSpace:'nowrap',fontSize:'0.72rem',fontWeight:400}}>{months[i]}</th>
+                  ))}
+                  <th onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Collapse FY ${g.label}`} style={{textAlign:'right',padding:'8px 10px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',cursor:'pointer',userSelect:'none',borderLeft:'2px solid rgba(255,255,255,0.2)'}}>
+                    FY {g.label} <span style={{fontSize:'0.65rem'}}>&#9666;</span>
+                  </th>
+                </React.Fragment>
+              ) : (
+                <th key={g.year} onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Expand FY ${g.label}`} style={{textAlign:'right',padding:'8px 10px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',cursor:'pointer',userSelect:'none',borderLeft:'2px solid rgba(255,255,255,0.2)'}}>
+                  FY {g.label} <span style={{fontSize:'0.65rem'}}>&#9662;</span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r,ri)=>(
+              <tr key={ri} style={{background:r.highlight?'#EBF8FF':r.bold?C.lightBg:C.white}}>
+                <td style={{padding:'7px 10px',fontWeight:r.bold?700:400,color:C.navy,minWidth:160,fontSize:'0.8rem',position:'sticky',left:0,background:r.highlight?'#EBF8FF':r.bold?C.lightBg:C.white}}>{r.label}</td>
+                {yearGroups.map(g => {
+                  const cell = collapseYear(r.values, r.actualMask, g.monthIndices)
+                  const displayVal = (v:number) => r.negate ? fmtFull(-Math.abs(v),cc) : fmtFull(v,cc)
+                  return expanded[g.year] ? (
+                    <React.Fragment key={g.year}>
+                      {g.monthIndices.map(i => {
+                        const isActual = r.actualMask?.[i]
+                        const isClosed = isActual && closedMask?.[i]
+                        return (
+                          <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',
+                            color:isClosed?C.white:r.negate?C.red:r.values[i]<0?C.red:C.navy,fontWeight:r.bold?700:400,
+                            background:isClosed?C.navy:isActual?'#EAFAF6':undefined,
+                            borderBottom:isActual&&!isClosed?`2px solid ${C.teal}`:undefined}}>
+                            {displayVal(r.values[i])}
+                          </td>
+                        )
+                      })}
+                      <td onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Collapse FY ${g.label}`} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:700,cursor:'pointer',
+                        color:r.negate?C.red:cell.value<0?C.red:C.navy,
+                        background:cell.isFullyActual?'#EAFAF6':cell.isPartiallyActual?'#FDF6E3':undefined,
+                        borderLeft:`2px solid ${C.border}`}}>
+                        {displayVal(cell.value)}
+                      </td>
+                    </React.Fragment>
+                  ) : (
+                    <td key={g.year} onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Expand FY ${g.label}`} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:r.bold?700:400,cursor:'pointer',
+                      color:r.negate?C.red:cell.value<0?C.red:C.navy,
+                      background:cell.isFullyActual?'#EAFAF6':cell.isPartiallyActual?'#FDF6E3':undefined,
+                      borderLeft:`2px solid ${C.border}`}}>
+                      {displayVal(cell.value)}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -2604,7 +2733,7 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
               <KPI label="EBITDA" value={fmtFull(hybridAnnEbitda,cc)} sub={pct(hybridAnnRev>0?hybridAnnEbitda/hybridAnnRev:0)} color={hybridAnnEbitda>=0?C.teal:C.red}/>
               <KPI label="Staff Cost %" value={pct(hybridAnnRev>0?hybridAnnStaff/hybridAnnRev:0)} sub={`${pl.staff_efficiency.headcount} staff`} color={C.amber}/>
             </div>
-            <PLTable title={`${config.business_units.find(u=>u.id===selUnit)?.name} — P&L`} rows={rows} months={months} cc={cc} showExport closedMask={closedMask}/>
+            <PLTableCollapsible title={`${config.business_units.find(u=>u.id===selUnit)?.name} — P&L`} rows={rows} months={months} startDate={config.start_date} cc={cc} showExport closedMask={closedMask}/>
           </div>
         )
       })()}
@@ -2628,7 +2757,7 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
           {label:'Tax',values:taxValues,negate:true,actualMask:periodIsActual},
           {label:'Net Profit After Tax',values:npatValues,bold:true,highlight:true,actualMask:periodIsActual},
         ]
-        return <PLTable title={`${config.business_name} — Consolidated P&L`} rows={rows} months={months} cc={cc} showExport closedMask={closedMask}/>
+        return <PLTableCollapsible title={`${config.business_name} — Consolidated P&L`} rows={rows} months={months} startDate={config.start_date} cc={cc} showExport closedMask={closedMask}/>
       })()}
     </div>
   )
