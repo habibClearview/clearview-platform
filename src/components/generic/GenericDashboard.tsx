@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import {
-  fmt, fmtFull, pct, buildMonthLabels, buildYearGroups, collapseYear, defaultExpandedYears,
+  fmt, fmtFull, pct, buildMonthLabels, buildYearGroups, collapseYear, defaultExpandedYears, type YearAggregation,
   runGenericModel, defaultGenericConfig,
   blankLine, spreadLine, serviceFeeLine,
   type GenericModelConfig, type GenericBusinessUnit,
@@ -154,7 +154,7 @@ function PLTable({title,rows,months,cc,showExport,closedMask}:{title?:string;row
 // here. Each year defaults to collapsed except the one containing
 // today's date, which starts expanded (the year someone is most likely
 // checking in on right now).
-function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMask}:{title?:string;rows:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;actualMask?:boolean[]}[];months:string[];startDate:string;cc:string;showExport?:boolean;closedMask?:boolean[]}) {
+function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMask}:{title?:string;rows:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;actualMask?:boolean[];aggregation?:YearAggregation}[];months:string[];startDate:string;cc:string;showExport?:boolean;closedMask?:boolean[]}) {
   const yearGroups = useMemo(() => buildYearGroups(startDate, months.length), [startDate, months.length])
   const currentYear = new Date().getUTCFullYear()
   const [expanded, setExpanded] = useState<Record<number, boolean>>(() => defaultExpandedYears(yearGroups, currentYear))
@@ -169,7 +169,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
     // display convenience, not a reason to omit real data from an export.
     const headers = ['', ...months, ...yearGroups.map(g => `FY ${g.label}`)]
     const data = rows.map(r => {
-      const yearTotals = yearGroups.map(g => String(Math.round(collapseYear(r.values, r.actualMask, g.monthIndices).value)))
+      const yearTotals = yearGroups.map(g => String(Math.round(collapseYear(r.values, r.actualMask, g.monthIndices, r.aggregation).value)))
       return [r.label, ...r.values.map(v => String(Math.round(v))), ...yearTotals]
     })
     const csv = [headers, ...data].map(r => r.map(c => `"${c}"`).join(',')).join('\n')
@@ -234,7 +234,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
               <tr key={ri} style={{background:r.highlight?'#EBF8FF':r.bold?C.lightBg:C.white}}>
                 <td style={{padding:'7px 10px',fontWeight:r.bold?700:400,color:C.navy,minWidth:160,fontSize:'0.8rem',position:'sticky',left:0,background:r.highlight?'#EBF8FF':r.bold?C.lightBg:C.white}}>{r.label}</td>
                 {yearGroups.map(g => {
-                  const cell = collapseYear(r.values, r.actualMask, g.monthIndices)
+                  const cell = collapseYear(r.values, r.actualMask, g.monthIndices, r.aggregation)
                   const displayVal = (v:number) => r.negate ? fmtFull(-Math.abs(v),cc) : fmtFull(v,cc)
                   return expanded[g.year] ? (
                     <React.Fragment key={g.year}>
@@ -3224,13 +3224,13 @@ function CashFlowTab({config,result,months,cc,closedPeriods}) {
     closedPeriods?.has(periodForMonthIndex(config.start_date, i)) ?? false
   )
   const rows = [
-    {label:'Opening Cash',values:cf.open,bold:true,actualMask:cf.act_mask},
+    {label:'Opening Cash',values:cf.open,bold:true,actualMask:cf.act_mask,aggregation:'startOfPeriod' as const},
     {label:'Net Profit After Tax',values:result.con.npat.map((v:number,i:number)=>result.con.act_npat[i]!==null?result.con.act_npat[i]:v),actualMask:cf.act_mask},
     {label:'Operating Cash Flow',values:cf.op_cash,bold:true,actualMask:cf.act_mask},
     {label:'Capital & Financing',values:cf.fin_cash},
     {label:'Fixed Asset Purchases',values:cf.inv_cash||Array(months.length).fill(0),negate:false},
     {label:'Net Change in Cash',values:cf.net,bold:true,actualMask:cf.act_mask},
-    {label:'Closing Cash',values:cf.close,bold:true,highlight:true,actualMask:cf.act_mask},
+    {label:'Closing Cash',values:cf.close,bold:true,highlight:true,actualMask:cf.act_mask,aggregation:'endOfPeriod' as const},
   ]
   const debt = result.debtSchedule
   const hasLoan = debt && debt.totalPrincipal.some((v:number)=>v>0)
@@ -3248,7 +3248,7 @@ function CashFlowTab({config,result,months,cc,closedPeriods}) {
         <KPI label="Closing Cash" value={fmt(cf.close[cf.close.length-1],cc)} color={cf.close[cf.close.length-1]>=0?C.navy:C.red}/>
         <KPI label="Lowest Point" value={fmt(result.metrics.min_cash,cc)} sub={`Month ${result.metrics.min_cash_month}`} color={result.metrics.min_cash>=0?C.navy:C.red}/>
       </div>
-      <PLTable title="Cash Flow Statement" rows={rows} months={months} cc={cc} showExport closedMask={closedMask}/>
+      <PLTableCollapsible title="Cash Flow Statement" rows={rows} months={months} startDate={config.start_date} cc={cc} showExport closedMask={closedMask}/>
       {hasLoan && <PLTable title="Loan Repayment Schedule" rows={loanRows} months={months} cc={cc} showExport/>}
     </div>
   )
@@ -3262,22 +3262,22 @@ function BalanceSheetTab({config,result,months,cc,closedPeriods}) {
     closedPeriods?.has(periodForMonthIndex(config.start_date, i)) ?? false
   )
   const rows = [
-    {label:'ASSETS',values:Array(months.length).fill(0),bold:true},
-    {label:'Cash & Bank',values:bs.cash,actualMask:bs.act_mask},
-    {label:'Fixed Assets',values:bs.fixed_assets},
-    {label:'Total Assets',values:bs.total_assets,bold:true,highlight:true,actualMask:bs.act_mask},
-    {label:'EQUITY',values:Array(months.length).fill(0),bold:true},
-    {label:'Share Capital',values:bs.share_capital},
-    {label:'Grant Equity',values:bs.grant_equity},
-    {label:'Retained Earnings',values:bs.retained_earnings,actualMask:bs.act_mask},
-    {label:'Total Equity',values:bs.total_equity,bold:true,actualMask:bs.act_mask},
-    {label:'LIABILITIES',values:Array(months.length).fill(0),bold:true},
-    {label:'Grant Liability',values:bs.grant_liability},
-    {label:'Loan Liability',values:bs.loan_liability},
-    {label:'Total Liabilities',values:bs.total_liabilities,bold:true},
-    {label:'Total Equity & Liabilities',values:bs.total_equity_and_liabilities,bold:true,highlight:true,actualMask:bs.act_mask},
+    {label:'ASSETS',values:Array(months.length).fill(0),bold:true,aggregation:'endOfPeriod' as const},
+    {label:'Cash & Bank',values:bs.cash,actualMask:bs.act_mask,aggregation:'endOfPeriod' as const},
+    {label:'Fixed Assets',values:bs.fixed_assets,aggregation:'endOfPeriod' as const},
+    {label:'Total Assets',values:bs.total_assets,bold:true,highlight:true,actualMask:bs.act_mask,aggregation:'endOfPeriod' as const},
+    {label:'EQUITY',values:Array(months.length).fill(0),bold:true,aggregation:'endOfPeriod' as const},
+    {label:'Share Capital',values:bs.share_capital,aggregation:'endOfPeriod' as const},
+    {label:'Grant Equity',values:bs.grant_equity,aggregation:'endOfPeriod' as const},
+    {label:'Retained Earnings',values:bs.retained_earnings,actualMask:bs.act_mask,aggregation:'endOfPeriod' as const},
+    {label:'Total Equity',values:bs.total_equity,bold:true,actualMask:bs.act_mask,aggregation:'endOfPeriod' as const},
+    {label:'LIABILITIES',values:Array(months.length).fill(0),bold:true,aggregation:'endOfPeriod' as const},
+    {label:'Grant Liability',values:bs.grant_liability,aggregation:'endOfPeriod' as const},
+    {label:'Loan Liability',values:bs.loan_liability,aggregation:'endOfPeriod' as const},
+    {label:'Total Liabilities',values:bs.total_liabilities,bold:true,aggregation:'endOfPeriod' as const},
+    {label:'Total Equity & Liabilities',values:bs.total_equity_and_liabilities,bold:true,highlight:true,actualMask:bs.act_mask,aggregation:'endOfPeriod' as const},
   ]
-  return <PLTable title="Balance Sheet" rows={rows} months={months} cc={cc} showExport closedMask={closedMask}/>
+  return <PLTableCollapsible title="Balance Sheet" rows={rows} months={months} startDate={config.start_date} cc={cc} showExport closedMask={closedMask}/>
 }
 
 // ── ANNUAL TAB ───────────────────────────────────────────────

@@ -942,6 +942,41 @@ describe('collapseYear — the year total and its actual/plan/partial status', (
   })
 })
 
+describe('collapseYear — endOfPeriod and startOfPeriod aggregation (Balance Sheet, Opening/Closing Cash)', () => {
+  it('REG: endOfPeriod uses the LAST month in the year, never a sum -- critical for Balance Sheet, where summing 12 months of Total Assets would be meaningless', () => {
+    // A stock value that happens to stay constant at 1,000,000 all year --
+    // if this were wrongly summed like a flow, collapsing 9 months would
+    // wrongly show 9,000,000 instead of the real balance of 1,000,000.
+    const values = Array(9).fill(1_000_000)
+    const result = collapseYear(values, undefined, [0,1,2,3,4,5,6,7,8], 'endOfPeriod')
+    expect(result.value).toBe(1_000_000)
+    expect(result.value).not.toBe(9_000_000)
+  })
+
+  it('REG: startOfPeriod uses the FIRST month in the year -- specifically for Opening Cash, which is the prior period\'s closing balance carried forward', () => {
+    const values = [500_000, 600_000, 700_000]
+    const result = collapseYear(values, undefined, [0, 1, 2], 'startOfPeriod')
+    expect(result.value).toBe(500_000)
+  })
+
+  it('REG: a point-in-time balance has no "partially actual" state -- it is either as of an actual month or a planned one, never a blend', () => {
+    const values = [100, 200, 300]
+    const actualMask = [true, true, false] // year is mixed, but the LAST month (index 2) is plan
+    const result = collapseYear(values, actualMask, [0, 1, 2], 'endOfPeriod')
+    expect(result.isFullyPlan).toBe(true)
+    expect(result.isFullyActual).toBe(false)
+    expect(result.isPartiallyActual).toBe(false) // never partial for a point-in-time figure
+  })
+
+  it('REG: endOfPeriod correctly reports fully actual when the last month in the year is itself actual, regardless of earlier months', () => {
+    const values = [100, 200, 300]
+    const actualMask = [false, true, true] // first month is plan, but the relevant (last) month is actual
+    const result = collapseYear(values, actualMask, [0, 1, 2], 'endOfPeriod')
+    expect(result.isFullyActual).toBe(true)
+    expect(result.isPartiallyActual).toBe(false)
+  })
+})
+
 describe('defaultExpandedYears — which year starts expanded', () => {
   it('REG: the year containing today expands by default, all others stay collapsed', () => {
     const groups = [{year: 2025, label: '2025', monthIndices: [0]}, {year: 2026, label: '2026', monthIndices: [1]}, {year: 2027, label: '2027', monthIndices: [2]}]
