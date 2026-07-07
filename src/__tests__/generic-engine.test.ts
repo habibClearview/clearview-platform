@@ -1108,4 +1108,36 @@ describe('extendPlanningHorizon — growing a client\'s planning horizon indefin
     expect(extendPlanningHorizon(original, 0)).toBe(original)
     expect(extendPlanningHorizon(original, -5)).toBe(original)
   })
+
+  it('REG: refuses to extend a config where an array is already out of sync with planning_months, rather than silently compounding the corruption', () => {
+    const config = makeConfigWithEverything() // planning_months: 12, every array correctly 12 months
+    // Corrupt one line's monthly_plan to 10 months, simulating a
+    // pre-existing bug or manual data edit that desynced it from
+    // planning_months.
+    const corrupted = {
+      ...config,
+      plan_lines: config.plan_lines.map(l => l.id === 'rev1' ? { ...l, monthly_plan: l.monthly_plan.slice(0, 10) } : l),
+    }
+    expect(() => extendPlanningHorizon(corrupted, 12)).toThrow(/out of sync/)
+    expect(() => extendPlanningHorizon(corrupted, 12)).toThrow(/rev1|Sales/) // identifies which line specifically
+  })
+
+  it('REG: the mismatch check covers the optional spread/service_fee/trade-credit arrays too, not just monthly_plan', () => {
+    const config = makeConfigWithEverything()
+    const corruptedSpread = {
+      ...config,
+      plan_lines: config.plan_lines.map(l => l.id === 'spread1' ? { ...l, buy_price: l.buy_price!.slice(0, 5) } : l),
+    }
+    expect(() => extendPlanningHorizon(corruptedSpread, 12)).toThrow(/out of sync/)
+
+    const corruptedTradeCredit = {
+      ...config,
+      settings: { ...config.settings, trade_credit_lines: config.settings.trade_credit_lines!.map(t => ({ ...t, monthly_settled: t.monthly_settled.slice(0, 3) })) },
+    }
+    expect(() => extendPlanningHorizon(corruptedTradeCredit, 12)).toThrow(/out of sync/)
+  })
+
+  it('REG: a genuinely consistent config (the normal case) is never rejected by the guard', () => {
+    expect(() => extendPlanningHorizon(makeConfigWithEverything(), 12)).not.toThrow()
+  })
 })

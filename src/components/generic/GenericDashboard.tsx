@@ -1957,8 +1957,12 @@ function ExtendHorizonControl({form,setForm}:{form:GenericModelConfig;setForm:(f
   const [confirming, setConfirming] = useState(false)
 
   function apply() {
-    setForm(f => extendPlanningHorizon(f, addMonths))
-    setConfirming(false)
+    try {
+      setForm(f => extendPlanningHorizon(f, addMonths))
+      setConfirming(false)
+    } catch (e: any) {
+      alert(e?.message || 'Could not extend the planning horizon -- some of this client\'s data may be inconsistent. Please contact support.')
+    }
   }
 
   return (
