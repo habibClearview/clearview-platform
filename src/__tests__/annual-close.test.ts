@@ -106,7 +106,7 @@ describe('Annual Close — aggregation is pure summing/snapshotting of already-c
     expect(yearEnd.retainedEarnings).toBe(1020)
   })
 
-  it('REG: computeAnnualPL/computeAnnualCashFlow/computeYearEndBalanceSheet accept a real YearGroup directly, not just a plain range object', () => {
+  it('REG: annual helpers can be driven from a YearGroup-derived contiguous range', () => {
     // YearGroup has extra fields (year, label, monthIndices) beyond
     // startMonthIndex/endMonthIndex -- but since a calendar year's
     // monthIndices are always contiguous, deriving start/end from it

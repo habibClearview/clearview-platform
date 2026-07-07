@@ -3339,6 +3339,13 @@ function YearCloseControls({config,result,closedPeriods,P,onCloseStatusChanged}:
   const canSeeAll = ['super_coach','ceo','finance_manager'].includes(P.role)
 
   useEffect(()=>{
+    // Gated on canSeeAll -- generic_year_close includes closing_snapshot
+    // (a full Balance Sheet position), which only finance-level roles
+    // should ever have in the browser at all. Checking this here, not
+    // just at render, means a hidden role never issues the request in
+    // the first place, rather than fetching it and only hiding the
+    // display.
+    if (!canSeeAll) return
     supabase.from('generic_year_close').select('*').eq('client_id',config.client_id)
       .then(({data,error})=>{
         if (error) { console.error('Failed to load year closes:', error); return }
@@ -3346,7 +3353,7 @@ function YearCloseControls({config,result,closedPeriods,P,onCloseStatusChanged}:
         ;(data||[]).forEach((r:any)=>{ byPeriod[r.year_start_period] = r })
         setYearCloses(byPeriod)
       })
-  },[config.client_id])
+  },[config.client_id,canSeeAll])
 
   if (!canSeeAll || !result) return null
 
@@ -3361,17 +3368,23 @@ function YearCloseControls({config,result,closedPeriods,P,onCloseStatusChanged}:
       return
     }
     setClosing(key)
-    const range = { startMonthIndex: group.monthIndices[0], endMonthIndex: group.monthIndices[group.monthIndices.length-1] }
-    const snapshot = computeYearEndBalanceSheet(result.bs, range)
-    const { error } = await supabase.from('generic_year_close').upsert({
-      client_id: config.client_id, year_start_period: key, closed: true,
-      closed_at: new Date().toISOString(), closed_by: P.fullName, closing_snapshot: snapshot,
-    }, { onConflict: 'client_id,year_start_period' })
-    if (!error) {
-      setYearCloses(prev => ({...prev, [key]: { closed:true, closed_at:new Date().toISOString(), closed_by:P.fullName, closing_snapshot:snapshot }}))
+    try {
+      const range = { startMonthIndex: group.monthIndices[0], endMonthIndex: group.monthIndices[group.monthIndices.length-1] }
+      const snapshot = computeYearEndBalanceSheet(result.bs, range)
+      const closedAt = new Date().toISOString()
+      const { error } = await supabase.from('generic_year_close').upsert({
+        client_id: config.client_id, year_start_period: key, closed: true,
+        closed_at: closedAt, closed_by: P.fullName, closing_snapshot: snapshot,
+      }, { onConflict: 'client_id,year_start_period' })
+      if (error) { alert('Could not close this year. Please try again.'); return }
+      setYearCloses(prev => ({...prev, [key]: { closed:true, closed_at:closedAt, closed_by:P.fullName, closing_snapshot:snapshot }}))
       onCloseStatusChanged?.()
-    } else alert('Could not close this year. Please try again.')
-    setClosing(null)
+    } catch (e) {
+      console.error('Could not close this year:', e)
+      alert('Could not close this year. Please try again.')
+    } finally {
+      setClosing(null)
+    }
   }
 
   return (
@@ -3386,7 +3399,7 @@ function YearCloseControls({config,result,closedPeriods,P,onCloseStatusChanged}:
             {yc?.closed ? (
               <span title={`Closed by ${yc.closed_by} on ${new Date(yc.closed_at).toLocaleDateString()}`}><Badge text="Closed" color={C.navy}/></span>
             ) : (
-              <button style={addBtn(true,canClose?C.green:C.border)} onClick={()=>closeYear(group)} disabled={!canClose||closing===key}>
+              <button type="button" style={addBtn(true,canClose?C.green:C.border)} onClick={()=>closeYear(group)} disabled={!canClose||closing===key}>
                 {closing===key?'Closing...':canClose?'Close This Year':'Not all months closed yet'}
               </button>
             )}

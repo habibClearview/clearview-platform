@@ -66,11 +66,11 @@ export interface AnnualPL {
 // Sums the engine's already-correct monthly consolidated arrays over one
 // calendar year's month range. No new figures are computed here -- this
 // is purely aggregation of numbers the engine already produced. Accepts
-// any {startMonthIndex, endMonthIndex} range, not specifically a
-// YearGroup -- both a full calendar year's contiguous monthIndices and
-// this simpler range shape describe the same thing (a calendar year is
-// always contiguous within the planning window), so callers can pass
-// either.
+// a plain {startMonthIndex, endMonthIndex} range, not a YearGroup
+// directly -- callers that already have a YearGroup should derive this
+// range from its first and last monthIndices (a calendar year's
+// monthIndices are always contiguous within the planning window, so
+// this is a lossless conversion).
 export function computeAnnualPL(con: {
   rev: number[]; cogs: number[]; gp: number[]; opex: number[]; ebitda: number[];
   interest: number[]; nbt: number[]; tax: number[]; npat: number[];
