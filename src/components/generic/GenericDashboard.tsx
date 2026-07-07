@@ -1071,9 +1071,11 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
   // item, enter a quantity, the price is never manually typed.
   useEffect(()=>{
     if (!selUnit) { setUnitCatalogue([]); return }
+    let active = true
     supabase.from('field_catalogue').select('id,plan_line_id,name,item_type,price,unit_label')
       .eq('client_id',config.client_id).eq('business_unit_id',selUnit).eq('active',true)
-      .then(({data})=>setUnitCatalogue(data||[]))
+      .then(({data})=>{ if (active) setUnitCatalogue(data||[]) })
+    return () => { active = false }
   },[selUnit,config.client_id])
 
   useEffect(()=>{
