@@ -243,6 +243,61 @@ export function defaultGenericConfig(overrides: Partial<GenericModelConfig> = {}
   }
 }
 
+// Extends every month-sized array in the config by additionalMonths,
+// all together, in one operation -- this is what makes "add another
+// year" safe. There are five distinct places a monthly array lives in
+// this config, and if even one were missed, the engine would either
+// error (mismatched array lengths) or silently produce wrong figures
+// for the newly-added months in whichever array wasn't extended:
+//   1. plan_lines[].monthly_plan (every line, every business unit)
+//   2. plan_lines[].buy_price/sell_price/volume (spread-type lines only)
+//   3. plan_lines[].fee_per_engagement/cost_per_engagement/engagements
+//      (service_fee-type lines only)
+//   4. shared_lines[].monthly_plan
+//   5. settings.trade_credit_lines[].monthly_new/monthly_settled
+// Debt obligations and capital structure are deliberately NOT touched --
+// they're scalar (a single rate, tenor, principal), with the actual
+// month-by-month repayment schedule computed dynamically by
+// buildDebtSchedule() for however many months exist, so they're already
+// compatible with any horizon with no changes needed.
+//
+// Pure: returns a new config object, never mutates the one passed in
+// (matching how the rest of this file and the React state that holds
+// this config expect immutability). New months are always zero-filled;
+// every existing month's value is preserved exactly as-is -- this is
+// purely additive, never a truncation or edit of anything already there.
+export function extendPlanningHorizon(config: GenericModelConfig, additionalMonths: number): GenericModelConfig {
+  if (additionalMonths <= 0) return config
+  const extendArr = (arr: number[] | undefined): number[] | undefined =>
+    arr ? [...arr, ...Array(additionalMonths).fill(0)] : arr
+
+  const extendLine = (l: GenericPlanLine): GenericPlanLine => ({
+    ...l,
+    monthly_plan: extendArr(l.monthly_plan) as number[],
+    buy_price: extendArr(l.buy_price),
+    sell_price: extendArr(l.sell_price),
+    volume: extendArr(l.volume),
+    fee_per_engagement: extendArr(l.fee_per_engagement),
+    cost_per_engagement: extendArr(l.cost_per_engagement),
+    engagements: extendArr(l.engagements),
+  })
+
+  return {
+    ...config,
+    planning_months: config.planning_months + additionalMonths,
+    plan_lines: config.plan_lines.map(extendLine),
+    shared_lines: config.shared_lines.map(extendLine),
+    settings: {
+      ...config.settings,
+      trade_credit_lines: config.settings.trade_credit_lines?.map(t => ({
+        ...t,
+        monthly_new: extendArr(t.monthly_new) as number[],
+        monthly_settled: extendArr(t.monthly_settled) as number[],
+      })),
+    },
+  }
+}
+
 // ── Helper: create a blank plan line ────────────────────────
 export function blankLine(
   id: string, unit_id: string, name: string,
