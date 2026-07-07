@@ -15,6 +15,20 @@ export function getFieldSupabase() {
 // directly from a route file, since Next.js App Router route files can
 // only export the specific handler names (GET, POST, etc.) and break
 // the build on any other export.
+// Pure decision so the auth gate can be unit-tested without a DB or
+// HTTP request -- extracted from validateFieldToken specifically
+// because this security-critical logic (expiry, missing operator
+// embed, inactive operator) previously had no direct test coverage at
+// all, only whatever incidentally exercised it through other routes.
+export function isTokenRowValid(
+  row: { expires_at?: string | null; operator?: { active?: boolean } | null } | null,
+  now: Date = new Date(),
+): boolean {
+  if (!row) return false
+  if (row.expires_at && new Date(row.expires_at) < now) return false
+  return !!row.operator?.active
+}
+
 export async function validateFieldToken(token: string) {
   const supabase = getFieldSupabase()
   const { data, error } = await supabase
@@ -22,9 +36,7 @@ export async function validateFieldToken(token: string) {
     .select('*, operator:field_operators(*)')
     .eq('token', token)
     .single()
-  if (error || !data) return null
-  if (data.expires_at && new Date(data.expires_at) < new Date()) return null
-  if (!data.operator?.active) return null
+  if (error || !isTokenRowValid(data)) return null
   return data.operator
 }
 

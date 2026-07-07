@@ -15,6 +15,11 @@ const C = {
 interface CatalogueItem { id:string; name:string; item_type:'product'|'service'; price:number; unit_label?:string; plan_line_id:string }
 interface CostLine { id:string; name:string; category:string }
 interface Customer { id:string; name:string; phone?:string; village?:string }
+interface HistoryEntry {
+  id:string; transaction_type:string; category:string; plan_line_name:string;
+  amount:number; quantity?:number; unit_price?:number; transaction_date:string;
+  synced_at:string; notes?:string; price_alert?:boolean;
+}
 interface AuthData {
   operator: { id:string; display_name:string; phone?:string; role:string; sync_frequency:string }
   client: { id:string; name:string; currency:string }
@@ -48,7 +53,7 @@ export default function FieldCapturePage() {
   const [syncMsg, setSyncMsg] = useState<string|null>(null)
   const [lastSync, setLastSync] = useState<string|null>(null)
   const [mode, setMode] = useState<'grid'|'sale-detail'|'cost-form'|'history'>('grid')
-  const [historyEntries, setHistoryEntries] = useState<any[]>([])
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState('')
   const [selectedItem, setSelectedItem] = useState<CatalogueItem|null>(null)
@@ -300,7 +305,9 @@ export default function FieldCapturePage() {
     setHistoryLoading(true)
     setHistoryError('')
     try {
-      const res = await fetch(`/api/field/history?token=${encodeURIComponent(token)}&limit=50`)
+      const res = await fetch(`/api/field/history?limit=50`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
       const data = await res.json()
       if (res.ok) setHistoryEntries(data.transactions || [])
       else setHistoryError(data.error || 'Could not load your transaction history.')
@@ -360,10 +367,12 @@ export default function FieldCapturePage() {
           <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',marginTop:'0.15rem'}}>{auth.unit.name}</div>
           <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.6)',marginTop:'0.1rem'}}>{auth.operator.display_name} · {auth.client.name}</div>
         </div>
-        <button onClick={mode==='history'?()=>setMode('grid'):loadHistory}
-          style={{background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.25)',color:C.white,borderRadius:6,padding:'0.5rem 0.75rem',fontSize:'0.72rem',cursor:'pointer',whiteSpace:'nowrap'}}>
-          {mode==='history'?'← Back':'History'}
-        </button>
+        {(mode==='grid' || mode==='history') && (
+          <button onClick={mode==='history'?()=>setMode('grid'):loadHistory}
+            style={{background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.25)',color:C.white,borderRadius:6,padding:'0.5rem 0.75rem',fontSize:'0.72rem',cursor:'pointer',whiteSpace:'nowrap'}}>
+            {mode==='history'?'← Back':'History'}
+          </button>
+        )}
       </header>
 
       <div style={{padding:'1rem'}}>
@@ -554,7 +563,7 @@ export default function FieldCapturePage() {
               <div style={{background:'#FDF2F0',border:`1px solid ${C.red}`,borderRadius:8,padding:'1rem',color:C.red,fontSize:'0.85rem'}}>{historyError}</div>
             )}
             {!historyLoading && !historyError && historyEntries.length===0 && (
-              <div style={{textAlign:'center',color:C.slate,padding:'2rem',fontSize:'0.85rem'}}>Nothing recorded yet. Once you sync an entry, it'll show up here.</div>
+              <div style={{textAlign:'center',color:C.slate,padding:'2rem',fontSize:'0.85rem'}}>Nothing recorded yet. Once you sync an entry, it&apos;ll show up here.</div>
             )}
             {!historyLoading && !historyError && historyEntries.map(entry=>(
               <div key={entry.id} style={{background:C.white,border:`1px solid ${C.border}`,borderLeft:`4px solid ${entry.transaction_type==='sale'?C.green:C.red}`,borderRadius:8,padding:'0.85rem 1rem',marginBottom:'0.6rem'}}>
@@ -562,7 +571,7 @@ export default function FieldCapturePage() {
                   <div>
                     <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>{entry.plan_line_name}</div>
                     <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.15rem'}}>
-                      {entry.transaction_date} {entry.quantity?`· ${entry.quantity} × ${fmt(entry.unit_price,auth.client.currency)}`:''}
+                      {entry.transaction_date} {entry.quantity?`· ${entry.quantity} × ${fmt(entry.unit_price??0,auth.client.currency)}`:''}
                     </div>
                     {entry.notes && <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.15rem',fontStyle:'italic'}}>{entry.notes}</div>}
                   </div>

@@ -12,7 +12,9 @@ export const dynamic = 'force-dynamic'
 // not something an individual operator's phone needs.
 export async function GET(req: NextRequest) {
   try {
-    const token = req.nextUrl.searchParams.get('token')
+    const authHeader = req.headers.get('authorization')
+    const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+    const token = headerToken || req.nextUrl.searchParams.get('token')
     if (!token) return NextResponse.json({ error: 'Token required' }, { status: 400 })
 
     const operator = await validateFieldToken(token)
