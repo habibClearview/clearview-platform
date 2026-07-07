@@ -162,27 +162,31 @@ async function flushQueue() {
       body: JSON.stringify({ token, device_id: 'sw_background_sync', transactions }),
     })
     const data = await res.json()
-    // This condition must stay identical to shouldClearQueue() in
-    // src/lib/field-db.ts -- field-sw.js is a plain static file and can't
-    // import that shared helper directly, so if the decision logic ever
-    // changes there, update this line to match.
-    // Only clear the queue when the server reports zero errors. A response
-    // can be success:true with a populated errors array (e.g. one bad
-    // catalogue_item_id in the batch) -- clearing everything in that case
-    // would silently delete entries the server never actually saved. Every
-    // row carries a stable local_id and the server dedupes on it (see
-    // app/api/field/sync/route.ts), so it's always safe to leave the queue
-    // intact and retry the whole batch next time -- already-saved rows are
-    // silently skipped server-side, not duplicated.
-    if (res.ok && data.success && (!data.errors || data.errors.length === 0)) {
-      await deleteMany(db, 'sales', sales.map((s) => s.local_id))
-      await deleteMany(db, 'costs', costs.map((c) => c.local_id))
-      const clients = await self.clients.matchAll()
-      clients.forEach((client) => client.postMessage({ type: 'field-sync-complete', synced_at: new Date().toISOString() }))
+    // This must stay behaviourally identical to app/field/page.tsx's
+    // syncNow() -- field-sw.js is a plain static file and can't import
+    // the shared field-db.ts helpers directly, so if that logic ever
+    // changes, update this to match. Clears ONLY the entries the server
+    // confirms it actually synced (data.synced_local_ids), not an
+    // all-or-nothing decision for the whole batch. A single permanently
+    // bad entry (e.g. a queued sale referencing a catalogue item that's
+    // since moved to a different business unit) fails validation on
+    // every retry forever -- previously that meant every OTHER entry in
+    // the same background sync stayed stuck too, since nothing cleared
+    // until the whole batch had zero errors.
+    if (res.ok && data.success) {
+      const syncedIds = new Set(data.synced_local_ids || [])
+      const salesToClear = sales.map((s) => s.local_id).filter((id) => syncedIds.has(id))
+      const costsToClear = costs.map((c) => c.local_id).filter((id) => syncedIds.has(id))
+      if (salesToClear.length > 0) await deleteMany(db, 'sales', salesToClear)
+      if (costsToClear.length > 0) await deleteMany(db, 'costs', costsToClear)
+      if (salesToClear.length > 0 || costsToClear.length > 0) {
+        const clients = await self.clients.matchAll()
+        clients.forEach((client) => client.postMessage({ type: 'field-sync-complete', synced_at: new Date().toISOString() }))
+      }
     }
-    // If the request failed, or the server reported errors, the queue is
-    // left as-is -- nothing is lost, and the next sync attempt (background
-    // or manual) will retry the same entries.
+    // If the request failed, the queue is left as-is -- nothing is lost,
+    // and the next sync attempt (background or manual) will retry
+    // whatever didn't clear.
   } catch (err) {
     // No connectivity or request failed -- leave the queue for next time.
   }

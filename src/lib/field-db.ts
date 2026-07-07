@@ -122,14 +122,15 @@ export async function queueCounts(): Promise<{ sales: number; costs: number }> {
 // and imported directly by tests, so a regression here is actually caught
 // rather than a test re-implementing the same logic separately and drifting
 // out of sync with it. The server can return success:true with a populated
-// errors array for a partial failure (e.g. one bad catalogue_item_id in a
-// batch) -- clearing the whole queue in that case would silently delete
-// entries the server never actually saved.
-//
-// public/field-sw.js's Background Sync handler applies the identical
-// condition inline (it's a plain static file and can't import this) --
-// if this logic ever changes, field-sw.js's `if (res.ok && data.success &&
-// (!data.errors || data.errors.length === 0))` check must be updated to match.
+// Retained for the all-or-nothing case (e.g. a caller that only has a
+// success/errors summary, not per-entry local_ids) and its existing test
+// coverage, but no longer used to decide queue-clearing in either
+// app/field/page.tsx or public/field-sw.js. Both now clear per-entry using
+// the server's synced_local_ids (see app/api/field/sync/route.ts), since
+// a single permanently bad entry in a batch (e.g. a catalogue item that's
+// moved to a different business unit) would otherwise keep every other
+// entry in the same batch stuck in the queue forever under an
+// all-or-nothing rule.
 export function shouldClearQueue(response: { success: boolean; errors?: string[] }): boolean {
   return response.success && (!response.errors || response.errors.length === 0)
 }

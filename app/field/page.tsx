@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   addQueuedSale, addQueuedCost, listQueuedSales, listQueuedCosts,
   removeQueuedSale, removeQueuedCost, clearSyncedSales, clearSyncedCosts,
-  setStoredToken, shouldClearQueue, type QueuedSale, type QueuedCost,
+  setStoredToken, type QueuedSale, type QueuedCost,
 } from '@/lib/field-db'
 
 const C = {
@@ -257,17 +257,22 @@ export default function FieldCapturePage() {
       })
       const data = await res.json()
       if (res.ok && data.success) {
-        // Only clear the queue when the server reported zero errors. A
-        // response can be success:true with a populated errors array (e.g.
-        // one bad catalogue_item_id in the batch) -- clearing everything in
-        // that case would silently delete entries the server never actually
-        // saved. Since every row now carries a stable local_id and the
-        // server dedupes on it, it's always safe to leave the queue intact
-        // and retry the whole batch next time; already-saved rows are
-        // silently skipped, not duplicated.
-        if (shouldClearQueue(data)) {
-          await clearSyncedSales(salesSnapshot.map(s=>s.local_id))
-          await clearSyncedCosts(costsSnapshot.map(c=>c.local_id))
+        // Clear ONLY the entries the server confirms it actually synced
+        // (data.synced_local_ids), not an all-or-nothing decision for the
+        // whole batch. A single permanently bad entry -- e.g. a queued
+        // sale referencing a catalogue item that's since moved to a
+        // different business unit -- will fail validation on every retry
+        // forever, and previously that meant every OTHER entry in the same
+        // batch stayed stuck in the queue too, since nothing would ever
+        // clear until the whole batch had zero errors. Now the entries
+        // that succeeded are removed immediately; only the genuinely bad
+        // ones remain, for the operator to notice and deal with.
+        const syncedIds = new Set<string>(data.synced_local_ids || [])
+        const salesToClear = salesSnapshot.map(s=>s.local_id).filter(id => syncedIds.has(id))
+        const costsToClear = costsSnapshot.map(c=>c.local_id).filter(id => syncedIds.has(id))
+        if (salesToClear.length > 0) await clearSyncedSales(salesToClear)
+        if (costsToClear.length > 0) await clearSyncedCosts(costsToClear)
+        if (salesToClear.length > 0 || costsToClear.length > 0) {
           setSalesQueue(await listQueuedSales())
           setCostsQueue(await listQueuedCosts())
         }

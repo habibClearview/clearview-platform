@@ -71,7 +71,7 @@ function SectionHeader({title,action}:{title:string;action?:React.ReactNode}) {
 
 function PLRow({label,values,bold,highlight,negate,months,cc,actualMask,closedMask}:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;months:string[];cc:string;actualMask?:boolean[];closedMask?:boolean[]}) {
   const total = values.reduce((s,v)=>s+v,0)
-  const display = (v:number) => negate ? fmt(-Math.abs(v),cc) : fmt(v,cc)
+  const display = (v:number) => negate ? fmtFull(-Math.abs(v),cc) : fmtFull(v,cc)
   return (
     <tr style={{background:highlight?'#EBF8FF':bold?C.lightBg:C.white}}>
       <td style={{padding:'7px 10px',fontWeight:bold?700:400,color:C.navy,minWidth:160,fontSize:'0.8rem'}}>{label}</td>
@@ -2598,13 +2598,13 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
                 </button>
               ))}
             </div>
-            <PLTable title={`${config.business_units.find(u=>u.id===selUnit)?.name} — P&L`} rows={rows} months={months} cc={cc} showExport closedMask={closedMask}/>
-            <div style={kpiGrid}>
-              <KPI label="Annual Revenue" value={fmt(hybridAnnRev,cc)}/>
-              <KPI label="Gross Profit" value={fmt(hybridAnnGp,cc)} sub={pct(hybridAnnRev>0?hybridAnnGp/hybridAnnRev:0)} color={hybridAnnGp>=0?C.green:C.red}/>
-              <KPI label="EBITDA" value={fmt(hybridAnnEbitda,cc)} sub={pct(hybridAnnRev>0?hybridAnnEbitda/hybridAnnRev:0)} color={hybridAnnEbitda>=0?C.teal:C.red}/>
+            <div style={{...kpiGrid,marginBottom:'1.25rem'}}>
+              <KPI label="Annual Revenue" value={fmtFull(hybridAnnRev,cc)}/>
+              <KPI label="Gross Profit" value={fmtFull(hybridAnnGp,cc)} sub={pct(hybridAnnRev>0?hybridAnnGp/hybridAnnRev:0)} color={hybridAnnGp>=0?C.green:C.red}/>
+              <KPI label="EBITDA" value={fmtFull(hybridAnnEbitda,cc)} sub={pct(hybridAnnRev>0?hybridAnnEbitda/hybridAnnRev:0)} color={hybridAnnEbitda>=0?C.teal:C.red}/>
               <KPI label="Staff Cost %" value={pct(hybridAnnRev>0?hybridAnnStaff/hybridAnnRev:0)} sub={`${pl.staff_efficiency.headcount} staff`} color={C.amber}/>
             </div>
+            <PLTable title={`${config.business_units.find(u=>u.id===selUnit)?.name} — P&L`} rows={rows} months={months} cc={cc} showExport closedMask={closedMask}/>
           </div>
         )
       })()}
