@@ -116,3 +116,16 @@ export function buildHybridConsolidated(con: {
     npat: applyPeriodActual(con.npat, con.act_npat, periodIsActual),
   }
 }
+
+// Computes a plan line's total from catalogue-priced manual entry:
+// quantity x price, summed across every catalogue item mapped to that
+// line. This is the "default" entry path for a line that has catalogue
+// items configured -- a round-figure entry remains available as an
+// explicit per-line fallback for paper-only outlets, entirely separate
+// from this calculation.
+export function computeCatalogueLineTotal(
+  items: {id: string; price: number}[],
+  quantities: Record<string, number>,
+): number {
+  return items.reduce((sum, item) => sum + (Number(quantities[item.id]) || 0) * Number(item.price || 0), 0)
+}

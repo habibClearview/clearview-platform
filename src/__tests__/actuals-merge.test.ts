@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { combinedActual as combined, computeActualsTotals as computeTotals, applyPeriodActual, buildHybridConsolidated, type ActualsPlanLine as PlanLine } from '../lib/actuals'
+import { combinedActual as combined, computeActualsTotals as computeTotals, applyPeriodActual, buildHybridConsolidated, computeCatalogueLineTotal, type ActualsPlanLine as PlanLine } from '../lib/actuals'
 
 // Tests the real src/lib/actuals.ts functions -- the exact ones
 // GenericDashboard.tsx's ActualsTab imports and uses, not a copy.
@@ -192,5 +192,39 @@ describe('buildHybridConsolidated — single source of truth for the P&L and Ann
     expect(hybrid.gp[0]).toBe(600_000)     // planned GP, not null and not a bogus actual figure
     expect(hybrid.ebitda[0]).toBe(500_000) // planned EBITDA -- NOT the anomalous actual 400,000
     expect(hybrid.opex[0]).toBe(100_000)   // planned Operating Costs, not a bogus -400,000
+  })
+})
+
+describe('computeCatalogueLineTotal — catalogue-priced manual actuals entry', () => {
+  it('REG: sums quantity x price across every catalogue item mapped to a line', () => {
+    const items = [{id: 'item1', price: 5000}, {id: 'item2', price: 12000}]
+    const quantities = {item1: 10, item2: 2}
+    // 10*5000 + 2*12000 = 50,000 + 24,000 = 74,000
+    expect(computeCatalogueLineTotal(items, quantities)).toBe(74_000)
+  })
+
+  it('REG: a quantity that has not been entered yet for an item contributes zero, not NaN or undefined propagating through', () => {
+    const items = [{id: 'item1', price: 5000}, {id: 'item2', price: 12000}]
+    const quantities = {item1: 10} // item2 never touched
+    expect(computeCatalogueLineTotal(items, quantities)).toBe(50_000)
+  })
+
+  it('REG: no catalogue items at all produces zero, not an error', () => {
+    expect(computeCatalogueLineTotal([], {})).toBe(0)
+  })
+
+  it('REG: a zero quantity for an item contributes zero, distinct from an unentered quantity but the same result', () => {
+    const items = [{id: 'item1', price: 5000}]
+    expect(computeCatalogueLineTotal(items, {item1: 0})).toBe(0)
+  })
+
+  it('REG: a single catalogue item still sums correctly (the common case -- one product per revenue line)', () => {
+    const items = [{id: 'item1', price: 2500}]
+    expect(computeCatalogueLineTotal(items, {item1: 40})).toBe(100_000)
+  })
+
+  it('REG: a missing or zero price on an item contributes zero regardless of quantity, rather than NaN', () => {
+    const items = [{id: 'item1', price: 0}]
+    expect(computeCatalogueLineTotal(items, {item1: 100})).toBe(0)
   })
 })
