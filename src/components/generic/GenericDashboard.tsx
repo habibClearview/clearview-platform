@@ -497,7 +497,7 @@ export default function GenericDashboard({
 
       {/* Main */}
       <main style={{maxWidth:1600,margin:'0 auto',padding:'1.5rem'}}>
-        {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} pendingApprovalCount={pendingApprovalCount} onGoToApprovals={()=>setView('approvals')}/>}
+        {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} pendingApprovalCount={pendingApprovalCount} onGoToApprovals={()=>setView('approvals')} onGoToIntelligence={()=>setView('intelligence')}/>}
         {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P}/>}
         {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
         {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
@@ -516,7 +516,7 @@ export default function GenericDashboard({
   )
 }
 // ── OVERVIEW TAB ─────────────────────────────────────────────
-function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGoToApprovals}) {
+function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGoToApprovals,onGoToIntelligence}) {
   if (!result) return (
     <div style={card}>
       <div style={{...secH,marginBottom:'0.5rem'}}>Welcome to Clearview</div>
@@ -528,12 +528,30 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGo
     </div>
   )
   const m = result.metrics
+  const s = result.scores
   return (
     <div>
       {pendingApprovalCount>0&&(
         <div style={{background:'#FFF8E8',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <span style={{fontWeight:600,color:C.amber}}>⏳ {pendingApprovalCount} spend request{pendingApprovalCount>1?'s':''} awaiting approval</span>
           <button style={addBtn(true,C.amber)} onClick={onGoToApprovals}>Review now →</button>
+        </div>
+      )}
+      {/* Headline scores -- the interpreted verdict, alongside the raw
+          numbers below. Kept as a compact banner rather than merged into
+          the KPI grid: these are composite, judgment-weighted scores,
+          not the same kind of figure as Revenue/EBITDA, and the deeper
+          narrative/coach assessment/events behind them stay in Clearview
+          Intelligence -- this just removes the need to click through
+          just to see where the business currently stands on each. */}
+      {s&&(
+        <div style={{...card,background:C.navy,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'1rem'}}>
+          <div style={{display:'flex',gap:'2rem',flexWrap:'wrap'}}>
+            <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>CREDIT RISK</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.classColor}}>{s.score}/100</div></div>
+            <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>GOING CONCERN</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.gcColor}}>{s.gcScore}/20</div></div>
+            <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>INVESTMENT READY</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.irColor}}>{s.irScore}/30</div></div>
+          </div>
+          <button style={{...addBtn(true),background:'transparent',color:C.white,borderColor:'rgba(255,255,255,0.3)'}} onClick={onGoToIntelligence}>See full analysis →</button>
         </div>
       )}
       <div style={kpiGrid}>
