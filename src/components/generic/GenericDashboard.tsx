@@ -461,7 +461,6 @@ export default function GenericDashboard({
     ['pl','P&L'],
     ['cashflow','Cash Flow'],
     ['balancesheet','Balance Sheet'],
-    ['margins','Margins & Break-Even'],
     ['actuals_wc','Actuals & Working Capital'],
     ['settings','Settings'],
   ]
@@ -504,7 +503,6 @@ export default function GenericDashboard({
         {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods}/>}
         {view==='cashflow'    && <CashFlowTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
         {view==='balancesheet'&& <BalanceSheetTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods} onCloseStatusChanged={loadClosedPeriods}/>}
-        {view==='margins'     && <MarginsTab config={config} result={result} months={months} cc={cc}/>}
         {view==='actuals_wc'  && <ActualsAndWorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} onCloseStatusChanged={loadClosedPeriods}/>}
         {view==='settings'    && <SettingsAndAdminTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={saveConfig}/>}
       </main>
@@ -2697,7 +2695,7 @@ function TradeCreditLineGrid({line,months,cc,canEdit,updateLineName,removeLine,u
 }
 // ── P&L TAB (Unit + Consolidated merged with toggle) ─────────
 function PLTab({config,result,months,cc,P,closedPeriods}) {
-  const [viewMode, setViewMode] = useState<'unit'|'consolidated'>('unit')
+  const [viewMode, setViewMode] = useState<'unit'|'consolidated'|'margins'>('unit')
   const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active)?.id||'')
   if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
 
@@ -2730,7 +2728,13 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
           background:viewMode==='consolidated'?C.navy:C.white,color:viewMode==='consolidated'?C.white:C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:viewMode==='consolidated'?700:400}}
           onClick={()=>setViewMode('consolidated')}>Consolidated</button>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:viewMode==='margins'?C.navy:C.white,color:viewMode==='margins'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:viewMode==='margins'?700:400}}
+          onClick={()=>setViewMode('margins')}>Margins & Break-Even</button>
       </div>
+
+      {viewMode==='margins' && <MarginsTab config={config} result={result} months={months} cc={cc}/>}
 
       {viewMode==='unit' && (() => {
         const pl = result.unitPL[selUnit]
