@@ -369,7 +369,13 @@ export function computeScores(inputs: ScoringInputs): ScoringResult {
   // ── Trade credit: supplier payables (e.g. input credit) and customer/partner
   // receivables (e.g. licensing partner credit). Tracks how effectively the
   // client manages credit it gives and receives -- collection speed vs payment speed.
-  const tradeCredit = computeTradeCredit(inputs.tradeCreditLines || [], cogs, rev, m)
+  // If a pre-computed, correctly-summarized range was supplied (scoring a
+  // slice of a longer plan), use it as-is -- computeTradeCredit's running
+  // balance simulation restarts at zero from whatever it's given, so
+  // recomputing it from a slice's own (possibly re-sliced or still full,
+  // truncated) monthly_new/monthly_settled arrays would silently lose
+  // whatever balance was actually carried in from a prior period.
+  const tradeCredit = inputs.precomputedTradeCredit || computeTradeCredit(inputs.tradeCreditLines || [], cogs, rev, m)
 
   // ── Credit Risk Score (0-100) ──
   // Debt service is only scored when a real repayment obligation exists and

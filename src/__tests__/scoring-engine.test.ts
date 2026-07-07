@@ -414,26 +414,39 @@ describe('computeScoresTimeSeries — the collapsible year/month trend for Credi
     expect(lastMonth.monthIndices).toEqual(Array.from({length: 12}, (_, i) => i + 12))
   })
 
-  it('REG: trade credit lines are correctly reflected end to end -- a payable balance carried from year 1 into year 2 affects year 2\'s score via the trade credit factor, not silently dropped', () => {
+  it('REG: trade credit lines are correctly reflected end to end -- a payable balance carried from year 1 into year 2 affects year 2\'s score via the exact, correctly-sliced trade credit factor, not a re-simulation from month 0', () => {
     const months = 24
     const lines: TradeCreditLine[] = [{
       id: 'supplier1', name: 'Input Supplier', type: 'payable',
       // Large new credit received early, settled very slowly -- creates a
-      // real, large cash conversion gap that should show up in scoring.
+      // real, large cash conversion gap that should show up in scoring,
+      // and is still being paid down well into year 2.
       monthly_new: [3_000_000, ...Array(months - 1).fill(0)],
       monthly_settled: Array(months).fill(50_000),
     }]
+    const cogs = Array(months).fill(1_000_000)
+    const rev = Array(months).fill(2_000_000)
     const inputs = {
-      rev: Array(months).fill(2_000_000), ebitda: Array(months).fill(400_000), cogs: Array(months).fill(1_000_000),
+      rev, ebitda: Array(months).fill(400_000), cogs,
       cashClose: Array(months).fill(3_000_000),
       totalEquityByMonth: Array(months).fill(5_000_000), totalLiabilitiesByMonth: Array(months).fill(1_000_000),
       debtObligations: [], tradeCreditLines: lines, assess: defaultCoachAssessment(),
     }
     const series = computeScoresTimeSeries(inputs, makeYearGroups(months), makeMonthLabels(months))
-    // Both years should show a real, non-zero DPO -- the outstanding
-    // payable balance is genuinely carried through both years, not lost
-    // when year 2 is scored on its own.
+
+    // Independently compute what year 2's DPO MUST be -- correctly sliced
+    // from the full-plan simulation, never re-derived from month 0 of a
+    // slice. This is the exact value the previous, too-weak "dpo > 0"
+    // assertion would have passed under EITHER the correct behavior or
+    // the real bug this was meant to catch (computeScores silently
+    // ignoring precomputedTradeCredit entirely) -- asserting the precise
+    // figure is what actually distinguishes them.
+    const year2Indices = Array.from({length: 12}, (_, i) => i + 12)
+    const fullTradeCredit = computeTradeCredit(lines, cogs, rev, months)
+    const expectedYear2Summary = summarizeTradeCreditForRange(fullTradeCredit, cogs, rev, year2Indices)
+
     expect(series.years[0].result.tradeCredit.dpo).toBeGreaterThan(0)
-    expect(series.years[1].result.tradeCredit.dpo).toBeGreaterThan(0)
+    expect(series.years[1].result.tradeCredit.dpo).toBeCloseTo(expectedYear2Summary.dpo, 6)
+    expect(series.years[1].result.tradeCredit.peakPayable).toBeCloseTo(expectedYear2Summary.peakPayable, 6)
   })
 })
