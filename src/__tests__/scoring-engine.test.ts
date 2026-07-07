@@ -413,4 +413,27 @@ describe('computeScoresTimeSeries — the collapsible year/month trend for Credi
     expect(lastMonth.monthIndices.length).toBe(12)
     expect(lastMonth.monthIndices).toEqual(Array.from({length: 12}, (_, i) => i + 12))
   })
+
+  it('REG: trade credit lines are correctly reflected end to end -- a payable balance carried from year 1 into year 2 affects year 2\'s score via the trade credit factor, not silently dropped', () => {
+    const months = 24
+    const lines: TradeCreditLine[] = [{
+      id: 'supplier1', name: 'Input Supplier', type: 'payable',
+      // Large new credit received early, settled very slowly -- creates a
+      // real, large cash conversion gap that should show up in scoring.
+      monthly_new: [3_000_000, ...Array(months - 1).fill(0)],
+      monthly_settled: Array(months).fill(50_000),
+    }]
+    const inputs = {
+      rev: Array(months).fill(2_000_000), ebitda: Array(months).fill(400_000), cogs: Array(months).fill(1_000_000),
+      cashClose: Array(months).fill(3_000_000),
+      totalEquityByMonth: Array(months).fill(5_000_000), totalLiabilitiesByMonth: Array(months).fill(1_000_000),
+      debtObligations: [], tradeCreditLines: lines, assess: defaultCoachAssessment(),
+    }
+    const series = computeScoresTimeSeries(inputs, makeYearGroups(months), makeMonthLabels(months))
+    // Both years should show a real, non-zero DPO -- the outstanding
+    // payable balance is genuinely carried through both years, not lost
+    // when year 2 is scored on its own.
+    expect(series.years[0].result.tradeCredit.dpo).toBeGreaterThan(0)
+    expect(series.years[1].result.tradeCredit.dpo).toBeGreaterThan(0)
+  })
 })

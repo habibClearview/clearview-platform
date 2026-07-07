@@ -2385,13 +2385,16 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave}) {
   const warnings = findCashWarningMonths(result, months)
   const latestHealth = healthReports[0]
   const latestInvestment = investmentAssessments[0]
-  const debtSched = buildDebtSchedule(
-    config.settings.capital_structure?.bank_loan > 0 ? [{
-      drawdownMonth:1, annualRate:config.settings.capital_structure?.annual_interest_rate||0.18,
-      tenorMonths:(config.settings.capital_structure?.loan_tenor_years||2)*12,
-      gracePeriodMonths:0, principal:config.settings.capital_structure?.bank_loan, repaymentType:'amortising',
-    }] : [], months_n
-  )
+  // Single source of truth for the bank loan's shape as a DebtObligation
+  // -- previously constructed twice (once for debtSched, once for the
+  // score time series below), byte-for-byte identical but at real risk
+  // of silently drifting apart if one were ever edited without the other.
+  const bankLoanObligation = config.settings.capital_structure?.bank_loan > 0 ? [{
+    drawdownMonth:1, annualRate:config.settings.capital_structure?.annual_interest_rate||0.18,
+    tenorMonths:(config.settings.capital_structure?.loan_tenor_years||2)*12,
+    gracePeriodMonths:0, principal:config.settings.capital_structure?.bank_loan, repaymentType:'amortising',
+  }] : []
+  const debtSched = buildDebtSchedule(bankLoanObligation, months_n)
 
   // Score trend, for the collapsible year/month presentation of Credit
   // Risk / Going Concern / Investment Readiness -- computed once here,
@@ -2403,11 +2406,7 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave}) {
   const scoreSeries = computeScoresTimeSeries({
     rev: result.con.rev, ebitda: result.con.ebitda, cogs: result.con.cogs, cashClose: result.cf.close,
     totalEquityByMonth: result.bs.total_equity, totalLiabilitiesByMonth: result.bs.total_liabilities,
-    debtObligations: config.settings.capital_structure?.bank_loan > 0 ? [{
-      drawdownMonth:1, annualRate:config.settings.capital_structure?.annual_interest_rate||0.18,
-      tenorMonths:(config.settings.capital_structure?.loan_tenor_years||2)*12,
-      gracePeriodMonths:0, principal:config.settings.capital_structure?.bank_loan, repaymentType:'amortising',
-    }] : [],
+    debtObligations: bankLoanObligation,
     tradeCreditLines: config.settings.trade_credit_lines || [],
     assess,
   }, yearGroups, monthLabelsFull)
