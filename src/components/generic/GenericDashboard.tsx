@@ -551,7 +551,7 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGo
             <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>GOING CONCERN</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.gcColor}}>{s.gcScore}/20</div></div>
             <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>INVESTMENT READY</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.irColor}}>{s.irScore}/30</div></div>
           </div>
-          <button style={{...addBtn(true),background:'transparent',color:C.white,borderColor:'rgba(255,255,255,0.3)'}} onClick={onGoToIntelligence}>See full analysis →</button>
+          <button type="button" style={{...addBtn(true),background:'transparent',color:C.white,borderColor:'rgba(255,255,255,0.3)'}} onClick={onGoToIntelligence}>See full analysis →</button>
         </div>
       )}
       <div style={kpiGrid}>
