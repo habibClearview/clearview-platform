@@ -81,6 +81,19 @@ export function collapseYear(values: number[], actualMask: boolean[] | undefined
   return { value, isFullyActual: allActual, isPartiallyActual: !allActual && !allPlan, isFullyPlan: allPlan }
 }
 
+// Which year should start expanded: the one containing today's date, so
+// whoever opens the P&L sees the year they're currently living through
+// broken out by month by default. If today's calendar year isn't in the
+// model's range at all (a fully-future plan, or a historical archive),
+// falls back to the first year rather than leaving every year collapsed
+// with no detail visible until the user clicks something.
+export function defaultExpandedYears(yearGroups: YearGroup[], currentYear: number): Record<number, boolean> {
+  const init: Record<number, boolean> = {}
+  const hasCurrentYear = yearGroups.some(g => g.year === currentYear)
+  yearGroups.forEach((g, idx) => { init[g.year] = hasCurrentYear ? g.year === currentYear : idx === 0 })
+  return init
+}
+
 // ── Types ────────────────────────────────────────────────────
 
 // Unit types

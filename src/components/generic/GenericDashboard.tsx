@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import {
-  fmt, fmtFull, pct, buildMonthLabels, buildYearGroups, collapseYear,
+  fmt, fmtFull, pct, buildMonthLabels, buildYearGroups, collapseYear, defaultExpandedYears,
   runGenericModel, defaultGenericConfig,
   blankLine, spreadLine, serviceFeeLine,
   type GenericModelConfig, type GenericBusinessUnit,
@@ -157,12 +157,11 @@ function PLTable({title,rows,months,cc,showExport,closedMask}:{title?:string;row
 function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMask}:{title?:string;rows:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;actualMask?:boolean[]}[];months:string[];startDate:string;cc:string;showExport?:boolean;closedMask?:boolean[]}) {
   const yearGroups = useMemo(() => buildYearGroups(startDate, months.length), [startDate, months.length])
   const currentYear = new Date().getUTCFullYear()
-  const [expanded, setExpanded] = useState<Record<number, boolean>>(() => {
-    const init: Record<number, boolean> = {}
-    yearGroups.forEach(g => { init[g.year] = g.year === currentYear })
-    return init
-  })
+  const [expanded, setExpanded] = useState<Record<number, boolean>>(() => defaultExpandedYears(yearGroups, currentYear))
   function toggle(year: number) { setExpanded(e => ({...e, [year]: !e[year]})) }
+  function toggleKeyHandler(year: number) {
+    return (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(year) } }
+  }
 
   function exportCSV() {
     // Export always includes full monthly detail regardless of the
@@ -219,12 +218,12 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
                   {g.monthIndices.map(i => (
                     <th key={i} style={{textAlign:'right',padding:'8px 8px',color:'rgba(255,255,255,0.75)',whiteSpace:'nowrap',fontSize:'0.72rem',fontWeight:400}}>{months[i]}</th>
                   ))}
-                  <th onClick={()=>toggle(g.year)} style={{textAlign:'right',padding:'8px 10px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',cursor:'pointer',userSelect:'none',borderLeft:'2px solid rgba(255,255,255,0.2)'}}>
+                  <th onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Collapse FY ${g.label}`} style={{textAlign:'right',padding:'8px 10px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',cursor:'pointer',userSelect:'none',borderLeft:'2px solid rgba(255,255,255,0.2)'}}>
                     FY {g.label} <span style={{fontSize:'0.65rem'}}>&#9666;</span>
                   </th>
                 </React.Fragment>
               ) : (
-                <th key={g.year} onClick={()=>toggle(g.year)} style={{textAlign:'right',padding:'8px 10px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',cursor:'pointer',userSelect:'none',borderLeft:'2px solid rgba(255,255,255,0.2)'}}>
+                <th key={g.year} onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Expand FY ${g.label}`} style={{textAlign:'right',padding:'8px 10px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',cursor:'pointer',userSelect:'none',borderLeft:'2px solid rgba(255,255,255,0.2)'}}>
                   FY {g.label} <span style={{fontSize:'0.65rem'}}>&#9662;</span>
                 </th>
               ))}
@@ -251,7 +250,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
                           </td>
                         )
                       })}
-                      <td onClick={()=>toggle(g.year)} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:700,cursor:'pointer',
+                      <td onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Collapse FY ${g.label}`} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:700,cursor:'pointer',
                         color:r.negate?C.red:cell.value<0?C.red:C.navy,
                         background:cell.isFullyActual?'#EAFAF6':cell.isPartiallyActual?'#FDF6E3':undefined,
                         borderLeft:`2px solid ${C.border}`}}>
@@ -259,7 +258,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
                       </td>
                     </React.Fragment>
                   ) : (
-                    <td key={g.year} onClick={()=>toggle(g.year)} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:r.bold?700:400,cursor:'pointer',
+                    <td key={g.year} onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Expand FY ${g.label}`} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:r.bold?700:400,cursor:'pointer',
                       color:r.negate?C.red:cell.value<0?C.red:C.navy,
                       background:cell.isFullyActual?'#EAFAF6':cell.isPartiallyActual?'#FDF6E3':undefined,
                       borderLeft:`2px solid ${C.border}`}}>

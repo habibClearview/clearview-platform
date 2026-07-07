@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { runGenericModel, defaultGenericConfig, spreadLine, serviceFeeLine, buildYearGroups, collapseYear } from '../lib/generic-engine'
+import { runGenericModel, defaultGenericConfig, spreadLine, serviceFeeLine, buildYearGroups, collapseYear, defaultExpandedYears } from '../lib/generic-engine'
 import { deriveActualOperatingCosts } from '../lib/actuals'
 
 function expectBalanceSheetBalances(result: ReturnType<typeof runGenericModel>) {
@@ -939,5 +939,30 @@ describe('collapseYear — the year total and its actual/plan/partial status', (
     const values = [10, 20, 30, 40, 50]
     const result = collapseYear(values, undefined, [2, 3]) // only months at index 2 and 3
     expect(result.value).toBe(70) // 30 + 40, not the full array
+  })
+})
+
+describe('defaultExpandedYears — which year starts expanded', () => {
+  it('REG: the year containing today expands by default, all others stay collapsed', () => {
+    const groups = [{year: 2025, label: '2025', monthIndices: [0]}, {year: 2026, label: '2026', monthIndices: [1]}, {year: 2027, label: '2027', monthIndices: [2]}]
+    const result = defaultExpandedYears(groups, 2026)
+    expect(result[2025]).toBe(false)
+    expect(result[2026]).toBe(true)
+    expect(result[2027]).toBe(false)
+  })
+
+  it('REG: when the current calendar year is not in the model range at all (a fully-future plan, or a historical archive), falls back to the FIRST year instead of leaving everything collapsed', () => {
+    // Models exactly the scenario CodeRabbit flagged: a plan starting well
+    // into the future, so today's year never matches any group.
+    const groups = [{year: 2030, label: '2030', monthIndices: [0]}, {year: 2031, label: '2031', monthIndices: [1]}]
+    const result = defaultExpandedYears(groups, 2026)
+    expect(result[2030]).toBe(true)  // first year, used as the fallback
+    expect(result[2031]).toBe(false)
+  })
+
+  it('REG: a single-year range with no match still expands that one year via the fallback', () => {
+    const groups = [{year: 2030, label: '2030', monthIndices: [0]}]
+    const result = defaultExpandedYears(groups, 2026)
+    expect(result[2030]).toBe(true)
   })
 })
