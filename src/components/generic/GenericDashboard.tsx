@@ -2623,7 +2623,7 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
           {label:'Gross Profit',values:gpValues,bold:true,highlight:true,actualMask:periodIsActual},
           {label:'Total Operating Costs',values:opexValues,negate:true,actualMask:periodIsActual},
           {label:'EBITDA',values:ebitdaValues,bold:true,highlight:true,actualMask:periodIsActual},
-          {label:'Interest',values:con.interest,negate:true},
+          {label:'Interest',values:result.con.interest,negate:true},
           {label:'Net Profit Before Tax',values:nbtValues,bold:true,actualMask:periodIsActual},
           {label:'Tax',values:taxValues,negate:true,actualMask:periodIsActual},
           {label:'Net Profit After Tax',values:npatValues,bold:true,highlight:true,actualMask:periodIsActual},
