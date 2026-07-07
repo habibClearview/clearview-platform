@@ -3,6 +3,7 @@ import { shouldClearQueue } from '../lib/field-db'
 import { friendlyDbError } from '../lib/field-errors'
 import { buildAutoCogsRow, type CatalogueItemForCogs } from '../lib/field-cogs'
 import { isPlanLineValidForUnit, isValidCostCategory } from '../lib/catalogue-validation'
+import { clampHistoryLimit, isTokenRowValid } from '../lib/field-auth'
 
 // Tests for Clearview Field API route logic
 // Tests the validation and transformation logic without HTTP or DB
@@ -662,5 +663,57 @@ describe('isValidCostCategory — the cost-category allowlist for field sync cos
   it('REG: an unrecognized or empty category is rejected', () => {
     expect(isValidCostCategory('')).toBe(false)
     expect(isValidCostCategory('made_up_category')).toBe(false)
+  })
+})
+
+describe('clampHistoryLimit — field transaction history page size', () => {
+  it('REG: a valid requested limit within range is used as-is', () => {
+    expect(clampHistoryLimit('30')).toBe(30)
+  })
+
+  it('REG: no limit specified (null) defaults to 50', () => {
+    expect(clampHistoryLimit(null)).toBe(50)
+  })
+
+  it('REG: a limit above the maximum is clamped to 200, not honored as-is', () => {
+    expect(clampHistoryLimit('5000')).toBe(200)
+  })
+
+  it('REG: a non-numeric, zero, or negative value defaults to 50 rather than producing NaN or an invalid query', () => {
+    expect(clampHistoryLimit('not-a-number')).toBe(50)
+    expect(clampHistoryLimit('0')).toBe(50)
+    expect(clampHistoryLimit('-10')).toBe(50)
+  })
+
+  it('REG: a fractional limit is floored to a whole number', () => {
+    expect(clampHistoryLimit('25.7')).toBe(25)
+  })
+})
+
+describe('isTokenRowValid — the field auth gate, security-critical, previously untested', () => {
+  it('REG: a null row (token not found at all) is rejected', () => {
+    expect(isTokenRowValid(null)).toBe(false)
+  })
+
+  it('REG: a row with no expiry and an active operator is valid', () => {
+    expect(isTokenRowValid({ expires_at: null, operator: { active: true } })).toBe(true)
+  })
+
+  it('REG: an expired token is rejected, even with an active operator', () => {
+    const row = { expires_at: '2020-01-01T00:00:00Z', operator: { active: true } }
+    expect(isTokenRowValid(row, new Date('2026-01-01'))).toBe(false)
+  })
+
+  it('REG: a token that has not yet expired is valid', () => {
+    const row = { expires_at: '2030-01-01T00:00:00Z', operator: { active: true } }
+    expect(isTokenRowValid(row, new Date('2026-01-01'))).toBe(true)
+  })
+
+  it('REG: a token with a missing operator embed entirely is rejected', () => {
+    expect(isTokenRowValid({ expires_at: null, operator: null })).toBe(false)
+  })
+
+  it('REG: an inactive operator is rejected, even with a token that has not expired', () => {
+    expect(isTokenRowValid({ expires_at: null, operator: { active: false } })).toBe(false)
   })
 })
