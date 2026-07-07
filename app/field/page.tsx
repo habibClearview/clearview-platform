@@ -47,7 +47,10 @@ export default function FieldCapturePage() {
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string|null>(null)
   const [lastSync, setLastSync] = useState<string|null>(null)
-  const [mode, setMode] = useState<'grid'|'sale-detail'|'cost-form'>('grid')
+  const [mode, setMode] = useState<'grid'|'sale-detail'|'cost-form'|'history'>('grid')
+  const [historyEntries, setHistoryEntries] = useState<any[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState('')
   const [selectedItem, setSelectedItem] = useState<CatalogueItem|null>(null)
   const [saleForm, setSaleForm] = useState({quantity:'', payment_method:'cash', customer_id:'', notes:'', override:false, override_price:''})
   const [costForm, setCostForm] = useState({plan_line_id:'', amount:'', notes:''})
@@ -291,6 +294,22 @@ export default function FieldCapturePage() {
     setSyncing(false)
   }
 
+  async function loadHistory() {
+    if (!token) return
+    setMode('history')
+    setHistoryLoading(true)
+    setHistoryError('')
+    try {
+      const res = await fetch(`/api/field/history?token=${encodeURIComponent(token)}&limit=50`)
+      const data = await res.json()
+      if (res.ok) setHistoryEntries(data.transactions || [])
+      else setHistoryError(data.error || 'Could not load your transaction history.')
+    } catch {
+      setHistoryError('No connection -- try again once you have signal.')
+    }
+    setHistoryLoading(false)
+  }
+
   useEffect(()=>{ syncNowRef.current = syncNow })
 
   if (!token) {
@@ -335,10 +354,16 @@ export default function FieldCapturePage() {
 
   return (
     <div style={{minHeight:'100vh',background:C.cream,fontFamily:"'Segoe UI',system-ui,sans-serif",paddingBottom:'2rem'}}>
-      <header style={{background:C.navy,padding:'1rem 1.1rem',color:C.white}}>
-        <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:C.cyan}}>CLEARVIEW FIELD</div>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',marginTop:'0.15rem'}}>{auth.unit.name}</div>
-        <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.6)',marginTop:'0.1rem'}}>{auth.operator.display_name} · {auth.client.name}</div>
+      <header style={{background:C.navy,padding:'1rem 1.1rem',color:C.white,display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+        <div>
+          <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:C.cyan}}>CLEARVIEW FIELD</div>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',marginTop:'0.15rem'}}>{auth.unit.name}</div>
+          <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.6)',marginTop:'0.1rem'}}>{auth.operator.display_name} · {auth.client.name}</div>
+        </div>
+        <button onClick={mode==='history'?()=>setMode('grid'):loadHistory}
+          style={{background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.25)',color:C.white,borderRadius:6,padding:'0.5rem 0.75rem',fontSize:'0.72rem',cursor:'pointer',whiteSpace:'nowrap'}}>
+          {mode==='history'?'← Back':'History'}
+        </button>
       </header>
 
       <div style={{padding:'1rem'}}>
@@ -518,6 +543,36 @@ export default function FieldCapturePage() {
                 style={{flex:1,padding:'0.85rem',background:C.red,color:C.white,border:'none',borderRadius:6,fontWeight:700,cursor:'pointer'}}>{editingCostId?'Save Changes':'Add to Queue'}</button>
               <button onClick={()=>{setMode('grid');setEditingCostId(null)}} style={{padding:'0.85rem 1rem',background:'transparent',color:C.slate,border:`1px solid ${C.border}`,borderRadius:6,cursor:'pointer'}}>Cancel</button>
             </div>
+          </div>
+        )}
+
+        {mode==='history' && (
+          <div>
+            <div style={{fontWeight:700,fontSize:'1rem',color:C.navy,marginBottom:'0.85rem'}}>Your Recent Activity</div>
+            {historyLoading && <div style={{textAlign:'center',color:C.slate,padding:'2rem',fontSize:'0.85rem'}}>Loading...</div>}
+            {!historyLoading && historyError && (
+              <div style={{background:'#FDF2F0',border:`1px solid ${C.red}`,borderRadius:8,padding:'1rem',color:C.red,fontSize:'0.85rem'}}>{historyError}</div>
+            )}
+            {!historyLoading && !historyError && historyEntries.length===0 && (
+              <div style={{textAlign:'center',color:C.slate,padding:'2rem',fontSize:'0.85rem'}}>Nothing recorded yet. Once you sync an entry, it'll show up here.</div>
+            )}
+            {!historyLoading && !historyError && historyEntries.map(entry=>(
+              <div key={entry.id} style={{background:C.white,border:`1px solid ${C.border}`,borderLeft:`4px solid ${entry.transaction_type==='sale'?C.green:C.red}`,borderRadius:8,padding:'0.85rem 1rem',marginBottom:'0.6rem'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'0.5rem'}}>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>{entry.plan_line_name}</div>
+                    <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.15rem'}}>
+                      {entry.transaction_date} {entry.quantity?`· ${entry.quantity} × ${fmt(entry.unit_price,auth.client.currency)}`:''}
+                    </div>
+                    {entry.notes && <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.15rem',fontStyle:'italic'}}>{entry.notes}</div>}
+                  </div>
+                  <div style={{fontWeight:700,fontSize:'0.95rem',color:entry.transaction_type==='sale'?C.green:C.red,whiteSpace:'nowrap'}}>
+                    {entry.transaction_type==='sale'?'+':'−'}{fmt(entry.amount,auth.client.currency)}
+                  </div>
+                </div>
+                {entry.price_alert && <div style={{fontSize:'0.68rem',color:C.amber,marginTop:'0.4rem'}}>⚠ Price was overridden from the standard catalogue price</div>}
+              </div>
+            ))}
           </div>
         )}
       </div>

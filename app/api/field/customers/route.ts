@@ -1,25 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Supabase environment variables not configured')
-  return createClient(url, key)
-}
-
-async function validateToken(token: string) {
-  const supabase = getSupabase()
-  const { data, error } = await supabase
-    .from('field_operator_tokens')
-    .select('*, operator:field_operators(*)')
-    .eq('token', token)
-    .single()
-  if (error || !data) return null
-  if (data.expires_at && new Date(data.expires_at) < new Date()) return null
-  if (!data.operator?.active) return null
-  return data.operator
-}
+import { getFieldSupabase as getSupabase, validateFieldToken as validateToken } from '@/lib/field-auth'
 
 export async function GET(req: NextRequest) {
   try {

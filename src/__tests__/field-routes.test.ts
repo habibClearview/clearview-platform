@@ -3,6 +3,7 @@ import { shouldClearQueue } from '../lib/field-db'
 import { friendlyDbError } from '../lib/field-errors'
 import { buildAutoCogsRow, type CatalogueItemForCogs } from '../lib/field-cogs'
 import { isPlanLineValidForUnit, isValidCostCategory } from '../lib/catalogue-validation'
+import { clampHistoryLimit } from '../lib/field-auth'
 
 // Tests for Clearview Field API route logic
 // Tests the validation and transformation logic without HTTP or DB
@@ -662,5 +663,29 @@ describe('isValidCostCategory — the cost-category allowlist for field sync cos
   it('REG: an unrecognized or empty category is rejected', () => {
     expect(isValidCostCategory('')).toBe(false)
     expect(isValidCostCategory('made_up_category')).toBe(false)
+  })
+})
+
+describe('clampHistoryLimit — field transaction history page size', () => {
+  it('REG: a valid requested limit within range is used as-is', () => {
+    expect(clampHistoryLimit('30')).toBe(30)
+  })
+
+  it('REG: no limit specified (null) defaults to 50', () => {
+    expect(clampHistoryLimit(null)).toBe(50)
+  })
+
+  it('REG: a limit above the maximum is clamped to 200, not honored as-is', () => {
+    expect(clampHistoryLimit('5000')).toBe(200)
+  })
+
+  it('REG: a non-numeric, zero, or negative value defaults to 50 rather than producing NaN or an invalid query', () => {
+    expect(clampHistoryLimit('not-a-number')).toBe(50)
+    expect(clampHistoryLimit('0')).toBe(50)
+    expect(clampHistoryLimit('-10')).toBe(50)
+  })
+
+  it('REG: a fractional limit is floored to a whole number', () => {
+    expect(clampHistoryLimit('25.7')).toBe(25)
   })
 })

@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { isPlanLineValidForUnit } from '@/lib/catalogue-validation'
-
-// Lazy init -- must never call createClient() at module level on Vercel.
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Supabase environment variables not configured')
-  return createClient(url, key)
-}
+import { getFieldSupabase as getSupabase } from '@/lib/field-auth'
 
 // ── GET: list catalogue items for a client (optionally one unit) ──
 export async function GET(req: NextRequest) {
