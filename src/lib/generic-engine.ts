@@ -72,7 +72,34 @@ export interface YearCollapsedCell {
   isPartiallyActual: boolean
   isFullyPlan: boolean
 }
-export function collapseYear(values: number[], actualMask: boolean[] | undefined, monthIndices: number[]): YearCollapsedCell {
+// Which kind of figure a row is, for collapsing a year down to one
+// value:
+// - 'sum' (default): a FLOW over the period -- revenue, costs, cash
+//   movements. The year total is the sum of its months. Correct for
+//   every P&L row and most Cash Flow rows.
+// - 'endOfPeriod': a STOCK, a balance AT A POINT IN TIME -- every
+//   Balance Sheet row, and Closing Cash. Summing 12 months of "Total
+//   Assets" would produce a meaningless, wildly inflated number; the
+//   only sensible collapsed value is the balance as of the last month
+//   in that year.
+// - 'startOfPeriod': also a point-in-time balance, but as of the START
+//   of the year -- specifically Opening Cash, which is genuinely the
+//   prior year's closing balance carried forward, not a mid-year or
+//   end-of-year figure.
+export type YearAggregation = 'sum' | 'endOfPeriod' | 'startOfPeriod'
+
+export function collapseYear(values: number[], actualMask: boolean[] | undefined, monthIndices: number[], aggregation: YearAggregation = 'sum'): YearCollapsedCell {
+  if (aggregation !== 'sum') {
+    // A point-in-time balance has no "partial" state the way a sum of
+    // flows over a part-actual, part-plan year does -- it's simply the
+    // balance as of one specific month, which is either a real, closed
+    // figure or a projected one, never a blend of both.
+    const relevantIdx = aggregation === 'endOfPeriod' ? monthIndices[monthIndices.length - 1] : monthIndices[0]
+    const value = values[relevantIdx] ?? 0
+    if (!actualMask) return { value, isFullyActual: false, isPartiallyActual: false, isFullyPlan: true }
+    const isActual = !!actualMask[relevantIdx]
+    return { value, isFullyActual: isActual, isPartiallyActual: false, isFullyPlan: !isActual }
+  }
   const value = monthIndices.reduce((s, i) => s + (values[i] ?? 0), 0)
   if (!actualMask) return { value, isFullyActual: false, isPartiallyActual: false, isFullyPlan: true }
   const maskSlice = monthIndices.map(i => actualMask[i])
