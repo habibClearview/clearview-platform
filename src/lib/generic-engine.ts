@@ -28,6 +28,59 @@ export function buildMonthLabels(startDate: string, months = 24): string[] {
   })
 }
 
+// Groups month indices by calendar year. Deliberately data-driven -- the
+// number of years returned is however many calendar years the model's
+// start_date + months span, not a fixed list. A model with 24 planning
+// months produces however many year-groups that spans (partial first
+// year if start_date isn't January, partial last year if the window
+// doesn't end in December); a model later extended to 60+ months
+// produces more year-groups automatically, with no separate code path
+// needed. This is what makes "add another year" a data change rather
+// than a UI change -- the collapsible column UI just renders however
+// many groups this returns.
+export interface YearGroup {
+  year: number
+  label: string
+  monthIndices: number[]
+}
+export function buildYearGroups(startDate: string, months: number): YearGroup[] {
+  const start = new Date(startDate)
+  const startYear = start.getUTCFullYear()
+  const startMonth = start.getUTCMonth()
+  const byYear: Record<number, number[]> = {}
+  for (let i = 0; i < months; i++) {
+    const d = new Date(Date.UTC(startYear, startMonth + i, 1))
+    const y = d.getUTCFullYear()
+    if (!byYear[y]) byYear[y] = []
+    byYear[y].push(i)
+  }
+  return Object.keys(byYear).map(Number).sort((a, b) => a - b)
+    .map(year => ({ year, label: String(year), monthIndices: byYear[year] }))
+}
+
+// Collapses one row's per-month values into a single year total, plus
+// whether that year is fully actual, fully plan, or -- for the year
+// currently in progress -- a mix of both (some months closed/actual,
+// the rest still forecast). The partial case needs its own status
+// rather than being forced into "actual" or "plan": a year that's
+// half real and half forecast is neither, and showing it as one or
+// the other would misrepresent it the same way a single blended
+// month once did.
+export interface YearCollapsedCell {
+  value: number
+  isFullyActual: boolean
+  isPartiallyActual: boolean
+  isFullyPlan: boolean
+}
+export function collapseYear(values: number[], actualMask: boolean[] | undefined, monthIndices: number[]): YearCollapsedCell {
+  const value = monthIndices.reduce((s, i) => s + (values[i] ?? 0), 0)
+  if (!actualMask) return { value, isFullyActual: false, isPartiallyActual: false, isFullyPlan: true }
+  const maskSlice = monthIndices.map(i => actualMask[i])
+  const allActual = maskSlice.length > 0 && maskSlice.every(Boolean)
+  const allPlan = maskSlice.every(v => !v)
+  return { value, isFullyActual: allActual, isPartiallyActual: !allActual && !allPlan, isFullyPlan: allPlan }
+}
+
 // ── Types ────────────────────────────────────────────────────
 
 // Unit types

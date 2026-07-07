@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { runGenericModel, defaultGenericConfig, spreadLine, serviceFeeLine } from '../lib/generic-engine'
+import { runGenericModel, defaultGenericConfig, spreadLine, serviceFeeLine, buildYearGroups, collapseYear } from '../lib/generic-engine'
 import { deriveActualOperatingCosts } from '../lib/actuals'
 
 function expectBalanceSheetBalances(result: ReturnType<typeof runGenericModel>) {
@@ -859,5 +859,85 @@ describe('Generic Engine — revenue under the calendar rule (multiple units)', 
     }
     const result = runGenericModel(makeTwoRevUnitsConfig(), actuals)
     expect(result.con.act_gp[0]).toBe(4_800_000 + 5_100_000)
+  })
+})
+
+describe('buildYearGroups — data-driven year columns for the collapsible P&L presentation', () => {
+  it('REG: a model starting mid-year produces a partial first year containing only the months from start_date onward', () => {
+    // Starts April 2026, 24 months -> spans Apr 2026 through Mar 2028
+    const groups = buildYearGroups('2026-04-02', 24)
+    expect(groups[0].year).toBe(2026)
+    expect(groups[0].monthIndices).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]) // Apr..Dec = 9 months
+  })
+
+  it('REG: full calendar years in the middle of the range contain all 12 months', () => {
+    const groups = buildYearGroups('2026-04-02', 24)
+    expect(groups[1].year).toBe(2027)
+    expect(groups[1].monthIndices.length).toBe(12)
+  })
+
+  it('REG: a range that ends mid-year produces a partial final year', () => {
+    // 24 months from April 2026 ends March 2028 -> 2028 only has Jan-Mar
+    const groups = buildYearGroups('2026-04-02', 24)
+    expect(groups[2].year).toBe(2028)
+    expect(groups[2].monthIndices.length).toBe(3)
+  })
+
+  it('REG: the number of year-groups is derived entirely from the data, not a fixed count -- more planning months produce more groups automatically', () => {
+    const groups24 = buildYearGroups('2026-01-01', 24)
+    const groups60 = buildYearGroups('2026-01-01', 60)
+    expect(groups24.length).toBe(2) // 2026, 2027
+    expect(groups60.length).toBe(5) // 2026, 2027, 2028, 2029, 2030
+  })
+
+  it('REG: a start_date of January 1st produces a full 12-month first year, not a partial one', () => {
+    const groups = buildYearGroups('2026-01-01', 12)
+    expect(groups.length).toBe(1)
+    expect(groups[0].monthIndices.length).toBe(12)
+  })
+})
+
+describe('collapseYear — the year total and its actual/plan/partial status', () => {
+  it('REG: a year where every included month is actual is fully actual', () => {
+    const values = [100, 200, 300]
+    const actualMask = [true, true, true]
+    const result = collapseYear(values, actualMask, [0, 1, 2])
+    expect(result.value).toBe(600)
+    expect(result.isFullyActual).toBe(true)
+    expect(result.isPartiallyActual).toBe(false)
+    expect(result.isFullyPlan).toBe(false)
+  })
+
+  it('REG: a year where every included month is plan is fully plan', () => {
+    const values = [100, 200, 300]
+    const actualMask = [false, false, false]
+    const result = collapseYear(values, actualMask, [0, 1, 2])
+    expect(result.isFullyPlan).toBe(true)
+    expect(result.isFullyActual).toBe(false)
+    expect(result.isPartiallyActual).toBe(false)
+  })
+
+  it('REG: the current year in progress (some months actual, some still plan) is neither fully actual nor fully plan -- it is its own distinct partial state', () => {
+    // Models a year like 2026 as of July: Apr-Jun actual, Jul(current)
+    // actual-to-date, Aug-Dec still plan.
+    const values = [100, 100, 100, 100, 100, 100, 100, 100, 100]
+    const actualMask = [true, true, true, true, false, false, false, false, false]
+    const result = collapseYear(values, actualMask, [0, 1, 2, 3, 4, 5, 6, 7, 8])
+    expect(result.isFullyActual).toBe(false)
+    expect(result.isFullyPlan).toBe(false)
+    expect(result.isPartiallyActual).toBe(true)
+    expect(result.value).toBe(900) // the total still sums whatever is in each month, actual or plan
+  })
+
+  it('REG: with no actualMask provided at all (e.g. Interest, which has no actual/plan distinction), the year is treated as fully plan, not fully actual', () => {
+    const result = collapseYear([100, 200], undefined, [0, 1])
+    expect(result.isFullyPlan).toBe(true)
+    expect(result.isFullyActual).toBe(false)
+  })
+
+  it('REG: the collapsed value correctly sums only the months belonging to this specific year, ignoring months outside monthIndices', () => {
+    const values = [10, 20, 30, 40, 50]
+    const result = collapseYear(values, undefined, [2, 3]) // only months at index 2 and 3
+    expect(result.value).toBe(70) // 30 + 40, not the full array
   })
 })
