@@ -11,7 +11,7 @@ import {
 } from '@/lib/generic-engine'
 import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor, computeScoresTimeSeries } from '@/lib/scoring-engine'
 import { computeNPV, computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary, annualRateToMonthlyRate, monthlyRateToAnnualRate } from '@/lib/investment-metrics'
-import { combinedActual, computeActualsTotals, applyPeriodActual, buildHybridConsolidated } from '@/lib/actuals'
+import { combinedActual, computeActualsTotals, applyPeriodActual, buildHybridConsolidated, computeCatalogueLineTotal } from '@/lib/actuals'
 import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
 import { yearStartPeriod, canCloseCalendarYear, computeYearEndBalanceSheet } from '@/lib/annual-close'
 
@@ -1021,6 +1021,9 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
   })
   const [lineValues, setLineValues] = useState<Record<string,number>>({})
   const [fieldLineValues, setFieldLineValues] = useState<Record<string,number>>({})
+  const [catalogueQuantities, setCatalogueQuantities] = useState<Record<string,Record<string,number>>>({})
+  const [entryMode, setEntryMode] = useState<Record<string,'catalogue'|'manual'>>({})
+  const [unitCatalogue, setUnitCatalogue] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -1054,10 +1057,26 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
         // for display -- see docs/ACCOUNTING_ARCHITECTURE.md section 4.
         setLineValues(data?.line_values||{})
         setFieldLineValues(data?.field_line_values||{})
+        setCatalogueQuantities(data?.catalogue_quantities||{})
         setSubmitted(data?.submitted||false)
         setLoading(false)
       })
   },[selUnit,selPeriod])
+
+  // Catalogue items for the SELECTED UNIT, available to any authorized
+  // user entering actuals -- not gated behind canSeeAll like the
+  // staleness check above, which feeds a different, FM/CEO/coach-only
+  // exception report. This is the same field_catalogue table and same
+  // price-locked entry principle the field app already uses: pick an
+  // item, enter a quantity, the price is never manually typed.
+  useEffect(()=>{
+    if (!selUnit) { setUnitCatalogue([]); return }
+    let active = true
+    supabase.from('field_catalogue').select('id,plan_line_id,name,item_type,price,unit_label')
+      .eq('client_id',config.client_id).eq('business_unit_id',selUnit).eq('active',true)
+      .then(({data})=>{ if (active) setUnitCatalogue(data||[]) })
+    return () => { active = false }
+  },[selUnit,config.client_id])
 
   useEffect(()=>{
     if (!canSeeAll) return
@@ -1113,7 +1132,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
     setSaving(true)
     const {error} = await supabase.from('generic_actuals').upsert({
       client_id:config.client_id, unit_id:selUnit, period:selPeriod,
-      line_values:lineValues, submitted:submit||(submitted&&!canSeeAll),
+      line_values:lineValues, catalogue_quantities:catalogueQuantities, submitted:submit||(submitted&&!canSeeAll),
       submitted_at:submit?new Date().toISOString():undefined,
       submitted_by:submit?P.fullName:undefined,
       entered_by:P.fullName, entered_at:new Date().toISOString(),
@@ -1200,6 +1219,34 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
   // Uses the shared src/lib/actuals.ts so tests exercise the same function.
   const combined = (lineId:string) => combinedActual(lineId, lineValues, fieldLineValues)
   const { totalRev, totalCOGS, totalCost, grossProfit, netResult } = computeActualsTotals(lines, lineValues, fieldLineValues)
+
+  // Catalogue items available for a given plan line -- if any exist,
+  // catalogue-priced entry (pick an item, enter a quantity, price is
+  // never manually typed) is the default; a line with none falls back to
+  // the round-figure entry unchanged. Matches the field app's own
+  // price-locked entry principle, now available for manual dashboard
+  // entry too -- for the paper-only outlets round-figure entry remains
+  // available as an explicit per-line fallback, never removed.
+  const catalogueItemsForLine = (lineId:string) => unitCatalogue.filter(c=>c.plan_line_id===lineId)
+
+  function isCatalogueMode(lineId:string): boolean {
+    const items = catalogueItemsForLine(lineId)
+    if (items.length === 0) return false
+    return entryMode[lineId] !== 'manual' // defaults to catalogue mode whenever items exist
+  }
+
+  // Updates one catalogue item's quantity for a line, recomputes that
+  // line's total as the sum of quantity x price across every catalogue
+  // item mapped to it, and writes the result into lineValues -- the
+  // single source of truth actually saved and used by the engine.
+  // catalogue_quantities is saved alongside purely so the quantity
+  // breakdown survives a reload, never read by the engine itself.
+  function updateQuantity(lineId:string, itemId:string, qty:number) {
+    const nextQuantities = {...(catalogueQuantities[lineId]||{}), [itemId]: qty}
+    setCatalogueQuantities(cq => ({...cq, [lineId]: nextQuantities}))
+    const total = computeCatalogueLineTotal(catalogueItemsForLine(lineId), nextQuantities)
+    setLineValues(v => ({...v, [lineId]: total}))
+  }
 
   return (
     <div>
@@ -1313,16 +1360,49 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
                   </div>
                   {sLines.map(l=>{
                     const fieldAmt = Number(fieldLineValues[l.id]||0)
+                    const items = catalogueItemsForLine(l.id)
+                    const catalogueMode = isCatalogueMode(l.id)
+                    const disabled = !periodCloseVerified||periodClose?.closed||(submitted&&!canSeeAll)
                     return (
                     <div key={l.id} style={{padding:'0.45rem 0.75rem',background:C.cream,borderRadius:4,marginBottom:'0.5rem'}}>
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 180px',alignItems:'center',gap:'0.75rem'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom: (catalogueMode && items.length>0) ? '0.5rem' : 0}}>
                         <label htmlFor={`actual-${l.id}`} style={{fontWeight:600,fontSize:'0.82rem',color:C.navy,lineHeight:1.3}}>{l.name}</label>
-                        <input id={`actual-${l.id}`} type="number"
-                          style={{width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'monospace',background:(!periodCloseVerified||periodClose?.closed||(submitted&&!canSeeAll))?'#F5F5F5':C.white,color:C.navy,textAlign:'right',boxSizing:'border-box'}}
-                          value={lineValues[l.id]??''} placeholder="0"
-                          disabled={!periodCloseVerified||periodClose?.closed||(submitted&&!canSeeAll)}
-                          onChange={e=>setLineValues(v=>({...v,[l.id]:Number(e.target.value)}))}/>
+                        {items.length>0 && (
+                          <button type="button" disabled={disabled}
+                            onClick={()=>setEntryMode(m=>({...m,[l.id]: catalogueMode ? 'manual' : 'catalogue'}))}
+                            style={{background:'none',border:'none',color:C.teal,fontSize:'0.68rem',cursor:disabled?'default':'pointer',textDecoration:'underline',padding:0}}>
+                            {catalogueMode ? 'Enter as round figure instead' : 'Use catalogue pricing instead'}
+                          </button>
+                        )}
                       </div>
+                      {catalogueMode ? (
+                        <div>
+                          {items.map(item=>(
+                            <div key={item.id} style={{display:'grid',gridTemplateColumns:'1fr 90px 110px',alignItems:'center',gap:'0.5rem',marginBottom:'0.35rem'}}>
+                              <span style={{fontSize:'0.78rem',color:C.navy}}>{item.name}{item.unit_label?` (${item.unit_label})`:''}</span>
+                              <input type="number" aria-label={`Quantity for ${item.name}`}
+                                style={{width:'100%',padding:'0.35rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.78rem',fontFamily:'monospace',textAlign:'right',background:disabled?'#F5F5F5':C.white,boxSizing:'border-box'}}
+                                value={catalogueQuantities[l.id]?.[item.id]??''} placeholder="0" disabled={disabled}
+                                onChange={e=>updateQuantity(l.id,item.id,Number(e.target.value))}/>
+                              <span style={{fontSize:'0.72rem',color:C.slate,fontFamily:'monospace',textAlign:'right'}}>
+                                @ {fmt(Number(item.price||0),cc)} = {fmt((Number(catalogueQuantities[l.id]?.[item.id])||0)*Number(item.price||0),cc)}
+                              </span>
+                            </div>
+                          ))}
+                          <div style={{textAlign:'right',fontSize:'0.8rem',fontWeight:700,color:C.navy,marginTop:'0.35rem',borderTop:`1px solid ${C.border}`,paddingTop:'0.35rem'}}>
+                            Total: {fmt(lineValues[l.id]||0,cc)}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 180px',alignItems:'center',gap:'0.75rem'}}>
+                          <span/>
+                          <input id={`actual-${l.id}`} type="number"
+                            style={{width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'monospace',background:disabled?'#F5F5F5':C.white,color:C.navy,textAlign:'right',boxSizing:'border-box'}}
+                            value={lineValues[l.id]??''} placeholder="0"
+                            disabled={disabled}
+                            onChange={e=>setLineValues(v=>({...v,[l.id]:Number(e.target.value)}))}/>
+                        </div>
+                      )}
                       {/* Field-app figure is read-only here -- it's written exclusively
                           by aggregate_field_transactions(), never editable by hand.
                           The input above is manual entry only (e.g. a paper-only store);
