@@ -9,7 +9,7 @@ import {
   type GenericModelConfig, type GenericBusinessUnit,
   type GenericPlanLine, type LineCategory, type LineType, type UnitType,
 } from '@/lib/generic-engine'
-import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor } from '@/lib/scoring-engine'
+import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor, computeScoresTimeSeries } from '@/lib/scoring-engine'
 import { computeNPV, computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary, annualRateToMonthlyRate, monthlyRateToAnnualRate } from '@/lib/investment-metrics'
 import { combinedActual, computeActualsTotals, applyPeriodActual, buildHybridConsolidated } from '@/lib/actuals'
 import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
@@ -275,6 +275,104 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
     </div>
   )
 }
+
+// Collapsible year/month trend for a single score dimension (Credit
+// Risk, Going Concern, or Investment Readiness) -- the same collapsible
+// mechanism as the P&L/BS/CF tabs, but built directly around
+// computeScoresTimeSeries' already-computed per-year and per-month
+// results rather than routing through PLTableCollapsible's aggregation
+// logic, since the "collapsed year" value here is the year computed
+// directly by the scoring engine, not a sum/endpoint of monthly values.
+// Works identically whether the underlying data is all-plan (a
+// prospective client with no live actuals at all) or a mix of actual
+// and plan -- every period always has a real, computed value.
+function ScoreTrendCard({
+  title, maxLabel, years, monthsByYear, getValue, getClassification, getColor,
+}: {
+  title: string
+  maxLabel: string
+  years: {label:string; monthIndices:number[]; result:any}[]
+  monthsByYear: Record<string, {label:string; monthIndices:number[]; result:any}[]>
+  getValue: (r:any) => number
+  getClassification: (r:any) => string
+  getColor: (r:any) => string
+}) {
+  const currentYear = new Date().getUTCFullYear()
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {}
+    const hasCurrent = years.some(y => y.label === String(currentYear))
+    years.forEach((y, idx) => { init[y.label] = hasCurrent ? y.label === String(currentYear) : idx === 0 })
+    return init
+  })
+  function toggle(label: string) { setExpanded(e => ({...e, [label]: !e[label]})) }
+  function toggleKey(label: string) { return (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(label) } } }
+
+  return (
+    <div style={{...card,padding:0,overflow:'hidden',marginBottom:'1.25rem'}}>
+      <div style={{padding:'0.85rem 1.1rem',borderBottom:`1px solid ${C.border}`,fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy}}>{title}</div>
+      <div style={{overflowX:'auto'}}>
+        <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.77rem',fontFamily:'monospace'}}>
+          <thead>
+            <tr style={{background:C.navy}}>
+              <th style={{textAlign:'left',padding:'8px 10px',color:C.white,minWidth:110,fontSize:'0.75rem',position:'sticky',left:0,background:C.navy}}></th>
+              {years.map(y => expanded[y.label] ? (
+                <React.Fragment key={y.label}>
+                  {(monthsByYear[y.label]||[]).map((m,i) => (
+                    <th key={i} style={{textAlign:'right',padding:'8px 8px',color:'rgba(255,255,255,0.75)',whiteSpace:'nowrap',fontSize:'0.72rem',fontWeight:400}}>{m.label}</th>
+                  ))}
+                  <th onClick={()=>toggle(y.label)} onKeyDown={toggleKey(y.label)} tabIndex={0} role="button" aria-label={`Collapse FY ${y.label}`}
+                    style={{textAlign:'right',padding:'8px 10px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',cursor:'pointer',userSelect:'none',borderLeft:'2px solid rgba(255,255,255,0.2)'}}>
+                    FY {y.label} <span style={{fontSize:'0.65rem'}}>&#9666;</span>
+                  </th>
+                </React.Fragment>
+              ) : (
+                <th key={y.label} onClick={()=>toggle(y.label)} onKeyDown={toggleKey(y.label)} tabIndex={0} role="button" aria-label={`Expand FY ${y.label}`}
+                  style={{textAlign:'right',padding:'8px 10px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',cursor:'pointer',userSelect:'none',borderLeft:'2px solid rgba(255,255,255,0.2)'}}>
+                  FY {y.label} <span style={{fontSize:'0.65rem'}}>&#9662;</span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={{padding:'7px 10px',fontWeight:700,color:C.navy,minWidth:110,fontSize:'0.8rem',position:'sticky',left:0,background:C.white}}>{title.replace(' Trend','')} <span style={{fontWeight:400,color:C.slate}}>/{maxLabel}</span></td>
+              {years.map(y => expanded[y.label] ? (
+                <React.Fragment key={y.label}>
+                  {(monthsByYear[y.label]||[]).map((m,i) => (
+                    <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:700,color:getColor(m.result)}}>
+                      {getValue(m.result)}
+                    </td>
+                  ))}
+                  <td onClick={()=>toggle(y.label)} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:700,cursor:'pointer',color:getColor(y.result),borderLeft:`2px solid ${C.border}`}}>
+                    {getValue(y.result)}
+                  </td>
+                </React.Fragment>
+              ) : (
+                <td key={y.label} onClick={()=>toggle(y.label)} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:700,cursor:'pointer',color:getColor(y.result),borderLeft:`2px solid ${C.border}`}}>
+                  {getValue(y.result)}
+                </td>
+              ))}
+            </tr>
+            <tr style={{background:C.lightBg}}>
+              <td style={{padding:'7px 10px',color:C.slate,fontSize:'0.72rem',position:'sticky',left:0,background:C.lightBg}}>Rating</td>
+              {years.map(y => expanded[y.label] ? (
+                <React.Fragment key={y.label}>
+                  {(monthsByYear[y.label]||[]).map((m,i) => (
+                    <td key={i} style={{padding:'7px 8px',textAlign:'right',fontSize:'0.68rem',color:getColor(m.result)}}>{getClassification(m.result)}</td>
+                  ))}
+                  <td style={{padding:'7px 10px',textAlign:'right',fontSize:'0.68rem',color:getColor(y.result),borderLeft:`2px solid ${C.border}`}}>{getClassification(y.result)}</td>
+                </React.Fragment>
+              ) : (
+                <td key={y.label} style={{padding:'7px 10px',textAlign:'right',fontSize:'0.68rem',color:getColor(y.result),borderLeft:`2px solid ${C.border}`}}>{getClassification(y.result)}</td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 
 // ── Permissions ──────────────────────────────────────────────
 export interface GenericPermissions {
@@ -2295,6 +2393,27 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave}) {
     }] : [], months_n
   )
 
+  // Score trend, for the collapsible year/month presentation of Credit
+  // Risk / Going Concern / Investment Readiness -- computed once here,
+  // shared by all three ScoreTrendCard instances below. Works whether
+  // this client has any live actuals yet or not, since it only draws on
+  // whatever the engine has already produced for every month.
+  const yearGroups = buildYearGroups(config.start_date, config.planning_months)
+  const monthLabelsFull = buildMonthLabels(config.start_date, config.planning_months)
+  const scoreSeries = computeScoresTimeSeries({
+    rev: result.con.rev, ebitda: result.con.ebitda, cogs: result.con.cogs, cashClose: result.cf.close,
+    totalEquityByMonth: result.bs.total_equity, totalLiabilitiesByMonth: result.bs.total_liabilities,
+    debtObligations: config.settings.capital_structure?.bank_loan > 0 ? [{
+      drawdownMonth:1, annualRate:config.settings.capital_structure?.annual_interest_rate||0.18,
+      tenorMonths:(config.settings.capital_structure?.loan_tenor_years||2)*12,
+      gracePeriodMonths:0, principal:config.settings.capital_structure?.bank_loan, repaymentType:'amortising',
+    }] : [],
+    tradeCreditLines: config.settings.trade_credit_lines || [],
+    assess,
+  }, yearGroups, monthLabelsFull)
+  const monthsByYearLabel: Record<string, typeof scoreSeries.monthsByYear[number]> = {}
+  yearGroups.forEach(g => { monthsByYearLabel[g.label] = scoreSeries.monthsByYear[g.year] })
+
   async function generateHealthCheck() {
     setGeneratingHealth(true)
     const targetPeriod = new Date().toISOString().slice(0,7)+'-01'
@@ -2492,6 +2611,11 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
         </div>
       )}
 
+      {activeSection==='credit'&&(
+        <ScoreTrendCard title="Credit Risk Trend" maxLabel="100" years={scoreSeries.years} monthsByYear={monthsByYearLabel}
+          getValue={(r:any)=>r.score} getClassification={(r:any)=>r.classification} getColor={(r:any)=>r.classColor}/>
+      )}
+
       {activeSection==='going_concern'&&(
         <div style={card}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem',flexWrap:'wrap',gap:'0.75rem'}}>
@@ -2513,6 +2637,11 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
             </div>
           ))}
         </div>
+      )}
+
+      {activeSection==='going_concern'&&(
+        <ScoreTrendCard title="Going Concern Trend" maxLabel="20" years={scoreSeries.years} monthsByYear={monthsByYearLabel}
+          getValue={(r:any)=>r.gcScore} getClassification={(r:any)=>r.gcRating} getColor={(r:any)=>r.gcColor}/>
       )}
 
       {activeSection==='investment'&&(
@@ -2544,6 +2673,11 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
             </div>
           )}
         </div>
+      )}
+
+      {activeSection==='investment'&&(
+        <ScoreTrendCard title="Investment Readiness Trend" maxLabel="30" years={scoreSeries.years} monthsByYear={monthsByYearLabel}
+          getValue={(r:any)=>r.irScore} getClassification={(r:any)=>r.irTier} getColor={(r:any)=>r.irColor}/>
       )}
 
       {activeSection==='investment_metrics'&&(() => {
