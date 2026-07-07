@@ -80,6 +80,7 @@ describe('annualRateToMonthlyRate / monthlyRateToAnnualRate — matching the dis
   it('REG: the monthly equivalent of a 15% annual rate is meaningfully smaller than 15%/12 -- compounding, not a naive divide', () => {
     const monthly = annualRateToMonthlyRate(0.15)
     expect(monthly).toBeGreaterThan(0)
+    expect(monthly).toBeLessThan(0.15 / 12) // the actual compounding bound -- catches overstatement, not just a rough sanity check
     expect(monthly).toBeLessThan(0.15 / 12 * 1.1) // sanity: in the right ballpark, not wildly different
     expect(monthly).not.toBeCloseTo(0.15 / 12, 5) // but NOT the naive division either -- must be the compounding formula
   })
