@@ -119,6 +119,66 @@ export function computeTradeCredit(
   }
 }
 
+// Slices an already-computed, full-plan-aligned DebtSchedule down to a
+// specific set of month indices -- used when scoring one calendar year
+// out of a longer plan. Never re-derives the schedule from these
+// indices renumbered starting at 0: buildDebtSchedule keys drawdown,
+// grace periods, and repayment due-dates off month 0 of whatever it's
+// given, so slicing the OUTPUT (computed once, correctly, for the whole
+// plan) is the only way to preserve correct timing for a loan that, say,
+// draws down in month 14 and is being scored as part of year 3.
+export function sliceDebtScheduleForRange(fullSchedule: DebtSchedule, monthIndices: number[]): DebtSchedule {
+  const pick = (arr: number[]) => monthIndices.map(i => arr[i] ?? 0)
+  const totalRepayment = pick(fullSchedule.totalRepayment)
+  return {
+    totalInterest: pick(fullSchedule.totalInterest),
+    totalPrincipal: pick(fullSchedule.totalPrincipal),
+    totalRepayment,
+    totalOutstanding: pick(fullSchedule.totalOutstanding),
+    annualY1: totalRepayment.reduce((a, b) => a + b, 0),
+  }
+}
+
+// Recomputes trade credit's AGGREGATE stats (DPO, DSO, cash conversion
+// gap, peaks) for a specific month range, from an already-simulated
+// full-plan TradeCreditSummary -- never re-runs computeTradeCredit
+// itself for the slice. Outstanding balances are a RUNNING balance
+// carried forward month to month (new credit added, settlements
+// subtracted); re-simulating from month 0 of a slice would lose
+// whatever balance was actually carried in from the prior period,
+// understating a mid-plan year's true outstanding position. The
+// per-month running-balance arrays must come from a single full-plan
+// simulation; only the range-specific averages/sums here change.
+export function summarizeTradeCreditForRange(
+  fullTradeCredit: TradeCreditSummary, fullCogs: number[], fullRev: number[], monthIndices: number[],
+): TradeCreditSummary {
+  const pick = (arr: number[]) => monthIndices.map(i => arr[i] ?? 0)
+  const payableSlice = pick(fullTradeCredit.totalPayableOutstanding)
+  const receivableSlice = pick(fullTradeCredit.totalReceivableOutstanding)
+  const cashEffectSlice = pick(fullTradeCredit.monthlyCashEffect)
+  const cogsSlice = pick(fullCogs)
+  const revSlice = pick(fullRev)
+
+  const n = Math.max(1, monthIndices.length)
+  const avgPayable = payableSlice.reduce((a, b) => a + b, 0) / n
+  const avgReceivable = receivableSlice.reduce((a, b) => a + b, 0) / n
+  const rangeCogs = cogsSlice.reduce((a, b) => a + b, 0)
+  const rangeRev = revSlice.reduce((a, b) => a + b, 0)
+
+  const dpo = rangeCogs > 0 ? (avgPayable / rangeCogs) * 365 : 0
+  const dso = rangeRev > 0 ? (avgReceivable / rangeRev) * 365 : 0
+
+  return {
+    totalPayableOutstanding: payableSlice,
+    totalReceivableOutstanding: receivableSlice,
+    monthlyCashEffect: cashEffectSlice,
+    dpo, dso, cashConversionGap: dso - dpo,
+    peakPayable: payableSlice.length > 0 ? Math.max(...payableSlice) : 0,
+    peakReceivable: receivableSlice.length > 0 ? Math.max(...receivableSlice) : 0,
+  }
+}
+
+
 export function buildDebtSchedule(obligations: DebtObligation[], months: number): DebtSchedule {
   months = months || 12
   const totalInterest = Array(months).fill(0)
@@ -216,6 +276,19 @@ export interface ScoringInputs {
   debtObligations?: DebtObligation[]   // supports multiple: bank loans, non-bank facilities, etc
   tradeCreditLines?: TradeCreditLine[] // supports multiple: supplier credit, partner/customer credit
   assess: CoachAssessment
+  // Optional pre-computed schedules, ALREADY ALIGNED to the full plan's
+  // actual month indices. When scoring a SLICE of a longer plan (e.g. one
+  // calendar year out of a 5-year plan), debtObligations/tradeCreditLines
+  // must NOT be re-derived from month 0 of the slice -- buildDebtSchedule
+  // and computeTradeCredit both key off drawdownMonth/grace periods/etc
+  // relative to month 0, so slicing rev/ebitda/cashClose to year 3 while
+  // still recomputing the debt schedule from "month 0 of this slice" would
+  // silently misalign a loan's grace period or drawdown timing. Supplying
+  // these pre-computed (from a single, correctly-indexed full-plan run)
+  // and slicing THEIR outputs instead avoids that entirely, while every
+  // caller still goes through the exact same scoring formulas below.
+  precomputedDebtSched?: DebtSchedule
+  precomputedTradeCredit?: TradeCreditSummary
 }
 
 export interface ScoringResult {
@@ -266,7 +339,11 @@ export function computeScores(inputs: ScoringInputs): ScoringResult {
 
   // Supports multiple debt obligations (bank loans, non-bank facilities, etc) --
   // each contributes its own interest/principal schedule, summed together.
-  const debtSched = buildDebtSchedule(inputs.debtObligations || [], m)
+  // If a pre-computed, full-plan-aligned schedule was supplied (scoring a
+  // slice of a longer plan), use it as-is rather than re-deriving from
+  // month 0 of this slice, which would misalign grace periods/drawdown
+  // timing relative to the plan's actual calendar.
+  const debtSched = inputs.precomputedDebtSched || buildDebtSchedule(inputs.debtObligations || [], m)
   const hasDebt = (inputs.debtObligations || []).some(ob => (ob.principal || 0) > 0)
   // Real DSCR only exists for a period where a repayment is actually due.
   // No placeholder value for periods without a repayment due -- that
@@ -292,7 +369,13 @@ export function computeScores(inputs: ScoringInputs): ScoringResult {
   // ── Trade credit: supplier payables (e.g. input credit) and customer/partner
   // receivables (e.g. licensing partner credit). Tracks how effectively the
   // client manages credit it gives and receives -- collection speed vs payment speed.
-  const tradeCredit = computeTradeCredit(inputs.tradeCreditLines || [], cogs, rev, m)
+  // If a pre-computed, correctly-summarized range was supplied (scoring a
+  // slice of a longer plan), use it as-is -- computeTradeCredit's running
+  // balance simulation restarts at zero from whatever it's given, so
+  // recomputing it from a slice's own (possibly re-sliced or still full,
+  // truncated) monthly_new/monthly_settled arrays would silently lose
+  // whatever balance was actually carried in from a prior period.
+  const tradeCredit = inputs.precomputedTradeCredit || computeTradeCredit(inputs.tradeCreditLines || [], cogs, rev, m)
 
   // ── Credit Risk Score (0-100) ──
   // Debt service is only scored when a real repayment obligation exists and
@@ -364,7 +447,102 @@ export function computeScores(inputs: ScoringInputs): ScoringResult {
   }
 }
 
-// ── Engagement Close viability rating, shared logic ──
+// ── Time series of scores, for the collapsible year/month presentation ──
+//
+// computeScores (above) summarizes an entire window of months into one
+// score -- this produces one of those per calendar year AND, for months
+// within an expanded year, one per month using a trailing-twelve-month
+// window ending at that month. This is what makes Credit Risk / Going
+// Concern / Investment Readiness genuinely collapsible the same way
+// P&L/BS/CF already are: every period gets a real, computed value, never
+// a placeholder, whether that period is fully actual, fully planned, or
+// (most importantly) a period with literally zero live data at all -- a
+// brand-new prospective client's plan alone is enough to produce a full
+// score at every year and month, since every input here already comes
+// from the engine's own rev/ebitda/cash/balance-sheet arrays, which exist
+// for every month regardless of whether any actuals have been entered.
+//
+// Debt schedule and trade credit are each computed ONCE for the full
+// plan (preserving correct drawdown/grace-period timing and running
+// trade-credit balances), then sliced/summarized per period -- see
+// sliceDebtScheduleForRange and summarizeTradeCreditForRange above for
+// why re-deriving them per-slice would silently corrupt both.
+
+export interface ScoredPeriod {
+  label: string        // e.g. "2026" for a year, "Jul 26" for a month
+  monthIndices: number[]
+  result: ScoringResult
+}
+
+export interface ScoresTimeSeriesInputs {
+  rev: number[]; ebitda: number[]; cogs: number[]; cashClose: number[]
+  totalEquityByMonth: number[]      // Balance Sheet total_equity, one entry per month
+  totalLiabilitiesByMonth: number[] // Balance Sheet total_liabilities, one entry per month
+  debtObligations?: DebtObligation[]
+  tradeCreditLines?: TradeCreditLine[]
+  assess: CoachAssessment
+}
+
+function scoreForRange(
+  inputs: ScoresTimeSeriesInputs, monthIndices: number[],
+  fullDebtSched: DebtSchedule, fullTradeCredit: TradeCreditSummary,
+): ScoringResult {
+  const pick = (arr: number[]) => monthIndices.map(i => arr[i] ?? 0)
+  const lastIdx = monthIndices[monthIndices.length - 1]
+  return computeScores({
+    rev: pick(inputs.rev),
+    ebitda: pick(inputs.ebitda),
+    cogs: pick(inputs.cogs),
+    cashClose: pick(inputs.cashClose),
+    // Point-in-time balances, taken at the LAST month of the range --
+    // matching how Balance Sheet itself collapses a year (endOfPeriod
+    // aggregation in generic-engine.ts), never summed across the range.
+    totalEquity: inputs.totalEquityByMonth[lastIdx] ?? 0,
+    totalLiabilities: inputs.totalLiabilitiesByMonth[lastIdx] ?? 0,
+    months: monthIndices.length,
+    debtObligations: inputs.debtObligations,
+    tradeCreditLines: inputs.tradeCreditLines,
+    assess: inputs.assess,
+    precomputedDebtSched: sliceDebtScheduleForRange(fullDebtSched, monthIndices),
+    precomputedTradeCredit: summarizeTradeCreditForRange(fullTradeCredit, inputs.cogs, inputs.rev, monthIndices),
+  })
+}
+
+export function computeScoresTimeSeries(
+  inputs: ScoresTimeSeriesInputs, yearGroups: { year: number; label: string; monthIndices: number[] }[], monthLabels: string[],
+): { years: ScoredPeriod[]; monthsByYear: Record<number, ScoredPeriod[]> } {
+  const totalMonths = inputs.rev.length
+  const fullDebtSched = buildDebtSchedule(inputs.debtObligations || [], totalMonths)
+  const fullTradeCredit = computeTradeCredit(inputs.tradeCreditLines || [], inputs.cogs, inputs.rev, totalMonths)
+
+  const years: ScoredPeriod[] = yearGroups.map(g => ({
+    label: g.label,
+    monthIndices: g.monthIndices,
+    result: scoreForRange(inputs, g.monthIndices, fullDebtSched, fullTradeCredit),
+  }))
+
+  // Monthly granularity, for when a year is expanded: a trailing-twelve-
+  // month window ending at that month (the standard TTM convention for
+  // metrics that are inherently annual, like DSCR or annual revenue) --
+  // or however many months are actually available from the start of the
+  // plan if fewer than 12 exist yet.
+  const monthsByYear: Record<number, ScoredPeriod[]> = {}
+  yearGroups.forEach(g => {
+    monthsByYear[g.year] = g.monthIndices.map(m => {
+      const windowStart = Math.max(0, m - 11)
+      const windowIndices = Array.from({ length: m - windowStart + 1 }, (_, i) => windowStart + i)
+      return {
+        label: monthLabels[m],
+        monthIndices: windowIndices,
+        result: scoreForRange(inputs, windowIndices, fullDebtSched, fullTradeCredit),
+      }
+    })
+  })
+
+  return { years, monthsByYear }
+}
+
+
 export function computeViabilityRating(gcScore: number, creditScore: number): string {
   if (gcScore >= 15 && creditScore >= 65) return 'Viable'
   if (gcScore >= 10 && creditScore >= 40) return 'Conditionally Viable'
