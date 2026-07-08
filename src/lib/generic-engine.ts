@@ -86,10 +86,19 @@ export interface YearCollapsedCell {
 //   of the year -- specifically Opening Cash, which is genuinely the
 //   prior year's closing balance carried forward, not a mid-year or
 //   end-of-year figure.
-export type YearAggregation = 'sum' | 'endOfPeriod' | 'startOfPeriod'
+// - 'weightedAverage': a per-unit PRICE or RATE -- Buy Price, Sell
+//   Price, Fee per Engagement. This is NOT a plain mean of the monthly
+//   prices (that would ignore volume entirely -- 1,000 units at 5,000
+//   and 10 units at 8,000 is nowhere near an average of 6,500). The
+//   only figure that's actually traceable back to real totals is
+//   total dollar value / total quantity for the year, using a
+//   caller-supplied weights array (the quantity/volume/engagements
+//   each month) -- a real, standard accounting calculation (a
+//   weighted-average price or cost), not a statistical estimate.
+export type YearAggregation = 'sum' | 'endOfPeriod' | 'startOfPeriod' | 'weightedAverage'
 
-export function collapseYear(values: number[], actualMask: boolean[] | undefined, monthIndices: number[], aggregation: YearAggregation = 'sum'): YearCollapsedCell {
-  if (aggregation !== 'sum') {
+export function collapseYear(values: number[], actualMask: boolean[] | undefined, monthIndices: number[], aggregation: YearAggregation = 'sum', weights?: number[]): YearCollapsedCell {
+  if (aggregation === 'endOfPeriod' || aggregation === 'startOfPeriod') {
     // A point-in-time balance has no "partial" state the way a sum of
     // flows over a part-actual, part-plan year does -- it's simply the
     // balance as of one specific month, which is either a real, closed
@@ -100,7 +109,15 @@ export function collapseYear(values: number[], actualMask: boolean[] | undefined
     const isActual = !!actualMask[relevantIdx]
     return { value, isFullyActual: isActual, isPartiallyActual: false, isFullyPlan: !isActual }
   }
-  const value = monthIndices.reduce((s, i) => s + (values[i] ?? 0), 0)
+  let value: number
+  if (aggregation === 'weightedAverage') {
+    const w = weights || []
+    const totalWeight = monthIndices.reduce((s, i) => s + (w[i] ?? 0), 0)
+    const totalValue = monthIndices.reduce((s, i) => s + (values[i] ?? 0) * (w[i] ?? 0), 0)
+    value = totalWeight > 0 ? totalValue / totalWeight : 0
+  } else {
+    value = monthIndices.reduce((s, i) => s + (values[i] ?? 0), 0)
+  }
   if (!actualMask) return { value, isFullyActual: false, isPartiallyActual: false, isFullyPlan: true }
   const maskSlice = monthIndices.map(i => actualMask[i])
   const allActual = maskSlice.length > 0 && maskSlice.every(Boolean)

@@ -977,6 +977,55 @@ describe('collapseYear — endOfPeriod and startOfPeriod aggregation (Balance Sh
   })
 })
 
+describe('collapseYear — weightedAverage aggregation (per-unit prices and rates, e.g. Buy Price, Fee per Engagement)', () => {
+  it('REG: the exact scenario that motivated this fix -- volume-weighted, not a naive mean of monthly prices', () => {
+    // 1,000 units at 5,000 in month 0; 10 units at 8,000 in month 1.
+    // A naive mean would say 6,500 -- nowhere close to reality. The
+    // correct weighted average is total cost / total volume:
+    // (1000*5000 + 10*8000) / (1000+10) = 5,080,000 / 1,010 ≈ 5029.7
+    const prices = [5000, 8000]
+    const volumes = [1000, 10]
+    const result = collapseYear(prices, undefined, [0,1], 'weightedAverage', volumes)
+    expect(result.value).toBeCloseTo(5080000/1010, 2)
+    expect(result.value).not.toBeCloseTo(6500, 0) // the wrong, naive answer
+  })
+
+  it('REG: is genuinely traceable back to real totals -- equals total dollar value divided by total quantity, computed independently', () => {
+    const prices = [10000, 12000, 11000]
+    const quantities = [50, 30, 20]
+    const result = collapseYear(prices, undefined, [0,1,2], 'weightedAverage', quantities)
+    const totalValue = 10000*50 + 12000*30 + 11000*20
+    const totalQty = 50+30+20
+    expect(result.value).toBeCloseTo(totalValue/totalQty, 6)
+  })
+
+  it('REG: a constant price across the year returns exactly that price, regardless of volume distribution', () => {
+    const constantPrice = Array(12).fill(5000)
+    const volumes = [10,20,5,8,15,12,9,11,6,14,7,13] // varying, irrelevant when price never changes
+    const result = collapseYear(constantPrice, undefined, Array.from({length:12},(_,i)=>i), 'weightedAverage', volumes)
+    expect(result.value).toBe(5000)
+  })
+
+  it('REG: zero total weight (no volume/engagements at all in the range) returns 0, not NaN from a division by zero', () => {
+    const result = collapseYear([5000,6000], undefined, [0,1], 'weightedAverage', [0,0])
+    expect(result.value).toBe(0)
+    expect(Number.isNaN(result.value)).toBe(false)
+  })
+
+  it('REG: missing weights array entirely (a caller error) returns 0 rather than throwing', () => {
+    const result = collapseYear([5000,6000], undefined, [0,1], 'weightedAverage')
+    expect(result.value).toBe(0)
+  })
+
+  it('REG: actual/plan status for weightedAverage uses the whole range\'s mask, like sum, not a single endpoint month', () => {
+    const values = [10000, 11000, 12000]
+    const weights = [10, 10, 10]
+    const actualMask = [true, true, false] // partially actual across the range
+    const result = collapseYear(values, actualMask, [0,1,2], 'weightedAverage', weights)
+    expect(result.isPartiallyActual).toBe(true)
+  })
+})
+
 describe('defaultExpandedYears — which year starts expanded', () => {
   it('REG: the year containing today expands by default, all others stay collapsed', () => {
     const groups = [{year: 2025, label: '2025', monthIndices: [0]}, {year: 2026, label: '2026', monthIndices: [1]}, {year: 2027, label: '2027', monthIndices: [2]}]

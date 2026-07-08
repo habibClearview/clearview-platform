@@ -1,9 +1,11 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  addQueuedSale, addQueuedCost, listQueuedSales, listQueuedCosts,
-  removeQueuedSale, removeQueuedCost, clearSyncedSales, clearSyncedCosts,
-  setStoredToken, type QueuedSale, type QueuedCost,
+  addQueuedSale, addQueuedCost, addQueuedUncategorizedCost,
+  listQueuedSales, listQueuedCosts, listQueuedUncategorizedCosts,
+  removeQueuedSale, removeQueuedCost, removeQueuedUncategorizedCost,
+  clearSyncedSales, clearSyncedCosts, clearSyncedUncategorizedCosts,
+  setStoredToken, type QueuedSale, type QueuedCost, type QueuedUncategorizedCost,
 } from '@/lib/field-db'
 
 const C = {
@@ -17,8 +19,12 @@ interface CostLine { id:string; name:string; category:string }
 interface Customer { id:string; name:string; phone?:string; village?:string }
 interface HistoryEntry {
   id:string; transaction_type:string; category:string; plan_line_name:string;
-  amount:number; quantity?:number; unit_price?:number; transaction_date:string;
+  amount:number; quantity?:number; unit_price?:number; unit_label?:string; transaction_date:string;
   synced_at:string; notes?:string; price_alert?:boolean;
+}
+interface StockLevel {
+  id:string; catalogue_item_id:string; quantity_on_hand:number; reorder_threshold?:number;
+  catalogue?: { name:string; unit_label?:string }
 }
 interface AuthData {
   operator: { id:string; display_name:string; phone?:string; role:string; sync_frequency:string }
@@ -47,18 +53,25 @@ export default function FieldCapturePage() {
   const [auth, setAuth] = useState<AuthData|null>(null)
   const [salesQueue, setSalesQueue] = useState<QueuedSale[]>([])
   const [costsQueue, setCostsQueue] = useState<QueuedCost[]>([])
+  const [uncategorizedCostsQueue, setUncategorizedCostsQueue] = useState<QueuedUncategorizedCost[]>([])
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState('')
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string|null>(null)
   const [lastSync, setLastSync] = useState<string|null>(null)
-  const [mode, setMode] = useState<'grid'|'sale-detail'|'cost-form'|'history'>('grid')
+  const [mode, setMode] = useState<'grid'|'sale-detail'|'cost-form'|'history'|'stock'>('grid')
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState('')
+  const [stockLevels, setStockLevels] = useState<StockLevel[]>([])
+  const [stockLoading, setStockLoading] = useState(false)
+  const [stockError, setStockError] = useState('')
+  const [receivingItemId, setReceivingItemId] = useState<string|null>(null)
+  const [receiveQty, setReceiveQty] = useState('')
+  const [receiving, setReceiving] = useState(false)
   const [selectedItem, setSelectedItem] = useState<CatalogueItem|null>(null)
   const [saleForm, setSaleForm] = useState({quantity:'', payment_method:'cash', customer_id:'', notes:'', override:false, override_price:''})
-  const [costForm, setCostForm] = useState({plan_line_id:'', amount:'', notes:''})
+  const [costForm, setCostForm] = useState({plan_line_id:'', amount:'', notes:'', description:''})
   const [search, setSearch] = useState('')
   const [queueOpen, setQueueOpen] = useState(false)
   const [editingSaleId, setEditingSaleId] = useState<string|null>(null)
@@ -74,6 +87,7 @@ export default function FieldCapturePage() {
     // readable by the Service Worker for Background Sync (see below).
     listQueuedSales().then(setSalesQueue).catch(()=>{})
     listQueuedCosts().then(setCostsQueue).catch(()=>{})
+    listQueuedUncategorizedCosts().then(setUncategorizedCostsQueue).catch(()=>{})
     if (savedToken) {
       setToken(savedToken)
       if (urlToken) localStorage.setItem(STORAGE_TOKEN, urlToken)
@@ -107,6 +121,7 @@ export default function FieldCapturePage() {
       if (event.data?.type === 'field-sync-complete') {
         listQueuedSales().then(setSalesQueue).catch(()=>{})
         listQueuedCosts().then(setCostsQueue).catch(()=>{})
+        listQueuedUncategorizedCosts().then(setUncategorizedCostsQueue).catch(()=>{})
         setLastSync(new Date(event.data.synced_at).toLocaleString())
         setSyncMsg('Synced automatically in the background.')
       }
@@ -187,7 +202,7 @@ export default function FieldCapturePage() {
 
   function openCostEdit(q: QueuedCost) {
     setEditingCostId(q.local_id)
-    setCostForm({plan_line_id: q.plan_line_id, amount: String(q.amount), notes: q.notes||''})
+    setCostForm({plan_line_id: q.plan_line_id, amount: String(q.amount), notes: q.notes||'', description:''})
     setMode('cost-form')
   }
 
@@ -197,6 +212,7 @@ export default function FieldCapturePage() {
     const tx: Omit<QueuedSale,'queued_at'> = {
       local_id: editingSaleId || `local_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
       catalogue_item_id: selectedItem.id, item_name: selectedItem.name, item_type: selectedItem.item_type,
+      unit_label: selectedItem.unit_label,
       standard_price: selectedItem.price,
       quantity: Number(saleForm.quantity),
       override_price: saleForm.override ? Number(saleForm.override_price) : undefined,
@@ -227,22 +243,42 @@ export default function FieldCapturePage() {
     await addQueuedCost(tx)
     setCostsQueue(await listQueuedCosts())
     requestBackgroundSync()
-    setCostForm({plan_line_id:'', amount:'', notes:''})
+    setCostForm({plan_line_id:'', amount:'', notes:'', description:''})
     setMode('grid')
     setEditingCostId(null)
   }
 
+  // A cost that doesn't match any existing cost line -- recorded with
+  // just a description and amount, categorization delegated to a coach
+  // reviewing it later on the dashboard.
+  async function addUncategorizedCostToQueue() {
+    if (!costForm.description || !costForm.amount) return
+    const tx: Omit<QueuedUncategorizedCost,'queued_at'> = {
+      local_id: `local_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+      description: costForm.description,
+      amount: Number(costForm.amount),
+      transaction_date: new Date().toISOString().split('T')[0],
+    }
+    await addQueuedUncategorizedCost(tx)
+    setUncategorizedCostsQueue(await listQueuedUncategorizedCosts())
+    requestBackgroundSync()
+    setCostForm({plan_line_id:'', amount:'', notes:'', description:''})
+    setMode('grid')
+  }
+
   async function removeSale(localId:string) { await removeQueuedSale(localId); setSalesQueue(await listQueuedSales()) }
   async function removeCost(localId:string) { await removeQueuedCost(localId); setCostsQueue(await listQueuedCosts()) }
+  async function removeUncategorizedCost(localId:string) { await removeQueuedUncategorizedCost(localId); setUncategorizedCostsQueue(await listQueuedUncategorizedCosts()) }
 
   async function syncNow() {
-    if (!token || (salesQueue.length===0 && costsQueue.length===0)) return
+    if (!token || (salesQueue.length===0 && costsQueue.length===0 && uncategorizedCostsQueue.length===0)) return
     setSyncing(true)
     setSyncMsg(null)
     // Snapshot exactly which local_ids are being synced -- if a new item
     // gets queued mid-request, only the ones actually sent get cleared.
     const salesSnapshot = salesQueue
     const costsSnapshot = costsQueue
+    const uncategorizedSnapshot = uncategorizedCostsQueue
     try {
       const deviceId = localStorage.getItem('clearview_device_id') || (()=>{ const id = Math.random().toString(36).slice(2,10); localStorage.setItem('clearview_device_id', id); return id })()
       const transactions = [
@@ -259,9 +295,12 @@ export default function FieldCapturePage() {
           transaction_date: c.transaction_date, notes: c.notes,
         })),
       ]
+      const uncategorized_costs = uncategorizedSnapshot.map(u=>({
+        local_id: u.local_id, description: u.description, amount: u.amount, transaction_date: u.transaction_date,
+      }))
       const res = await fetch('/api/field/sync', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ token, device_id: 'web_'+deviceId, transactions }),
+        body: JSON.stringify({ token, device_id: 'web_'+deviceId, transactions, uncategorized_costs }),
       })
       const data = await res.json()
       if (res.ok && data.success) {
@@ -278,11 +317,14 @@ export default function FieldCapturePage() {
         const syncedIds = new Set<string>(data.synced_local_ids || [])
         const salesToClear = salesSnapshot.map(s=>s.local_id).filter(id => syncedIds.has(id))
         const costsToClear = costsSnapshot.map(c=>c.local_id).filter(id => syncedIds.has(id))
+        const uncategorizedToClear = uncategorizedSnapshot.map(u=>u.local_id).filter(id => syncedIds.has(id))
         if (salesToClear.length > 0) await clearSyncedSales(salesToClear)
         if (costsToClear.length > 0) await clearSyncedCosts(costsToClear)
-        if (salesToClear.length > 0 || costsToClear.length > 0) {
+        if (uncategorizedToClear.length > 0) await clearSyncedUncategorizedCosts(uncategorizedToClear)
+        if (salesToClear.length > 0 || costsToClear.length > 0 || uncategorizedToClear.length > 0) {
           setSalesQueue(await listQueuedSales())
           setCostsQueue(await listQueuedCosts())
+          setUncategorizedCostsQueue(await listQueuedUncategorizedCosts())
         }
         setLastSync(new Date().toLocaleString())
         setSyncMsg(
@@ -315,6 +357,46 @@ export default function FieldCapturePage() {
       setHistoryError('No connection -- try again once you have signal.')
     }
     setHistoryLoading(false)
+  }
+
+  async function loadStock() {
+    if (!token) return
+    setMode('stock')
+    setStockLoading(true)
+    setStockError('')
+    try {
+      const res = await fetch(`/api/field/stock`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (res.ok) setStockLevels(data.stockLevels || [])
+      else setStockError(data.error || 'Could not load stock levels.')
+    } catch {
+      setStockError('No connection -- try again once you have signal.')
+    }
+    setStockLoading(false)
+  }
+
+  async function receiveStock(catalogueItemId: string) {
+    if (!token || !receiveQty || Number(receiveQty) <= 0) return
+    setReceiving(true)
+    try {
+      const res = await fetch('/api/field/stock', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, catalogue_item_id: catalogueItemId, movement_type: 'stock_in', quantity: Number(receiveQty) }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setReceivingItemId(null)
+        setReceiveQty('')
+        await loadStock()
+      } else {
+        alert(data.error || 'Could not record stock received.')
+      }
+    } catch {
+      alert('No connection -- could not record stock received. Please try again.')
+    }
+    setReceiving(false)
   }
 
   useEffect(()=>{ syncNowRef.current = syncNow })
@@ -354,7 +436,7 @@ export default function FieldCapturePage() {
 
   const inp: React.CSSProperties = {width:'100%',padding:'0.65rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'0.9rem',boxSizing:'border-box',marginBottom:'0.7rem'}
   const lbl: React.CSSProperties = {display:'block',fontSize:'0.78rem',fontWeight:600,color:C.navy,marginBottom:'0.25rem'}
-  const pendingCount = salesQueue.length + costsQueue.length
+  const pendingCount = salesQueue.length + costsQueue.length + uncategorizedCostsQueue.length
   const searchLower = search.trim().toLowerCase()
   const products = auth.catalogue.filter(c=>c.item_type==='product' && (!searchLower || c.name.toLowerCase().includes(searchLower)))
   const services = auth.catalogue.filter(c=>c.item_type==='service' && (!searchLower || c.name.toLowerCase().includes(searchLower)))
@@ -367,11 +449,19 @@ export default function FieldCapturePage() {
           <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',marginTop:'0.15rem'}}>{auth.unit.name}</div>
           <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.6)',marginTop:'0.1rem'}}>{auth.operator.display_name} · {auth.client.name}</div>
         </div>
-        {(mode==='grid' || mode==='history') && (
-          <button onClick={mode==='history'?()=>setMode('grid'):loadHistory}
-            style={{background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.25)',color:C.white,borderRadius:6,padding:'0.5rem 0.75rem',fontSize:'0.72rem',cursor:'pointer',whiteSpace:'nowrap'}}>
-            {mode==='history'?'← Back':'History'}
-          </button>
+        {(mode==='grid' || mode==='history' || mode==='stock') && (
+          <div style={{display:'flex',gap:'0.5rem'}}>
+            {mode==='grid' && (
+              <button onClick={loadStock}
+                style={{background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.25)',color:C.white,borderRadius:6,padding:'0.5rem 0.75rem',fontSize:'0.72rem',cursor:'pointer',whiteSpace:'nowrap'}}>
+                Stock
+              </button>
+            )}
+            <button onClick={mode==='grid'?loadHistory:()=>setMode('grid')}
+              style={{background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.25)',color:C.white,borderRadius:6,padding:'0.5rem 0.75rem',fontSize:'0.72rem',cursor:'pointer',whiteSpace:'nowrap'}}>
+              {mode==='grid'?'History':'← Back'}
+            </button>
+          </div>
         )}
       </header>
 
@@ -439,7 +529,7 @@ export default function FieldCapturePage() {
               </div>
             )}
             {auth.cost_lines.length>0 && (
-              <button onClick={()=>{setEditingCostId(null);setCostForm({plan_line_id:'',amount:'',notes:''});setMode('cost-form')}}
+              <button onClick={()=>{setEditingCostId(null);setCostForm({plan_line_id:'',amount:'',notes:'',description:''});setMode('cost-form')}}
                 style={{width:'100%',padding:'0.85rem',background:'#FDF2F0',color:C.red,border:`1px solid ${C.red}`,borderRadius:8,fontSize:'0.9rem',fontWeight:600,cursor:'pointer',marginBottom:'1.25rem'}}>
                 − Record a Cost or Expense
               </button>
@@ -454,7 +544,7 @@ export default function FieldCapturePage() {
                   <div key={q.local_id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
                     <div style={{minWidth:0}}>
                       <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.item_name}</div>
-                      <div style={{fontSize:'0.72rem',color:C.slate}}>{q.quantity} {q.override_price?'(price overridden)':`× ${fmt(q.standard_price,auth.client.currency)}`}</div>
+                      <div style={{fontSize:'0.72rem',color:C.slate}}>{q.quantity}{q.unit_label?` ${q.unit_label}`:''} {q.override_price?'(price overridden)':`× ${fmt(q.standard_price,auth.client.currency)}`}</div>
                     </div>
                     <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
                       <div style={{fontFamily:'monospace',fontWeight:700,color:C.green,whiteSpace:'nowrap'}}>+{fmt(q.quantity*(q.override_price??q.standard_price),auth.client.currency)}</div>
@@ -473,6 +563,18 @@ export default function FieldCapturePage() {
                       <div style={{fontFamily:'monospace',fontWeight:700,color:C.red,whiteSpace:'nowrap'}}>-{fmt(q.amount,auth.client.currency)}</div>
                       <button onClick={()=>openCostEdit(q)} style={{background:'transparent',border:'none',color:C.teal,fontSize:'0.78rem',cursor:'pointer',fontWeight:600}}>Edit</button>
                       <button onClick={()=>removeCost(q.local_id)} style={{background:'transparent',border:'none',color:C.red,fontSize:'1.1rem',cursor:'pointer'}}>×</button>
+                    </div>
+                  </div>
+                ))}
+                {uncategorizedCostsQueue.map(q=>(
+                  <div key={q.local_id} style={{background:C.white,border:`1px solid ${C.amber}`,borderRadius:6,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.description}</div>
+                      <div style={{fontSize:'0.68rem',color:C.amber}}>Awaiting categorization · {q.transaction_date}</div>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
+                      <div style={{fontFamily:'monospace',fontWeight:700,color:C.red,whiteSpace:'nowrap'}}>-{fmt(q.amount,auth.client.currency)}</div>
+                      <button onClick={()=>removeUncategorizedCost(q.local_id)} style={{background:'transparent',border:'none',color:C.red,fontSize:'1.1rem',cursor:'pointer'}}>×</button>
                     </div>
                   </div>
                 ))}
@@ -539,16 +641,31 @@ export default function FieldCapturePage() {
           <div style={{background:C.white,border:`1px solid ${C.red}`,borderRadius:8,padding:'1.1rem'}}>
             <div style={{fontWeight:700,fontSize:'1rem',color:C.navy,marginBottom:'0.7rem'}}>{editingCostId?'Edit Cost / Expense':'Record a Cost or Expense'}</div>
             <label style={lbl}>What is this for?</label>
-            <select style={inp} value={costForm.plan_line_id} onChange={e=>setCostForm(f=>({...f,plan_line_id:e.target.value}))}>
+            <select style={inp} value={costForm.plan_line_id} onChange={e=>setCostForm(f=>({...f,plan_line_id:e.target.value,description:''}))}>
               <option value="">Select...</option>
               {auth.cost_lines.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
+              {!editingCostId && <option value="__other__">Something else (not listed)</option>}
             </select>
+            {costForm.plan_line_id==='__other__' ? (
+              <>
+                <label style={lbl}>What was this cost for?</label>
+                <input style={inp} value={costForm.description} onChange={e=>setCostForm(f=>({...f,description:e.target.value}))} placeholder="e.g. Motorbike repair"/>
+                <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.3rem',marginBottom:'0.6rem'}}>
+                  This will be recorded and reviewed by your coach, who will assign it to the right category.
+                </div>
+              </>
+            ) : null}
             <label style={lbl}>Amount ({auth.client.currency})</label>
             <input type="number" inputMode="numeric" style={inp} value={costForm.amount} onChange={e=>setCostForm(f=>({...f,amount:e.target.value}))} placeholder="0"/>
-            <label style={lbl}>Notes (optional)</label>
-            <input style={inp} value={costForm.notes} onChange={e=>setCostForm(f=>({...f,notes:e.target.value}))}/>
+            {costForm.plan_line_id!=='__other__' && (
+              <>
+                <label style={lbl}>Notes (optional)</label>
+                <input style={inp} value={costForm.notes} onChange={e=>setCostForm(f=>({...f,notes:e.target.value}))}/>
+              </>
+            )}
             <div style={{display:'flex',gap:'0.6rem',marginTop:'0.5rem'}}>
-              <button onClick={addCostToQueue} disabled={!costForm.plan_line_id||!costForm.amount}
+              <button onClick={costForm.plan_line_id==='__other__'?addUncategorizedCostToQueue:addCostToQueue}
+                disabled={costForm.plan_line_id==='__other__'?(!costForm.description||!costForm.amount):(!costForm.plan_line_id||!costForm.amount)}
                 style={{flex:1,padding:'0.85rem',background:C.red,color:C.white,border:'none',borderRadius:6,fontWeight:700,cursor:'pointer'}}>{editingCostId?'Save Changes':'Add to Queue'}</button>
               <button onClick={()=>{setMode('grid');setEditingCostId(null)}} style={{padding:'0.85rem 1rem',background:'transparent',color:C.slate,border:`1px solid ${C.border}`,borderRadius:6,cursor:'pointer'}}>Cancel</button>
             </div>
@@ -571,7 +688,7 @@ export default function FieldCapturePage() {
                   <div>
                     <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>{entry.plan_line_name}</div>
                     <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.15rem'}}>
-                      {entry.transaction_date} {entry.quantity?`· ${entry.quantity} × ${fmt(entry.unit_price??0,auth.client.currency)}`:''}
+                      {entry.transaction_date} {entry.quantity?`· ${entry.quantity}${entry.unit_label?` ${entry.unit_label}`:''} × ${fmt(entry.unit_price??0,auth.client.currency)}`:''}
                     </div>
                     {entry.notes && <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.15rem',fontStyle:'italic'}}>{entry.notes}</div>}
                   </div>
@@ -582,6 +699,54 @@ export default function FieldCapturePage() {
                 {entry.price_alert && <div style={{fontSize:'0.68rem',color:C.amber,marginTop:'0.4rem'}}>⚠ Price was overridden from the standard catalogue price</div>}
               </div>
             ))}
+          </div>
+        )}
+
+        {mode==='stock' && (
+          <div>
+            <div style={{fontWeight:700,fontSize:'1rem',color:C.navy,marginBottom:'0.85rem'}}>Stock on Hand</div>
+            {stockLoading && <div style={{textAlign:'center',color:C.slate,padding:'2rem',fontSize:'0.85rem'}}>Loading...</div>}
+            {!stockLoading && stockError && (
+              <div style={{background:'#FDF2F0',border:`1px solid ${C.red}`,borderRadius:8,padding:'1rem',color:C.red,fontSize:'0.85rem'}}>{stockError}</div>
+            )}
+            {!stockLoading && !stockError && stockLevels.length===0 && (
+              <div style={{textAlign:'center',color:C.slate,padding:'2rem',fontSize:'0.85rem'}}>No stock recorded yet. Record a sale or receive stock for a catalogue item to start tracking it here.</div>
+            )}
+            {!stockLoading && !stockError && stockLevels.map(level=>{
+              const low = level.reorder_threshold != null && level.quantity_on_hand <= level.reorder_threshold
+              return (
+                <div key={level.id} style={{background:C.white,border:`1px solid ${low?C.amber:C.border}`,borderRadius:8,padding:'0.85rem 1rem',marginBottom:'0.6rem'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>{level.catalogue?.name || 'Item'}</div>
+                      {low && <div style={{fontSize:'0.68rem',color:C.amber,marginTop:'0.1rem'}}>⚠ At or below reorder threshold ({level.reorder_threshold})</div>}
+                    </div>
+                    <div style={{fontFamily:'monospace',fontWeight:700,fontSize:'1rem',color:C.navy,whiteSpace:'nowrap'}}>
+                      {level.quantity_on_hand}{level.catalogue?.unit_label?` ${level.catalogue.unit_label}`:''}
+                    </div>
+                  </div>
+                  {receivingItemId===level.catalogue_item_id ? (
+                    <div style={{display:'flex',gap:'0.5rem',marginTop:'0.6rem'}}>
+                      <input type="number" autoFocus value={receiveQty} onChange={e=>setReceiveQty(e.target.value)}
+                        placeholder="Quantity received" style={{flex:1,padding:'0.5rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'0.82rem'}}/>
+                      <button disabled={receiving} onClick={()=>receiveStock(level.catalogue_item_id)}
+                        style={{padding:'0.5rem 0.85rem',background:C.teal,color:C.white,border:'none',borderRadius:6,fontSize:'0.78rem',cursor:'pointer',fontWeight:600}}>
+                        {receiving?'Saving...':'Confirm'}
+                      </button>
+                      <button onClick={()=>{setReceivingItemId(null);setReceiveQty('')}}
+                        style={{padding:'0.5rem 0.85rem',background:'transparent',color:C.slate,border:`1px solid ${C.border}`,borderRadius:6,fontSize:'0.78rem',cursor:'pointer'}}>
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={()=>{setReceivingItemId(level.catalogue_item_id);setReceiveQty('')}}
+                      style={{marginTop:'0.6rem',padding:'0.4rem 0.75rem',background:'transparent',color:C.teal,border:`1px solid ${C.teal}`,borderRadius:6,fontSize:'0.75rem',cursor:'pointer',fontWeight:600}}>
+                      + Receive Stock
+                    </button>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

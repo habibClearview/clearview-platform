@@ -450,3 +450,66 @@ describe('computeScoresTimeSeries — the collapsible year/month trend for Credi
     expect(series.years[1].result.tradeCredit.peakPayable).toBeCloseTo(expectedYear2Summary.peakPayable, 6)
   })
 })
+
+describe('Going Concern sub-indicator fields, exposed for the per-indicator trend UI', () => {
+  it('REG: the five exposed sub-indicator fields sum to exactly gcScore -- guards against the refactor exposing them ever drifting from the actual total', () => {
+    const result = computeScores({
+      rev: [2_000_000, 2_000_000], ebitda: [400_000, 400_000], cogs: [1_000_000, 1_000_000],
+      cashClose: [3_000_000, 3_000_000], totalEquity: 5_000_000, totalLiabilities: 1_000_000, months: 2,
+      debtObligations: [{ principal: 1_000_000, tenorMonths: 12, drawdownMonth: 1, annualRate: 0.15 }],
+      tradeCreditLines: [], assess: defaultCoachAssessment(),
+    })
+    const sum = result.gcDebtServiceFactor + result.gcLiquidityFactor + result.gcRevenueSustainabilityFactor + result.gcProfitabilityFactor + result.gcManagementFactor
+    expect(Math.min(20, sum)).toBe(result.gcScore)
+  })
+
+  it('REG: the sum invariant also holds with no debt, no trade credit, and negative EBITDA -- every branch of every factor', () => {
+    const result = computeScores({
+      rev: [500_000], ebitda: [-100_000], cogs: [400_000],
+      cashClose: [-2_000_000], totalEquity: 1_000_000, totalLiabilities: 500_000, months: 1,
+      debtObligations: [], tradeCreditLines: [], assess: defaultCoachAssessment(),
+    })
+    const sum = result.gcDebtServiceFactor + result.gcLiquidityFactor + result.gcRevenueSustainabilityFactor + result.gcProfitabilityFactor + result.gcManagementFactor
+    expect(Math.min(20, sum)).toBe(result.gcScore)
+  })
+})
+
+describe('Coach assessment fallback correctly preserves a genuine 0 rating', () => {
+  it('REG: a coach who deliberately rates management capability at 0 (the worst case) sees gcManagementFactor as 0, not silently defaulted to 2', () => {
+    const result = computeScores({
+      rev: [1_000_000], ebitda: [100_000], cogs: [500_000], cashClose: [500_000],
+      totalEquity: 1_000_000, totalLiabilities: 200_000, months: 1,
+      debtObligations: [], tradeCreditLines: [],
+      assess: { ...defaultCoachAssessment(), managementCapability: 0 },
+    })
+    expect(result.gcManagementFactor).toBe(0)
+  })
+
+  it('REG: a genuine 0 across all four irScore assessment terms is fully reflected, not silently raised to 2 each', () => {
+    const result = computeScores({
+      rev: [1_000_000], ebitda: [100_000], cogs: [500_000], cashClose: [500_000],
+      totalEquity: 1_000_000, totalLiabilities: 200_000, months: 1,
+      debtObligations: [], tradeCreditLines: [],
+      assess: { ...defaultCoachAssessment(), commercialModel: 0, managementCapability: 0, marketEvidence: 0, governance: 0 },
+    })
+    const withDefaults = computeScores({
+      rev: [1_000_000], ebitda: [100_000], cogs: [500_000], cashClose: [500_000],
+      totalEquity: 1_000_000, totalLiabilities: 200_000, months: 1,
+      debtObligations: [], tradeCreditLines: [], assess: defaultCoachAssessment(),
+    })
+    // All-zero ratings must score strictly lower than the default (2
+    // each) ratings -- if the bug were present, both would be identical
+    // since every 0 would silently become 2.
+    expect(result.irScore).toBeLessThan(withDefaults.irScore)
+  })
+
+  it('REG: an absent/undefined rating still defaults to 2, distinguishing "not set" from "deliberately 0"', () => {
+    const result = computeScores({
+      rev: [1_000_000], ebitda: [100_000], cogs: [500_000], cashClose: [500_000],
+      totalEquity: 1_000_000, totalLiabilities: 200_000, months: 1,
+      debtObligations: [], tradeCreditLines: [],
+      assess: { ...defaultCoachAssessment(), managementCapability: undefined as any },
+    })
+    expect(result.gcManagementFactor).toBe(2)
+  })
+})

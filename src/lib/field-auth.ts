@@ -47,3 +47,13 @@ export function clampHistoryLimit(requested: string | null): number {
   if (!Number.isFinite(n) || n <= 0) return 50
   return Math.min(Math.floor(n), 200)
 }
+
+// An operator can have multiple tokens over time (each "issue new
+// token" action adds another) -- last_used_at lives on each token
+// record, not on the operator itself. The operator's own "last synced"
+// moment is the most recent last_used_at across all of them.
+export function mostRecentTokenUse(tokens: {last_used_at?: string | null}[] | undefined): string | null {
+  const timestamps = (tokens || []).map(t => t.last_used_at).filter((t): t is string => !!t)
+  if (timestamps.length === 0) return null
+  return timestamps.reduce((latest, t) => new Date(t).getTime() > new Date(latest).getTime() ? t : latest)
+}

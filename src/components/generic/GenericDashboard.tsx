@@ -1,6 +1,8 @@
 // @ts-nocheck
 'use client'
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import QRCode from 'qrcode'
+import { mostRecentTokenUse } from '@/lib/field-auth'
 import { supabase } from '@/lib/supabase'
 import {
   fmt, fmtFull, pct, buildMonthLabels, buildYearGroups, collapseYear, defaultExpandedYears, extendPlanningHorizon, type YearAggregation, type YearGroup,
@@ -11,6 +13,7 @@ import {
 } from '@/lib/generic-engine'
 import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor, computeScoresTimeSeries } from '@/lib/scoring-engine'
 import { computeNPV, computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary, annualRateToMonthlyRate, monthlyRateToAnnualRate } from '@/lib/investment-metrics'
+import { computeLiquidityReadinessScore, computeLRSTimeSeries, computeFitScore, FIT_SCORE_PRESETS, LRS_WEIGHTS } from '@/lib/liquidity-readiness'
 import { combinedActual, computeActualsTotals, applyPeriodActual, buildHybridConsolidated, computeCatalogueLineTotal } from '@/lib/actuals'
 import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
 import { yearStartPeriod, canCloseCalendarYear, computeYearEndBalanceSheet } from '@/lib/annual-close'
@@ -155,7 +158,7 @@ function PLTable({title,rows,months,cc,showExport,closedMask}:{title?:string;row
 // here. Each year defaults to collapsed except the one containing
 // today's date, which starts expanded (the year someone is most likely
 // checking in on right now).
-function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMask}:{title?:string;rows:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;actualMask?:boolean[];aggregation?:YearAggregation}[];months:string[];startDate:string;cc:string;showExport?:boolean;closedMask?:boolean[]}) {
+function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMask}:{title?:string;rows:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;actualMask?:boolean[];aggregation?:YearAggregation;weights?:number[]}[];months:string[];startDate:string;cc:string;showExport?:boolean;closedMask?:boolean[]}) {
   const yearGroups = useMemo(() => buildYearGroups(startDate, months.length), [startDate, months.length])
   const currentYear = new Date().getUTCFullYear()
   const [expanded, setExpanded] = useState<Record<number, boolean>>(() => defaultExpandedYears(yearGroups, currentYear))
@@ -170,7 +173,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
     // display convenience, not a reason to omit real data from an export.
     const headers = ['', ...months, ...yearGroups.map(g => `FY ${g.label}`)]
     const data = rows.map(r => {
-      const yearTotals = yearGroups.map(g => String(Math.round(collapseYear(r.values, r.actualMask, g.monthIndices, r.aggregation).value)))
+      const yearTotals = yearGroups.map(g => String(Math.round(collapseYear(r.values, r.actualMask, g.monthIndices, r.aggregation, r.weights).value)))
       return [r.label, ...r.values.map(v => String(Math.round(v))), ...yearTotals]
     })
     const csv = [headers, ...data].map(r => r.map(c => `"${c}"`).join(',')).join('\n')
@@ -235,7 +238,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
               <tr key={ri} style={{background:r.highlight?'#EBF8FF':r.bold?C.lightBg:C.white}}>
                 <td style={{padding:'7px 10px',fontWeight:r.bold?700:400,color:C.navy,minWidth:160,fontSize:'0.8rem',position:'sticky',left:0,background:r.highlight?'#EBF8FF':r.bold?C.lightBg:C.white}}>{r.label}</td>
                 {yearGroups.map(g => {
-                  const cell = collapseYear(r.values, r.actualMask, g.monthIndices, r.aggregation)
+                  const cell = collapseYear(r.values, r.actualMask, g.monthIndices, r.aggregation, r.weights)
                   const displayVal = (v:number) => r.negate ? fmtFull(-Math.abs(v),cc) : fmtFull(v,cc)
                   return expanded[g.year] ? (
                     <React.Fragment key={g.year}>
@@ -287,15 +290,12 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
 // prospective client with no live actuals at all) or a mix of actual
 // and plan -- every period always has a real, computed value.
 function ScoreTrendCard({
-  title, maxLabel, years, monthsByYear, getValue, getClassification, getColor,
+  title, years, monthsByYear, rows,
 }: {
   title: string
-  maxLabel: string
   years: {label:string; monthIndices:number[]; result:any}[]
   monthsByYear: Record<string, {label:string; monthIndices:number[]; result:any}[]>
-  getValue: (r:any) => number
-  getClassification: (r:any) => string
-  getColor: (r:any) => string
+  rows: {label:string; getValue:(r:any)=>string|number; getColor:(r:any)=>string}[]
 }) {
   const currentYear = new Date().getUTCFullYear()
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
@@ -314,7 +314,7 @@ function ScoreTrendCard({
         <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.77rem',fontFamily:'monospace'}}>
           <thead>
             <tr style={{background:C.navy}}>
-              <th style={{textAlign:'left',padding:'8px 10px',color:C.white,minWidth:110,fontSize:'0.75rem',position:'sticky',left:0,background:C.navy}}></th>
+              <th style={{textAlign:'left',padding:'8px 10px',color:C.white,minWidth:160,fontSize:'0.75rem',position:'sticky',left:0,background:C.navy}}></th>
               {years.map(y => expanded[y.label] ? (
                 <React.Fragment key={y.label}>
                   {(monthsByYear[y.label]||[]).map((m,i) => (
@@ -334,38 +334,27 @@ function ScoreTrendCard({
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td style={{padding:'7px 10px',fontWeight:700,color:C.navy,minWidth:110,fontSize:'0.8rem',position:'sticky',left:0,background:C.white}}>{title.replace(' Trend','')} <span style={{fontWeight:400,color:C.slate}}>/{maxLabel}</span></td>
-              {years.map(y => expanded[y.label] ? (
-                <React.Fragment key={y.label}>
-                  {(monthsByYear[y.label]||[]).map((m,i) => (
-                    <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:700,color:getColor(m.result)}}>
-                      {getValue(m.result)}
+            {rows.map((row,ri)=>(
+              <tr key={row.label} style={ri%2===1?{background:C.lightBg}:undefined}>
+                <td style={{padding:'7px 10px',fontWeight:ri===0?700:400,color:C.navy,minWidth:160,fontSize:ri===0?'0.8rem':'0.75rem',position:'sticky',left:0,background:ri%2===1?C.lightBg:C.white}}>{row.label}</td>
+                {years.map(y => expanded[y.label] ? (
+                  <React.Fragment key={y.label}>
+                    {(monthsByYear[y.label]||[]).map((m,i) => (
+                      <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:ri===0?700:400,color:row.getColor(m.result)}}>
+                        {row.getValue(m.result)}
+                      </td>
+                    ))}
+                    <td onClick={()=>toggle(y.label)} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:ri===0?700:400,cursor:'pointer',color:row.getColor(y.result),borderLeft:`2px solid ${C.border}`}}>
+                      {row.getValue(y.result)}
                     </td>
-                  ))}
-                  <td onClick={()=>toggle(y.label)} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:700,cursor:'pointer',color:getColor(y.result),borderLeft:`2px solid ${C.border}`}}>
-                    {getValue(y.result)}
+                  </React.Fragment>
+                ) : (
+                  <td key={y.label} onClick={()=>toggle(y.label)} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:ri===0?700:400,cursor:'pointer',color:row.getColor(y.result),borderLeft:`2px solid ${C.border}`}}>
+                    {row.getValue(y.result)}
                   </td>
-                </React.Fragment>
-              ) : (
-                <td key={y.label} onClick={()=>toggle(y.label)} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:700,cursor:'pointer',color:getColor(y.result),borderLeft:`2px solid ${C.border}`}}>
-                  {getValue(y.result)}
-                </td>
-              ))}
-            </tr>
-            <tr style={{background:C.lightBg}}>
-              <td style={{padding:'7px 10px',color:C.slate,fontSize:'0.72rem',position:'sticky',left:0,background:C.lightBg}}>Rating</td>
-              {years.map(y => expanded[y.label] ? (
-                <React.Fragment key={y.label}>
-                  {(monthsByYear[y.label]||[]).map((m,i) => (
-                    <td key={i} style={{padding:'7px 8px',textAlign:'right',fontSize:'0.68rem',color:getColor(m.result)}}>{getClassification(m.result)}</td>
-                  ))}
-                  <td style={{padding:'7px 10px',textAlign:'right',fontSize:'0.68rem',color:getColor(y.result),borderLeft:`2px solid ${C.border}`}}>{getClassification(y.result)}</td>
-                </React.Fragment>
-              ) : (
-                <td key={y.label} style={{padding:'7px 10px',textAlign:'right',fontSize:'0.68rem',color:getColor(y.result),borderLeft:`2px solid ${C.border}`}}>{getClassification(y.result)}</td>
-              ))}
-            </tr>
+                ))}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -597,7 +586,7 @@ export default function GenericDashboard({
       <main style={{maxWidth:1600,margin:'0 auto',padding:'1.5rem'}}>
         {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} pendingApprovalCount={pendingApprovalCount} onGoToApprovals={()=>setView('approvals')} onGoToIntelligence={()=>setView('intelligence')}/>}
         {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P}/>}
-        {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
+        {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods}/>}
         {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
         {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods}/>}
         {view==='cashflow'    && <CashFlowTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
@@ -987,27 +976,69 @@ function ScenariosTab({config,result,months,cc,P,onSave}) {
     }})
   }
 
+  function updateScenario(id:string, field:'label'|'rev_mult'|'cost_mult', value:string|number) {
+    onSave({...config,settings:{...config.settings,
+      scenarios:scenarios.map(s=>s.id===id?{...s,[field]:value}:s)
+    }})
+  }
+
+  function addScenario() {
+    const newId = 'scenario_'+Date.now()
+    onSave({...config,settings:{...config.settings,
+      scenarios:[...scenarios,{id:newId,label:'New Scenario',rev_mult:1.0,cost_mult:1.0,active:false}]
+    }})
+  }
+
+  function deleteScenario(id:string) {
+    if (id==='base') return // the base case is never deletable -- always a real 1.0x baseline to compare against
+    const wasActive = scenarios.find(s=>s.id===id)?.active
+    const remaining = scenarios.filter(s=>s.id!==id)
+    onSave({...config,settings:{...config.settings,
+      scenarios: wasActive ? remaining.map(s=>({...s,active:s.id==='base'})) : remaining,
+    }})
+  }
+
   return (
     <div>
       <div style={card}>
-        <div style={secH}>Scenarios</div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+          <div style={secH}>Scenarios</div>
+          {P.canEditPlan&&<button type="button" style={addBtn()} onClick={addScenario}>+ New Scenario</button>}
+        </div>
         {scenarios.map(sc=>(
           <div key={sc.id} style={{display:'flex',alignItems:'center',gap:'1rem',padding:'0.75rem',border:`1px solid ${sc.active?C.cyan:C.border}`,borderRadius:6,marginBottom:'0.5rem',background:sc.active?'#EBF8FF':C.white}}>
-            <input type="radio" checked={sc.active} onChange={()=>setActiveScenario(sc.id)} style={{cursor:'pointer'}}/>
+            <input type="radio" checked={sc.active} onChange={()=>setActiveScenario(sc.id)} style={{cursor:'pointer'}} aria-label={`Set ${sc.label} as active`}/>
             <div style={{flex:1}}>
-              <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>{sc.label}</div>
-              <div style={{fontSize:'0.75rem',color:C.slate}}>Revenue ×{sc.rev_mult} · Costs ×{sc.cost_mult}</div>
+              {P.canEditPlan ? (
+                <input style={{...inp,fontWeight:700,fontSize:'0.88rem',padding:'0.2rem 0.4rem',marginBottom:'0.3rem'}}
+                  value={sc.label} onChange={e=>updateScenario(sc.id,'label',e.target.value)} aria-label={`Name for scenario ${sc.label}`}/>
+              ) : (
+                <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>{sc.label}</div>
+              )}
+              {P.canEditPlan ? (
+                <div style={{display:'flex',gap:'0.75rem',alignItems:'center',fontSize:'0.75rem',color:C.slate}}>
+                  <span>Revenue ×</span>
+                  <input type="number" step="0.01" style={{width:70,padding:'0.25rem 0.4rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily:'monospace',fontSize:'0.78rem'}}
+                    value={sc.rev_mult} onChange={e=>updateScenario(sc.id,'rev_mult',e.target.value===''?1:Number(e.target.value))} aria-label={`Revenue multiplier for ${sc.label}`}/>
+                  <span>Costs ×</span>
+                  <input type="number" step="0.01" style={{width:70,padding:'0.25rem 0.4rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily:'monospace',fontSize:'0.78rem'}}
+                    value={sc.cost_mult} onChange={e=>updateScenario(sc.id,'cost_mult',e.target.value===''?1:Number(e.target.value))} aria-label={`Cost multiplier for ${sc.label}`}/>
+                </div>
+              ) : (
+                <div style={{fontSize:'0.75rem',color:C.slate}}>Revenue ×{sc.rev_mult} · Costs ×{sc.cost_mult}</div>
+              )}
             </div>
             {sc.active&&<Badge text="Active" color={C.cyan}/>}
+            {P.canEditPlan&&sc.id!=='base'&&<button type="button" style={delBtn} onClick={()=>deleteScenario(sc.id)} aria-label={`Delete ${sc.label}`}>×</button>}
           </div>
         ))}
       </div>
       {result&&(
-        <PLTable title="Scenario P&L" rows={[
+        <PLTableCollapsible title="Scenario P&L" rows={[
           {label:'Revenue',values:result.con.rev,bold:true},
           {label:'Gross Profit',values:result.con.gp,highlight:true},
           {label:'EBITDA',values:result.con.ebitda,bold:true,highlight:true},
-        ]} months={months} cc={cc} showExport/>
+        ]} months={months} startDate={config.start_date} cc={cc} showExport/>
       )}
     </div>
   )
@@ -2194,6 +2225,373 @@ function ExtendHorizonControl({form,setForm}:{form:GenericModelConfig;setForm:(n
   )
 }
 
+// Field operator management -- lists every operator for this client,
+// lets a CEO/coach create new ones (issuing a token immediately),
+// activate/deactivate, and issue a fresh token. The backend
+// (/api/field/admin/operators) already fully supported all of this;
+// this was purely a missing UI -- operators previously could only be
+// created via direct database access.
+function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;businessUnits:{id:string;name:string;active:boolean}[]}) {
+  const [operators, setOperators] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [form, setForm] = useState({display_name:'', phone:'', business_unit_id:'', sync_frequency:'realtime'})
+  const [newLink, setNewLink] = useState<{operatorName:string; url:string; qrDataUrl:string}|null>(null)
+  const [busyId, setBusyId] = useState<string|null>(null)
+
+  async function load() {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/field/admin/operators?client_id=${encodeURIComponent(clientId)}`)
+      const data = await res.json()
+      if (res.ok) setOperators(data.operators||[])
+      else alert(data.error || 'Could not load field operators.')
+    } catch { /* leave operators as-is; the list below shows empty rather than a broken page */ }
+    setLoading(false)
+  }
+  useEffect(()=>{ load() },[clientId])
+
+  async function buildShareLink(operatorName: string, token: string) {
+    const url = `${window.location.origin}/field?token=${encodeURIComponent(token)}`
+    const qrDataUrl = await QRCode.toDataURL(url, { width: 220, margin: 1 })
+    setNewLink({operatorName, url, qrDataUrl})
+  }
+
+  async function createOperator() {
+    if (!form.display_name || !form.business_unit_id) { alert('Name and business unit are required.'); return }
+    setCreating(true)
+    try {
+      const res = await fetch('/api/field/admin/operators', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({client_id: clientId, ...form}),
+      })
+      const data = await res.json()
+      if (!res.ok) { alert(data.error || 'Could not create operator.'); setCreating(false); return }
+      setForm({display_name:'', phone:'', business_unit_id:'', sync_frequency:'realtime'})
+      setShowForm(false)
+      await load()
+      // Isolated from the outer catch deliberately -- the operator is
+      // already created and the list already reloaded by this point, so
+      // a QR-generation failure here must not surface as "could not
+      // create operator", which would wrongly invite a duplicate retry.
+      if (data.token?.token) {
+        try { await buildShareLink(form.display_name, data.token.token) }
+        catch { alert('Operator created, but the share link/QR code could not be generated. Use "New Link" to retry.') }
+      }
+    } catch {
+      alert('No connection -- could not create operator. Please try again.')
+    }
+    setCreating(false)
+  }
+
+  async function toggleActive(operatorId: string, active: boolean) {
+    setBusyId(operatorId)
+    try {
+      const res = await fetch('/api/field/admin/operators', {
+        method: 'PATCH', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({operator_id: operatorId, active}),
+      })
+      if (res.ok) await load()
+      else { const d = await res.json(); alert(d.error || 'Could not update operator.') }
+    } catch {
+      alert('No connection -- could not update operator. Please try again.')
+    }
+    setBusyId(null)
+  }
+
+  async function issueNewToken(operatorId: string, operatorName: string) {
+    setBusyId(operatorId)
+    try {
+      const res = await fetch('/api/field/admin/operators', {
+        method: 'PATCH', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({operator_id: operatorId, issue_new_token: true}),
+      })
+      const data = await res.json()
+      if (res.ok && data.token?.token) {
+        await load()
+        try { await buildShareLink(operatorName, data.token.token) }
+        catch { alert('New token issued, but the share link/QR code could not be generated. Use "New Link" again to retry.') }
+      }
+      else alert(data.error || 'Could not issue a new token.')
+    } catch {
+      alert('No connection -- could not issue a new token. Please try again.')
+    }
+    setBusyId(null)
+  }
+
+  const unitName = (id: string) => businessUnits.find(u=>u.id===id)?.name || id
+
+  return (
+    <div style={card}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+        <div style={secH}>Field Operators</div>
+        <button type="button" style={addBtn(true)} onClick={()=>setShowForm(!showForm)}>{showForm?'Cancel':'+ New Operator'}</button>
+      </div>
+      <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1rem',lineHeight:1.6}}>
+        Create an operator to give them access to Clearview Field for one business unit. Each operator gets their own
+        access link and QR code -- share either one to get them started; no login or password needed.
+      </p>
+
+      {showForm && (
+        <div style={{background:C.cream,borderRadius:6,padding:'1rem',marginBottom:'1.25rem'}}>
+          <div style={fGrid}>
+            <div><label htmlFor="new-op-name" style={lbl}>Operator Name</label>
+              <input id="new-op-name" style={inp} value={form.display_name} onChange={e=>setForm(f=>({...f,display_name:e.target.value}))} placeholder="e.g. Grace Nakato"/>
+            </div>
+            <div><label htmlFor="new-op-phone" style={lbl}>Phone (optional)</label>
+              <input id="new-op-phone" style={inp} value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="e.g. 0772 123 456"/>
+            </div>
+            <div><label htmlFor="new-op-unit" style={lbl}>Business Unit</label>
+              <select id="new-op-unit" style={inp} value={form.business_unit_id} onChange={e=>setForm(f=>({...f,business_unit_id:e.target.value}))}>
+                <option value="">Select a unit...</option>
+                {businessUnits.filter(u=>u.active).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+            <div><label htmlFor="new-op-freq" style={lbl}>Sync Frequency</label>
+              <select id="new-op-freq" style={inp} value={form.sync_frequency} onChange={e=>setForm(f=>({...f,sync_frequency:e.target.value}))}>
+                <option value="realtime">Real-time (as entered)</option>
+                <option value="end_of_day">Once at end of day</option>
+                <option value="daily">Once daily</option>
+              </select>
+            </div>
+          </div>
+          <button type="button" style={{...solidBtn(C.navy),marginTop:'0.75rem'}} disabled={creating} onClick={createOperator}>{creating?'Creating...':'Create Operator & Generate Link'}</button>
+        </div>
+      )}
+
+      {newLink && (
+        <div style={{background:'#EAFAF6',border:`1px solid ${C.teal}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}}>
+          <div style={{fontWeight:700,color:C.navy,marginBottom:'0.75rem'}}>Access link for {newLink.operatorName}</div>
+          <div style={{display:'flex',gap:'1.25rem',alignItems:'flex-start',flexWrap:'wrap'}}>
+            <img src={newLink.qrDataUrl} alt={`QR code for ${newLink.operatorName}'s field access link`} style={{borderRadius:6,border:`1px solid ${C.border}`}}/>
+            <div style={{flex:1,minWidth:240}}>
+              <div style={{fontSize:'0.78rem',color:C.slate,marginBottom:'0.4rem'}}>Share this link directly, or have them scan the QR code:</div>
+              <div style={{display:'flex',gap:'0.5rem'}}>
+                <input readOnly aria-label="Field access link URL" style={{...inp,fontFamily:'monospace',fontSize:'0.75rem'}} value={newLink.url} onFocus={e=>e.target.select()}/>
+                <button type="button" style={addBtn(true)} onClick={()=>{navigator.clipboard.writeText(newLink.url)}}>Copy</button>
+              </div>
+              <button type="button" style={{...addBtn(true,C.slate),marginTop:'0.75rem'}} onClick={()=>setNewLink(null)}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <p style={{color:C.slate,fontSize:'0.85rem'}}>Loading...</p>
+      ) : operators.length===0 ? (
+        <p style={{color:C.slate,fontSize:'0.85rem'}}>No field operators yet. Create one above to get started.</p>
+      ) : (
+        <div style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.82rem'}}>
+            <thead>
+              <tr style={{background:C.navy,color:C.white}}>
+                {['Name','Unit','Phone','Status','Last Synced',''].map(h=>(
+                  <th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.75rem'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {operators.map((op:any,i:number)=>(
+                <tr key={op.id} style={{background:i%2===0?C.cream:C.white}}>
+                  <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{op.display_name}</td>
+                  <td style={{padding:'8px 10px'}}>{unitName(op.business_unit_id)}</td>
+                  <td style={{padding:'8px 10px',color:C.slate}}>{op.phone||'—'}</td>
+                  <td style={{padding:'8px 10px'}}><Badge text={op.active?'Active':'Inactive'} color={op.active?C.green:C.slate}/></td>
+                  <td style={{padding:'8px 10px',color:C.slate,fontSize:'0.75rem'}}>{mostRecentTokenUse(op.tokens) ? new Date(mostRecentTokenUse(op.tokens)!).toLocaleString() : 'Never'}</td>
+                  <td style={{padding:'8px 10px',whiteSpace:'nowrap'}}>
+                    <button type="button" disabled={busyId===op.id} style={{...addBtn(true,C.slate),marginRight:'0.4rem'}} onClick={()=>toggleActive(op.id,!op.active)}>
+                      {busyId===op.id?'...':op.active?'Deactivate':'Reactivate'}
+                    </button>
+                    <button type="button" disabled={busyId===op.id} style={addBtn(true)} onClick={()=>issueNewToken(op.id,op.display_name)}>
+                      New Link
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Dashboard-side stock view -- every level across every business unit
+// for this client (unlike the field app's own stock view, which only
+// ever shows one operator's own unit), setting reorder thresholds, and
+// recording intra-store transfers. Deliberately a coach/CEO-level
+// action: moving inventory between business units is an administrative
+// decision, not something an individual field operator does from their
+// own limited-scope phone view.
+function StockAndTransfersSection({clientId,businessUnits}:{clientId:string;businessUnits:{id:string;name:string;active:boolean}[]}) {
+  const [levels, setLevels] = useState<any[]>([])
+  const [catalogueByUnit, setCatalogueByUnit] = useState<Record<string,any[]>>({})
+  const [loading, setLoading] = useState(true)
+  const [showTransferForm, setShowTransferForm] = useState(false)
+  const [transferring, setTransferring] = useState(false)
+  const [transferForm, setTransferForm] = useState({
+    from_business_unit_id:'', from_catalogue_item_id:'', to_business_unit_id:'', to_catalogue_item_id:'', quantity:'', notes:'',
+  })
+  const [editingThresholdId, setEditingThresholdId] = useState<string|null>(null)
+  const [thresholdValue, setThresholdValue] = useState('')
+
+  async function load() {
+    setLoading(true)
+    try {
+      const [levelsRes, catalogueRes] = await Promise.all([
+        fetch(`/api/field/admin/stock?client_id=${encodeURIComponent(clientId)}`),
+        supabase.from('field_catalogue').select('id,name,unit_label,business_unit_id').eq('client_id',clientId).eq('active',true),
+      ])
+      const levelsData = await levelsRes.json()
+      if (levelsRes.ok) setLevels(levelsData.stockLevels||[])
+      const byUnit: Record<string,any[]> = {}
+      ;(catalogueRes.data||[]).forEach((item:any) => {
+        if (!byUnit[item.business_unit_id]) byUnit[item.business_unit_id] = []
+        byUnit[item.business_unit_id].push(item)
+      })
+      setCatalogueByUnit(byUnit)
+    } catch { /* leave lists as-is; the view below shows empty rather than a broken page */ }
+    setLoading(false)
+  }
+  useEffect(()=>{ load() },[clientId])
+
+  const unitName = (id: string) => businessUnits.find(u=>u.id===id)?.name || id
+
+  async function saveThreshold(levelId: string) {
+    try {
+      const res = await fetch('/api/field/admin/stock', {
+        method: 'PATCH', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ stock_level_id: levelId, reorder_threshold: thresholdValue===''?null:Number(thresholdValue) }),
+      })
+      if (res.ok) { setEditingThresholdId(null); await load() }
+      else { const d = await res.json(); alert(d.error || 'Could not update the reorder threshold.') }
+    } catch {
+      alert('No connection -- could not update the reorder threshold. Please try again.')
+    }
+  }
+
+  async function submitTransfer() {
+    const f = transferForm
+    if (!f.from_business_unit_id || !f.from_catalogue_item_id || !f.to_business_unit_id || !f.to_catalogue_item_id || !f.quantity) {
+      alert('Every field is required for a transfer.'); return
+    }
+    setTransferring(true)
+    try {
+      const res = await fetch('/api/field/admin/stock', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ client_id: clientId, ...f, quantity: Number(f.quantity) }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setShowTransferForm(false)
+        setTransferForm({from_business_unit_id:'',from_catalogue_item_id:'',to_business_unit_id:'',to_catalogue_item_id:'',quantity:'',notes:''})
+        await load()
+      } else {
+        alert(data.error || 'Could not record the transfer.')
+      }
+    } catch {
+      alert('No connection -- could not record the transfer. Please try again.')
+    }
+    setTransferring(false)
+  }
+
+  return (
+    <div style={card}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+        <div style={secH}>Stock & Transfers</div>
+        <button type="button" style={addBtn(true)} onClick={()=>setShowTransferForm(!showTransferForm)}>{showTransferForm?'Cancel':'+ New Transfer'}</button>
+      </div>
+      <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1rem',lineHeight:1.6}}>
+        Stock is tracked automatically as operators record sales, and updated when they receive new stock in the field app.
+        Use a transfer here to move inventory between business units -- e.g. produce grown on the farm being moved into the
+        shop for resale.
+      </p>
+
+      {showTransferForm && (
+        <div style={{background:C.cream,borderRadius:6,padding:'1rem',marginBottom:'1.25rem'}}>
+          <div style={fGrid}>
+            <div><label style={lbl}>From Unit</label>
+              <select style={inp} value={transferForm.from_business_unit_id} onChange={e=>setTransferForm(f=>({...f,from_business_unit_id:e.target.value,from_catalogue_item_id:''}))}>
+                <option value="">Select...</option>
+                {businessUnits.filter(u=>u.active).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+            <div><label style={lbl}>From Item</label>
+              <select style={inp} value={transferForm.from_catalogue_item_id} onChange={e=>setTransferForm(f=>({...f,from_catalogue_item_id:e.target.value}))} disabled={!transferForm.from_business_unit_id}>
+                <option value="">Select a unit first...</option>
+                {(catalogueByUnit[transferForm.from_business_unit_id]||[]).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </div>
+            <div><label style={lbl}>To Unit</label>
+              <select style={inp} value={transferForm.to_business_unit_id} onChange={e=>setTransferForm(f=>({...f,to_business_unit_id:e.target.value,to_catalogue_item_id:''}))}>
+                <option value="">Select...</option>
+                {businessUnits.filter(u=>u.active).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+            <div><label style={lbl}>To Item</label>
+              <select style={inp} value={transferForm.to_catalogue_item_id} onChange={e=>setTransferForm(f=>({...f,to_catalogue_item_id:e.target.value}))} disabled={!transferForm.to_business_unit_id}>
+                <option value="">Select a unit first...</option>
+                {(catalogueByUnit[transferForm.to_business_unit_id]||[]).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </div>
+            <div><label style={lbl}>Quantity</label>
+              <input type="number" style={inp} value={transferForm.quantity} onChange={e=>setTransferForm(f=>({...f,quantity:e.target.value}))}/>
+            </div>
+            <div><label style={lbl}>Notes (optional)</label>
+              <input style={inp} value={transferForm.notes} onChange={e=>setTransferForm(f=>({...f,notes:e.target.value}))}/>
+            </div>
+          </div>
+          <button type="button" style={{...solidBtn(C.navy),marginTop:'0.75rem'}} disabled={transferring} onClick={submitTransfer}>{transferring?'Recording...':'Record Transfer'}</button>
+        </div>
+      )}
+
+      {loading ? (
+        <p style={{color:C.slate,fontSize:'0.85rem'}}>Loading...</p>
+      ) : levels.length===0 ? (
+        <p style={{color:C.slate,fontSize:'0.85rem'}}>No stock recorded yet. Levels appear here once operators record sales or receive stock in the field app.</p>
+      ) : (
+        <div style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.82rem'}}>
+            <thead>
+              <tr style={{background:C.navy,color:C.white}}>
+                {['Unit','Item','On Hand','Reorder Threshold',''].map(h=>(
+                  <th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.75rem'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {levels.map((level:any,i:number)=>{
+                const low = level.reorder_threshold != null && level.quantity_on_hand <= level.reorder_threshold
+                return (
+                  <tr key={level.id} style={{background:low?'#FFF8E8':i%2===0?C.cream:C.white}}>
+                    <td style={{padding:'8px 10px'}}>{unitName(level.business_unit_id)}</td>
+                    <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{level.catalogue?.name||'Item'}</td>
+                    <td style={{padding:'8px 10px',fontFamily:'monospace',fontWeight:700}}>{level.quantity_on_hand}{level.catalogue?.unit_label?` ${level.catalogue.unit_label}`:''}</td>
+                    <td style={{padding:'8px 10px'}}>
+                      {editingThresholdId===level.id ? (
+                        <div style={{display:'flex',gap:'0.4rem'}}>
+                          <input type="number" style={{width:70,padding:'0.3rem 0.4rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.78rem'}} value={thresholdValue} onChange={e=>setThresholdValue(e.target.value)}/>
+                          <button type="button" style={addBtn(true)} onClick={()=>saveThreshold(level.id)}>Save</button>
+                        </div>
+                      ) : (
+                        <span onClick={()=>{setEditingThresholdId(level.id);setThresholdValue(String(level.reorder_threshold??''))}} style={{cursor:'pointer',color:level.reorder_threshold!=null?C.navy:C.slate,textDecoration:'underline',fontSize:'0.8rem'}}>
+                          {level.reorder_threshold ?? 'Set threshold'}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{padding:'8px 10px'}}>{low && <Badge text="Low Stock" color={C.amber}/>}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function SettingsTab({config,P,onSave}) {
   const [form, setForm] = useState({...config})
   const [saving, setSaving] = useState(false)
@@ -2222,7 +2620,7 @@ function SettingsTab({config,P,onSave}) {
     setForm(f=>({...f,business_units:[...f.business_units,newUnit]}))
   }
 
-  const sections = [['general','General'],['units','Business Units'],['capital','Capital Structure'],['credit','Debt Obligations'],['delegation','Approval Delegation']]
+  const sections = [['general','General'],['units','Business Units'],['capital','Capital Structure'],['credit','Debt Obligations'],['delegation','Approval Delegation'],['field_operators','Field Operators'],['stock','Stock & Transfers']]
 
   return (
     <div>
@@ -2393,6 +2791,9 @@ function SettingsTab({config,P,onSave}) {
         </div>
       )}
 
+      {activeSection==='field_operators'&&<FieldOperatorsSection clientId={config.client_id} businessUnits={config.business_units}/>}
+      {activeSection==='stock'&&<StockAndTransfersSection clientId={config.client_id} businessUnits={config.business_units}/>}
+
       <div style={{marginTop:'1.25rem',display:'flex',gap:'0.75rem'}}>
         <button style={solidBtn(C.navy)} disabled={saving} onClick={save}>{saving?'Saving...':'Save All Settings'}</button>
       </div>
@@ -2414,11 +2815,12 @@ function findCashWarningMonths(result:any, months:string[]) {
   return warnings
 }
 
-function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave}) {
+function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,closedPeriods}) {
   const [activeSection,setActiveSection]=useState('summary')
   const [healthReports, setHealthReports] = useState<any[]>([])
   const [investmentAssessments, setInvestmentAssessments] = useState<any[]>([])
   const [events, setEvents] = useState<any[]>([])
+  const [fieldAppPeriods, setFieldAppPeriods] = useState<Set<string>>(new Set())
   const [narrative, setNarrative] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [generatingNarrative, setGeneratingNarrative] = useState(false)
@@ -2431,11 +2833,21 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave}) {
       supabase.from('investment_readiness').select('*').eq('client_id',clientId).order('generated_at',{ascending:false}).limit(1),
       supabase.from('management_events').select('*').eq('client_id',clientId).order('date',{ascending:false}).limit(1000),
       supabase.from('coach_briefings').select('*').eq('client_id',clientId).order('generated_at',{ascending:false}).limit(1),
-    ]).then(([h,i,e,n])=>{
+      supabase.from('generic_actuals').select('period,field_line_values').eq('client_id',clientId),
+    ]).then(([h,i,e,n,a])=>{
       setHealthReports(h.data||[])
       setInvestmentAssessments(i.data||[])
       setEvents(e.data||[])
       setNarrative(n.data?.[0]||null)
+      // A period counts as having real field-app data if ANY business
+      // unit's row for that period has a non-empty field_line_values --
+      // used by Liquidity Readiness's Visibility dimension (Transactions
+      // Digitally Captured), not fabricated or defaulted to false.
+      const periodsWithFieldData = new Set<string>()
+      ;(a.data||[]).forEach((row:any) => {
+        if (row.field_line_values && Object.keys(row.field_line_values).length > 0) periodsWithFieldData.add(row.period)
+      })
+      setFieldAppPeriods(periodsWithFieldData)
       setLoading(false)
     })
   },[clientId])
@@ -2492,6 +2904,41 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave}) {
   }, yearGroups, monthLabelsFull)
   const monthsByYearLabel: Record<string, typeof scoreSeries.monthsByYear[number]> = {}
   yearGroups.forEach(g => { monthsByYearLabel[g.label] = scoreSeries.monthsByYear[g.year] })
+
+  // Liquidity Readiness Score time series -- same year/month structure
+  // as scoreSeries above, sharing yearGroups/monthLabelsFull.
+  const periodIsActual: boolean[] = result.con.act_ebitda.map((v:number|null) => v !== null)
+  const monthsClosedFlags: boolean[] = months.map((_:string, i:number) =>
+    closedPeriods?.has(periodForMonthIndex(config.start_date, i)) ?? false
+  )
+  const monthsWithFieldAppFlags: boolean[] = months.map((_:string, i:number) =>
+    fieldAppPeriods.has(periodForMonthIndex(config.start_date, i))
+  )
+  const capitalStructure = config.settings.capital_structure
+  const capitalAtRisk = (capitalStructure?.shareholder_contribution||0) + (capitalStructure?.grant_recoverable||0)
+  const lrsCashFlows = buildInvestmentCashFlows(capitalAtRisk, result.cf.op_cash, result.cf.inv_cash)
+  const lrsMonthlyIrr = computeIRR(lrsCashFlows)
+  const lrsAnnualIrr = lrsMonthlyIrr !== null ? monthlyRateToAnnualRate(lrsMonthlyIrr) : null
+  const lrsCustomerGrowth = computeCustomerGrowthSummary(events)
+  const lrsSeries = computeLRSTimeSeries({
+    rev: result.con.rev, ebitda: result.con.ebitda, grossProfit: result.con.gp,
+    cashClose: result.cf.close, opex: result.con.opex,
+    totalEquityByMonth: result.bs.total_equity, totalLiabilitiesByMonth: result.bs.total_liabilities,
+    businessBreakeven: result.metrics.business_breakeven,
+    monthsWithActuals: periodIsActual, monthsClosed: monthsClosedFlags, monthsWithFieldApp: monthsWithFieldAppFlags,
+    customersAcquiredTotal: lrsCustomerGrowth.totalCustomersAcquired,
+    irr: lrsAnnualIrr, revenuePerHead: result.metrics.revenue_per_head,
+    dscrMin: s.dscrMin, hasDebt: s.hasDebt, cashGaps: s.cashGaps, tradeCreditDpo: s.tradeCredit.dpo,
+    assess,
+  }, yearGroups, monthLabelsFull)
+  const lrsMonthsByYearLabel: Record<string, typeof lrsSeries.monthsByYear[number]> = {}
+  yearGroups.forEach(g => { lrsMonthsByYearLabel[g.label] = lrsSeries.monthsByYear[g.year] })
+  const lrsCurrent = lrsSeries.years[lrsSeries.years.length-1]?.result || computeLiquidityReadinessScore({
+    annualRevenue:0,annualEbitda:0,annualGrossProfit:0,cashClose:[0],monthlyOpex:[0],businessBreakeven:0,
+    totalEquity:0,totalLiabilities:0,dscrMin:null,hasDebt:false,cashGaps:0,tradeCreditDpo:0,
+    monthsOfActualData:0,monthsElapsed:0,monthsClosed:0,fieldAppMonths:0,revenueGrowthRate:0,
+    customersAcquired:0,irr:null,revenuePerHead:0,assess,
+  })
 
   async function generateHealthCheck() {
     setGeneratingHealth(true)
@@ -2559,7 +3006,7 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
 
   const tabList:[string,string][] = [
     ['summary','Summary'],['narrative',"This Month's Story"],['credit','Credit Risk'],
-    ['going_concern','Going Concern'],['investment','Investment Readiness'],['investment_metrics','Investment Metrics'],
+    ['going_concern','Going Concern'],['liquidity_readiness','Liquidity Readiness'],
     ['coach','Coach Assessment'],['events','Marketing Events'],
   ]
 
@@ -2691,8 +3138,14 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
       )}
 
       {activeSection==='credit'&&(
-        <ScoreTrendCard title="Credit Risk Trend" maxLabel="100" years={scoreSeries.years} monthsByYear={monthsByYearLabel}
-          getValue={(r:any)=>r.score} getClassification={(r:any)=>r.classification} getColor={(r:any)=>r.classColor}/>
+        <ScoreTrendCard title="Credit Risk Trend" years={scoreSeries.years} monthsByYear={monthsByYearLabel} rows={[
+          {label:'Credit Risk Score /100', getValue:(r:any)=>r.score, getColor:(r:any)=>r.classColor},
+          {label:'Rating', getValue:(r:any)=>r.classification, getColor:(r:any)=>r.classColor},
+          {label:'DSCR', getValue:(r:any)=>dscrLabel(r), getColor:(r:any)=>dscrColor(r,C)},
+          {label:'Trade Credit: DPO (days)', getValue:(r:any)=>r.tradeCredit.dpo.toFixed(0), getColor:()=>C.navy},
+          {label:'Trade Credit: DSO (days)', getValue:(r:any)=>r.tradeCredit.dso.toFixed(0), getColor:()=>C.navy},
+          {label:'Trade Credit: Cash Conversion Gap', getValue:(r:any)=>r.tradeCredit.cashConversionGap.toFixed(0), getColor:(r:any)=>r.tradeCredit.cashConversionGap<=0?C.green:r.tradeCredit.cashConversionGap>60?C.red:C.amber},
+        ]}/>
       )}
 
       {activeSection==='going_concern'&&(
@@ -2702,118 +3155,140 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
             <div style={{display:'flex',alignItems:'center',gap:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:s.gcColor,lineHeight:1}}>{s.gcScore}</div><div><div style={{fontSize:'0.75rem',color:C.slate}}>out of 20</div><Badge2 label={s.gcRating} color={s.gcColor}/></div></div>
           </div>
           {[
-            {name:'Debt Service Coverage',sc:!s.hasDebt?4:s.dscrMin===null?3:s.dscrMin>=1.5?4:s.dscrMin>=1.0?3:s.dscrMin>=0.5?2:1,max:4,ev:dscrLabel(s),field:null},
-            {name:'Liquidity Position',sc:m.min_cash>=0?4:m.min_cash>-10000000?1:0,max:4,ev:'Min cash: '+fmt(m.min_cash,cc),field:null},
-            {name:'Revenue Sustainability',sc:3,max:4,ev:'Revenue trend: '+s.revTrend,field:null},
-            {name:'Operational Profitability',sc:m.total_ebitda>0?3:2,max:4,ev:'Annual EBITDA: '+fmt(m.total_ebitda,cc),field:null},
-            {name:'Management & Governance',sc:Number(assess.managementCapability)||2,max:4,ev:'Coach assessment',field:'managementCapability'},
+            {name:'Debt Service Coverage',sc:s.gcDebtServiceFactor,max:4,ev:dscrLabel(s),field:null},
+            {name:'Liquidity Position',sc:s.gcLiquidityFactor,max:4,ev:'Min cash: '+fmt(m.min_cash,cc),field:null},
+            {name:'Revenue Sustainability',sc:s.gcRevenueSustainabilityFactor,max:4,ev:'Revenue trend: '+s.revTrend,field:null},
+            {name:'Operational Profitability',sc:s.gcProfitabilityFactor,max:4,ev:'Annual EBITDA: '+fmt(m.total_ebitda,cc),field:null},
+            {name:'Management & Governance',sc:s.gcManagementFactor,max:5,ev:'Coach assessment',field:'managementCapability'},
           ].map(ind=>(
             <div key={ind.name} style={{marginBottom:'1rem',paddingBottom:'1rem',borderBottom:`1px solid ${C.border}`}}>
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}><span style={{fontWeight:600,fontSize:'0.88rem',color:C.navy}}>{ind.name}</span><span style={{fontFamily:'monospace',fontWeight:700,color:ind.sc>=3?C.green:ind.sc>=2?C.amber:C.red}}>{ind.sc}/{ind.max}</span></div>
               <div style={{background:'#E8ECF0',borderRadius:999,height:7}}><div style={{width:(ind.sc/ind.max*100)+'%',height:'100%',background:ind.sc>=3?C.green:ind.sc>=2?C.amber:C.red,borderRadius:999}}/></div>
               <div style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.3rem'}}>{ind.ev}</div>
-              {ind.field!=null&&<input type="range" min="0" max={ind.max} step="1" value={(assess as any)[ind.field]||2} onChange={e=>updateAssess(ind.field as string,Number(e.target.value))} style={{width:'100%',accentColor:C.cyan,marginTop:'0.4rem'}}/>}
+              {ind.field!=null&&<div style={{fontSize:'0.72rem',color:C.teal,marginTop:'0.3rem',fontStyle:'italic'}}>Set on the Coach Assessment tab</div>}
             </div>
           ))}
         </div>
       )}
 
       {activeSection==='going_concern'&&(
-        <ScoreTrendCard title="Going Concern Trend" maxLabel="20" years={scoreSeries.years} monthsByYear={monthsByYearLabel}
-          getValue={(r:any)=>r.gcScore} getClassification={(r:any)=>r.gcRating} getColor={(r:any)=>r.gcColor}/>
+        <ScoreTrendCard title="Going Concern Trend" years={scoreSeries.years} monthsByYear={monthsByYearLabel} rows={[
+          {label:'Going Concern Score /20', getValue:(r:any)=>r.gcScore, getColor:(r:any)=>r.gcColor},
+          {label:'Rating', getValue:(r:any)=>r.gcRating, getColor:(r:any)=>r.gcColor},
+          {label:'Debt Service Coverage /4', getValue:(r:any)=>r.gcDebtServiceFactor, getColor:(r:any)=>r.gcDebtServiceFactor>=3?C.green:r.gcDebtServiceFactor>=2?C.amber:C.red},
+          {label:'Liquidity Position /4', getValue:(r:any)=>r.gcLiquidityFactor, getColor:(r:any)=>r.gcLiquidityFactor>=3?C.green:r.gcLiquidityFactor>=2?C.amber:C.red},
+          {label:'Revenue Sustainability /4', getValue:(r:any)=>r.gcRevenueSustainabilityFactor, getColor:(r:any)=>r.gcRevenueSustainabilityFactor>=3?C.green:r.gcRevenueSustainabilityFactor>=2?C.amber:C.red},
+          {label:'Operational Profitability /3', getValue:(r:any)=>r.gcProfitabilityFactor, getColor:(r:any)=>r.gcProfitabilityFactor>=3?C.green:C.amber},
+          {label:'Management & Governance /4', getValue:(r:any)=>r.gcManagementFactor, getColor:(r:any)=>r.gcManagementFactor>=3?C.green:r.gcManagementFactor>=2?C.amber:C.red},
+        ]}/>
       )}
 
-      {activeSection==='investment'&&(
-        <div style={card}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem',flexWrap:'wrap',gap:'0.75rem'}}>
-            <div style={secH}>Investment Readiness Score</div>
-            <div style={{display:'flex',alignItems:'center',gap:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:s.irColor,lineHeight:1}}>{s.irScore}</div><div><div style={{fontSize:'0.75rem',color:C.slate}}>out of 30</div><Badge2 label={s.irTier} color={s.irColor}/></div></div>
-          </div>
-          <InvestmentPitchDownload clientId={clientId}/>
-          {[
-            {name:'Financial Viability',sc:s.irFinancial,max:5,ev:'EBITDA margin '+(s.ebitdaMargin*100).toFixed(1)+'%',field:null},
-            {name:'Debt Serviceability',sc:s.irDebt,max:5,ev:dscrLabel(s),field:null},
-            {name:'Commercial Model Clarity',sc:Number(assess.commercialModel)||2,max:5,ev:'Coach assessment',field:'commercialModel'},
-            {name:'Management Capability',sc:Number(assess.managementCapability)||2,max:5,ev:'Coach assessment',field:'managementCapability'},
-            {name:'Market Evidence',sc:Number(assess.marketEvidence)||2,max:5,ev:'Coach assessment',field:'marketEvidence'},
-            {name:'Governance & Records',sc:Number(assess.governance)||2,max:5,ev:'Coach assessment',field:'governance'},
-          ].map(dim=>(
-            <div key={dim.name} style={{marginBottom:'1rem',paddingBottom:'1rem',borderBottom:`1px solid ${C.border}`}}>
-              <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}><span style={{fontWeight:600,fontSize:'0.88rem',color:C.navy}}>{dim.name}</span><span style={{fontFamily:'monospace',fontWeight:700,color:dim.sc>=4?C.green:dim.sc>=3?C.teal:dim.sc>=2?C.amber:C.red}}>{dim.sc}/{dim.max}</span></div>
-              <div style={{background:'#E8ECF0',borderRadius:999,height:7}}><div style={{width:(dim.sc/dim.max*100)+'%',height:'100%',background:dim.sc>=4?C.green:dim.sc>=3?C.teal:dim.sc>=2?C.amber:C.red,borderRadius:999}}/></div>
-              <div style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.3rem'}}>{dim.ev}</div>
-              {dim.field!=null&&<input type="range" min="0" max={dim.max} step="1" value={(assess as any)[dim.field]||2} onChange={e=>updateAssess(dim.field as string,Number(e.target.value))} style={{width:'100%',accentColor:C.cyan,marginTop:'0.4rem'}}/>}
-            </div>
-          ))}
-          {latestInvestment&&(
-            <div style={{marginTop:'1.25rem',paddingTop:'1.25rem',borderTop:`1px solid ${C.border}`}}>
-              <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy,marginBottom:'0.5rem'}}>AI Narrative Assessment</div>
-              <div style={{fontSize:'0.85rem',color:C.navy,lineHeight:1.75,whiteSpace:'pre-wrap'}}>{latestInvestment.assessment_text}</div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeSection==='investment'&&(
-        <ScoreTrendCard title="Investment Readiness Trend" maxLabel="30" years={scoreSeries.years} monthsByYear={monthsByYearLabel}
-          getValue={(r:any)=>r.irScore} getClassification={(r:any)=>r.irTier} getColor={(r:any)=>r.irColor}/>
-      )}
-
-      {activeSection==='investment_metrics'&&(() => {
-        const capital = config.settings.capital_structure
-        // Capital genuinely at risk for an equity-style return -- share-
-        // holder contributions and recoverable (repayable) grants.
-        // Non-repayable grants and bank loan principal are deliberately
-        // excluded (see investment-metrics.ts for why) -- this is the
-        // one judgment call in an otherwise standard NPV/IRR calculation.
-        const capitalAtRisk = (capital?.shareholder_contribution||0) + (capital?.grant_recoverable||0)
-        const cashFlows = buildInvestmentCashFlows(capitalAtRisk, result.cf.op_cash, result.cf.inv_cash)
-        // cashFlows is a MONTHLY series (one entry per month, from
-        // op_cash/inv_cash) -- discountRate is what the user thinks of
-        // as an ANNUAL rate, so it must be converted to its monthly
-        // equivalent before feeding computeNPV, which discounts by
-        // (1+r) per ENTRY in the array, not per year. Likewise,
-        // computeIRR run on monthly cash flows returns a monthly rate,
-        // which must be annualized before comparison/display -- both
-        // conversions use the same standard compounding formula, not a
-        // naive divide/multiply by 12.
+      {activeSection==='liquidity_readiness'&&(() => {
+        // Reuses capitalAtRisk/lrsCashFlows/lrsAnnualIrr already computed
+        // once above for the LRS time series -- IRR is an iterative
+        // Newton-Raphson/bisection routine, so recomputing it here under
+        // different names would be wasted work with a real risk of the
+        // two silently drifting apart. NPV still needs its own
+        // calculation since it depends on the adjustable discountRate.
         const monthlyDiscountRate = annualRateToMonthlyRate(discountRate)
-        const npv = computeNPV(cashFlows, monthlyDiscountRate)
-        const monthlyIrr = computeIRR(cashFlows)
-        const irr = monthlyIrr !== null ? monthlyRateToAnnualRate(monthlyIrr) : null
+        const npv = computeNPV(lrsCashFlows, monthlyDiscountRate)
+        const irr = lrsAnnualIrr
         const growth = computeCustomerGrowthSummary(events)
+        const dimLabels: [keyof typeof lrsCurrent.dimensions, string][] = [
+          ['marketOpportunity','Market Opportunity'],['visibility','Visibility'],['trust','Trust'],
+          ['profitability','Profitability'],['capacity','Capacity'],['resilience','Resilience'],['compliance','Compliance'],
+        ]
+        const scoreColor = (v:number) => v>=70?C.green:v>=50?C.teal:v>=30?C.amber:C.red
         return (
-          <div style={card}>
-            <div style={secH}>Investment Metrics</div>
-            <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1rem',lineHeight:1.6}}>
-              Net Present Value and Internal Rate of Return, calculated against the capital genuinely at risk for a return
-              (shareholder contributions and recoverable grants -- not non-repayable grants or loan principal, which have their own
-              separate return: interest, already reflected in Credit Risk) and the business's projected Free Cash Flow (Operating
-              Cash Flow less spend on Fixed Assets).
-            </p>
-            <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'1rem'}}>
-              <label htmlFor="discount-rate" style={{fontSize:'0.8rem',color:C.slate}}>Discount rate assumption:</label>
-              <input id="discount-rate" type="number" min={1} max={100} value={Math.round(discountRate*100)} onChange={e=>setDiscountRate(Number(e.target.value)/100)} style={{width:70,padding:'0.3rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily:'monospace'}}/>
-              <span style={{fontSize:'0.8rem',color:C.slate}}>% -- adjust to your own cost of capital or required return</span>
-            </div>
-            <div style={kpiGrid}>
-              <KPI label="Capital at Risk" value={fmt(capitalAtRisk,cc)} sub="Shareholder + recoverable grant"/>
-              <KPI label="Net Present Value" value={fmt(npv,cc)} sub={`at ${(discountRate*100).toFixed(0)}%`} color={npv>=0?C.green:C.red}/>
-              <KPI label="Internal Rate of Return" value={irr!==null?pct(irr):'N/A'} sub={irr===null?'No real IRR (check cash flow signs)':'Annualised'} color={irr!==null&&irr>discountRate?C.green:C.red}/>
-            </div>
-            {capitalAtRisk===0&&(
-              <div style={{background:'#FFF8E8',border:`1px solid ${C.amber}`,borderRadius:6,padding:'0.75rem 1rem',marginBottom:'1rem',fontSize:'0.8rem',color:C.navy}}>
-                No shareholder contribution or recoverable grant is recorded in Capital Structure (Settings) -- NPV/IRR above are
-                calculated against zero capital at risk, which makes them of limited meaning. Enter the real capital structure for
-                an accurate result.
+          <div>
+            <div style={card}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.5rem',flexWrap:'wrap',gap:'0.75rem'}}>
+                <div style={secH}>Liquidity Readiness Score</div>
+                <div style={{display:'flex',alignItems:'center',gap:'1rem'}}>
+                  <div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:scoreColor(lrsCurrent.score),lineHeight:1}}>{Math.round(lrsCurrent.score)}</div>
+                  <div style={{fontSize:'0.75rem',color:C.slate}}>out of 100</div>
+                </div>
               </div>
-            )}
-            <div style={{marginTop:'1.25rem',paddingTop:'1.25rem',borderTop:`1px solid ${C.border}`}}>
-              <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy,marginBottom:'0.75rem'}}>Customer Growth (whole business, all recorded marketing events)</div>
+              <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1.25rem',lineHeight:1.6}}>
+                The extent to which this business has the characteristics required for productive liquidity to flow into it --
+                one core score across seven weighted dimensions. A Bank Fit or Investor Fit score below is the same seven
+                dimensions, simply weighted differently for that specific lens; the business's underlying data never changes.
+              </p>
+              <InvestmentPitchDownload clientId={clientId}/>
+              {dimLabels.map(([key,label])=>{
+                const dim = lrsCurrent.dimensions[key]
+                const weight = LRS_WEIGHTS[key]
+                return (
+                  <div key={key} style={{marginBottom:'1.1rem',paddingBottom:'1.1rem',borderBottom:`1px solid ${C.border}`}}>
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}>
+                      <span style={{fontWeight:700,fontSize:'0.9rem',color:C.navy}}>{label} <span style={{fontWeight:400,color:C.slate,fontSize:'0.75rem'}}>({(weight*100).toFixed(0)}% weight)</span></span>
+                      <span style={{fontFamily:'monospace',fontWeight:700,color:scoreColor(dim.score)}}>{Math.round(dim.score)}/100</span>
+                    </div>
+                    <div style={{background:'#E8ECF0',borderRadius:999,height:7,marginBottom:'0.5rem'}}><div style={{width:dim.score+'%',height:'100%',background:scoreColor(dim.score),borderRadius:999}}/></div>
+                    {dim.indicators.map(ind=>(
+                      <div key={ind.label} style={{display:'flex',justifyContent:'space-between',fontSize:'0.74rem',color:C.slate,padding:'0.15rem 0'}}>
+                        <span>{ind.label}</span>
+                        <span style={{fontFamily:'monospace'}}>{Math.round(ind.value)}/100 — {ind.note}</span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+              <div style={{display:'flex',gap:'1.5rem',marginTop:'1rem'}}>
+                {Object.entries(FIT_SCORE_PRESETS).map(([key,preset])=>(
+                  <div key={key}>
+                    <div style={{fontSize:'0.7rem',color:C.slate}}>{preset.label}</div>
+                    <div style={{fontFamily:'monospace',fontWeight:700,fontSize:'1.1rem',color:scoreColor(computeFitScore(lrsCurrent,preset.weights))}}>{Math.round(computeFitScore(lrsCurrent,preset.weights))}/100</div>
+                  </div>
+                ))}
+              </div>
+              {latestInvestment&&(
+                <div style={{marginTop:'1.25rem',paddingTop:'1.25rem',borderTop:`1px solid ${C.border}`}}>
+                  <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy,marginBottom:'0.5rem'}}>AI Narrative Assessment</div>
+                  <div style={{fontSize:'0.85rem',color:C.navy,lineHeight:1.75,whiteSpace:'pre-wrap'}}>{latestInvestment.assessment_text}</div>
+                </div>
+              )}
+            </div>
+
+            <ScoreTrendCard title="Liquidity Readiness Trend" years={lrsSeries.years} monthsByYear={lrsMonthsByYearLabel} rows={[
+              {label:'Liquidity Readiness Score /100', getValue:(r:any)=>Math.round(r.score), getColor:(r:any)=>scoreColor(r.score)},
+              ...dimLabels.map(([key,label])=>({
+                label, getValue:(r:any)=>Math.round(r.dimensions[key].score), getColor:(r:any)=>scoreColor(r.dimensions[key].score),
+              })),
+            ]}/>
+
+            <div style={card}>
+              <div style={secH}>Investment Metrics</div>
+              <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1rem',lineHeight:1.6}}>
+                Net Present Value and Internal Rate of Return, calculated against the capital genuinely at risk for a return
+                (shareholder contributions and recoverable grants -- not non-repayable grants or loan principal, which have their own
+                separate return: interest, already reflected in Credit Risk) and the business's projected Free Cash Flow (Operating
+                Cash Flow less spend on Fixed Assets).
+              </p>
+              <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'1rem'}}>
+                <label htmlFor="discount-rate" style={{fontSize:'0.8rem',color:C.slate}}>Discount rate assumption:</label>
+                <input id="discount-rate" type="number" min={1} max={100} value={Math.round(discountRate*100)} onChange={e=>setDiscountRate(Number(e.target.value)/100)} style={{width:70,padding:'0.3rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily:'monospace'}}/>
+                <span style={{fontSize:'0.8rem',color:C.slate}}>% -- adjust to your own cost of capital or required return</span>
+              </div>
               <div style={kpiGrid}>
-                <KPI label="Customers Acquired" value={growth.totalCustomersAcquired.toLocaleString()}/>
-                <KPI label="Blended CAC" value={growth.blendedCAC!==null?fmt(growth.blendedCAC,cc):'N/A'} sub={growth.blendedCAC===null?'No customers recorded yet':undefined}/>
-                <KPI label="Revenue Lift" value={fmt(growth.totalRevenueLift,cc)} sub="From tracked events"/>
+                <KPI label="Capital at Risk" value={fmt(capitalAtRisk,cc)} sub="Shareholder + recoverable grant"/>
+                <KPI label="Net Present Value" value={fmt(npv,cc)} sub={`at ${(discountRate*100).toFixed(0)}%`} color={npv>=0?C.green:C.red}/>
+                <KPI label="Internal Rate of Return" value={irr!==null?pct(irr):'N/A'} sub={irr===null?'No real IRR (check cash flow signs)':'Annualised'} color={irr!==null&&irr>discountRate?C.green:C.red}/>
+              </div>
+              {capitalAtRisk===0&&(
+                <div style={{background:'#FFF8E8',border:`1px solid ${C.amber}`,borderRadius:6,padding:'0.75rem 1rem',marginBottom:'1rem',fontSize:'0.8rem',color:C.navy}}>
+                  No shareholder contribution or recoverable grant is recorded in Capital Structure (Settings) -- NPV/IRR above are
+                  calculated against zero capital at risk, which makes them of limited meaning. Enter the real capital structure for
+                  an accurate result.
+                </div>
+              )}
+              <div style={{marginTop:'1.25rem',paddingTop:'1.25rem',borderTop:`1px solid ${C.border}`}}>
+                <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy,marginBottom:'0.75rem'}}>Customer Growth (whole business, all recorded marketing events)</div>
+                <div style={kpiGrid}>
+                  <KPI label="Customers Acquired" value={growth.totalCustomersAcquired.toLocaleString()}/>
+                  <KPI label="Blended CAC" value={growth.blendedCAC!==null?fmt(growth.blendedCAC,cc):'N/A'} sub={growth.blendedCAC===null?'No customers recorded yet':undefined}/>
+                  <KPI label="Revenue Lift" value={fmt(growth.totalRevenueLift,cc)} sub="From tracked events"/>
+                </div>
               </div>
             </div>
           </div>
@@ -2822,20 +3297,57 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
 
       {activeSection==='coach'&&(
         <div style={card}>
-          <div style={secH}>Coach Assessment Inputs</div>
-          <p style={{fontSize:'0.85rem',color:C.slate,marginBottom:'1.5rem',lineHeight:1.6}}>These scores feed into Going Concern and Investment Readiness.</p>
-          <div style={fGrid}>
-            {[{label:'Commercial Model Clarity',field:'commercialModel',max:5},{label:'Management Capability',field:'managementCapability',max:4},{label:'Market Evidence',field:'marketEvidence',max:5},{label:'Governance & Record-Keeping',field:'governance',max:5}].map(item=>(
-              <div key={item.field}>
-                <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}>
-                  <label style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{item.label}</label>
-                  <span style={{fontFamily:'monospace',fontWeight:700,color:C.cyan}}>{Number((assess as any)[item.field])||2}/{item.max}</span>
-                </div>
-                <input type="range" min="0" max={item.max} step="1" value={(assess as any)[item.field]||2} onChange={e=>updateAssess(item.field,Number(e.target.value))} style={{width:'100%',accentColor:C.cyan,marginBottom:'0.2rem'}}/>
+          <div style={secH}>Coach Assessment (Business Profile)</div>
+          <p style={{fontSize:'0.85rem',color:C.slate,marginBottom:'1.5rem',lineHeight:1.6}}>
+            Every qualitative input the platform uses lives here, grouped by exactly which score it feeds into.
+            Everything else on Credit Risk, Going Concern, and Liquidity Readiness is computed directly from the financial
+            model -- these are the only figures a human judgement call, not a calculation.
+          </p>
+          {[
+            {group:'Feeds: Going Concern and Investment Readiness', items:[
+              {label:'Management Capability',field:'managementCapability',max:5},
+              {label:'Commercial Model Clarity',field:'commercialModel',max:5},
+              {label:'Market Evidence',field:'marketEvidence',max:5},
+            ]},
+            {group:'Feeds: Liquidity Readiness — Visibility', items:[
+              {label:'KPI Reporting',field:'kpiReporting',max:5},
+            ]},
+            {group:'Feeds: Liquidity Readiness — Trust (and Compliance: Policies)', items:[
+              {label:'Audit Trail',field:'auditTrail',max:5},
+              {label:'Supplier Relationships',field:'supplierRelationships',max:5},
+              {label:'Governance & Record-Keeping',field:'governance',max:5},
+            ]},
+            {group:'Feeds: Liquidity Readiness — Capacity', items:[
+              {label:'Production Capacity',field:'productionCapacity',max:5},
+              {label:'Inventory Availability',field:'inventoryAvailability',max:5},
+            ]},
+            {group:'Feeds: Liquidity Readiness — Resilience', items:[
+              {label:'Customer Diversification',field:'customerDiversification',max:5},
+              {label:'Supplier Diversification',field:'supplierDiversification',max:5},
+              {label:'Business Continuity',field:'businessContinuity',max:5},
+            ]},
+            {group:'Feeds: Liquidity Readiness — Compliance', items:[
+              {label:'Registration',field:'registrationCompliance',max:5},
+              {label:'Tax Compliance',field:'taxCompliance',max:5},
+              {label:'Licences',field:'licenceCompliance',max:5},
+            ]},
+          ].map(section=>(
+            <div key={section.group} style={{marginBottom:'1.75rem'}}>
+              <div style={{fontSize:'0.72rem',fontWeight:700,color:C.teal,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'0.75rem',borderBottom:`1px solid ${C.border}`,paddingBottom:'0.4rem'}}>{section.group}</div>
+              <div style={fGrid}>
+                {section.items.map(item=>(
+                  <div key={item.field}>
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}>
+                      <label htmlFor={`assess-${item.field}`} style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{item.label}</label>
+                      <span style={{fontFamily:'monospace',fontWeight:700,color:C.cyan}}>{(assess as any)[item.field] ?? 2}/{item.max}</span>
+                    </div>
+                    <input id={`assess-${item.field}`} type="range" min="0" max={item.max} step="1" value={(assess as any)[item.field] ?? 2} onChange={e=>updateAssess(item.field,Number(e.target.value))} style={{width:'100%',accentColor:C.cyan,marginBottom:'0.2rem'}}/>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginTop:'1.5rem'}}>
+            </div>
+          ))}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginTop:'0.5rem'}}>
             {[{label:'Immediate Actions (30 days)',field:'immediateActions'},{label:'Near-Term Actions (60-90 days)',field:'nearTermActions'},{label:'Required Follow-Up',field:'followUp'},{label:'Coach Notes',field:'coachNotes'}].map(item=>(
               <div key={item.field}>
                 <label style={{display:'block',fontWeight:600,fontSize:'0.82rem',marginBottom:'0.25rem',color:C.navy}}>{item.label}</label>
@@ -3216,13 +3728,13 @@ function MarginsTab({config,result,months,cc}) {
                   <KPI label="Avg Sell Price" value={fmt(s.sell_price.filter(v=>v>0).reduce((a,b)=>a+b,0)/Math.max(1,s.sell_price.filter(v=>v>0).length),cc)} color={C.green}/>
                   <KPI label="Total Spread" value={fmt(s.total_spread.reduce((a,b)=>a+b,0),cc)} color={C.teal}/>
                 </div>
-                <PLTable title="" rows={[
+                <PLTableCollapsible title="" rows={[
                   {label:'Volume (units)',values:s.volume},
-                  {label:'Buy Price',values:s.buy_price},
-                  {label:'Sell Price',values:s.sell_price},
-                  {label:'Spread per Unit',values:s.spread_per_unit,highlight:true},
+                  {label:'Buy Price',values:s.buy_price,aggregation:'weightedAverage',weights:s.volume},
+                  {label:'Sell Price',values:s.sell_price,aggregation:'weightedAverage',weights:s.volume},
+                  {label:'Spread per Unit',values:s.spread_per_unit,highlight:true,aggregation:'weightedAverage',weights:s.volume},
                   {label:'Total Spread Revenue',values:s.total_spread,bold:true},
-                ]} months={months} cc={cc} showExport/>
+                ]} months={months} startDate={config.start_date} cc={cc} showExport/>
               </div>
             ))}
           </div>
@@ -3247,13 +3759,13 @@ function MarginsTab({config,result,months,cc}) {
                   <KPI label="Avg Cost/Engagement" value={fmt(s.cost.filter(v=>v>0).reduce((a,b)=>a+b,0)/Math.max(1,s.cost.filter(v=>v>0).length),cc)} color={C.red}/>
                   <KPI label="Total Margin" value={fmt(s.margin.reduce((a,b)=>a+b,0),cc)} color={C.teal}/>
                 </div>
-                <PLTable title="" rows={[
+                <PLTableCollapsible title="" rows={[
                   {label:'Engagements',values:s.engagements},
-                  {label:'Fee per Engagement',values:s.fee},
-                  {label:'Cost per Engagement',values:s.cost,negate:true},
-                  {label:'Margin per Engagement',values:s.margin.map((mv,i)=>s.engagements[i]>0?mv/s.engagements[i]:0),highlight:true},
+                  {label:'Fee per Engagement',values:s.fee,aggregation:'weightedAverage',weights:s.engagements},
+                  {label:'Cost per Engagement',values:s.cost,negate:true,aggregation:'weightedAverage',weights:s.engagements},
+                  {label:'Margin per Engagement',values:s.margin.map((mv,i)=>s.engagements[i]>0?mv/s.engagements[i]:0),highlight:true,aggregation:'weightedAverage',weights:s.engagements},
                   {label:'Total Margin',values:s.margin,bold:true},
-                ]} months={months} cc={cc} showExport/>
+                ]} months={months} startDate={config.start_date} cc={cc} showExport/>
               </div>
             ))}
           </div>
@@ -3298,20 +3810,109 @@ function MarginsTab({config,result,months,cc}) {
               </table>
             </div>
           </div>
-          <PLTable title="Monthly Staff Cost Trend" rows={[
+          <PLTableCollapsible title="Staff Cost Trend" rows={[
             {label:'Total Staff Costs',values:result.allocUnits.reduce((acc,u)=>{
               const pl = result.unitPL[u.id]
               return pl ? acc.map((v,m2)=>v+pl.staff[m2]) : acc
             },Array(months.length).fill(0)),bold:true},
-          ]} months={months} cc={cc} showExport/>
+          ]} months={months} startDate={config.start_date} cc={cc} showExport/>
         </div>
       )}
     </div>
   )
 }
+
+// Delegated categorization review queue: costs an operator recorded in
+// the field app that didn't match any existing cost line -- described
+// freely instead. A coach assigns each one to a real plan line here,
+// which promotes it into a genuine field_transactions row (so it flows
+// into the normal actuals aggregation) rather than it sitting outside
+// the numbers indefinitely.
+function UncategorizedCostsSection({config,P}:{config:GenericModelConfig;P:any}) {
+  const [pending, setPending] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [categorizingId, setCategorizingId] = useState<string|null>(null)
+  const [chosenLineId, setChosenLineId] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function load() {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/field/admin/uncategorized-costs?client_id=${encodeURIComponent(config.client_id)}`)
+      const data = await res.json()
+      if (res.ok) setPending(data.pendingCosts||[])
+    } catch { /* leave list as-is; shows empty rather than a broken page */ }
+    setLoading(false)
+  }
+  useEffect(()=>{ load() },[config.client_id])
+
+  const unitName = (id: string) => config.business_units.find(u=>u.id===id)?.name || id
+  const costLinesForUnit = (unitId: string) => config.plan_lines.filter(l=>l.unit_id===unitId&&l.active&&(l.category==='direct_opex'||l.category==='cost_of_sales'))
+
+  async function categorize(cost: any) {
+    if (!chosenLineId) { alert('Select a plan line first.'); return }
+    const line = config.plan_lines.find(l=>l.id===chosenLineId)
+    if (!line) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/field/admin/uncategorized-costs', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ uncategorized_cost_id: cost.id, plan_line_id: line.id, plan_line_name: line.name, category: line.category, categorized_by: P.fullName }),
+      })
+      const data = await res.json()
+      if (res.ok) { setCategorizingId(null); setChosenLineId(''); await load() }
+      else alert(data.error || 'Could not categorize this cost.')
+    } catch {
+      alert('No connection -- could not categorize this cost. Please try again.')
+    }
+    setSaving(false)
+  }
+
+  return (
+    <div style={card}>
+      <div style={secH}>Needs Categorizing</div>
+      <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1rem',lineHeight:1.6}}>
+        Costs recorded in the field app that didn't match any existing cost line -- an operator described what happened,
+        and it's waiting for you to assign it to the right category. Until then, it isn't counted in any financial statement.
+      </p>
+      {loading ? (
+        <p style={{color:C.slate,fontSize:'0.85rem'}}>Loading...</p>
+      ) : pending.length===0 ? (
+        <p style={{color:C.slate,fontSize:'0.85rem'}}>Nothing waiting -- every field-recorded cost has a category.</p>
+      ) : (
+        pending.map(cost=>(
+          <div key={cost.id} style={{background:C.cream,border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1rem',marginBottom:'0.6rem'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'0.5rem'}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:'0.9rem',color:C.navy}}>{cost.description}</div>
+                <div style={{fontSize:'0.75rem',color:C.slate,marginTop:'0.15rem'}}>{unitName(cost.business_unit_id)} · {cost.transaction_date}</div>
+              </div>
+              <div style={{fontFamily:'monospace',fontWeight:700,fontSize:'0.95rem',color:C.red,whiteSpace:'nowrap'}}>{fmt(cost.amount,config.currency)}</div>
+            </div>
+            {categorizingId===cost.id ? (
+              <div style={{display:'flex',gap:'0.5rem',marginTop:'0.6rem'}}>
+                <select style={{flex:1,padding:'0.4rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.8rem'}} value={chosenLineId} onChange={e=>setChosenLineId(e.target.value)}>
+                  <option value="">Select the right category...</option>
+                  {costLinesForUnit(cost.business_unit_id).map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+                <button type="button" disabled={saving} style={addBtn(true)} onClick={()=>categorize(cost)}>{saving?'Saving...':'Confirm'}</button>
+                <button type="button" style={addBtn(true,C.slate)} onClick={()=>{setCategorizingId(null);setChosenLineId('')}}>Cancel</button>
+              </div>
+            ) : (
+              <button type="button" style={{marginTop:'0.6rem',padding:'0.4rem 0.75rem',background:'transparent',color:C.teal,border:`1px solid ${C.teal}`,borderRadius:6,fontSize:'0.75rem',cursor:'pointer',fontWeight:600}} onClick={()=>setCategorizingId(cost.id)}>
+                Categorize
+              </button>
+            )}
+          </div>
+        ))
+      )}
+    </div>
+  )
+}
+
 // ── ACTUALS & WORKING CAPITAL TAB (toggle between two existing components) ──
 function ActualsAndWorkingCapitalTab({config,result,months,cc,P,onSave,onCloseStatusChanged}) {
-  const [mode, setMode] = useState<'actuals'|'workingcapital'>('actuals')
+  const [mode, setMode] = useState<'actuals'|'workingcapital'|'uncategorized'>('actuals')
   return (
     <div>
       <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
@@ -3323,9 +3924,14 @@ function ActualsAndWorkingCapitalTab({config,result,months,cc,P,onSave,onCloseSt
           background:mode==='workingcapital'?C.navy:C.white,color:mode==='workingcapital'?C.white:C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:mode==='workingcapital'?700:400}}
           onClick={()=>setMode('workingcapital')}>Working Capital (Trade Credit)</button>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:mode==='uncategorized'?C.navy:C.white,color:mode==='uncategorized'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:mode==='uncategorized'?700:400}}
+          onClick={()=>setMode('uncategorized')}>Needs Categorizing</button>
       </div>
       {mode==='actuals' && <ActualsTab config={config} months={months} cc={cc} P={P} onSave={onSave} onCloseStatusChanged={onCloseStatusChanged}/>}
       {mode==='workingcapital' && <WorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={onSave}/>}
+      {mode==='uncategorized' && <UncategorizedCostsSection config={config} P={P}/>}
     </div>
   )
 }
@@ -3427,8 +4033,46 @@ function PromotionEventsSection({clientId,config,cc,P,events,setEvents}) {
     return a.cac-b.cac
   })
 
+  // Collapsible year/month trend -- grouped by the events' own dates,
+  // not the model's planning window, since a marketing event can happen
+  // any time regardless of the plan's start/end. Reuses
+  // computeCustomerGrowthSummary (already used for the whole-business
+  // Liquidity Readiness figures) per period rather than a separate
+  // aggregation formula.
+  const eventsByYear: Record<string, any[]> = {}
+  events.forEach((evt:any) => {
+    if (!evt.date) return
+    const year = String(new Date(evt.date).getUTCFullYear())
+    if (!eventsByYear[year]) eventsByYear[year] = []
+    eventsByYear[year].push(evt)
+  })
+  const eventYears = Object.keys(eventsByYear).sort()
+  const eventTrendYears = eventYears.map(year => ({
+    label: year, monthIndices: [], result: computeCustomerGrowthSummary(eventsByYear[year]),
+  }))
+  const eventTrendMonthsByYear: Record<string, any[]> = {}
+  eventYears.forEach(year => {
+    const byMonth: Record<string, any[]> = {}
+    eventsByYear[year].forEach((evt:any) => {
+      const monthLabel = new Date(evt.date).toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })
+      if (!byMonth[monthLabel]) byMonth[monthLabel] = []
+      byMonth[monthLabel].push(evt)
+    })
+    const monthOrder = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    eventTrendMonthsByYear[year] = monthOrder.filter(m=>byMonth[m]).map(monthLabel => ({
+      label: monthLabel, monthIndices: [], result: computeCustomerGrowthSummary(byMonth[monthLabel]),
+    }))
+  })
+
   return (
     <div>
+      {eventYears.length>0 && (
+        <ScoreTrendCard title="Marketing Events Trend" years={eventTrendYears} monthsByYear={eventTrendMonthsByYear} rows={[
+          {label:'Customers Acquired', getValue:(r:any)=>r.totalCustomersAcquired, getColor:()=>C.navy},
+          {label:'Blended CAC', getValue:(r:any)=>r.blendedCAC!==null?fmt(r.blendedCAC,cc):'N/A', getColor:()=>C.navy},
+          {label:'Revenue Lift', getValue:(r:any)=>fmt(r.totalRevenueLift,cc), getColor:()=>C.green},
+        ]}/>
+      )}
       <div style={card}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
           <div style={secH}>Customer Acquisition Cost by Channel</div>
@@ -3598,7 +4242,7 @@ function CashFlowTab({config,result,months,cc,closedPeriods}) {
     {label:'Interest',values:debt.totalInterest},
     {label:'Principal',values:debt.totalPrincipal},
     {label:'Total Debt Service',values:debt.totalRepayment,bold:true},
-    {label:'Closing Loan Balance',values:debt.totalOutstanding,bold:true,highlight:true},
+    {label:'Closing Loan Balance',values:debt.totalOutstanding,bold:true,highlight:true,aggregation:'endOfPeriod' as const},
   ] : []
   return (
     <div>
@@ -3609,7 +4253,7 @@ function CashFlowTab({config,result,months,cc,closedPeriods}) {
         <KPI label="Lowest Point" value={fmt(result.metrics.min_cash,cc)} sub={`Month ${result.metrics.min_cash_month}`} color={result.metrics.min_cash>=0?C.navy:C.red}/>
       </div>
       <PLTableCollapsible title="Cash Flow Statement" rows={rows} months={months} startDate={config.start_date} cc={cc} showExport closedMask={closedMask}/>
-      {hasLoan && <PLTable title="Loan Repayment Schedule" rows={loanRows} months={months} cc={cc} showExport/>}
+      {hasLoan && <PLTableCollapsible title="Loan Repayment Schedule" rows={loanRows} months={months} startDate={config.start_date} cc={cc} showExport/>}
     </div>
   )
 }

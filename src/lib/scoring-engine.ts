@@ -248,10 +248,33 @@ export function buildDebtSchedule(obligations: DebtObligation[], months: number)
 }
 
 export interface CoachAssessment {
+  // Reused across Going Concern, the old Investment Readiness, and now
+  // Liquidity Readiness -- these four already existed and map naturally
+  // onto LRS dimensions (commercialModel/marketEvidence -> Market
+  // Opportunity; managementCapability -> Capacity; governance -> Trust
+  // and Compliance).
   commercialModel: number
   managementCapability: number
   marketEvidence: number
   governance: number
+  // New fields, added specifically for the Liquidity Readiness Score --
+  // each covers an indicator the platform has no other way to know,
+  // since it isn't derivable from any financial data already tracked.
+  // All 0-5, matching the existing four for one consistent input pattern.
+  // Market Opportunity's qualitative indicators are covered by
+  // commercialModel/marketEvidence above -- no separate TAM/repeat-
+  // customer fields, since they'd cover near-identical ground.
+  kpiReporting: number             // Visibility: does the business track and report its own KPIs?
+  auditTrail: number                // Trust: are transactions recorded with supporting documentation?
+  supplierRelationships: number    // Trust: quality of supplier relationships beyond payment timing alone
+  productionCapacity: number       // Capacity: can the business scale production/service delivery?
+  inventoryAvailability: number    // Capacity: is stock/inventory reliably available when needed?
+  customerDiversification: number // Resilience: how concentrated is the customer base?
+  supplierDiversification: number  // Resilience: how concentrated is the supplier base?
+  businessContinuity: number       // Resilience: is there a succession/continuity plan?
+  registrationCompliance: number   // Compliance: is the business properly registered?
+  taxCompliance: number             // Compliance: is the business tax-compliant?
+  licenceCompliance: number         // Compliance: does it hold the licences its operations require?
   immediateActions: string
   nearTermActions: string
   followUp: string
@@ -261,6 +284,11 @@ export interface CoachAssessment {
 export function defaultCoachAssessment(): CoachAssessment {
   return {
     commercialModel: 2, managementCapability: 2, marketEvidence: 2, governance: 2,
+    kpiReporting: 2,
+    auditTrail: 2, supplierRelationships: 2,
+    productionCapacity: 2, inventoryAvailability: 2,
+    customerDiversification: 2, supplierDiversification: 2, businessContinuity: 2,
+    registrationCompliance: 2, taxCompliance: 2, licenceCompliance: 2,
     immediateActions: '', nearTermActions: '', followUp: '', coachNotes: '',
   }
 }
@@ -314,6 +342,15 @@ export interface ScoringResult {
   gcScore: number
   gcRating: 'Strong' | 'Adequate' | 'Marginal' | 'Concern'
   gcColor: string
+  // Each of the five factors summed into gcScore, exposed individually so
+  // the UI can show a genuine per-indicator trend rather than only the
+  // combined total -- avoids a second, duplicated copy of these formulas
+  // living in the UI layer.
+  gcDebtServiceFactor: number
+  gcLiquidityFactor: number
+  gcRevenueSustainabilityFactor: number
+  gcProfitabilityFactor: number
+  gcManagementFactor: number
   // Investment Readiness
   irScore: number
   irTier: 'Investment Ready' | 'Near Ready' | 'Development Stage' | 'Pre-Investment'
@@ -331,6 +368,15 @@ export interface ScoringResult {
 }
 
 const GREEN = '#1A7A4A', AMBER = '#B8860B', RED = '#C0392B', TEAL = '#1A9DAA'
+
+// A coach assessment field defaults to 2 only when genuinely absent
+// (null/undefined/non-numeric) -- `|| 2` would also replace a real,
+// deliberately-recorded 0 (the worst possible rating) with 2, silently
+// making the worst case unrepresentable.
+function assessOrDefault(value: unknown, fallback = 2): number {
+  const n = Number(value)
+  return value != null && Number.isFinite(n) ? n : fallback
+}
 
 export function computeScores(inputs: ScoringInputs): ScoringResult {
   const { rev, ebitda, cashClose, totalEquity, totalLiabilities, months, assess } = inputs
@@ -407,21 +453,20 @@ export function computeScores(inputs: ScoringInputs): ScoringResult {
   // ── Going Concern Score (0-20) ──
   // Revenue sustainability factor now reflects trade credit management quality
   // when data is available, rather than a flat default.
-  const revenueSustainabilityScore = (tradeCredit.dso > 0 || tradeCredit.dpo > 0)
+  const gcRevenueSustainabilityFactor = (tradeCredit.dso > 0 || tradeCredit.dpo > 0)
     ? (tradeCredit.cashConversionGap <= 0 ? 4 : tradeCredit.cashConversionGap <= 30 ? 3 : tradeCredit.cashConversionGap <= 60 ? 2 : 1)
     : 3 // no trade credit data entered -- default adequate
   // Debt service factor: no debt at all scores the same as strong coverage
   // (4/4) since it carries no default risk -- but this is an explicit rule,
   // not a fabricated DSCR number standing in for "no debt."
-  const debtServiceFactor = !hasDebt ? 4
+  const gcDebtServiceFactor = !hasDebt ? 4
     : dscrMin === null ? 3 // debt exists but nothing due yet (grace period) -- treat as adequate, not scored as if failing
     : dscrMin >= 1.5 ? 4 : dscrMin >= 1.0 ? 3 : dscrMin >= 0.5 ? 2 : 1
+  const gcLiquidityFactor = minCash >= 0 ? 4 : minCash > -10000000 ? 1 : 0
+  const gcProfitabilityFactor = annualEbitda > 0 ? 3 : 2
+  const gcManagementFactor = assessOrDefault(assess.managementCapability)
   const gcScore = Math.min(20,
-    debtServiceFactor +
-    (minCash >= 0 ? 4 : minCash > -10000000 ? 1 : 0) +
-    revenueSustainabilityScore +
-    (annualEbitda > 0 ? 3 : 2) +
-    (Number(assess.managementCapability) || 2)
+    gcDebtServiceFactor + gcLiquidityFactor + gcRevenueSustainabilityFactor + gcProfitabilityFactor + gcManagementFactor
   )
   const gcRating: 'Strong'|'Adequate'|'Marginal'|'Concern' = gcScore >= 17 ? 'Strong' : gcScore >= 12 ? 'Adequate' : gcScore >= 7 ? 'Marginal' : 'Concern'
   const gcColor = gcRating === 'Strong' ? GREEN : gcRating === 'Adequate' ? TEAL : gcRating === 'Marginal' ? AMBER : RED
@@ -434,13 +479,14 @@ export function computeScores(inputs: ScoringInputs): ScoringResult {
   const irDebt = !hasDebt ? 5
     : dscrMin === null ? 3
     : Math.min(5, Math.round(dscrMin >= 2 ? 5 : dscrMin >= 1.5 ? 4 : dscrMin >= 1 ? 3 : 2))
-  const irScore = Math.min(30, irFinancial + irDebt + (Number(assess.commercialModel) || 2) + (Number(assess.managementCapability) || 2) + (Number(assess.marketEvidence) || 2) + (Number(assess.governance) || 2))
+  const irScore = Math.min(30, irFinancial + irDebt + assessOrDefault(assess.commercialModel) + assessOrDefault(assess.managementCapability) + assessOrDefault(assess.marketEvidence) + assessOrDefault(assess.governance))
   const irTier: 'Investment Ready'|'Near Ready'|'Development Stage'|'Pre-Investment' = irScore >= 24 ? 'Investment Ready' : irScore >= 17 ? 'Near Ready' : irScore >= 10 ? 'Development Stage' : 'Pre-Investment'
   const irColor = irTier === 'Investment Ready' ? GREEN : irTier === 'Near Ready' ? TEAL : AMBER
 
   return {
     score, classification, classColor, hasDebt, dscrMin, dscrVals, cashGaps, revTrend,
     gcScore, gcRating, gcColor,
+    gcDebtServiceFactor, gcLiquidityFactor, gcRevenueSustainabilityFactor, gcProfitabilityFactor, gcManagementFactor,
     irScore, irTier, irColor, irFinancial, irDebt,
     tradeCredit,
     annualRevenue, annualEbitda, minCash, ebitdaMargin, deToEq,

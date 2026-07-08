@@ -3,7 +3,7 @@ import { shouldClearQueue } from '../lib/field-db'
 import { friendlyDbError } from '../lib/field-errors'
 import { buildAutoCogsRow, type CatalogueItemForCogs } from '../lib/field-cogs'
 import { isPlanLineValidForUnit, isValidCostCategory } from '../lib/catalogue-validation'
-import { clampHistoryLimit, isTokenRowValid } from '../lib/field-auth'
+import { clampHistoryLimit, isTokenRowValid, mostRecentTokenUse } from '../lib/field-auth'
 
 // Tests for Clearview Field API route logic
 // Tests the validation and transformation logic without HTTP or DB
@@ -715,5 +715,34 @@ describe('isTokenRowValid — the field auth gate, security-critical, previously
 
   it('REG: an inactive operator is rejected, even with a token that has not expired', () => {
     expect(isTokenRowValid({ expires_at: null, operator: { active: false } })).toBe(false)
+  })
+})
+
+describe('mostRecentTokenUse — deriving an operator\'s last sync from its tokens array', () => {
+  it('REG: a single token with a use timestamp returns that timestamp', () => {
+    expect(mostRecentTokenUse([{ last_used_at: '2026-07-07T17:19:35.375+00:00' }])).toBe('2026-07-07T17:19:35.375+00:00')
+  })
+
+  it('REG: multiple tokens (from repeated "issue new token" actions) return the MOST RECENT use, not the first or last in array order', () => {
+    const tokens = [
+      { last_used_at: '2026-06-01T10:00:00.000+00:00' },
+      { last_used_at: '2026-07-07T17:19:35.375+00:00' }, // most recent, but not last in the array
+      { last_used_at: '2026-06-15T08:00:00.000+00:00' },
+    ]
+    expect(mostRecentTokenUse(tokens)).toBe('2026-07-07T17:19:35.375+00:00')
+  })
+
+  it('REG: tokens that have never been used (null last_used_at) are excluded, not treated as "most recent"', () => {
+    const tokens = [
+      { last_used_at: null },
+      { last_used_at: '2026-06-01T10:00:00.000+00:00' },
+    ]
+    expect(mostRecentTokenUse(tokens)).toBe('2026-06-01T10:00:00.000+00:00')
+  })
+
+  it('REG: no tokens at all, or an operator that has never synced, returns null rather than throwing', () => {
+    expect(mostRecentTokenUse([])).toBeNull()
+    expect(mostRecentTokenUse(undefined)).toBeNull()
+    expect(mostRecentTokenUse([{ last_used_at: null }])).toBeNull()
   })
 })

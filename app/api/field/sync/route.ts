@@ -3,6 +3,7 @@ import { friendlyDbError } from '@/lib/field-errors'
 import { buildAutoCogsRow } from '@/lib/field-cogs'
 import { isPlanLineValidForUnit, isValidCostCategory } from '@/lib/catalogue-validation'
 import { getFieldSupabase as getSupabase, validateFieldToken as validateToken } from '@/lib/field-auth'
+import { applyStockMovement } from '@/lib/field-stock'
 
 // A bulk override is flagged if it deviates from the catalogue's standard
 // price by more than this fraction -- surfaced back to the operator's app
@@ -13,7 +14,7 @@ const PRICE_ALERT_THRESHOLD = 0.10
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { token, device_id, transactions = [], credit_transactions = [] } = body
+    const { token, device_id, transactions = [], credit_transactions = [], uncategorized_costs = [] } = body
 
     if (!token) return NextResponse.json({ error: 'Token required' }, { status: 400 })
 
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
         const catalogueIds = Array.from(new Set(saleEntries.map((t: any) => t.catalogue_item_id)))
         const { data: catalogueItems, error: catErr } = await supabase
           .from('field_catalogue')
-          .select('id, name, price, plan_line_id, cost_price, cogs_plan_line_id')
+          .select('id, name, price, plan_line_id, cost_price, cogs_plan_line_id, unit_label')
           .in('id', catalogueIds)
           .eq('client_id', operator.client_id)
           .eq('business_unit_id', operator.business_unit_id)
@@ -81,6 +82,7 @@ export async function POST(req: NextRequest) {
             business_unit_id: operator.business_unit_id,
             plan_line_id: item.plan_line_id,
             plan_line_name: item.name,
+            unit_label: item.unit_label || null,
             transaction_type: 'sale',
             category: 'revenue',
             amount: quantity * priceUsed,
@@ -224,6 +226,52 @@ export async function POST(req: NextRequest) {
           syncedLocalIds.length = 0
         }
         else txSynced = insertedTx?.length ?? 0
+
+        // Decrement stock for every sale that was actually written (not
+        // ones skipped as duplicates or rejected by validation above).
+        // Processed sequentially against an in-memory running balance
+        // seeded from the database, since multiple sales of the same
+        // catalogue item can appear in one sync batch -- each reading
+        // field_stock_levels independently would miss the others' effect
+        // within the same call.
+        if (!txErr) {
+          const saleRows = rows.filter((r: any) => r.transaction_type === 'sale' && r.catalogue_item_id)
+          if (saleRows.length > 0) {
+            const itemIds = Array.from(new Set(saleRows.map((r: any) => r.catalogue_item_id)))
+            const { data: levels } = await supabase
+              .from('field_stock_levels')
+              .select('id, catalogue_item_id, quantity_on_hand')
+              .eq('business_unit_id', operator.business_unit_id)
+              .in('catalogue_item_id', itemIds)
+            const runningBalance = new Map<string, number>()
+            const levelIdByItem = new Map<string, string>()
+            ;(levels || []).forEach((l: any) => { runningBalance.set(l.catalogue_item_id, l.quantity_on_hand); levelIdByItem.set(l.catalogue_item_id, l.id) })
+
+            const movementRows: any[] = []
+            for (const r of saleRows) {
+              const current = runningBalance.get(r.catalogue_item_id) ?? 0
+              const next = applyStockMovement(current, 'sale', r.quantity)
+              runningBalance.set(r.catalogue_item_id, next)
+              movementRows.push({
+                client_id: operator.client_id, business_unit_id: operator.business_unit_id,
+                catalogue_item_id: r.catalogue_item_id, movement_type: 'sale', quantity: r.quantity,
+                reference_id: r.local_id || null, operator_id: operator.id,
+              })
+            }
+            const { error: stockMoveErr } = await supabase.from('field_stock_movements').insert(movementRows)
+            if (stockMoveErr) technicalErrors.push(`Stock movement insert error: ${stockMoveErr.message}`)
+            // Best-effort: stock level upserts failing doesn't undo the
+            // sale itself (which already synced successfully) -- logged,
+            // not surfaced as a sync failure to the operator.
+            for (const itemId of itemIds) {
+              const { error: levelErr } = await supabase.from('field_stock_levels').upsert({
+                id: levelIdByItem.get(itemId), client_id: operator.client_id, business_unit_id: operator.business_unit_id,
+                catalogue_item_id: itemId, quantity_on_hand: runningBalance.get(itemId), updated_at: new Date().toISOString(),
+              }, { onConflict: 'business_unit_id,catalogue_item_id' })
+              if (levelErr) technicalErrors.push(`Stock level upsert error: ${levelErr.message}`)
+            }
+          }
+        }
       }
     }
 
@@ -267,6 +315,41 @@ export async function POST(req: NextRequest) {
         }
       }
     }
+
+    // Uncategorized costs: a genuinely new kind of cost that doesn't
+    // match any existing cost line in this operator's catalogue. No
+    // plan_line_id at all -- deliberately a separate table
+    // (field_uncategorized_costs), not a nullable plan_line_id on
+    // field_transactions, since every downstream calculation assumes
+    // that column is always present and valid. Categorization is
+    // delegated to a coach/CEO via the dashboard review queue.
+    let uncategorizedSynced = 0
+    if (uncategorized_costs.length > 0) {
+      const validUncategorized = uncategorized_costs.filter((u: any) => {
+        if (!u.description) { errors.push('Uncategorized cost missing description'); return false }
+        if (u.amount === undefined || u.amount === null) { errors.push('Uncategorized cost missing amount'); return false }
+        return true
+      })
+      if (validUncategorized.length > 0) {
+        const rows = validUncategorized.map((u: any) => ({
+          client_id: operator.client_id, business_unit_id: operator.business_unit_id,
+          description: u.description, amount: Number(u.amount),
+          transaction_date: u.transaction_date || new Date().toISOString().split('T')[0],
+          operator_id: operator.id,
+        }))
+        const { data: insertedUncategorized, error: uncategorizedErr } = await supabase
+          .from('field_uncategorized_costs')
+          .insert(rows)
+          .select('id')
+        if (uncategorizedErr) {
+          technicalErrors.push(`Uncategorized cost insert error: ${uncategorizedErr.message}`); errors.push(friendlyDbError(uncategorizedErr.message))
+        } else {
+          uncategorizedSynced = insertedUncategorized?.length ?? 0
+          for (const u of validUncategorized) { if (u.local_id) syncedLocalIds.push(u.local_id) }
+        }
+      }
+    }
+
 
     // Runs whenever ANY transaction was attempted, not just newly-inserted
     // ones (txSynced > 0 would miss this). Why it matters: if aggregation
@@ -313,6 +396,7 @@ export async function POST(req: NextRequest) {
       success: true,
       transactions_synced: txSynced,
       credit_synced: creditSynced,
+      uncategorized_synced: uncategorizedSynced,
       errors: errors.length > 0 ? errors : undefined,
       price_alerts: priceAlerts.length > 0 ? priceAlerts : undefined,
       synced_at: new Date().toISOString(),
