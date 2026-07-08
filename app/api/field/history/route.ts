@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await supabase
       .from('field_transactions')
-      .select('id, transaction_type, category, plan_line_name, amount, quantity, unit_price, transaction_date, synced_at, notes, price_alert')
+      .select('id, transaction_type, category, plan_line_name, amount, quantity, unit_price, unit_label, transaction_date, synced_at, notes, price_alert')
       .eq('operator_id', operator.id)
       .order('synced_at', { ascending: false })
       .limit(limit)

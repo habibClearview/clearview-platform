@@ -158,7 +158,7 @@ function PLTable({title,rows,months,cc,showExport,closedMask}:{title?:string;row
 // here. Each year defaults to collapsed except the one containing
 // today's date, which starts expanded (the year someone is most likely
 // checking in on right now).
-function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMask}:{title?:string;rows:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;actualMask?:boolean[];aggregation?:YearAggregation}[];months:string[];startDate:string;cc:string;showExport?:boolean;closedMask?:boolean[]}) {
+function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMask}:{title?:string;rows:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;actualMask?:boolean[];aggregation?:YearAggregation;weights?:number[]}[];months:string[];startDate:string;cc:string;showExport?:boolean;closedMask?:boolean[]}) {
   const yearGroups = useMemo(() => buildYearGroups(startDate, months.length), [startDate, months.length])
   const currentYear = new Date().getUTCFullYear()
   const [expanded, setExpanded] = useState<Record<number, boolean>>(() => defaultExpandedYears(yearGroups, currentYear))
@@ -173,7 +173,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
     // display convenience, not a reason to omit real data from an export.
     const headers = ['', ...months, ...yearGroups.map(g => `FY ${g.label}`)]
     const data = rows.map(r => {
-      const yearTotals = yearGroups.map(g => String(Math.round(collapseYear(r.values, r.actualMask, g.monthIndices, r.aggregation).value)))
+      const yearTotals = yearGroups.map(g => String(Math.round(collapseYear(r.values, r.actualMask, g.monthIndices, r.aggregation, r.weights).value)))
       return [r.label, ...r.values.map(v => String(Math.round(v))), ...yearTotals]
     })
     const csv = [headers, ...data].map(r => r.map(c => `"${c}"`).join(',')).join('\n')
@@ -238,7 +238,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
               <tr key={ri} style={{background:r.highlight?'#EBF8FF':r.bold?C.lightBg:C.white}}>
                 <td style={{padding:'7px 10px',fontWeight:r.bold?700:400,color:C.navy,minWidth:160,fontSize:'0.8rem',position:'sticky',left:0,background:r.highlight?'#EBF8FF':r.bold?C.lightBg:C.white}}>{r.label}</td>
                 {yearGroups.map(g => {
-                  const cell = collapseYear(r.values, r.actualMask, g.monthIndices, r.aggregation)
+                  const cell = collapseYear(r.values, r.actualMask, g.monthIndices, r.aggregation, r.weights)
                   const displayVal = (v:number) => r.negate ? fmtFull(-Math.abs(v),cc) : fmtFull(v,cc)
                   return expanded[g.year] ? (
                     <React.Fragment key={g.year}>
@@ -3543,9 +3543,9 @@ function MarginsTab({config,result,months,cc}) {
                 </div>
                 <PLTableCollapsible title="" rows={[
                   {label:'Volume (units)',values:s.volume},
-                  {label:'Buy Price',values:s.buy_price,aggregation:'average'},
-                  {label:'Sell Price',values:s.sell_price,aggregation:'average'},
-                  {label:'Spread per Unit',values:s.spread_per_unit,highlight:true,aggregation:'average'},
+                  {label:'Buy Price',values:s.buy_price,aggregation:'weightedAverage',weights:s.volume},
+                  {label:'Sell Price',values:s.sell_price,aggregation:'weightedAverage',weights:s.volume},
+                  {label:'Spread per Unit',values:s.spread_per_unit,highlight:true,aggregation:'weightedAverage',weights:s.volume},
                   {label:'Total Spread Revenue',values:s.total_spread,bold:true},
                 ]} months={months} startDate={config.start_date} cc={cc} showExport/>
               </div>
@@ -3574,9 +3574,9 @@ function MarginsTab({config,result,months,cc}) {
                 </div>
                 <PLTableCollapsible title="" rows={[
                   {label:'Engagements',values:s.engagements},
-                  {label:'Fee per Engagement',values:s.fee,aggregation:'average'},
-                  {label:'Cost per Engagement',values:s.cost,negate:true,aggregation:'average'},
-                  {label:'Margin per Engagement',values:s.margin.map((mv,i)=>s.engagements[i]>0?mv/s.engagements[i]:0),highlight:true,aggregation:'average'},
+                  {label:'Fee per Engagement',values:s.fee,aggregation:'weightedAverage',weights:s.engagements},
+                  {label:'Cost per Engagement',values:s.cost,negate:true,aggregation:'weightedAverage',weights:s.engagements},
+                  {label:'Margin per Engagement',values:s.margin.map((mv,i)=>s.engagements[i]>0?mv/s.engagements[i]:0),highlight:true,aggregation:'weightedAverage',weights:s.engagements},
                   {label:'Total Margin',values:s.margin,bold:true},
                 ]} months={months} startDate={config.start_date} cc={cc} showExport/>
               </div>

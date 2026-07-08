@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
         const catalogueIds = Array.from(new Set(saleEntries.map((t: any) => t.catalogue_item_id)))
         const { data: catalogueItems, error: catErr } = await supabase
           .from('field_catalogue')
-          .select('id, name, price, plan_line_id, cost_price, cogs_plan_line_id')
+          .select('id, name, price, plan_line_id, cost_price, cogs_plan_line_id, unit_label')
           .in('id', catalogueIds)
           .eq('client_id', operator.client_id)
           .eq('business_unit_id', operator.business_unit_id)
@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
             business_unit_id: operator.business_unit_id,
             plan_line_id: item.plan_line_id,
             plan_line_name: item.name,
+            unit_label: item.unit_label || null,
             transaction_type: 'sale',
             category: 'revenue',
             amount: quantity * priceUsed,
