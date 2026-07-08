@@ -86,10 +86,17 @@ export interface YearCollapsedCell {
 //   of the year -- specifically Opening Cash, which is genuinely the
 //   prior year's closing balance carried forward, not a mid-year or
 //   end-of-year figure.
-export type YearAggregation = 'sum' | 'endOfPeriod' | 'startOfPeriod'
+// - 'average': a per-unit PRICE or RATE -- Buy Price, Sell Price, Fee
+//   per Engagement. Neither summing (a "total price" for the year is
+//   meaningless) nor a single endpoint month (which would discard the
+//   year's actual pricing pattern) makes sense; the collapsed value is
+//   the mean across months that actually had activity, matching the
+//   same "average of non-zero months" convention already used
+//   elsewhere in this codebase for these exact figures.
+export type YearAggregation = 'sum' | 'endOfPeriod' | 'startOfPeriod' | 'average'
 
 export function collapseYear(values: number[], actualMask: boolean[] | undefined, monthIndices: number[], aggregation: YearAggregation = 'sum'): YearCollapsedCell {
-  if (aggregation !== 'sum') {
+  if (aggregation === 'endOfPeriod' || aggregation === 'startOfPeriod') {
     // A point-in-time balance has no "partial" state the way a sum of
     // flows over a part-actual, part-plan year does -- it's simply the
     // balance as of one specific month, which is either a real, closed
@@ -100,7 +107,13 @@ export function collapseYear(values: number[], actualMask: boolean[] | undefined
     const isActual = !!actualMask[relevantIdx]
     return { value, isFullyActual: isActual, isPartiallyActual: false, isFullyPlan: !isActual }
   }
-  const value = monthIndices.reduce((s, i) => s + (values[i] ?? 0), 0)
+  let value: number
+  if (aggregation === 'average') {
+    const nonZero = monthIndices.map(i => values[i] ?? 0).filter(v => v !== 0)
+    value = nonZero.length > 0 ? nonZero.reduce((s, v) => s + v, 0) / nonZero.length : 0
+  } else {
+    value = monthIndices.reduce((s, i) => s + (values[i] ?? 0), 0)
+  }
   if (!actualMask) return { value, isFullyActual: false, isPartiallyActual: false, isFullyPlan: true }
   const maskSlice = monthIndices.map(i => actualMask[i])
   const allActual = maskSlice.length > 0 && maskSlice.every(Boolean)

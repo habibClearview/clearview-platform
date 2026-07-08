@@ -974,27 +974,69 @@ function ScenariosTab({config,result,months,cc,P,onSave}) {
     }})
   }
 
+  function updateScenario(id:string, field:'label'|'rev_mult'|'cost_mult', value:string|number) {
+    onSave({...config,settings:{...config.settings,
+      scenarios:scenarios.map(s=>s.id===id?{...s,[field]:value}:s)
+    }})
+  }
+
+  function addScenario() {
+    const newId = 'scenario_'+Date.now()
+    onSave({...config,settings:{...config.settings,
+      scenarios:[...scenarios,{id:newId,label:'New Scenario',rev_mult:1.0,cost_mult:1.0,active:false}]
+    }})
+  }
+
+  function deleteScenario(id:string) {
+    if (id==='base') return // the base case is never deletable -- always a real 1.0x baseline to compare against
+    const wasActive = scenarios.find(s=>s.id===id)?.active
+    const remaining = scenarios.filter(s=>s.id!==id)
+    onSave({...config,settings:{...config.settings,
+      scenarios: wasActive ? remaining.map(s=>({...s,active:s.id==='base'})) : remaining,
+    }})
+  }
+
   return (
     <div>
       <div style={card}>
-        <div style={secH}>Scenarios</div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+          <div style={secH}>Scenarios</div>
+          {P.canEditPlan&&<button style={addBtn()} onClick={addScenario}>+ New Scenario</button>}
+        </div>
         {scenarios.map(sc=>(
           <div key={sc.id} style={{display:'flex',alignItems:'center',gap:'1rem',padding:'0.75rem',border:`1px solid ${sc.active?C.cyan:C.border}`,borderRadius:6,marginBottom:'0.5rem',background:sc.active?'#EBF8FF':C.white}}>
-            <input type="radio" checked={sc.active} onChange={()=>setActiveScenario(sc.id)} style={{cursor:'pointer'}}/>
+            <input type="radio" checked={sc.active} onChange={()=>setActiveScenario(sc.id)} style={{cursor:'pointer'}} aria-label={`Set ${sc.label} as active`}/>
             <div style={{flex:1}}>
-              <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>{sc.label}</div>
-              <div style={{fontSize:'0.75rem',color:C.slate}}>Revenue ×{sc.rev_mult} · Costs ×{sc.cost_mult}</div>
+              {P.canEditPlan ? (
+                <input style={{...inp,fontWeight:700,fontSize:'0.88rem',padding:'0.2rem 0.4rem',marginBottom:'0.3rem'}}
+                  value={sc.label} onChange={e=>updateScenario(sc.id,'label',e.target.value)}/>
+              ) : (
+                <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>{sc.label}</div>
+              )}
+              {P.canEditPlan ? (
+                <div style={{display:'flex',gap:'0.75rem',alignItems:'center',fontSize:'0.75rem',color:C.slate}}>
+                  <span>Revenue ×</span>
+                  <input type="number" step="0.01" style={{width:70,padding:'0.25rem 0.4rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily:'monospace',fontSize:'0.78rem'}}
+                    value={sc.rev_mult} onChange={e=>updateScenario(sc.id,'rev_mult',Number(e.target.value))}/>
+                  <span>Costs ×</span>
+                  <input type="number" step="0.01" style={{width:70,padding:'0.25rem 0.4rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily:'monospace',fontSize:'0.78rem'}}
+                    value={sc.cost_mult} onChange={e=>updateScenario(sc.id,'cost_mult',Number(e.target.value))}/>
+                </div>
+              ) : (
+                <div style={{fontSize:'0.75rem',color:C.slate}}>Revenue ×{sc.rev_mult} · Costs ×{sc.cost_mult}</div>
+              )}
             </div>
             {sc.active&&<Badge text="Active" color={C.cyan}/>}
+            {P.canEditPlan&&sc.id!=='base'&&<button style={delBtn} onClick={()=>deleteScenario(sc.id)} aria-label={`Delete ${sc.label}`}>×</button>}
           </div>
         ))}
       </div>
       {result&&(
-        <PLTable title="Scenario P&L" rows={[
+        <PLTableCollapsible title="Scenario P&L" rows={[
           {label:'Revenue',values:result.con.rev,bold:true},
           {label:'Gross Profit',values:result.con.gp,highlight:true},
           {label:'EBITDA',values:result.con.ebitda,bold:true,highlight:true},
-        ]} months={months} cc={cc} showExport/>
+        ]} months={months} startDate={config.start_date} cc={cc} showExport/>
       )}
     </div>
   )
@@ -3315,13 +3357,13 @@ function MarginsTab({config,result,months,cc}) {
                   <KPI label="Avg Sell Price" value={fmt(s.sell_price.filter(v=>v>0).reduce((a,b)=>a+b,0)/Math.max(1,s.sell_price.filter(v=>v>0).length),cc)} color={C.green}/>
                   <KPI label="Total Spread" value={fmt(s.total_spread.reduce((a,b)=>a+b,0),cc)} color={C.teal}/>
                 </div>
-                <PLTable title="" rows={[
+                <PLTableCollapsible title="" rows={[
                   {label:'Volume (units)',values:s.volume},
-                  {label:'Buy Price',values:s.buy_price},
-                  {label:'Sell Price',values:s.sell_price},
-                  {label:'Spread per Unit',values:s.spread_per_unit,highlight:true},
+                  {label:'Buy Price',values:s.buy_price,aggregation:'average'},
+                  {label:'Sell Price',values:s.sell_price,aggregation:'average'},
+                  {label:'Spread per Unit',values:s.spread_per_unit,highlight:true,aggregation:'average'},
                   {label:'Total Spread Revenue',values:s.total_spread,bold:true},
-                ]} months={months} cc={cc} showExport/>
+                ]} months={months} startDate={config.start_date} cc={cc} showExport/>
               </div>
             ))}
           </div>
@@ -3346,13 +3388,13 @@ function MarginsTab({config,result,months,cc}) {
                   <KPI label="Avg Cost/Engagement" value={fmt(s.cost.filter(v=>v>0).reduce((a,b)=>a+b,0)/Math.max(1,s.cost.filter(v=>v>0).length),cc)} color={C.red}/>
                   <KPI label="Total Margin" value={fmt(s.margin.reduce((a,b)=>a+b,0),cc)} color={C.teal}/>
                 </div>
-                <PLTable title="" rows={[
+                <PLTableCollapsible title="" rows={[
                   {label:'Engagements',values:s.engagements},
-                  {label:'Fee per Engagement',values:s.fee},
-                  {label:'Cost per Engagement',values:s.cost,negate:true},
-                  {label:'Margin per Engagement',values:s.margin.map((mv,i)=>s.engagements[i]>0?mv/s.engagements[i]:0),highlight:true},
+                  {label:'Fee per Engagement',values:s.fee,aggregation:'average'},
+                  {label:'Cost per Engagement',values:s.cost,negate:true,aggregation:'average'},
+                  {label:'Margin per Engagement',values:s.margin.map((mv,i)=>s.engagements[i]>0?mv/s.engagements[i]:0),highlight:true,aggregation:'average'},
                   {label:'Total Margin',values:s.margin,bold:true},
-                ]} months={months} cc={cc} showExport/>
+                ]} months={months} startDate={config.start_date} cc={cc} showExport/>
               </div>
             ))}
           </div>
@@ -3397,12 +3439,12 @@ function MarginsTab({config,result,months,cc}) {
               </table>
             </div>
           </div>
-          <PLTable title="Monthly Staff Cost Trend" rows={[
+          <PLTableCollapsible title="Staff Cost Trend" rows={[
             {label:'Total Staff Costs',values:result.allocUnits.reduce((acc,u)=>{
               const pl = result.unitPL[u.id]
               return pl ? acc.map((v,m2)=>v+pl.staff[m2]) : acc
             },Array(months.length).fill(0)),bold:true},
-          ]} months={months} cc={cc} showExport/>
+          ]} months={months} startDate={config.start_date} cc={cc} showExport/>
         </div>
       )}
     </div>
@@ -3735,7 +3777,7 @@ function CashFlowTab({config,result,months,cc,closedPeriods}) {
     {label:'Interest',values:debt.totalInterest},
     {label:'Principal',values:debt.totalPrincipal},
     {label:'Total Debt Service',values:debt.totalRepayment,bold:true},
-    {label:'Closing Loan Balance',values:debt.totalOutstanding,bold:true,highlight:true},
+    {label:'Closing Loan Balance',values:debt.totalOutstanding,bold:true,highlight:true,aggregation:'endOfPeriod' as const},
   ] : []
   return (
     <div>
@@ -3746,7 +3788,7 @@ function CashFlowTab({config,result,months,cc,closedPeriods}) {
         <KPI label="Lowest Point" value={fmt(result.metrics.min_cash,cc)} sub={`Month ${result.metrics.min_cash_month}`} color={result.metrics.min_cash>=0?C.navy:C.red}/>
       </div>
       <PLTableCollapsible title="Cash Flow Statement" rows={rows} months={months} startDate={config.start_date} cc={cc} showExport closedMask={closedMask}/>
-      {hasLoan && <PLTable title="Loan Repayment Schedule" rows={loanRows} months={months} cc={cc} showExport/>}
+      {hasLoan && <PLTableCollapsible title="Loan Repayment Schedule" rows={loanRows} months={months} startDate={config.start_date} cc={cc} showExport/>}
     </div>
   )
 }

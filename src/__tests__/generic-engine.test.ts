@@ -977,6 +977,33 @@ describe('collapseYear — endOfPeriod and startOfPeriod aggregation (Balance Sh
   })
 })
 
+describe('collapseYear — average aggregation (per-unit prices and rates, e.g. Buy Price, Fee per Engagement)', () => {
+  it('REG: averages only the non-zero months -- a month with no activity does not drag down the average price', () => {
+    const values = [10000, 0, 12000, 0, 11000] // price only exists in months with actual sales
+    const result = collapseYear(values, undefined, [0,1,2,3,4], 'average')
+    expect(result.value).toBeCloseTo((10000+12000+11000)/3, 5) // NOT divided by 5
+  })
+
+  it('REG: summing 12 months of a price would be meaningless -- average never does this', () => {
+    const constantPrice = Array(12).fill(5000)
+    const result = collapseYear(constantPrice, undefined, Array.from({length:12},(_,i)=>i), 'average')
+    expect(result.value).toBe(5000) // the actual price, not 60,000 (12 x 5000)
+  })
+
+  it('REG: all-zero months (no activity at all in this range) average to 0, not NaN from an empty division', () => {
+    const result = collapseYear([0,0,0], undefined, [0,1,2], 'average')
+    expect(result.value).toBe(0)
+    expect(Number.isNaN(result.value)).toBe(false)
+  })
+
+  it('REG: actual/plan status for average uses the whole range\'s mask, like sum, not a single endpoint month', () => {
+    const values = [10000, 11000, 12000]
+    const actualMask = [true, true, false] // partially actual across the range
+    const result = collapseYear(values, actualMask, [0,1,2], 'average')
+    expect(result.isPartiallyActual).toBe(true)
+  })
+})
+
 describe('defaultExpandedYears — which year starts expanded', () => {
   it('REG: the year containing today expands by default, all others stay collapsed', () => {
     const groups = [{year: 2025, label: '2025', monthIndices: [0]}, {year: 2026, label: '2026', monthIndices: [1]}, {year: 2027, label: '2027', monthIndices: [2]}]
