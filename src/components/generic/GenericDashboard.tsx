@@ -3526,8 +3526,46 @@ function PromotionEventsSection({clientId,config,cc,P,events,setEvents}) {
     return a.cac-b.cac
   })
 
+  // Collapsible year/month trend -- grouped by the events' own dates,
+  // not the model's planning window, since a marketing event can happen
+  // any time regardless of the plan's start/end. Reuses
+  // computeCustomerGrowthSummary (already used for the whole-business
+  // Liquidity Readiness figures) per period rather than a separate
+  // aggregation formula.
+  const eventsByYear: Record<string, any[]> = {}
+  events.forEach((evt:any) => {
+    if (!evt.date) return
+    const year = String(new Date(evt.date).getUTCFullYear())
+    if (!eventsByYear[year]) eventsByYear[year] = []
+    eventsByYear[year].push(evt)
+  })
+  const eventYears = Object.keys(eventsByYear).sort()
+  const eventTrendYears = eventYears.map(year => ({
+    label: year, monthIndices: [], result: computeCustomerGrowthSummary(eventsByYear[year]),
+  }))
+  const eventTrendMonthsByYear: Record<string, any[]> = {}
+  eventYears.forEach(year => {
+    const byMonth: Record<string, any[]> = {}
+    eventsByYear[year].forEach((evt:any) => {
+      const monthLabel = new Date(evt.date).toLocaleString('en-GB', { month: 'short' })
+      if (!byMonth[monthLabel]) byMonth[monthLabel] = []
+      byMonth[monthLabel].push(evt)
+    })
+    const monthOrder = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    eventTrendMonthsByYear[year] = monthOrder.filter(m=>byMonth[m]).map(monthLabel => ({
+      label: monthLabel, monthIndices: [], result: computeCustomerGrowthSummary(byMonth[monthLabel]),
+    }))
+  })
+
   return (
     <div>
+      {eventYears.length>0 && (
+        <ScoreTrendCard title="Marketing Events Trend" years={eventTrendYears} monthsByYear={eventTrendMonthsByYear} rows={[
+          {label:'Customers Acquired', getValue:(r:any)=>r.totalCustomersAcquired, getColor:()=>C.navy},
+          {label:'Blended CAC', getValue:(r:any)=>r.blendedCAC!==null?fmt(r.blendedCAC,cc):'N/A', getColor:()=>C.navy},
+          {label:'Revenue Lift', getValue:(r:any)=>fmt(r.totalRevenueLift,cc), getColor:()=>C.green},
+        ]}/>
+      )}
       <div style={card}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
           <div style={secH}>Customer Acquisition Cost by Channel</div>
