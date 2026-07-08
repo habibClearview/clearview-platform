@@ -450,3 +450,26 @@ describe('computeScoresTimeSeries — the collapsible year/month trend for Credi
     expect(series.years[1].result.tradeCredit.peakPayable).toBeCloseTo(expectedYear2Summary.peakPayable, 6)
   })
 })
+
+describe('Going Concern sub-indicator fields, exposed for the per-indicator trend UI', () => {
+  it('REG: the five exposed sub-indicator fields sum to exactly gcScore -- guards against the refactor exposing them ever drifting from the actual total', () => {
+    const result = computeScores({
+      rev: [2_000_000, 2_000_000], ebitda: [400_000, 400_000], cogs: [1_000_000, 1_000_000],
+      cashClose: [3_000_000, 3_000_000], totalEquity: 5_000_000, totalLiabilities: 1_000_000, months: 2,
+      debtObligations: [{ principal: 1_000_000, tenorMonths: 12, drawdownMonth: 1, annualRate: 0.15 }],
+      tradeCreditLines: [], assess: defaultCoachAssessment(),
+    })
+    const sum = result.gcDebtServiceFactor + result.gcLiquidityFactor + result.gcRevenueSustainabilityFactor + result.gcProfitabilityFactor + result.gcManagementFactor
+    expect(Math.min(20, sum)).toBe(result.gcScore)
+  })
+
+  it('REG: the sum invariant also holds with no debt, no trade credit, and negative EBITDA -- every branch of every factor', () => {
+    const result = computeScores({
+      rev: [500_000], ebitda: [-100_000], cogs: [400_000],
+      cashClose: [-2_000_000], totalEquity: 1_000_000, totalLiabilities: 500_000, months: 1,
+      debtObligations: [], tradeCreditLines: [], assess: defaultCoachAssessment(),
+    })
+    const sum = result.gcDebtServiceFactor + result.gcLiquidityFactor + result.gcRevenueSustainabilityFactor + result.gcProfitabilityFactor + result.gcManagementFactor
+    expect(Math.min(20, sum)).toBe(result.gcScore)
+  })
+})

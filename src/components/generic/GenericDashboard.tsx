@@ -11,6 +11,7 @@ import {
 } from '@/lib/generic-engine'
 import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor, computeScoresTimeSeries } from '@/lib/scoring-engine'
 import { computeNPV, computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary, annualRateToMonthlyRate, monthlyRateToAnnualRate } from '@/lib/investment-metrics'
+import { computeLiquidityReadinessScore, computeLRSTimeSeries, computeFitScore, FIT_SCORE_PRESETS, LRS_WEIGHTS } from '@/lib/liquidity-readiness'
 import { combinedActual, computeActualsTotals, applyPeriodActual, buildHybridConsolidated, computeCatalogueLineTotal } from '@/lib/actuals'
 import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
 import { yearStartPeriod, canCloseCalendarYear, computeYearEndBalanceSheet } from '@/lib/annual-close'
@@ -287,15 +288,12 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
 // prospective client with no live actuals at all) or a mix of actual
 // and plan -- every period always has a real, computed value.
 function ScoreTrendCard({
-  title, maxLabel, years, monthsByYear, getValue, getClassification, getColor,
+  title, years, monthsByYear, rows,
 }: {
   title: string
-  maxLabel: string
   years: {label:string; monthIndices:number[]; result:any}[]
   monthsByYear: Record<string, {label:string; monthIndices:number[]; result:any}[]>
-  getValue: (r:any) => number
-  getClassification: (r:any) => string
-  getColor: (r:any) => string
+  rows: {label:string; getValue:(r:any)=>string|number; getColor:(r:any)=>string}[]
 }) {
   const currentYear = new Date().getUTCFullYear()
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
@@ -314,7 +312,7 @@ function ScoreTrendCard({
         <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.77rem',fontFamily:'monospace'}}>
           <thead>
             <tr style={{background:C.navy}}>
-              <th style={{textAlign:'left',padding:'8px 10px',color:C.white,minWidth:110,fontSize:'0.75rem',position:'sticky',left:0,background:C.navy}}></th>
+              <th style={{textAlign:'left',padding:'8px 10px',color:C.white,minWidth:160,fontSize:'0.75rem',position:'sticky',left:0,background:C.navy}}></th>
               {years.map(y => expanded[y.label] ? (
                 <React.Fragment key={y.label}>
                   {(monthsByYear[y.label]||[]).map((m,i) => (
@@ -334,38 +332,27 @@ function ScoreTrendCard({
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td style={{padding:'7px 10px',fontWeight:700,color:C.navy,minWidth:110,fontSize:'0.8rem',position:'sticky',left:0,background:C.white}}>{title.replace(' Trend','')} <span style={{fontWeight:400,color:C.slate}}>/{maxLabel}</span></td>
-              {years.map(y => expanded[y.label] ? (
-                <React.Fragment key={y.label}>
-                  {(monthsByYear[y.label]||[]).map((m,i) => (
-                    <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:700,color:getColor(m.result)}}>
-                      {getValue(m.result)}
+            {rows.map((row,ri)=>(
+              <tr key={row.label} style={ri%2===1?{background:C.lightBg}:undefined}>
+                <td style={{padding:'7px 10px',fontWeight:ri===0?700:400,color:C.navy,minWidth:160,fontSize:ri===0?'0.8rem':'0.75rem',position:'sticky',left:0,background:ri%2===1?C.lightBg:C.white}}>{row.label}</td>
+                {years.map(y => expanded[y.label] ? (
+                  <React.Fragment key={y.label}>
+                    {(monthsByYear[y.label]||[]).map((m,i) => (
+                      <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:ri===0?700:400,color:row.getColor(m.result)}}>
+                        {row.getValue(m.result)}
+                      </td>
+                    ))}
+                    <td onClick={()=>toggle(y.label)} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:ri===0?700:400,cursor:'pointer',color:row.getColor(y.result),borderLeft:`2px solid ${C.border}`}}>
+                      {row.getValue(y.result)}
                     </td>
-                  ))}
-                  <td onClick={()=>toggle(y.label)} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:700,cursor:'pointer',color:getColor(y.result),borderLeft:`2px solid ${C.border}`}}>
-                    {getValue(y.result)}
+                  </React.Fragment>
+                ) : (
+                  <td key={y.label} onClick={()=>toggle(y.label)} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:ri===0?700:400,cursor:'pointer',color:row.getColor(y.result),borderLeft:`2px solid ${C.border}`}}>
+                    {row.getValue(y.result)}
                   </td>
-                </React.Fragment>
-              ) : (
-                <td key={y.label} onClick={()=>toggle(y.label)} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:700,cursor:'pointer',color:getColor(y.result),borderLeft:`2px solid ${C.border}`}}>
-                  {getValue(y.result)}
-                </td>
-              ))}
-            </tr>
-            <tr style={{background:C.lightBg}}>
-              <td style={{padding:'7px 10px',color:C.slate,fontSize:'0.72rem',position:'sticky',left:0,background:C.lightBg}}>Rating</td>
-              {years.map(y => expanded[y.label] ? (
-                <React.Fragment key={y.label}>
-                  {(monthsByYear[y.label]||[]).map((m,i) => (
-                    <td key={i} style={{padding:'7px 8px',textAlign:'right',fontSize:'0.68rem',color:getColor(m.result)}}>{getClassification(m.result)}</td>
-                  ))}
-                  <td style={{padding:'7px 10px',textAlign:'right',fontSize:'0.68rem',color:getColor(y.result),borderLeft:`2px solid ${C.border}`}}>{getClassification(y.result)}</td>
-                </React.Fragment>
-              ) : (
-                <td key={y.label} style={{padding:'7px 10px',textAlign:'right',fontSize:'0.68rem',color:getColor(y.result),borderLeft:`2px solid ${C.border}`}}>{getClassification(y.result)}</td>
-              ))}
-            </tr>
+                ))}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -597,7 +584,7 @@ export default function GenericDashboard({
       <main style={{maxWidth:1600,margin:'0 auto',padding:'1.5rem'}}>
         {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} pendingApprovalCount={pendingApprovalCount} onGoToApprovals={()=>setView('approvals')} onGoToIntelligence={()=>setView('intelligence')}/>}
         {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P}/>}
-        {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
+        {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods}/>}
         {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
         {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods}/>}
         {view==='cashflow'    && <CashFlowTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
@@ -2414,11 +2401,12 @@ function findCashWarningMonths(result:any, months:string[]) {
   return warnings
 }
 
-function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave}) {
+function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,closedPeriods}) {
   const [activeSection,setActiveSection]=useState('summary')
   const [healthReports, setHealthReports] = useState<any[]>([])
   const [investmentAssessments, setInvestmentAssessments] = useState<any[]>([])
   const [events, setEvents] = useState<any[]>([])
+  const [fieldAppPeriods, setFieldAppPeriods] = useState<Set<string>>(new Set())
   const [narrative, setNarrative] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [generatingNarrative, setGeneratingNarrative] = useState(false)
@@ -2431,11 +2419,21 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave}) {
       supabase.from('investment_readiness').select('*').eq('client_id',clientId).order('generated_at',{ascending:false}).limit(1),
       supabase.from('management_events').select('*').eq('client_id',clientId).order('date',{ascending:false}).limit(1000),
       supabase.from('coach_briefings').select('*').eq('client_id',clientId).order('generated_at',{ascending:false}).limit(1),
-    ]).then(([h,i,e,n])=>{
+      supabase.from('generic_actuals').select('period,field_line_values').eq('client_id',clientId),
+    ]).then(([h,i,e,n,a])=>{
       setHealthReports(h.data||[])
       setInvestmentAssessments(i.data||[])
       setEvents(e.data||[])
       setNarrative(n.data?.[0]||null)
+      // A period counts as having real field-app data if ANY business
+      // unit's row for that period has a non-empty field_line_values --
+      // used by Liquidity Readiness's Visibility dimension (Transactions
+      // Digitally Captured), not fabricated or defaulted to false.
+      const periodsWithFieldData = new Set<string>()
+      ;(a.data||[]).forEach((row:any) => {
+        if (row.field_line_values && Object.keys(row.field_line_values).length > 0) periodsWithFieldData.add(row.period)
+      })
+      setFieldAppPeriods(periodsWithFieldData)
       setLoading(false)
     })
   },[clientId])
@@ -2492,6 +2490,41 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave}) {
   }, yearGroups, monthLabelsFull)
   const monthsByYearLabel: Record<string, typeof scoreSeries.monthsByYear[number]> = {}
   yearGroups.forEach(g => { monthsByYearLabel[g.label] = scoreSeries.monthsByYear[g.year] })
+
+  // Liquidity Readiness Score time series -- same year/month structure
+  // as scoreSeries above, sharing yearGroups/monthLabelsFull.
+  const periodIsActual: boolean[] = result.con.act_ebitda.map((v:number|null) => v !== null)
+  const monthsClosedFlags: boolean[] = months.map((_:string, i:number) =>
+    closedPeriods?.has(periodForMonthIndex(config.start_date, i)) ?? false
+  )
+  const monthsWithFieldAppFlags: boolean[] = months.map((_:string, i:number) =>
+    fieldAppPeriods.has(periodForMonthIndex(config.start_date, i))
+  )
+  const capitalStructure = config.settings.capital_structure
+  const capitalAtRisk = (capitalStructure?.shareholder_contribution||0) + (capitalStructure?.grant_recoverable||0)
+  const lrsCashFlows = buildInvestmentCashFlows(capitalAtRisk, result.cf.op_cash, result.cf.inv_cash)
+  const lrsMonthlyIrr = computeIRR(lrsCashFlows)
+  const lrsAnnualIrr = lrsMonthlyIrr !== null ? monthlyRateToAnnualRate(lrsMonthlyIrr) : null
+  const lrsCustomerGrowth = computeCustomerGrowthSummary(events)
+  const lrsSeries = computeLRSTimeSeries({
+    rev: result.con.rev, ebitda: result.con.ebitda, grossProfit: result.con.gp,
+    cashClose: result.cf.close, opex: result.con.opex,
+    totalEquityByMonth: result.bs.total_equity, totalLiabilitiesByMonth: result.bs.total_liabilities,
+    businessBreakeven: result.metrics.business_breakeven,
+    monthsWithActuals: periodIsActual, monthsClosed: monthsClosedFlags, monthsWithFieldApp: monthsWithFieldAppFlags,
+    customersAcquiredTotal: lrsCustomerGrowth.totalCustomersAcquired,
+    irr: lrsAnnualIrr, revenuePerHead: result.metrics.revenue_per_head,
+    dscrMin: s.dscrMin, hasDebt: s.hasDebt, cashGaps: s.cashGaps, tradeCreditDpo: s.tradeCredit.dpo,
+    assess,
+  }, yearGroups, monthLabelsFull)
+  const lrsMonthsByYearLabel: Record<string, typeof lrsSeries.monthsByYear[number]> = {}
+  yearGroups.forEach(g => { lrsMonthsByYearLabel[g.label] = lrsSeries.monthsByYear[g.year] })
+  const lrsCurrent = lrsSeries.years[lrsSeries.years.length-1]?.result || computeLiquidityReadinessScore({
+    annualRevenue:0,annualEbitda:0,annualGrossProfit:0,cashClose:[0],monthlyOpex:[0],businessBreakeven:0,
+    totalEquity:0,totalLiabilities:0,dscrMin:null,hasDebt:false,cashGaps:0,tradeCreditDpo:0,
+    monthsOfActualData:0,monthsElapsed:0,monthsClosed:0,fieldAppMonths:0,revenueGrowthRate:0,
+    customersAcquired:0,irr:null,revenuePerHead:0,assess,
+  })
 
   async function generateHealthCheck() {
     setGeneratingHealth(true)
@@ -2559,7 +2592,7 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
 
   const tabList:[string,string][] = [
     ['summary','Summary'],['narrative',"This Month's Story"],['credit','Credit Risk'],
-    ['going_concern','Going Concern'],['investment','Investment Readiness'],['investment_metrics','Investment Metrics'],
+    ['going_concern','Going Concern'],['liquidity_readiness','Liquidity Readiness'],
     ['coach','Coach Assessment'],['events','Marketing Events'],
   ]
 
@@ -2691,8 +2724,14 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
       )}
 
       {activeSection==='credit'&&(
-        <ScoreTrendCard title="Credit Risk Trend" maxLabel="100" years={scoreSeries.years} monthsByYear={monthsByYearLabel}
-          getValue={(r:any)=>r.score} getClassification={(r:any)=>r.classification} getColor={(r:any)=>r.classColor}/>
+        <ScoreTrendCard title="Credit Risk Trend" years={scoreSeries.years} monthsByYear={monthsByYearLabel} rows={[
+          {label:'Credit Risk Score /100', getValue:(r:any)=>r.score, getColor:(r:any)=>r.classColor},
+          {label:'Rating', getValue:(r:any)=>r.classification, getColor:(r:any)=>r.classColor},
+          {label:'DSCR', getValue:(r:any)=>dscrLabel(r), getColor:(r:any)=>dscrColor(r,C)},
+          {label:'Trade Credit: DPO (days)', getValue:(r:any)=>r.tradeCredit.dpo.toFixed(0), getColor:()=>C.navy},
+          {label:'Trade Credit: DSO (days)', getValue:(r:any)=>r.tradeCredit.dso.toFixed(0), getColor:()=>C.navy},
+          {label:'Trade Credit: Cash Conversion Gap', getValue:(r:any)=>r.tradeCredit.cashConversionGap.toFixed(0), getColor:(r:any)=>r.tradeCredit.cashConversionGap<=0?C.green:r.tradeCredit.cashConversionGap>60?C.red:C.amber},
+        ]}/>
       )}
 
       {activeSection==='going_concern'&&(
@@ -2712,108 +2751,128 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}><span style={{fontWeight:600,fontSize:'0.88rem',color:C.navy}}>{ind.name}</span><span style={{fontFamily:'monospace',fontWeight:700,color:ind.sc>=3?C.green:ind.sc>=2?C.amber:C.red}}>{ind.sc}/{ind.max}</span></div>
               <div style={{background:'#E8ECF0',borderRadius:999,height:7}}><div style={{width:(ind.sc/ind.max*100)+'%',height:'100%',background:ind.sc>=3?C.green:ind.sc>=2?C.amber:C.red,borderRadius:999}}/></div>
               <div style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.3rem'}}>{ind.ev}</div>
-              {ind.field!=null&&<input type="range" min="0" max={ind.max} step="1" value={(assess as any)[ind.field]||2} onChange={e=>updateAssess(ind.field as string,Number(e.target.value))} style={{width:'100%',accentColor:C.cyan,marginTop:'0.4rem'}}/>}
+              {ind.field!=null&&<div style={{fontSize:'0.72rem',color:C.teal,marginTop:'0.3rem',fontStyle:'italic'}}>Set on the Coach Assessment tab</div>}
             </div>
           ))}
         </div>
       )}
 
       {activeSection==='going_concern'&&(
-        <ScoreTrendCard title="Going Concern Trend" maxLabel="20" years={scoreSeries.years} monthsByYear={monthsByYearLabel}
-          getValue={(r:any)=>r.gcScore} getClassification={(r:any)=>r.gcRating} getColor={(r:any)=>r.gcColor}/>
+        <ScoreTrendCard title="Going Concern Trend" years={scoreSeries.years} monthsByYear={monthsByYearLabel} rows={[
+          {label:'Going Concern Score /20', getValue:(r:any)=>r.gcScore, getColor:(r:any)=>r.gcColor},
+          {label:'Rating', getValue:(r:any)=>r.gcRating, getColor:(r:any)=>r.gcColor},
+          {label:'Debt Service Coverage /4', getValue:(r:any)=>r.gcDebtServiceFactor, getColor:(r:any)=>r.gcDebtServiceFactor>=3?C.green:r.gcDebtServiceFactor>=2?C.amber:C.red},
+          {label:'Liquidity Position /4', getValue:(r:any)=>r.gcLiquidityFactor, getColor:(r:any)=>r.gcLiquidityFactor>=3?C.green:r.gcLiquidityFactor>=2?C.amber:C.red},
+          {label:'Revenue Sustainability /4', getValue:(r:any)=>r.gcRevenueSustainabilityFactor, getColor:(r:any)=>r.gcRevenueSustainabilityFactor>=3?C.green:r.gcRevenueSustainabilityFactor>=2?C.amber:C.red},
+          {label:'Operational Profitability /3', getValue:(r:any)=>r.gcProfitabilityFactor, getColor:(r:any)=>r.gcProfitabilityFactor>=3?C.green:C.amber},
+          {label:'Management & Governance /4', getValue:(r:any)=>r.gcManagementFactor, getColor:(r:any)=>r.gcManagementFactor>=3?C.green:r.gcManagementFactor>=2?C.amber:C.red},
+        ]}/>
       )}
 
-      {activeSection==='investment'&&(
-        <div style={card}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem',flexWrap:'wrap',gap:'0.75rem'}}>
-            <div style={secH}>Investment Readiness Score</div>
-            <div style={{display:'flex',alignItems:'center',gap:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:s.irColor,lineHeight:1}}>{s.irScore}</div><div><div style={{fontSize:'0.75rem',color:C.slate}}>out of 30</div><Badge2 label={s.irTier} color={s.irColor}/></div></div>
-          </div>
-          <InvestmentPitchDownload clientId={clientId}/>
-          {[
-            {name:'Financial Viability',sc:s.irFinancial,max:5,ev:'EBITDA margin '+(s.ebitdaMargin*100).toFixed(1)+'%',field:null},
-            {name:'Debt Serviceability',sc:s.irDebt,max:5,ev:dscrLabel(s),field:null},
-            {name:'Commercial Model Clarity',sc:Number(assess.commercialModel)||2,max:5,ev:'Coach assessment',field:'commercialModel'},
-            {name:'Management Capability',sc:Number(assess.managementCapability)||2,max:5,ev:'Coach assessment',field:'managementCapability'},
-            {name:'Market Evidence',sc:Number(assess.marketEvidence)||2,max:5,ev:'Coach assessment',field:'marketEvidence'},
-            {name:'Governance & Records',sc:Number(assess.governance)||2,max:5,ev:'Coach assessment',field:'governance'},
-          ].map(dim=>(
-            <div key={dim.name} style={{marginBottom:'1rem',paddingBottom:'1rem',borderBottom:`1px solid ${C.border}`}}>
-              <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}><span style={{fontWeight:600,fontSize:'0.88rem',color:C.navy}}>{dim.name}</span><span style={{fontFamily:'monospace',fontWeight:700,color:dim.sc>=4?C.green:dim.sc>=3?C.teal:dim.sc>=2?C.amber:C.red}}>{dim.sc}/{dim.max}</span></div>
-              <div style={{background:'#E8ECF0',borderRadius:999,height:7}}><div style={{width:(dim.sc/dim.max*100)+'%',height:'100%',background:dim.sc>=4?C.green:dim.sc>=3?C.teal:dim.sc>=2?C.amber:C.red,borderRadius:999}}/></div>
-              <div style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.3rem'}}>{dim.ev}</div>
-              {dim.field!=null&&<input type="range" min="0" max={dim.max} step="1" value={(assess as any)[dim.field]||2} onChange={e=>updateAssess(dim.field as string,Number(e.target.value))} style={{width:'100%',accentColor:C.cyan,marginTop:'0.4rem'}}/>}
-            </div>
-          ))}
-          {latestInvestment&&(
-            <div style={{marginTop:'1.25rem',paddingTop:'1.25rem',borderTop:`1px solid ${C.border}`}}>
-              <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy,marginBottom:'0.5rem'}}>AI Narrative Assessment</div>
-              <div style={{fontSize:'0.85rem',color:C.navy,lineHeight:1.75,whiteSpace:'pre-wrap'}}>{latestInvestment.assessment_text}</div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeSection==='investment'&&(
-        <ScoreTrendCard title="Investment Readiness Trend" maxLabel="30" years={scoreSeries.years} monthsByYear={monthsByYearLabel}
-          getValue={(r:any)=>r.irScore} getClassification={(r:any)=>r.irTier} getColor={(r:any)=>r.irColor}/>
-      )}
-
-      {activeSection==='investment_metrics'&&(() => {
+      {activeSection==='liquidity_readiness'&&(() => {
         const capital = config.settings.capital_structure
-        // Capital genuinely at risk for an equity-style return -- share-
-        // holder contributions and recoverable (repayable) grants.
-        // Non-repayable grants and bank loan principal are deliberately
-        // excluded (see investment-metrics.ts for why) -- this is the
-        // one judgment call in an otherwise standard NPV/IRR calculation.
         const capitalAtRisk = (capital?.shareholder_contribution||0) + (capital?.grant_recoverable||0)
         const cashFlows = buildInvestmentCashFlows(capitalAtRisk, result.cf.op_cash, result.cf.inv_cash)
-        // cashFlows is a MONTHLY series (one entry per month, from
-        // op_cash/inv_cash) -- discountRate is what the user thinks of
-        // as an ANNUAL rate, so it must be converted to its monthly
-        // equivalent before feeding computeNPV, which discounts by
-        // (1+r) per ENTRY in the array, not per year. Likewise,
-        // computeIRR run on monthly cash flows returns a monthly rate,
-        // which must be annualized before comparison/display -- both
-        // conversions use the same standard compounding formula, not a
-        // naive divide/multiply by 12.
         const monthlyDiscountRate = annualRateToMonthlyRate(discountRate)
         const npv = computeNPV(cashFlows, monthlyDiscountRate)
         const monthlyIrr = computeIRR(cashFlows)
         const irr = monthlyIrr !== null ? monthlyRateToAnnualRate(monthlyIrr) : null
         const growth = computeCustomerGrowthSummary(events)
+        const dimLabels: [keyof typeof lrsCurrent.dimensions, string][] = [
+          ['marketOpportunity','Market Opportunity'],['visibility','Visibility'],['trust','Trust'],
+          ['profitability','Profitability'],['capacity','Capacity'],['resilience','Resilience'],['compliance','Compliance'],
+        ]
+        const scoreColor = (v:number) => v>=70?C.green:v>=50?C.teal:v>=30?C.amber:C.red
         return (
-          <div style={card}>
-            <div style={secH}>Investment Metrics</div>
-            <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1rem',lineHeight:1.6}}>
-              Net Present Value and Internal Rate of Return, calculated against the capital genuinely at risk for a return
-              (shareholder contributions and recoverable grants -- not non-repayable grants or loan principal, which have their own
-              separate return: interest, already reflected in Credit Risk) and the business's projected Free Cash Flow (Operating
-              Cash Flow less spend on Fixed Assets).
-            </p>
-            <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'1rem'}}>
-              <label htmlFor="discount-rate" style={{fontSize:'0.8rem',color:C.slate}}>Discount rate assumption:</label>
-              <input id="discount-rate" type="number" min={1} max={100} value={Math.round(discountRate*100)} onChange={e=>setDiscountRate(Number(e.target.value)/100)} style={{width:70,padding:'0.3rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily:'monospace'}}/>
-              <span style={{fontSize:'0.8rem',color:C.slate}}>% -- adjust to your own cost of capital or required return</span>
-            </div>
-            <div style={kpiGrid}>
-              <KPI label="Capital at Risk" value={fmt(capitalAtRisk,cc)} sub="Shareholder + recoverable grant"/>
-              <KPI label="Net Present Value" value={fmt(npv,cc)} sub={`at ${(discountRate*100).toFixed(0)}%`} color={npv>=0?C.green:C.red}/>
-              <KPI label="Internal Rate of Return" value={irr!==null?pct(irr):'N/A'} sub={irr===null?'No real IRR (check cash flow signs)':'Annualised'} color={irr!==null&&irr>discountRate?C.green:C.red}/>
-            </div>
-            {capitalAtRisk===0&&(
-              <div style={{background:'#FFF8E8',border:`1px solid ${C.amber}`,borderRadius:6,padding:'0.75rem 1rem',marginBottom:'1rem',fontSize:'0.8rem',color:C.navy}}>
-                No shareholder contribution or recoverable grant is recorded in Capital Structure (Settings) -- NPV/IRR above are
-                calculated against zero capital at risk, which makes them of limited meaning. Enter the real capital structure for
-                an accurate result.
+          <div>
+            <div style={card}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.5rem',flexWrap:'wrap',gap:'0.75rem'}}>
+                <div style={secH}>Liquidity Readiness Score</div>
+                <div style={{display:'flex',alignItems:'center',gap:'1rem'}}>
+                  <div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:scoreColor(lrsCurrent.score),lineHeight:1}}>{Math.round(lrsCurrent.score)}</div>
+                  <div style={{fontSize:'0.75rem',color:C.slate}}>out of 100</div>
+                </div>
               </div>
-            )}
-            <div style={{marginTop:'1.25rem',paddingTop:'1.25rem',borderTop:`1px solid ${C.border}`}}>
-              <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy,marginBottom:'0.75rem'}}>Customer Growth (whole business, all recorded marketing events)</div>
+              <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1.25rem',lineHeight:1.6}}>
+                The extent to which this business has the characteristics required for productive liquidity to flow into it --
+                one core score across seven weighted dimensions. A Bank Fit or Investor Fit score below is the same seven
+                dimensions, simply weighted differently for that specific lens; the business's underlying data never changes.
+              </p>
+              <InvestmentPitchDownload clientId={clientId}/>
+              {dimLabels.map(([key,label])=>{
+                const dim = lrsCurrent.dimensions[key]
+                const weight = LRS_WEIGHTS[key]
+                return (
+                  <div key={key} style={{marginBottom:'1.1rem',paddingBottom:'1.1rem',borderBottom:`1px solid ${C.border}`}}>
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}>
+                      <span style={{fontWeight:700,fontSize:'0.9rem',color:C.navy}}>{label} <span style={{fontWeight:400,color:C.slate,fontSize:'0.75rem'}}>({(weight*100).toFixed(0)}% weight)</span></span>
+                      <span style={{fontFamily:'monospace',fontWeight:700,color:scoreColor(dim.score)}}>{Math.round(dim.score)}/100</span>
+                    </div>
+                    <div style={{background:'#E8ECF0',borderRadius:999,height:7,marginBottom:'0.5rem'}}><div style={{width:dim.score+'%',height:'100%',background:scoreColor(dim.score),borderRadius:999}}/></div>
+                    {dim.indicators.map(ind=>(
+                      <div key={ind.label} style={{display:'flex',justifyContent:'space-between',fontSize:'0.74rem',color:C.slate,padding:'0.15rem 0'}}>
+                        <span>{ind.label}</span>
+                        <span style={{fontFamily:'monospace'}}>{Math.round(ind.value)}/100 — {ind.note}</span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+              <div style={{display:'flex',gap:'1.5rem',marginTop:'1rem'}}>
+                {Object.entries(FIT_SCORE_PRESETS).map(([key,preset])=>(
+                  <div key={key}>
+                    <div style={{fontSize:'0.7rem',color:C.slate}}>{preset.label}</div>
+                    <div style={{fontFamily:'monospace',fontWeight:700,fontSize:'1.1rem',color:scoreColor(computeFitScore(lrsCurrent,preset.weights))}}>{Math.round(computeFitScore(lrsCurrent,preset.weights))}/100</div>
+                  </div>
+                ))}
+              </div>
+              {latestInvestment&&(
+                <div style={{marginTop:'1.25rem',paddingTop:'1.25rem',borderTop:`1px solid ${C.border}`}}>
+                  <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy,marginBottom:'0.5rem'}}>AI Narrative Assessment</div>
+                  <div style={{fontSize:'0.85rem',color:C.navy,lineHeight:1.75,whiteSpace:'pre-wrap'}}>{latestInvestment.assessment_text}</div>
+                </div>
+              )}
+            </div>
+
+            <ScoreTrendCard title="Liquidity Readiness Trend" years={lrsSeries.years} monthsByYear={lrsMonthsByYearLabel} rows={[
+              {label:'Liquidity Readiness Score /100', getValue:(r:any)=>Math.round(r.score), getColor:(r:any)=>scoreColor(r.score)},
+              ...dimLabels.map(([key,label])=>({
+                label, getValue:(r:any)=>Math.round(r.dimensions[key].score), getColor:(r:any)=>scoreColor(r.dimensions[key].score),
+              })),
+            ]}/>
+
+            <div style={card}>
+              <div style={secH}>Investment Metrics</div>
+              <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1rem',lineHeight:1.6}}>
+                Net Present Value and Internal Rate of Return, calculated against the capital genuinely at risk for a return
+                (shareholder contributions and recoverable grants -- not non-repayable grants or loan principal, which have their own
+                separate return: interest, already reflected in Credit Risk) and the business's projected Free Cash Flow (Operating
+                Cash Flow less spend on Fixed Assets).
+              </p>
+              <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'1rem'}}>
+                <label htmlFor="discount-rate" style={{fontSize:'0.8rem',color:C.slate}}>Discount rate assumption:</label>
+                <input id="discount-rate" type="number" min={1} max={100} value={Math.round(discountRate*100)} onChange={e=>setDiscountRate(Number(e.target.value)/100)} style={{width:70,padding:'0.3rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily:'monospace'}}/>
+                <span style={{fontSize:'0.8rem',color:C.slate}}>% -- adjust to your own cost of capital or required return</span>
+              </div>
               <div style={kpiGrid}>
-                <KPI label="Customers Acquired" value={growth.totalCustomersAcquired.toLocaleString()}/>
-                <KPI label="Blended CAC" value={growth.blendedCAC!==null?fmt(growth.blendedCAC,cc):'N/A'} sub={growth.blendedCAC===null?'No customers recorded yet':undefined}/>
-                <KPI label="Revenue Lift" value={fmt(growth.totalRevenueLift,cc)} sub="From tracked events"/>
+                <KPI label="Capital at Risk" value={fmt(capitalAtRisk,cc)} sub="Shareholder + recoverable grant"/>
+                <KPI label="Net Present Value" value={fmt(npv,cc)} sub={`at ${(discountRate*100).toFixed(0)}%`} color={npv>=0?C.green:C.red}/>
+                <KPI label="Internal Rate of Return" value={irr!==null?pct(irr):'N/A'} sub={irr===null?'No real IRR (check cash flow signs)':'Annualised'} color={irr!==null&&irr>discountRate?C.green:C.red}/>
+              </div>
+              {capitalAtRisk===0&&(
+                <div style={{background:'#FFF8E8',border:`1px solid ${C.amber}`,borderRadius:6,padding:'0.75rem 1rem',marginBottom:'1rem',fontSize:'0.8rem',color:C.navy}}>
+                  No shareholder contribution or recoverable grant is recorded in Capital Structure (Settings) -- NPV/IRR above are
+                  calculated against zero capital at risk, which makes them of limited meaning. Enter the real capital structure for
+                  an accurate result.
+                </div>
+              )}
+              <div style={{marginTop:'1.25rem',paddingTop:'1.25rem',borderTop:`1px solid ${C.border}`}}>
+                <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy,marginBottom:'0.75rem'}}>Customer Growth (whole business, all recorded marketing events)</div>
+                <div style={kpiGrid}>
+                  <KPI label="Customers Acquired" value={growth.totalCustomersAcquired.toLocaleString()}/>
+                  <KPI label="Blended CAC" value={growth.blendedCAC!==null?fmt(growth.blendedCAC,cc):'N/A'} sub={growth.blendedCAC===null?'No customers recorded yet':undefined}/>
+                  <KPI label="Revenue Lift" value={fmt(growth.totalRevenueLift,cc)} sub="From tracked events"/>
+                </div>
               </div>
             </div>
           </div>
@@ -2822,20 +2881,60 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
 
       {activeSection==='coach'&&(
         <div style={card}>
-          <div style={secH}>Coach Assessment Inputs</div>
-          <p style={{fontSize:'0.85rem',color:C.slate,marginBottom:'1.5rem',lineHeight:1.6}}>These scores feed into Going Concern and Investment Readiness.</p>
-          <div style={fGrid}>
-            {[{label:'Commercial Model Clarity',field:'commercialModel',max:5},{label:'Management Capability',field:'managementCapability',max:4},{label:'Market Evidence',field:'marketEvidence',max:5},{label:'Governance & Record-Keeping',field:'governance',max:5}].map(item=>(
-              <div key={item.field}>
-                <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}>
-                  <label style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{item.label}</label>
-                  <span style={{fontFamily:'monospace',fontWeight:700,color:C.cyan}}>{Number((assess as any)[item.field])||2}/{item.max}</span>
-                </div>
-                <input type="range" min="0" max={item.max} step="1" value={(assess as any)[item.field]||2} onChange={e=>updateAssess(item.field,Number(e.target.value))} style={{width:'100%',accentColor:C.cyan,marginBottom:'0.2rem'}}/>
+          <div style={secH}>Coach Assessment (Business Profile)</div>
+          <p style={{fontSize:'0.85rem',color:C.slate,marginBottom:'1.5rem',lineHeight:1.6}}>
+            Every qualitative input the platform uses lives here, grouped by exactly which score it feeds into.
+            Everything else on Credit Risk, Going Concern, and Liquidity Readiness is computed directly from the financial
+            model -- these are the only figures a human judgement call, not a calculation.
+          </p>
+          {[
+            {group:'Feeds: Going Concern', items:[
+              {label:'Management Capability',field:'managementCapability',max:4},
+            ]},
+            {group:'Feeds: Liquidity Readiness — Market Opportunity', items:[
+              {label:'Total Addressable Market',field:'totalAddressableMarket',max:5},
+              {label:'Repeat Customers',field:'repeatCustomers',max:5},
+            ]},
+            {group:'Feeds: Liquidity Readiness — Visibility', items:[
+              {label:'KPI Reporting',field:'kpiReporting',max:5},
+            ]},
+            {group:'Feeds: Liquidity Readiness — Trust (and Compliance: Policies)', items:[
+              {label:'Audit Trail',field:'auditTrail',max:5},
+              {label:'Supplier Relationships',field:'supplierRelationships',max:5},
+              {label:'Governance & Record-Keeping',field:'governance',max:5},
+            ]},
+            {group:'Feeds: Liquidity Readiness — Capacity', items:[
+              {label:'Commercial Model Clarity',field:'commercialModel',max:5},
+              {label:'Production Capacity',field:'productionCapacity',max:5},
+              {label:'Inventory Availability',field:'inventoryAvailability',max:5},
+            ]},
+            {group:'Feeds: Liquidity Readiness — Resilience', items:[
+              {label:'Customer Diversification',field:'customerDiversification',max:5},
+              {label:'Supplier Diversification',field:'supplierDiversification',max:5},
+              {label:'Business Continuity',field:'businessContinuity',max:5},
+            ]},
+            {group:'Feeds: Liquidity Readiness — Compliance', items:[
+              {label:'Registration',field:'registrationCompliance',max:5},
+              {label:'Tax Compliance',field:'taxCompliance',max:5},
+              {label:'Licences',field:'licenceCompliance',max:5},
+            ]},
+          ].map(section=>(
+            <div key={section.group} style={{marginBottom:'1.75rem'}}>
+              <div style={{fontSize:'0.72rem',fontWeight:700,color:C.teal,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'0.75rem',borderBottom:`1px solid ${C.border}`,paddingBottom:'0.4rem'}}>{section.group}</div>
+              <div style={fGrid}>
+                {section.items.map(item=>(
+                  <div key={item.field}>
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}>
+                      <label style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{item.label}</label>
+                      <span style={{fontFamily:'monospace',fontWeight:700,color:C.cyan}}>{Number((assess as any)[item.field])||2}/{item.max}</span>
+                    </div>
+                    <input type="range" min="0" max={item.max} step="1" value={(assess as any)[item.field]||2} onChange={e=>updateAssess(item.field,Number(e.target.value))} style={{width:'100%',accentColor:C.cyan,marginBottom:'0.2rem'}}/>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginTop:'1.5rem'}}>
+            </div>
+          ))}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginTop:'0.5rem'}}>
             {[{label:'Immediate Actions (30 days)',field:'immediateActions'},{label:'Near-Term Actions (60-90 days)',field:'nearTermActions'},{label:'Required Follow-Up',field:'followUp'},{label:'Coach Notes',field:'coachNotes'}].map(item=>(
               <div key={item.field}>
                 <label style={{display:'block',fontWeight:600,fontSize:'0.82rem',marginBottom:'0.25rem',color:C.navy}}>{item.label}</label>
