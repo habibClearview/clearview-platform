@@ -22,6 +22,7 @@ export interface QueuedSale {
   catalogue_item_id: string
   item_name: string
   item_type: 'product' | 'service'
+  unit_label?: string
   standard_price: number
   quantity: number
   override_price?: number

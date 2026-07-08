@@ -17,7 +17,7 @@ interface CostLine { id:string; name:string; category:string }
 interface Customer { id:string; name:string; phone?:string; village?:string }
 interface HistoryEntry {
   id:string; transaction_type:string; category:string; plan_line_name:string;
-  amount:number; quantity?:number; unit_price?:number; transaction_date:string;
+  amount:number; quantity?:number; unit_price?:number; unit_label?:string; transaction_date:string;
   synced_at:string; notes?:string; price_alert?:boolean;
 }
 interface AuthData {
@@ -197,6 +197,7 @@ export default function FieldCapturePage() {
     const tx: Omit<QueuedSale,'queued_at'> = {
       local_id: editingSaleId || `local_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
       catalogue_item_id: selectedItem.id, item_name: selectedItem.name, item_type: selectedItem.item_type,
+      unit_label: selectedItem.unit_label,
       standard_price: selectedItem.price,
       quantity: Number(saleForm.quantity),
       override_price: saleForm.override ? Number(saleForm.override_price) : undefined,
@@ -454,7 +455,7 @@ export default function FieldCapturePage() {
                   <div key={q.local_id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
                     <div style={{minWidth:0}}>
                       <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.item_name}</div>
-                      <div style={{fontSize:'0.72rem',color:C.slate}}>{q.quantity} {q.override_price?'(price overridden)':`× ${fmt(q.standard_price,auth.client.currency)}`}</div>
+                      <div style={{fontSize:'0.72rem',color:C.slate}}>{q.quantity}{q.unit_label?` ${q.unit_label}`:''} {q.override_price?'(price overridden)':`× ${fmt(q.standard_price,auth.client.currency)}`}</div>
                     </div>
                     <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
                       <div style={{fontFamily:'monospace',fontWeight:700,color:C.green,whiteSpace:'nowrap'}}>+{fmt(q.quantity*(q.override_price??q.standard_price),auth.client.currency)}</div>
@@ -571,7 +572,7 @@ export default function FieldCapturePage() {
                   <div>
                     <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>{entry.plan_line_name}</div>
                     <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.15rem'}}>
-                      {entry.transaction_date} {entry.quantity?`· ${entry.quantity} × ${fmt(entry.unit_price??0,auth.client.currency)}`:''}
+                      {entry.transaction_date} {entry.quantity?`· ${entry.quantity}${entry.unit_label?` ${entry.unit_label}`:''} × ${fmt(entry.unit_price??0,auth.client.currency)}`:''}
                     </div>
                     {entry.notes && <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.15rem',fontStyle:'italic'}}>{entry.notes}</div>}
                   </div>
