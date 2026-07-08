@@ -261,8 +261,9 @@ export interface CoachAssessment {
   // each covers an indicator the platform has no other way to know,
   // since it isn't derivable from any financial data already tracked.
   // All 0-5, matching the existing four for one consistent input pattern.
-  totalAddressableMarket: number   // Market Opportunity: is there a genuinely large, scalable market?
-  repeatCustomers: number          // Market Opportunity: how much revenue comes from repeat business?
+  // Market Opportunity's qualitative indicators are covered by
+  // commercialModel/marketEvidence above -- no separate TAM/repeat-
+  // customer fields, since they'd cover near-identical ground.
   kpiReporting: number             // Visibility: does the business track and report its own KPIs?
   auditTrail: number                // Trust: are transactions recorded with supporting documentation?
   supplierRelationships: number    // Trust: quality of supplier relationships beyond payment timing alone
@@ -283,7 +284,7 @@ export interface CoachAssessment {
 export function defaultCoachAssessment(): CoachAssessment {
   return {
     commercialModel: 2, managementCapability: 2, marketEvidence: 2, governance: 2,
-    totalAddressableMarket: 2, repeatCustomers: 2, kpiReporting: 2,
+    kpiReporting: 2,
     auditTrail: 2, supplierRelationships: 2,
     productionCapacity: 2, inventoryAvailability: 2,
     customerDiversification: 2, supplierDiversification: 2, businessContinuity: 2,
@@ -367,6 +368,15 @@ export interface ScoringResult {
 }
 
 const GREEN = '#1A7A4A', AMBER = '#B8860B', RED = '#C0392B', TEAL = '#1A9DAA'
+
+// A coach assessment field defaults to 2 only when genuinely absent
+// (null/undefined/non-numeric) -- `|| 2` would also replace a real,
+// deliberately-recorded 0 (the worst possible rating) with 2, silently
+// making the worst case unrepresentable.
+function assessOrDefault(value: unknown, fallback = 2): number {
+  const n = Number(value)
+  return value != null && Number.isFinite(n) ? n : fallback
+}
 
 export function computeScores(inputs: ScoringInputs): ScoringResult {
   const { rev, ebitda, cashClose, totalEquity, totalLiabilities, months, assess } = inputs
@@ -454,7 +464,7 @@ export function computeScores(inputs: ScoringInputs): ScoringResult {
     : dscrMin >= 1.5 ? 4 : dscrMin >= 1.0 ? 3 : dscrMin >= 0.5 ? 2 : 1
   const gcLiquidityFactor = minCash >= 0 ? 4 : minCash > -10000000 ? 1 : 0
   const gcProfitabilityFactor = annualEbitda > 0 ? 3 : 2
-  const gcManagementFactor = Number(assess.managementCapability) || 2
+  const gcManagementFactor = assessOrDefault(assess.managementCapability)
   const gcScore = Math.min(20,
     gcDebtServiceFactor + gcLiquidityFactor + gcRevenueSustainabilityFactor + gcProfitabilityFactor + gcManagementFactor
   )
@@ -469,7 +479,7 @@ export function computeScores(inputs: ScoringInputs): ScoringResult {
   const irDebt = !hasDebt ? 5
     : dscrMin === null ? 3
     : Math.min(5, Math.round(dscrMin >= 2 ? 5 : dscrMin >= 1.5 ? 4 : dscrMin >= 1 ? 3 : 2))
-  const irScore = Math.min(30, irFinancial + irDebt + (Number(assess.commercialModel) || 2) + (Number(assess.managementCapability) || 2) + (Number(assess.marketEvidence) || 2) + (Number(assess.governance) || 2))
+  const irScore = Math.min(30, irFinancial + irDebt + assessOrDefault(assess.commercialModel) + assessOrDefault(assess.managementCapability) + assessOrDefault(assess.marketEvidence) + assessOrDefault(assess.governance))
   const irTier: 'Investment Ready'|'Near Ready'|'Development Stage'|'Pre-Investment' = irScore >= 24 ? 'Investment Ready' : irScore >= 17 ? 'Near Ready' : irScore >= 10 ? 'Development Stage' : 'Pre-Investment'
   const irColor = irTier === 'Investment Ready' ? GREEN : irTier === 'Near Ready' ? TEAL : AMBER
 

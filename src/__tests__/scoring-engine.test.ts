@@ -473,3 +473,43 @@ describe('Going Concern sub-indicator fields, exposed for the per-indicator tren
     expect(Math.min(20, sum)).toBe(result.gcScore)
   })
 })
+
+describe('Coach assessment fallback correctly preserves a genuine 0 rating', () => {
+  it('REG: a coach who deliberately rates management capability at 0 (the worst case) sees gcManagementFactor as 0, not silently defaulted to 2', () => {
+    const result = computeScores({
+      rev: [1_000_000], ebitda: [100_000], cogs: [500_000], cashClose: [500_000],
+      totalEquity: 1_000_000, totalLiabilities: 200_000, months: 1,
+      debtObligations: [], tradeCreditLines: [],
+      assess: { ...defaultCoachAssessment(), managementCapability: 0 },
+    })
+    expect(result.gcManagementFactor).toBe(0)
+  })
+
+  it('REG: a genuine 0 across all four irScore assessment terms is fully reflected, not silently raised to 2 each', () => {
+    const result = computeScores({
+      rev: [1_000_000], ebitda: [100_000], cogs: [500_000], cashClose: [500_000],
+      totalEquity: 1_000_000, totalLiabilities: 200_000, months: 1,
+      debtObligations: [], tradeCreditLines: [],
+      assess: { ...defaultCoachAssessment(), commercialModel: 0, managementCapability: 0, marketEvidence: 0, governance: 0 },
+    })
+    const withDefaults = computeScores({
+      rev: [1_000_000], ebitda: [100_000], cogs: [500_000], cashClose: [500_000],
+      totalEquity: 1_000_000, totalLiabilities: 200_000, months: 1,
+      debtObligations: [], tradeCreditLines: [], assess: defaultCoachAssessment(),
+    })
+    // All-zero ratings must score strictly lower than the default (2
+    // each) ratings -- if the bug were present, both would be identical
+    // since every 0 would silently become 2.
+    expect(result.irScore).toBeLessThan(withDefaults.irScore)
+  })
+
+  it('REG: an absent/undefined rating still defaults to 2, distinguishing "not set" from "deliberately 0"', () => {
+    const result = computeScores({
+      rev: [1_000_000], ebitda: [100_000], cogs: [500_000], cashClose: [500_000],
+      totalEquity: 1_000_000, totalLiabilities: 200_000, months: 1,
+      debtObligations: [], tradeCreditLines: [],
+      assess: { ...defaultCoachAssessment(), managementCapability: undefined as any },
+    })
+    expect(result.gcManagementFactor).toBe(2)
+  })
+})

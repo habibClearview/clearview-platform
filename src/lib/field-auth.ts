@@ -54,5 +54,6 @@ export function clampHistoryLimit(requested: string | null): number {
 // moment is the most recent last_used_at across all of them.
 export function mostRecentTokenUse(tokens: {last_used_at?: string | null}[] | undefined): string | null {
   const timestamps = (tokens || []).map(t => t.last_used_at).filter((t): t is string => !!t)
-  return timestamps.length > 0 ? timestamps.sort().reverse()[0] : null
+  if (timestamps.length === 0) return null
+  return timestamps.reduce((latest, t) => new Date(t).getTime() > new Date(latest).getTime() ? t : latest)
 }

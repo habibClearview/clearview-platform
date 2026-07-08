@@ -92,20 +92,32 @@ function average(values: number[]): number {
   return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0
 }
 
+// Shared by computeMarketOpportunity and computeProfitability -- both
+// need the same gross-margin-as-percentage-of-revenue ramp, and having
+// it in two places risked the threshold drifting apart between them.
+function grossMarginScore(annualRevenue: number, annualGrossProfit: number): number {
+  return annualRevenue > 0 ? ramp(annualGrossProfit / annualRevenue, 0, 0.40) : 0
+}
+
 export function computeMarketOpportunity(i: LRSInputs): LRSDimensionScore {
   const revenueGrowth = ramp(i.revenueGrowthRate, -0.20, 0.30)
-  const grossMargin = i.annualRevenue > 0 ? ramp(i.annualGrossProfit / i.annualRevenue, 0, 0.40) : 0
-  const tam = qualitative(i.assess.totalAddressableMarket)
+  const grossMargin = grossMarginScore(i.annualRevenue, i.annualGrossProfit)
+  // commercialModel/marketEvidence: whether there's a clear, well-
+  // evidenced commercial opportunity here -- conceptually the same
+  // ground a separate "Total Addressable Market" input would cover,
+  // so reusing these (already collected for Going Concern/Investment
+  // Readiness) rather than inventing a redundant new field.
+  const commercialModel = qualitative(i.assess.commercialModel)
   const customerGrowth = i.customersAcquired <= 0 ? 0 : i.customersAcquired <= 5 ? 40 : i.customersAcquired <= 20 ? 70 : 100
-  const repeatCustomers = qualitative(i.assess.repeatCustomers)
+  const marketEvidence = qualitative(i.assess.marketEvidence)
   return {
-    score: average([revenueGrowth, grossMargin, tam, customerGrowth, repeatCustomers]),
+    score: average([revenueGrowth, grossMargin, commercialModel, customerGrowth, marketEvidence]),
     indicators: [
       { label: 'Revenue Growth', value: revenueGrowth, note: `${(i.revenueGrowthRate*100).toFixed(1)}% vs prior period` },
       { label: 'Gross Margin', value: grossMargin, note: i.annualRevenue > 0 ? `${((i.annualGrossProfit/i.annualRevenue)*100).toFixed(1)}%` : 'No revenue yet' },
-      { label: 'Total Addressable Market', value: tam, note: 'Business Profile input' },
+      { label: 'Commercial Model Clarity', value: commercialModel, note: 'Business Profile input' },
       { label: 'Customer Growth', value: customerGrowth, note: `${i.customersAcquired} customers acquired (tracked events)` },
-      { label: 'Repeat Customers', value: repeatCustomers, note: 'Business Profile input' },
+      { label: 'Market Evidence', value: marketEvidence, note: 'Business Profile input' },
     ],
   }
 }
@@ -150,7 +162,7 @@ export function computeProfitability(i: LRSInputs): LRSDimensionScore {
   const netMargin = i.annualRevenue > 0 ? ramp(i.annualEbitda / i.annualRevenue, 0, 0.30) : 0
   const cashFlow = i.cashGaps === 0 && (i.cashClose[i.cashClose.length-1] ?? 0) >= 0 ? 100 : i.cashGaps <= 2 ? 50 : 10
   const roi = i.irr === null ? 50 : ramp(i.irr, 0, 0.40)
-  const grossMargin = i.annualRevenue > 0 ? ramp(i.annualGrossProfit / i.annualRevenue, 0, 0.40) : 0
+  const grossMargin = grossMarginScore(i.annualRevenue, i.annualGrossProfit)
   const breakeven = i.businessBreakeven > 0 ? ramp(i.annualRevenue / i.businessBreakeven, 0, 1.2) : (i.annualRevenue > 0 ? 100 : 0)
   return {
     score: average([netMargin, cashFlow, roi, grossMargin, breakeven]),
@@ -166,7 +178,7 @@ export function computeProfitability(i: LRSInputs): LRSDimensionScore {
 
 export function computeCapacity(i: LRSInputs): LRSDimensionScore {
   const productionCapacity = qualitative(i.assess.productionCapacity)
-  const managementSystems = qualitative(i.assess.commercialModel)
+  const managementSystems = qualitative(i.assess.managementCapability)
   const staffCapability = i.revenuePerHead > 0 ? ramp(i.revenuePerHead, 0, 20_000_000) : 0
   const avgMonthlyOpex = average(i.monthlyOpex)
   const currentCash = i.cashClose[i.cashClose.length-1] ?? 0
@@ -191,7 +203,15 @@ export function computeResilience(i: LRSInputs): LRSDimensionScore {
   const customerDiversification = qualitative(i.assess.customerDiversification)
   const supplierDiversification = qualitative(i.assess.supplierDiversification)
   const deToEq = i.totalEquity > 0 ? i.totalLiabilities / i.totalEquity : 99
-  const debtExposure = inverseRamp(deToEq, 0.5, 2.0)
+  const leverageScore = inverseRamp(deToEq, 0.5, 2.0)
+  // Debt Exposure blends leverage (debt/equity) with actual coverage
+  // ability (DSCR) when debt genuinely exists and DSCR is computable --
+  // a highly-levered business that comfortably services its debt is a
+  // different risk than one with the same leverage barely covering it.
+  // With no debt, or debt too new for anything to be due yet (a grace
+  // period), DSCR isn't meaningful, so leverage alone is used.
+  const dscrScore = i.hasDebt && i.dscrMin !== null ? ramp(i.dscrMin, 0.5, 2.0) : null
+  const debtExposure = dscrScore !== null ? (leverageScore + dscrScore) / 2 : leverageScore
   const businessContinuity = qualitative(i.assess.businessContinuity)
   return {
     score: average([cashReserve, customerDiversification, supplierDiversification, debtExposure, businessContinuity]),
@@ -199,7 +219,9 @@ export function computeResilience(i: LRSInputs): LRSDimensionScore {
       { label: 'Cash Reserve (Runway)', value: cashReserve, note: avgMonthlyOpex > 0 ? `${(currentCash/avgMonthlyOpex).toFixed(1)} months` : 'Opex not computable' },
       { label: 'Customer Diversification', value: customerDiversification, note: 'Business Profile input' },
       { label: 'Supplier Diversification', value: supplierDiversification, note: 'Business Profile input' },
-      { label: 'Debt Exposure', value: debtExposure, note: i.totalEquity > 0 ? `Debt/Equity ${deToEq.toFixed(2)}x` : 'Equity not available' },
+      { label: 'Debt Exposure', value: debtExposure, note: i.totalEquity > 0
+          ? `Debt/Equity ${deToEq.toFixed(2)}x${dscrScore !== null ? `, DSCR ${i.dscrMin!.toFixed(2)}x` : ''}`
+          : 'Equity not available' },
       { label: 'Business Continuity', value: businessContinuity, note: 'Business Profile input' },
     ],
   }

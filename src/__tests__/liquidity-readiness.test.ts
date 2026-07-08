@@ -199,11 +199,32 @@ describe('computeCapacity and computeResilience — cash runway indicators do no
     expect(Number.isNaN(resilience.score)).toBe(false)
   })
 
-  it('REG: zero equity does not crash the debt exposure indicator', () => {
+  it('REG: zero equity does not crash the debt exposure indicator, and zero equity with no debt at all correctly scores leverage alone as poor', () => {
     const result = computeResilience(baseInputs({ totalEquity: 0, totalLiabilities: 5_000_000 }))
     expect(Number.isNaN(result.score)).toBe(false)
-    const debtIndicator = result.indicators.find(i => i.label === 'Debt Exposure')!
-    expect(debtIndicator.value).toBe(0) // deToEq defaults to 99 (very high) when equity is zero -- correctly scores poorly, not undefined
+    expect(Number.isNaN(result.indicators.find(i => i.label === 'Debt Exposure')!.value)).toBe(false)
+
+    // With no debt at all (so no DSCR blending applies), zero equity
+    // against real liabilities should score debt exposure at exactly 0
+    // -- deToEq defaults to 99 (very high) when equity is zero, and
+    // leverage alone (no DSCR to blend in) correctly scores poorly.
+    const noDebtResult = computeResilience(baseInputs({ totalEquity: 0, totalLiabilities: 5_000_000, hasDebt: false, dscrMin: null }))
+    const debtIndicator = noDebtResult.indicators.find(i => i.label === 'Debt Exposure')!
+    expect(debtIndicator.value).toBe(0)
+  })
+
+  it('REG: DSCR is blended into Debt Exposure when debt exists and is computable -- strong DSCR meaningfully lifts the score above leverage alone', () => {
+    const withStrongDscr = computeResilience(baseInputs({ hasDebt: true, dscrMin: 2.0, totalEquity: 2_000_000, totalLiabilities: 4_000_000 }))
+    const withoutDebt = computeResilience(baseInputs({ hasDebt: false, dscrMin: null, totalEquity: 2_000_000, totalLiabilities: 4_000_000 }))
+    const withDscr = withStrongDscr.indicators.find(i => i.label === 'Debt Exposure')!.value
+    const leverageOnly = withoutDebt.indicators.find(i => i.label === 'Debt Exposure')!.value
+    expect(withDscr).toBeGreaterThan(leverageOnly)
+  })
+
+  it('REG: debt that exists but has nothing due yet (dscrMin null, e.g. a grace period) falls back to leverage alone, not treated as a coverage failure', () => {
+    const result = computeResilience(baseInputs({ hasDebt: true, dscrMin: null, totalEquity: 2_000_000, totalLiabilities: 4_000_000 }))
+    const withoutDebt = computeResilience(baseInputs({ hasDebt: false, dscrMin: null, totalEquity: 2_000_000, totalLiabilities: 4_000_000 }))
+    expect(result.indicators.find(i => i.label === 'Debt Exposure')!.value).toBe(withoutDebt.indicators.find(i => i.label === 'Debt Exposure')!.value)
   })
 })
 

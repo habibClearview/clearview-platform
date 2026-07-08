@@ -1003,7 +1003,7 @@ function ScenariosTab({config,result,months,cc,P,onSave}) {
       <div style={card}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
           <div style={secH}>Scenarios</div>
-          {P.canEditPlan&&<button style={addBtn()} onClick={addScenario}>+ New Scenario</button>}
+          {P.canEditPlan&&<button type="button" style={addBtn()} onClick={addScenario}>+ New Scenario</button>}
         </div>
         {scenarios.map(sc=>(
           <div key={sc.id} style={{display:'flex',alignItems:'center',gap:'1rem',padding:'0.75rem',border:`1px solid ${sc.active?C.cyan:C.border}`,borderRadius:6,marginBottom:'0.5rem',background:sc.active?'#EBF8FF':C.white}}>
@@ -1011,7 +1011,7 @@ function ScenariosTab({config,result,months,cc,P,onSave}) {
             <div style={{flex:1}}>
               {P.canEditPlan ? (
                 <input style={{...inp,fontWeight:700,fontSize:'0.88rem',padding:'0.2rem 0.4rem',marginBottom:'0.3rem'}}
-                  value={sc.label} onChange={e=>updateScenario(sc.id,'label',e.target.value)}/>
+                  value={sc.label} onChange={e=>updateScenario(sc.id,'label',e.target.value)} aria-label={`Name for scenario ${sc.label}`}/>
               ) : (
                 <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>{sc.label}</div>
               )}
@@ -1019,17 +1019,17 @@ function ScenariosTab({config,result,months,cc,P,onSave}) {
                 <div style={{display:'flex',gap:'0.75rem',alignItems:'center',fontSize:'0.75rem',color:C.slate}}>
                   <span>Revenue ×</span>
                   <input type="number" step="0.01" style={{width:70,padding:'0.25rem 0.4rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily:'monospace',fontSize:'0.78rem'}}
-                    value={sc.rev_mult} onChange={e=>updateScenario(sc.id,'rev_mult',Number(e.target.value))}/>
+                    value={sc.rev_mult} onChange={e=>updateScenario(sc.id,'rev_mult',e.target.value===''?1:Number(e.target.value))} aria-label={`Revenue multiplier for ${sc.label}`}/>
                   <span>Costs ×</span>
                   <input type="number" step="0.01" style={{width:70,padding:'0.25rem 0.4rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily:'monospace',fontSize:'0.78rem'}}
-                    value={sc.cost_mult} onChange={e=>updateScenario(sc.id,'cost_mult',Number(e.target.value))}/>
+                    value={sc.cost_mult} onChange={e=>updateScenario(sc.id,'cost_mult',e.target.value===''?1:Number(e.target.value))} aria-label={`Cost multiplier for ${sc.label}`}/>
                 </div>
               ) : (
                 <div style={{fontSize:'0.75rem',color:C.slate}}>Revenue ×{sc.rev_mult} · Costs ×{sc.cost_mult}</div>
               )}
             </div>
             {sc.active&&<Badge text="Active" color={C.cyan}/>}
-            {P.canEditPlan&&sc.id!=='base'&&<button style={delBtn} onClick={()=>deleteScenario(sc.id)} aria-label={`Delete ${sc.label}`}>×</button>}
+            {P.canEditPlan&&sc.id!=='base'&&<button type="button" style={delBtn} onClick={()=>deleteScenario(sc.id)} aria-label={`Delete ${sc.label}`}>×</button>}
           </div>
         ))}
       </div>
@@ -2246,6 +2246,7 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
       const res = await fetch(`/api/field/admin/operators?client_id=${encodeURIComponent(clientId)}`)
       const data = await res.json()
       if (res.ok) setOperators(data.operators||[])
+      else alert(data.error || 'Could not load field operators.')
     } catch { /* leave operators as-is; the list below shows empty rather than a broken page */ }
     setLoading(false)
   }
@@ -2270,7 +2271,14 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
       setForm({display_name:'', phone:'', business_unit_id:'', sync_frequency:'realtime'})
       setShowForm(false)
       await load()
-      if (data.token?.token) await buildShareLink(form.display_name, data.token.token)
+      // Isolated from the outer catch deliberately -- the operator is
+      // already created and the list already reloaded by this point, so
+      // a QR-generation failure here must not surface as "could not
+      // create operator", which would wrongly invite a duplicate retry.
+      if (data.token?.token) {
+        try { await buildShareLink(form.display_name, data.token.token) }
+        catch { alert('Operator created, but the share link/QR code could not be generated. Use "New Link" to retry.') }
+      }
     } catch {
       alert('No connection -- could not create operator. Please try again.')
     }
@@ -2300,7 +2308,11 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
         body: JSON.stringify({operator_id: operatorId, issue_new_token: true}),
       })
       const data = await res.json()
-      if (res.ok && data.token?.token) { await load(); await buildShareLink(operatorName, data.token.token) }
+      if (res.ok && data.token?.token) {
+        await load()
+        try { await buildShareLink(operatorName, data.token.token) }
+        catch { alert('New token issued, but the share link/QR code could not be generated. Use "New Link" again to retry.') }
+      }
       else alert(data.error || 'Could not issue a new token.')
     } catch {
       alert('No connection -- could not issue a new token. Please try again.')
@@ -2324,20 +2336,20 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
       {showForm && (
         <div style={{background:C.cream,borderRadius:6,padding:'1rem',marginBottom:'1.25rem'}}>
           <div style={fGrid}>
-            <div><label style={lbl}>Operator Name</label>
-              <input style={inp} value={form.display_name} onChange={e=>setForm(f=>({...f,display_name:e.target.value}))} placeholder="e.g. Grace Nakato"/>
+            <div><label htmlFor="new-op-name" style={lbl}>Operator Name</label>
+              <input id="new-op-name" style={inp} value={form.display_name} onChange={e=>setForm(f=>({...f,display_name:e.target.value}))} placeholder="e.g. Grace Nakato"/>
             </div>
-            <div><label style={lbl}>Phone (optional)</label>
-              <input style={inp} value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="e.g. 0772 123 456"/>
+            <div><label htmlFor="new-op-phone" style={lbl}>Phone (optional)</label>
+              <input id="new-op-phone" style={inp} value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="e.g. 0772 123 456"/>
             </div>
-            <div><label style={lbl}>Business Unit</label>
-              <select style={inp} value={form.business_unit_id} onChange={e=>setForm(f=>({...f,business_unit_id:e.target.value}))}>
+            <div><label htmlFor="new-op-unit" style={lbl}>Business Unit</label>
+              <select id="new-op-unit" style={inp} value={form.business_unit_id} onChange={e=>setForm(f=>({...f,business_unit_id:e.target.value}))}>
                 <option value="">Select a unit...</option>
                 {businessUnits.filter(u=>u.active).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </div>
-            <div><label style={lbl}>Sync Frequency</label>
-              <select style={inp} value={form.sync_frequency} onChange={e=>setForm(f=>({...f,sync_frequency:e.target.value}))}>
+            <div><label htmlFor="new-op-freq" style={lbl}>Sync Frequency</label>
+              <select id="new-op-freq" style={inp} value={form.sync_frequency} onChange={e=>setForm(f=>({...f,sync_frequency:e.target.value}))}>
                 <option value="realtime">Real-time (as entered)</option>
                 <option value="end_of_day">Once at end of day</option>
                 <option value="daily">Once daily</option>
@@ -2356,7 +2368,7 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
             <div style={{flex:1,minWidth:240}}>
               <div style={{fontSize:'0.78rem',color:C.slate,marginBottom:'0.4rem'}}>Share this link directly, or have them scan the QR code:</div>
               <div style={{display:'flex',gap:'0.5rem'}}>
-                <input readOnly style={{...inp,fontFamily:'monospace',fontSize:'0.75rem'}} value={newLink.url} onFocus={e=>e.target.select()}/>
+                <input readOnly aria-label="Field access link URL" style={{...inp,fontFamily:'monospace',fontSize:'0.75rem'}} value={newLink.url} onFocus={e=>e.target.select()}/>
                 <button type="button" style={addBtn(true)} onClick={()=>{navigator.clipboard.writeText(newLink.url)}}>Copy</button>
               </div>
               <button type="button" style={{...addBtn(true,C.slate),marginTop:'0.75rem'}} onClick={()=>setNewLink(null)}>Done</button>
@@ -3143,11 +3155,11 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
             <div style={{display:'flex',alignItems:'center',gap:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:s.gcColor,lineHeight:1}}>{s.gcScore}</div><div><div style={{fontSize:'0.75rem',color:C.slate}}>out of 20</div><Badge2 label={s.gcRating} color={s.gcColor}/></div></div>
           </div>
           {[
-            {name:'Debt Service Coverage',sc:!s.hasDebt?4:s.dscrMin===null?3:s.dscrMin>=1.5?4:s.dscrMin>=1.0?3:s.dscrMin>=0.5?2:1,max:4,ev:dscrLabel(s),field:null},
-            {name:'Liquidity Position',sc:m.min_cash>=0?4:m.min_cash>-10000000?1:0,max:4,ev:'Min cash: '+fmt(m.min_cash,cc),field:null},
-            {name:'Revenue Sustainability',sc:3,max:4,ev:'Revenue trend: '+s.revTrend,field:null},
-            {name:'Operational Profitability',sc:m.total_ebitda>0?3:2,max:4,ev:'Annual EBITDA: '+fmt(m.total_ebitda,cc),field:null},
-            {name:'Management & Governance',sc:Number(assess.managementCapability)||2,max:4,ev:'Coach assessment',field:'managementCapability'},
+            {name:'Debt Service Coverage',sc:s.gcDebtServiceFactor,max:4,ev:dscrLabel(s),field:null},
+            {name:'Liquidity Position',sc:s.gcLiquidityFactor,max:4,ev:'Min cash: '+fmt(m.min_cash,cc),field:null},
+            {name:'Revenue Sustainability',sc:s.gcRevenueSustainabilityFactor,max:4,ev:'Revenue trend: '+s.revTrend,field:null},
+            {name:'Operational Profitability',sc:s.gcProfitabilityFactor,max:4,ev:'Annual EBITDA: '+fmt(m.total_ebitda,cc),field:null},
+            {name:'Management & Governance',sc:s.gcManagementFactor,max:5,ev:'Coach assessment',field:'managementCapability'},
           ].map(ind=>(
             <div key={ind.name} style={{marginBottom:'1rem',paddingBottom:'1rem',borderBottom:`1px solid ${C.border}`}}>
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}><span style={{fontWeight:600,fontSize:'0.88rem',color:C.navy}}>{ind.name}</span><span style={{fontFamily:'monospace',fontWeight:700,color:ind.sc>=3?C.green:ind.sc>=2?C.amber:C.red}}>{ind.sc}/{ind.max}</span></div>
@@ -3172,13 +3184,15 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
       )}
 
       {activeSection==='liquidity_readiness'&&(() => {
-        const capital = config.settings.capital_structure
-        const capitalAtRisk = (capital?.shareholder_contribution||0) + (capital?.grant_recoverable||0)
-        const cashFlows = buildInvestmentCashFlows(capitalAtRisk, result.cf.op_cash, result.cf.inv_cash)
+        // Reuses capitalAtRisk/lrsCashFlows/lrsAnnualIrr already computed
+        // once above for the LRS time series -- IRR is an iterative
+        // Newton-Raphson/bisection routine, so recomputing it here under
+        // different names would be wasted work with a real risk of the
+        // two silently drifting apart. NPV still needs its own
+        // calculation since it depends on the adjustable discountRate.
         const monthlyDiscountRate = annualRateToMonthlyRate(discountRate)
-        const npv = computeNPV(cashFlows, monthlyDiscountRate)
-        const monthlyIrr = computeIRR(cashFlows)
-        const irr = monthlyIrr !== null ? monthlyRateToAnnualRate(monthlyIrr) : null
+        const npv = computeNPV(lrsCashFlows, monthlyDiscountRate)
+        const irr = lrsAnnualIrr
         const growth = computeCustomerGrowthSummary(events)
         const dimLabels: [keyof typeof lrsCurrent.dimensions, string][] = [
           ['marketOpportunity','Market Opportunity'],['visibility','Visibility'],['trust','Trust'],
@@ -3290,12 +3304,10 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
             model -- these are the only figures a human judgement call, not a calculation.
           </p>
           {[
-            {group:'Feeds: Going Concern', items:[
-              {label:'Management Capability',field:'managementCapability',max:4},
-            ]},
-            {group:'Feeds: Liquidity Readiness — Market Opportunity', items:[
-              {label:'Total Addressable Market',field:'totalAddressableMarket',max:5},
-              {label:'Repeat Customers',field:'repeatCustomers',max:5},
+            {group:'Feeds: Going Concern and Investment Readiness', items:[
+              {label:'Management Capability',field:'managementCapability',max:5},
+              {label:'Commercial Model Clarity',field:'commercialModel',max:5},
+              {label:'Market Evidence',field:'marketEvidence',max:5},
             ]},
             {group:'Feeds: Liquidity Readiness — Visibility', items:[
               {label:'KPI Reporting',field:'kpiReporting',max:5},
@@ -3306,7 +3318,6 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
               {label:'Governance & Record-Keeping',field:'governance',max:5},
             ]},
             {group:'Feeds: Liquidity Readiness — Capacity', items:[
-              {label:'Commercial Model Clarity',field:'commercialModel',max:5},
               {label:'Production Capacity',field:'productionCapacity',max:5},
               {label:'Inventory Availability',field:'inventoryAvailability',max:5},
             ]},
@@ -3327,10 +3338,10 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
                 {section.items.map(item=>(
                   <div key={item.field}>
                     <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}>
-                      <label style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{item.label}</label>
-                      <span style={{fontFamily:'monospace',fontWeight:700,color:C.cyan}}>{Number((assess as any)[item.field])||2}/{item.max}</span>
+                      <label htmlFor={`assess-${item.field}`} style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{item.label}</label>
+                      <span style={{fontFamily:'monospace',fontWeight:700,color:C.cyan}}>{(assess as any)[item.field] ?? 2}/{item.max}</span>
                     </div>
-                    <input type="range" min="0" max={item.max} step="1" value={(assess as any)[item.field]||2} onChange={e=>updateAssess(item.field,Number(e.target.value))} style={{width:'100%',accentColor:C.cyan,marginBottom:'0.2rem'}}/>
+                    <input id={`assess-${item.field}`} type="range" min="0" max={item.max} step="1" value={(assess as any)[item.field] ?? 2} onChange={e=>updateAssess(item.field,Number(e.target.value))} style={{width:'100%',accentColor:C.cyan,marginBottom:'0.2rem'}}/>
                   </div>
                 ))}
               </div>
@@ -4043,7 +4054,7 @@ function PromotionEventsSection({clientId,config,cc,P,events,setEvents}) {
   eventYears.forEach(year => {
     const byMonth: Record<string, any[]> = {}
     eventsByYear[year].forEach((evt:any) => {
-      const monthLabel = new Date(evt.date).toLocaleString('en-GB', { month: 'short' })
+      const monthLabel = new Date(evt.date).toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })
       if (!byMonth[monthLabel]) byMonth[monthLabel] = []
       byMonth[monthLabel].push(evt)
     })
