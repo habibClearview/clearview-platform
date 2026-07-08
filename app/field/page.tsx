@@ -20,6 +20,10 @@ interface HistoryEntry {
   amount:number; quantity?:number; unit_price?:number; unit_label?:string; transaction_date:string;
   synced_at:string; notes?:string; price_alert?:boolean;
 }
+interface StockLevel {
+  id:string; catalogue_item_id:string; quantity_on_hand:number; reorder_threshold?:number;
+  catalogue?: { name:string; unit_label?:string }
+}
 interface AuthData {
   operator: { id:string; display_name:string; phone?:string; role:string; sync_frequency:string }
   client: { id:string; name:string; currency:string }
@@ -52,10 +56,16 @@ export default function FieldCapturePage() {
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string|null>(null)
   const [lastSync, setLastSync] = useState<string|null>(null)
-  const [mode, setMode] = useState<'grid'|'sale-detail'|'cost-form'|'history'>('grid')
+  const [mode, setMode] = useState<'grid'|'sale-detail'|'cost-form'|'history'|'stock'>('grid')
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState('')
+  const [stockLevels, setStockLevels] = useState<StockLevel[]>([])
+  const [stockLoading, setStockLoading] = useState(false)
+  const [stockError, setStockError] = useState('')
+  const [receivingItemId, setReceivingItemId] = useState<string|null>(null)
+  const [receiveQty, setReceiveQty] = useState('')
+  const [receiving, setReceiving] = useState(false)
   const [selectedItem, setSelectedItem] = useState<CatalogueItem|null>(null)
   const [saleForm, setSaleForm] = useState({quantity:'', payment_method:'cash', customer_id:'', notes:'', override:false, override_price:''})
   const [costForm, setCostForm] = useState({plan_line_id:'', amount:'', notes:''})
@@ -318,6 +328,46 @@ export default function FieldCapturePage() {
     setHistoryLoading(false)
   }
 
+  async function loadStock() {
+    if (!token) return
+    setMode('stock')
+    setStockLoading(true)
+    setStockError('')
+    try {
+      const res = await fetch(`/api/field/stock`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (res.ok) setStockLevels(data.stockLevels || [])
+      else setStockError(data.error || 'Could not load stock levels.')
+    } catch {
+      setStockError('No connection -- try again once you have signal.')
+    }
+    setStockLoading(false)
+  }
+
+  async function receiveStock(catalogueItemId: string) {
+    if (!token || !receiveQty || Number(receiveQty) <= 0) return
+    setReceiving(true)
+    try {
+      const res = await fetch('/api/field/stock', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, catalogue_item_id: catalogueItemId, movement_type: 'stock_in', quantity: Number(receiveQty) }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setReceivingItemId(null)
+        setReceiveQty('')
+        await loadStock()
+      } else {
+        alert(data.error || 'Could not record stock received.')
+      }
+    } catch {
+      alert('No connection -- could not record stock received. Please try again.')
+    }
+    setReceiving(false)
+  }
+
   useEffect(()=>{ syncNowRef.current = syncNow })
 
   if (!token) {
@@ -368,11 +418,19 @@ export default function FieldCapturePage() {
           <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',marginTop:'0.15rem'}}>{auth.unit.name}</div>
           <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.6)',marginTop:'0.1rem'}}>{auth.operator.display_name} · {auth.client.name}</div>
         </div>
-        {(mode==='grid' || mode==='history') && (
-          <button onClick={mode==='history'?()=>setMode('grid'):loadHistory}
-            style={{background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.25)',color:C.white,borderRadius:6,padding:'0.5rem 0.75rem',fontSize:'0.72rem',cursor:'pointer',whiteSpace:'nowrap'}}>
-            {mode==='history'?'← Back':'History'}
-          </button>
+        {(mode==='grid' || mode==='history' || mode==='stock') && (
+          <div style={{display:'flex',gap:'0.5rem'}}>
+            {mode==='grid' && (
+              <button onClick={loadStock}
+                style={{background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.25)',color:C.white,borderRadius:6,padding:'0.5rem 0.75rem',fontSize:'0.72rem',cursor:'pointer',whiteSpace:'nowrap'}}>
+                Stock
+              </button>
+            )}
+            <button onClick={mode==='grid'?loadHistory:()=>setMode('grid')}
+              style={{background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.25)',color:C.white,borderRadius:6,padding:'0.5rem 0.75rem',fontSize:'0.72rem',cursor:'pointer',whiteSpace:'nowrap'}}>
+              {mode==='grid'?'History':'← Back'}
+            </button>
+          </div>
         )}
       </header>
 
@@ -583,6 +641,54 @@ export default function FieldCapturePage() {
                 {entry.price_alert && <div style={{fontSize:'0.68rem',color:C.amber,marginTop:'0.4rem'}}>⚠ Price was overridden from the standard catalogue price</div>}
               </div>
             ))}
+          </div>
+        )}
+
+        {mode==='stock' && (
+          <div>
+            <div style={{fontWeight:700,fontSize:'1rem',color:C.navy,marginBottom:'0.85rem'}}>Stock on Hand</div>
+            {stockLoading && <div style={{textAlign:'center',color:C.slate,padding:'2rem',fontSize:'0.85rem'}}>Loading...</div>}
+            {!stockLoading && stockError && (
+              <div style={{background:'#FDF2F0',border:`1px solid ${C.red}`,borderRadius:8,padding:'1rem',color:C.red,fontSize:'0.85rem'}}>{stockError}</div>
+            )}
+            {!stockLoading && !stockError && stockLevels.length===0 && (
+              <div style={{textAlign:'center',color:C.slate,padding:'2rem',fontSize:'0.85rem'}}>No stock recorded yet. Record a sale or receive stock for a catalogue item to start tracking it here.</div>
+            )}
+            {!stockLoading && !stockError && stockLevels.map(level=>{
+              const low = level.reorder_threshold != null && level.quantity_on_hand <= level.reorder_threshold
+              return (
+                <div key={level.id} style={{background:C.white,border:`1px solid ${low?C.amber:C.border}`,borderRadius:8,padding:'0.85rem 1rem',marginBottom:'0.6rem'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>{level.catalogue?.name || 'Item'}</div>
+                      {low && <div style={{fontSize:'0.68rem',color:C.amber,marginTop:'0.1rem'}}>⚠ At or below reorder threshold ({level.reorder_threshold})</div>}
+                    </div>
+                    <div style={{fontFamily:'monospace',fontWeight:700,fontSize:'1rem',color:C.navy,whiteSpace:'nowrap'}}>
+                      {level.quantity_on_hand}{level.catalogue?.unit_label?` ${level.catalogue.unit_label}`:''}
+                    </div>
+                  </div>
+                  {receivingItemId===level.catalogue_item_id ? (
+                    <div style={{display:'flex',gap:'0.5rem',marginTop:'0.6rem'}}>
+                      <input type="number" autoFocus value={receiveQty} onChange={e=>setReceiveQty(e.target.value)}
+                        placeholder="Quantity received" style={{flex:1,padding:'0.5rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'0.82rem'}}/>
+                      <button disabled={receiving} onClick={()=>receiveStock(level.catalogue_item_id)}
+                        style={{padding:'0.5rem 0.85rem',background:C.teal,color:C.white,border:'none',borderRadius:6,fontSize:'0.78rem',cursor:'pointer',fontWeight:600}}>
+                        {receiving?'Saving...':'Confirm'}
+                      </button>
+                      <button onClick={()=>{setReceivingItemId(null);setReceiveQty('')}}
+                        style={{padding:'0.5rem 0.85rem',background:'transparent',color:C.slate,border:`1px solid ${C.border}`,borderRadius:6,fontSize:'0.78rem',cursor:'pointer'}}>
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={()=>{setReceivingItemId(level.catalogue_item_id);setReceiveQty('')}}
+                      style={{marginTop:'0.6rem',padding:'0.4rem 0.75rem',background:'transparent',color:C.teal,border:`1px solid ${C.teal}`,borderRadius:6,fontSize:'0.75rem',cursor:'pointer',fontWeight:600}}>
+                      + Receive Stock
+                    </button>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

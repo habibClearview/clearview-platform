@@ -3,6 +3,7 @@ import { friendlyDbError } from '@/lib/field-errors'
 import { buildAutoCogsRow } from '@/lib/field-cogs'
 import { isPlanLineValidForUnit, isValidCostCategory } from '@/lib/catalogue-validation'
 import { getFieldSupabase as getSupabase, validateFieldToken as validateToken } from '@/lib/field-auth'
+import { applyStockMovement } from '@/lib/field-stock'
 
 // A bulk override is flagged if it deviates from the catalogue's standard
 // price by more than this fraction -- surfaced back to the operator's app
@@ -225,6 +226,52 @@ export async function POST(req: NextRequest) {
           syncedLocalIds.length = 0
         }
         else txSynced = insertedTx?.length ?? 0
+
+        // Decrement stock for every sale that was actually written (not
+        // ones skipped as duplicates or rejected by validation above).
+        // Processed sequentially against an in-memory running balance
+        // seeded from the database, since multiple sales of the same
+        // catalogue item can appear in one sync batch -- each reading
+        // field_stock_levels independently would miss the others' effect
+        // within the same call.
+        if (!txErr) {
+          const saleRows = rows.filter((r: any) => r.transaction_type === 'sale' && r.catalogue_item_id)
+          if (saleRows.length > 0) {
+            const itemIds = Array.from(new Set(saleRows.map((r: any) => r.catalogue_item_id)))
+            const { data: levels } = await supabase
+              .from('field_stock_levels')
+              .select('id, catalogue_item_id, quantity_on_hand')
+              .eq('business_unit_id', operator.business_unit_id)
+              .in('catalogue_item_id', itemIds)
+            const runningBalance = new Map<string, number>()
+            const levelIdByItem = new Map<string, string>()
+            ;(levels || []).forEach((l: any) => { runningBalance.set(l.catalogue_item_id, l.quantity_on_hand); levelIdByItem.set(l.catalogue_item_id, l.id) })
+
+            const movementRows: any[] = []
+            for (const r of saleRows) {
+              const current = runningBalance.get(r.catalogue_item_id) ?? 0
+              const next = applyStockMovement(current, 'sale', r.quantity)
+              runningBalance.set(r.catalogue_item_id, next)
+              movementRows.push({
+                client_id: operator.client_id, business_unit_id: operator.business_unit_id,
+                catalogue_item_id: r.catalogue_item_id, movement_type: 'sale', quantity: r.quantity,
+                reference_id: r.local_id || null, operator_id: operator.id,
+              })
+            }
+            const { error: stockMoveErr } = await supabase.from('field_stock_movements').insert(movementRows)
+            if (stockMoveErr) technicalErrors.push(`Stock movement insert error: ${stockMoveErr.message}`)
+            // Best-effort: stock level upserts failing doesn't undo the
+            // sale itself (which already synced successfully) -- logged,
+            // not surfaced as a sync failure to the operator.
+            for (const itemId of itemIds) {
+              const { error: levelErr } = await supabase.from('field_stock_levels').upsert({
+                id: levelIdByItem.get(itemId), client_id: operator.client_id, business_unit_id: operator.business_unit_id,
+                catalogue_item_id: itemId, quantity_on_hand: runningBalance.get(itemId), updated_at: new Date().toISOString(),
+              }, { onConflict: 'business_unit_id,catalogue_item_id' })
+              if (levelErr) technicalErrors.push(`Stock level upsert error: ${levelErr.message}`)
+            }
+          }
+        }
       }
     }
 
