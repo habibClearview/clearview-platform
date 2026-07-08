@@ -148,10 +148,12 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
           : cellStr(pf, `C${WHICH_PART_ROW}`)
 
         // Find month columns
-        // New template: headers in row 6, data starts col C (col index 3, 1-based)
-        // Old template: HEADER_ROW and MONTH_START_COL constants
+        // New template: headers in row 6, data starts col C
+        // (colLetter(2) = 'C' -- verified directly against real uploaded
+        // files: row 6 has Category/Figure Type in columns A/B, then
+        // M-3, M-2, M-1... starting at column C, index 2, not 3).
         const headerRow = isNewTemplate ? 6 : HEADER_ROW
-        const monthStartCol = isNewTemplate ? 3 : MONTH_START_COL
+        const monthStartCol = isNewTemplate ? 2 : MONTH_START_COL
 
         let monthCols: number[] = []
         let thisMonthColIdx = -1
@@ -195,13 +197,16 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
 
         if (isNewTemplate) {
           // New template v7: paired rows
-          // Revenue section starts after 2 header rows (row 8 = section header, row 9 = note)
-          // Row 10 onwards: each product = 2 rows (rev row + cog row)
+          // Row 8 = "REVENUE — PRODUCT CATEGORIES" section header + note.
+          // Row 9 onwards: each product = 2 rows (rev row + cog row).
+          // Verified directly against a real uploaded file: the first
+          // product's "Sales Revenue" row is 9, not 10 -- row 10 is
+          // already that product's "Cost of Goods" row.
           // Product name is in Col A (merged across both rows)
           // Row type in Col B: "Sales Revenue" or "Cost of Goods"
-          // Data starts Col C (col 3)
-          // Scan rows 10 to 10+(N_REV*2) for revenue section
-          const revSectionStart = 10
+          // Data starts Col C (col index 2)
+          // Scan rows 9 to 9+(N_REV*2) for revenue section
+          const revSectionStart = 9
           const N_REV = 8
 
           for (let i = 0; i < N_REV; i++) {
@@ -224,9 +229,12 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
             allProducts.push({ name, costLines, revenue, unitName: resolvedUnitName })
           }
 
-          // Staff section: find it after revenue section
-          // Row 10 + N_REV*2 + 2 (section header + spacer) = staff section
-          const staffSectionStart = revSectionStart + (N_REV * 2) + 2
+          // Staff section: after the revenue section there are 2 blank
+          // spacer rows, then 1 "STAFF COSTS" section-header/note row,
+          // then the first real staff data row -- verified directly
+          // against a real uploaded file (revenue rows 9-24, blank
+          // 25-26, header 27, first staff data row 28).
+          const staffSectionStart = revSectionStart + (N_REV * 2) + 3
           for (let i = 0; i < 4; i++) {
             const row = staffSectionStart + i
             const name = cellStr(pf, `A${row}`)
@@ -236,8 +244,10 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
             }
           }
 
-          // Overheads section
-          const opexSectionStart = staffSectionStart + 4 + 2
+          // Overheads section: same pattern -- 2 blank rows + 1
+          // "DIRECT OVERHEADS" header/note row before the first real
+          // data row.
+          const opexSectionStart = staffSectionStart + 4 + 3
           for (let i = 0; i < 4; i++) {
             const row = opexSectionStart + i
             const name = cellStr(pf, `A${row}`)
