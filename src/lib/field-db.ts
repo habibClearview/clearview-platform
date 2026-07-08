@@ -43,9 +43,21 @@ export interface QueuedCost {
   queued_at: number
 }
 
+// A cost that doesn't match any existing cost line in this operator's
+// catalogue -- no plan_line_id at all. Categorization is delegated to
+// a coach/CEO via the dashboard review queue once synced.
+export interface QueuedUncategorizedCost {
+  local_id: string
+  description: string
+  amount: number
+  transaction_date: string
+  queued_at: number
+}
+
 class FieldQueueDB extends Dexie {
   sales!: Table<QueuedSale, string>
   costs!: Table<QueuedCost, string>
+  uncategorizedCosts!: Table<QueuedUncategorizedCost, string>
   meta!: Table<{ key: string; value: string }, string>
 
   // ⚠️ SCHEMA MUST STAY IN SYNC WITH public/field-sw.js ⚠️
@@ -60,6 +72,16 @@ class FieldQueueDB extends Dexie {
     this.version(1).stores({
       sales: 'local_id, queued_at',
       costs: 'local_id, queued_at',
+      meta: 'key',
+    })
+    // v2 adds uncategorized_costs (delegated categorization) -- existing
+    // installs upgrade automatically; Dexie keeps every store declared in
+    // version(1) unless explicitly removed, so sales/costs/meta carry
+    // forward untouched.
+    this.version(2).stores({
+      sales: 'local_id, queued_at',
+      costs: 'local_id, queued_at',
+      uncategorizedCosts: 'local_id, queued_at',
       // Service Workers can't read localStorage -- the auth token needs to
       // live somewhere the sync event handler in public/field-sw.js can
       // reach it too. IndexedDB is shared between the page and the SW.
@@ -83,6 +105,11 @@ export async function addQueuedCost(cost: Omit<QueuedCost, 'queued_at'>): Promis
   await fieldDB.costs.add({ ...cost, queued_at: Date.now() })
 }
 
+export async function addQueuedUncategorizedCost(cost: Omit<QueuedUncategorizedCost, 'queued_at'>): Promise<void> {
+  if (!fieldDB) return
+  await fieldDB.uncategorizedCosts.add({ ...cost, queued_at: Date.now() })
+}
+
 export async function listQueuedSales(): Promise<QueuedSale[]> {
   if (!fieldDB) return []
   return fieldDB.sales.orderBy('queued_at').toArray()
@@ -91,6 +118,11 @@ export async function listQueuedSales(): Promise<QueuedSale[]> {
 export async function listQueuedCosts(): Promise<QueuedCost[]> {
   if (!fieldDB) return []
   return fieldDB.costs.orderBy('queued_at').toArray()
+}
+
+export async function listQueuedUncategorizedCosts(): Promise<QueuedUncategorizedCost[]> {
+  if (!fieldDB) return []
+  return fieldDB.uncategorizedCosts.orderBy('queued_at').toArray()
 }
 
 export async function removeQueuedSale(localId: string): Promise<void> {
@@ -103,6 +135,11 @@ export async function removeQueuedCost(localId: string): Promise<void> {
   await fieldDB.costs.delete(localId)
 }
 
+export async function removeQueuedUncategorizedCost(localId: string): Promise<void> {
+  if (!fieldDB) return
+  await fieldDB.uncategorizedCosts.delete(localId)
+}
+
 export async function clearSyncedSales(localIds: string[]): Promise<void> {
   if (!fieldDB) return
   await fieldDB.sales.bulkDelete(localIds)
@@ -113,10 +150,15 @@ export async function clearSyncedCosts(localIds: string[]): Promise<void> {
   await fieldDB.costs.bulkDelete(localIds)
 }
 
-export async function queueCounts(): Promise<{ sales: number; costs: number }> {
-  if (!fieldDB) return { sales: 0, costs: 0 }
-  const [sales, costs] = await Promise.all([fieldDB.sales.count(), fieldDB.costs.count()])
-  return { sales, costs }
+export async function clearSyncedUncategorizedCosts(localIds: string[]): Promise<void> {
+  if (!fieldDB) return
+  await fieldDB.uncategorizedCosts.bulkDelete(localIds)
+}
+
+export async function queueCounts(): Promise<{ sales: number; costs: number; uncategorizedCosts: number }> {
+  if (!fieldDB) return { sales: 0, costs: 0, uncategorizedCosts: 0 }
+  const [sales, costs, uncategorizedCosts] = await Promise.all([fieldDB.sales.count(), fieldDB.costs.count(), fieldDB.uncategorizedCosts.count()])
+  return { sales, costs, uncategorizedCosts }
 }
 
 // Shared decision used by both the manual "Sync Now" button (app/field/page.tsx)

@@ -24,8 +24,8 @@
 // The openDB() check below fails loudly (throws, logged to the SW console)
 // rather than silently missing data if the two ever drift apart.
 const DB_NAME = 'clearview_field_queue'
-const DB_VERSION = 1
-const EXPECTED_STORES = ['sales', 'costs', 'meta'] // must match field-db.ts's stores: {...} keys
+const DB_VERSION = 2
+const EXPECTED_STORES = ['sales', 'costs', 'uncategorizedCosts', 'meta'] // must match field-db.ts's stores: {...} keys
 const CACHE_NAME = 'clearview-field-shell-v1'
 const SYNC_TAG = 'clearview-field-sync'
 
@@ -137,8 +137,8 @@ async function flushQueue() {
   const token = await getMeta(db, 'token')
   if (!token) return
 
-  const [sales, costs] = await Promise.all([getAll(db, 'sales'), getAll(db, 'costs')])
-  if (sales.length === 0 && costs.length === 0) return
+  const [sales, costs, uncategorizedCosts] = await Promise.all([getAll(db, 'sales'), getAll(db, 'costs'), getAll(db, 'uncategorizedCosts')])
+  if (sales.length === 0 && costs.length === 0 && uncategorizedCosts.length === 0) return
 
   const transactions = [
     ...sales.map((s) => ({
@@ -154,12 +154,15 @@ async function flushQueue() {
       transaction_date: c.transaction_date, notes: c.notes,
     })),
   ]
+  const uncategorized_costs = uncategorizedCosts.map((u) => ({
+    local_id: u.local_id, description: u.description, amount: u.amount, transaction_date: u.transaction_date,
+  }))
 
   try {
     const res = await fetch('/api/field/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, device_id: 'sw_background_sync', transactions }),
+      body: JSON.stringify({ token, device_id: 'sw_background_sync', transactions, uncategorized_costs }),
     })
     const data = await res.json()
     // This must stay behaviourally identical to app/field/page.tsx's
@@ -177,9 +180,11 @@ async function flushQueue() {
       const syncedIds = new Set(data.synced_local_ids || [])
       const salesToClear = sales.map((s) => s.local_id).filter((id) => syncedIds.has(id))
       const costsToClear = costs.map((c) => c.local_id).filter((id) => syncedIds.has(id))
+      const uncategorizedToClear = uncategorizedCosts.map((u) => u.local_id).filter((id) => syncedIds.has(id))
       if (salesToClear.length > 0) await deleteMany(db, 'sales', salesToClear)
       if (costsToClear.length > 0) await deleteMany(db, 'costs', costsToClear)
-      if (salesToClear.length > 0 || costsToClear.length > 0) {
+      if (uncategorizedToClear.length > 0) await deleteMany(db, 'uncategorizedCosts', uncategorizedToClear)
+      if (salesToClear.length > 0 || costsToClear.length > 0 || uncategorizedToClear.length > 0) {
         const clients = await self.clients.matchAll()
         clients.forEach((client) => client.postMessage({ type: 'field-sync-complete', synced_at: new Date().toISOString() }))
       }

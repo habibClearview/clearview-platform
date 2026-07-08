@@ -17,8 +17,10 @@ import 'fake-indexeddb/auto'
 import { describe, it, expect, beforeEach } from 'vitest'
 
 import {
-  addQueuedSale, addQueuedCost, listQueuedSales, listQueuedCosts,
-  removeQueuedSale, removeQueuedCost, clearSyncedSales, clearSyncedCosts,
+  addQueuedSale, addQueuedCost, addQueuedUncategorizedCost,
+  listQueuedSales, listQueuedCosts, listQueuedUncategorizedCosts,
+  removeQueuedSale, removeQueuedCost, removeQueuedUncategorizedCost,
+  clearSyncedSales, clearSyncedCosts, clearSyncedUncategorizedCosts,
   queueCounts, setStoredToken, getStoredToken, fieldDB,
 } from '../lib/field-db'
 
@@ -28,6 +30,7 @@ beforeEach(async () => {
   if (fieldDB) {
     await fieldDB.sales.clear()
     await fieldDB.costs.clear()
+    await fieldDB.uncategorizedCosts.clear()
     await fieldDB.meta.clear()
   }
 })
@@ -88,17 +91,46 @@ describe('Field offline queue — costs', () => {
   })
 })
 
+describe('Field offline queue — uncategorized costs (delegated categorization)', () => {
+  it('REG: an uncategorized cost can be added and then listed back, with no plan_line_id at all', async () => {
+    await addQueuedUncategorizedCost({ local_id: 'u1', description: 'Motorbike repair', amount: 35000, transaction_date: '2026-07-08' })
+    const costs = await listQueuedUncategorizedCosts()
+    expect(costs).toHaveLength(1)
+    expect(costs[0].description).toBe('Motorbike repair')
+    expect(costs[0].amount).toBe(35000)
+    expect((costs[0] as any).plan_line_id).toBeUndefined()
+  })
+
+  it('REG: removing an uncategorized cost by local_id works independently of the categorized costs queue', async () => {
+    await addQueuedCost({ local_id: 'cost_a', plan_line_id: 'pl1', plan_line_name: 'Transport', amount: 50000, transaction_date: '2026-07-04' })
+    await addQueuedUncategorizedCost({ local_id: 'u1', description: 'Something odd', amount: 10000, transaction_date: '2026-07-08' })
+    await removeQueuedUncategorizedCost('u1')
+    expect(await listQueuedUncategorizedCosts()).toHaveLength(0)
+    expect(await listQueuedCosts()).toHaveLength(1) // untouched
+  })
+
+  it('REG: clearSyncedUncategorizedCosts only removes the specific ids given, not everything', async () => {
+    await addQueuedUncategorizedCost({ local_id: 'u1', description: 'A', amount: 1000, transaction_date: '2026-07-08' })
+    await addQueuedUncategorizedCost({ local_id: 'u2', description: 'B', amount: 2000, transaction_date: '2026-07-08' })
+    await clearSyncedUncategorizedCosts(['u1'])
+    const remaining = await listQueuedUncategorizedCosts()
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0].local_id).toBe('u2')
+  })
+})
+
 describe('Field offline queue — counts', () => {
-  it('REG: queueCounts reflects both sales and costs independently', async () => {
+  it('REG: queueCounts reflects sales, costs, and uncategorized costs independently', async () => {
     await addQueuedSale({ local_id: 's1', catalogue_item_id: 'c1', item_name: 'X', item_type: 'product', standard_price: 100, quantity: 1, transaction_date: '2026-07-04' })
     await addQueuedSale({ local_id: 's2', catalogue_item_id: 'c1', item_name: 'X', item_type: 'product', standard_price: 100, quantity: 1, transaction_date: '2026-07-04' })
     await addQueuedCost({ local_id: 'c1', plan_line_id: 'pl1', plan_line_name: 'Transport', amount: 50000, transaction_date: '2026-07-04' })
+    await addQueuedUncategorizedCost({ local_id: 'u1', description: 'Odd cost', amount: 5000, transaction_date: '2026-07-08' })
     const counts = await queueCounts()
-    expect(counts).toEqual({ sales: 2, costs: 1 })
+    expect(counts).toEqual({ sales: 2, costs: 1, uncategorizedCosts: 1 })
   })
 
   it('REG: an empty queue reports zero counts, not an error', async () => {
-    expect(await queueCounts()).toEqual({ sales: 0, costs: 0 })
+    expect(await queueCounts()).toEqual({ sales: 0, costs: 0, uncategorizedCosts: 0 })
   })
 })
 

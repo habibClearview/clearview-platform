@@ -3810,9 +3810,98 @@ function MarginsTab({config,result,months,cc}) {
     </div>
   )
 }
+
+// Delegated categorization review queue: costs an operator recorded in
+// the field app that didn't match any existing cost line -- described
+// freely instead. A coach assigns each one to a real plan line here,
+// which promotes it into a genuine field_transactions row (so it flows
+// into the normal actuals aggregation) rather than it sitting outside
+// the numbers indefinitely.
+function UncategorizedCostsSection({config,P}:{config:GenericModelConfig;P:any}) {
+  const [pending, setPending] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [categorizingId, setCategorizingId] = useState<string|null>(null)
+  const [chosenLineId, setChosenLineId] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function load() {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/field/admin/uncategorized-costs?client_id=${encodeURIComponent(config.client_id)}`)
+      const data = await res.json()
+      if (res.ok) setPending(data.pendingCosts||[])
+    } catch { /* leave list as-is; shows empty rather than a broken page */ }
+    setLoading(false)
+  }
+  useEffect(()=>{ load() },[config.client_id])
+
+  const unitName = (id: string) => config.business_units.find(u=>u.id===id)?.name || id
+  const costLinesForUnit = (unitId: string) => config.plan_lines.filter(l=>l.unit_id===unitId&&l.active&&(l.category==='direct_opex'||l.category==='cost_of_sales'))
+
+  async function categorize(cost: any) {
+    if (!chosenLineId) { alert('Select a plan line first.'); return }
+    const line = config.plan_lines.find(l=>l.id===chosenLineId)
+    if (!line) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/field/admin/uncategorized-costs', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ uncategorized_cost_id: cost.id, plan_line_id: line.id, plan_line_name: line.name, category: line.category, categorized_by: P.fullName }),
+      })
+      const data = await res.json()
+      if (res.ok) { setCategorizingId(null); setChosenLineId(''); await load() }
+      else alert(data.error || 'Could not categorize this cost.')
+    } catch {
+      alert('No connection -- could not categorize this cost. Please try again.')
+    }
+    setSaving(false)
+  }
+
+  return (
+    <div style={card}>
+      <div style={secH}>Needs Categorizing</div>
+      <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1rem',lineHeight:1.6}}>
+        Costs recorded in the field app that didn't match any existing cost line -- an operator described what happened,
+        and it's waiting for you to assign it to the right category. Until then, it isn't counted in any financial statement.
+      </p>
+      {loading ? (
+        <p style={{color:C.slate,fontSize:'0.85rem'}}>Loading...</p>
+      ) : pending.length===0 ? (
+        <p style={{color:C.slate,fontSize:'0.85rem'}}>Nothing waiting -- every field-recorded cost has a category.</p>
+      ) : (
+        pending.map(cost=>(
+          <div key={cost.id} style={{background:C.cream,border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1rem',marginBottom:'0.6rem'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'0.5rem'}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:'0.9rem',color:C.navy}}>{cost.description}</div>
+                <div style={{fontSize:'0.75rem',color:C.slate,marginTop:'0.15rem'}}>{unitName(cost.business_unit_id)} · {cost.transaction_date}</div>
+              </div>
+              <div style={{fontFamily:'monospace',fontWeight:700,fontSize:'0.95rem',color:C.red,whiteSpace:'nowrap'}}>{fmt(cost.amount,config.currency)}</div>
+            </div>
+            {categorizingId===cost.id ? (
+              <div style={{display:'flex',gap:'0.5rem',marginTop:'0.6rem'}}>
+                <select style={{flex:1,padding:'0.4rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.8rem'}} value={chosenLineId} onChange={e=>setChosenLineId(e.target.value)}>
+                  <option value="">Select the right category...</option>
+                  {costLinesForUnit(cost.business_unit_id).map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+                <button type="button" disabled={saving} style={addBtn(true)} onClick={()=>categorize(cost)}>{saving?'Saving...':'Confirm'}</button>
+                <button type="button" style={addBtn(true,C.slate)} onClick={()=>{setCategorizingId(null);setChosenLineId('')}}>Cancel</button>
+              </div>
+            ) : (
+              <button type="button" style={{marginTop:'0.6rem',padding:'0.4rem 0.75rem',background:'transparent',color:C.teal,border:`1px solid ${C.teal}`,borderRadius:6,fontSize:'0.75rem',cursor:'pointer',fontWeight:600}} onClick={()=>setCategorizingId(cost.id)}>
+                Categorize
+              </button>
+            )}
+          </div>
+        ))
+      )}
+    </div>
+  )
+}
+
 // ── ACTUALS & WORKING CAPITAL TAB (toggle between two existing components) ──
 function ActualsAndWorkingCapitalTab({config,result,months,cc,P,onSave,onCloseStatusChanged}) {
-  const [mode, setMode] = useState<'actuals'|'workingcapital'>('actuals')
+  const [mode, setMode] = useState<'actuals'|'workingcapital'|'uncategorized'>('actuals')
   return (
     <div>
       <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
@@ -3824,9 +3913,14 @@ function ActualsAndWorkingCapitalTab({config,result,months,cc,P,onSave,onCloseSt
           background:mode==='workingcapital'?C.navy:C.white,color:mode==='workingcapital'?C.white:C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:mode==='workingcapital'?700:400}}
           onClick={()=>setMode('workingcapital')}>Working Capital (Trade Credit)</button>
+        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+          background:mode==='uncategorized'?C.navy:C.white,color:mode==='uncategorized'?C.white:C.slate,
+          borderRadius:4,cursor:'pointer',fontWeight:mode==='uncategorized'?700:400}}
+          onClick={()=>setMode('uncategorized')}>Needs Categorizing</button>
       </div>
       {mode==='actuals' && <ActualsTab config={config} months={months} cc={cc} P={P} onSave={onSave} onCloseStatusChanged={onCloseStatusChanged}/>}
       {mode==='workingcapital' && <WorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={onSave}/>}
+      {mode==='uncategorized' && <UncategorizedCostsSection config={config} P={P}/>}
     </div>
   )
 }

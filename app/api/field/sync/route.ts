@@ -14,7 +14,7 @@ const PRICE_ALERT_THRESHOLD = 0.10
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { token, device_id, transactions = [], credit_transactions = [] } = body
+    const { token, device_id, transactions = [], credit_transactions = [], uncategorized_costs = [] } = body
 
     if (!token) return NextResponse.json({ error: 'Token required' }, { status: 400 })
 
@@ -316,6 +316,41 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Uncategorized costs: a genuinely new kind of cost that doesn't
+    // match any existing cost line in this operator's catalogue. No
+    // plan_line_id at all -- deliberately a separate table
+    // (field_uncategorized_costs), not a nullable plan_line_id on
+    // field_transactions, since every downstream calculation assumes
+    // that column is always present and valid. Categorization is
+    // delegated to a coach/CEO via the dashboard review queue.
+    let uncategorizedSynced = 0
+    if (uncategorized_costs.length > 0) {
+      const validUncategorized = uncategorized_costs.filter((u: any) => {
+        if (!u.description) { errors.push('Uncategorized cost missing description'); return false }
+        if (u.amount === undefined || u.amount === null) { errors.push('Uncategorized cost missing amount'); return false }
+        return true
+      })
+      if (validUncategorized.length > 0) {
+        const rows = validUncategorized.map((u: any) => ({
+          client_id: operator.client_id, business_unit_id: operator.business_unit_id,
+          description: u.description, amount: Number(u.amount),
+          transaction_date: u.transaction_date || new Date().toISOString().split('T')[0],
+          operator_id: operator.id,
+        }))
+        const { data: insertedUncategorized, error: uncategorizedErr } = await supabase
+          .from('field_uncategorized_costs')
+          .insert(rows)
+          .select('id')
+        if (uncategorizedErr) {
+          technicalErrors.push(`Uncategorized cost insert error: ${uncategorizedErr.message}`); errors.push(friendlyDbError(uncategorizedErr.message))
+        } else {
+          uncategorizedSynced = insertedUncategorized?.length ?? 0
+          for (const u of validUncategorized) { if (u.local_id) syncedLocalIds.push(u.local_id) }
+        }
+      }
+    }
+
+
     // Runs whenever ANY transaction was attempted, not just newly-inserted
     // ones (txSynced > 0 would miss this). Why it matters: if aggregation
     // fails once (e.g. a transient DB error) after rows were successfully
@@ -361,6 +396,7 @@ export async function POST(req: NextRequest) {
       success: true,
       transactions_synced: txSynced,
       credit_synced: creditSynced,
+      uncategorized_synced: uncategorizedSynced,
       errors: errors.length > 0 ? errors : undefined,
       price_alerts: priceAlerts.length > 0 ? priceAlerts : undefined,
       synced_at: new Date().toISOString(),
