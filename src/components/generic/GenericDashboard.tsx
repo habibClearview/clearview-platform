@@ -1,6 +1,8 @@
 // @ts-nocheck
 'use client'
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import QRCode from 'qrcode'
+import { mostRecentTokenUse } from '@/lib/field-auth'
 import { supabase } from '@/lib/supabase'
 import {
   fmt, fmtFull, pct, buildMonthLabels, buildYearGroups, collapseYear, defaultExpandedYears, extendPlanningHorizon, type YearAggregation, type YearGroup,
@@ -2223,6 +2225,186 @@ function ExtendHorizonControl({form,setForm}:{form:GenericModelConfig;setForm:(n
   )
 }
 
+// Field operator management -- lists every operator for this client,
+// lets a CEO/coach create new ones (issuing a token immediately),
+// activate/deactivate, and issue a fresh token. The backend
+// (/api/field/admin/operators) already fully supported all of this;
+// this was purely a missing UI -- operators previously could only be
+// created via direct database access.
+function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;businessUnits:{id:string;name:string;active:boolean}[]}) {
+  const [operators, setOperators] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [form, setForm] = useState({display_name:'', phone:'', business_unit_id:'', sync_frequency:'realtime'})
+  const [newLink, setNewLink] = useState<{operatorName:string; url:string; qrDataUrl:string}|null>(null)
+  const [busyId, setBusyId] = useState<string|null>(null)
+
+  async function load() {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/field/admin/operators?client_id=${encodeURIComponent(clientId)}`)
+      const data = await res.json()
+      if (res.ok) setOperators(data.operators||[])
+    } catch { /* leave operators as-is; the list below shows empty rather than a broken page */ }
+    setLoading(false)
+  }
+  useEffect(()=>{ load() },[clientId])
+
+  async function buildShareLink(operatorName: string, token: string) {
+    const url = `${window.location.origin}/field?token=${encodeURIComponent(token)}`
+    const qrDataUrl = await QRCode.toDataURL(url, { width: 220, margin: 1 })
+    setNewLink({operatorName, url, qrDataUrl})
+  }
+
+  async function createOperator() {
+    if (!form.display_name || !form.business_unit_id) { alert('Name and business unit are required.'); return }
+    setCreating(true)
+    try {
+      const res = await fetch('/api/field/admin/operators', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({client_id: clientId, ...form}),
+      })
+      const data = await res.json()
+      if (!res.ok) { alert(data.error || 'Could not create operator.'); setCreating(false); return }
+      setForm({display_name:'', phone:'', business_unit_id:'', sync_frequency:'realtime'})
+      setShowForm(false)
+      await load()
+      if (data.token?.token) await buildShareLink(form.display_name, data.token.token)
+    } catch {
+      alert('No connection -- could not create operator. Please try again.')
+    }
+    setCreating(false)
+  }
+
+  async function toggleActive(operatorId: string, active: boolean) {
+    setBusyId(operatorId)
+    try {
+      const res = await fetch('/api/field/admin/operators', {
+        method: 'PATCH', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({operator_id: operatorId, active}),
+      })
+      if (res.ok) await load()
+      else { const d = await res.json(); alert(d.error || 'Could not update operator.') }
+    } catch {
+      alert('No connection -- could not update operator. Please try again.')
+    }
+    setBusyId(null)
+  }
+
+  async function issueNewToken(operatorId: string, operatorName: string) {
+    setBusyId(operatorId)
+    try {
+      const res = await fetch('/api/field/admin/operators', {
+        method: 'PATCH', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({operator_id: operatorId, issue_new_token: true}),
+      })
+      const data = await res.json()
+      if (res.ok && data.token?.token) { await load(); await buildShareLink(operatorName, data.token.token) }
+      else alert(data.error || 'Could not issue a new token.')
+    } catch {
+      alert('No connection -- could not issue a new token. Please try again.')
+    }
+    setBusyId(null)
+  }
+
+  const unitName = (id: string) => businessUnits.find(u=>u.id===id)?.name || id
+
+  return (
+    <div style={card}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+        <div style={secH}>Field Operators</div>
+        <button type="button" style={addBtn(true)} onClick={()=>setShowForm(!showForm)}>{showForm?'Cancel':'+ New Operator'}</button>
+      </div>
+      <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1rem',lineHeight:1.6}}>
+        Create an operator to give them access to Clearview Field for one business unit. Each operator gets their own
+        access link and QR code -- share either one to get them started; no login or password needed.
+      </p>
+
+      {showForm && (
+        <div style={{background:C.cream,borderRadius:6,padding:'1rem',marginBottom:'1.25rem'}}>
+          <div style={fGrid}>
+            <div><label style={lbl}>Operator Name</label>
+              <input style={inp} value={form.display_name} onChange={e=>setForm(f=>({...f,display_name:e.target.value}))} placeholder="e.g. Grace Nakato"/>
+            </div>
+            <div><label style={lbl}>Phone (optional)</label>
+              <input style={inp} value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="e.g. 0772 123 456"/>
+            </div>
+            <div><label style={lbl}>Business Unit</label>
+              <select style={inp} value={form.business_unit_id} onChange={e=>setForm(f=>({...f,business_unit_id:e.target.value}))}>
+                <option value="">Select a unit...</option>
+                {businessUnits.filter(u=>u.active).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+            <div><label style={lbl}>Sync Frequency</label>
+              <select style={inp} value={form.sync_frequency} onChange={e=>setForm(f=>({...f,sync_frequency:e.target.value}))}>
+                <option value="realtime">Real-time (as entered)</option>
+                <option value="end_of_day">Once at end of day</option>
+                <option value="daily">Once daily</option>
+              </select>
+            </div>
+          </div>
+          <button type="button" style={{...solidBtn(C.navy),marginTop:'0.75rem'}} disabled={creating} onClick={createOperator}>{creating?'Creating...':'Create Operator & Generate Link'}</button>
+        </div>
+      )}
+
+      {newLink && (
+        <div style={{background:'#EAFAF6',border:`1px solid ${C.teal}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}}>
+          <div style={{fontWeight:700,color:C.navy,marginBottom:'0.75rem'}}>Access link for {newLink.operatorName}</div>
+          <div style={{display:'flex',gap:'1.25rem',alignItems:'flex-start',flexWrap:'wrap'}}>
+            <img src={newLink.qrDataUrl} alt={`QR code for ${newLink.operatorName}'s field access link`} style={{borderRadius:6,border:`1px solid ${C.border}`}}/>
+            <div style={{flex:1,minWidth:240}}>
+              <div style={{fontSize:'0.78rem',color:C.slate,marginBottom:'0.4rem'}}>Share this link directly, or have them scan the QR code:</div>
+              <div style={{display:'flex',gap:'0.5rem'}}>
+                <input readOnly style={{...inp,fontFamily:'monospace',fontSize:'0.75rem'}} value={newLink.url} onFocus={e=>e.target.select()}/>
+                <button type="button" style={addBtn(true)} onClick={()=>{navigator.clipboard.writeText(newLink.url)}}>Copy</button>
+              </div>
+              <button type="button" style={{...addBtn(true,C.slate),marginTop:'0.75rem'}} onClick={()=>setNewLink(null)}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <p style={{color:C.slate,fontSize:'0.85rem'}}>Loading...</p>
+      ) : operators.length===0 ? (
+        <p style={{color:C.slate,fontSize:'0.85rem'}}>No field operators yet. Create one above to get started.</p>
+      ) : (
+        <div style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.82rem'}}>
+            <thead>
+              <tr style={{background:C.navy,color:C.white}}>
+                {['Name','Unit','Phone','Status','Last Synced',''].map(h=>(
+                  <th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.75rem'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {operators.map((op:any,i:number)=>(
+                <tr key={op.id} style={{background:i%2===0?C.cream:C.white}}>
+                  <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{op.display_name}</td>
+                  <td style={{padding:'8px 10px'}}>{unitName(op.business_unit_id)}</td>
+                  <td style={{padding:'8px 10px',color:C.slate}}>{op.phone||'—'}</td>
+                  <td style={{padding:'8px 10px'}}><Badge text={op.active?'Active':'Inactive'} color={op.active?C.green:C.slate}/></td>
+                  <td style={{padding:'8px 10px',color:C.slate,fontSize:'0.75rem'}}>{mostRecentTokenUse(op.tokens) ? new Date(mostRecentTokenUse(op.tokens)!).toLocaleString() : 'Never'}</td>
+                  <td style={{padding:'8px 10px',whiteSpace:'nowrap'}}>
+                    <button type="button" disabled={busyId===op.id} style={{...addBtn(true,C.slate),marginRight:'0.4rem'}} onClick={()=>toggleActive(op.id,!op.active)}>
+                      {busyId===op.id?'...':op.active?'Deactivate':'Reactivate'}
+                    </button>
+                    <button type="button" disabled={busyId===op.id} style={addBtn(true)} onClick={()=>issueNewToken(op.id,op.display_name)}>
+                      New Link
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function SettingsTab({config,P,onSave}) {
   const [form, setForm] = useState({...config})
   const [saving, setSaving] = useState(false)
@@ -2251,7 +2433,7 @@ function SettingsTab({config,P,onSave}) {
     setForm(f=>({...f,business_units:[...f.business_units,newUnit]}))
   }
 
-  const sections = [['general','General'],['units','Business Units'],['capital','Capital Structure'],['credit','Debt Obligations'],['delegation','Approval Delegation']]
+  const sections = [['general','General'],['units','Business Units'],['capital','Capital Structure'],['credit','Debt Obligations'],['delegation','Approval Delegation'],['field_operators','Field Operators']]
 
   return (
     <div>
@@ -2421,6 +2603,8 @@ function SettingsTab({config,P,onSave}) {
           </div>
         </div>
       )}
+
+      {activeSection==='field_operators'&&<FieldOperatorsSection clientId={config.client_id} businessUnits={config.business_units}/>}
 
       <div style={{marginTop:'1.25rem',display:'flex',gap:'0.75rem'}}>
         <button style={solidBtn(C.navy)} disabled={saving} onClick={save}>{saving?'Saving...':'Save All Settings'}</button>
