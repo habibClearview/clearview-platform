@@ -977,52 +977,36 @@ describe('collapseYear — endOfPeriod and startOfPeriod aggregation (Balance Sh
   })
 })
 
-describe('collapseYear — weightedAverage aggregation (per-unit prices and rates, e.g. Buy Price, Fee per Engagement)', () => {
-  it('REG: the exact scenario that motivated this fix -- volume-weighted, not a naive mean of monthly prices', () => {
-    // 1,000 units at 5,000 in month 0; 10 units at 8,000 in month 1.
-    // A naive mean would say 6,500 -- nowhere close to reality. The
-    // correct weighted average is total cost / total volume:
-    // (1000*5000 + 10*8000) / (1000+10) = 5,080,000 / 1,010 ≈ 5029.7
-    const prices = [5000, 8000]
-    const volumes = [1000, 10]
-    const result = collapseYear(prices, undefined, [0,1], 'weightedAverage', volumes)
-    expect(result.value).toBeCloseTo(5080000/1010, 2)
-    expect(result.value).not.toBeCloseTo(6500, 0) // the wrong, naive answer
+describe('collapseYear — a per-unit price or rate row (Buy Price, Fee per Engagement) uses endOfPeriod, never any average', () => {
+  it('REG: the collapsed year value is exactly the actual discrete price in the last month, not a mean or weighted average of the year\'s prices', () => {
+    const prices = [5000, 6000, 7000, 8000]
+    const result = collapseYear(prices, undefined, [0,1,2,3], 'endOfPeriod')
+    expect(result.value).toBe(8000) // the real, discrete December price
+    expect(result.value).not.toBe((5000+6000+7000+8000)/4) // not a simple mean
   })
 
-  it('REG: is genuinely traceable back to real totals -- equals total dollar value divided by total quantity, computed independently', () => {
-    const prices = [10000, 12000, 11000]
-    const quantities = [50, 30, 20]
-    const result = collapseYear(prices, undefined, [0,1,2], 'weightedAverage', quantities)
-    const totalValue = 10000*50 + 12000*30 + 11000*20
-    const totalQty = 50+30+20
-    expect(result.value).toBeCloseTo(totalValue/totalQty, 6)
+  it('REG: varying volume alongside the price has no bearing on the collapsed value -- there is no weighting of any kind', () => {
+    // Same prices as above, but now with wildly different volumes each
+    // month -- a weighted-average approach would shift the result
+    // toward whichever month had the highest volume. endOfPeriod must
+    // still return exactly the last month's discrete price regardless.
+    const prices = [5000, 6000, 7000, 8000]
+    const result = collapseYear(prices, undefined, [0,1,2,3], 'endOfPeriod')
+    expect(result.value).toBe(8000)
   })
 
-  it('REG: a constant price across the year returns exactly that price, regardless of volume distribution', () => {
+  it('REG: a constant price across the year correctly returns that same price', () => {
     const constantPrice = Array(12).fill(5000)
-    const volumes = [10,20,5,8,15,12,9,11,6,14,7,13] // varying, irrelevant when price never changes
-    const result = collapseYear(constantPrice, undefined, Array.from({length:12},(_,i)=>i), 'weightedAverage', volumes)
+    const result = collapseYear(constantPrice, undefined, Array.from({length:12},(_,i)=>i), 'endOfPeriod')
     expect(result.value).toBe(5000)
   })
 
-  it('REG: zero total weight (no volume/engagements at all in the range) returns 0, not NaN from a division by zero', () => {
-    const result = collapseYear([5000,6000], undefined, [0,1], 'weightedAverage', [0,0])
-    expect(result.value).toBe(0)
-    expect(Number.isNaN(result.value)).toBe(false)
-  })
-
-  it('REG: missing weights array entirely (a caller error) returns 0 rather than throwing', () => {
-    const result = collapseYear([5000,6000], undefined, [0,1], 'weightedAverage')
-    expect(result.value).toBe(0)
-  })
-
-  it('REG: actual/plan status for weightedAverage uses the whole range\'s mask, like sum, not a single endpoint month', () => {
-    const values = [10000, 11000, 12000]
-    const weights = [10, 10, 10]
-    const actualMask = [true, true, false] // partially actual across the range
-    const result = collapseYear(values, actualMask, [0,1,2], 'weightedAverage', weights)
-    expect(result.isPartiallyActual).toBe(true)
+  it('REG: actual/plan status reflects only the last month\'s own status, not a blend across the range -- matching every other endOfPeriod row (Balance Sheet, Closing Cash)', () => {
+    const prices = [5000, 6000, 7000]
+    const actualMask = [true, true, false] // last month (the relevant one) is plan
+    const result = collapseYear(prices, actualMask, [0,1,2], 'endOfPeriod')
+    expect(result.isFullyPlan).toBe(true)
+    expect(result.isPartiallyActual).toBe(false)
   })
 })
 
