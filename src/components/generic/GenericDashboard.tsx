@@ -2405,6 +2405,181 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
   )
 }
 
+// Dashboard-side stock view -- every level across every business unit
+// for this client (unlike the field app's own stock view, which only
+// ever shows one operator's own unit), setting reorder thresholds, and
+// recording intra-store transfers. Deliberately a coach/CEO-level
+// action: moving inventory between business units is an administrative
+// decision, not something an individual field operator does from their
+// own limited-scope phone view.
+function StockAndTransfersSection({clientId,businessUnits}:{clientId:string;businessUnits:{id:string;name:string;active:boolean}[]}) {
+  const [levels, setLevels] = useState<any[]>([])
+  const [catalogueByUnit, setCatalogueByUnit] = useState<Record<string,any[]>>({})
+  const [loading, setLoading] = useState(true)
+  const [showTransferForm, setShowTransferForm] = useState(false)
+  const [transferring, setTransferring] = useState(false)
+  const [transferForm, setTransferForm] = useState({
+    from_business_unit_id:'', from_catalogue_item_id:'', to_business_unit_id:'', to_catalogue_item_id:'', quantity:'', notes:'',
+  })
+  const [editingThresholdId, setEditingThresholdId] = useState<string|null>(null)
+  const [thresholdValue, setThresholdValue] = useState('')
+
+  async function load() {
+    setLoading(true)
+    try {
+      const [levelsRes, catalogueRes] = await Promise.all([
+        fetch(`/api/field/admin/stock?client_id=${encodeURIComponent(clientId)}`),
+        supabase.from('field_catalogue').select('id,name,unit_label,business_unit_id').eq('client_id',clientId).eq('active',true),
+      ])
+      const levelsData = await levelsRes.json()
+      if (levelsRes.ok) setLevels(levelsData.stockLevels||[])
+      const byUnit: Record<string,any[]> = {}
+      ;(catalogueRes.data||[]).forEach((item:any) => {
+        if (!byUnit[item.business_unit_id]) byUnit[item.business_unit_id] = []
+        byUnit[item.business_unit_id].push(item)
+      })
+      setCatalogueByUnit(byUnit)
+    } catch { /* leave lists as-is; the view below shows empty rather than a broken page */ }
+    setLoading(false)
+  }
+  useEffect(()=>{ load() },[clientId])
+
+  const unitName = (id: string) => businessUnits.find(u=>u.id===id)?.name || id
+
+  async function saveThreshold(levelId: string) {
+    try {
+      const res = await fetch('/api/field/admin/stock', {
+        method: 'PATCH', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ stock_level_id: levelId, reorder_threshold: thresholdValue===''?null:Number(thresholdValue) }),
+      })
+      if (res.ok) { setEditingThresholdId(null); await load() }
+      else { const d = await res.json(); alert(d.error || 'Could not update the reorder threshold.') }
+    } catch {
+      alert('No connection -- could not update the reorder threshold. Please try again.')
+    }
+  }
+
+  async function submitTransfer() {
+    const f = transferForm
+    if (!f.from_business_unit_id || !f.from_catalogue_item_id || !f.to_business_unit_id || !f.to_catalogue_item_id || !f.quantity) {
+      alert('Every field is required for a transfer.'); return
+    }
+    setTransferring(true)
+    try {
+      const res = await fetch('/api/field/admin/stock', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ client_id: clientId, ...f, quantity: Number(f.quantity) }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setShowTransferForm(false)
+        setTransferForm({from_business_unit_id:'',from_catalogue_item_id:'',to_business_unit_id:'',to_catalogue_item_id:'',quantity:'',notes:''})
+        await load()
+      } else {
+        alert(data.error || 'Could not record the transfer.')
+      }
+    } catch {
+      alert('No connection -- could not record the transfer. Please try again.')
+    }
+    setTransferring(false)
+  }
+
+  return (
+    <div style={card}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+        <div style={secH}>Stock & Transfers</div>
+        <button type="button" style={addBtn(true)} onClick={()=>setShowTransferForm(!showTransferForm)}>{showTransferForm?'Cancel':'+ New Transfer'}</button>
+      </div>
+      <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1rem',lineHeight:1.6}}>
+        Stock is tracked automatically as operators record sales, and updated when they receive new stock in the field app.
+        Use a transfer here to move inventory between business units -- e.g. produce grown on the farm being moved into the
+        shop for resale.
+      </p>
+
+      {showTransferForm && (
+        <div style={{background:C.cream,borderRadius:6,padding:'1rem',marginBottom:'1.25rem'}}>
+          <div style={fGrid}>
+            <div><label style={lbl}>From Unit</label>
+              <select style={inp} value={transferForm.from_business_unit_id} onChange={e=>setTransferForm(f=>({...f,from_business_unit_id:e.target.value,from_catalogue_item_id:''}))}>
+                <option value="">Select...</option>
+                {businessUnits.filter(u=>u.active).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+            <div><label style={lbl}>From Item</label>
+              <select style={inp} value={transferForm.from_catalogue_item_id} onChange={e=>setTransferForm(f=>({...f,from_catalogue_item_id:e.target.value}))} disabled={!transferForm.from_business_unit_id}>
+                <option value="">Select a unit first...</option>
+                {(catalogueByUnit[transferForm.from_business_unit_id]||[]).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </div>
+            <div><label style={lbl}>To Unit</label>
+              <select style={inp} value={transferForm.to_business_unit_id} onChange={e=>setTransferForm(f=>({...f,to_business_unit_id:e.target.value,to_catalogue_item_id:''}))}>
+                <option value="">Select...</option>
+                {businessUnits.filter(u=>u.active).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+            <div><label style={lbl}>To Item</label>
+              <select style={inp} value={transferForm.to_catalogue_item_id} onChange={e=>setTransferForm(f=>({...f,to_catalogue_item_id:e.target.value}))} disabled={!transferForm.to_business_unit_id}>
+                <option value="">Select a unit first...</option>
+                {(catalogueByUnit[transferForm.to_business_unit_id]||[]).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </div>
+            <div><label style={lbl}>Quantity</label>
+              <input type="number" style={inp} value={transferForm.quantity} onChange={e=>setTransferForm(f=>({...f,quantity:e.target.value}))}/>
+            </div>
+            <div><label style={lbl}>Notes (optional)</label>
+              <input style={inp} value={transferForm.notes} onChange={e=>setTransferForm(f=>({...f,notes:e.target.value}))}/>
+            </div>
+          </div>
+          <button type="button" style={{...solidBtn(C.navy),marginTop:'0.75rem'}} disabled={transferring} onClick={submitTransfer}>{transferring?'Recording...':'Record Transfer'}</button>
+        </div>
+      )}
+
+      {loading ? (
+        <p style={{color:C.slate,fontSize:'0.85rem'}}>Loading...</p>
+      ) : levels.length===0 ? (
+        <p style={{color:C.slate,fontSize:'0.85rem'}}>No stock recorded yet. Levels appear here once operators record sales or receive stock in the field app.</p>
+      ) : (
+        <div style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.82rem'}}>
+            <thead>
+              <tr style={{background:C.navy,color:C.white}}>
+                {['Unit','Item','On Hand','Reorder Threshold',''].map(h=>(
+                  <th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.75rem'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {levels.map((level:any,i:number)=>{
+                const low = level.reorder_threshold != null && level.quantity_on_hand <= level.reorder_threshold
+                return (
+                  <tr key={level.id} style={{background:low?'#FFF8E8':i%2===0?C.cream:C.white}}>
+                    <td style={{padding:'8px 10px'}}>{unitName(level.business_unit_id)}</td>
+                    <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{level.catalogue?.name||'Item'}</td>
+                    <td style={{padding:'8px 10px',fontFamily:'monospace',fontWeight:700}}>{level.quantity_on_hand}{level.catalogue?.unit_label?` ${level.catalogue.unit_label}`:''}</td>
+                    <td style={{padding:'8px 10px'}}>
+                      {editingThresholdId===level.id ? (
+                        <div style={{display:'flex',gap:'0.4rem'}}>
+                          <input type="number" style={{width:70,padding:'0.3rem 0.4rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.78rem'}} value={thresholdValue} onChange={e=>setThresholdValue(e.target.value)}/>
+                          <button type="button" style={addBtn(true)} onClick={()=>saveThreshold(level.id)}>Save</button>
+                        </div>
+                      ) : (
+                        <span onClick={()=>{setEditingThresholdId(level.id);setThresholdValue(String(level.reorder_threshold??''))}} style={{cursor:'pointer',color:level.reorder_threshold!=null?C.navy:C.slate,textDecoration:'underline',fontSize:'0.8rem'}}>
+                          {level.reorder_threshold ?? 'Set threshold'}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{padding:'8px 10px'}}>{low && <Badge text="Low Stock" color={C.amber}/>}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function SettingsTab({config,P,onSave}) {
   const [form, setForm] = useState({...config})
   const [saving, setSaving] = useState(false)
@@ -2433,7 +2608,7 @@ function SettingsTab({config,P,onSave}) {
     setForm(f=>({...f,business_units:[...f.business_units,newUnit]}))
   }
 
-  const sections = [['general','General'],['units','Business Units'],['capital','Capital Structure'],['credit','Debt Obligations'],['delegation','Approval Delegation'],['field_operators','Field Operators']]
+  const sections = [['general','General'],['units','Business Units'],['capital','Capital Structure'],['credit','Debt Obligations'],['delegation','Approval Delegation'],['field_operators','Field Operators'],['stock','Stock & Transfers']]
 
   return (
     <div>
@@ -2605,6 +2780,7 @@ function SettingsTab({config,P,onSave}) {
       )}
 
       {activeSection==='field_operators'&&<FieldOperatorsSection clientId={config.client_id} businessUnits={config.business_units}/>}
+      {activeSection==='stock'&&<StockAndTransfersSection clientId={config.client_id} businessUnits={config.business_units}/>}
 
       <div style={{marginTop:'1.25rem',display:'flex',gap:'0.75rem'}}>
         <button style={solidBtn(C.navy)} disabled={saving} onClick={save}>{saving?'Saving...':'Save All Settings'}</button>
