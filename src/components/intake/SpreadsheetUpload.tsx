@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
+import { cellStr, cellNum, colLetter, findMonthColumns, NEW_TEMPLATE_LAYOUT } from '@/lib/intake-spreadsheet-parser'
 
 const C = {
   navy:'#1B2A4A', cyan:'#00B4D8', cream:'#F8F4EE', white:'#FFFFFF',
@@ -31,26 +32,6 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-
-  function cellStr(ws:any, addr:string): string {
-    const cell = ws[addr]
-    return cell ? String(cell.v ?? '').trim() : ''
-  }
-  function cellNum(ws:any, addr:string): number {
-    const cell = ws[addr]
-    const v = cell ? cell.v : 0
-    return typeof v === 'number' ? v : (parseFloat(v) || 0)
-  }
-  function colLetter(idx:number): string {
-    let s = ''
-    idx += 1
-    while (idx > 0) {
-      const rem = (idx - 1) % 26
-      s = String.fromCharCode(65 + rem) + s
-      idx = Math.floor((idx - 1) / 26)
-    }
-    return s
-  }
 
   async function handleFile(f: File) {
     setFile(f)
@@ -148,23 +129,14 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
           : cellStr(pf, `C${WHICH_PART_ROW}`)
 
         // Find month columns
-        // New template: headers in row 6, data starts col C (col index 3, 1-based)
-        // Old template: HEADER_ROW and MONTH_START_COL constants
-        const headerRow = isNewTemplate ? 6 : HEADER_ROW
-        const monthStartCol = isNewTemplate ? 3 : MONTH_START_COL
+        // New template: headers in row 6, data starts col C
+        // (colLetter(2) = 'C' -- verified directly against real uploaded
+        // files: row 6 has Category/Figure Type in columns A/B, then
+        // M-3, M-2, M-1... starting at column C, index 2, not 3).
+        const headerRow = isNewTemplate ? NEW_TEMPLATE_LAYOUT.headerRow : HEADER_ROW
+        const monthStartCol = isNewTemplate ? NEW_TEMPLATE_LAYOUT.monthStartCol : MONTH_START_COL
 
-        let monthCols: number[] = []
-        let thisMonthColIdx = -1
-        for (let c = monthStartCol; c < monthStartCol + 30; c++) {
-          const addr = `${colLetter(c)}${headerRow}`
-          const val = cellStr(pf, addr)
-          if (!val) break
-          monthCols.push(c)
-          const upper = val.toUpperCase()
-          if (upper.includes('M0') || upper.includes('NOW') || upper.includes('THIS MONTH')) {
-            thisMonthColIdx = monthCols.length - 1
-          }
-        }
+        const { monthCols, thisMonthColIdx } = findMonthColumns(pf, headerRow, monthStartCol)
         if (monthCols.length === 0) continue
 
         const sheetPast = thisMonthColIdx >= 0 ? thisMonthColIdx : 0
@@ -194,15 +166,23 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
         }
 
         if (isNewTemplate) {
-          // New template v7: paired rows
-          // Revenue section starts after 2 header rows (row 8 = section header, row 9 = note)
-          // Row 10 onwards: each product = 2 rows (rev row + cog row)
-          // Product name is in Col A (merged across both rows)
-          // Row type in Col B: "Sales Revenue" or "Cost of Goods"
-          // Data starts Col C (col 3)
-          // Scan rows 10 to 10+(N_REV*2) for revenue section
-          const revSectionStart = 10
-          const N_REV = 8
+          // New template v7: paired rows. Full layout documented and
+          // verified in src/lib/intake-spreadsheet-parser.ts.
+          const revSectionStart = NEW_TEMPLATE_LAYOUT.revSectionStart
+          const N_REV = NEW_TEMPLATE_LAYOUT.nRevSlots
+
+          // Sanity check: confirm the section headers are genuinely
+          // where these hardcoded offsets assume they are, before
+          // trusting them for the whole sheet. Two separate off-by-one
+          // bugs were found and silently misclassified rows/columns
+          // for a real client's data before this was caught -- a
+          // template layout shift in the future should fail loudly
+          // here instead of repeating that.
+          const revHeaderRow = NEW_TEMPLATE_LAYOUT.revSectionHeaderRow
+          const revHeaderLabel = cellStr(pf, `A${revHeaderRow}`).toUpperCase()
+          if (!revHeaderLabel.includes('REVENUE')) {
+            throw new Error(`"${sheetName}" does not match the expected template layout (expected "REVENUE" section header at row ${revHeaderRow}, found "${cellStr(pf,`A${revHeaderRow}`)}"). Please use the current Clearview Data Capture template, or contact your coach if this is a newer version.`)
+          }
 
           for (let i = 0; i < N_REV; i++) {
             const revRow = revSectionStart + (i * 2)
@@ -224,10 +204,14 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
             allProducts.push({ name, costLines, revenue, unitName: resolvedUnitName })
           }
 
-          // Staff section: find it after revenue section
-          // Row 10 + N_REV*2 + 2 (section header + spacer) = staff section
-          const staffSectionStart = revSectionStart + (N_REV * 2) + 2
-          for (let i = 0; i < 4; i++) {
+          // Staff section. The header row's descriptive text
+          // ("Salaries, wages, casual labour") sits in column C, not A.
+          const staffSectionStart = NEW_TEMPLATE_LAYOUT.staffSectionStart
+          const staffHeaderLabel = cellStr(pf, `C${staffSectionStart - 1}`).toUpperCase()
+          if (!staffHeaderLabel.includes('SALAR')) {
+            throw new Error(`"${sheetName}" does not match the expected template layout (expected the staff costs section note near row ${staffSectionStart - 1}, found "${cellStr(pf, `C${staffSectionStart - 1}`)}"). Please use the current Clearview Data Capture template, or contact your coach if this is a newer version.`)
+          }
+          for (let i = 0; i < NEW_TEMPLATE_LAYOUT.nStaffSlots; i++) {
             const row = staffSectionStart + i
             const name = cellStr(pf, `A${row}`)
             const vals = readVals(row)
@@ -236,9 +220,13 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
             }
           }
 
-          // Overheads section
-          const opexSectionStart = staffSectionStart + 4 + 2
-          for (let i = 0; i < 4; i++) {
+          // Overheads section (header in column A, like revenue).
+          const opexSectionStart = NEW_TEMPLATE_LAYOUT.opexSectionStart
+          const opexHeaderLabel = cellStr(pf, `A${opexSectionStart - 1}`).toUpperCase()
+          if (!opexHeaderLabel.includes('OVERHEAD')) {
+            throw new Error(`"${sheetName}" does not match the expected template layout (expected "DIRECT OVERHEADS" section header at row ${opexSectionStart - 1}, found "${cellStr(pf, `A${opexSectionStart - 1}`)}"). Please use the current Clearview Data Capture template, or contact your coach if this is a newer version.`)
+          }
+          for (let i = 0; i < NEW_TEMPLATE_LAYOUT.nOpexSlots; i++) {
             const row = opexSectionStart + i
             const name = cellStr(pf, `A${row}`)
             const vals = readVals(row)
