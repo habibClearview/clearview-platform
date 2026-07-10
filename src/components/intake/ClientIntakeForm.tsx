@@ -2,6 +2,7 @@
 'use client'
 import React, { useState, useEffect, Component } from 'react'
 import { supabase } from '@/lib/supabase'
+import SpreadsheetUpload from '@/components/intake/SpreadsheetUpload'
 
 const C = {
   navy:'#1B2A4A', cyan:'#00B4D8', cream:'#F8F4EE', white:'#FFFFFF',
@@ -55,6 +56,7 @@ class IntakeErrorBoundary extends Component<{children:React.ReactNode},{hasError
 
 function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
   const [step, setStep] = useState(0)
+  const [uploadMode, setUploadMode] = useState(false)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -337,6 +339,20 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
             <p style={{fontSize:'0.88rem',color:C.slate,lineHeight:1.8,marginBottom:'1rem'}}>For each product category, you will enter: (1) Sales Revenue — what customers paid you, and (2) Cost of Goods — what you paid to procure or produce those goods. These can be different months — a business may buy inputs in one month and sell them over the next two or three months. Your cash flow will handle the timing automatically.</p>
             <p style={{fontSize:'0.88rem',color:C.slate,lineHeight:1.8,marginBottom:'1.5rem'}}>Estimates are fine where exact figures are not available. This takes about 20-30 minutes.</p>
             <button style={btn()} onClick={()=>setStep(1)}>Get Started</button>
+
+            <div style={{marginTop:'2rem',paddingTop:'1.5rem',borderTop:`1px solid ${C.border}`}}>
+              <div style={{fontWeight:700,color:C.navy,marginBottom:'0.4rem',fontSize:'0.95rem'}}>Prefer to work in Excel?</div>
+              <p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.7,marginBottom:'0.9rem'}}>Download the Clearview data-capture template, fill it in offline, then upload the completed file instead of filling in this form.</p>
+              <div style={{display:'flex',gap:'0.75rem',flexWrap:'wrap',alignItems:'center'}}>
+                <a href="/Clearview_Data_Capture_Template_v7.xlsx" download style={{...ghostBtn,textDecoration:'none',display:'inline-block'}}>⬇ Download Template</a>
+                <button style={smallBtn(C.teal)} onClick={()=>setUploadMode(m=>!m)}>{uploadMode?'Hide upload':'Upload completed template'}</button>
+              </div>
+              {uploadMode && (
+                <div style={{marginTop:'1.25rem'}}>
+                  <SpreadsheetUpload intakeToken={intakeToken} onSuccess={()=>setSubmitted(true)}/>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
