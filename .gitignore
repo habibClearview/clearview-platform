@@ -20,3 +20,6 @@ coverage/
 
 # Vercel
 .vercel
+
+# Claude Code local scratch/worktrees -- never committed
+.claude/
