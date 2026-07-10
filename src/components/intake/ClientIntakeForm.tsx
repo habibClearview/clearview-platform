@@ -68,7 +68,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
     country:'Uganda', sector:'', currency:'UGX',
     year_established:'', legal_structure:'', sales_channel:'',
     season_name:'', year_round:'Year-round',
-    dso:0,
+    dso:0, dpo:0,
     shareholder_contribution:0, grant_non_repayable:0, grant_recoverable:0,
     bank_loan:0, annual_interest_rate:18, loan_tenor_years:2,
     grace_period_months:0, fixed_assets:0, opening_cash_balance:0,
@@ -254,6 +254,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
             fixed_assets: business.fixed_assets || 0,
           },
           dso_days: business.dso || 0,
+          dpo_days: business.dpo || 0,
           season_name: business.season_name || '',
           year_round: business.year_round || 'Year-round',
           year_established: business.year_established || '',
@@ -381,6 +382,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
                 {['Year-round','Seasonal'].map(v=><option key={v} value={v}>{v}</option>)}
               </select></div>
               <div><label style={lbl}>Avg days customers take to pay</label><input type="number" style={inp} placeholder="0 = cash only" value={business.dso||''} onChange={e=>setBusiness(b=>({...b,dso:Number(e.target.value)}))}/></div>
+              <div><label style={lbl}>Avg days you take to pay suppliers</label><input type="number" style={inp} placeholder="0 = pay immediately" value={business.dpo||''} onChange={e=>setBusiness(b=>({...b,dpo:Number(e.target.value)}))}/></div>
             </div>
             <div style={{display:'flex',gap:'0.6rem',marginTop:'1.25rem'}}>
               <button style={ghostBtn} onClick={()=>setStep(0)}>Back</button>

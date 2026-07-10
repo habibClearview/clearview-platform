@@ -374,6 +374,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
             fixed_assets: business.fixed_assets || 0,
           },
           dso_days: business.dso || 0,
+          dpo_days: business.dpo || 0,
           season_name: business.season_name || '',
           year_round: business.year_round || 'Year-round',
           year_established: business.year_established || '',
