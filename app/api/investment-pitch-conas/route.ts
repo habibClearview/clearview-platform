@@ -30,7 +30,7 @@ function spacer(before=0,after=0){return new Paragraph({children:[new TextRun(''
 function sectionHeader(text:string){
   return new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[9360],
     borders:{top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE}},
-    rows:[new TableRow({children:[new TableCell({shading:{fill:NAVY,type:ShadingType.SOLID},margins:{top:120,bottom:120,left:200,right:200},
+    rows:[new TableRow({children:[new TableCell({shading:{fill:NAVY,type:ShadingType.CLEAR},margins:{top:120,bottom:120,left:200,right:200},
       children:[new Paragraph({children:[new TextRun({text,bold:true,color:CYAN,size:22,font:'Arial',allCaps:true})]})]})]})],
   })
 }
@@ -38,7 +38,7 @@ function sectionHeader(text:string){
 function metricBox(label:string,value:string,sub:string,color:string,width:number){
   const b={style:BorderStyle.SINGLE,size:4,color:CYAN}
   const borders={top:b,bottom:b,left:b,right:b}
-  return new TableCell({borders,shading:{fill:LBBLUE,type:ShadingType.SOLID},width:{size:width,type:WidthType.DXA},
+  return new TableCell({borders,shading:{fill:LBBLUE,type:ShadingType.CLEAR},width:{size:width,type:WidthType.DXA},
     margins:{top:100,bottom:100,left:140,right:140},children:[
       new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:value,bold:true,color,size:36,font:'Georgia'})]}),
       new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:label,color:NAVY,size:16,font:'Arial',bold:true})]}),
@@ -71,9 +71,9 @@ function infoBox(left:string[],right:string[]){
   const nb={top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE}}
   return new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[4500,4860],borders:nb,
     rows:[new TableRow({children:[
-      new TableCell({borders,shading:{fill:CREAM,type:ShadingType.SOLID},width:{size:4500,type:WidthType.DXA},margins:{top:120,bottom:120,left:160,right:160},
+      new TableCell({borders,shading:{fill:CREAM,type:ShadingType.CLEAR},width:{size:4500,type:WidthType.DXA},margins:{top:120,bottom:120,left:160,right:160},
         children:left.map(t=>new Paragraph({children:[new TextRun({text:t,size:20,font:'Arial',color:NAVY})]}))}),
-      new TableCell({borders,shading:{fill:WHITE,type:ShadingType.SOLID},width:{size:4860,type:WidthType.DXA},margins:{top:120,bottom:120,left:160,right:160},
+      new TableCell({borders,shading:{fill:WHITE,type:ShadingType.CLEAR},width:{size:4860,type:WidthType.DXA},margins:{top:120,bottom:120,left:160,right:160},
         children:right.map(t=>new Paragraph({children:[new TextRun({text:t,size:20,font:'Arial',color:NAVY})]}))}),
     ]})]
   })
@@ -156,7 +156,7 @@ Capital: Shareholder ${fmt(inputs.capitalStructure?.shareholderContribution||0,c
     // Cover
     children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[9360],
       borders:{top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE}},
-      rows:[new TableRow({children:[new TableCell({shading:{fill:NAVY,type:ShadingType.SOLID},margins:{top:200,bottom:200,left:280,right:280},children:[
+      rows:[new TableRow({children:[new TableCell({shading:{fill:NAVY,type:ShadingType.CLEAR},margins:{top:200,bottom:200,left:280,right:280},children:[
         new Paragraph({children:[new TextRun({text:'CONAS Agricultural Hub',bold:true,color:WHITE,size:48,font:'Georgia'})]}),
         new Paragraph({children:[new TextRun({text:'Crop Aggregation · Five Input Profit Centres · Northern Uganda',color:CYAN,size:22,font:'Arial'})]}),
         new Paragraph({children:[new TextRun({text:`Investment Readiness Brief · ${new Date().toLocaleDateString('en-GB',{month:'long',year:'numeric'})}`,color:'AAAAAA',size:18,font:'Arial',italics:true})]}),
@@ -266,7 +266,7 @@ Capital: Shareholder ${fmt(inputs.capitalStructure?.shareholderContribution||0,c
     // Footer
     children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[9360],
       borders:{top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE}},
-      rows:[new TableRow({children:[new TableCell({shading:{fill:NAVY,type:ShadingType.SOLID},margins:{top:100,bottom:100,left:200,right:200},children:[
+      rows:[new TableRow({children:[new TableCell({shading:{fill:NAVY,type:ShadingType.CLEAR},margins:{top:100,bottom:100,left:200,right:200},children:[
         new Paragraph({alignment:AlignmentType.CENTER,children:[
           new TextRun({text:'Powered by ',color:'AAAAAA',size:16,font:'Arial'}),
           new TextRun({text:'Canvas Coach Clearview',color:CYAN,size:16,font:'Arial',bold:true}),
