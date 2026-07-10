@@ -2960,7 +2960,7 @@ Financial summary:
 Write a clear, plain-English health check report for the CEO. Include: 1) Overall status (Green/Amber/Red with reason) 2) Two or three things going well 3) Two or three areas of concern 4) Three specific actions this month. Maximum 300 words.`
       const response = await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+        body:JSON.stringify({model:'claude-opus-4-8',max_tokens:1000,messages:[{role:'user',content:prompt}]})
       })
       const data = await response.json()
       const text = data.content?.[0]?.text||'Report unavailable'
@@ -2990,7 +2990,7 @@ Data:
 Write 4-5 short paragraphs telling the story of this business right now. Speak directly to the owner. No headers, no bullets, no jargon. Maximum 350 words.`
       const response = await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+        body:JSON.stringify({model:'claude-opus-4-8',max_tokens:1000,messages:[{role:'user',content:prompt}]})
       })
       const data = await response.json()
       const text = data.content?.[0]?.text||'Narrative unavailable'

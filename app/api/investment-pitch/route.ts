@@ -140,7 +140,7 @@ async function callClaude(prompt: string): Promise<string> {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] }),
+    body: JSON.stringify({ model: 'claude-opus-4-8', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] }),
   })
   const data = await response.json()
   return data.content?.[0]?.text || ''
