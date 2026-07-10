@@ -468,9 +468,12 @@ export default function FieldCapturePage() {
       <div style={{padding:'1rem'}}>
         {/* Compact sync bar -- kept short so it never pushes the product grid down */}
         <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'0.75rem 1rem',marginBottom:'0.85rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.6rem'}}>
-          <button onClick={()=>setQueueOpen(o=>!o)} style={{background:'none',border:'none',padding:0,cursor:'pointer',textAlign:'left'}}>
-            <div style={{fontSize:'0.65rem',color:C.slate,fontFamily:'monospace'}}>PENDING TO SYNC {queueOpen?'▾':'▸'}</div>
-            <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',fontWeight:700,color:C.navy}}>{pendingCount} entr{pendingCount===1?'y':'ies'}</div>
+          <button onClick={()=>setQueueOpen(o=>!o)} style={{background:'none',border:'none',padding:0,cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:'0.6rem'}}>
+            <span aria-hidden="true" style={{width:12,height:12,borderRadius:'50%',flexShrink:0,background:pendingCount===0?C.green:C.amber,boxShadow:`0 0 0 4px ${pendingCount===0?'#E4F5EC':'#FBF0D8'}`}}/>
+            <span>
+              <div style={{fontSize:'0.65rem',color:C.slate,fontFamily:'monospace'}}>{pendingCount===0?'ALL SAVED & SENT':'WAITING TO SEND'} {queueOpen?'▾':'▸'}</div>
+              <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',fontWeight:700,color:pendingCount===0?C.green:C.navy}}>{pendingCount===0?'Up to date':`${pendingCount} entr${pendingCount===1?'y':'ies'}`}</div>
+            </span>
           </button>
           <button disabled={syncing||pendingCount===0} onClick={syncNow}
             style={{padding:'0.6rem 1rem',background:pendingCount===0?C.border:C.teal,color:C.white,border:'none',borderRadius:6,fontWeight:600,cursor:pendingCount===0?'default':'pointer',fontSize:'0.82rem',whiteSpace:'nowrap'}}>
@@ -495,25 +498,27 @@ export default function FieldCapturePage() {
             />
 
             {products.length>0 && <>
-              <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:C.slate,marginBottom:'0.5rem'}}>PRODUCTS</div>
+              <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:C.slate,marginBottom:'0.5rem'}}>📦 PRODUCTS</div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.6rem',marginBottom:'1rem'}}>
                 {products.map(item=>(
                   <button key={item.id} onClick={()=>openSaleDetail(item)}
-                    style={{background:C.white,border:`1px solid ${C.border}`,borderLeft:`4px solid ${C.green}`,borderRadius:8,padding:'1rem 0.75rem',textAlign:'left',cursor:'pointer'}}>
-                    <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy}}>{item.name}</div>
-                    <div style={{fontSize:'0.75rem',color:C.slate,marginTop:'0.2rem'}}>{fmt(item.price,auth.client.currency)}{item.unit_label?` / ${item.unit_label}`:''}</div>
+                    style={{background:C.white,border:`1px solid ${C.border}`,borderTop:`4px solid ${C.teal}`,borderRadius:10,padding:'0.95rem 0.8rem',textAlign:'left',cursor:'pointer',minHeight:'90px',display:'flex',flexDirection:'column',gap:'0.28rem'}}>
+                    <div style={{fontSize:'1.5rem',lineHeight:1}} aria-hidden="true">📦</div>
+                    <div style={{fontWeight:700,fontSize:'0.9rem',color:C.navy,lineHeight:1.2}}>{item.name}</div>
+                    <div style={{fontSize:'0.78rem',color:C.slate,fontWeight:600}}>{fmt(item.price,auth.client.currency)}{item.unit_label?` / ${item.unit_label}`:''}</div>
                   </button>
                 ))}
               </div>
             </>}
             {services.length>0 && <>
-              <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:C.slate,marginBottom:'0.5rem'}}>SERVICES</div>
+              <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:C.slate,marginBottom:'0.5rem'}}>🛠️ SERVICES</div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.6rem',marginBottom:'1rem'}}>
                 {services.map(item=>(
                   <button key={item.id} onClick={()=>openSaleDetail(item)}
-                    style={{background:C.white,border:`1px solid ${C.border}`,borderLeft:`4px solid ${C.green}`,borderRadius:8,padding:'1rem 0.75rem',textAlign:'left',cursor:'pointer'}}>
-                    <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy}}>{item.name}</div>
-                    <div style={{fontSize:'0.75rem',color:C.slate,marginTop:'0.2rem'}}>{fmt(item.price,auth.client.currency)}{item.unit_label?` / ${item.unit_label}`:''}</div>
+                    style={{background:C.white,border:`1px solid ${C.border}`,borderTop:`4px solid ${C.cyan}`,borderRadius:10,padding:'0.95rem 0.8rem',textAlign:'left',cursor:'pointer',minHeight:'90px',display:'flex',flexDirection:'column',gap:'0.28rem'}}>
+                    <div style={{fontSize:'1.5rem',lineHeight:1}} aria-hidden="true">🛠️</div>
+                    <div style={{fontWeight:700,fontSize:'0.9rem',color:C.navy,lineHeight:1.2}}>{item.name}</div>
+                    <div style={{fontSize:'0.78rem',color:C.slate,fontWeight:600}}>{fmt(item.price,auth.client.currency)}{item.unit_label?` / ${item.unit_label}`:''}</div>
                   </button>
                 ))}
               </div>
