@@ -51,7 +51,7 @@ function sectionHeader(text: string) {
     columnWidths: [9360],
     borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
     rows: [new TableRow({ children: [new TableCell({
-      shading: { fill: NAVY, type: ShadingType.SOLID },
+      shading: { fill: NAVY, type: ShadingType.CLEAR },
       margins: { top: 120, bottom: 120, left: 200, right: 200 },
       children: [new Paragraph({ children: [new TextRun({ text, bold: true, color: CYAN, size: 22, font: 'Arial', allCaps: true })] })],
     })] })],
@@ -64,7 +64,7 @@ function metricBox(label: string, value: string, sub: string, color: string, wid
   const borders = { top: b, bottom: b, left: b, right: b }
   return new TableCell({
     borders,
-    shading: { fill: LBBLUE, type: ShadingType.SOLID },
+    shading: { fill: LBBLUE, type: ShadingType.CLEAR },
     width: { size: width, type: WidthType.DXA },
     margins: { top: 100, bottom: 100, left: 140, right: 140 },
     children: [
@@ -95,9 +95,9 @@ function infoBox(left: string[], right: string[], leftWidth = 4500, rightWidth =
     columnWidths: [leftWidth, rightWidth],
     borders: noBorder,
     rows: [new TableRow({ children: [
-      new TableCell({ borders, shading: { fill: CREAM, type: ShadingType.SOLID }, width: { size: leftWidth, type: WidthType.DXA }, margins: { top: 120, bottom: 120, left: 160, right: 160 },
+      new TableCell({ borders, shading: { fill: CREAM, type: ShadingType.CLEAR }, width: { size: leftWidth, type: WidthType.DXA }, margins: { top: 120, bottom: 120, left: 160, right: 160 },
         children: left.map(t => new Paragraph({ children: [new TextRun({ text: t, size: 20, font: 'Arial', color: NAVY })] })) }),
-      new TableCell({ borders, shading: { fill: WHITE, type: ShadingType.SOLID }, width: { size: rightWidth, type: WidthType.DXA }, margins: { top: 120, bottom: 120, left: 160, right: 160 },
+      new TableCell({ borders, shading: { fill: WHITE, type: ShadingType.CLEAR }, width: { size: rightWidth, type: WidthType.DXA }, margins: { top: 120, bottom: 120, left: 160, right: 160 },
         children: right.map(t => new Paragraph({ children: [new TextRun({ text: t, size: 20, font: 'Arial', color: NAVY })] })) }),
     ]})],
   })
@@ -260,7 +260,7 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
       columnWidths: [9360],
       borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
       rows: [new TableRow({ children: [new TableCell({
-        shading: { fill: NAVY, type: ShadingType.SOLID },
+        shading: { fill: NAVY, type: ShadingType.CLEAR },
         margins: { top: 200, bottom: 200, left: 280, right: 280 },
         children: [
           new Paragraph({ children: [new TextRun({ text: config.business_name, bold: true, color: WHITE, size: 48, font: 'Georgia' })] }),
@@ -408,7 +408,7 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
       columnWidths: [9360],
       borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
       rows: [new TableRow({ children: [new TableCell({
-        shading: { fill: NAVY, type: ShadingType.SOLID },
+        shading: { fill: NAVY, type: ShadingType.CLEAR },
         margins: { top: 100, bottom: 100, left: 200, right: 200 },
         children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [
           new TextRun({ text: 'Powered by ', color: 'AAAAAA', size: 16, font: 'Arial' }),
