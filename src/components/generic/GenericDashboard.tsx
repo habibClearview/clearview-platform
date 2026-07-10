@@ -561,14 +561,14 @@ export default function GenericDashboard({
           <div>
             <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>CANVAS COACH — CLEARVIEW</div>
             <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:C.white,margin:'0.1rem 0 0.15rem'}}>{config.business_name || 'New Client'}</h1>
-            <div style={{fontSize:'0.76rem',color:'rgba(255,255,255,0.6)'}}>
+            <div style={{fontSize:'0.76rem',color:'rgba(255,255,255,0.85)'}}>
               {activeUnits.length} unit{activeUnits.length!==1?'s':''} · {cc} · {P.fullName}
               {saving&&<span style={{marginLeft:8,color:C.amber}}>· Saving...</span>}
             </div>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}>
             <span style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.cyan,border:`1px solid rgba(0,180,216,0.4)`,borderRadius:4,padding:'0.18rem 0.5rem',textTransform:'uppercase'}}>{P.role.replace('_',' ')}</span>
-            <button onClick={P.onSignOut} style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid rgba(255,255,255,0.25)`,borderRadius:4,color:'rgba(255,255,255,0.6)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
+            <button onClick={P.onSignOut} style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid rgba(255,255,255,0.45)`,borderRadius:4,color:'rgba(255,255,255,0.85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
           </div>
         </div>
       </header>
@@ -3084,11 +3084,22 @@ Write 4-5 short paragraphs telling the story of this business right now. Speak d
           <div style={card}>
             <div style={secH}>Cash Flow Early Warning</div>
             {warnings.length===0 ? (
-              <div style={{padding:'0.85rem',background:'#EBFAF0',borderRadius:6,color:C.green,fontSize:'0.85rem',fontWeight:600}}>No cash shortfall projected across the planning period.</div>
+              <div style={{padding:'0.85rem 1rem',background:'#EBFAF0',border:`1px solid ${C.green}`,borderRadius:8,color:C.green,fontSize:'0.9rem',fontWeight:600,display:'flex',alignItems:'center',gap:'0.55rem'}}>
+                <span aria-hidden="true" style={{fontSize:'1.1rem'}}>✓</span> No cash shortfall projected across the planning period.
+              </div>
             ) : (
               <div>
+                <div style={{background:'#FDF0EE',border:`1px solid ${C.red}`,borderRadius:10,padding:'0.9rem 1rem',marginBottom:'0.85rem'}}>
+                  <div style={{fontSize:'0.68rem',fontFamily:'monospace',letterSpacing:'0.1em',color:C.red,fontWeight:700}}>⚠ CASH RUNS SHORT</div>
+                  <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',color:C.navy,fontWeight:700,marginTop:'0.25rem',lineHeight:1.3}}>
+                    First shortfall in {warnings[0].month} · deepest point {fmt(Math.min(...warnings.map(w=>w.balance)),cc)}
+                  </div>
+                  <div style={{fontSize:'0.82rem',color:C.slate,marginTop:'0.35rem',lineHeight:1.5}}>
+                    {warnings.length} month{warnings.length>1?'s':''} fall below zero. Cover the gap with a short-term facility, bring collections forward, or delay non-critical spend before {warnings[0].month}.
+                  </div>
+                </div>
                 {warnings.map((w,i)=>(
-                  <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'0.5rem 0.75rem',background:'#FDF0EE',borderRadius:5,marginBottom:'0.4rem'}}>
+                  <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'0.55rem 0.8rem',background:'#FDF0EE',borderRadius:6,marginBottom:'0.4rem'}}>
                     <span style={{fontWeight:600,color:C.navy}}>{w.month}</span>
                     <span style={{fontFamily:'monospace',color:C.red,fontWeight:700}}>{fmt(w.balance,cc)}</span>
                   </div>
