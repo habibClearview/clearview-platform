@@ -334,7 +334,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
         businessUnits.push({
           id:k.id, name:k.name, short:(k.name||'').split(' ').map((w:string)=>w[0]).join('').toUpperCase().slice(0,4),
           type:'mixed', color:['#00B4D8','#1A9DAA','#B8860B','#6B4A8B','#1A7A4A'][ki%5],
-          headcount: key.headcount || 0, active:true, sort_order:ki,
+          headcount: k.headcount || 0, active:true, sort_order:ki,
         })
       })
 
@@ -374,6 +374,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
             fixed_assets: business.fixed_assets || 0,
           },
           dso_days: business.dso || 0,
+          dpo_days: business.dpo || 0,
           season_name: business.season_name || '',
           year_round: business.year_round || 'Year-round',
           year_established: business.year_established || '',

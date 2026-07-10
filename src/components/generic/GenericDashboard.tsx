@@ -2958,12 +2958,12 @@ Financial summary:
 - Staff cost as % of revenue: ${(m.staff_cost_pct*100).toFixed(1)}%
 
 Write a clear, plain-English health check report for the CEO. Include: 1) Overall status (Green/Amber/Red with reason) 2) Two or three things going well 3) Two or three areas of concern 4) Three specific actions this month. Maximum 300 words.`
-      const response = await fetch('https://api.anthropic.com/v1/messages',{
+      const response = await fetch('/api/ai-generate',{
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+        body:JSON.stringify({prompt,max_tokens:1000})
       })
       const data = await response.json()
-      const text = data.content?.[0]?.text||'Report unavailable'
+      const text = data.text||'Report unavailable'
       const {data:saved} = await supabase.from('ai_health_checks').upsert({
         client_id:clientId, period:targetPeriod, report_text:text,
         triggered_by:'manual', generated_at:new Date().toISOString(), visible_to_ceo:true,
@@ -2988,12 +2988,12 @@ Data:
 - Business units: ${config.business_units.filter(u=>u.active).map(u=>u.name).join(', ')}
 
 Write 4-5 short paragraphs telling the story of this business right now. Speak directly to the owner. No headers, no bullets, no jargon. Maximum 350 words.`
-      const response = await fetch('https://api.anthropic.com/v1/messages',{
+      const response = await fetch('/api/ai-generate',{
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+        body:JSON.stringify({prompt,max_tokens:1000})
       })
       const data = await response.json()
-      const text = data.content?.[0]?.text||'Narrative unavailable'
+      const text = data.text||'Narrative unavailable'
       const {data:saved} = await supabase.from('coach_briefings').insert([{
         client_id:clientId, briefing_text:text, visit_context:'Monthly Narrative',
         period_covered:new Date().toLocaleString('en-GB',{month:'long',year:'numeric'}),

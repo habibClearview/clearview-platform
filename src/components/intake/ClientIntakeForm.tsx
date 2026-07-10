@@ -2,6 +2,7 @@
 'use client'
 import React, { useState, useEffect, Component } from 'react'
 import { supabase } from '@/lib/supabase'
+import SpreadsheetUpload from '@/components/intake/SpreadsheetUpload'
 
 const C = {
   navy:'#1B2A4A', cyan:'#00B4D8', cream:'#F8F4EE', white:'#FFFFFF',
@@ -55,6 +56,7 @@ class IntakeErrorBoundary extends Component<{children:React.ReactNode},{hasError
 
 function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
   const [step, setStep] = useState(0)
+  const [uploadMode, setUploadMode] = useState(false)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -66,7 +68,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
     country:'Uganda', sector:'', currency:'UGX',
     year_established:'', legal_structure:'', sales_channel:'',
     season_name:'', year_round:'Year-round',
-    dso:0,
+    dso:0, dpo:0,
     shareholder_contribution:0, grant_non_repayable:0, grant_recoverable:0,
     bank_loan:0, annual_interest_rate:18, loan_tenor_years:2,
     grace_period_months:0, fixed_assets:0, opening_cash_balance:0,
@@ -252,6 +254,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
             fixed_assets: business.fixed_assets || 0,
           },
           dso_days: business.dso || 0,
+          dpo_days: business.dpo || 0,
           season_name: business.season_name || '',
           year_round: business.year_round || 'Year-round',
           year_established: business.year_established || '',
@@ -337,6 +340,20 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
             <p style={{fontSize:'0.88rem',color:C.slate,lineHeight:1.8,marginBottom:'1rem'}}>For each product category, you will enter: (1) Sales Revenue — what customers paid you, and (2) Cost of Goods — what you paid to procure or produce those goods. These can be different months — a business may buy inputs in one month and sell them over the next two or three months. Your cash flow will handle the timing automatically.</p>
             <p style={{fontSize:'0.88rem',color:C.slate,lineHeight:1.8,marginBottom:'1.5rem'}}>Estimates are fine where exact figures are not available. This takes about 20-30 minutes.</p>
             <button style={btn()} onClick={()=>setStep(1)}>Get Started</button>
+
+            <div style={{marginTop:'2rem',paddingTop:'1.5rem',borderTop:`1px solid ${C.border}`}}>
+              <div style={{fontWeight:700,color:C.navy,marginBottom:'0.4rem',fontSize:'0.95rem'}}>Prefer to work in Excel?</div>
+              <p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.7,marginBottom:'0.9rem'}}>Download the Clearview data-capture template, fill it in offline, then upload the completed file instead of filling in this form.</p>
+              <div style={{display:'flex',gap:'0.75rem',flexWrap:'wrap',alignItems:'center'}}>
+                <a href="/Clearview_Data_Capture_Template_v7.xlsx" download style={{...ghostBtn,textDecoration:'none',display:'inline-block'}}>⬇ Download Template</a>
+                <button style={smallBtn(C.teal)} onClick={()=>setUploadMode(m=>!m)}>{uploadMode?'Hide upload':'Upload completed template'}</button>
+              </div>
+              {uploadMode && (
+                <div style={{marginTop:'1.25rem'}}>
+                  <SpreadsheetUpload intakeToken={intakeToken} onSuccess={()=>setSubmitted(true)}/>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -365,6 +382,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
                 {['Year-round','Seasonal'].map(v=><option key={v} value={v}>{v}</option>)}
               </select></div>
               <div><label style={lbl}>Avg days customers take to pay</label><input type="number" style={inp} placeholder="0 = cash only" value={business.dso||''} onChange={e=>setBusiness(b=>({...b,dso:Number(e.target.value)}))}/></div>
+              <div><label style={lbl}>Avg days you take to pay suppliers</label><input type="number" style={inp} placeholder="0 = pay immediately" value={business.dpo||''} onChange={e=>setBusiness(b=>({...b,dpo:Number(e.target.value)}))}/></div>
             </div>
             <div style={{display:'flex',gap:'0.6rem',marginTop:'1.25rem'}}>
               <button style={ghostBtn} onClick={()=>setStep(0)}>Back</button>
