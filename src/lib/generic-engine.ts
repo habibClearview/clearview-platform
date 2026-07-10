@@ -560,7 +560,10 @@ export function runGenericModel(
         Object.entries(actuals[unit.id]).forEach(([period, lineVals]) => {
           const d = new Date(period)
           const startD = new Date(config.start_date)
-          const mIdx = (d.getFullYear() - startD.getFullYear()) * 12 + (d.getMonth() - startD.getMonth())
+          // Use UTC to match buildYearGroups / todayMonthIndex; period keys and
+          // start_date parse as UTC midnight, so a local getMonth() would shift
+          // the month (dropping or misfiling actuals) in any timezone behind UTC.
+          const mIdx = (d.getUTCFullYear() - startD.getUTCFullYear()) * 12 + (d.getUTCMonth() - startD.getUTCMonth())
           if (mIdx < 0 || mIdx >= months) return
           const val = lineVals[l.id]
           if (val === undefined) return
