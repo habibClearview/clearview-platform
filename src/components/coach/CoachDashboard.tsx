@@ -10,6 +10,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import SpreadsheetUpload from '@/components/intake/SpreadsheetUpload'
 import BuildStamp from '@/components/BuildStamp'
+import TeamPayments from '@/components/coach/TeamPayments'
 
 // \u2500\u2500\u2500 DESIGN TOKENS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 const C = {
@@ -720,7 +721,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   }
 
   // \u2500\u2500 HEADER + SHELL \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-  const mainNavTabs=[['overview','My Business'],['clients','Clients'],['programmes','Programmes'],['team','Team']]
+  const mainNavTabs=[['overview','My Business'],['clients','Clients'],['programmes','Programmes'],['team','Team'],['payments','Team & Payments']]
   return(
     <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif",background:C.cream,color:C.navy,minHeight:'100vh'}}>
       <BuildStamp/>
@@ -748,6 +749,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         {view==='client'&&<ClientDetailView/>}
         {view==='programmes'&&<ProgrammesView/>}
         {view==='team'&&<TeamView/>}
+        {view==='payments'&&<TeamPayments coImplementers={coImplementers} clients={clients} userName={userName}/>}
       </main>
       <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.67rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach \u00b7 Coach Dashboard \u00b7 habibonifade.com \u00b7 Confidential</footer>
     </div>
