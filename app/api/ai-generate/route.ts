@@ -6,6 +6,7 @@
 // the server, never in the browser. Returns { text }.
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
+import { CLEARVIEW_STYLE } from '@/lib/ai-style'
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: 'claude-opus-4-8',
         max_tokens: cappedTokens,
+        system: CLEARVIEW_STYLE,
         messages: [{ role: 'user', content: prompt }],
       }),
     })

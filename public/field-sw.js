@@ -26,7 +26,7 @@
 const DB_NAME = 'clearview_field_queue'
 const DB_VERSION = 2
 const EXPECTED_STORES = ['sales', 'costs', 'uncategorizedCosts', 'meta'] // must match field-db.ts's stores: {...} keys
-const CACHE_NAME = 'clearview-field-shell-v1'
+const CACHE_NAME = 'clearview-field-shell-v2'
 const SYNC_TAG = 'clearview-field-sync'
 
 // ── App shell caching ──────────────────────────────────────────
