@@ -75,6 +75,21 @@ whose own "graduation" is being paid directly by clients. Implications:
   weans the practice off one-off programme project fees. Clearview is the coach's graduation vehicle,
   not just a product he sells.
 
+## Coach revenue streams (three; two are independent)
+
+1. **Programme advisory** — GtCV paid by a programme (grant money). The lumpy, project-based income.
+2. **Self-funded GtCV advisory** — independent NGOs paying to go through the canvas themselves. Independent.
+3. **Clearview subscriptions** — independent, recurring, client-paid. Independent.
+
+Streams 2 and 3 are the coach's OWN commercial base (independent revenue) — the graduation metric.
+Surface "independent clients" count and the independent share of revenue on the coach's home tab.
+
+## GtCV zone progression is gate-driven, not AI
+
+A client's position on the 9-zone tracker advances when a **decision gate is signed off as complied-with**
+(in the online GtCV that's a system event; until then a one-tap "mark gate closed" by coach/co-implementer).
+No AI inference required.
+
 ## Dashboard direction (coach)
 
 - **Tab 1 "My Business"** (coach's own book): engagements by mode; revenue paid-up / invoiced /
