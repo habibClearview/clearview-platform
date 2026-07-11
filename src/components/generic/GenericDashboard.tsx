@@ -3500,7 +3500,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
         return (
         <div>
           <SectionLabel>Where the business stands</SectionLabel>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(215px,1fr))',gap:'1rem'}}>
+          <div className="cv-grid-4">
             <ScoreDonut label="Credit Risk" display={`${s.score}/100`} frac={s.score/100} rating={s.classification} color={s.classColor}/>
             <ScoreDonut label="Going Concern" display={`${s.gcScore}/20`} frac={s.gcScore/20} rating={s.gcRating} color={s.gcColor}/>
             <ScoreDonut label="Investment Readiness" display={`${s.irScore}/30`} frac={s.irScore/30} rating={s.irTier} color={s.irColor}/>
@@ -3619,7 +3619,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
         return (
         <div>
           <SectionLabel>Credit Risk · Score</SectionLabel>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(215px,1fr))',gap:'1rem'}}>
+          <div className="cv-grid-4">
             <ScoreDonut label="Credit Risk" display={`${s.score}/100`} frac={s.score/100} rating={s.classification} color={s.classColor}/>
             <StatCard label="Minimum DSCR" value={dscrLabel(s)} rating={!s.hasDebt?'No debt':s.dscrMin===null?'Not yet due':dscrRating(s)} color={dscrColor(s,C)} valueColor={dscrColor(s,C)} ratingColor={dscrColor(s,C)}/>
             <StatCard label="Revenue trend" value={s.revTrend} rating={s.revTrend==='Growing'?'Healthy':s.revTrend==='Stable'?'Steady':'Watch'} color={trendCol} valueColor={trendCol} ratingColor={trendCol}/>
@@ -3627,7 +3627,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
           </div>
 
           <SectionLabel right={<span onClick={()=>onNavigate&&onNavigate('actuals_wc')} style={{color:C.teal,textTransform:'none',letterSpacing:0,cursor:'pointer'}}>Enter on Actuals &amp; Working Capital &rarr;</span>}>Payment behaviour · trade credit</SectionLabel>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(215px,1fr))',gap:'1rem'}}>
+          <div className="cv-grid-4">
             <StatCard label="Days to collect (DSO)" value={hasTc?`${tc.dso.toFixed(0)}d`:'n/a'} rating={hasTc?(tc.dso>45?'Slow':'Normal'):'No data'} color={hasTc&&tc.dso>45?C.red:C.green} valueColor={hasTc&&tc.dso>45?C.red:C.navy} ratingColor={hasTc&&tc.dso>45?C.red:C.slate}/>
             <StatCard label="Days to pay (DPO)" value={hasTc?`${tc.dpo.toFixed(0)}d`:'n/a'} rating={hasTc?'Normal':'No data'} color={C.green} ratingColor={C.slate}/>
             <StatCard label="Cash conversion gap" value={hasTc?`${gap.toFixed(0)}d`:'n/a'} rating={hasTc?(gap<=0?'Supplier-financed':gap>30?'Cash tied up':'Manageable'):'No data'} color={gapCol} valueColor={hasTc?gapCol:C.navy} ratingColor={hasTc?gapCol:C.slate}/>
@@ -3679,7 +3679,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
           </div>
 
           <SectionLabel>Score &amp; key drivers</SectionLabel>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:'1rem'}}>
+          <div className="cv-grid-3">
             <ScoreDonut label="Going Concern" display={`${s.gcScore}/20`} frac={s.gcScore/20} rating={s.gcRating} color={s.gcColor}/>
             {heads.map(f=>(
               <ScoreDonut key={f.key} label={f.name} display={f.headVal} frac={f.sc/f.max} rating={f.headRating} color={facColor(f.sc/f.max)}/>
@@ -3687,8 +3687,8 @@ Write a status report, not a letter. Do not address the reader. Do not open with
           </div>
 
           <SectionLabel>Five factors</SectionLabel>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gridAutoRows:'1fr',gap:'0.85rem'}}>
-            <div style={{...card,margin:0,padding:0,overflow:'hidden',gridColumn:'1 / 3',gridRow:'1 / 3',display:'flex',flexDirection:'column'}}>
+          <div className="cv-gc-grid">
+            <div className="cv-dim-radar" style={{...card,margin:0,padding:0,overflow:'hidden',display:'flex',flexDirection:'column'}}>
               <div style={cardHead}>Going concern profile</div>
               <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'0.4rem'}}>
                 <RadarChart color={s.gcColor} axes={gcFactors.map(f=>({label:f.radar,frac:f.sc/f.max}))}/>
@@ -3761,7 +3761,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
               const investorFit = computeFitScore(lrsCurrent, FIT_SCORE_PRESETS.investor.weights)
               const lrsWord = lrsCurrent.score>=70?'Strong':lrsCurrent.score>=50?'Building':lrsCurrent.score>=30?'Developing':'Early'
               return (
-                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:'1rem'}}>
+                <div className="cv-grid-3">
                   <ScoreDonut label="Liquidity Readiness" display={`${Math.round(lrsCurrent.score)}/100`} frac={lrsCurrent.score/100} rating={lrsWord} color={scoreColor(lrsCurrent.score)}/>
                   <ScoreDonut label="Bank Fit" display={`${Math.round(bankFit)}/100`} frac={bankFit/100} rating="Re-weighted" color={scoreColor(bankFit)}/>
                   <ScoreDonut label="Investor Fit" display={`${Math.round(investorFit)}/100`} frac={investorFit/100} rating="Re-weighted" color={scoreColor(investorFit)}/>
@@ -3776,8 +3776,8 @@ Write a status report, not a letter. Do not address the reader. Do not open with
               const maxLift = Math.max(1, Math.round(weakest.weight*(100-weakest.dim.score)))
               const fieldWeak = weakest.key==='visibility'
               return (
-                <div style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gridAutoRows:'1fr',gap:'0.85rem'}}>
-                  <div style={{...card,margin:0,padding:0,overflow:'hidden',gridColumn:'1 / 3',gridRow:'1 / 3',display:'flex',flexDirection:'column'}}>
+                <div className="cv-dim-grid">
+                  <div className="cv-dim-radar" style={{...card,margin:0,padding:0,overflow:'hidden',display:'flex',flexDirection:'column'}}>
                     <div style={cardHead}>Readiness profile</div>
                     <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'0.4rem'}}>
                       <RadarChart color={C.teal} axes={dims.map(d=>({label:d.label.split(' ')[0],frac:d.dim.score/100}))}/>
@@ -3827,6 +3827,32 @@ Write a status report, not a letter. Do not address the reader. Do not open with
               const liqRows:{k:string;v:string;vColor?:string}[] = []
               if (runwayMonths!==null) liqRows.push({k:'Cash runway', v:`${runwayMonths.toFixed(1)} mo`, vColor: runwayMonths>=3?C.navy:C.amber})
               liqRows.push({k:'Cash cycle', v:`${tc.cashConversionGap.toFixed(0)}d`, vColor: tc.cashConversionGap<=0?C.green:tc.cashConversionGap>30?C.red:C.amber})
+              // Current & quick ratio, computed honestly from what the model
+              // actually holds -- nothing fabricated. Current assets = latest
+              // cash (floored at 0 for the ratio; a negative balance is an
+              // overdraft, flagged separately) + receivables outstanding.
+              // Current liabilities = payables outstanding + loan principal due
+              // within the next 12 months (summed from the debt schedule's
+              // per-month principal, starting at the current month). Quick
+              // ratio == current ratio because no inventory sits on the balance
+              // sheet. n/a when there are no current liabilities.
+              const cashLast = result.bs.cash?.[lastIdx] || 0
+              const receivablesLast = tc.totalReceivableOutstanding?.[lastIdx] || 0
+              const payablesLast = tc.totalPayableOutstanding?.[lastIdx] || 0
+              const curBoundary = result.cf.act_mask.lastIndexOf(true)
+              const loanFromIdx = curBoundary>=0 ? curBoundary : 0
+              const loanCurrentPortion = (debtSched.totalPrincipal||[]).slice(loanFromIdx, loanFromIdx+12).reduce((a:number,b:number)=>a+b,0)
+              const currentAssets = Math.max(0, cashLast) + receivablesLast
+              const currentLiabilities = payablesLast + loanCurrentPortion
+              const ratioColor = (r:number) => r>=1.5?C.green:r>=1?C.amber:C.red
+              if (currentLiabilities>0) {
+                const cr = currentAssets/currentLiabilities
+                liqRows.push({k:'Current ratio', v: cr.toFixed(2), vColor: ratioColor(cr)})
+                liqRows.push({k:'Quick ratio', v: cr.toFixed(2), vColor: ratioColor(cr)})
+              } else {
+                liqRows.push({k:'Current ratio', v:'n/a'})
+                liqRows.push({k:'Quick ratio', v:'n/a'})
+              }
               const retRows:{k:string;v:string;vColor?:string}[] = [
                 {k:'Revenue CAGR', v: revenueCagr!==null?pct(revenueCagr):'n/a'},
                 {k:'NPV', v: fmt(npvL,cc), vColor: npvL>=0?C.green:C.red},
@@ -3835,16 +3861,17 @@ Write a status report, not a letter. Do not address the reader. Do not open with
               ]
               return (
                 <>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'1rem'}}>
+                  <div className="cv-grid-4">
                     <MetricGroup title="Profitability" color={C.green} rows={profitRows}/>
                     <MetricGroup title="Debt & coverage" color={C.red} rows={debtRows}/>
                     <MetricGroup title="Liquidity" color={C.cyan} rows={liqRows}/>
                     <MetricGroup title="Returns & value" color={C.purple} rows={retRows}/>
                   </div>
                   <p style={{fontSize:'0.68rem',color:C.slate,marginTop:'0.5rem',lineHeight:1.5}}>
-                    Current ratio and quick ratio are omitted: this model does not split the balance sheet into current vs
-                    non-current items, so they cannot be derived honestly. EBIT equals EBITDA here as no depreciation is modelled;
-                    coverage ratios use the latest full financial year.
+                    Current ratio = (cash + receivables outstanding) &divide; (payables outstanding + loan principal due in the next 12 months).
+                    Quick ratio equals the current ratio here because no inventory is held on the balance sheet. Cash is floored at zero for the
+                    ratio (a negative balance is an overdraft, flagged separately in the cash warning). EBIT equals EBITDA here as no depreciation
+                    is modelled; coverage ratios use the latest full financial year.
                   </p>
                 </>
               )
@@ -5180,6 +5207,56 @@ function InvestmentPitchDownload({clientId}:{clientId:string}) {
   )
 }
 
+// Small "at a glance" position card (mockup ".kc"): a border-left accent,
+// a monospace uppercase label, a serif value and a monospace descriptor.
+// Shared by the Cash Flow and Balance Sheet tabs. Colours come from C tokens.
+function GlanceCard({label,value,desc,accent,valueColor,descColor}:{label:string;value:string;desc?:React.ReactNode;accent:string;valueColor?:string;descColor?:string}) {
+  return (
+    <div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)',borderLeft:`4px solid ${accent}`}}>
+      <div style={{fontFamily:'monospace',fontSize:'0.56rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.35rem'}}>{label}</div>
+      <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:valueColor||C.navy,lineHeight:1.1}}>{value}</div>
+      {desc&&<div style={{fontSize:'0.66rem',marginTop:'0.18rem',fontFamily:'monospace',color:descColor||C.slate,display:'flex',alignItems:'center',gap:'0.35rem'}}>{desc}</div>}
+    </div>
+  )
+}
+
+// Cash close series drawn as a solid line over the actuals and a dashed line
+// over the projection, with an amber "today · projection starts" marker at the
+// actual/plan boundary. No calculation -- it plots cf.close as the engine
+// produced it. nowIdx is the last actual month (from cf.act_mask).
+function CashProjectionChart({vals,months,nowIdx,minIdx,cc}:{vals:number[];months:string[];nowIdx:number;minIdx:number;cc:string}) {
+  const n=vals.length
+  if(!n) return null
+  const W=680,H=200,padL=52,padR=14,padT=24,padB=26
+  const maxV=Math.max(0,...vals), minV=Math.min(0,...vals), span=(maxV-minV)||1
+  const x=(i:number)=> padL+(n<=1?0:(i/(n-1))*(W-padL-padR))
+  const y=(v:number)=> padT+(1-(((v||0)-minV)/span))*(H-padT-padB)
+  const pts=(from:number,to:number)=>{const a=[];for(let i=Math.max(0,from);i<=Math.min(n-1,to);i++)a.push(`${x(i).toFixed(1)},${y(vals[i]).toFixed(1)}`);return a.join(' ')}
+  const nb=Math.max(0,Math.min(n-1,nowIdx))
+  const short=(v:number)=>{const a=Math.abs(v);const s=v<0?'-':'';return a>=1e9?`${s}${(a/1e9).toFixed(1)}B`:a>=1e6?`${s}${(a/1e6).toFixed(0)}M`:a>=1e3?`${s}${(a/1e3).toFixed(0)}K`:`${Math.round(v)}`}
+  const ticks=[minV,minV+span/2,maxV]
+  const xi=Array.from(new Set([0,Math.round((n-1)/3),Math.round(2*(n-1)/3),n-1]))
+  return (
+    <div style={{overflowX:'auto'}}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:'block',minWidth:420}}>
+        {ticks.map((t,i)=>(<g key={i}>
+          <line x1={padL} y1={y(t)} x2={W-padR} y2={y(t)} style={{stroke:t===0?C.red:'var(--cv-border-soft)'}} strokeDasharray={t===0?'3 3':undefined} opacity={t===0?0.55:1}/>
+          <text x={4} y={y(t)+3} fontSize="9" style={{fill:t===0?C.red:C.slate}} fontFamily="monospace">{short(t)}</text>
+        </g>))}
+        {/* today / projection-start marker at the actual/plan boundary */}
+        <line x1={x(nb)} y1={padT-8} x2={x(nb)} y2={H-padB} style={{stroke:C.amber}} strokeDasharray="4 3" strokeWidth="1.5"/>
+        <text x={x(nb)} y={padT-11} fontSize="8.5" style={{fill:C.amber}} fontFamily="monospace" textAnchor="middle">today · projection starts</text>
+        {nb>0 && <polyline fill="none" style={{stroke:C.teal}} strokeWidth="2.5" points={pts(0,nb)}/>}
+        {nb<n-1 && <polyline fill="none" style={{stroke:C.teal}} strokeWidth="2.5" strokeDasharray="6 4" points={pts(nb,n-1)}/>}
+        {nb===n-1 && n===1 && <circle cx={x(0)} cy={y(vals[0])} r="3" style={{fill:C.teal}}/>}
+        <circle cx={x(minIdx)} cy={y(vals[minIdx])} r="4" style={{fill:C.red}}/>
+        <text x={x(minIdx)} y={y(vals[minIdx])+16} fontSize="9" style={{fill:C.red}} fontFamily="monospace" textAnchor="middle">{months[minIdx]||`M${minIdx+1}`} low</text>
+        {xi.map(i=>(<text key={i} x={x(i)} y={H-7} fontSize="9" style={{fill:C.slate}} textAnchor="middle" fontFamily="monospace">{months[i]||`M${i+1}`}</text>))}
+      </svg>
+    </div>
+  )
+}
+
 // ── CASH FLOW TAB ────────────────────────────────────────────
 function CashFlowTab({config,result,months,cc,closedPeriods}) {
   if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
@@ -5207,14 +5284,53 @@ function CashFlowTab({config,result,months,cc,closedPeriods}) {
     {label:'Total Debt Service',values:debt.totalRepayment,bold:true},
     {label:'Closing Loan Balance',values:debt.totalOutstanding,bold:true,highlight:true,aggregation:'endOfPeriod' as const},
   ] : []
+
+  // "Today" = the last actual month (the actual/plan boundary the engine
+  // already marks on every month via cf.act_mask). Everything after it is
+  // projection. If no month is actual yet, treat month 1 as the boundary.
+  const lastActualIdx = cf.act_mask.lastIndexOf(true)
+  const nowIdx = lastActualIdx>=0 ? lastActualIdx : 0
+  const warn = findCashWarningMonths(result, months)
+  const minIdx = Math.max(0, Math.min(cf.close.length-1, (result.metrics.min_cash_month||1)-1))
+  const minCash = result.metrics.min_cash
+  const minLabel = months[minIdx] || `Month ${result.metrics.min_cash_month}`
+  const cashNow = cf.close[nowIdx] ?? 0
+  const cashNowLabel = months[nowIdx] || `Month ${nowIdx+1}`
+  const projClose = cf.close[cf.close.length-1] ?? 0
+
   return (
     <div>
-      <div style={kpiGrid}>
-        <KPI label="Opening Cash" value={fmt(cf.open[0],cc)}/>
-        <KPI label="Month 6 Cash" value={fmt(cf.close[5]||0,cc)} color={(cf.close[5]||0)>=0?C.navy:C.red}/>
-        <KPI label="Closing Cash" value={fmt(cf.close[cf.close.length-1],cc)} color={cf.close[cf.close.length-1]>=0?C.navy:C.red}/>
-        <KPI label="Lowest Point" value={fmt(result.metrics.min_cash,cc)} sub={`Month ${result.metrics.min_cash_month}`} color={result.metrics.min_cash>=0?C.navy:C.red}/>
+      <SectionLabel>Cash at a glance</SectionLabel>
+      <div className="cv-grid-4">
+        <GlanceCard label={`Cash now (${cashNowLabel})`} value={fmt(cashNow,cc)} desc={lastActualIdx>=0?'latest actual':'plan · no actuals yet'} accent={cashNow>=0?C.navy:C.red} valueColor={cashNow>=0?C.navy:C.red}/>
+        <GlanceCard label="Projected low" value={fmt(minCash,cc)} desc={minLabel} accent={minCash>=0?C.teal:C.red} valueColor={minCash>=0?C.navy:C.red}/>
+        <GlanceCard label="Months negative" value={String(warn.length)} desc="in the projection" accent={warn.length>0?C.red:C.green} valueColor={warn.length>0?C.red:C.green}/>
+        <GlanceCard label="Projected closing" value={fmt(projClose,cc)} desc="end of plan" accent={C.teal} valueColor={projClose>=0?C.navy:C.red}/>
       </div>
+
+      {warn.length>0 && (
+        <div style={{marginTop:'1.1rem',background:'var(--cv-tint-red)',border:`1px solid ${C.red}`,borderLeft:`4px solid ${C.red}`,borderRadius:14,padding:'0.85rem 1.1rem',display:'flex',alignItems:'center',gap:'0.9rem',flexWrap:'wrap'}}>
+          <div style={{flex:1,minWidth:220}}>
+            <div style={{display:'flex',alignItems:'center',gap:'0.5rem',fontWeight:700,color:C.red,fontSize:'0.92rem'}}><span aria-hidden="true">&#9888;</span> Cash flow early warning</div>
+            <div style={{fontSize:'0.82rem',color:C.navy,lineHeight:1.5,marginTop:'0.2rem'}}>The projection dips below zero, lowest <b>{fmt(minCash,cc)} in {minLabel}</b>, with <b>{warn.length} month{warn.length>1?'s':''}</b> at risk across the plan. Arrange working capital before then.</div>
+          </div>
+        </div>
+      )}
+
+      <div style={{...card,padding:0,overflow:'hidden',marginTop:'1.1rem'}}>
+        <div style={{...cardHead,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.5rem'}}>
+          <span>Cash balance over time</span>
+          <span style={{display:'flex',gap:'1rem',fontSize:'0.68rem',color:C.slate,fontFamily:'monospace'}}>
+            <span><span style={{display:'inline-block',width:22,borderTop:`2px solid ${C.teal}`,verticalAlign:'middle',marginRight:5}}/>Actual to date</span>
+            <span><span style={{display:'inline-block',width:22,borderTop:`2px dashed ${C.teal}`,verticalAlign:'middle',marginRight:5}}/>Projected</span>
+          </span>
+        </div>
+        <div style={{padding:'0.8rem 1rem 1rem'}}>
+          <CashProjectionChart vals={cf.close} months={months} nowIdx={nowIdx} minIdx={minIdx} cc={cc}/>
+        </div>
+      </div>
+
+      <p style={{fontSize:'0.72rem',color:C.slate,margin:'0 0 0.5rem',lineHeight:1.5}}>Green cells are posted actuals to date. Columns after {cashNowLabel} are projected.</p>
       <PLTableCollapsible title="Cash Flow Statement" rows={rows} months={months} startDate={config.start_date} cc={cc} showExport closedMask={closedMask}/>
       {hasLoan && <PLTableCollapsible title="Loan Repayment Schedule" rows={loanRows} months={months} startDate={config.start_date} cc={cc} showExport/>}
     </div>
@@ -5345,9 +5461,27 @@ function BalanceSheetTab({config,result,months,cc,P,closedPeriods,onCloseStatusC
     {label:'Total Liabilities',values:bs.total_liabilities,bold:true,aggregation:'endOfPeriod' as const},
     {label:'Total Equity & Liabilities',values:bs.total_equity_and_liabilities,bold:true,highlight:true,actualMask:bs.act_mask,aggregation:'endOfPeriod' as const},
   ]
+  // Latest month-end position. The engine guarantees the accounting identity
+  // (Assets = Equity + Liabilities) holds every month -- we compare the two
+  // latest totals to show the check, never to recompute anything.
+  const last = bs.total_assets.length-1
+  const totalAssets = bs.total_assets[last] ?? 0
+  const totalEquity = bs.total_equity[last] ?? 0
+  const totalLiab = bs.total_liabilities[last] ?? 0
+  const totalEandL = bs.total_equity_and_liabilities[last] ?? 0
+  const balanced = Math.abs(totalAssets - totalEandL) < 1
   return (
     <div>
+      <SectionLabel>Position at latest close</SectionLabel>
+      <div className="cv-grid-4" style={{marginBottom:'1.25rem'}}>
+        <GlanceCard label="Total assets" value={fmt(totalAssets,cc)} desc="cash, receivables & fixed assets" accent={C.navy}/>
+        <GlanceCard label="Total equity" value={fmt(totalEquity,cc)} desc="capital, grants & retained earnings" accent={C.teal} valueColor={totalEquity>=0?C.navy:C.red}/>
+        <GlanceCard label="Total liabilities" value={fmt(totalLiab,cc)} desc="loans, payables & grant liability" accent={C.amber}/>
+        <GlanceCard label="Balance check" value={balanced?'Balanced':'Check figures'} valueColor={balanced?C.green:C.amber} accent={balanced?C.green:C.amber}
+          desc={<><span aria-hidden="true">{balanced?'✓':'⚠'}</span> Assets = Equity + Liabilities</>} descColor={balanced?C.green:C.amber}/>
+      </div>
       <YearCloseControls config={config} result={result} closedPeriods={closedPeriods} P={P} onCloseStatusChanged={onCloseStatusChanged}/>
+      <p style={{fontSize:'0.72rem',color:C.slate,margin:'0 0 0.5rem',lineHeight:1.5}}>Each FY column is the year-end position; click a year to open its month-end balances. Green cells are posted actuals.</p>
       <PLTableCollapsible title="Balance Sheet" rows={rows} months={months} startDate={config.start_date} cc={cc} showExport closedMask={closedMask}/>
     </div>
   )
