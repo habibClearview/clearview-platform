@@ -137,7 +137,7 @@
   /* White-alpha header tokens intentionally unchanged (header stays dark) */
 }
 
-body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--cv-bg); color: var(--cv-navy); }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; font-size: 16px; background: var(--cv-bg); color: var(--cv-navy); }
 input, select, button, textarea { font-family: inherit; }
 input:focus, select:focus { outline: 2px solid var(--cv-cyan); outline-offset: 1px; }
 
