@@ -28,7 +28,7 @@ const C = {
 }
 
 // ── Style helpers ────────────────────────────────────────────
-const card: React.CSSProperties = {background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}
+const card: React.CSSProperties = {background:C.white,border:'1px solid #E6ECF2',borderRadius:14,padding:'1.4rem 1.6rem',marginBottom:'1.35rem',boxShadow:'0 1px 2px rgba(16,42,67,0.05), 0 10px 30px rgba(16,42,67,0.05)'}
 const secH: React.CSSProperties = {fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
 const inp:  React.CSSProperties = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'inherit',background:'#F4F8FC',color:C.navy,boxSizing:'border-box'}
 const lbl:  React.CSSProperties = {display:'block',fontWeight:600,fontSize:'0.8rem',marginBottom:'0.22rem',color:C.navy}
@@ -48,11 +48,12 @@ function navBtn(active: boolean): React.CSSProperties {
 
 // ── Shared components ────────────────────────────────────────
 function KPI({label,value,sub,color}:{label:string;value:string;sub?:string;color?:string}) {
+  const accent = color || C.cyan
   return (
-    <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1rem 1.1rem'}}>
-      <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.1em',color:C.slate,textTransform:'uppercase',marginBottom:'0.28rem'}}>{label}</div>
-      <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:color||C.navy}}>{value}</div>
-      {sub&&<div style={{fontSize:'0.7rem',color:C.slate,marginTop:'0.18rem'}}>{sub}</div>}
+    <div style={{background:C.white,borderRadius:14,padding:'1.15rem 1.3rem 1.25rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px rgba(16,42,67,0.05), 0 12px 32px rgba(16,42,67,0.06)'}}>
+      <div style={{fontFamily:'monospace',fontSize:'0.6rem',letterSpacing:'0.14em',color:C.slate,textTransform:'uppercase',marginBottom:'0.45rem'}}>{label}</div>
+      <div style={{fontFamily:'Georgia,serif',fontSize:'1.75rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>
+      {sub&&<div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.32rem'}}>{sub}</div>}
     </div>
   )
 }
@@ -653,7 +654,7 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGo
         <KPI label="Gross Profit" value={fmt(m.total_gp,cc)} sub={pct(m.gross_margin)} color={m.total_gp>=0?C.green:C.red}/>
         <KPI label="EBITDA" value={fmt(m.total_ebitda,cc)} sub={pct(m.net_margin)} color={m.total_ebitda>=0?C.teal:C.red}/>
         <KPI label="Min Cash" value={fmt(m.min_cash,cc)} sub={`Month ${m.min_cash_month}`} color={m.min_cash>=0?C.navy:C.red}/>
-        <KPI label="Break-Even" value={fmt(m.business_breakeven,cc)} sub="Annual revenue needed" color={C.amber}/>
+        <KPI label="Breakeven" value={fmt(m.business_breakeven,cc)} sub="Annual revenue needed" color={C.amber}/>
         <KPI label="Revenue/Head" value={fmt(m.revenue_per_head,cc)} sub={`${m.total_headcount} staff`} color={C.purple}/>
       </div>
       {/* Unit performance cards */}
