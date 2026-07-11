@@ -915,9 +915,16 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
   const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active)?.id||'')
   const [selSection, setSelSection] = useState<LineCategory>('revenue')
   const [saving, setSaving] = useState(false)
+  // Cost of Sales product scope: '__whole__' = whole unit / shared, otherwise a
+  // revenue line id. NOTE: no persisted cost->revenue link exists in the model
+  // (GenericPlanLine has no revenue_line_id), so this is a presentation-only
+  // grouping for now -- selecting a product does not filter or persist a link.
+  const [costProduct, setCostProduct] = useState<string>('__whole__')
 
   const unit = config.business_units.find(u=>u.id===selUnit)
   const lines = config.plan_lines.filter(l=>l.unit_id===selUnit&&l.category===selSection&&l.active)
+  // Revenue lines of the selected unit -- feed the Cost of Sales product selector.
+  const revLines = config.plan_lines.filter(l=>l.unit_id===selUnit&&l.category==='revenue'&&l.active)
 
   function updateLine(lineId:string, mIdx:number, val:number) {
     const newConfig = {...config, plan_lines: config.plan_lines.map(l =>
@@ -963,7 +970,69 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
     onSave({...config, plan_lines:config.plan_lines.map(l=>l.id===lineId?{...l,active:false}:l)})
   }
 
+  // Bulk setter for a line's whole monthly_plan array -- same onSave contract
+  // and same plan_lines.map shape as updateLine (the per-month editor), just
+  // writing the entire array at once so a fill helper is a single save rather
+  // than a loop of stale-config updates. Used only by the FILL buttons below.
+  function setLineMonthlyPlan(lineId:string, arr:number[]) {
+    onSave({...config, plan_lines: config.plan_lines.map(l =>
+      l.id===lineId ? {...l, monthly_plan: arr} : l
+    )})
+  }
+
+  // ── Per-line FILL helpers ──────────────────────────────────
+  // All operate purely on monthly_plan via setLineMonthlyPlan (same path as the
+  // manual month inputs). monthly_plan is the real driver for standard revenue
+  // lines and for every cost/staff/overhead line; spread & service-fee lines
+  // drive off their sub-fields instead, so fills are not offered on them.
+  function fillSameEachMonth(l:GenericPlanLine) {
+    let val = l.monthly_plan.find(v=>v) // first non-zero
+    if (val===undefined||val===0) {
+      const entered = typeof window!=='undefined' ? window.prompt('Value to use for every month?','0') : null
+      if (entered===null) return
+      val = Number(entered)||0
+    }
+    setLineMonthlyPlan(l.id, l.monthly_plan.map(()=>val as number))
+  }
+  function fillGrow5(l:GenericPlanLine) {
+    // Per-calendar-year +5%: base is the first non-zero month, held flat within
+    // each 12-month year and stepped up 5% compounding at each year boundary.
+    let base = l.monthly_plan.find(v=>v)
+    if (base===undefined||base===0) {
+      const entered = typeof window!=='undefined' ? window.prompt('Starting monthly value to grow 5%/yr?','0') : null
+      if (entered===null) return
+      base = Number(entered)||0
+    }
+    const b = base as number
+    setLineMonthlyPlan(l.id, l.monthly_plan.map((_,m)=>Math.round(b*Math.pow(1.05,Math.floor(m/12)))))
+  }
+  function fillCopyLast(l:GenericPlanLine) {
+    // Copy the last edited (last non-zero) month forward to every later month.
+    let lastIdx = -1
+    for (let i=0;i<l.monthly_plan.length;i++) if (l.monthly_plan[i]) lastIdx=i
+    if (lastIdx<0) return
+    const val = l.monthly_plan[lastIdx]
+    setLineMonthlyPlan(l.id, l.monthly_plan.map((v,i)=>i>lastIdx?val:v))
+  }
+  function clearLine(l:GenericPlanLine) {
+    setLineMonthlyPlan(l.id, l.monthly_plan.map(()=>0))
+  }
+
+  // Set the active scenario -- same mechanism as the Scenarios tab: the engine
+  // reads whichever scenario carries active:true and applies its multipliers.
+  const scenarios = config.settings.scenarios||[]
+  const activeScenarioId = scenarios.find(s=>s.active)?.id||''
+  function setActiveScenario(id:string) {
+    onSave({...config, settings:{...config.settings,
+      scenarios: scenarios.map(s=>({...s, active:s.id===id}))
+    }})
+  }
+
   const sections: [LineCategory,string][] = [['revenue','Revenue'],['cost_of_sales','Cost of Sales'],['staff','Staff'],['direct_opex','Overheads']]
+  const sectionAccent: Record<string,string> = {revenue:C.green, cost_of_sales:C.red, staff:C.purple, direct_opex:C.amber}
+  const accent = sectionAccent[selSection]||C.cyan
+  const typeBadge = (lt:LineType):[string,string] =>
+    lt==='spread' ? ['Spread',C.purple] : lt==='service_fee' ? ['Service',C.teal] : ['Standard',C.slate]
 
   const unitRevenue = result?.unitPL[selUnit]
   const totals = selSection==='revenue' ? unitRevenue?.rev : selSection==='cost_of_sales' ? unitRevenue?.cogs : selSection==='staff' ? unitRevenue?.staff : unitRevenue?.opex
@@ -995,114 +1064,181 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
         ))}
       </div>
 
-      {/* Lines */}
-      <div style={card}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy}}>{unit?.name} — {sections.find(s=>s[0]===selSection)?.[1]}</div>
-          {P.canEditPlan&&<button style={addBtn(true)} onClick={()=>addLine(selSection)}>+ Add Line</button>}
-        </div>
+      {/* Instruction bar — calm workflow guidance + plan/actual legend */}
+      <div style={{display:'flex',alignItems:'center',gap:'0.9rem',flexWrap:'wrap',background:C.lightBg,border:'1px solid var(--cv-border-soft)',borderLeft:`4px solid ${accent}`,borderRadius:10,padding:'0.7rem 1rem',marginBottom:'1.1rem'}}>
+        <span style={{fontSize:'0.82rem',color:C.navy,lineHeight:1.5}}>Set your assumptions first, then fill each line month by month — use the quick-fill buttons or type directly into any cell.</span>
+        <span style={{display:'flex',alignItems:'center',gap:'0.9rem',marginLeft:'auto',fontSize:'0.7rem',color:C.slate,whiteSpace:'nowrap'}}>
+          <span style={{display:'inline-flex',alignItems:'center',gap:'0.35rem'}}><span style={{width:11,height:11,borderRadius:3,background:C.green,display:'inline-block'}}/>posted actual</span>
+          <span style={{display:'inline-flex',alignItems:'center',gap:'0.35rem'}}><span style={{width:11,height:11,borderRadius:3,background:C.border,display:'inline-block'}}/>plan</span>
+        </span>
+      </div>
 
-        {/* Header row */}
-        <div style={{overflowX:'auto'}}>
-          <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.76rem',fontFamily:'monospace'}}>
-            <thead>
-              <tr style={{background:C.lightBg}}>
-                <th style={{textAlign:'left',padding:'6px 8px',fontWeight:600,color:C.navy,minWidth:180,fontSize:'0.75rem'}}>Line</th>
-                {selSection==='revenue'&&<th style={{textAlign:'left',padding:'6px 8px',fontWeight:600,color:C.navy,minWidth:110,fontSize:'0.75rem'}}>Type</th>}
-                {months.map((m,i)=><th key={i} style={{textAlign:'right',padding:'6px 6px',color:C.slate,whiteSpace:'nowrap',fontSize:'0.68rem'}}>{m}</th>)}
-                <th style={{textAlign:'right',padding:'6px 8px',color:C.navy,fontWeight:700,borderLeft:`2px solid ${C.border}`,fontSize:'0.72rem'}}>Total</th>
-                {P.canEditPlan&&<th style={{width:30}}></th>}
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((l,ri)=>{
-                const isSpread = selSection==='revenue' && l.line_type==='spread'
-                const isServiceFee = selSection==='revenue' && l.line_type==='service_fee'
-                // For spread/service-fee lines, revenue is derived from the source
-                // fields (matches the formula in generic-engine.ts exactly) rather
-                // than monthly_plan, which the engine ignores for these line types.
-                // Spread revenue is the GROSS sale value (sell price x volume) --
-                // buy cost is a separate Cost of Sales line in the engine, not
-                // netted against revenue. Must match generic-engine.ts exactly or
-                // this row shows a different number than the Total row below it.
-                const revenueByMonth = isSpread
-                  ? (l.volume??[]).map((v,m)=>(l.sell_price?.[m]??0)*v)
-                  : isServiceFee
-                  ? (l.engagements??[]).map((e,m)=>(l.fee_per_engagement?.[m]??0)*e)
-                  : l.monthly_plan
-                const total = revenueByMonth.reduce((s,v)=>s+v,0)
-                const rowBg = ri%2===0?C.cream:C.white
-                return (
-                  <React.Fragment key={l.id}>
-                  <tr style={{background:rowBg}}>
-                    <td style={{padding:'5px 8px'}}>
-                      {P.canEditPlan
-                        ? <input style={{...inp,background:'transparent',border:'none',padding:0,fontSize:'0.8rem',fontFamily:'inherit'}}
-                            value={l.name} onChange={e=>updateLineName(l.id,e.target.value)}/>
-                        : <span style={{fontSize:'0.8rem',color:C.navy}}>{l.name}</span>
-                      }
-                    </td>
-                    {selSection==='revenue'&&(
-                      <td style={{padding:'5px 8px'}}>
-                        {P.canEditPlan
-                          ? <select style={{...inp,padding:'0.3rem 0.4rem',fontSize:'0.72rem'}}
-                              value={l.line_type} onChange={e=>changeLineType(l.id,e.target.value as LineType)}>
-                              <option value="standard">Standard</option>
-                              <option value="spread">Spread</option>
-                              <option value="service_fee">Service fee</option>
-                            </select>
-                          : <span style={{fontSize:'0.72rem',color:C.slate}}>{l.line_type==='spread'?'Spread':l.line_type==='service_fee'?'Service fee':'Standard'}</span>
-                        }
-                      </td>
-                    )}
-                    {(isSpread||isServiceFee) ? (
-                      revenueByMonth.map((v,m)=>(
-                        <td key={m} style={{padding:'4px 4px'}}>
-                          <span style={{display:'block',textAlign:'right',padding:'3px 5px',fontSize:'0.72rem',fontFamily:'monospace',color:C.slate}}>{fmt(v,cc)}</span>
-                        </td>
-                      ))
-                    ) : l.monthly_plan.map((v,m)=>(
-                      <td key={m} style={{padding:'4px 4px'}}>
-                        {P.canEditPlan
-                          ? <input type="number" style={{width:80,padding:'3px 5px',border:`1px solid ${C.border}`,borderRadius:3,fontSize:'0.72rem',fontFamily:'monospace',textAlign:'right',background:C.white,color:C.navy}}
-                              value={v??''} placeholder="0"
-                              onChange={e=>updateLine(l.id,m,Number(e.target.value))}/>
-                          : <span style={{display:'block',textAlign:'right',padding:'3px 5px',fontSize:'0.72rem'}}>{fmt(v,cc)}</span>
-                        }
-                      </td>
-                    ))}
-                    <td style={{padding:'5px 8px',textAlign:'right',fontWeight:700,color:C.navy,borderLeft:`2px solid ${C.border}`}}>{fmt(total,cc)}</td>
-                    {P.canEditPlan&&<td><button style={delBtn} onClick={()=>deleteLine(l.id)}>×</button></td>}
+      {/* Assumptions strip — real settings only (scenario). Payment-terms drivers
+          do not exist in this model, so they are omitted rather than faked. */}
+      <div style={{display:'flex',alignItems:'center',gap:'1.1rem',flexWrap:'wrap',background:C.white,border:'1px solid var(--cv-border-soft)',borderLeft:`4px solid ${C.cyan}`,borderRadius:10,padding:'0.75rem 1.1rem',marginBottom:'1.4rem',boxShadow:'0 1px 2px var(--cv-shadow-1)'}}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'0.88rem',fontWeight:700,color:C.navy}}>Assumptions</div>
+        <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
+          <label style={{...lbl,marginBottom:0}}>Scenario</label>
+          {scenarios.length>0
+            ? <select style={{...inp,width:'auto',minWidth:210}} value={activeScenarioId} disabled={!P.canEditPlan}
+                onChange={e=>setActiveScenario(e.target.value)} aria-label="Active scenario">
+                {scenarios.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
+              </select>
+            : <span style={{...hint,marginTop:0}}>No scenarios defined — add them in the Scenarios tab.</span>
+          }
+        </div>
+        <span style={{...hint,marginTop:0,maxWidth:360}}>Scenario multipliers are edited in the Scenarios tab. This model has no payment-terms (DSO/DPO) drivers, so those controls are intentionally omitted.</span>
+      </div>
+
+      {/* Cost of Sales — product / revenue-line scope selector */}
+      {selSection==='cost_of_sales' && (
+        <div style={{display:'flex',alignItems:'center',gap:'0.9rem',flexWrap:'wrap',background:C.white,border:'1px solid var(--cv-border-soft)',borderLeft:`4px solid ${C.red}`,borderRadius:10,padding:'0.75rem 1.1rem',marginBottom:'1.3rem',boxShadow:'0 1px 2px var(--cv-shadow-1)'}}>
+          <label style={{...lbl,marginBottom:0}}>Costs for</label>
+          <select style={{...inp,width:'auto',minWidth:220}} value={costProduct} onChange={e=>setCostProduct(e.target.value)} aria-label="Cost of sales product scope">
+            <option value="__whole__">Whole unit / shared</option>
+            {revLines.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+          <span style={{...hint,marginTop:0,maxWidth:440}}>Working view only: cost lines are not yet linked to a specific revenue line in the data model, so every cost line for this unit is shown regardless of the selection above.</span>
+        </div>
+      )}
+
+      {/* Section header + add */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,color:C.navy}}>{unit?.name} — {sections.find(s=>s[0]===selSection)?.[1]}</div>
+        {P.canEditPlan&&<button style={addBtn(true,accent)} onClick={()=>addLine(selSection)}>+ Add {selSection==='cost_of_sales'?'a cost':'line'}</button>}
+      </div>
+
+      {/* Line cards */}
+      {lines.length===0 && (
+        <div style={{...card,textAlign:'center',color:C.slate,fontSize:'0.85rem'}}>No lines yet. Use “+ Add” above to create one.</div>
+      )}
+      {lines.map((l,ri)=>{
+        const isSpread = selSection==='revenue' && l.line_type==='spread'
+        const isServiceFee = selSection==='revenue' && l.line_type==='service_fee'
+        // For spread/service-fee lines, revenue is derived from the source
+        // fields (matches the formula in generic-engine.ts exactly) rather
+        // than monthly_plan, which the engine ignores for these line types.
+        // Spread revenue is the GROSS sale value (sell price x volume) --
+        // buy cost is a separate Cost of Sales line in the engine, not
+        // netted against revenue. Must match generic-engine.ts exactly or
+        // this row shows a different number than the sub-row total below it.
+        const revenueByMonth = isSpread
+          ? (l.volume??[]).map((v,m)=>(l.sell_price?.[m]??0)*v)
+          : isServiceFee
+          ? (l.engagements??[]).map((e,m)=>(l.fee_per_engagement?.[m]??0)*e)
+          : l.monthly_plan
+        const total = revenueByMonth.reduce((s,v)=>s+v,0)
+        // Quick-fill writes monthly_plan; that is only the real driver for
+        // standard/non-revenue lines. Spread & service lines drive off their
+        // sub-fields, so fills are not offered for them (avoids a no-op).
+        const canFill = !(isSpread||isServiceFee)
+        const [badgeLabel,badgeColor] = typeBadge(l.line_type)
+        return (
+          <div key={l.id} style={{...card,padding:0,overflow:'hidden'}}>
+            {/* Header with coloured accent bar */}
+            <div style={{display:'flex',alignItems:'center',gap:'0.85rem',padding:'0.8rem 1.1rem',borderLeft:`5px solid ${accent}`,background:C.lightBg,borderBottom:'1px solid var(--cv-border-soft)',flexWrap:'wrap'}}>
+              <div style={{flex:'1 1 220px',minWidth:180}}>
+                {P.canEditPlan
+                  ? <input style={{...inp,background:'transparent',border:'none',padding:0,fontSize:'0.95rem',fontWeight:700,fontFamily:'Georgia,serif',color:C.navy}}
+                      value={l.name} onChange={e=>updateLineName(l.id,e.target.value)} aria-label="Line name"/>
+                  : <span style={{fontSize:'0.95rem',fontWeight:700,fontFamily:'Georgia,serif',color:C.navy}}>{l.name}</span>
+                }
+              </div>
+              {selSection==='revenue' && P.canEditPlan && (
+                <select style={{...inp,width:'auto',padding:'0.3rem 0.5rem',fontSize:'0.72rem'}}
+                  value={l.line_type} onChange={e=>changeLineType(l.id,e.target.value as LineType)} aria-label="Line type">
+                  <option value="standard">Standard</option>
+                  <option value="spread">Spread</option>
+                  <option value="service_fee">Service fee</option>
+                </select>
+              )}
+              <span style={{fontFamily:'monospace',fontSize:'0.6rem',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',color:badgeColor,border:`1px solid ${badgeColor}`,borderRadius:20,padding:'0.15rem 0.6rem',whiteSpace:'nowrap'}}>{badgeLabel}</span>
+              <div style={{textAlign:'right',minWidth:100}}>
+                <div style={{fontSize:'0.58rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.06em'}}>Annual total</div>
+                <div style={{fontFamily:'monospace',fontSize:'0.95rem',fontWeight:700,color:C.navy}}>{fmt(total,cc)}</div>
+              </div>
+              {P.canEditPlan&&<button style={delBtn} onClick={()=>deleteLine(l.id)} aria-label={`Delete ${l.name}`}>×</button>}
+            </div>
+
+            {/* Per-line quick-fill helpers (write monthly_plan via the same save path) */}
+            {P.canEditPlan && canFill && (
+              <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',padding:'0.65rem 1.1rem 0',alignItems:'center'}}>
+                <span style={{fontSize:'0.68rem',color:C.slate,marginRight:'0.15rem'}}>Quick fill:</span>
+                <button style={addBtn(true)} onClick={()=>fillSameEachMonth(l)}>Same each month</button>
+                <button style={addBtn(true)} onClick={()=>fillGrow5(l)}>Grow 5% / yr</button>
+                <button style={addBtn(true)} onClick={()=>fillCopyLast(l)}>Copy last month →</button>
+                <button style={addBtn(true,C.red)} onClick={()=>clearLine(l)}>Clear</button>
+              </div>
+            )}
+
+            {/* Month inputs (+ spread/service sub-rows unchanged) */}
+            <div style={{overflowX:'auto',padding:'0.7rem 1.1rem 1.1rem'}}>
+              <table style={{borderCollapse:'collapse',fontSize:'0.72rem',fontFamily:'monospace'}}>
+                <thead>
+                  <tr>
+                    <th style={{minWidth:96}}></th>
+                    {months.map((m,i)=><th key={i} style={{textAlign:'right',padding:'2px 4px',color:C.slate,whiteSpace:'nowrap',fontSize:'0.62rem',fontWeight:600}}>{m}</th>)}
+                    <th style={{textAlign:'right',padding:'2px 8px',color:C.navy,fontWeight:700,fontSize:'0.64rem',borderLeft:`2px solid ${C.border}`}}>Total</th>
+                    {P.canEditPlan&&<th style={{width:16}}></th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style={{padding:'3px 8px',fontSize:'0.66rem',color:C.slate,whiteSpace:'nowrap'}}>{(isSpread||isServiceFee)?'↳ Revenue':'Monthly plan'}</td>
+                    {(isSpread||isServiceFee)
+                      ? revenueByMonth.map((v,m)=>(
+                          <td key={m} style={{padding:'2px 4px'}}>
+                            <span style={{display:'block',textAlign:'right',padding:'3px 5px',fontSize:'0.72rem',color:C.slate}}>{fmt(v,cc)}</span>
+                          </td>
+                        ))
+                      : l.monthly_plan.map((v,m)=>(
+                          <td key={m} style={{padding:'2px 4px'}}>
+                            {P.canEditPlan
+                              ? <input type="number" style={{width:80,padding:'3px 5px',border:`1px solid ${C.border}`,borderRadius:3,fontSize:'0.72rem',fontFamily:'monospace',textAlign:'right',background:C.white,color:C.navy}}
+                                  value={v??''} placeholder="0"
+                                  onChange={e=>updateLine(l.id,m,Number(e.target.value))}/>
+                              : <span style={{display:'block',textAlign:'right',padding:'3px 5px',fontSize:'0.72rem'}}>{fmt(v,cc)}</span>
+                            }
+                          </td>
+                        ))}
+                    <td style={{padding:'3px 8px',textAlign:'right',fontWeight:700,color:C.navy,borderLeft:`2px solid ${C.border}`}}>{fmt(total,cc)}</td>
+                    {P.canEditPlan&&<td></td>}
                   </tr>
                   {isSpread && (
                     <LineFieldSubRows l={l} months={months} cc={cc} canEdit={P.canEditPlan}
-                      rowBg={rowBg} colSpanBefore={selSection==='revenue'?2:1}
+                      rowBg={C.white} colSpanBefore={1}
                       rows={SPREAD_SUBROWS} totalField="volume"
                       onUpdate={(field,m,val)=>updateLineArrayField(l.id,field as any,m,val)}/>
                   )}
                   {isServiceFee && (
                     <LineFieldSubRows l={l} months={months} cc={cc} canEdit={P.canEditPlan}
-                      rowBg={rowBg} colSpanBefore={selSection==='revenue'?2:1}
+                      rowBg={C.white} colSpanBefore={1}
                       rows={SERVICE_FEE_SUBROWS} totalField="engagements"
                       onUpdate={(field,m,val)=>updateLineArrayField(l.id,field as any,m,val)}/>
                   )}
-                  </React.Fragment>
-                )
-              })}
-              {/* Total row */}
-              {totals&&(
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      })}
+
+      {/* Section total */}
+      {totals&&(
+        <div style={{...card,padding:0,overflow:'hidden',borderTop:`3px solid ${accent}`}}>
+          <div style={{overflowX:'auto',padding:'0.8rem 1.1rem'}}>
+            <table style={{borderCollapse:'collapse',fontSize:'0.72rem',fontFamily:'monospace'}}>
+              <tbody>
                 <tr style={{background:'var(--cv-header)'}}>
-                  <td style={{padding:'6px 8px',fontWeight:700,color:'var(--cv-on-accent)',fontSize:'0.78rem'}}>Total</td>
-                  {selSection==='revenue'&&<td></td>}
-                  {totals.map((v,i)=><td key={i} style={{padding:'6px 6px',textAlign:'right',fontFamily:'monospace',fontSize:'0.72rem',color:C.cyan,fontWeight:700}}>{fmt(v,cc)}</td>)}
-                  <td style={{padding:'6px 8px',textAlign:'right',fontFamily:'monospace',fontWeight:700,color:C.cyan,borderLeft:`2px solid var(--cv-wa-20)`}}>{fmt(totals.reduce((s,v)=>s+v,0),cc)}</td>
-                  {P.canEditPlan&&<td></td>}
+                  <td style={{padding:'6px 10px',fontWeight:700,color:'var(--cv-on-accent)',fontSize:'0.78rem',whiteSpace:'nowrap'}}>Section total</td>
+                  {totals.map((v,i)=><td key={i} style={{padding:'6px 4px',textAlign:'right',fontSize:'0.7rem',color:C.cyan,fontWeight:700,minWidth:74}}>{fmt(v,cc)}</td>)}
+                  <td style={{padding:'6px 10px',textAlign:'right',fontWeight:700,color:C.cyan,borderLeft:'2px solid var(--cv-wa-20)'}}>{fmt(totals.reduce((s,v)=>s+v,0),cc)}</td>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Shared lines section */}
       {selSection==='staff'&&(
