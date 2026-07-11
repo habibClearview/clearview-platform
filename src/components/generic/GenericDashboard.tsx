@@ -3097,21 +3097,21 @@ Write a clear, plain-English health check report for the CEO. Include: 1) Overal
   async function generateNarrative() {
     setGeneratingNarrative(true)
     try {
-      const prompt = `You are writing this month's story for the owner of ${config.business_name}, an African MSME. Be short and direct. No filler.
+      const prompt = `This month's status report for ${config.business_name}.
 
 Data:
-Revenue: ${cc} ${m.total_revenue.toLocaleString()}, EBITDA margin: ${(m.net_margin*100).toFixed(1)}%
-Credit Risk: ${s.score}/100 (${s.classification}); Going Concern: ${s.gcScore}/20 (${s.gcRating}); Investment Readiness: ${s.irScore}/30 (${s.irTier})
-Debt service coverage: ${dscrLabel(s)}
+Revenue: ${cc} ${m.total_revenue.toLocaleString()}, trend ${s.revTrend}
+EBITDA: ${cc} ${m.total_ebitda.toLocaleString()} (${(m.net_margin*100).toFixed(1)}% margin)
+Minimum cash: ${cc} ${m.min_cash.toLocaleString()}; months where cash goes negative: ${warnings.length}
 Break-even revenue: ${cc} ${m.business_breakeven.toLocaleString()}
-Cash shortfall months: ${warnings.length>0?warnings.map(w=>w.month).join(', '):'none'}
 Staff cost ratio: ${(m.staff_cost_pct*100).toFixed(1)}%
+Credit Risk: ${s.score}/100 (${s.classification}); Going Concern: ${s.gcScore}/20; Investment Readiness: ${s.irScore}/30
 Business units: ${config.business_units.filter(u=>u.active).map(u=>u.name).join(', ')}
 
-Write at most 110 words. One short sentence on overall status. Then the single strongest point, the single biggest risk, and the one action that matters most this month, each in one short sentence. Plain sentences, speak to the owner, no repetition.`
+Write a status report, not a letter. Do not address the reader. Do not open with any preamble or greeting. Start with the single most important fact. State what is going well, then what is getting worse (revenue direction, whether cash covers outflow, cost pressure), then the one action that matters most this month. At most 5 short factual sentences, under 80 words. No repetition, no filler.`
       const response = await fetch('/api/ai-generate',{
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({prompt,max_tokens:400})
+        body:JSON.stringify({prompt,max_tokens:350})
       })
       const data = await response.json()
       const text = data.text||'Narrative unavailable'
