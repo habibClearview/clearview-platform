@@ -11,7 +11,7 @@ import {
   type GenericModelConfig, type GenericBusinessUnit,
   type GenericPlanLine, type LineCategory, type LineType, type UnitType,
 } from '@/lib/generic-engine'
-import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor, dscrRating, computeScoresTimeSeries } from '@/lib/scoring-engine'
+import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor, dscrRating, computeScoresTimeSeries, computeTradeCredit } from '@/lib/scoring-engine'
 import { computeNPV, computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary, annualRateToMonthlyRate, monthlyRateToAnnualRate } from '@/lib/investment-metrics'
 import { computeLiquidityReadinessScore, computeLRSTimeSeries, computeFitScore, FIT_SCORE_PRESETS, LRS_WEIGHTS } from '@/lib/liquidity-readiness'
 import { combinedActual, computeActualsTotals, applyPeriodActual, buildHybridConsolidated, computeCatalogueLineTotal } from '@/lib/actuals'
@@ -4303,54 +4303,133 @@ Write a status report, not a letter. Do not address the reader. Do not open with
 // as monthly movements -- new credit and amounts settled -- the way real
 // bookkeeping works. The outstanding balance and DSO/DPO are derived, not
 // entered directly. These movements feed the cash flow statement automatically.
+// Mirrors the engine's legacy running-balance simulation for a SINGLE line,
+// used only to (a) render legacy flow-based lines read-only as an outstanding
+// series and (b) seed monthly_balance when the user converts one to the new
+// month-end balance input. Kept byte-for-byte consistent with
+// computeTradeCredit's legacy path (same Math.min settlement cap, same floor).
+function legacyOutstanding(line:any, months:number): number[] {
+  const out:number[] = []
+  let bal = 0
+  for (let i=0;i<months;i++){
+    const n = line.monthly_new?.[i] || 0
+    const rawS = line.monthly_settled?.[i] || 0
+    const s = Math.min(rawS, bal + n)
+    bal = Math.max(0, bal + n - s)
+    out.push(bal)
+  }
+  return out
+}
+
+const TC_ALL = '__all__'
+const TC_UNASSIGNED = '__unassigned__'
+
 function WorkingCapitalTab({config,result,months,cc,P,onSave}) {
   const lines: any[] = config.settings.trade_credit_lines || []
+  const canEdit = P.canEditPlan
+  const activeUnits = config.business_units.filter((u:any)=>u.active)
+  const hasUnassigned = lines.some(l=>!l.unit_id)
+  const [selUnit, setSelUnit] = useState<string>(activeUnits[0]?.id || TC_ALL)
 
+  // The set of lines shown / metered for the current selection.
+  const unitLines = selUnit===TC_ALL ? lines
+    : selUnit===TC_UNASSIGNED ? lines.filter(l=>!l.unit_id)
+    : lines.filter(l=>l.unit_id===selUnit)
+
+  // Per-unit revenue/cogs come from the engine result the same way the P&L
+  // unit views derive them (result.unitPL[uid] / result.con) -- never a new
+  // derivation. Consolidated and Unassigned (whole-business legacy) use the
+  // consolidated arrays.
+  const isWhole = selUnit===TC_ALL || selUnit===TC_UNASSIGNED
+  const cogsArr: number[] = isWhole ? (result?.con?.cogs || []) : (result?.unitPL?.[selUnit]?.cogs || [])
+  const revArr: number[]  = isWhole ? (result?.con?.rev  || []) : (result?.unitPL?.[selUnit]?.rev  || [])
+  // The metric figures come straight from the shared engine function applied
+  // to just this unit's lines and this unit's rev/cogs -- nothing fabricated.
+  const tc = computeTradeCredit(unitLines, cogsArr, revArr, months.length)
+
+  function persist(next:any[]) {
+    onSave({...config, settings:{...config.settings, trade_credit_lines: next}})
+  }
   function addLine(type:'payable'|'receivable') {
     const id = `tc_${Date.now()}`
-    const newLine = {
+    // New lines are BALANCE-based per unit: month-end outstanding only. The
+    // legacy monthly_new/monthly_settled are deliberately omitted.
+    const newLine:any = {
       id, name: '', type,
-      monthly_new: Array(config.planning_months).fill(0),
-      monthly_settled: Array(config.planning_months).fill(0),
+      unit_id: (selUnit===TC_ALL || selUnit===TC_UNASSIGNED) ? undefined : selUnit,
+      monthly_balance: Array(config.planning_months).fill(0),
     }
-    onSave({...config, settings:{...config.settings, trade_credit_lines:[...lines, newLine]}})
+    persist([...lines, newLine])
   }
   function updateLineName(id:string, name:string) {
-    onSave({...config, settings:{...config.settings, trade_credit_lines: lines.map(l=>l.id===id?{...l,name}:l)}})
+    persist(lines.map(l=>l.id===id?{...l,name}:l))
   }
   function removeLine(id:string) {
-    onSave({...config, settings:{...config.settings, trade_credit_lines: lines.filter(l=>l.id!==id)}})
+    persist(lines.filter(l=>l.id!==id))
   }
-  function updateMonth(id:string, field:'monthly_new'|'monthly_settled', idx:number, val:number) {
-    onSave({...config, settings:{...config.settings, trade_credit_lines: lines.map(l=>
-      l.id===id ? {...l, [field]: l[field].map((v:number,i:number)=>i===idx?val:v)} : l
-    )}})
+  function updateBalance(id:string, idx:number, val:number) {
+    persist(lines.map(l=>{
+      if (l.id!==id) return l
+      const base = (l.monthly_balance && l.monthly_balance.length===config.planning_months)
+        ? l.monthly_balance : Array(config.planning_months).fill(0)
+      return {...l, monthly_balance: base.map((v:number,i:number)=>i===idx?val:v)}
+    }))
+  }
+  // Non-destructive conversion: seed monthly_balance from the legacy running
+  // outstanding so the line switches to the balance path while its original
+  // monthly_new/monthly_settled arrays are kept on record.
+  function convertLegacy(id:string) {
+    persist(lines.map(l=> l.id===id
+      ? {...l, monthly_balance: legacyOutstanding(l, config.planning_months)}
+      : l))
   }
 
-  const payableLines = lines.filter(l=>l.type==='payable')
-  const receivableLines = lines.filter(l=>l.type==='receivable')
+  const payableLines = unitLines.filter(l=>l.type==='payable')
+  const receivableLines = unitLines.filter(l=>l.type==='receivable')
   const s = result?.scores
+
+  const unitTabs = [
+    {id:TC_ALL, name:'All units'},
+    ...activeUnits.map((u:any)=>({id:u.id, name:u.name})),
+    ...(hasUnassigned?[{id:TC_UNASSIGNED, name:'Unassigned'}]:[]),
+  ]
 
   return (
     <div>
       <div style={{background:'var(--cv-tint-cyan)',borderRadius:6,padding:'0.85rem 1rem',marginBottom:'1.25rem'}}>
         <p style={{fontSize:'0.82rem',color:C.navy,lineHeight:1.6,margin:0}}>
-          Track supplier credit received (Payable) and credit extended to customers or partners such as licensing partners (Receivable) month by month. Enter <strong>new credit</strong> and what was <strong>actually settled</strong> each month. The outstanding balance and how it affects cash are calculated automatically and feed directly into Cash Flow and Going Concern.
+          Track, per business unit, the credit you extend to customers or partners (Receivable) and the credit your suppliers extend to you (Payable). For each month simply enter the <strong>outstanding balance at month end</strong> — what customers still owe you, and what you still owe suppliers — read straight off your debtors and creditors book. The days-to-collect (DSO), days-to-pay (DPO) and the cash impact are all worked out automatically and feed into Cash Flow and Going Concern.
         </p>
       </div>
 
+      {/* Business-unit selector */}
+      <div style={{display:'flex',gap:'0.45rem',marginBottom:'1rem',flexWrap:'wrap'}}>
+        {unitTabs.map(u=>{
+          const bu = activeUnits.find((x:any)=>x.id===u.id)
+          const accent = bu?.color || C.cyan
+          const on = selUnit===u.id
+          return (
+            <button key={u.id} style={{fontFamily:'monospace',fontSize:'0.71rem',padding:'0.45rem 0.85rem',
+              border:`2px solid ${on?accent:C.border}`,borderRadius:4,
+              background:on?accent:C.white,color:on?'var(--cv-on-accent)':C.navy,cursor:'pointer'}}
+              onClick={()=>setSelUnit(u.id)}>{u.name}</button>
+          )
+        })}
+      </div>
+
       {s && (()=>{
-        const dso=s.tradeCredit.dso, dpo=s.tradeCredit.dpo, gap=s.tradeCredit.cashConversionGap
-        const payOut=s.tradeCredit.totalPayableOutstanding[s.tradeCredit.totalPayableOutstanding.length-1]||0
-        const recOut=s.tradeCredit.totalReceivableOutstanding[s.tradeCredit.totalReceivableOutstanding.length-1]||0
+        const dso=tc.dso, dpo=tc.dpo, gap=tc.cashConversionGap
+        const payOut=tc.totalPayableOutstanding[tc.totalPayableOutstanding.length-1]||0
+        const recOut=tc.totalReceivableOutstanding[tc.totalReceivableOutstanding.length-1]||0
         // Ring fill is a purely visual gauge over a 90-day reference window --
         // no new score is computed; the day counts themselves come straight
         // from the engine's tradeCredit output.
         const ringFrac=(d:number)=>Math.max(0,Math.min(1,d/90))
         const gapCol=gap<=0?C.green:gap>30?C.red:C.amber
+        const scopeLabel = selUnit===TC_ALL ? 'all units' : selUnit===TC_UNASSIGNED ? 'unassigned lines' : (activeUnits.find((u:any)=>u.id===selUnit)?.name || 'unit')
         return (
           <>
-            <div style={ovLabel}>Payment behaviour</div>
+            <div style={ovLabel}>Payment behaviour · {scopeLabel}</div>
             <div className="cv-grid-3" style={{marginBottom:'1.35rem'}}>
               <div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)',borderLeft:`4px solid ${C.navy}`}}>
                 <div style={{fontFamily:'monospace',fontSize:'0.56rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.45rem'}}>Days to collect · DSO</div>
@@ -4380,67 +4459,74 @@ function WorkingCapitalTab({config,result,months,cc,P,onSave}) {
       })()}
 
       <div style={card}>
-        <SectionHeader title="Payable -- Supplier Credit" action={P.canEditPlan?<button style={addBtn(true)} onClick={()=>addLine('payable')}>+ Add Supplier Credit Line</button>:null}/>
-        {payableLines.length===0 && <p style={{color:C.slate,fontSize:'0.85rem'}}>No supplier credit lines yet.</p>}
-        {payableLines.map(line=>(
-          <TradeCreditLineGrid key={line.id} line={line} months={months} cc={cc} canEdit={P.canEditPlan}
-            updateLineName={updateLineName} removeLine={removeLine} updateMonth={updateMonth}/>
-        ))}
+        <SectionHeader title="What customers still owe you (month-end)" action={canEdit?<button style={addBtn(true)} onClick={()=>addLine('receivable')}>+ Add Receivable Line</button>:null}/>
+        <p style={{fontSize:'0.72rem',color:C.slate,margin:'0 0 0.6rem'}}>Enter the outstanding balance at the end of each month — the total your customers or partners have not yet paid.</p>
+        <TradeCreditBalanceGrid lines={receivableLines} months={months} cc={cc} canEdit={canEdit} planningMonths={config.planning_months}
+          updateLineName={updateLineName} removeLine={removeLine} updateBalance={updateBalance} convertLegacy={convertLegacy}
+          emptyText="No receivable lines yet. Use this for credit given to customers or licensing partners."/>
       </div>
 
       <div style={card}>
-        <SectionHeader title="Receivable -- Customer / Partner Credit" action={P.canEditPlan?<button style={addBtn(true)} onClick={()=>addLine('receivable')}>+ Add Receivable Line</button>:null}/>
-        {receivableLines.length===0 && <p style={{color:C.slate,fontSize:'0.85rem'}}>No receivable lines yet. Use this for credit given to customers or licensing partners.</p>}
-        {receivableLines.map(line=>(
-          <TradeCreditLineGrid key={line.id} line={line} months={months} cc={cc} canEdit={P.canEditPlan}
-            updateLineName={updateLineName} removeLine={removeLine} updateMonth={updateMonth}/>
-        ))}
+        <SectionHeader title="What you still owe suppliers (month-end)" action={canEdit?<button style={addBtn(true)} onClick={()=>addLine('payable')}>+ Add Supplier Credit Line</button>:null}/>
+        <p style={{fontSize:'0.72rem',color:C.slate,margin:'0 0 0.6rem'}}>Enter the outstanding balance at the end of each month — the total you have not yet paid your suppliers.</p>
+        <TradeCreditBalanceGrid lines={payableLines} months={months} cc={cc} canEdit={canEdit} planningMonths={config.planning_months}
+          updateLineName={updateLineName} removeLine={removeLine} updateBalance={updateBalance} convertLegacy={convertLegacy}
+          emptyText="No supplier credit lines yet."/>
       </div>
     </div>
   )
 }
 
-function TradeCreditLineGrid({line,months,cc,canEdit,updateLineName,removeLine,updateMonth}:any) {
-  const [expanded,setExpanded] = useState(false)
+// Month-end OUTSTANDING balance grid: one row per line, months across. New
+// (balance-based) lines are editable; legacy flow-based lines (monthly_new/
+// monthly_settled, no monthly_balance) render read-only as their computed
+// outstanding series with a one-click "convert to month-end balances".
+function TradeCreditBalanceGrid({lines,months,cc,canEdit,planningMonths,updateLineName,removeLine,updateBalance,convertLegacy,emptyText}:any) {
+  if (!lines || lines.length===0) return <p style={{color:C.slate,fontSize:'0.85rem',margin:0}}>{emptyText}</p>
   return (
-    <div style={{marginBottom:'1rem',border:`1px solid ${C.border}`,borderRadius:6,padding:'0.75rem'}}>
-      <div style={{display:'flex',gap:'0.5rem',alignItems:'center',marginBottom:'0.5rem'}}>
-        <input style={{...inp,fontWeight:700}} placeholder="e.g. Input Supplier, Licensing Partner" value={line.name}
-          disabled={!canEdit} onChange={e=>updateLineName(line.id,e.target.value)}/>
-        {line.name && <button style={addBtn(true)} onClick={()=>setExpanded(!expanded)}>{expanded?'Hide months':'Enter monthly figures'}</button>}
-        {canEdit && <button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>removeLine(line.id)}>×</button>}
-      </div>
-      {expanded && line.name && (
-        <div style={{overflowX:'auto',marginTop:'0.6rem'}}>
-          <table style={{borderCollapse:'collapse',fontSize:'0.74rem'}}>
-            <thead><tr>
-              <th style={{padding:'4px 6px',textAlign:'left',minWidth:90}}></th>
-              {months.map((m:string,i:number)=><th key={i} style={{padding:'4px 5px',textAlign:'center',minWidth:78,background:C.lightBg,color:C.navy,fontWeight:600}}>{m}</th>)}
-            </tr></thead>
-            <tbody>
-              <tr>
-                <td style={{padding:'4px 6px',fontWeight:600,color:C.teal,fontSize:'0.72rem'}}>{line.type==='payable'?'New Credit Received':'New Credit Extended'}</td>
-                {(line.monthly_new||[]).map((v:number,i:number)=>(
-                  <td key={i} style={{padding:'2px 3px'}}>
-                    <input type="number" disabled={!canEdit} style={{width:70,padding:'0.28rem 0.32rem',fontSize:'0.7rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:canEdit?C.white:'var(--cv-disabled)'}}
-                      value={v??''} placeholder="0" onChange={e=>updateMonth(line.id,'monthly_new',i,Number(e.target.value))}/>
+    <div style={{overflowX:'auto'}}>
+      <table style={{borderCollapse:'collapse',fontSize:'0.74rem',minWidth:640}}>
+        <thead><tr>
+          <th style={{padding:'4px 6px',textAlign:'left',minWidth:160,background:C.lightBg,color:C.navy,fontWeight:600}}>Outstanding at month end</th>
+          {months.map((m:string,i:number)=><th key={i} style={{padding:'4px 5px',textAlign:'center',minWidth:78,background:C.lightBg,color:C.navy,fontWeight:600}}>{m}</th>)}
+        </tr></thead>
+        <tbody>
+          {lines.map((line:any)=>{
+            const isLegacy = line.monthly_balance===undefined
+            const values:number[] = isLegacy
+              ? legacyOutstanding(line, planningMonths)
+              : (line.monthly_balance.length===planningMonths ? line.monthly_balance : Array(planningMonths).fill(0))
+            return (
+              <React.Fragment key={line.id}>
+                <tr>
+                  <td style={{padding:'4px 6px',minWidth:160}}>
+                    <div style={{display:'flex',gap:'0.35rem',alignItems:'center'}}>
+                      <input style={{...inp,fontWeight:600,fontSize:'0.72rem',padding:'0.3rem 0.4rem'}} placeholder="e.g. Input Supplier, Licensing Partner"
+                        value={line.name} disabled={!canEdit} onChange={e=>updateLineName(line.id,e.target.value)}/>
+                      {canEdit && <button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>removeLine(line.id)}>×</button>}
+                    </div>
+                    {isLegacy && (
+                      <div style={{marginTop:'0.25rem'}}>
+                        <span style={{fontFamily:'monospace',fontSize:'0.56rem',padding:'0.05rem 0.35rem',borderRadius:4,background:C.lightBg,color:C.slate,border:`1px solid ${C.border}`}}>legacy new/settled · read-only</span>
+                        {canEdit && <button style={{...addBtn(true),marginLeft:'0.35rem',fontSize:'0.58rem',padding:'0.15rem 0.4rem'}} onClick={()=>convertLegacy(line.id)}>Convert to month-end balances</button>}
+                      </div>
+                    )}
                   </td>
-                ))}
-              </tr>
-              <tr>
-                <td style={{padding:'4px 6px',fontWeight:600,color:C.green,fontSize:'0.72rem'}}>{line.type==='payable'?'Paid This Month':'Collected This Month'}</td>
-                {(line.monthly_settled||[]).map((v:number,i:number)=>(
-                  <td key={i} style={{padding:'2px 3px'}}>
-                    <input type="number" disabled={!canEdit} style={{width:70,padding:'0.28rem 0.32rem',fontSize:'0.7rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:canEdit?C.white:'var(--cv-disabled)'}}
-                      value={v??''} placeholder="0" onChange={e=>updateMonth(line.id,'monthly_settled',i,Number(e.target.value))}/>
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
-          <p style={{fontSize:'0.68rem',color:C.slate,marginTop:'0.4rem'}}>All figures in {cc}. The outstanding balance carries forward automatically: new credit increases it, settling reduces it.</p>
-        </div>
-      )}
+                  {values.map((v:number,i:number)=>(
+                    <td key={i} style={{padding:'2px 3px'}}>
+                      <input type="number" disabled={!canEdit || isLegacy}
+                        style={{width:70,padding:'0.28rem 0.32rem',fontSize:'0.7rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:(canEdit&&!isLegacy)?C.white:'var(--cv-disabled)',color:C.navy}}
+                        value={isLegacy ? (v||'') : (v??'')} placeholder="0"
+                        onChange={e=>updateBalance(line.id,i,Number(e.target.value))}/>
+                    </td>
+                  ))}
+                </tr>
+              </React.Fragment>
+            )
+          })}
+        </tbody>
+      </table>
+      <p style={{fontSize:'0.68rem',color:C.slate,marginTop:'0.4rem'}}>All figures in {cc}. Enter the balance still outstanding at the end of each month; the cash impact (the month-to-month change) is worked out automatically.</p>
     </div>
   )
 }

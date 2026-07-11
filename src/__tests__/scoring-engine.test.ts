@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeScores, buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor, sliceDebtScheduleForRange, summarizeTradeCreditForRange, computeTradeCredit, computeScoresTimeSeries, type DebtObligation, type TradeCreditLine } from '../lib/scoring-engine'
+import { computeScores, buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor, sliceDebtScheduleForRange, summarizeTradeCreditForRange, computeTradeCredit, computeTradeCreditByUnit, computeScoresTimeSeries, type DebtObligation, type TradeCreditLine } from '../lib/scoring-engine'
 
 const MONTHS = 24
 const COLORS = { green: 'green', amber: 'amber', red: 'red', slate: 'slate' }
@@ -264,6 +264,145 @@ describe('summarizeTradeCreditForRange — recomputing DPO/DSO for one year with
     expect(summary.dpo).toBe(0)
     expect(summary.dso).toBe(0)
     expect(Number.isNaN(summary.dpo)).toBe(false)
+  })
+})
+
+describe('computeTradeCredit — BALANCE input path (month-end outstanding, per unit)', () => {
+  it('exact hand-computed fixture: outstanding, cashEffect, DSO/DPO/gap on a mixed payable+receivable balance model', () => {
+    // 6-month horizon. Balances entered directly (month-end outstanding).
+    const months = 6
+    const lines: TradeCreditLine[] = [
+      { id: 'rec1', name: 'Customer credit', type: 'receivable',
+        monthly_balance: [100, 150, 150, 120, 200, 0] },
+      { id: 'pay1', name: 'Supplier credit', type: 'payable',
+        monthly_balance: [50, 50, 90, 60, 60, 60] },
+    ]
+    const cogs = Array(months).fill(1000) // annual (range) COGS = 6000
+    const rev = Array(months).fill(2000)  // annual (range) revenue = 12000
+    const tc = computeTradeCredit(lines, cogs, rev, months)
+
+    // Outstanding is just the entered balance (floored at 0), per type.
+    expect(tc.totalReceivableOutstanding).toEqual([100, 150, 150, 120, 200, 0])
+    expect(tc.totalPayableOutstanding).toEqual([50, 50, 90, 60, 60, 60])
+
+    // Cash effect = per-line ΔB. Receivable: prev - B (collecting is +, extending is -).
+    // Payable: B - prev (owing more defers an outflow +, paying down is -).
+    // rec ΔinflowEffect: 0-100=-100, 100-150=-50, 150-150=0, 150-120=+30, 120-200=-80, 200-0=+200
+    // pay effect:        50-0=+50,   50-50=0,     90-50=+40, 60-90=-30,  60-60=0,    60-60=0
+    // sum per month:
+    expect(tc.monthlyCashEffect).toEqual([-50, -50, 40, 0, -80, 200])
+
+    // Averages: avgRec = (100+150+150+120+200+0)/6 = 720/6 = 120
+    //           avgPay = (50+50+90+60+60+60)/6 = 370/6 ≈ 61.6667
+    const avgRec = 720 / 6, avgPay = 370 / 6
+    const expectedDso = (avgRec / 12000) * 365
+    const expectedDpo = (avgPay / 6000) * 365
+    expect(tc.dso).toBeCloseTo(expectedDso, 9)
+    expect(tc.dpo).toBeCloseTo(expectedDpo, 9)
+    expect(tc.cashConversionGap).toBeCloseTo(expectedDso - expectedDpo, 9)
+    expect(tc.peakReceivable).toBe(200)
+    expect(tc.peakPayable).toBe(90)
+  })
+
+  it('negative entered balances floor at 0 (no negative outstanding)', () => {
+    const tc = computeTradeCredit(
+      [{ id: 'p', name: 'x', type: 'payable', monthly_balance: [-40, 30, -10] }],
+      Array(3).fill(100), Array(3).fill(100), 3,
+    )
+    expect(tc.totalPayableOutstanding).toEqual([0, 30, 0])
+    // cashEffect uses the floored balances: 0-0=0, 30-0=+30, 0-30=-30
+    expect(tc.monthlyCashEffect).toEqual([0, 30, -30])
+  })
+
+  it('EQUIVALENCE: a balance-path line and a flow-path line describing the SAME position produce identical outstanding and cashEffect', () => {
+    const months = 6
+    // Flow line: new/settled movements.
+    const flowLine: TradeCreditLine = {
+      id: 'flow', name: 'flow', type: 'payable',
+      monthly_new:     [200, 0,  100, 0,  50, 0],
+      monthly_settled: [0,   80, 20,  40, 0,  30],
+    }
+    // Build the equivalent balance line from the flow line's running outstanding.
+    const flowTc = computeTradeCredit([flowLine], Array(months).fill(500), Array(months).fill(900), months)
+    const balanceLine: TradeCreditLine = {
+      id: 'bal', name: 'bal', type: 'payable',
+      monthly_balance: [...flowTc.totalPayableOutstanding],
+    }
+    const balTc = computeTradeCredit([balanceLine], Array(months).fill(500), Array(months).fill(900), months)
+
+    expect(balTc.totalPayableOutstanding).toEqual(flowTc.totalPayableOutstanding)
+    expect(balTc.monthlyCashEffect).toEqual(flowTc.monthlyCashEffect)
+    expect(balTc.dpo).toBeCloseTo(flowTc.dpo, 9)
+    expect(balTc.dso).toBeCloseTo(flowTc.dso, 9)
+    expect(balTc.cashConversionGap).toBeCloseTo(flowTc.cashConversionGap, 9)
+  })
+
+  it('EQUIVALENCE (receivable): identical outstanding and cashEffect between flow and balance representations', () => {
+    const months = 5
+    const flowLine: TradeCreditLine = {
+      id: 'flow', name: 'flow', type: 'receivable',
+      monthly_new:     [300, 100, 0,   50, 0],
+      monthly_settled: [0,   150, 200, 0,  60],
+    }
+    const flowTc = computeTradeCredit([flowLine], Array(months).fill(400), Array(months).fill(800), months)
+    const balTc = computeTradeCredit(
+      [{ id: 'bal', name: 'bal', type: 'receivable', monthly_balance: [...flowTc.totalReceivableOutstanding] }],
+      Array(months).fill(400), Array(months).fill(800), months,
+    )
+    expect(balTc.totalReceivableOutstanding).toEqual(flowTc.totalReceivableOutstanding)
+    expect(balTc.monthlyCashEffect).toEqual(flowTc.monthlyCashEffect)
+    expect(balTc.dso).toBeCloseTo(flowTc.dso, 9)
+  })
+
+  it('legacy flow lines and balance lines coexist in one call and sum correctly', () => {
+    const months = 3
+    const lines: TradeCreditLine[] = [
+      { id: 'legacy', name: 'old', type: 'payable', monthly_new: [100, 0, 0], monthly_settled: [0, 40, 0] },
+      { id: 'new', name: 'new', type: 'payable', monthly_balance: [10, 20, 30] },
+    ]
+    const tc = computeTradeCredit(lines, Array(months).fill(100), Array(months).fill(100), months)
+    // legacy outstanding: 100, 60, 60 ; balance line: 10, 20, 30 -> summed
+    expect(tc.totalPayableOutstanding).toEqual([110, 80, 90])
+  })
+})
+
+describe('computeTradeCreditByUnit — per-business-unit DSO/DPO and outstanding', () => {
+  it('filters by unit_id and applies each unit\'s own rev/cogs; groups unassigned under ""', () => {
+    const months = 3
+    const lines: TradeCreditLine[] = [
+      { id: 'a', name: 'A rec', type: 'receivable', unit_id: 'u1', monthly_balance: [100, 100, 100] },
+      { id: 'b', name: 'B pay', type: 'payable', unit_id: 'u2', monthly_balance: [50, 50, 50] },
+      { id: 'c', name: 'legacy', type: 'receivable', monthly_new: [90, 0, 0], monthly_settled: [0, 0, 0] },
+    ]
+    const perUnitCogs = { u1: Array(months).fill(200), u2: Array(months).fill(300) }
+    const perUnitRev = { u1: Array(months).fill(400), u2: Array(months).fill(500) }
+    const byUnit = computeTradeCreditByUnit(lines, perUnitCogs, perUnitRev, months)
+
+    expect(Object.keys(byUnit).sort()).toEqual(['', 'u1', 'u2'])
+    // u1 receivable outstanding = 100 each month; payable 0.
+    expect(byUnit['u1'].totalReceivableOutstanding).toEqual([100, 100, 100])
+    expect(byUnit['u1'].totalPayableOutstanding).toEqual([0, 0, 0])
+    expect(byUnit['u1'].dso).toBeCloseTo((100 / (400 * months)) * 365, 9)
+    // u2 payable outstanding = 50 each month.
+    expect(byUnit['u2'].totalPayableOutstanding).toEqual([50, 50, 50])
+    expect(byUnit['u2'].dpo).toBeCloseTo((50 / (300 * months)) * 365, 9)
+    // Unassigned legacy line grouped under '' and simulated via the flow path.
+    expect(byUnit[''].totalReceivableOutstanding).toEqual([90, 90, 90])
+  })
+
+  it('a unit\'s per-unit total matches computeTradeCredit run over just that unit\'s lines', () => {
+    const months = 4
+    const lines: TradeCreditLine[] = [
+      { id: 'a', name: 'A', type: 'payable', unit_id: 'u1', monthly_balance: [10, 20, 30, 40] },
+      { id: 'b', name: 'B', type: 'payable', unit_id: 'u1', monthly_balance: [5, 5, 5, 5] },
+      { id: 'c', name: 'C', type: 'payable', unit_id: 'u2', monthly_balance: [1, 1, 1, 1] },
+    ]
+    const cogs = Array(months).fill(100), rev = Array(months).fill(100)
+    const byUnit = computeTradeCreditByUnit(lines, { u1: cogs, u2: cogs }, { u1: rev, u2: rev }, months)
+    const u1Direct = computeTradeCredit(lines.filter(l => l.unit_id === 'u1'), cogs, rev, months)
+    expect(byUnit['u1'].totalPayableOutstanding).toEqual(u1Direct.totalPayableOutstanding)
+    expect(byUnit['u1'].monthlyCashEffect).toEqual(u1Direct.monthlyCashEffect)
+    expect(byUnit['u1'].dpo).toBeCloseTo(u1Direct.dpo, 9)
   })
 })
 
