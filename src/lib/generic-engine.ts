@@ -78,26 +78,22 @@ export interface YearCollapsedCell {
 //   movements. The year total is the sum of its months. Correct for
 //   every P&L row and most Cash Flow rows.
 // - 'endOfPeriod': a STOCK, a balance AT A POINT IN TIME -- every
-//   Balance Sheet row, and Closing Cash. Summing 12 months of "Total
-//   Assets" would produce a meaningless, wildly inflated number; the
-//   only sensible collapsed value is the balance as of the last month
-//   in that year.
+//   Balance Sheet row, Closing Cash, and any per-unit PRICE or RATE
+//   (Buy Price, Sell Price, Fee per Engagement). The business sets a
+//   discrete price for each transaction -- there is no "average price
+//   for the year" concept here, by standing instruction: every figure
+//   shown must be a real inputted value or a value directly calculated
+//   from real inputs, never an average (weighted or otherwise) of any
+//   kind. The only sensible collapsed value for a year is the actual,
+//   discrete price as of the last month in that year -- exactly what
+//   was really charged then, not a statistical construct.
 // - 'startOfPeriod': also a point-in-time balance, but as of the START
 //   of the year -- specifically Opening Cash, which is genuinely the
 //   prior year's closing balance carried forward, not a mid-year or
 //   end-of-year figure.
-// - 'weightedAverage': a per-unit PRICE or RATE -- Buy Price, Sell
-//   Price, Fee per Engagement. This is NOT a plain mean of the monthly
-//   prices (that would ignore volume entirely -- 1,000 units at 5,000
-//   and 10 units at 8,000 is nowhere near an average of 6,500). The
-//   only figure that's actually traceable back to real totals is
-//   total dollar value / total quantity for the year, using a
-//   caller-supplied weights array (the quantity/volume/engagements
-//   each month) -- a real, standard accounting calculation (a
-//   weighted-average price or cost), not a statistical estimate.
-export type YearAggregation = 'sum' | 'endOfPeriod' | 'startOfPeriod' | 'weightedAverage'
+export type YearAggregation = 'sum' | 'endOfPeriod' | 'startOfPeriod'
 
-export function collapseYear(values: number[], actualMask: boolean[] | undefined, monthIndices: number[], aggregation: YearAggregation = 'sum', weights?: number[]): YearCollapsedCell {
+export function collapseYear(values: number[], actualMask: boolean[] | undefined, monthIndices: number[], aggregation: YearAggregation = 'sum'): YearCollapsedCell {
   if (aggregation === 'endOfPeriod' || aggregation === 'startOfPeriod') {
     // A point-in-time balance has no "partial" state the way a sum of
     // flows over a part-actual, part-plan year does -- it's simply the
@@ -109,15 +105,7 @@ export function collapseYear(values: number[], actualMask: boolean[] | undefined
     const isActual = !!actualMask[relevantIdx]
     return { value, isFullyActual: isActual, isPartiallyActual: false, isFullyPlan: !isActual }
   }
-  let value: number
-  if (aggregation === 'weightedAverage') {
-    const w = weights || []
-    const totalWeight = monthIndices.reduce((s, i) => s + (w[i] ?? 0), 0)
-    const totalValue = monthIndices.reduce((s, i) => s + (values[i] ?? 0) * (w[i] ?? 0), 0)
-    value = totalWeight > 0 ? totalValue / totalWeight : 0
-  } else {
-    value = monthIndices.reduce((s, i) => s + (values[i] ?? 0), 0)
-  }
+  const value = monthIndices.reduce((s, i) => s + (values[i] ?? 0), 0)
   if (!actualMask) return { value, isFullyActual: false, isPartiallyActual: false, isFullyPlan: true }
   const maskSlice = monthIndices.map(i => actualMask[i])
   const allActual = maskSlice.length > 0 && maskSlice.every(Boolean)
@@ -572,7 +560,10 @@ export function runGenericModel(
         Object.entries(actuals[unit.id]).forEach(([period, lineVals]) => {
           const d = new Date(period)
           const startD = new Date(config.start_date)
-          const mIdx = (d.getFullYear() - startD.getFullYear()) * 12 + (d.getMonth() - startD.getMonth())
+          // Use UTC to match buildYearGroups / todayMonthIndex; period keys and
+          // start_date parse as UTC midnight, so a local getMonth() would shift
+          // the month (dropping or misfiling actuals) in any timezone behind UTC.
+          const mIdx = (d.getUTCFullYear() - startD.getUTCFullYear()) * 12 + (d.getUTCMonth() - startD.getUTCMonth())
           if (mIdx < 0 || mIdx >= months) return
           const val = lineVals[l.id]
           if (val === undefined) return

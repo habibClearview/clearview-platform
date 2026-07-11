@@ -180,9 +180,13 @@ export function computeCapacity(i: LRSInputs): LRSDimensionScore {
   const productionCapacity = qualitative(i.assess.productionCapacity)
   const managementSystems = qualitative(i.assess.managementCapability)
   const staffCapability = i.revenuePerHead > 0 ? ramp(i.revenuePerHead, 0, 20_000_000) : 0
-  const avgMonthlyOpex = average(i.monthlyOpex)
+  // The actual, discrete latest month's opex -- not an average across
+  // the period. "Months of runway at the current rate of spend" is
+  // meant to reflect what's really happening now, not a smoothed
+  // estimate across months that may have looked very different.
+  const latestMonthlyOpex = i.monthlyOpex[i.monthlyOpex.length-1] ?? 0
   const currentCash = i.cashClose[i.cashClose.length-1] ?? 0
-  const workingCapital = avgMonthlyOpex > 0 ? ramp(currentCash / avgMonthlyOpex, 0, 3) : (currentCash > 0 ? 100 : 0)
+  const workingCapital = latestMonthlyOpex > 0 ? ramp(currentCash / latestMonthlyOpex, 0, 3) : (currentCash > 0 ? 100 : 0)
   const inventoryAvailability = qualitative(i.assess.inventoryAvailability)
   return {
     score: average([productionCapacity, managementSystems, staffCapability, workingCapital, inventoryAvailability]),
@@ -190,16 +194,16 @@ export function computeCapacity(i: LRSInputs): LRSDimensionScore {
       { label: 'Production Capacity', value: productionCapacity, note: 'Business Profile input' },
       { label: 'Management Systems', value: managementSystems, note: 'Business Profile input' },
       { label: 'Staff Capability (Revenue/Head)', value: staffCapability, note: i.revenuePerHead > 0 ? `Revenue/head: ${Math.round(i.revenuePerHead).toLocaleString()}` : 'No headcount recorded' },
-      { label: 'Working Capital (Cash Runway)', value: workingCapital, note: avgMonthlyOpex > 0 ? `${(currentCash/avgMonthlyOpex).toFixed(1)} months of opex covered` : 'Opex not computable' },
+      { label: 'Working Capital (Cash Runway)', value: workingCapital, note: latestMonthlyOpex > 0 ? `${(currentCash/latestMonthlyOpex).toFixed(1)} months at latest month's opex` : 'Opex not computable' },
       { label: 'Inventory Availability', value: inventoryAvailability, note: 'Business Profile input' },
     ],
   }
 }
 
 export function computeResilience(i: LRSInputs): LRSDimensionScore {
-  const avgMonthlyOpex = average(i.monthlyOpex)
+  const latestMonthlyOpex = i.monthlyOpex[i.monthlyOpex.length-1] ?? 0
   const currentCash = i.cashClose[i.cashClose.length-1] ?? 0
-  const cashReserve = avgMonthlyOpex > 0 ? ramp(currentCash / avgMonthlyOpex, 0, 6) : (currentCash > 0 ? 100 : 0)
+  const cashReserve = latestMonthlyOpex > 0 ? ramp(currentCash / latestMonthlyOpex, 0, 6) : (currentCash > 0 ? 100 : 0)
   const customerDiversification = qualitative(i.assess.customerDiversification)
   const supplierDiversification = qualitative(i.assess.supplierDiversification)
   const deToEq = i.totalEquity > 0 ? i.totalLiabilities / i.totalEquity : 99
@@ -216,7 +220,7 @@ export function computeResilience(i: LRSInputs): LRSDimensionScore {
   return {
     score: average([cashReserve, customerDiversification, supplierDiversification, debtExposure, businessContinuity]),
     indicators: [
-      { label: 'Cash Reserve (Runway)', value: cashReserve, note: avgMonthlyOpex > 0 ? `${(currentCash/avgMonthlyOpex).toFixed(1)} months` : 'Opex not computable' },
+      { label: 'Cash Reserve (Runway)', value: cashReserve, note: latestMonthlyOpex > 0 ? `${(currentCash/latestMonthlyOpex).toFixed(1)} months at latest month's opex` : 'Opex not computable' },
       { label: 'Customer Diversification', value: customerDiversification, note: 'Business Profile input' },
       { label: 'Supplier Diversification', value: supplierDiversification, note: 'Business Profile input' },
       { label: 'Debt Exposure', value: debtExposure, note: i.totalEquity > 0

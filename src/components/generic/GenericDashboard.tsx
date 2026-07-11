@@ -120,6 +120,9 @@ function PLTable({title,rows,months,cc,showExport,closedMask}:{title?:string;row
           </div>}
         </div>
       )}
+      <div style={{padding:'0.45rem 1.1rem',fontSize:'0.7rem',color:C.slate,background:C.lightBg,borderBottom:`1px solid ${C.border}`}}>
+        Tip: each column headed FY is one year. Click a year to open or close its monthly detail.
+      </div>
       {hasActuals&&(
         <div style={{padding:'0.5rem 1.1rem',fontSize:'0.68rem',fontFamily:'monospace',color:C.teal,display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap',background:'#F4FDFB'}}>
           <span style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
@@ -158,7 +161,7 @@ function PLTable({title,rows,months,cc,showExport,closedMask}:{title?:string;row
 // here. Each year defaults to collapsed except the one containing
 // today's date, which starts expanded (the year someone is most likely
 // checking in on right now).
-function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMask}:{title?:string;rows:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;actualMask?:boolean[];aggregation?:YearAggregation;weights?:number[]}[];months:string[];startDate:string;cc:string;showExport?:boolean;closedMask?:boolean[]}) {
+function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMask}:{title?:string;rows:{label:string;values:number[];bold?:boolean;highlight?:boolean;negate?:boolean;actualMask?:boolean[];aggregation?:YearAggregation}[];months:string[];startDate:string;cc:string;showExport?:boolean;closedMask?:boolean[]}) {
   const yearGroups = useMemo(() => buildYearGroups(startDate, months.length), [startDate, months.length])
   const currentYear = new Date().getUTCFullYear()
   const [expanded, setExpanded] = useState<Record<number, boolean>>(() => defaultExpandedYears(yearGroups, currentYear))
@@ -173,7 +176,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
     // display convenience, not a reason to omit real data from an export.
     const headers = ['', ...months, ...yearGroups.map(g => `FY ${g.label}`)]
     const data = rows.map(r => {
-      const yearTotals = yearGroups.map(g => String(Math.round(collapseYear(r.values, r.actualMask, g.monthIndices, r.aggregation, r.weights).value)))
+      const yearTotals = yearGroups.map(g => String(Math.round(collapseYear(r.values, r.actualMask, g.monthIndices, r.aggregation).value)))
       return [r.label, ...r.values.map(v => String(Math.round(v))), ...yearTotals]
     })
     const csv = [headers, ...data].map(r => r.map(c => `"${c}"`).join(',')).join('\n')
@@ -196,6 +199,9 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
           </div>}
         </div>
       )}
+      <div style={{padding:'0.45rem 1.1rem',fontSize:'0.7rem',color:C.slate,background:C.lightBg,borderBottom:`1px solid ${C.border}`}}>
+        Tip: each column headed FY is one year. Click a year to open or close its monthly detail.
+      </div>
       {hasActuals&&(
         <div style={{padding:'0.5rem 1.1rem',fontSize:'0.68rem',fontFamily:'monospace',color:C.teal,display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap',background:'#F4FDFB'}}>
           <span style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
@@ -238,7 +244,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
               <tr key={ri} style={{background:r.highlight?'#EBF8FF':r.bold?C.lightBg:C.white}}>
                 <td style={{padding:'7px 10px',fontWeight:r.bold?700:400,color:C.navy,minWidth:160,fontSize:'0.8rem',position:'sticky',left:0,background:r.highlight?'#EBF8FF':r.bold?C.lightBg:C.white}}>{r.label}</td>
                 {yearGroups.map(g => {
-                  const cell = collapseYear(r.values, r.actualMask, g.monthIndices, r.aggregation, r.weights)
+                  const cell = collapseYear(r.values, r.actualMask, g.monthIndices, r.aggregation)
                   const displayVal = (v:number) => r.negate ? fmtFull(-Math.abs(v),cc) : fmtFull(v,cc)
                   return expanded[g.year] ? (
                     <React.Fragment key={g.year}>
@@ -3741,9 +3747,9 @@ function MarginsTab({config,result,months,cc}) {
                 </div>
                 <PLTableCollapsible title="" rows={[
                   {label:'Volume (units)',values:s.volume},
-                  {label:'Buy Price',values:s.buy_price,aggregation:'weightedAverage',weights:s.volume},
-                  {label:'Sell Price',values:s.sell_price,aggregation:'weightedAverage',weights:s.volume},
-                  {label:'Spread per Unit',values:s.spread_per_unit,highlight:true,aggregation:'weightedAverage',weights:s.volume},
+                  {label:'Buy Price',values:s.buy_price,aggregation:'endOfPeriod'},
+                  {label:'Sell Price',values:s.sell_price,aggregation:'endOfPeriod'},
+                  {label:'Spread per Unit',values:s.spread_per_unit,highlight:true,aggregation:'endOfPeriod'},
                   {label:'Total Spread Revenue',values:s.total_spread,bold:true},
                 ]} months={months} startDate={config.start_date} cc={cc} showExport/>
               </div>
@@ -3772,9 +3778,9 @@ function MarginsTab({config,result,months,cc}) {
                 </div>
                 <PLTableCollapsible title="" rows={[
                   {label:'Engagements',values:s.engagements},
-                  {label:'Fee per Engagement',values:s.fee,aggregation:'weightedAverage',weights:s.engagements},
-                  {label:'Cost per Engagement',values:s.cost,negate:true,aggregation:'weightedAverage',weights:s.engagements},
-                  {label:'Margin per Engagement',values:s.margin.map((mv,i)=>s.engagements[i]>0?mv/s.engagements[i]:0),highlight:true,aggregation:'weightedAverage',weights:s.engagements},
+                  {label:'Fee per Engagement',values:s.fee,aggregation:'endOfPeriod'},
+                  {label:'Cost per Engagement',values:s.cost,negate:true,aggregation:'endOfPeriod'},
+                  {label:'Margin per Engagement',values:s.margin.map((mv,i)=>s.engagements[i]>0?mv/s.engagements[i]:0),highlight:true,aggregation:'endOfPeriod'},
                   {label:'Total Margin',values:s.margin,bold:true},
                 ]} months={months} startDate={config.start_date} cc={cc} showExport/>
               </div>
@@ -4340,25 +4346,33 @@ function YearCloseControls({config,result,closedPeriods,P,onCloseStatusChanged}:
     }
   }
 
+  const anyClosable = groups.some(g => canCloseCalendarYear(g, closedPeriods||new Set(), periodForMonthIndex, config.start_date))
+
   return (
-    <div style={{display:'flex',gap:'0.6rem',flexWrap:'wrap',marginBottom:'1rem'}}>
-      {groups.map(group => {
-        const key = yearStartPeriod(group, periodForMonthIndex, config.start_date)
-        const yc = yearCloses[key]
-        const canClose = canCloseCalendarYear(group, closedPeriods||new Set(), periodForMonthIndex, config.start_date)
-        return (
-          <div key={group.year} style={{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.45rem 0.75rem',border:`1px solid ${yc?.closed?C.navy:C.border}`,borderRadius:6,fontSize:'0.75rem',background:yc?.closed?C.lightBg:C.white}}>
-            <span style={{fontWeight:700,color:C.navy}}>FY {group.label}</span>
-            {yc?.closed ? (
-              <span title={`Closed by ${yc.closed_by} on ${new Date(yc.closed_at).toLocaleDateString()}`}><Badge text="Closed" color={C.navy}/></span>
-            ) : (
-              <button type="button" style={addBtn(true,canClose?C.green:C.border)} onClick={()=>closeYear(group)} disabled={!canClose||closing===key}>
-                {closing===key?'Closing...':canClose?'Close This Year':'Not all months closed yet'}
-              </button>
-            )}
-          </div>
-        )
-      })}
+    <div style={{marginBottom:'1.25rem',padding:'0.9rem 1rem',border:`1px solid ${C.border}`,borderLeft:`4px solid ${C.navy}`,borderRadius:8,background:C.lightBg}}>
+      <div style={{fontWeight:700,color:C.navy,fontSize:'0.9rem',marginBottom:'0.25rem'}}>Year-End Close</div>
+      <p style={{margin:'0 0 0.75rem',fontSize:'0.78rem',color:C.slate,lineHeight:1.5,maxWidth:'46rem'}}>
+        Each box below is one financial year. Once every month in a year has been closed on the Actuals tab, you can lock that year here so its year-end balance sheet is frozen and cannot change. A box stays inactive until all of that year's months are closed, so {anyClosable ? 'the years ready to lock show a green button' : 'nothing is clickable yet'}. Locking is optional and only affects finance-level users.
+      </p>
+      <div style={{display:'flex',gap:'0.6rem',flexWrap:'wrap'}}>
+        {groups.map(group => {
+          const key = yearStartPeriod(group, periodForMonthIndex, config.start_date)
+          const yc = yearCloses[key]
+          const canClose = canCloseCalendarYear(group, closedPeriods||new Set(), periodForMonthIndex, config.start_date)
+          return (
+            <div key={group.year} style={{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.45rem 0.75rem',border:`1px solid ${yc?.closed?C.navy:C.border}`,borderRadius:6,fontSize:'0.75rem',background:yc?.closed?C.white:C.white}}>
+              <span style={{fontWeight:700,color:C.navy}}>FY {group.label}</span>
+              {yc?.closed ? (
+                <span title={`Closed by ${yc.closed_by} on ${new Date(yc.closed_at).toLocaleDateString()}`}><Badge text="Closed" color={C.navy}/></span>
+              ) : (
+                <button type="button" style={addBtn(true,canClose?C.green:C.border)} onClick={()=>closeYear(group)} disabled={!canClose||closing===key}>
+                  {closing===key?'Closing...':canClose?'Close This Year':'Not all months closed yet'}
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
