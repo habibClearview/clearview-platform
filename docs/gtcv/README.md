@@ -93,7 +93,7 @@ The coach's "Team & Payments" tab turns the co-implementer relationship into an 
 - **Invoice:** the platform **auto-drafts one invoice per co-implementer per period** = approved days × rate + approved expenses − advance taken, with a due date; **viewable and downloadable by both** coach and co-implementer.
 - Each issued invoice **posts into the coach's own Clearview** as cost-to-serve for those engagements (a payable until paid), keeping per-engagement margin honest.
 
-Open build decisions: day length (default 8h), day rate per co-implementer vs per engagement, whether an unreconciled advance blocks the next invoice.
+Locked decisions: **day = 8 hours**; **day rate set per co-implementer** (per-engagement deferred, not needed yet); **an unreconciled advance BLOCKS the next invoice** from issuing until cleared.
 
 ## Co-implementer login is a GtCV-phase feature (not Clearview)
 
