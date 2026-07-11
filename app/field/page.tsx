@@ -10,30 +10,30 @@ import {
 import BuildStamp from '@/components/BuildStamp'
 
 const C = {
-  navy:'#1B2A4A', cyan:'#00B4D8', cream:'#F8F4EE', white:'#FFFFFF',
-  slate:'#4A5A6A', border:'#D8E0E8', teal:'#1A9DAA',
-  red:'#C0392B', green:'#1A7A4A', amber:'#B8860B',
+  navy:'var(--cv-navy)', cyan:'var(--cv-cyan)', cream:'var(--cv-cream)', white:'var(--cv-card)',
+  slate:'var(--cv-slate)', border:'var(--cv-border)', teal:'var(--cv-teal)',
+  red:'var(--cv-red)', green:'var(--cv-green)', amber:'var(--cv-amber)',
 }
 
 // Dark-theme palette for the redesigned field UI (picture-first, numbers-only,
 // large touch targets). Presentation only -- no logic depends on these.
 const D = {
-  bg:'#0E1B2E',        // page background (dark navy)
-  bg2:'#12233B',       // slightly lighter panel / input background
-  card:'#16283F',      // card surface
-  cardHi:'#1B3253',    // raised / active card surface
-  border:'rgba(255,255,255,0.10)',
-  white:'#FFFFFF',
-  text:'#FFFFFF',
-  muted:'rgba(255,255,255,0.58)',
-  faint:'rgba(255,255,255,0.40)',
-  cyan:'#00B4D8',      // primary accent (Money in / active)
-  cyanDim:'rgba(0,180,216,0.15)',
-  green:'#1F8A4C',     // confirm actions
-  amber:'#E0A100',     // waiting to sync
-  amberDim:'rgba(224,161,0,0.14)',
-  red:'#C0392B',       // money out
-  redDim:'rgba(192,57,43,0.14)',
+  bg:'var(--cv-bg)',        // page background
+  bg2:'var(--cv-bg-2)',     // slightly lighter panel / input background
+  card:'var(--cv-card)',    // card surface
+  cardHi:'var(--cv-card-hi)',// raised / active card surface
+  border:'var(--cv-border)',
+  white:'var(--cv-on-accent)',
+  text:'var(--cv-navy)',
+  muted:'var(--cv-slate)',
+  faint:'var(--cv-faint)',
+  cyan:'var(--cv-cyan)',    // primary accent (Money in / active)
+  cyanDim:'var(--cv-cyan-dim)',
+  green:'var(--cv-green)',  // confirm actions
+  amber:'var(--cv-amber)',  // waiting to sync
+  amberDim:'var(--cv-amber-dim)',
+  red:'var(--cv-red)',      // money out
+  redDim:'var(--cv-red-dim)',
 }
 
 interface CatalogueItem { id:string; name:string; item_type:'product'|'service'; price:number; unit_label?:string; plan_line_id:string; image?:string; image_url?:string }
@@ -101,7 +101,30 @@ export default function FieldCapturePage() {
   // Presentation-only: which capture flow the grid screen is showing.
   // 'in' = record a sale (Money in), 'out' = record a cost (Money out).
   const [flow, setFlow] = useState<'in'|'out'>('in')
+  // Light/dark theme. Field app defaults to dark (matching the mockup).
+  // The chosen theme is applied globally via document.documentElement.dataset.theme
+  // so it is shared with the dashboard page too.
+  const [theme, setTheme] = useState<'light'|'dark'>('dark')
   const syncNowRef = useRef<()=>void>(()=>{})
+
+  function applyTheme(next:'light'|'dark') {
+    if (next==='dark') document.documentElement.dataset.theme = 'dark'
+    else delete document.documentElement.dataset.theme
+  }
+  useEffect(()=>{
+    const saved = localStorage.getItem('cv-theme')
+    const initial = saved==='light' || saved==='dark' ? saved : 'dark'
+    setTheme(initial)
+    applyTheme(initial)
+  },[])
+  function toggleTheme() {
+    setTheme(prev=>{
+      const next = prev==='dark' ? 'light' : 'dark'
+      localStorage.setItem('cv-theme', next)
+      applyTheme(next)
+      return next
+    })
+  }
 
   useEffect(()=>{
     const urlToken = new URLSearchParams(window.location.search).get('token')
@@ -448,8 +471,8 @@ export default function FieldCapturePage() {
           <p style={{fontSize:'0.9rem',color:D.muted,lineHeight:1.6,marginBottom:'1.2rem'}}>Paste the code you were given, or open this page using the link directly.</p>
           <input style={{width:'100%',padding:'0.9rem',background:D.bg2,border:`1px solid ${D.border}`,borderRadius:12,fontSize:'1rem',color:D.text,boxSizing:'border-box',marginBottom:'0.9rem'}}
             placeholder="Paste your access code here" value={tokenInput} onChange={e=>setTokenInput(e.target.value)}/>
-          {authError && <div style={{color:'#FF8B7E',fontSize:'0.85rem',marginBottom:'0.9rem'}}>{authError}</div>}
-          <button style={{width:'100%',padding:'1rem',background:D.cyan,color:'#062230',border:'none',borderRadius:12,fontSize:'1rem',fontWeight:700,cursor:'pointer'}}
+          {authError && <div style={{color:'var(--cv-red-text)',fontSize:'0.85rem',marginBottom:'0.9rem'}}>{authError}</div>}
+          <button style={{width:'100%',padding:'1rem',background:D.cyan,color:'var(--cv-on-cyan)',border:'none',borderRadius:12,fontSize:'1rem',fontWeight:700,cursor:'pointer'}}
             disabled={loading || !tokenInput} onClick={()=>authenticate(tokenInput.trim())}>{loading?'Checking...':'Continue'}</button>
         </div>
       </div>
@@ -464,8 +487,8 @@ export default function FieldCapturePage() {
     return (
       <div style={{minHeight:'100vh',background:D.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:'1.5rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
         <div style={{background:D.card,border:`1px solid ${D.border}`,borderRadius:18,padding:'1.9rem',maxWidth:420,width:'100%',textAlign:'center'}}>
-          <div style={{color:'#FF8B7E',marginBottom:'1.1rem'}}>{authError || 'Could not load your data.'}</div>
-          <button style={{padding:'0.85rem 1.6rem',background:D.cyan,color:'#062230',border:'none',borderRadius:12,fontWeight:700,cursor:'pointer'}}
+          <div style={{color:'var(--cv-red-text)',marginBottom:'1.1rem'}}>{authError || 'Could not load your data.'}</div>
+          <button style={{padding:'0.85rem 1.6rem',background:D.cyan,color:'var(--cv-on-cyan)',border:'none',borderRadius:12,fontWeight:700,cursor:'pointer'}}
             onClick={()=>token && authenticate(token)}>Try Again</button>
         </div>
       </div>
@@ -560,20 +583,26 @@ export default function FieldCapturePage() {
             </div>
             <div style={{fontSize:'0.82rem',color:D.muted,marginTop:'0.25rem'}}>{auth.operator.display_name} · {auth.unit.name}</div>
           </div>
-          {(mode==='grid' || mode==='history' || mode==='stock') && (
-            <div style={{display:'flex',gap:'0.45rem',flexShrink:0}}>
-              {mode==='grid' && (
-                <button onClick={loadStock}
+          <div style={{display:'flex',gap:'0.45rem',flexShrink:0}}>
+            <button onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle light/dark theme"
+              style={{background:D.card,border:`1px solid ${D.border}`,color:D.text,borderRadius:10,padding:'0.55rem 0.7rem',fontSize:'0.78rem',cursor:'pointer',whiteSpace:'nowrap'}}>
+              {theme==='dark'?'☀':'☾'} Theme
+            </button>
+            {(mode==='grid' || mode==='history' || mode==='stock') && (
+              <>
+                {mode==='grid' && (
+                  <button onClick={loadStock}
+                    style={{background:D.card,border:`1px solid ${D.border}`,color:D.text,borderRadius:10,padding:'0.55rem 0.8rem',fontSize:'0.78rem',cursor:'pointer',whiteSpace:'nowrap'}}>
+                    Stock
+                  </button>
+                )}
+                <button onClick={mode==='grid'?loadHistory:()=>setMode('grid')}
                   style={{background:D.card,border:`1px solid ${D.border}`,color:D.text,borderRadius:10,padding:'0.55rem 0.8rem',fontSize:'0.78rem',cursor:'pointer',whiteSpace:'nowrap'}}>
-                  Stock
+                  {mode==='grid'?'History':'← Back'}
                 </button>
-              )}
-              <button onClick={mode==='grid'?loadHistory:()=>setMode('grid')}
-                style={{background:D.card,border:`1px solid ${D.border}`,color:D.text,borderRadius:10,padding:'0.55rem 0.8rem',fontSize:'0.78rem',cursor:'pointer',whiteSpace:'nowrap'}}>
-                {mode==='grid'?'History':'← Back'}
-              </button>
-            </div>
-          )}
+              </>
+            )}
+          </div>
         </header>
 
         {/* ---- Sync-status banner (with manual Sync now) ---- */}
@@ -588,7 +617,7 @@ export default function FieldCapturePage() {
           </button>
           {pendingCount>0 && (
             <button disabled={syncing} onClick={syncNow}
-              style={{padding:'0.6rem 0.95rem',background:D.cyan,color:'#062230',border:'none',borderRadius:10,fontWeight:700,cursor:'pointer',fontSize:'0.82rem',whiteSpace:'nowrap',flexShrink:0,opacity:syncing?0.6:1}}>
+              style={{padding:'0.6rem 0.95rem',background:D.cyan,color:'var(--cv-on-cyan)',border:'none',borderRadius:10,fontWeight:700,cursor:'pointer',fontSize:'0.82rem',whiteSpace:'nowrap',flexShrink:0,opacity:syncing?0.6:1}}>
               {syncing?'Syncing...':'Sync now'}
             </button>
           )}
@@ -596,7 +625,7 @@ export default function FieldCapturePage() {
         {(lastSync || syncMsg) && (
           <div style={{marginBottom:'0.9rem',fontSize:'0.78rem'}}>
             {lastSync && <div style={{color:D.faint}}>Last synced {lastSync}</div>}
-            {syncMsg && <div style={{color:syncMsg.startsWith('Synced')?'#5FD08A':'#FF8B7E',marginTop:'0.2rem'}}>{syncMsg}</div>}
+            {syncMsg && <div style={{color:syncMsg.startsWith('Synced')?'var(--cv-green-text)':'var(--cv-red-text)',marginTop:'0.2rem'}}>{syncMsg}</div>}
           </div>
         )}
 
@@ -611,9 +640,9 @@ export default function FieldCapturePage() {
                   <div style={{fontSize:'0.72rem',color:D.faint}}>{q.override_price?'(price overridden)':`× ${fmt(q.standard_price,currency)}`}</div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
-                  <div style={{fontFamily:'monospace',fontWeight:700,color:'#5FD08A',whiteSpace:'nowrap'}}>+{fmt(q.quantity*(q.override_price??q.standard_price),currency)}</div>
+                  <div style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-green-text)',whiteSpace:'nowrap'}}>+{fmt(q.quantity*(q.override_price??q.standard_price),currency)}</div>
                   <button onClick={()=>openSaleEdit(q)} style={{background:'transparent',border:'none',color:D.cyan,fontSize:'0.82rem',cursor:'pointer',fontWeight:600}}>Edit</button>
-                  <button onClick={()=>removeSale(q.local_id)} style={{background:'transparent',border:'none',color:'#FF8B7E',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
+                  <button onClick={()=>removeSale(q.local_id)} style={{background:'transparent',border:'none',color:'var(--cv-red-text)',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
                 </div>
               </div>
             ))}
@@ -624,9 +653,9 @@ export default function FieldCapturePage() {
                   <div style={{fontSize:'0.72rem',color:D.faint}}>{q.transaction_date}</div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
-                  <div style={{fontFamily:'monospace',fontWeight:700,color:'#FF8B7E',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</div>
+                  <div style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</div>
                   <button onClick={()=>openCostEdit(q)} style={{background:'transparent',border:'none',color:D.cyan,fontSize:'0.82rem',cursor:'pointer',fontWeight:600}}>Edit</button>
-                  <button onClick={()=>removeCost(q.local_id)} style={{background:'transparent',border:'none',color:'#FF8B7E',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
+                  <button onClick={()=>removeCost(q.local_id)} style={{background:'transparent',border:'none',color:'var(--cv-red-text)',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
                 </div>
               </div>
             ))}
@@ -637,8 +666,8 @@ export default function FieldCapturePage() {
                   <div style={{fontSize:'0.68rem',color:D.amber}}>Awaiting categorization · {q.transaction_date}</div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
-                  <div style={{fontFamily:'monospace',fontWeight:700,color:'#FF8B7E',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</div>
-                  <button onClick={()=>removeUncategorizedCost(q.local_id)} style={{background:'transparent',border:'none',color:'#FF8B7E',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
+                  <div style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</div>
+                  <button onClick={()=>removeUncategorizedCost(q.local_id)} style={{background:'transparent',border:'none',color:'var(--cv-red-text)',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
                 </div>
               </div>
             ))}
@@ -652,7 +681,7 @@ export default function FieldCapturePage() {
             <div style={{display:'flex',gap:'0.6rem',marginBottom:'1.1rem'}}>
               <button onClick={()=>setFlow('in')}
                 style={{flex:1,padding:'0.95rem',borderRadius:14,fontSize:'1rem',fontWeight:700,cursor:'pointer',
-                  background:flow==='in'?D.cyan:'transparent',color:flow==='in'?'#062230':D.text,
+                  background:flow==='in'?D.cyan:'transparent',color:flow==='in'?'var(--cv-on-cyan)':D.text,
                   border:flow==='in'?'none':`1px solid ${D.border}`}}>
                 + Money in
               </button>
@@ -718,7 +747,7 @@ export default function FieldCapturePage() {
                           <span style={{display:'block',fontWeight:600,fontSize:'0.92rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.quantity}{q.unit_label?` ${q.unit_label}`:''} {q.item_name}</span>
                           <span style={{display:'inline-block',fontSize:'0.66rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
                         </span>
-                        <span style={{fontFamily:'monospace',fontWeight:700,color:'#5FD08A',whiteSpace:'nowrap',flexShrink:0}}>+{fmt(q.quantity*(q.override_price??q.standard_price),currency)}</span>
+                        <span style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-green-text)',whiteSpace:'nowrap',flexShrink:0}}>+{fmt(q.quantity*(q.override_price??q.standard_price),currency)}</span>
                       </button>
                     )
                   })}
@@ -730,7 +759,7 @@ export default function FieldCapturePage() {
                         <span style={{display:'block',fontWeight:600,fontSize:'0.92rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.plan_line_name}</span>
                         <span style={{display:'inline-block',fontSize:'0.66rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
                       </span>
-                      <span style={{fontFamily:'monospace',fontWeight:700,color:'#FF8B7E',whiteSpace:'nowrap',flexShrink:0}}>-{fmt(q.amount,currency)}</span>
+                      <span style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap',flexShrink:0}}>-{fmt(q.amount,currency)}</span>
                     </button>
                   ))}
                   {uncategorizedCostsQueue.map(q=>(
@@ -742,8 +771,8 @@ export default function FieldCapturePage() {
                         <span style={{display:'inline-block',fontSize:'0.66rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
                       </span>
                       <span style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
-                        <span style={{fontFamily:'monospace',fontWeight:700,color:'#FF8B7E',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</span>
-                        <button onClick={()=>removeUncategorizedCost(q.local_id)} style={{background:'transparent',border:'none',color:'#FF8B7E',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
+                        <span style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</span>
+                        <button onClick={()=>removeUncategorizedCost(q.local_id)} style={{background:'transparent',border:'none',color:'var(--cv-red-text)',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
                       </span>
                     </div>
                   ))}
@@ -840,7 +869,7 @@ export default function FieldCapturePage() {
           <div>
             {historyLoading && <div style={{textAlign:'center',color:D.muted,padding:'2rem',fontSize:'0.9rem'}}>Loading...</div>}
             {!historyLoading && historyError && (
-              <div style={{background:D.redDim,border:`1px solid ${D.red}`,borderRadius:14,padding:'1rem',color:'#FF8B7E',fontSize:'0.9rem'}}>{historyError}</div>
+              <div style={{background:D.redDim,border:`1px solid ${D.red}`,borderRadius:14,padding:'1rem',color:'var(--cv-red-text)',fontSize:'0.9rem'}}>{historyError}</div>
             )}
             {!historyLoading && !historyError && historyEntries.length===0 && (
               <div style={{textAlign:'center',color:D.muted,padding:'2rem',fontSize:'0.9rem'}}>Nothing recorded yet. Once you sync an entry, it&apos;ll show up here.</div>
@@ -855,7 +884,7 @@ export default function FieldCapturePage() {
                     </div>
                     {entry.notes && <div style={{fontSize:'0.74rem',color:D.faint,marginTop:'0.15rem',fontStyle:'italic'}}>{entry.notes}</div>}
                   </div>
-                  <div style={{fontWeight:800,fontSize:'1rem',color:entry.transaction_type==='sale'?'#5FD08A':'#FF8B7E',whiteSpace:'nowrap'}}>
+                  <div style={{fontWeight:800,fontSize:'1rem',color:entry.transaction_type==='sale'?'var(--cv-green-text)':'var(--cv-red-text)',whiteSpace:'nowrap'}}>
                     {entry.transaction_type==='sale'?'+':'−'}{fmt(entry.amount,currency)}
                   </div>
                 </div>
@@ -870,7 +899,7 @@ export default function FieldCapturePage() {
           <div>
             {stockLoading && <div style={{textAlign:'center',color:D.muted,padding:'2rem',fontSize:'0.9rem'}}>Loading...</div>}
             {!stockLoading && stockError && (
-              <div style={{background:D.redDim,border:`1px solid ${D.red}`,borderRadius:14,padding:'1rem',color:'#FF8B7E',fontSize:'0.9rem'}}>{stockError}</div>
+              <div style={{background:D.redDim,border:`1px solid ${D.red}`,borderRadius:14,padding:'1rem',color:'var(--cv-red-text)',fontSize:'0.9rem'}}>{stockError}</div>
             )}
             {!stockLoading && !stockError && stockLevels.length===0 && (
               <div style={{textAlign:'center',color:D.muted,padding:'2rem',fontSize:'0.9rem'}}>No stock recorded yet. Record a sale or receive stock for a catalogue item to start tracking it here.</div>
