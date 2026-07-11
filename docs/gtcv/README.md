@@ -95,6 +95,22 @@ The coach's "Team & Payments" tab turns the co-implementer relationship into an 
 
 Locked decisions: **day = 8 hours**; **day rate set per co-implementer** (per-engagement deferred, not needed yet); **an unreconciled advance BLOCKS the next invoice** from issuing until cleared.
 
+## Track 2 migration — HOW TO APPLY
+
+The tables for the Team & Payments loop, deals pipeline, and per-engagement fees are in
+`supabase/migrations/2026_07_11_coach_payments_deals_fees.sql`. It is additive and safe
+(only CREATE ... IF NOT EXISTS / ADD COLUMN IF NOT EXISTS; nothing dropped or altered).
+
+To apply: open the Supabase SQL editor
+(https://supabase.com/dashboard/project/sxsenbvaitpnumdwvxaj/sql/new), paste the entire
+file contents, and click Run. Then the coach dashboard UI can be wired to these tables
+(Phase 2; requires DB access to build and verify).
+
+Note: this session cannot reach Supabase (org egress policy returns 403 for the DB host,
+logged by the proxy), and the environment's Supabase keys are placeholders. To let a
+session apply/verify directly instead of pasting SQL, the environment needs Supabase
+egress allowed AND a real service-role key / DATABASE_URL, then a fresh session.
+
 ## Co-implementer login is a GtCV-phase feature (not Clearview)
 
 What a co-implementer sees when THEY log in (their assigned clients, their gates/zone work, their own
