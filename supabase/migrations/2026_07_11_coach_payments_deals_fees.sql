@@ -34,7 +34,7 @@ alter table co_implementers add column if not exists rate_currency text default 
 --    is affected.
 create table if not exists coach_timesheet_entries (
   id uuid primary key default gen_random_uuid(),
-  co_implementer_id uuid references co_implementers(id) on delete cascade,
+  co_implementer_id text references co_implementers(id) on delete cascade,
   client_id text,
   entry_date date not null,
   task text,
@@ -51,7 +51,7 @@ create index if not exists idx_coach_ts_ci_period on coach_timesheet_entries(co_
 -- 3) Expenses to reclaim -------------------------------------------
 create table if not exists coach_expenses (
   id uuid primary key default gen_random_uuid(),
-  co_implementer_id uuid references co_implementers(id) on delete cascade,
+  co_implementer_id text references co_implementers(id) on delete cascade,
   client_id text,
   expense_date date not null,
   description text,
@@ -70,7 +70,7 @@ create index if not exists idx_coach_exp_ci_period on coach_expenses(co_implemen
 -- 4) Advances, reconciled against actual spend ---------------------
 create table if not exists coach_advances (
   id uuid primary key default gen_random_uuid(),
-  co_implementer_id uuid references co_implementers(id) on delete cascade,
+  co_implementer_id text references co_implementers(id) on delete cascade,
   amount numeric not null default 0,
   currency text default 'USD',
   advance_date date not null,
@@ -87,7 +87,7 @@ create index if not exists idx_coach_adv_ci_open on coach_advances(co_implemente
 create table if not exists coach_invoices (
   id uuid primary key default gen_random_uuid(),
   invoice_number text unique,
-  co_implementer_id uuid references co_implementers(id) on delete set null,
+  co_implementer_id text references co_implementers(id) on delete set null,
   period text not null,
   days numeric not null default 0,
   day_rate numeric not null default 0,
