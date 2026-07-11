@@ -725,19 +725,21 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGo
         <KPI label="Revenue/Head" value={fmt(m.revenue_per_head,cc)} sub={`${m.total_headcount} staff`} color={C.purple}/>
       </div>
       <div style={ovLabel}>Overview</div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(330px,1fr))',gap:'1.25rem',marginBottom:'1.6rem',alignItems:'start'}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(340px,1fr))',gap:'1.25rem',marginBottom:'1.6rem',alignItems:'stretch'}}>
         {result.con&&Array.isArray(result.con.rev)&&(
-          <div style={{...card,marginBottom:0}}>
+          <div style={{...card,marginBottom:0,height:360,display:'flex',flexDirection:'column'}}>
             <div style={{...secH,fontSize:'1rem',marginBottom:'0.55rem'}}>Revenue and cost trend</div>
             <div style={{display:'flex',gap:'1.2rem',marginBottom:'0.75rem',fontSize:'0.72rem',color:C.slate,flexWrap:'wrap'}}>
               <span><span style={{display:'inline-block',width:10,height:10,borderRadius:10,background:C.teal,marginRight:6,verticalAlign:'middle'}}/>Revenue</span>
               <span><span style={{display:'inline-block',width:10,height:10,borderRadius:10,background:C.amber,marginRight:6,verticalAlign:'middle'}}/>Total cost</span>
               <span><span style={{display:'inline-block',width:10,height:10,borderRadius:10,background:C.green,marginRight:6,verticalAlign:'middle'}}/>EBITDA</span>
             </div>
-            <TrendChart months={months} revenue={result.con.rev} cost={result.con.rev.map((r:number,i:number)=>r-((result.con.ebitda&&result.con.ebitda[i])||0))} ebitda={result.con.ebitda||[]} cc={cc}/>
+            <div style={{flex:1,minHeight:0,display:'flex',alignItems:'center'}}>
+              <TrendChart months={months} revenue={result.con.rev} cost={result.con.rev.map((r:number,i:number)=>r-((result.con.ebitda&&result.con.ebitda[i])||0))} ebitda={result.con.ebitda||[]} cc={cc}/>
+            </div>
           </div>
         )}
-        <div style={{...card,marginBottom:0}}>
+        <div style={{...card,marginBottom:0,height:360,display:'flex',flexDirection:'column'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.5rem'}}>
             <div style={{...secH,fontSize:'1rem',marginBottom:0}}>This Month&apos;s Story</div>
             <span style={{fontFamily:'monospace',fontSize:'0.58rem',letterSpacing:'0.1em',color:C.purple,border:`1px solid ${C.purple}`,borderRadius:4,padding:'0.1rem 0.42rem'}}>OPUS</span>
@@ -745,40 +747,51 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGo
           {story ? (
             <>
               <div style={{fontSize:'0.72rem',color:C.slate,marginBottom:'0.6rem'}}>{story.period_covered||''}{story.generated_at?` · generated ${new Date(story.generated_at).toLocaleDateString('en-GB')}`:''}</div>
-              <div style={{fontSize:'0.86rem',color:C.navy,lineHeight:1.75,whiteSpace:'pre-wrap',maxHeight:340,overflowY:'auto'}}>{story.briefing_text}</div>
+              <div style={{flex:1,minHeight:0,fontSize:'0.85rem',color:C.navy,lineHeight:1.7,whiteSpace:'pre-wrap',overflowY:'auto'}}>{story.briefing_text}</div>
             </>
           ) : (
-            <p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.7}}>
-              No month story yet. Open{' '}
-              <span onClick={onGoToIntelligence} style={{color:C.teal,fontWeight:700,cursor:'pointer',textDecoration:'underline'}}>Clearview Intelligence</span>
-              {' '}and generate This Month&apos;s Story to see it here.
-            </p>
+            <div style={{flex:1,display:'flex',alignItems:'center'}}>
+              <p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.7,margin:0}}>
+                No month story yet. Open{' '}
+                <span onClick={onGoToIntelligence} style={{color:C.teal,fontWeight:700,cursor:'pointer',textDecoration:'underline'}}>Clearview Intelligence</span>
+                {' '}and generate This Month&apos;s Story to see it here.
+              </p>
+            </div>
           )}
         </div>
       </div>
       {/* Unit performance cards */}
       <div style={{...secH,marginTop:'0.5rem'}}>Business Unit Performance</div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'1.25rem',marginBottom:'1.5rem',alignItems:'stretch'}}>
         {result.allocUnits.map(u => {
           const pl = result.unitPL[u.id]
           if (!pl) return null
+          const metric = (label:string,value:string,color:string) => (
+            <div style={{background:C.lightBg,borderRadius:8,padding:'0.7rem 0.8rem'}}>
+              <div style={{color:C.slate,fontSize:'0.66rem',letterSpacing:'0.06em',textTransform:'uppercase',marginBottom:'0.25rem'}}>{label}</div>
+              <div style={{fontWeight:700,fontSize:'0.95rem',color,fontFamily:'monospace'}}>{value}</div>
+            </div>
+          )
           return (
-            <div key={u.id} style={{...card,borderTop:`4px solid ${u.color||C.cyan}`,marginBottom:0}}>
-              <div style={{fontWeight:700,fontSize:'0.9rem',color:C.navy,marginBottom:'0.5rem'}}>{u.name}</div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.5rem',fontSize:'0.8rem'}}>
-                <div><div style={{color:C.slate,fontSize:'0.7rem'}}>Revenue</div><div style={{fontWeight:700,color:C.navy,fontFamily:'monospace'}}>{fmt(pl.ann_rev,cc)}</div></div>
-                <div><div style={{color:C.slate,fontSize:'0.7rem'}}>Gross Profit</div><div style={{fontWeight:700,color:pl.ann_gp>=0?C.green:C.red,fontFamily:'monospace'}}>{fmt(pl.ann_gp,cc)}</div></div>
-                <div><div style={{color:C.slate,fontSize:'0.7rem'}}>EBITDA</div><div style={{fontWeight:700,color:pl.ann_ebitda>=0?C.teal:C.red,fontFamily:'monospace'}}>{fmt(pl.ann_ebitda,cc)}</div></div>
-                <div><div style={{color:C.slate,fontSize:'0.7rem'}}>GP Margin</div><div style={{fontWeight:700,color:C.navy,fontFamily:'monospace'}}>{pct(pl.gp_margin)}</div></div>
+            <div key={u.id} style={{...card,borderTop:`4px solid ${u.color||C.cyan}`,marginBottom:0,display:'flex',flexDirection:'column'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginBottom:'0.85rem'}}>
+                <span style={{width:9,height:9,borderRadius:9,background:u.color||C.cyan,display:'inline-block',flexShrink:0}}/>
+                <div style={{fontWeight:700,fontSize:'0.95rem',color:C.navy}}>{u.name}</div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.6rem'}}>
+                {metric('Revenue',fmt(pl.ann_rev,cc),C.navy)}
+                {metric('Gross Profit',fmt(pl.ann_gp,cc),pl.ann_gp>=0?C.green:C.red)}
+                {metric('EBITDA',fmt(pl.ann_ebitda,cc),pl.ann_ebitda>=0?C.teal:C.red)}
+                {metric('GP Margin',pct(pl.gp_margin),C.navy)}
               </div>
               {/* Sub-units if any */}
               {result.subUnitsByParent[u.id]&&(
-                <div style={{marginTop:'0.75rem',borderTop:`1px solid ${C.border}`,paddingTop:'0.5rem'}}>
-                  <div style={{fontSize:'0.7rem',color:C.slate,marginBottom:'0.35rem',fontFamily:'monospace',letterSpacing:'0.08em'}}>SUB-UNITS</div>
+                <div style={{marginTop:'0.85rem',borderTop:`1px solid ${C.border}`,paddingTop:'0.6rem'}}>
+                  <div style={{fontSize:'0.66rem',color:C.slate,marginBottom:'0.4rem',fontFamily:'monospace',letterSpacing:'0.08em'}}>SUB-UNITS</div>
                   {result.subUnitsByParent[u.id].map(su=>{
                     const spl = result.unitPL[su.id]
                     return spl ? (
-                      <div key={su.id} style={{display:'flex',justifyContent:'space-between',fontSize:'0.78rem',padding:'0.2rem 0',borderBottom:`1px solid ${C.border}`}}>
+                      <div key={su.id} style={{display:'flex',justifyContent:'space-between',fontSize:'0.78rem',padding:'0.25rem 0'}}>
                         <span style={{color:C.navy}}>{su.name}</span>
                         <span style={{fontFamily:'monospace',color:spl.ann_ebitda>=0?C.green:C.red,fontWeight:700}}>{fmt(spl.ann_ebitda,cc)}</span>
                       </div>
@@ -3084,21 +3097,21 @@ Write a clear, plain-English health check report for the CEO. Include: 1) Overal
   async function generateNarrative() {
     setGeneratingNarrative(true)
     try {
-      const prompt = `You are writing a monthly business narrative for the CEO of ${config.business_name}, an African MSME. Write a complete story of where the business stands right now, in plain conversational English -- not a list, a narrative read top to bottom like a letter.
+      const prompt = `You are writing this month's story for the owner of ${config.business_name}, an African MSME. Be short and direct. No filler.
 
 Data:
-- Revenue: ${cc} ${m.total_revenue.toLocaleString()}, EBITDA margin: ${(m.net_margin*100).toFixed(1)}%
-- Credit Risk: ${s.score}/100 (${s.classification}); Going Concern: ${s.gcScore}/20 (${s.gcRating}); Investment Readiness: ${s.irScore}/30 (${s.irTier})
-- Debt service coverage: ${dscrLabel(s)}
-- Break-even revenue: ${cc} ${m.business_breakeven.toLocaleString()}
-- Cash shortfall months: ${warnings.length>0?warnings.map(w=>w.month).join(', '):'none'}
-- Staff cost ratio: ${(m.staff_cost_pct*100).toFixed(1)}%
-- Business units: ${config.business_units.filter(u=>u.active).map(u=>u.name).join(', ')}
+Revenue: ${cc} ${m.total_revenue.toLocaleString()}, EBITDA margin: ${(m.net_margin*100).toFixed(1)}%
+Credit Risk: ${s.score}/100 (${s.classification}); Going Concern: ${s.gcScore}/20 (${s.gcRating}); Investment Readiness: ${s.irScore}/30 (${s.irTier})
+Debt service coverage: ${dscrLabel(s)}
+Break-even revenue: ${cc} ${m.business_breakeven.toLocaleString()}
+Cash shortfall months: ${warnings.length>0?warnings.map(w=>w.month).join(', '):'none'}
+Staff cost ratio: ${(m.staff_cost_pct*100).toFixed(1)}%
+Business units: ${config.business_units.filter(u=>u.active).map(u=>u.name).join(', ')}
 
-Write 4-5 short paragraphs telling the story of this business right now. Speak directly to the owner. No headers, no bullets, no jargon. Maximum 350 words.`
+Write at most 110 words. One short sentence on overall status. Then the single strongest point, the single biggest risk, and the one action that matters most this month, each in one short sentence. Plain sentences, speak to the owner, no repetition.`
       const response = await fetch('/api/ai-generate',{
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({prompt,max_tokens:1000})
+        body:JSON.stringify({prompt,max_tokens:400})
       })
       const data = await response.json()
       const text = data.text||'Narrative unavailable'
