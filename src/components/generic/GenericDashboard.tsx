@@ -599,15 +599,17 @@ export default function GenericDashboard({
 
   const activeUnits = config.business_units.filter(u => u.active)
 
+  // Grouped so inputs sit together and outputs sit together: Overview (home),
+  // then the input tabs, then the reporting/output tabs, then admin.
   const mainNav = [
     ['overview','Overview'],
-    ['approvals',`Approvals${pendingApprovalCount>0?` (${pendingApprovalCount})`:''}`],
-    ['intelligence','Clearview Intelligence'],
     ['planning','Planning'],
+    ['actuals_wc','Actuals & Working Capital'],
     ['pl','P&L'],
     ['cashflow','Cash Flow'],
     ['balancesheet','Balance Sheet'],
-    ['actuals_wc','Actuals & Working Capital'],
+    ['intelligence','Clearview Intelligence'],
+    ['approvals',`Approvals${pendingApprovalCount>0?` (${pendingApprovalCount})`:''}`],
     ['settings','Settings'],
   ]
 
