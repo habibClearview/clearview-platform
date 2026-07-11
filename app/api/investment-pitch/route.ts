@@ -230,7 +230,7 @@ export async function POST(req: NextRequest) {
       const context = `
 Business: ${config.business_name}, ${client?.sector || 'agribusiness'} sector, ${client?.country || 'Uganda'}
 Revenue: ${fmt(m.total_revenue, cc)} | Gross Margin: ${pct(m.gross_margin)} | EBITDA: ${fmt(m.total_ebitda, cc)} (${pct(m.net_margin)})
-Break-even: ${fmt(m.business_breakeven, cc)} | Headroom: ${fmt(m.total_revenue - m.business_breakeven, cc)}
+Breakeven: ${fmt(m.business_breakeven, cc)} | Headroom: ${fmt(m.total_revenue - m.business_breakeven, cc)}
 Investment Readiness: ${s.irScore}/30 (${s.irTier}) | Credit Risk: ${s.score}/100 (${s.classification}) | DSCR: ${dscrLabel(s)}
 Units: ${unitLines.join('; ')}
 ${hasMarketing ? `Top marketing channel by CAC: ${channels[0]?.channel} at ${channels[0]?.cac ? fmt(channels[0].cac, cc) : 'unquantified'} per customer` : ''}
@@ -240,9 +240,9 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
 `
       const [vp, bm, sg, rm, rec] = await Promise.all([
         callClaude(`Write 2 punchy sentences on the value proposition of ${config.business_name} for an investment brief. Who does it serve, what problem does it solve, and what makes it distinctive? No jargon. Data:\n${context}`),
-        callClaude(`Write 2-3 sentences on how ${config.business_name} makes money — its revenue model, key customers, and channels. Mention the gross margin and what it says about the model. Data:\n${context}`),
+        callClaude(`Write 2 or 3 sentences on how ${config.business_name} makes money, covering its revenue model, key customers, and channels. Mention the gross margin and what it says about the model. Data:\n${context}`),
         callClaude(`Write 2 sentences on the scale potential of ${config.business_name}. What is the current reach and what enables it to grow without rebuilding from scratch? Data:\n${context}`),
-        callClaude(`Name 2 specific risks for ${config.business_name} and one mitigation for each. Be honest and concrete. Format as: Risk 1: [name] — [one sentence description]. Mitigation: [one sentence]. Risk 2: same. Data:\n${context}`),
+        callClaude(`Name 2 specific risks for ${config.business_name} and one mitigation for each. Be honest and concrete. Do not use dashes anywhere. Format as: Risk 1: [name]. [one sentence description]. Mitigation: [one sentence]. Risk 2: same format. Data:\n${context}`),
         callClaude(`Write 3 sentences giving an investment recommendation for ${config.business_name}. State clearly: is it investment-ready now, near-ready with conditions, or at an earlier stage? What is the single most important thing that would improve the case? Data:\n${context}`),
       ])
       valueProposition = vp
@@ -296,7 +296,7 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
       { label: 'Revenue', value: fmt(m.total_revenue, cc), sub: 'planned period', color: NAVY },
       { label: 'Gross Margin', value: pct(m.gross_margin), sub: 'after direct costs', color: m.gross_margin > 0.3 ? GREEN : AMBER },
       { label: 'EBITDA', value: fmt(m.total_ebitda, cc), sub: pct(m.net_margin) + ' margin', color: m.total_ebitda >= 0 ? GREEN : RED },
-      { label: 'Break-Even', value: fmt(m.business_breakeven, cc), sub: m.total_revenue >= m.business_breakeven ? `${fmt(m.total_revenue - m.business_breakeven, cc)} headroom` : 'not yet reached', color: m.total_revenue >= m.business_breakeven ? GREEN : RED },
+      { label: 'Breakeven', value: fmt(m.business_breakeven, cc), sub: m.total_revenue >= m.business_breakeven ? `${fmt(m.total_revenue - m.business_breakeven, cc)} headroom` : 'not yet reached', color: m.total_revenue >= m.business_breakeven ? GREEN : RED },
     ]))
     children.push(spacer(0, 80))
     children.push(metricRow([
@@ -312,8 +312,8 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
       children.push(sectionHeader('Value Proposition & Business Model'))
       children.push(spacer(0, 80))
       children.push(infoBox(
-        ['VALUE PROPOSITION', '', ...(valueProposition ? valueProposition.split('\n').filter(Boolean) : ['—'])],
-        ['HOW IT MAKES MONEY', '', ...(businessModel ? businessModel.split('\n').filter(Boolean) : ['—'])],
+        ['VALUE PROPOSITION', '', ...(valueProposition ? valueProposition.split('\n').filter(Boolean) : ['Not provided'])],
+        ['HOW IT MAKES MONEY', '', ...(businessModel ? businessModel.split('\n').filter(Boolean) : ['Not provided'])],
       ))
       children.push(spacer(0, 200))
     }
@@ -374,10 +374,10 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
     children.push(sectionHeader('Governance & Business Foundations'))
     children.push(spacer(0, 80))
     children.push(metricRow([
-      { label: 'Commercial Model', value: `${assess.commercialModel || '—'}/5`, sub: 'clarity & viability', color: Number(assess.commercialModel) >= 4 ? GREEN : AMBER },
-      { label: 'Management', value: `${assess.managementCapability || '—'}/4`, sub: 'capability assessed', color: Number(assess.managementCapability) >= 3 ? GREEN : AMBER },
-      { label: 'Market Evidence', value: `${assess.marketEvidence || '—'}/5`, sub: 'demand & traction', color: Number(assess.marketEvidence) >= 4 ? GREEN : AMBER },
-      { label: 'Governance & Records', value: `${assess.governance || '—'}/5`, sub: 'systems & compliance', color: Number(assess.governance) >= 4 ? GREEN : AMBER },
+      { label: 'Commercial Model', value: `${assess.commercialModel || 'n/a'}/5`, sub: 'clarity & viability', color: Number(assess.commercialModel) >= 4 ? GREEN : AMBER },
+      { label: 'Management', value: `${assess.managementCapability || 'n/a'}/4`, sub: 'capability assessed', color: Number(assess.managementCapability) >= 3 ? GREEN : AMBER },
+      { label: 'Market Evidence', value: `${assess.marketEvidence || 'n/a'}/5`, sub: 'demand & traction', color: Number(assess.marketEvidence) >= 4 ? GREEN : AMBER },
+      { label: 'Governance & Records', value: `${assess.governance || 'n/a'}/5`, sub: 'systems & compliance', color: Number(assess.governance) >= 4 ? GREEN : AMBER },
     ]))
     children.push(spacer(0, 200))
 
@@ -414,7 +414,7 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
         children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [
           new TextRun({ text: 'Powered by ', color: 'AAAAAA', size: 16, font: 'Arial' }),
           new TextRun({ text: 'Canvas Coach Clearview', color: CYAN, size: 16, font: 'Arial', bold: true }),
-          new TextRun({ text: '  ·  habibonifade.com  ·  Confidential — not for circulation without permission', color: 'AAAAAA', size: 16, font: 'Arial' }),
+          new TextRun({ text: '  ·  habibonifade.com  ·  Confidential. Not for circulation without permission', color: 'AAAAAA', size: 16, font: 'Arial' }),
         ] })],
       })] })],
     }))
