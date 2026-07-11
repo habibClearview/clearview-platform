@@ -41,8 +41,18 @@ export interface TradeCreditLine {
   id: string
   name: string               // e.g. "Input Supplier", "Licensing Partner", "FGE Advance"
   type: 'payable' | 'receivable'
-  monthly_new: number[]      // new credit received (payable) or extended (receivable) this month
-  monthly_settled: number[]  // amount actually paid (payable) or collected (receivable) this month
+  // ── Legacy FLOW inputs (kept for backward compatibility). When
+  // monthly_balance is undefined these drive the running-balance simulation.
+  monthly_new?: number[]     // new credit received (payable) or extended (receivable) this month
+  monthly_settled?: number[] // amount actually paid (payable) or collected (receivable) this month
+  // ── New BALANCE input: month-end OUTSTANDING balance, per month. A
+  // non-accountant can read this straight off their debtors/creditors book.
+  // When present, this line uses the balance path (ΔB drives cash effect),
+  // which is provably identical in meaning to the flow path (new - settled = ΔB).
+  monthly_balance?: number[]
+  // Optional business unit this line belongs to. Legacy lines have no unit_id
+  // and are treated as belonging to the whole business ("Unassigned").
+  unit_id?: string
 }
 
 export interface TradeCreditSummary {
@@ -74,6 +84,31 @@ export function computeTradeCredit(
   ;(lines || []).forEach(line => {
     const isPayable = line.type === 'payable'
     const balanceTarget = isPayable ? totalPayableOutstanding : totalReceivableOutstanding
+
+    if (line.monthly_balance !== undefined) {
+      // ── BALANCE path (new): the user enters the month-end OUTSTANDING
+      // balance directly. The cash effect is the change in that balance,
+      // which is provably identical to the flow path's (new - settled),
+      // since new - settled == ΔB by construction of a running balance.
+      // Opening balance before month 0 is 0.
+      let prevBalance = 0
+      for (let i = 0; i < months; i++) {
+        const B = Math.max(0, line.monthly_balance[i] || 0)
+        balanceTarget[i] += B
+        // payable: growing what you owe defers an outflow (+), paying it down is an outflow (-).
+        // receivable: growing what you're owed defers an inflow (-), collecting it is an inflow (+).
+        if (isPayable) {
+          monthlyCashEffect[i] += B - prevBalance
+        } else {
+          monthlyCashEffect[i] += prevBalance - B
+        }
+        prevBalance = B
+      }
+      return
+    }
+
+    // ── Legacy FLOW path (unchanged): running-balance simulation from
+    // monthly_new / monthly_settled movements.
     let runningBalance = 0
     for (let i = 0; i < months; i++) {
       const newAmt = line.monthly_new?.[i] || 0
@@ -117,6 +152,37 @@ export function computeTradeCredit(
     peakPayable: totalPayableOutstanding.length>0 ? Math.max(...totalPayableOutstanding) : 0,
     peakReceivable: totalReceivableOutstanding.length>0 ? Math.max(...totalReceivableOutstanding) : 0,
   }
+}
+
+// Computes trade credit per business unit. Filters the lines by unit_id and
+// runs computeTradeCredit against that unit's own cogs/revenue arrays, so
+// DSO/DPO and outstanding balances are unit-specific. Lines without a unit_id
+// are grouped under the '' (Unassigned) key so legacy data stays visible.
+// The consolidated total is still obtained by calling computeTradeCredit over
+// ALL lines (that behaviour is unchanged) -- this helper is purely additive
+// for the per-unit UI views.
+export function computeTradeCreditByUnit(
+  lines: TradeCreditLine[],
+  perUnitCogs: Record<string, number[]>,
+  perUnitRev: Record<string, number[]>,
+  months: number,
+): Record<string, TradeCreditSummary> {
+  const byUnit: Record<string, TradeCreditLine[]> = {}
+  ;(lines || []).forEach(line => {
+    const key = line.unit_id || ''
+    ;(byUnit[key] ||= []).push(line)
+  })
+  const out: Record<string, TradeCreditSummary> = {}
+  const zero = Array(months).fill(0)
+  Object.keys(byUnit).forEach(key => {
+    out[key] = computeTradeCredit(
+      byUnit[key],
+      perUnitCogs[key] || zero,
+      perUnitRev[key] || zero,
+      months,
+    )
+  })
+  return out
 }
 
 // Slices an already-computed, full-plan-aligned DebtSchedule down to a

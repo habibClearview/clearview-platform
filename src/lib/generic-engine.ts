@@ -304,6 +304,7 @@ export function extendPlanningHorizon(config: GenericModelConfig, additionalMont
   config.settings.trade_credit_lines?.forEach(t => {
     checkLen(`trade credit line "${t.name}" monthly_new`, t.monthly_new)
     checkLen(`trade credit line "${t.name}" monthly_settled`, t.monthly_settled)
+    checkLen(`trade credit line "${t.name}" monthly_balance`, t.monthly_balance)
   })
   if (mismatches.length > 0) {
     throw new Error(`Cannot extend planning horizon: the following are already out of sync with planning_months (${config.planning_months}) and must be fixed first: ${mismatches.join('; ')}`)
@@ -332,8 +333,9 @@ export function extendPlanningHorizon(config: GenericModelConfig, additionalMont
       ...config.settings,
       trade_credit_lines: config.settings.trade_credit_lines?.map(t => ({
         ...t,
-        monthly_new: extendArr(t.monthly_new) as number[],
-        monthly_settled: extendArr(t.monthly_settled) as number[],
+        monthly_new: extendArr(t.monthly_new),
+        monthly_settled: extendArr(t.monthly_settled),
+        monthly_balance: extendArr(t.monthly_balance),
       })),
     },
   }
