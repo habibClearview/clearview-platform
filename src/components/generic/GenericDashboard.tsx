@@ -120,6 +120,9 @@ function PLTable({title,rows,months,cc,showExport,closedMask}:{title?:string;row
           </div>}
         </div>
       )}
+      <div style={{padding:'0.45rem 1.1rem',fontSize:'0.7rem',color:C.slate,background:C.lightBg,borderBottom:`1px solid ${C.border}`}}>
+        Tip: each column headed FY is one year. Click a year to open or close its monthly detail.
+      </div>
       {hasActuals&&(
         <div style={{padding:'0.5rem 1.1rem',fontSize:'0.68rem',fontFamily:'monospace',color:C.teal,display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap',background:'#F4FDFB'}}>
           <span style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
@@ -196,6 +199,9 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
           </div>}
         </div>
       )}
+      <div style={{padding:'0.45rem 1.1rem',fontSize:'0.7rem',color:C.slate,background:C.lightBg,borderBottom:`1px solid ${C.border}`}}>
+        Tip: each column headed FY is one year. Click a year to open or close its monthly detail.
+      </div>
       {hasActuals&&(
         <div style={{padding:'0.5rem 1.1rem',fontSize:'0.68rem',fontFamily:'monospace',color:C.teal,display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap',background:'#F4FDFB'}}>
           <span style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
@@ -4340,25 +4346,33 @@ function YearCloseControls({config,result,closedPeriods,P,onCloseStatusChanged}:
     }
   }
 
+  const anyClosable = groups.some(g => canCloseCalendarYear(g, closedPeriods||new Set(), periodForMonthIndex, config.start_date))
+
   return (
-    <div style={{display:'flex',gap:'0.6rem',flexWrap:'wrap',marginBottom:'1rem'}}>
-      {groups.map(group => {
-        const key = yearStartPeriod(group, periodForMonthIndex, config.start_date)
-        const yc = yearCloses[key]
-        const canClose = canCloseCalendarYear(group, closedPeriods||new Set(), periodForMonthIndex, config.start_date)
-        return (
-          <div key={group.year} style={{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.45rem 0.75rem',border:`1px solid ${yc?.closed?C.navy:C.border}`,borderRadius:6,fontSize:'0.75rem',background:yc?.closed?C.lightBg:C.white}}>
-            <span style={{fontWeight:700,color:C.navy}}>FY {group.label}</span>
-            {yc?.closed ? (
-              <span title={`Closed by ${yc.closed_by} on ${new Date(yc.closed_at).toLocaleDateString()}`}><Badge text="Closed" color={C.navy}/></span>
-            ) : (
-              <button type="button" style={addBtn(true,canClose?C.green:C.border)} onClick={()=>closeYear(group)} disabled={!canClose||closing===key}>
-                {closing===key?'Closing...':canClose?'Close This Year':'Not all months closed yet'}
-              </button>
-            )}
-          </div>
-        )
-      })}
+    <div style={{marginBottom:'1.25rem',padding:'0.9rem 1rem',border:`1px solid ${C.border}`,borderLeft:`4px solid ${C.navy}`,borderRadius:8,background:C.lightBg}}>
+      <div style={{fontWeight:700,color:C.navy,fontSize:'0.9rem',marginBottom:'0.25rem'}}>Year-End Close</div>
+      <p style={{margin:'0 0 0.75rem',fontSize:'0.78rem',color:C.slate,lineHeight:1.5,maxWidth:'46rem'}}>
+        Each box below is one financial year. Once every month in a year has been closed on the Actuals tab, you can lock that year here so its year-end balance sheet is frozen and cannot change. A box stays inactive until all of that year's months are closed, so {anyClosable ? 'the years ready to lock show a green button' : 'nothing is clickable yet'}. Locking is optional and only affects finance-level users.
+      </p>
+      <div style={{display:'flex',gap:'0.6rem',flexWrap:'wrap'}}>
+        {groups.map(group => {
+          const key = yearStartPeriod(group, periodForMonthIndex, config.start_date)
+          const yc = yearCloses[key]
+          const canClose = canCloseCalendarYear(group, closedPeriods||new Set(), periodForMonthIndex, config.start_date)
+          return (
+            <div key={group.year} style={{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.45rem 0.75rem',border:`1px solid ${yc?.closed?C.navy:C.border}`,borderRadius:6,fontSize:'0.75rem',background:yc?.closed?C.white:C.white}}>
+              <span style={{fontWeight:700,color:C.navy}}>FY {group.label}</span>
+              {yc?.closed ? (
+                <span title={`Closed by ${yc.closed_by} on ${new Date(yc.closed_at).toLocaleDateString()}`}><Badge text="Closed" color={C.navy}/></span>
+              ) : (
+                <button type="button" style={addBtn(true,canClose?C.green:C.border)} onClick={()=>closeYear(group)} disabled={!canClose||closing===key}>
+                  {closing===key?'Closing...':canClose?'Close This Year':'Not all months closed yet'}
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
