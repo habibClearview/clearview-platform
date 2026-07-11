@@ -569,7 +569,14 @@ export default function GenericDashboard({
         <div style={{maxWidth:1600,margin:'0 auto',padding:'1.25rem 1.5rem',display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
           <div>
             <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>CANVAS COACH — CLEARVIEW</div>
-            <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:C.white,margin:'0.1rem 0 0.15rem'}}>{config.business_name || 'New Client'}</h1>
+            <div style={{display:'flex',alignItems:'center',gap:'0.7rem',flexWrap:'wrap'}}>
+              <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:C.white,margin:'0.1rem 0 0.15rem'}}>{config.business_name || 'New Client'}</h1>
+              {result?.scores&&(
+                <span style={{fontFamily:'monospace',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.04em',padding:'0.2rem 0.65rem',borderRadius:20,background:'rgba(255,255,255,0.1)',color:result.scores.classColor,border:`1px solid ${result.scores.classColor}`,display:'inline-flex',alignItems:'center',gap:'0.4rem'}}>
+                  <span style={{width:7,height:7,borderRadius:7,background:result.scores.classColor,display:'inline-block'}}/>{result.scores.classification}
+                </span>
+              )}
+            </div>
             <div style={{fontSize:'0.76rem',color:'rgba(255,255,255,0.85)'}}>
               {activeUnits.length} unit{activeUnits.length!==1?'s':''} · {cc} · {P.fullName}
               {saving&&<span style={{marginLeft:8,color:C.amber}}>· Saving...</span>}
