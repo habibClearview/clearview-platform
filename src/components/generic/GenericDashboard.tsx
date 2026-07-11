@@ -21,27 +21,27 @@ import BuildStamp from '@/components/BuildStamp'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
-  navy:'#1B2A4A', cyan:'#00B4D8', cream:'#F8F4EE', white:'#FFFFFF',
-  slate:'#4A5A6A', border:'#D8E0E8', teal:'#1A9DAA',
-  red:'#C0392B', green:'#1A7A4A', amber:'#B8860B', purple:'#6B4A8B',
-  lightBg:'#F0F4F8', planBg:'#FFFFFF', actualBg:'#E8F6F8',
+  navy:'var(--cv-navy)', cyan:'var(--cv-cyan)', cream:'var(--cv-cream)', white:'var(--cv-card)',
+  slate:'var(--cv-slate)', border:'var(--cv-border)', teal:'var(--cv-teal)',
+  red:'var(--cv-red)', green:'var(--cv-green)', amber:'var(--cv-amber)', purple:'var(--cv-purple)',
+  lightBg:'var(--cv-alt)', planBg:'var(--cv-card)', actualBg:'var(--cv-tint-actual)',
 }
 
 // ── Style helpers ────────────────────────────────────────────
-const card: React.CSSProperties = {background:C.white,border:'1px solid #E6ECF2',borderRadius:14,padding:'1.4rem 1.6rem',marginBottom:'1.35rem',boxShadow:'0 1px 2px rgba(16,42,67,0.05), 0 10px 30px rgba(16,42,67,0.05)'}
+const card: React.CSSProperties = {background:C.white,border:'1px solid var(--cv-border-soft)',borderRadius:14,padding:'1.4rem 1.6rem',marginBottom:'1.35rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)'}
 const secH: React.CSSProperties = {fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
-const inp:  React.CSSProperties = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'inherit',background:'#F4F8FC',color:C.navy,boxSizing:'border-box'}
+const inp:  React.CSSProperties = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'inherit',background:'var(--cv-bg-2)',color:C.navy,boxSizing:'border-box'}
 const lbl:  React.CSSProperties = {display:'block',fontWeight:600,fontSize:'0.8rem',marginBottom:'0.22rem',color:C.navy}
 const hint: React.CSSProperties = {fontSize:'0.7rem',color:C.slate,lineHeight:1.4,marginTop:'0.18rem'}
 const fGrid:React.CSSProperties = {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:'1.1rem'}
 const kpiGrid:React.CSSProperties = {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(175px,1fr))',gap:'1rem',marginBottom:'1.25rem'}
 const addBtn = (sm=false, col=C.cyan): React.CSSProperties => ({fontFamily:'monospace',fontSize:sm?'0.68rem':'0.72rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:4,background:'transparent',color:col,cursor:'pointer'})
-const solidBtn = (col=C.cyan, sm=false): React.CSSProperties => ({fontFamily:'monospace',fontSize:sm?'0.72rem':'0.78rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:4,background:col,color:col===C.white?C.navy:C.white,cursor:'pointer'})
+const solidBtn = (col=C.cyan, sm=false): React.CSSProperties => ({fontFamily:'monospace',fontSize:sm?'0.72rem':'0.78rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:4,background:col,color:col===C.white?'var(--cv-navy)':'var(--cv-on-accent)',cursor:'pointer'})
 const delBtn: React.CSSProperties = {fontSize:'0.68rem',color:C.red,background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,cursor:'pointer',padding:'0.18rem 0.42rem'}
 
 function navBtn(active: boolean): React.CSSProperties {
   return {fontFamily:'monospace',fontSize:'0.72rem',padding:'0.65rem 1rem',border:'none',background:'transparent',
-    color:active?C.cyan:'rgba(255,255,255,0.6)',cursor:'pointer',
+    color:active?C.cyan:'var(--cv-wa-60)',cursor:'pointer',
     borderBottom:active?`3px solid ${C.cyan}`:'3px solid transparent',
     fontWeight:active?700:400,whiteSpace:'nowrap'}
 }
@@ -79,7 +79,7 @@ function cleanStory(text: string): string {
 function KPI({label,value,sub,color}:{label:string;value:string;sub?:string;color?:string}) {
   const accent = color || C.cyan
   return (
-    <div style={{background:C.white,borderRadius:14,padding:'1.15rem 1.3rem 1.25rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px rgba(16,42,67,0.05), 0 12px 32px rgba(16,42,67,0.06)'}}>
+    <div style={{background:C.white,borderRadius:14,padding:'1.15rem 1.3rem 1.25rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}>
       <div style={{fontFamily:'monospace',fontSize:'0.6rem',letterSpacing:'0.14em',color:C.slate,textTransform:'uppercase',marginBottom:'0.45rem'}}>{label}</div>
       <div style={{fontFamily:'Georgia,serif',fontSize:'1.75rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>
       {sub&&<div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.32rem'}}>{sub}</div>}
@@ -88,7 +88,7 @@ function KPI({label,value,sub,color}:{label:string;value:string;sub?:string;colo
 }
 
 function Badge({text,color}:{text:string;color?:string}) {
-  return <span style={{fontFamily:'monospace',fontSize:'0.63rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:C.white,display:'inline-block'}}>{text}</span>
+  return <span style={{fontFamily:'monospace',fontSize:'0.63rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>
 }
 
 function Spinner() {
@@ -108,15 +108,15 @@ function PLRow({label,values,bold,highlight,negate,months,cc,actualMask,closedMa
   const total = values.reduce((s,v)=>s+v,0)
   const display = (v:number) => negate ? fmtFull(-Math.abs(v),cc) : fmtFull(v,cc)
   return (
-    <tr style={{background:highlight?'#EBF8FF':bold?C.lightBg:C.white}}>
+    <tr style={{background:highlight?'var(--cv-tint-cyan)':bold?C.lightBg:C.white}}>
       <td style={{padding:'7px 10px',fontWeight:bold?700:400,color:C.navy,minWidth:160,fontSize:'0.8rem'}}>{label}</td>
       {values.map((v,i)=>{
         const isActual = actualMask?.[i]
         const isClosed = isActual && closedMask?.[i]
         return (
         <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',
-          color:isClosed?C.white:negate?C.red:v<0?C.red:C.navy,fontWeight:bold?700:400,
-          background:isClosed?C.navy:isActual?'#EAFAF6':undefined,
+          color:isClosed?'var(--cv-on-accent)':negate?C.red:v<0?C.red:C.navy,fontWeight:bold?700:400,
+          background:isClosed?'var(--cv-header)':isActual?'var(--cv-tint-teal)':undefined,
           borderBottom:isActual&&!isClosed?`2px solid ${C.teal}`:undefined}}>
           {display(v)}
         </td>
@@ -155,13 +155,13 @@ function PLTable({title,rows,months,cc,showExport,closedMask}:{title?:string;row
         Tip: each column headed FY is one year. Click a year to open or close its monthly detail.
       </div>
       {hasActuals&&(
-        <div style={{padding:'0.5rem 1.1rem',fontSize:'0.68rem',fontFamily:'monospace',color:C.teal,display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap',background:'#F4FDFB'}}>
+        <div style={{padding:'0.5rem 1.1rem',fontSize:'0.68rem',fontFamily:'monospace',color:C.teal,display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap',background:'var(--cv-tint-teal-soft)'}}>
           <span style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
-            <span style={{width:10,height:10,borderRadius:2,background:'#EAFAF6',border:`2px solid ${C.teal}`,display:'inline-block'}}></span>
+            <span style={{width:10,height:10,borderRadius:2,background:'var(--cv-tint-teal)',border:`2px solid ${C.teal}`,display:'inline-block'}}></span>
             Real data, still updating (live)
           </span>
           <span style={{display:'flex',alignItems:'center',gap:'0.4rem',color:C.navy}}>
-            <span style={{width:10,height:10,borderRadius:2,background:C.navy,display:'inline-block'}}></span>
+            <span style={{width:10,height:10,borderRadius:2,background:'var(--cv-header)',display:'inline-block'}}></span>
             Closed -- final, locked at month-end
           </span>
         </div>
@@ -169,10 +169,10 @@ function PLTable({title,rows,months,cc,showExport,closedMask}:{title?:string;row
       <div style={{overflowX:'auto'}}>
         <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.77rem',fontFamily:'monospace'}}>
           <thead>
-            <tr style={{background:C.navy}}>
-              <th style={{textAlign:'left',padding:'8px 10px',color:C.white,minWidth:160,fontSize:'0.75rem'}}></th>
-              {months.map((m,i)=><th key={i} style={{textAlign:'right',padding:'8px 8px',color:C.white,whiteSpace:'nowrap',fontSize:'0.72rem'}}>{m}</th>)}
-              <th style={{textAlign:'right',padding:'8px 8px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',borderLeft:`2px solid rgba(255,255,255,0.2)`}}>Total</th>
+            <tr style={{background:'var(--cv-header)'}}>
+              <th style={{textAlign:'left',padding:'8px 10px',color:'var(--cv-on-accent)',minWidth:160,fontSize:'0.75rem'}}></th>
+              {months.map((m,i)=><th key={i} style={{textAlign:'right',padding:'8px 8px',color:'var(--cv-on-accent)',whiteSpace:'nowrap',fontSize:'0.72rem'}}>{m}</th>)}
+              <th style={{textAlign:'right',padding:'8px 8px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',borderLeft:`2px solid var(--cv-wa-20)`}}>Total</th>
             </tr>
           </thead>
           <tbody>
@@ -234,17 +234,17 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
         Tip: each column headed FY is one year. Click a year to open or close its monthly detail.
       </div>
       {hasActuals&&(
-        <div style={{padding:'0.5rem 1.1rem',fontSize:'0.68rem',fontFamily:'monospace',color:C.teal,display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap',background:'#F4FDFB'}}>
+        <div style={{padding:'0.5rem 1.1rem',fontSize:'0.68rem',fontFamily:'monospace',color:C.teal,display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap',background:'var(--cv-tint-teal-soft)'}}>
           <span style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
-            <span style={{width:10,height:10,borderRadius:2,background:'#EAFAF6',border:`2px solid ${C.teal}`,display:'inline-block'}}></span>
+            <span style={{width:10,height:10,borderRadius:2,background:'var(--cv-tint-teal)',border:`2px solid ${C.teal}`,display:'inline-block'}}></span>
             Real data, still updating (live)
           </span>
           <span style={{display:'flex',alignItems:'center',gap:'0.4rem',color:C.navy}}>
-            <span style={{width:10,height:10,borderRadius:2,background:C.navy,display:'inline-block'}}></span>
+            <span style={{width:10,height:10,borderRadius:2,background:'var(--cv-header)',display:'inline-block'}}></span>
             Closed -- final, locked at month-end
           </span>
           <span style={{display:'flex',alignItems:'center',gap:'0.4rem',color:C.amber}}>
-            <span style={{width:10,height:10,borderRadius:2,background:'#FDF6E3',border:`2px solid ${C.amber}`,display:'inline-block'}}></span>
+            <span style={{width:10,height:10,borderRadius:2,background:'var(--cv-tint-amber-2)',border:`2px solid ${C.amber}`,display:'inline-block'}}></span>
             Year in progress -- part actual, part plan
           </span>
         </div>
@@ -252,19 +252,19 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
       <div style={{overflowX:'auto'}}>
         <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.77rem',fontFamily:'monospace'}}>
           <thead>
-            <tr style={{background:C.navy}}>
-              <th style={{textAlign:'left',padding:'8px 10px',color:C.white,minWidth:160,fontSize:'0.75rem',position:'sticky',left:0,background:C.navy}}></th>
+            <tr style={{background:'var(--cv-header)'}}>
+              <th style={{textAlign:'left',padding:'8px 10px',color:'var(--cv-on-accent)',minWidth:160,fontSize:'0.75rem',position:'sticky',left:0,background:'var(--cv-header)'}}></th>
               {yearGroups.map(g => expanded[g.year] ? (
                 <React.Fragment key={g.year}>
                   {g.monthIndices.map(i => (
-                    <th key={i} style={{textAlign:'right',padding:'8px 8px',color:'rgba(255,255,255,0.75)',whiteSpace:'nowrap',fontSize:'0.72rem',fontWeight:400}}>{months[i]}</th>
+                    <th key={i} style={{textAlign:'right',padding:'8px 8px',color:'var(--cv-wa-75)',whiteSpace:'nowrap',fontSize:'0.72rem',fontWeight:400}}>{months[i]}</th>
                   ))}
-                  <th onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Collapse FY ${g.label}`} style={{textAlign:'right',padding:'8px 10px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',cursor:'pointer',userSelect:'none',borderLeft:'2px solid rgba(255,255,255,0.2)'}}>
+                  <th onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Collapse FY ${g.label}`} style={{textAlign:'right',padding:'8px 10px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',cursor:'pointer',userSelect:'none',borderLeft:'2px solid var(--cv-wa-20)'}}>
                     FY {g.label} <span style={{fontSize:'0.65rem'}}>&#9666;</span>
                   </th>
                 </React.Fragment>
               ) : (
-                <th key={g.year} onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Expand FY ${g.label}`} style={{textAlign:'right',padding:'8px 10px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',cursor:'pointer',userSelect:'none',borderLeft:'2px solid rgba(255,255,255,0.2)'}}>
+                <th key={g.year} onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Expand FY ${g.label}`} style={{textAlign:'right',padding:'8px 10px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',cursor:'pointer',userSelect:'none',borderLeft:'2px solid var(--cv-wa-20)'}}>
                   FY {g.label} <span style={{fontSize:'0.65rem'}}>&#9662;</span>
                 </th>
               ))}
@@ -272,8 +272,8 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
           </thead>
           <tbody>
             {rows.map((r,ri)=>(
-              <tr key={ri} style={{background:r.highlight?'#EBF8FF':r.bold?C.lightBg:C.white}}>
-                <td style={{padding:'7px 10px',fontWeight:r.bold?700:400,color:C.navy,minWidth:160,fontSize:'0.8rem',position:'sticky',left:0,background:r.highlight?'#EBF8FF':r.bold?C.lightBg:C.white}}>{r.label}</td>
+              <tr key={ri} style={{background:r.highlight?'var(--cv-tint-cyan)':r.bold?C.lightBg:C.white}}>
+                <td style={{padding:'7px 10px',fontWeight:r.bold?700:400,color:C.navy,minWidth:160,fontSize:'0.8rem',position:'sticky',left:0,background:r.highlight?'var(--cv-tint-cyan)':r.bold?C.lightBg:C.white}}>{r.label}</td>
                 {yearGroups.map(g => {
                   const cell = collapseYear(r.values, r.actualMask, g.monthIndices, r.aggregation)
                   const displayVal = (v:number) => r.negate ? fmtFull(-Math.abs(v),cc) : fmtFull(v,cc)
@@ -284,8 +284,8 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
                         const isClosed = isActual && closedMask?.[i]
                         return (
                           <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',
-                            color:isClosed?C.white:r.negate?C.red:r.values[i]<0?C.red:C.navy,fontWeight:r.bold?700:400,
-                            background:isClosed?C.navy:isActual?'#EAFAF6':undefined,
+                            color:isClosed?'var(--cv-on-accent)':r.negate?C.red:r.values[i]<0?C.red:C.navy,fontWeight:r.bold?700:400,
+                            background:isClosed?'var(--cv-header)':isActual?'var(--cv-tint-teal)':undefined,
                             borderBottom:isActual&&!isClosed?`2px solid ${C.teal}`:undefined}}>
                             {displayVal(r.values[i])}
                           </td>
@@ -293,7 +293,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
                       })}
                       <td onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Collapse FY ${g.label}`} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:700,cursor:'pointer',
                         color:r.negate?C.red:cell.value<0?C.red:C.navy,
-                        background:cell.isFullyActual?'#EAFAF6':cell.isPartiallyActual?'#FDF6E3':undefined,
+                        background:cell.isFullyActual?'var(--cv-tint-teal)':cell.isPartiallyActual?'var(--cv-tint-amber-2)':undefined,
                         borderLeft:`2px solid ${C.border}`}}>
                         {displayVal(cell.value)}
                       </td>
@@ -301,7 +301,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
                   ) : (
                     <td key={g.year} onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Expand FY ${g.label}`} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',fontWeight:r.bold?700:400,cursor:'pointer',
                       color:r.negate?C.red:cell.value<0?C.red:C.navy,
-                      background:cell.isFullyActual?'#EAFAF6':cell.isPartiallyActual?'#FDF6E3':undefined,
+                      background:cell.isFullyActual?'var(--cv-tint-teal)':cell.isPartiallyActual?'var(--cv-tint-amber-2)':undefined,
                       borderLeft:`2px solid ${C.border}`}}>
                       {displayVal(cell.value)}
                     </td>
@@ -350,21 +350,21 @@ function ScoreTrendCard({
       <div style={{overflowX:'auto'}}>
         <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.77rem',fontFamily:'monospace'}}>
           <thead>
-            <tr style={{background:C.navy}}>
-              <th style={{textAlign:'left',padding:'8px 10px',color:C.white,minWidth:160,fontSize:'0.75rem',position:'sticky',left:0,background:C.navy}}></th>
+            <tr style={{background:'var(--cv-header)'}}>
+              <th style={{textAlign:'left',padding:'8px 10px',color:'var(--cv-on-accent)',minWidth:160,fontSize:'0.75rem',position:'sticky',left:0,background:'var(--cv-header)'}}></th>
               {years.map(y => expanded[y.label] ? (
                 <React.Fragment key={y.label}>
                   {(monthsByYear[y.label]||[]).map((m,i) => (
-                    <th key={i} style={{textAlign:'right',padding:'8px 8px',color:'rgba(255,255,255,0.75)',whiteSpace:'nowrap',fontSize:'0.72rem',fontWeight:400}}>{m.label}</th>
+                    <th key={i} style={{textAlign:'right',padding:'8px 8px',color:'var(--cv-wa-75)',whiteSpace:'nowrap',fontSize:'0.72rem',fontWeight:400}}>{m.label}</th>
                   ))}
                   <th onClick={()=>toggle(y.label)} onKeyDown={toggleKey(y.label)} tabIndex={0} role="button" aria-label={`Collapse FY ${y.label}`}
-                    style={{textAlign:'right',padding:'8px 10px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',cursor:'pointer',userSelect:'none',borderLeft:'2px solid rgba(255,255,255,0.2)'}}>
+                    style={{textAlign:'right',padding:'8px 10px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',cursor:'pointer',userSelect:'none',borderLeft:'2px solid var(--cv-wa-20)'}}>
                     FY {y.label} <span style={{fontSize:'0.65rem'}}>&#9666;</span>
                   </th>
                 </React.Fragment>
               ) : (
                 <th key={y.label} onClick={()=>toggle(y.label)} onKeyDown={toggleKey(y.label)} tabIndex={0} role="button" aria-label={`Expand FY ${y.label}`}
-                  style={{textAlign:'right',padding:'8px 10px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',cursor:'pointer',userSelect:'none',borderLeft:'2px solid rgba(255,255,255,0.2)'}}>
+                  style={{textAlign:'right',padding:'8px 10px',color:C.cyan,whiteSpace:'nowrap',fontSize:'0.72rem',cursor:'pointer',userSelect:'none',borderLeft:'2px solid var(--cv-wa-20)'}}>
                   FY {y.label} <span style={{fontSize:'0.65rem'}}>&#9662;</span>
                 </th>
               ))}
@@ -452,6 +452,27 @@ export default function GenericDashboard({
   // month from a "closed, final" one (docs/ACCOUNTING_ARCHITECTURE.md
   // section 5: the live highlight moves to the new current month at close).
   const [closedPeriods, setClosedPeriods] = useState<Set<string>>(new Set())
+
+  // Light/dark theme. Dashboard defaults to light (matching the mockup).
+  // Applied globally via document.documentElement.dataset.theme, so the
+  // choice is shared with the field app page too.
+  const [theme, setTheme] = useState<'light'|'dark'>('light')
+  useEffect(() => {
+    const saved = localStorage.getItem('cv-theme')
+    const initial = saved === 'light' || saved === 'dark' ? saved : 'light'
+    setTheme(initial)
+    if (initial === 'dark') document.documentElement.dataset.theme = 'dark'
+    else delete document.documentElement.dataset.theme
+  }, [])
+  const toggleTheme = () => {
+    setTheme(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark'
+      localStorage.setItem('cv-theme', next)
+      if (next === 'dark') document.documentElement.dataset.theme = 'dark'
+      else delete document.documentElement.dataset.theme
+      return next
+    })
+  }
 
   useEffect(() => {
     if (!clientId) return
@@ -571,7 +592,7 @@ export default function GenericDashboard({
   if (error) return (
     <div style={{padding:'2rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
       <div style={{color:C.red,marginBottom:'1rem'}}>Error loading data: {error}</div>
-      <button onClick={P.onSignOut} style={solidBtn(C.navy)}>Sign Out</button>
+      <button onClick={P.onSignOut} style={solidBtn('var(--cv-header)')}>Sign Out</button>
     </div>
   )
   if (!config) return <Spinner/>
@@ -594,32 +615,33 @@ export default function GenericDashboard({
     <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif",background:C.cream,color:C.navy,minHeight:'100vh'}}>
       <BuildStamp/>
       {/* Header */}
-      <header style={{background:C.navy,borderBottom:`3px solid ${C.cyan}`}}>
+      <header style={{background:'var(--cv-header)',borderBottom:`3px solid ${C.cyan}`}}>
         <div style={{maxWidth:1600,margin:'0 auto',padding:'1.25rem 1.5rem',display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
           <div>
             <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>CANVAS COACH — CLEARVIEW</div>
             <div style={{display:'flex',alignItems:'center',gap:'0.7rem',flexWrap:'wrap'}}>
-              <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:C.white,margin:'0.1rem 0 0.15rem'}}>{config.business_name || 'New Client'}</h1>
+              <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0.1rem 0 0.15rem'}}>{config.business_name || 'New Client'}</h1>
               {result?.scores&&(
-                <span style={{fontFamily:'monospace',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.04em',padding:'0.2rem 0.65rem',borderRadius:20,background:'rgba(255,255,255,0.1)',color:result.scores.classColor,border:`1px solid ${result.scores.classColor}`,display:'inline-flex',alignItems:'center',gap:'0.4rem'}}>
+                <span style={{fontFamily:'monospace',fontSize:'0.62rem',fontWeight:700,letterSpacing:'0.04em',padding:'0.2rem 0.65rem',borderRadius:20,background:'var(--cv-wa-10)',color:result.scores.classColor,border:`1px solid ${result.scores.classColor}`,display:'inline-flex',alignItems:'center',gap:'0.4rem'}}>
                   <span style={{width:7,height:7,borderRadius:7,background:result.scores.classColor,display:'inline-block'}}/>{result.scores.classification}
                 </span>
               )}
             </div>
-            <div style={{fontSize:'0.76rem',color:'rgba(255,255,255,0.85)'}}>
+            <div style={{fontSize:'0.76rem',color:'var(--cv-wa-85)'}}>
               {activeUnits.length} unit{activeUnits.length!==1?'s':''} · {cc} · {P.fullName}
               {saving&&<span style={{marginLeft:8,color:C.amber}}>· Saving...</span>}
             </div>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}>
-            <span style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.cyan,border:`1px solid rgba(0,180,216,0.4)`,borderRadius:4,padding:'0.18rem 0.5rem',textTransform:'uppercase'}}>{P.role.replace('_',' ')}</span>
-            <button onClick={P.onSignOut} style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid rgba(255,255,255,0.45)`,borderRadius:4,color:'rgba(255,255,255,0.85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
+            <span style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem',textTransform:'uppercase'}}>{P.role.replace('_',' ')}</span>
+            <button onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle light/dark theme" style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid var(--cv-wa-45)`,borderRadius:4,color:'var(--cv-wa-85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>{theme==='dark'?'☀':'☾'} Theme</button>
+            <button onClick={P.onSignOut} style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid var(--cv-wa-45)`,borderRadius:4,color:'var(--cv-wa-85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
           </div>
         </div>
       </header>
 
       {/* Nav */}
-      <nav style={{background:'#142038',borderBottom:`1px solid rgba(0,180,216,0.15)`,overflowX:'auto'}}>
+      <nav style={{background:'var(--cv-nav)',borderBottom:`1px solid var(--cv-cyan-dim)`,overflowX:'auto'}}>
         <div style={{maxWidth:1600,margin:'0 auto',padding:'0 1.5rem',display:'flex'}}>
           {mainNav.map(([id,label])=>(
             <button key={id} style={navBtn(view===id)} onClick={()=>setView(id)}>{label}</button>
@@ -650,10 +672,10 @@ export default function GenericDashboard({
 function ScoreDonut({label,display,frac,rating,color,onClick}:{label:string;display:string;frac:number;rating:string;color:string;onClick?:()=>void}) {
   const r=26, circ=2*Math.PI*r, f=Math.max(0,Math.min(1,frac||0))
   return (
-    <div onClick={onClick} style={{background:C.white,borderRadius:14,padding:'1.05rem 1.15rem',borderLeft:`4px solid ${color}`,boxShadow:'0 1px 2px rgba(16,42,67,0.05), 0 12px 32px rgba(16,42,67,0.06)',display:'flex',alignItems:'center',gap:'0.9rem',cursor:onClick?'pointer':'default'}}>
+    <div onClick={onClick} style={{background:C.white,borderRadius:14,padding:'1.05rem 1.15rem',borderLeft:`4px solid ${color}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)',display:'flex',alignItems:'center',gap:'0.9rem',cursor:onClick?'pointer':'default'}}>
       <svg width="60" height="60" viewBox="0 0 62 62" style={{flexShrink:0}}>
-        <circle cx="31" cy="31" r={r} fill="none" stroke="#E6ECF2" strokeWidth="6"/>
-        <circle cx="31" cy="31" r={r} fill="none" stroke={color} strokeWidth="6" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ*(1-f)} transform="rotate(-90 31 31)"/>
+        <circle cx="31" cy="31" r={r} fill="none" style={{stroke:'var(--cv-border-soft)'}} strokeWidth="6"/>
+        <circle cx="31" cy="31" r={r} fill="none" style={{stroke:color}} strokeWidth="6" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ*(1-f)} transform="rotate(-90 31 31)"/>
       </svg>
       <div style={{minWidth:0}}>
         <div style={{fontSize:'0.68rem',color:C.slate,marginBottom:'0.18rem'}}>{label}</div>
@@ -682,14 +704,14 @@ function TrendChart({months,revenue,cost,ebitda,cc}:{months:string[];revenue:num
     <div style={{overflowX:'auto'}}>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:'block',minWidth:420}}>
         {ticks.map((t,i)=>(<g key={i}>
-          <line x1={padL} y1={y(t)} x2={W-padR} y2={y(t)} stroke="#EEF1F6"/>
-          <text x={4} y={y(t)+3} fontSize="9" fill={C.slate} fontFamily="monospace">{short(t)}</text>
+          <line x1={padL} y1={y(t)} x2={W-padR} y2={y(t)} style={{stroke:'var(--cv-border-soft)'}}/>
+          <text x={4} y={y(t)+3} fontSize="9" style={{fill:C.slate}} fontFamily="monospace">{short(t)}</text>
         </g>))}
-        <path d={area} fill={C.cyan} opacity="0.1"/>
-        <path d={path(cost)} fill="none" stroke={C.amber} strokeWidth="2"/>
-        <path d={path(ebitda)} fill="none" stroke={C.green} strokeWidth="2"/>
-        <path d={path(revenue)} fill="none" stroke={C.teal} strokeWidth="2.5"/>
-        {xi.map(i=>(<text key={i} x={x(i)} y={H-7} fontSize="9" fill={C.slate} textAnchor="middle" fontFamily="monospace">{months[i]||`M${i+1}`}</text>))}
+        <path d={area} style={{fill:C.cyan}} opacity="0.1"/>
+        <path d={path(cost)} fill="none" style={{stroke:C.amber}} strokeWidth="2"/>
+        <path d={path(ebitda)} fill="none" style={{stroke:C.green}} strokeWidth="2"/>
+        <path d={path(revenue)} fill="none" style={{stroke:C.teal}} strokeWidth="2.5"/>
+        {xi.map(i=>(<text key={i} x={x(i)} y={H-7} fontSize="9" style={{fill:C.slate}} textAnchor="middle" fontFamily="monospace">{months[i]||`M${i+1}`}</text>))}
       </svg>
     </div>
   )
@@ -720,7 +742,7 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGo
   return (
     <div>
       {pendingApprovalCount>0&&(
-        <div style={{background:'#FFF8E8',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <span style={{fontWeight:600,color:C.amber}}>⏳ {pendingApprovalCount} spend request{pendingApprovalCount>1?'s':''} awaiting approval</span>
           <button style={addBtn(true,C.amber)} onClick={onGoToApprovals}>Review now →</button>
         </div>
@@ -952,7 +974,7 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
           <button key={u.id} style={{fontFamily:'monospace',fontSize:'0.71rem',padding:'0.45rem 0.85rem',
             border:`2px solid ${selUnit===u.id?(u.color||C.cyan):C.border}`,borderRadius:4,
             background:selUnit===u.id?(u.color||C.cyan):C.white,
-            color:selUnit===u.id?C.white:C.navy,cursor:'pointer'}}
+            color:selUnit===u.id?'var(--cv-on-accent)':C.navy,cursor:'pointer'}}
             onClick={()=>setSelUnit(u.id)}>
             {u.name}
           </button>
@@ -963,7 +985,7 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
       <div style={{display:'flex',gap:'0.35rem',marginBottom:'1.25rem',borderBottom:`1px solid ${C.border}`,paddingBottom:'0.5rem'}}>
         {sections.map(([cat,label])=>(
           <button key={cat} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.85rem',border:'none',
-            background:selSection===cat?C.navy:C.white,color:selSection===cat?C.white:C.slate,
+            background:selSection===cat?'var(--cv-header)':C.white,color:selSection===cat?'var(--cv-on-accent)':C.slate,
             borderRadius:4,cursor:'pointer',fontWeight:selSection===cat?700:400}}
             onClick={()=>setSelSection(cat)}>
             {label}
@@ -1067,11 +1089,11 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
               })}
               {/* Total row */}
               {totals&&(
-                <tr style={{background:C.navy}}>
-                  <td style={{padding:'6px 8px',fontWeight:700,color:C.white,fontSize:'0.78rem'}}>Total</td>
+                <tr style={{background:'var(--cv-header)'}}>
+                  <td style={{padding:'6px 8px',fontWeight:700,color:'var(--cv-on-accent)',fontSize:'0.78rem'}}>Total</td>
                   {selSection==='revenue'&&<td></td>}
                   {totals.map((v,i)=><td key={i} style={{padding:'6px 6px',textAlign:'right',fontFamily:'monospace',fontSize:'0.72rem',color:C.cyan,fontWeight:700}}>{fmt(v,cc)}</td>)}
-                  <td style={{padding:'6px 8px',textAlign:'right',fontFamily:'monospace',fontWeight:700,color:C.cyan,borderLeft:`2px solid rgba(255,255,255,0.2)`}}>{fmt(totals.reduce((s,v)=>s+v,0),cc)}</td>
+                  <td style={{padding:'6px 8px',textAlign:'right',fontFamily:'monospace',fontWeight:700,color:C.cyan,borderLeft:`2px solid var(--cv-wa-20)`}}>{fmt(totals.reduce((s,v)=>s+v,0),cc)}</td>
                   {P.canEditPlan&&<td></td>}
                 </tr>
               )}
@@ -1156,7 +1178,7 @@ function ScenariosTab({config,result,months,cc,P,onSave}) {
           {P.canEditPlan&&<button type="button" style={addBtn()} onClick={addScenario}>+ New Scenario</button>}
         </div>
         {scenarios.map(sc=>(
-          <div key={sc.id} style={{display:'flex',alignItems:'center',gap:'1rem',padding:'0.75rem',border:`1px solid ${sc.active?C.cyan:C.border}`,borderRadius:6,marginBottom:'0.5rem',background:sc.active?'#EBF8FF':C.white}}>
+          <div key={sc.id} style={{display:'flex',alignItems:'center',gap:'1rem',padding:'0.75rem',border:`1px solid ${sc.active?C.cyan:C.border}`,borderRadius:6,marginBottom:'0.5rem',background:sc.active?'var(--cv-tint-cyan)':C.white}}>
             <input type="radio" checked={sc.active} onChange={()=>setActiveScenario(sc.id)} style={{cursor:'pointer'}} aria-label={`Set ${sc.label} as active`}/>
             <div style={{flex:1}}>
               {P.canEditPlan ? (
@@ -1444,7 +1466,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
           {periodMonths.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}
         </select>
         {submitted&&<Badge text="Submitted" color={C.green}/>}
-        {periodClose?.closed&&<Badge text="Closed" color={C.navy}/>}
+        {periodClose?.closed&&<Badge text="Closed" color={'var(--cv-header)'}/>}
       </div>
 
       {/* Month-End Close -- docs/ACCOUNTING_ARCHITECTURE.md section 5.
@@ -1475,7 +1497,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
                   : 'For your review -- these do not block closing:'}
               </div>
               {exceptionReport.map((exc,i)=>(
-                <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.5rem 0.75rem',background:exc.severity==='blocking'?'#FDF2F0':'#FFFBEB',borderRadius:4,marginBottom:'0.4rem',gap:'0.5rem'}}>
+                <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.5rem 0.75rem',background:exc.severity==='blocking'?'var(--cv-tint-red)':'var(--cv-tint-warn)',borderRadius:4,marginBottom:'0.4rem',gap:'0.5rem'}}>
                   <div style={{fontSize:'0.78rem',color:exc.severity==='blocking'?C.red:C.amber}}>{exc.message}</div>
                   {exc.type==='stale_cost_price'&&(()=>{
                     const item = staleCatalogue.find((c:any)=>c.id===exc.ref_id)
@@ -1494,7 +1516,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
           <div style={{fontWeight:700,color:C.navy,marginBottom:'0.75rem',fontSize:'0.88rem'}}>All Units — {periodMonths.find(m=>m.value===selPeriod)?.label}</div>
           <div style={{overflowX:'auto'}}>
             <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.78rem',fontFamily:'monospace'}}>
-              <thead><tr style={{background:C.navy,color:C.white}}>
+              <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
                 {['Business Unit','Revenue','Total Costs','Gross Profit','Status'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600}}>{h}</th>)}
               </tr></thead>
               <tbody>{allActuals.map((a,i)=>{
@@ -1562,7 +1584,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
                             <div key={item.id} style={{display:'grid',gridTemplateColumns:'1fr 90px 110px',alignItems:'center',gap:'0.5rem',marginBottom:'0.35rem'}}>
                               <span style={{fontSize:'0.78rem',color:C.navy}}>{item.name}{item.unit_label?` (${item.unit_label})`:''}</span>
                               <input type="number" aria-label={`Quantity for ${item.name}`}
-                                style={{width:'100%',padding:'0.35rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.78rem',fontFamily:'monospace',textAlign:'right',background:disabled?'#F5F5F5':C.white,boxSizing:'border-box'}}
+                                style={{width:'100%',padding:'0.35rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.78rem',fontFamily:'monospace',textAlign:'right',background:disabled?'var(--cv-disabled)':C.white,boxSizing:'border-box'}}
                                 value={catalogueQuantities[l.id]?.[item.id]??''} placeholder="0" disabled={disabled}
                                 onChange={e=>updateQuantity(l.id,item.id,Number(e.target.value))}/>
                               <span style={{fontSize:'0.72rem',color:C.slate,fontFamily:'monospace',textAlign:'right'}}>
@@ -1578,7 +1600,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
                         <div style={{display:'grid',gridTemplateColumns:'1fr 180px',alignItems:'center',gap:'0.75rem'}}>
                           <span/>
                           <input id={`actual-${l.id}`} type="number"
-                            style={{width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'monospace',background:disabled?'#F5F5F5':C.white,color:C.navy,textAlign:'right',boxSizing:'border-box'}}
+                            style={{width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.83rem',fontFamily:'monospace',background:disabled?'var(--cv-disabled)':C.white,color:C.navy,textAlign:'right',boxSizing:'border-box'}}
                             value={lineValues[l.id]??''} placeholder="0"
                             disabled={disabled}
                             onChange={e=>setLineValues(v=>({...v,[l.id]:Number(e.target.value)}))}/>
@@ -1600,7 +1622,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
               )
             })}
             <div style={{display:'flex',gap:'0.75rem',flexWrap:'wrap',marginTop:'1rem'}}>
-              <button style={solidBtn(C.navy)} disabled={saving} onClick={()=>save(false)}>{saving?'Saving...':'Save Draft'}</button>
+              <button style={solidBtn('var(--cv-header)')} disabled={saving} onClick={()=>save(false)}>{saving?'Saving...':'Save Draft'}</button>
               {!submitted&&P.canEnterActuals&&(
                 <button style={solidBtn(C.green)} disabled={saving} onClick={()=>save(true)}>Submit for Approval</button>
               )}
@@ -1836,7 +1858,7 @@ function TeamTab({clientId,config,P}) {
               <label style={lbl}>Assign to Units</label>
               <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',marginTop:'0.3rem'}}>
                 {config.business_units.filter(u=>u.active).map(u=>(
-                  <label key={u.id} style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'0.82rem',cursor:'pointer',padding:'0.3rem 0.6rem',border:`1px solid ${inviteForm.unit_ids.includes(u.id)?C.cyan:C.border}`,borderRadius:4,background:inviteForm.unit_ids.includes(u.id)?'#EBF8FF':C.white}}>
+                  <label key={u.id} style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'0.82rem',cursor:'pointer',padding:'0.3rem 0.6rem',border:`1px solid ${inviteForm.unit_ids.includes(u.id)?C.cyan:C.border}`,borderRadius:4,background:inviteForm.unit_ids.includes(u.id)?'var(--cv-tint-cyan)':C.white}}>
                     <input type="checkbox" checked={inviteForm.unit_ids.includes(u.id)} onChange={e=>setInviteForm(f=>({...f,unit_ids:e.target.checked?[...f.unit_ids,u.id]:f.unit_ids.filter(id=>id!==u.id)}))}/>{u.name}
                   </label>
                 ))}
@@ -2162,7 +2184,7 @@ function CatalogueManager({clientId,config,P}) {
         This is your price list. Field operators pick an item from here and record how much was sold -- the price shown here is what's used automatically. They never enter a price themselves. The CEO or Finance Manager can grant other staff permission to edit this list from the Team tab.
       </p>
 
-      {!canEdit && <div style={{...card,background:'#FFF8E8',border:`1px solid ${C.amber}`,fontSize:'0.82rem',color:C.navy,marginBottom:'1rem'}}>You can view the catalogue but don't have permission to edit it. Ask your CEO or Finance Manager to grant you "Manage Field Catalogue" access in Team if you need to make changes.</div>}
+      {!canEdit && <div style={{...card,background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,fontSize:'0.82rem',color:C.navy,marginBottom:'1rem'}}>You can view the catalogue but don't have permission to edit it. Ask your CEO or Finance Manager to grant you "Manage Field Catalogue" access in Team if you need to make changes.</div>}
 
       {showAdd&&canEdit&&(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>
@@ -2360,7 +2382,7 @@ function ExtendHorizonControl({form,setForm}:{form:GenericModelConfig;setForm:(n
           <button style={addBtn(true)} onClick={()=>setConfirming(true)}>Extend Horizon</button>
         </div>
       ) : (
-        <div style={{background:'#FDF6E3',border:`1px solid ${C.amber}`,borderRadius:6,padding:'0.85rem'}}>
+        <div style={{background:'var(--cv-tint-amber-2)',border:`1px solid ${C.amber}`,borderRadius:6,padding:'0.85rem'}}>
           <p style={{fontSize:'0.8rem',color:C.navy,marginBottom:'0.6rem'}}>
             This will extend the plan to {form.planning_months + addMonths} months (through {buildMonthLabels(form.start_date, form.planning_months + addMonths).slice(-1)[0]}).
             You'll still need to press Save below for this to take effect.
@@ -2506,12 +2528,12 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
               </select>
             </div>
           </div>
-          <button type="button" style={{...solidBtn(C.navy),marginTop:'0.75rem'}} disabled={creating} onClick={createOperator}>{creating?'Creating...':'Create Operator & Generate Link'}</button>
+          <button type="button" style={{...solidBtn('var(--cv-header)'),marginTop:'0.75rem'}} disabled={creating} onClick={createOperator}>{creating?'Creating...':'Create Operator & Generate Link'}</button>
         </div>
       )}
 
       {newLink && (
-        <div style={{background:'#EAFAF6',border:`1px solid ${C.teal}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}}>
+        <div style={{background:'var(--cv-tint-teal)',border:`1px solid ${C.teal}`,borderRadius:8,padding:'1.25rem',marginBottom:'1.25rem'}}>
           <div style={{fontWeight:700,color:C.navy,marginBottom:'0.75rem'}}>Access link for {newLink.operatorName}</div>
           <div style={{display:'flex',gap:'1.25rem',alignItems:'flex-start',flexWrap:'wrap'}}>
             <img src={newLink.qrDataUrl} alt={`QR code for ${newLink.operatorName}'s field access link`} style={{borderRadius:6,border:`1px solid ${C.border}`}}/>
@@ -2535,7 +2557,7 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
         <div style={{overflowX:'auto'}}>
           <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.82rem'}}>
             <thead>
-              <tr style={{background:C.navy,color:C.white}}>
+              <tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
                 {['Name','Unit','Phone','Status','Last Synced',''].map(h=>(
                   <th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.75rem'}}>{h}</th>
                 ))}
@@ -2692,7 +2714,7 @@ function StockAndTransfersSection({clientId,businessUnits}:{clientId:string;busi
               <input style={inp} value={transferForm.notes} onChange={e=>setTransferForm(f=>({...f,notes:e.target.value}))}/>
             </div>
           </div>
-          <button type="button" style={{...solidBtn(C.navy),marginTop:'0.75rem'}} disabled={transferring} onClick={submitTransfer}>{transferring?'Recording...':'Record Transfer'}</button>
+          <button type="button" style={{...solidBtn('var(--cv-header)'),marginTop:'0.75rem'}} disabled={transferring} onClick={submitTransfer}>{transferring?'Recording...':'Record Transfer'}</button>
         </div>
       )}
 
@@ -2704,7 +2726,7 @@ function StockAndTransfersSection({clientId,businessUnits}:{clientId:string;busi
         <div style={{overflowX:'auto'}}>
           <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.82rem'}}>
             <thead>
-              <tr style={{background:C.navy,color:C.white}}>
+              <tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
                 {['Unit','Item','On Hand','Reorder Threshold',''].map(h=>(
                   <th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.75rem'}}>{h}</th>
                 ))}
@@ -2714,7 +2736,7 @@ function StockAndTransfersSection({clientId,businessUnits}:{clientId:string;busi
               {levels.map((level:any,i:number)=>{
                 const low = level.reorder_threshold != null && level.quantity_on_hand <= level.reorder_threshold
                 return (
-                  <tr key={level.id} style={{background:low?'#FFF8E8':i%2===0?C.cream:C.white}}>
+                  <tr key={level.id} style={{background:low?'var(--cv-tint-amber)':i%2===0?C.cream:C.white}}>
                     <td style={{padding:'8px 10px'}}>{unitName(level.business_unit_id)}</td>
                     <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{level.catalogue?.name||'Item'}</td>
                     <td style={{padding:'8px 10px',fontFamily:'monospace',fontWeight:700}}>{level.quantity_on_hand}{level.catalogue?.unit_label?` ${level.catalogue.unit_label}`:''}</td>
@@ -2777,7 +2799,7 @@ function SettingsTab({config,P,onSave}) {
       <div style={{display:'flex',gap:'0.35rem',marginBottom:'1.25rem',borderBottom:`1px solid ${C.border}`,paddingBottom:'0.5rem'}}>
         {sections.map(([id,label])=>(
           <button key={id} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.85rem',border:'none',
-            background:activeSection===id?C.navy:C.white,color:activeSection===id?C.white:C.slate,
+            background:activeSection===id?'var(--cv-header)':C.white,color:activeSection===id?'var(--cv-on-accent)':C.slate,
             borderRadius:4,cursor:'pointer'}} onClick={()=>setActiveSection(id)}>{label}</button>
         ))}
       </div>
@@ -2945,7 +2967,7 @@ function SettingsTab({config,P,onSave}) {
       {activeSection==='stock'&&<StockAndTransfersSection clientId={config.client_id} businessUnits={config.business_units}/>}
 
       <div style={{marginTop:'1.25rem',display:'flex',gap:'0.75rem'}}>
-        <button style={solidBtn(C.navy)} disabled={saving} onClick={save}>{saving?'Saving...':'Save All Settings'}</button>
+        <button style={solidBtn('var(--cv-header)')} disabled={saving} onClick={save}>{saving?'Saving...':'Save All Settings'}</button>
       </div>
     </div>
   )
@@ -3009,7 +3031,7 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,clo
   }
 
   function Badge2({label,color}:{label:string;color:string}) {
-    return <span style={{fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,padding:'0.25rem 0.7rem',borderRadius:20,background:color,color:C.white}}>{label}</span>
+    return <span style={{fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,padding:'0.25rem 0.7rem',borderRadius:20,background:color,color:'var(--cv-on-accent)'}}>{label}</span>
   }
 
   if (loading) return <Spinner/>
@@ -3162,14 +3184,14 @@ Write a status report, not a letter. Do not address the reader. Do not open with
 
   return (
     <div>
-      <div style={{...card,background:C.navy,marginBottom:'1.25rem'}}>
+      <div style={{...card,background:'var(--cv-header)',marginBottom:'1.25rem'}}>
         <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.3rem'}}>CLEARVIEW BUSINESS INTELLIGENCE</div>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.white,marginBottom:'0.5rem'}}>{config.business_name}</div>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:'var(--cv-on-accent)',marginBottom:'0.5rem'}}>{config.business_name}</div>
         <div style={{display:'flex',gap:'1.5rem',flexWrap:'wrap'}}>
-          <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>CREDIT RISK</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.classColor}}>{s.score}/100</div></div>
-          <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>GOING CONCERN</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.gcColor}}>{s.gcScore}/20</div></div>
-          <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>INVESTMENT READY</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.irColor}}>{s.irScore}/30</div></div>
-          <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>CASH WARNINGS</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:warnings.length>0?C.red:C.green}}>{warnings.length}</div></div>
+          <div><div style={{fontSize:'0.65rem',color:'var(--cv-wa-50)'}}>CREDIT RISK</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.classColor}}>{s.score}/100</div></div>
+          <div><div style={{fontSize:'0.65rem',color:'var(--cv-wa-50)'}}>GOING CONCERN</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.gcColor}}>{s.gcScore}/20</div></div>
+          <div><div style={{fontSize:'0.65rem',color:'var(--cv-wa-50)'}}>INVESTMENT READY</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.irColor}}>{s.irScore}/30</div></div>
+          <div><div style={{fontSize:'0.65rem',color:'var(--cv-wa-50)'}}>CASH WARNINGS</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:warnings.length>0?C.red:C.green}}>{warnings.length}</div></div>
         </div>
       </div>
 
@@ -3192,7 +3214,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
             <KPI label="Days to Pay (DPO)" value={`${s.tradeCredit.dpo.toFixed(0)}d`} color={C.navy}/>
             <KPI label="Cash Conversion Gap" value={`${s.tradeCredit.cashConversionGap.toFixed(0)}d`} color={s.tradeCredit.cashConversionGap<=0?C.green:s.tradeCredit.cashConversionGap>30?C.red:C.amber}/>
           </div>
-          <div style={{background:C.navy,borderRadius:8,padding:'1rem 1.25rem'}}>
+          <div style={{background:'var(--cv-header)',borderRadius:8,padding:'1rem 1.25rem'}}>
             <div style={{fontFamily:'monospace',fontSize:'0.65rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.75rem'}}>READING THE PICTURE</div>
             {[
               [!s.hasDebt?'info':s.dscrMin===null?'info':s.dscrMin>=1.5?'ok':s.dscrMin>=1.0?'info':'warn',
@@ -3207,7 +3229,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
             ].map((item,i)=>{
               const col = item[0]==='ok'?C.green:item[0]==='warn'?C.red:C.teal
               return(
-                <div key={i} style={{display:'flex',gap:'0.6rem',marginBottom:'0.5rem',fontSize:'0.84rem',color:C.white,lineHeight:1.5}}>
+                <div key={i} style={{display:'flex',gap:'0.6rem',marginBottom:'0.5rem',fontSize:'0.84rem',color:'var(--cv-on-accent)',lineHeight:1.5}}>
                   <span style={{width:8,height:8,borderRadius:'50%',background:col,marginTop:'0.45rem',flexShrink:0,display:'inline-block'}}/>
                   <span>{item[1]}</span>
                 </div>
@@ -3234,12 +3256,12 @@ Write a status report, not a letter. Do not address the reader. Do not open with
           <div style={card}>
             <div style={secH}>Cash Flow Early Warning</div>
             {warnings.length===0 ? (
-              <div style={{padding:'0.85rem 1rem',background:'#EBFAF0',border:`1px solid ${C.green}`,borderRadius:8,color:C.green,fontSize:'0.9rem',fontWeight:600,display:'flex',alignItems:'center',gap:'0.55rem'}}>
+              <div style={{padding:'0.85rem 1rem',background:'var(--cv-tint-green)',border:`1px solid ${C.green}`,borderRadius:8,color:C.green,fontSize:'0.9rem',fontWeight:600,display:'flex',alignItems:'center',gap:'0.55rem'}}>
                 <span aria-hidden="true" style={{fontSize:'1.1rem'}}>✓</span> No cash shortfall projected across the planning period.
               </div>
             ) : (
               <div>
-                <div style={{background:'#FDF0EE',border:`1px solid ${C.red}`,borderRadius:10,padding:'0.9rem 1rem',marginBottom:'0.85rem'}}>
+                <div style={{background:'var(--cv-tint-red)',border:`1px solid ${C.red}`,borderRadius:10,padding:'0.9rem 1rem',marginBottom:'0.85rem'}}>
                   <div style={{fontSize:'0.68rem',fontFamily:'monospace',letterSpacing:'0.1em',color:C.red,fontWeight:700}}>⚠ CASH RUNS SHORT</div>
                   <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',color:C.navy,fontWeight:700,marginTop:'0.25rem',lineHeight:1.3}}>
                     First shortfall in {warnings[0].month} · deepest point {fmt(Math.min(...warnings.map(w=>w.balance)),cc)}
@@ -3249,7 +3271,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
                   </div>
                 </div>
                 {warnings.map((w,i)=>(
-                  <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'0.55rem 0.8rem',background:'#FDF0EE',borderRadius:6,marginBottom:'0.4rem'}}>
+                  <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'0.55rem 0.8rem',background:'var(--cv-tint-red)',borderRadius:6,marginBottom:'0.4rem'}}>
                     <span style={{fontWeight:600,color:C.navy}}>{w.month}</span>
                     <span style={{fontFamily:'monospace',color:C.red,fontWeight:700}}>{fmt(w.balance,cc)}</span>
                   </div>
@@ -3288,11 +3310,11 @@ Write a status report, not a letter. Do not address the reader. Do not open with
             <KPI label="Annual EBITDA" value={fmt(m.total_ebitda,cc)} color={m.total_ebitda>=0?C.green:C.red}/>
           </div>
           <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.75rem',fontFamily:'monospace'}}>
-            <thead><tr style={{background:C.navy,color:C.white}}><th style={{padding:'7px 10px',textAlign:'left',minWidth:120}}>Metric</th>{months.map((mo,i)=><th key={i} style={{padding:'7px 8px',textAlign:'right',whiteSpace:'nowrap'}}>{mo}</th>)}</tr></thead>
+            <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}><th style={{padding:'7px 10px',textAlign:'left',minWidth:120}}>Metric</th>{months.map((mo,i)=><th key={i} style={{padding:'7px 8px',textAlign:'right',whiteSpace:'nowrap'}}>{mo}</th>)}</tr></thead>
             <tbody>
-              <tr style={{background:'#F8F4EE'}}><td style={{padding:'6px 10px',fontWeight:600}}>EBITDA</td>{result.con.ebitda.map((v:number,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right',color:v>=0?C.green:C.red}}>{fmt(v,cc)}</td>)}</tr>
+              <tr style={{background:'var(--cv-cream)'}}><td style={{padding:'6px 10px',fontWeight:600}}>EBITDA</td>{result.con.ebitda.map((v:number,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right',color:v>=0?C.green:C.red}}>{fmt(v,cc)}</td>)}</tr>
               <tr><td style={{padding:'6px 10px',fontWeight:600}}>Debt Service</td>{debtSched.totalRepayment.map((v:number,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right'}}>{fmt(v,cc)}</td>)}</tr>
-              <tr style={{background:'#F0F4F8'}}><td style={{padding:'6px 10px',fontWeight:700}}>DSCR</td>{s.dscrVals.map((v:number|null,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:v===null?C.slate:v>=1.5?C.green:v>=1.0?C.amber:C.red}}>{v===null?'–':`${v.toFixed(2)}x`}</td>)}</tr>
+              <tr style={{background:'var(--cv-alt)'}}><td style={{padding:'6px 10px',fontWeight:700}}>DSCR</td>{s.dscrVals.map((v:number|null,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:v===null?C.slate:v>=1.5?C.green:v>=1.0?C.amber:C.red}}>{v===null?'–':`${v.toFixed(2)}x`}</td>)}</tr>
             </tbody>
           </table></div>
         </div>
@@ -3324,7 +3346,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
           ].map(ind=>(
             <div key={ind.name} style={{marginBottom:'1rem',paddingBottom:'1rem',borderBottom:`1px solid ${C.border}`}}>
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}><span style={{fontWeight:600,fontSize:'0.88rem',color:C.navy}}>{ind.name}</span><span style={{fontFamily:'monospace',fontWeight:700,color:ind.sc>=3?C.green:ind.sc>=2?C.amber:C.red}}>{ind.sc}/{ind.max}</span></div>
-              <div style={{background:'#E8ECF0',borderRadius:999,height:7}}><div style={{width:(ind.sc/ind.max*100)+'%',height:'100%',background:ind.sc>=3?C.green:ind.sc>=2?C.amber:C.red,borderRadius:999}}/></div>
+              <div style={{background:'var(--cv-track)',borderRadius:999,height:7}}><div style={{width:(ind.sc/ind.max*100)+'%',height:'100%',background:ind.sc>=3?C.green:ind.sc>=2?C.amber:C.red,borderRadius:999}}/></div>
               <div style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.3rem'}}>{ind.ev}</div>
               {ind.field!=null&&<div style={{fontSize:'0.72rem',color:C.teal,marginTop:'0.3rem',fontStyle:'italic'}}>Set on the Coach Assessment tab</div>}
             </div>
@@ -3385,7 +3407,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
                       <span style={{fontWeight:700,fontSize:'0.9rem',color:C.navy}}>{label} <span style={{fontWeight:400,color:C.slate,fontSize:'0.75rem'}}>({(weight*100).toFixed(0)}% weight)</span></span>
                       <span style={{fontFamily:'monospace',fontWeight:700,color:scoreColor(dim.score)}}>{Math.round(dim.score)}/100</span>
                     </div>
-                    <div style={{background:'#E8ECF0',borderRadius:999,height:7,marginBottom:'0.5rem'}}><div style={{width:dim.score+'%',height:'100%',background:scoreColor(dim.score),borderRadius:999}}/></div>
+                    <div style={{background:'var(--cv-track)',borderRadius:999,height:7,marginBottom:'0.5rem'}}><div style={{width:dim.score+'%',height:'100%',background:scoreColor(dim.score),borderRadius:999}}/></div>
                     {dim.indicators.map(ind=>(
                       <div key={ind.label} style={{display:'flex',justifyContent:'space-between',fontSize:'0.74rem',color:C.slate,padding:'0.15rem 0'}}>
                         <span>{ind.label}</span>
@@ -3437,7 +3459,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
                 <KPI label="Internal Rate of Return" value={irr!==null?pct(irr):'N/A'} sub={irr===null?'No real IRR (check cash flow signs)':'Annualised'} color={irr!==null&&irr>discountRate?C.green:C.red}/>
               </div>
               {capitalAtRisk===0&&(
-                <div style={{background:'#FFF8E8',border:`1px solid ${C.amber}`,borderRadius:6,padding:'0.75rem 1rem',marginBottom:'1rem',fontSize:'0.8rem',color:C.navy}}>
+                <div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:6,padding:'0.75rem 1rem',marginBottom:'1rem',fontSize:'0.8rem',color:C.navy}}>
                   No shareholder contribution or recoverable grant is recorded in Capital Structure (Settings) -- NPV/IRR above are
                   calculated against zero capital at risk, which makes them of limited meaning. Enter the real capital structure for
                   an accurate result.
@@ -3561,7 +3583,7 @@ function WorkingCapitalTab({config,result,months,cc,P,onSave}) {
 
   return (
     <div>
-      <div style={{background:'#EBF8FF',borderRadius:6,padding:'0.85rem 1rem',marginBottom:'1.25rem'}}>
+      <div style={{background:'var(--cv-tint-cyan)',borderRadius:6,padding:'0.85rem 1rem',marginBottom:'1.25rem'}}>
         <p style={{fontSize:'0.82rem',color:C.navy,lineHeight:1.6,margin:0}}>
           Track supplier credit received (Payable) and credit extended to customers or partners such as licensing partners (Receivable) month by month. Enter <strong>new credit</strong> and what was <strong>actually settled</strong> each month. The outstanding balance and how it affects cash are calculated automatically and feed directly into Cash Flow and Going Concern.
         </p>
@@ -3620,7 +3642,7 @@ function TradeCreditLineGrid({line,months,cc,canEdit,updateLineName,removeLine,u
                 <td style={{padding:'4px 6px',fontWeight:600,color:C.teal,fontSize:'0.72rem'}}>{line.type==='payable'?'New Credit Received':'New Credit Extended'}</td>
                 {(line.monthly_new||[]).map((v:number,i:number)=>(
                   <td key={i} style={{padding:'2px 3px'}}>
-                    <input type="number" disabled={!canEdit} style={{width:70,padding:'0.28rem 0.32rem',fontSize:'0.7rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:canEdit?C.white:'#F4F4F4'}}
+                    <input type="number" disabled={!canEdit} style={{width:70,padding:'0.28rem 0.32rem',fontSize:'0.7rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:canEdit?C.white:'var(--cv-disabled)'}}
                       value={v??''} placeholder="0" onChange={e=>updateMonth(line.id,'monthly_new',i,Number(e.target.value))}/>
                   </td>
                 ))}
@@ -3629,7 +3651,7 @@ function TradeCreditLineGrid({line,months,cc,canEdit,updateLineName,removeLine,u
                 <td style={{padding:'4px 6px',fontWeight:600,color:C.green,fontSize:'0.72rem'}}>{line.type==='payable'?'Paid This Month':'Collected This Month'}</td>
                 {(line.monthly_settled||[]).map((v:number,i:number)=>(
                   <td key={i} style={{padding:'2px 3px'}}>
-                    <input type="number" disabled={!canEdit} style={{width:70,padding:'0.28rem 0.32rem',fontSize:'0.7rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:canEdit?C.white:'#F4F4F4'}}
+                    <input type="number" disabled={!canEdit} style={{width:70,padding:'0.28rem 0.32rem',fontSize:'0.7rem',textAlign:'right',border:`1px solid ${C.border}`,borderRadius:3,background:canEdit?C.white:'var(--cv-disabled)'}}
                       value={v??''} placeholder="0" onChange={e=>updateMonth(line.id,'monthly_settled',i,Number(e.target.value))}/>
                   </td>
                 ))}
@@ -3670,15 +3692,15 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
     <div>
       <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
         <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:viewMode==='unit'?C.navy:C.white,color:viewMode==='unit'?C.white:C.slate,
+          background:viewMode==='unit'?'var(--cv-header)':C.white,color:viewMode==='unit'?'var(--cv-on-accent)':C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:viewMode==='unit'?700:400}}
           onClick={()=>setViewMode('unit')}>By Business Unit</button>
         <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:viewMode==='consolidated'?C.navy:C.white,color:viewMode==='consolidated'?C.white:C.slate,
+          background:viewMode==='consolidated'?'var(--cv-header)':C.white,color:viewMode==='consolidated'?'var(--cv-on-accent)':C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:viewMode==='consolidated'?700:400}}
           onClick={()=>setViewMode('consolidated')}>Consolidated</button>
         <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:viewMode==='margins'?C.navy:C.white,color:viewMode==='margins'?C.white:C.slate,
+          background:viewMode==='margins'?'var(--cv-header)':C.white,color:viewMode==='margins'?'var(--cv-on-accent)':C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:viewMode==='margins'?700:400}}
           onClick={()=>setViewMode('margins')}>Margins & Break-Even</button>
       </div>
@@ -3754,7 +3776,7 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
                 <button key={u.id} style={{fontFamily:'monospace',fontSize:'0.71rem',padding:'0.45rem 0.85rem',
                   border:`2px solid ${selUnit===u.id?(u.color||C.cyan):C.border}`,borderRadius:4,
                   background:selUnit===u.id?(u.color||C.cyan):C.white,
-                  color:selUnit===u.id?C.white:C.navy,cursor:'pointer'}}
+                  color:selUnit===u.id?'var(--cv-on-accent)':C.navy,cursor:'pointer'}}
                   onClick={()=>setSelUnit(u.id)}>
                   {u.name}
                 </button>
@@ -3846,7 +3868,7 @@ function MarginsTab({config,result,months,cc}) {
                 <div style={{overflowX:'auto'}}>
                   <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.8rem'}}>
                     <thead>
-                      <tr style={{background:C.navy,color:C.white}}>
+                      <tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
                         {['Revenue Line','Break-Even Revenue','Current Revenue','Gap / Surplus','Variable Cost %'].map(h=>(
                           <th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.75rem'}}>{h}</th>
                         ))}
@@ -3946,7 +3968,7 @@ function MarginsTab({config,result,months,cc}) {
             <div style={{overflowX:'auto'}}>
               <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.8rem'}}>
                 <thead>
-                  <tr style={{background:C.navy,color:C.white}}>
+                  <tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
                     {['Unit','Headcount','Revenue','Staff Cost','Revenue/Head','Staff Cost %'].map(h=>(
                       <th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.75rem'}}>{h}</th>
                     ))}
@@ -4078,15 +4100,15 @@ function ActualsAndWorkingCapitalTab({config,result,months,cc,P,onSave,onCloseSt
     <div>
       <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
         <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='actuals'?C.navy:C.white,color:mode==='actuals'?C.white:C.slate,
+          background:mode==='actuals'?'var(--cv-header)':C.white,color:mode==='actuals'?'var(--cv-on-accent)':C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:mode==='actuals'?700:400}}
           onClick={()=>setMode('actuals')}>Monthly Actuals</button>
         <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='workingcapital'?C.navy:C.white,color:mode==='workingcapital'?C.white:C.slate,
+          background:mode==='workingcapital'?'var(--cv-header)':C.white,color:mode==='workingcapital'?'var(--cv-on-accent)':C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:mode==='workingcapital'?700:400}}
           onClick={()=>setMode('workingcapital')}>Working Capital (Trade Credit)</button>
         <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='uncategorized'?C.navy:C.white,color:mode==='uncategorized'?C.white:C.slate,
+          background:mode==='uncategorized'?'var(--cv-header)':C.white,color:mode==='uncategorized'?'var(--cv-on-accent)':C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:mode==='uncategorized'?700:400}}
           onClick={()=>setMode('uncategorized')}>Needs Categorizing</button>
       </div>
@@ -4103,11 +4125,11 @@ function ApprovalsAndSpendTab({clientId,config,cc,P}) {
     <div>
       <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
         <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='approvals'?C.navy:C.white,color:mode==='approvals'?C.white:C.slate,
+          background:mode==='approvals'?'var(--cv-header)':C.white,color:mode==='approvals'?'var(--cv-on-accent)':C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:mode==='approvals'?700:400}}
           onClick={()=>setMode('approvals')}>Approvals</button>
         <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='requests'?C.navy:C.white,color:mode==='requests'?C.white:C.slate,
+          background:mode==='requests'?'var(--cv-header)':C.white,color:mode==='requests'?'var(--cv-on-accent)':C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:mode==='requests'?700:400}}
           onClick={()=>setMode('requests')}>My Spend Requests</button>
       </div>
@@ -4123,23 +4145,23 @@ function SettingsAndAdminTab({config,result,months,cc,clientId,P,onSave}) {
     <div>
       <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
         <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='settings'?C.navy:C.white,color:mode==='settings'?C.white:C.slate,
+          background:mode==='settings'?'var(--cv-header)':C.white,color:mode==='settings'?'var(--cv-on-accent)':C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:mode==='settings'?700:400}}
           onClick={()=>setMode('settings')}>General Settings</button>
         <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='scenarios'?C.navy:C.white,color:mode==='scenarios'?C.white:C.slate,
+          background:mode==='scenarios'?'var(--cv-header)':C.white,color:mode==='scenarios'?'var(--cv-on-accent)':C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:mode==='scenarios'?700:400}}
           onClick={()=>setMode('scenarios')}>Scenarios</button>
         <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='team'?C.navy:C.white,color:mode==='team'?C.white:C.slate,
+          background:mode==='team'?'var(--cv-header)':C.white,color:mode==='team'?'var(--cv-on-accent)':C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:mode==='team'?700:400}}
           onClick={()=>setMode('team')}>Team</button>
         <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='catalogue'?C.navy:C.white,color:mode==='catalogue'?C.white:C.slate,
+          background:mode==='catalogue'?'var(--cv-header)':C.white,color:mode==='catalogue'?'var(--cv-on-accent)':C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:mode==='catalogue'?700:400}}
           onClick={()=>setMode('catalogue')}>Catalogue</button>
         <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='field'?C.navy:C.white,color:mode==='field'?C.white:C.slate,
+          background:mode==='field'?'var(--cv-header)':C.white,color:mode==='field'?'var(--cv-on-accent)':C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:mode==='field'?700:400}}
           onClick={()=>setMode('field')}>Clearview Field</button>
       </div>
@@ -4245,7 +4267,7 @@ function PromotionEventsSection({clientId,config,cc,P,events,setEvents}) {
           <div style={{overflowX:'auto'}}>
             <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.8rem'}}>
               <thead>
-                <tr style={{background:C.navy,color:C.white}}>
+                <tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
                   {['Channel','Events','Total Cost','Customers Acquired','Cost per Customer (CAC)','Revenue Lift'].map(h=>(
                     <th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.75rem'}}>{h}</th>
                   ))}
@@ -4360,16 +4382,16 @@ function InvestmentPitchDownload({clientId}:{clientId:string}) {
   }
 
   return (
-    <div style={{background:'#EBF8FF',borderRadius:6,padding:'0.85rem 1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.75rem'}}>
+    <div style={{background:'var(--cv-tint-cyan)',borderRadius:6,padding:'0.85rem 1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.75rem'}}>
       <div>
         <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>Investment Pitch Summary</div>
         <div style={{fontSize:'0.78rem',color:C.slate}}>A one-page Word document with the financial summary and scores, ready to send to a lender or investor.</div>
       </div>
-      <button style={solidBtn(C.navy)} disabled={downloading} onClick={download}>
+      <button style={solidBtn('var(--cv-header)')} disabled={downloading} onClick={download}>
         {downloading ? 'Generating...' : 'Download Word Document'}
       </button>
       {error && (
-        <div style={{width:'100%',background:'#FDF0EE',border:`2px solid ${C.red}`,borderRadius:6,padding:'0.85rem 1rem',marginTop:'0.5rem'}}>
+        <div style={{width:'100%',background:'var(--cv-tint-red)',border:`2px solid ${C.red}`,borderRadius:6,padding:'0.85rem 1rem',marginTop:'0.5rem'}}>
           <div style={{fontWeight:700,color:C.red,fontSize:'0.85rem',marginBottom:'0.3rem'}}>⚠ Could not generate the document</div>
           <div style={{color:C.red,fontSize:'0.8rem'}}>{error}</div>
         </div>
@@ -4507,7 +4529,7 @@ function YearCloseControls({config,result,closedPeriods,P,onCloseStatusChanged}:
             <div key={group.year} style={{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.45rem 0.75rem',border:`1px solid ${yc?.closed?C.navy:C.border}`,borderRadius:6,fontSize:'0.75rem',background:yc?.closed?C.white:C.white}}>
               <span style={{fontWeight:700,color:C.navy}}>FY {group.label}</span>
               {yc?.closed ? (
-                <span title={`Closed by ${yc.closed_by} on ${new Date(yc.closed_at).toLocaleDateString()}`}><Badge text="Closed" color={C.navy}/></span>
+                <span title={`Closed by ${yc.closed_by} on ${new Date(yc.closed_at).toLocaleDateString()}`}><Badge text="Closed" color={'var(--cv-header)'}/></span>
               ) : (
                 <button type="button" style={addBtn(true,canClose?C.green:C.border)} onClick={()=>closeYear(group)} disabled={!canClose||closing===key}>
                   {closing===key?'Closing...':canClose?'Close This Year':'Not all months closed yet'}

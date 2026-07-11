@@ -1,4 +1,142 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #F8F4EE; color: #1B2A4A; }
+
+/* ============================================================
+   THEME TOKENS
+   Light values live under :root (the default). Dark values
+   override under :root[data-theme="dark"]. Every colour used by
+   the dashboard (GenericDashboard) and the field app (app/field)
+   maps to one of these variables so both flip cleanly.
+   The "header/nav" and "wa-*" (white-alpha) tokens sit on the
+   permanently-dark navy header, so they hold the same value in
+   both themes on purpose.
+   ============================================================ */
+:root {
+  color-scheme: light;
+
+  /* Surfaces & backgrounds */
+  --cv-bg:          #F0F4F8;  /* generic page background */
+  --cv-bg-2:        #F4F8FC;  /* secondary / input background */
+  --cv-card:        #FFFFFF;  /* card surface (was "white") */
+  --cv-card-hi:     #EEF1F6;  /* elevated / hover surface */
+  --cv-cream:       #F8F4EE;  /* dashboard page background */
+  --cv-alt:         #F0F4F8;  /* subtle panel / alt table row */
+  --cv-disabled:    #F5F5F5;  /* disabled input background */
+  --cv-track:       #E8ECF0;  /* progress-bar track */
+
+  /* Permanently-dark header / nav (dark in BOTH themes) */
+  --cv-header:      #1B2A4A;  /* navy header + table head background */
+  --cv-nav:         #142038;  /* sub-nav bar background */
+
+  /* Borders & shadow */
+  --cv-border:      #D8E0E8;
+  --cv-border-soft: #E6ECF2;
+  --cv-shadow-1:    rgba(16,42,67,0.05);
+  --cv-shadow-2:    rgba(16,42,67,0.06);
+
+  /* Text */
+  --cv-navy:        #1B2A4A;  /* primary text */
+  --cv-slate:       #4A5A6A;  /* muted text */
+  --cv-faint:       #7A8A9A;  /* fainter text */
+  --cv-on-accent:   #FFFFFF;  /* text on accent / dark header (white both) */
+  --cv-on-cyan:     #062230;  /* dark text on a cyan button (dark both) */
+
+  /* Brand accents */
+  --cv-cyan:        #00B4D8;
+  --cv-teal:        #1A9DAA;
+  --cv-green:       #1A7A4A;
+  --cv-amber:       #B8860B;
+  --cv-red:         #C0392B;
+  --cv-purple:      #6B4A8B;
+  --cv-cyan-40:     rgba(0,180,216,0.40);
+
+  /* Accent TEXT that must stay readable on either surface */
+  --cv-green-text:  #1A7A4A;  /* positive amounts */
+  --cv-red-text:    #C0392B;  /* negative amounts / errors */
+
+  /* Dim / tint backgrounds */
+  --cv-cyan-dim:    rgba(0,180,216,0.15);
+  --cv-amber-dim:   rgba(184,134,11,0.14);
+  --cv-red-dim:     rgba(192,57,43,0.10);
+  --cv-tint-cyan:   #EBF8FF;
+  --cv-tint-teal:   #EAFAF6;
+  --cv-tint-teal-soft: #F4FDFB;
+  --cv-tint-amber:  #FFF8E8;
+  --cv-tint-amber-2:#FDF6E3;
+  --cv-tint-red:    #FDF0EE;
+  --cv-tint-warn:   #FFFBEB;
+  --cv-tint-green:  #EBFAF0;
+  --cv-tint-actual: #E8F6F8;
+
+  /* White-alpha values used ON the dark navy header (same in both themes) */
+  --cv-wa-10: rgba(255,255,255,0.10);
+  --cv-wa-20: rgba(255,255,255,0.20);
+  --cv-wa-45: rgba(255,255,255,0.45);
+  --cv-wa-50: rgba(255,255,255,0.50);
+  --cv-wa-60: rgba(255,255,255,0.60);
+  --cv-wa-75: rgba(255,255,255,0.75);
+  --cv-wa-85: rgba(255,255,255,0.85);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Surfaces & backgrounds */
+  --cv-bg:          #0E1B2E;
+  --cv-bg-2:        #12233B;
+  --cv-card:        #16283F;
+  --cv-card-hi:     #1B3253;
+  --cv-cream:       #0E1B2E;
+  --cv-alt:         #1B3253;
+  --cv-disabled:    #0C1A2B;
+  --cv-track:       rgba(255,255,255,0.12);
+
+  /* Permanently-dark header / nav (kept dark) */
+  --cv-header:      #14243B;
+  --cv-nav:         #0C1728;
+
+  /* Borders & shadow */
+  --cv-border:      rgba(255,255,255,0.10);
+  --cv-border-soft: rgba(255,255,255,0.08);
+  --cv-shadow-1:    rgba(0,0,0,0.35);
+  --cv-shadow-2:    rgba(0,0,0,0.45);
+
+  /* Text */
+  --cv-navy:        #E7EEF6;  /* primary text, now light */
+  --cv-slate:       #9FB2C6;
+  --cv-faint:       rgba(255,255,255,0.42);
+  --cv-on-accent:   #FFFFFF;
+  --cv-on-cyan:     #062230;
+
+  /* Brand accents (slightly brightened for dark) */
+  --cv-cyan:        #35C6EC;
+  --cv-teal:        #33C0CE;
+  --cv-green:       #35B570;
+  --cv-amber:       #E0A100;
+  --cv-red:         #E06455;
+  --cv-purple:      #A385C4;
+  --cv-cyan-40:     rgba(53,198,236,0.45);
+
+  /* Accent TEXT */
+  --cv-green-text:  #5FD08A;
+  --cv-red-text:    #FF8B7E;
+
+  /* Dim / tint backgrounds (translucent so they read on dark surfaces) */
+  --cv-cyan-dim:    rgba(53,198,236,0.18);
+  --cv-amber-dim:   rgba(224,161,0,0.16);
+  --cv-red-dim:     rgba(224,100,85,0.16);
+  --cv-tint-cyan:   rgba(53,198,236,0.12);
+  --cv-tint-teal:   rgba(51,192,206,0.14);
+  --cv-tint-teal-soft: rgba(51,192,206,0.07);
+  --cv-tint-amber:  rgba(224,161,0,0.13);
+  --cv-tint-amber-2:rgba(224,161,0,0.20);
+  --cv-tint-red:    rgba(224,100,85,0.14);
+  --cv-tint-warn:   rgba(224,161,0,0.10);
+  --cv-tint-green:  rgba(53,181,112,0.14);
+  --cv-tint-actual: rgba(53,198,236,0.10);
+
+  /* White-alpha header tokens intentionally unchanged (header stays dark) */
+}
+
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--cv-bg); color: var(--cv-navy); }
 input, select, button, textarea { font-family: inherit; }
-input:focus, select:focus { outline: 2px solid #00B4D8; outline-offset: 1px; }
+input:focus, select:focus { outline: 2px solid var(--cv-cyan); outline-offset: 1px; }
