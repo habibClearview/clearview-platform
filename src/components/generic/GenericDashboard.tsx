@@ -1373,6 +1373,10 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
   const [periodCloseVerified, setPeriodCloseVerified] = useState(false)
   const [staleCatalogue, setStaleCatalogue] = useState<any[]>([])
   const [closing, setClosing] = useState(false)
+  // "One month · guided" (this existing single-month form) vs
+  // "Many months · grid" (the multi-month catch-up grid). The guided path's
+  // logic is entirely unchanged; the grid is a separate self-contained view.
+  const [view, setView] = useState<'guided'|'grid'>('guided')
 
   // Rolling 24 months
   const periodMonths = Array.from({length:24},(_,i)=>{
@@ -1589,23 +1593,59 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
     setLineValues(v => ({...v, [lineId]: total}))
   }
 
+  const segBtn = (active:boolean): React.CSSProperties => ({fontFamily:'monospace',fontSize:'0.7rem',border:0,
+    background:active?'var(--cv-header)':'transparent',color:active?'var(--cv-on-accent)':C.slate,
+    padding:'0.42rem 0.85rem',borderRadius:7,cursor:'pointer',fontWeight:active?700:400})
+  const unitSelect = canSeeAll ? (
+    <select style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.38rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,background:C.white,color:C.navy}}
+      value={selUnit} onChange={e=>setSelUnit(e.target.value)}>
+      {visibleUnits.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+    </select>
+  ) : null
+
   return (
     <div>
-      {/* Selectors */}
-      <div style={{display:'flex',gap:'0.75rem',flexWrap:'wrap',alignItems:'center',marginBottom:'1.25rem'}}>
-        {canSeeAll&&(
-          <select style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.38rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,background:C.white,color:C.navy}}
-            value={selUnit} onChange={e=>setSelUnit(e.target.value)}>
-            {visibleUnits.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
-          </select>
-        )}
-        <select style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.38rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,background:C.white,color:C.navy}}
-          value={selPeriod} onChange={e=>setSelPeriod(e.target.value)}>
-          {periodMonths.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}
-        </select>
-        {submitted&&<Badge text="Submitted" color={C.green}/>}
-        {periodClose?.closed&&<Badge text="Closed" color={'var(--cv-header)'}/>}
+      {/* View toggle (segmented control) + selectors */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',marginBottom:'1.1rem'}}>
+        <div style={{display:'inline-flex',background:C.lightBg,borderRadius:9,padding:3}}>
+          <button style={segBtn(view==='guided')} onClick={()=>setView('guided')}>One month · guided</button>
+          <button style={segBtn(view==='grid')} onClick={()=>setView('grid')}>Many months · grid</button>
+        </div>
+        <div style={{display:'flex',gap:'0.75rem',flexWrap:'wrap',alignItems:'center'}}>
+          {unitSelect}
+          {view==='guided'&&(
+            <>
+              <select style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.38rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,background:C.white,color:C.navy}}
+                value={selPeriod} onChange={e=>setSelPeriod(e.target.value)}>
+                {periodMonths.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+              {submitted&&<Badge text="Submitted" color={C.green}/>}
+              {periodClose?.closed&&<Badge text="Closed" color={'var(--cv-header)'}/>}
+            </>
+          )}
+        </div>
       </div>
+
+      {view==='grid'
+        ? <ActualsGridView config={config} selUnit={selUnit} cc={cc} P={P} canSeeAll={canSeeAll}/>
+        : <>
+
+      {/* This month at a glance */}
+      {!loading&&(
+        <>
+          <div style={ovLabel}>This month at a glance</div>
+          <div className="cv-grid-4" style={{marginBottom:'1.35rem'}}>
+            <GlanceCard label="Revenue" value={fmt(totalRev,cc)} accent={C.green} valueColor={C.green}
+              desc={`${lines.filter(l=>l.category==='revenue'&&combined(l.id)!==0).length} lines entered`}/>
+            <GlanceCard label="Total costs" value={fmt(totalCost,cc)} accent={C.red} valueColor={C.red}
+              desc="cost of sales + overheads"/>
+            <GlanceCard label="Gross profit" value={fmt(grossProfit,cc)} accent={C.teal} valueColor={grossProfit>=0?C.teal:C.red}
+              desc={totalRev>0?`${Math.round((grossProfit/totalRev)*100)}% margin`:'—'}/>
+            <GlanceCard label="Net result" value={fmt(netResult,cc)} accent={C.navy} valueColor={netResult>=0?C.navy:C.red}
+              desc="after all costs"/>
+          </div>
+        </>
+      )}
 
       {/* Month-End Close -- docs/ACCOUNTING_ARCHITECTURE.md section 5.
           Only shown to roles who can actually close a period. */}
@@ -1767,6 +1807,263 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
             </div>
           </>
         )}
+      </div>
+        </>
+      }
+    </div>
+  )
+}
+
+// ── ACTUALS · MANY MONTHS · GRID VIEW ─────────────────────────
+// The multi-month catch-up grid from the approved setup mockup. ONE unit,
+// MANY month columns. Rows are the unit's active plan_lines grouped by
+// category (same sections/labels as the guided form). Each editable cell
+// edits only the MANUAL line_values for its (unit, period, line). Field-app
+// figures (field_line_values) are shown but never editable here -- per
+// docs/ACCOUNTING_ARCHITECTURE.md section 4 they are field-owned. Closed
+// periods (generic_period_close) render read-only and fail closed while the
+// close status is still being verified. Reuses the same combinedActual /
+// computeActualsTotals as the guided form so totals reconcile exactly.
+function parseGridNum(s?:string):number|null {
+  if (s===undefined || s===null) return null
+  const t = String(s).replace(/[,\s]/g,'').replace(/[^0-9.\-]/g,'')
+  if (t==='') return null
+  const n = Number(t)
+  return isNaN(n) ? null : n
+}
+
+function ActualsGridView({config,selUnit,cc,P,canSeeAll}) {
+  const [monthsCount, setMonthsCount] = useState(6)
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [manual, setManual] = useState<Record<string,string>>({})          // `${period}|${lineId}` -> raw string
+  const [loadedManual, setLoadedManual] = useState<Record<string,Record<string,number>>>({})
+  const [field, setField] = useState<Record<string,Record<string,number>>>({})
+  const [submittedByPeriod, setSubmittedByPeriod] = useState<Record<string,boolean>>({})
+  const [dirty, setDirty] = useState<Set<string>>(new Set())
+  const [closedSet, setClosedSet] = useState<Set<string>>(new Set())
+  const [closeVerified, setCloseVerified] = useState(false)
+
+  // Rolling last-N months ending on the current month -- same construction
+  // as ActualsTab's periodMonths, just a configurable window.
+  const periods = useMemo(()=>Array.from({length:monthsCount},(_,i)=>{
+    const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-(monthsCount-1)+i)
+    return {
+      value:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`,
+      label:`${d.toLocaleString('en-GB',{month:'short'})} ${String(d.getFullYear()).slice(2)}`,
+    }
+  }),[monthsCount])
+
+  const lines = config.plan_lines.filter((l:any)=>l.unit_id===selUnit&&l.active&&!l.name.startsWith('Add '))
+  const sections:[string,string][] = [['revenue','Revenue'],['cost_of_sales','Cost of Sales'],['staff','Staff'],['direct_opex','Overheads']]
+  const sectioned = sections
+    .map(([cat,label])=>[label, lines.filter((l:any)=>l.category===cat)] as [string, any[]])
+    .filter(([,ls])=>ls.length>0)
+  const flatLines = sectioned.flatMap(([,ls])=>ls)
+
+  // Load the unit's actuals for every visible period in one query.
+  useEffect(()=>{
+    if (!selUnit) return
+    let active = true
+    setLoading(true)
+    const pv = periods.map(p=>p.value)
+    supabase.from('generic_actuals').select('*')
+      .eq('client_id',config.client_id).eq('unit_id',selUnit).in('period',pv)
+      .then(({data})=>{
+        if (!active) return
+        const lm:Record<string,Record<string,number>>={}, fm:Record<string,Record<string,number>>={}, sm:Record<string,boolean>={}, man:Record<string,string>={}
+        ;(data||[]).forEach((row:any)=>{
+          lm[row.period]=row.line_values||{}
+          fm[row.period]=row.field_line_values||{}
+          sm[row.period]=!!row.submitted
+          Object.entries(row.line_values||{}).forEach(([lid,v])=>{ man[`${row.period}|${lid}`]=String(v) })
+        })
+        setLoadedManual(lm); setField(fm); setSubmittedByPeriod(sm); setManual(man); setDirty(new Set()); setLoading(false)
+      })
+    return ()=>{ active=false }
+  },[selUnit,monthsCount,config.client_id])
+
+  // Period-close for the visible window. Fail closed: while this is in
+  // flight (or on error) every cell stays read-only, mirroring ActualsTab.
+  useEffect(()=>{
+    let active = true
+    setClosedSet(new Set()); setCloseVerified(false)
+    const pv = periods.map(p=>p.value)
+    supabase.from('generic_period_close').select('*')
+      .eq('client_id',config.client_id).in('period',pv)
+      .then(({data,error})=>{
+        if (!active) return
+        if (error) { alert('Could not verify which months are closed. Editing is disabled until it can be verified.'); return }
+        const s=new Set<string>(); (data||[]).forEach((r:any)=>{ if (r.closed) s.add(r.period) })
+        setClosedSet(s); setCloseVerified(true)
+      })
+    return ()=>{ active=false }
+  },[monthsCount,config.client_id])
+
+  // A period is locked if it is closed, if the current user has already
+  // submitted it and cannot see all units, or while close status is
+  // unverified (fail closed).
+  const isLocked = (period:string) => !closeVerified || closedSet.has(period) || (!!submittedByPeriod[period] && !canSeeAll)
+  const manualNum = (period:string, lineId:string) => { const n=parseGridNum(manual[`${period}|${lineId}`]); return n===null?0:n }
+  const fieldNum  = (period:string, lineId:string) => Number(field[period]?.[lineId]||0)
+  const cellCombined = (period:string, lineId:string) => manualNum(period,lineId)+fieldNum(period,lineId)
+
+  const manualObjFor = (period:string) => { const o:Record<string,number>={}; lines.forEach((l:any)=>{ o[l.id]=manualNum(period,l.id) }); return o }
+  const netFor = (period:string) => computeActualsTotals(lines, manualObjFor(period), field[period]||{}).netResult
+  const lineTotal = (lineId:string) => periods.reduce((s,p)=>s+cellCombined(p.value,lineId),0)
+  const grandNet  = periods.reduce((s,p)=>s+netFor(p.value),0)
+
+  function setCell(period:string, lineId:string, val:string) {
+    if (isLocked(period)) return
+    setManual(m=>({...m,[`${period}|${lineId}`]:val}))
+    setDirty(d=>{ const n=new Set(d); n.add(period); return n })
+  }
+
+  // Paste a block copied from a spreadsheet, starting at the focused cell.
+  // Rows split on newlines, columns on tabs. Locked (closed / submitted)
+  // cells and field values are never touched -- only manual line_values.
+  function handlePaste(e:any, startFlatIdx:number, startPeriodIdx:number) {
+    const text = e.clipboardData?.getData('text') || ''
+    if (!text.includes('\t') && !text.includes('\n')) return // single value -> let the input handle it normally
+    e.preventDefault()
+    const rows = text.replace(/\r/g,'').split('\n')
+    while (rows.length && rows[rows.length-1]==='') rows.pop()
+    const upd:Record<string,string>={}; const dp=new Set(dirty)
+    rows.forEach((row:string,r:number)=>{
+      row.split('\t').forEach((cell:string,c:number)=>{
+        const li=startFlatIdx+r, pi=startPeriodIdx+c
+        if (li>=flatLines.length || pi>=periods.length) return
+        const period=periods[pi].value
+        if (isLocked(period)) return   // never write into a locked cell
+        const n=parseGridNum(cell)
+        if (n===null) return
+        upd[`${period}|${flatLines[li].id}`]=String(n); dp.add(period)
+      })
+    })
+    if (Object.keys(upd).length) { setManual(m=>({...m,...upd})); setDirty(dp) }
+  }
+
+  async function save() {
+    if (!closeVerified) { alert('Close status is still loading. Please try again in a moment.'); return }
+    const toWrite=[...dirty].filter(p=>!closedSet.has(p))
+    if (toWrite.length===0) { alert('No changes to save.'); return }
+    setSaving(true)
+    const now=new Date().toISOString()
+    const rows=toWrite.map(period=>{
+      // Start from the period's originally-loaded manual values (so keys for
+      // lines not shown in this grid survive), then overlay the displayed
+      // lines. field_line_values and catalogue_quantities are deliberately
+      // omitted: an ON CONFLICT UPDATE only sets provided columns, so field
+      // data is never clobbered here. Same upsert shape as ActualsTab.save.
+      const base:Record<string,number>={...(loadedManual[period]||{})}
+      lines.forEach((l:any)=>{
+        const n=parseGridNum(manual[`${period}|${l.id}`])
+        if (n===null) delete base[l.id]; else base[l.id]=n
+      })
+      return {
+        client_id:config.client_id, unit_id:selUnit, period,
+        line_values:base, submitted:!!submittedByPeriod[period],
+        entered_by:P.fullName, entered_at:now, updated_at:now,
+      }
+    })
+    const {error}=await supabase.from('generic_actuals').upsert(rows,{onConflict:'client_id,unit_id,period'})
+    if (!error) {
+      const nl={...loadedManual}; rows.forEach(r=>{ nl[r.period]=r.line_values }); setLoadedManual(nl); setDirty(new Set())
+    } else alert('Could not save. Please try again.')
+    setSaving(false)
+  }
+
+  const unitName = config.business_units.find((u:any)=>u.id===selUnit)?.name || ''
+  const thBase:React.CSSProperties = {background:'var(--cv-header)',color:'var(--cv-on-accent)',padding:'7px 9px',fontWeight:400,fontSize:'0.66rem',textAlign:'right',whiteSpace:'nowrap',fontFamily:'monospace'}
+  const grpTd:React.CSSProperties = {background:C.lightBg,color:C.navy,fontFamily:'monospace',fontSize:'0.6rem',letterSpacing:'0.06em',textTransform:'uppercase',fontWeight:700,padding:'5px 9px'}
+
+  return (
+    <div style={{...card,padding:0,overflow:'hidden'}}>
+      <div style={{padding:'0.85rem 1.1rem',borderBottom:`1px solid ${C.border}`,display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.6rem',flexWrap:'wrap'}}>
+        <div style={{fontFamily:'Georgia,serif',fontWeight:700,fontSize:'0.98rem',color:C.navy}}>{unitName} · enter what you have</div>
+        <div style={{display:'flex',gap:'0.5rem',alignItems:'center'}}>
+          <select style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.35rem 0.55rem',border:`1px solid ${C.border}`,borderRadius:6,background:C.white,color:C.navy}}
+            value={monthsCount} onChange={e=>setMonthsCount(Number(e.target.value))}>
+            <option value={6}>Last 6 months</option>
+            <option value={12}>Last 12 months</option>
+            <option value={24}>Last 24 months</option>
+          </select>
+          <button style={solidBtn('var(--cv-header)',true)} disabled={saving||dirty.size===0} onClick={save}>{saving?'Saving...':'Save'}</button>
+        </div>
+      </div>
+      {/* Legend */}
+      <div style={{display:'flex',gap:'1.1rem',flexWrap:'wrap',fontFamily:'monospace',fontSize:'0.66rem',color:C.slate,padding:'0.6rem 1.1rem',background:C.lightBg,borderBottom:`1px solid ${C.border}`}}>
+        <span style={{display:'inline-flex',alignItems:'center',gap:'0.35rem'}}><span style={{width:11,height:11,borderRadius:3,background:'var(--cv-tint-teal)',border:'1px solid var(--cv-border-soft)'}}/>closed · locked</span>
+        <span style={{display:'inline-flex',alignItems:'center',gap:'0.35rem'}}><span style={{width:11,height:11,borderRadius:3,background:'var(--cv-tint-cyan)'}}/>from Clearview Field</span>
+        <span style={{display:'inline-flex',alignItems:'center',gap:'0.35rem'}}><span style={{width:11,height:11,borderRadius:3,background:C.white,border:`1px solid ${C.border}`}}/>type here</span>
+        <span style={{marginLeft:'auto'}}>Blanks are fine. Fill what you have.</span>
+      </div>
+      {loading ? <Spinner/> : (
+        <div style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',fontFamily:'monospace',fontSize:'0.74rem',width:'100%',minWidth:720}}>
+            <thead><tr>
+              <th style={{...thBase,textAlign:'left',minWidth:170}}>Line</th>
+              {periods.map(p=>{
+                const closed=closedSet.has(p.value)
+                return <th key={p.value} style={{...thBase,color:closed?'var(--cv-wa-60)':'var(--cv-on-accent)'}}>{p.label}</th>
+              })}
+              <th style={{...thBase,borderLeft:'2px solid var(--cv-wa-20)'}}>Total</th>
+            </tr></thead>
+            <tbody>
+              {sectioned.map(([label,ls])=>{
+                let flatBase = 0
+                for (const [,prev] of sectioned) { if (prev===ls) break; flatBase += prev.length }
+                return (
+                  <React.Fragment key={label}>
+                    <tr>
+                      <td style={grpTd}>{label}</td>
+                      {periods.map(p=><td key={p.value} style={{...grpTd,background:C.lightBg}}/>)}
+                      <td style={{...grpTd,background:C.lightBg}}/>
+                    </tr>
+                    {ls.map((l:any,li:number)=>{
+                      const flatIdx = flatBase + li
+                      return (
+                        <tr key={l.id}>
+                          <td style={{textAlign:'left',padding:'3px 5px 3px 1.6rem',color:'var(--cv-slate)',fontFamily:'inherit'}}>{l.name}</td>
+                          {periods.map((p,pi)=>{
+                            const locked=isLocked(p.value)
+                            const fAmt=fieldNum(p.value,l.id)
+                            const hasField=fAmt!==0
+                            return (
+                              <td key={p.value} style={{padding:'3px 5px',borderBottom:'1px solid var(--cv-border-soft)'}}>
+                                <input inputMode="decimal" disabled={locked}
+                                  value={manual[`${p.value}|${l.id}`]??''} placeholder={hasField?'0':''}
+                                  onChange={e=>setCell(p.value,l.id,e.target.value)}
+                                  onPaste={e=>handlePaste(e,flatIdx,pi)}
+                                  title={hasField?`+ ${fmt(fAmt,cc)} from Clearview Field · Total ${fmt(cellCombined(p.value,l.id),cc)}`:undefined}
+                                  style={{width:'100%',minWidth:66,textAlign:'right',padding:'0.3rem 0.35rem',border:'1px solid transparent',borderRadius:4,fontFamily:'monospace',fontSize:'0.72rem',boxSizing:'border-box',
+                                    background:locked?'var(--cv-tint-teal)':hasField?'var(--cv-tint-cyan)':C.white,
+                                    color:locked?C.green:C.navy}}/>
+                                {hasField&&<div style={{fontSize:'0.55rem',color:C.teal,textAlign:'right',marginTop:'1px',fontFamily:'monospace'}}>+{fmt(fAmt,cc)}</div>}
+                              </td>
+                            )
+                          })}
+                          <td style={{fontWeight:700,color:C.navy,background:'var(--cv-alt)',borderLeft:`2px solid ${C.border}`,padding:'3px 6px',textAlign:'right'}}>{fmt(lineTotal(l.id),cc)}</td>
+                        </tr>
+                      )
+                    })}
+                  </React.Fragment>
+                )
+              })}
+              <tr>
+                <td style={{fontWeight:700,color:C.navy,background:'var(--cv-alt)',borderTop:`2px solid ${C.border}`,padding:'5px 5px',textAlign:'left'}}>Net result</td>
+                {periods.map(p=>{
+                  const n=netFor(p.value)
+                  return <td key={p.value} style={{fontWeight:700,background:'var(--cv-alt)',borderTop:`2px solid ${C.border}`,padding:'5px 5px',textAlign:'right',color:n>=0?C.navy:C.red}}>{fmt(n,cc)}</td>
+                })}
+                <td style={{fontWeight:700,background:'var(--cv-alt)',borderTop:`2px solid ${C.border}`,borderLeft:`2px solid ${C.border}`,padding:'5px 6px',textAlign:'right',color:grandNet>=0?C.navy:C.red}}>{fmt(grandNet,cc)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div style={{fontSize:'0.72rem',color:C.teal,fontFamily:'monospace',padding:'0.6rem 1.1rem',borderTop:`1px solid ${C.border}`}}>
+        Tip: copy a block from Excel and paste straight into the grid. Field-app figures are shown in blue and can't be edited by hand; closed months are locked in green.
       </div>
     </div>
   )
@@ -4042,15 +4339,45 @@ function WorkingCapitalTab({config,result,months,cc,P,onSave}) {
         </p>
       </div>
 
-      {s && (
-        <div style={kpiGrid}>
-          <KPI label="Days to Collect (DSO)" value={`${s.tradeCredit.dso.toFixed(0)}d`} color={C.navy}/>
-          <KPI label="Days to Pay (DPO)" value={`${s.tradeCredit.dpo.toFixed(0)}d`} color={C.navy}/>
-          <KPI label="Cash Conversion Gap" value={`${s.tradeCredit.cashConversionGap.toFixed(0)}d`} color={s.tradeCredit.cashConversionGap<=0?C.green:s.tradeCredit.cashConversionGap>30?C.red:C.amber}/>
-          <KPI label="Current Payable Outstanding" value={fmt(s.tradeCredit.totalPayableOutstanding[s.tradeCredit.totalPayableOutstanding.length-1]||0,cc)}/>
-          <KPI label="Current Receivable Outstanding" value={fmt(s.tradeCredit.totalReceivableOutstanding[s.tradeCredit.totalReceivableOutstanding.length-1]||0,cc)}/>
-        </div>
-      )}
+      {s && (()=>{
+        const dso=s.tradeCredit.dso, dpo=s.tradeCredit.dpo, gap=s.tradeCredit.cashConversionGap
+        const payOut=s.tradeCredit.totalPayableOutstanding[s.tradeCredit.totalPayableOutstanding.length-1]||0
+        const recOut=s.tradeCredit.totalReceivableOutstanding[s.tradeCredit.totalReceivableOutstanding.length-1]||0
+        // Ring fill is a purely visual gauge over a 90-day reference window --
+        // no new score is computed; the day counts themselves come straight
+        // from the engine's tradeCredit output.
+        const ringFrac=(d:number)=>Math.max(0,Math.min(1,d/90))
+        const gapCol=gap<=0?C.green:gap>30?C.red:C.amber
+        return (
+          <>
+            <div style={ovLabel}>Payment behaviour</div>
+            <div className="cv-grid-3" style={{marginBottom:'1.35rem'}}>
+              <div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)',borderLeft:`4px solid ${C.navy}`}}>
+                <div style={{fontFamily:'monospace',fontSize:'0.56rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.45rem'}}>Days to collect · DSO</div>
+                <div style={{display:'flex',alignItems:'center',gap:'0.8rem'}}>
+                  <MiniDonut frac={ringFrac(dso)} color={C.amber} size={46} center=""/>
+                  <div>
+                    <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy,lineHeight:1.05}}>{dso.toFixed(0)}d</div>
+                    <div style={{fontSize:'0.62rem',color:C.slate,fontFamily:'monospace'}}>{fmt(recOut,cc)} outstanding</div>
+                  </div>
+                </div>
+              </div>
+              <div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)',borderLeft:`4px solid ${C.navy}`}}>
+                <div style={{fontFamily:'monospace',fontSize:'0.56rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.45rem'}}>Days to pay · DPO</div>
+                <div style={{display:'flex',alignItems:'center',gap:'0.8rem'}}>
+                  <MiniDonut frac={ringFrac(dpo)} color={C.teal} size={46} center=""/>
+                  <div>
+                    <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy,lineHeight:1.05}}>{dpo.toFixed(0)}d</div>
+                    <div style={{fontSize:'0.62rem',color:C.slate,fontFamily:'monospace'}}>{fmt(payOut,cc)} outstanding</div>
+                  </div>
+                </div>
+              </div>
+              <GlanceCard label="Cash conversion gap" value={`${gap.toFixed(0)}d`} accent={gapCol} valueColor={gapCol}
+                desc={gap>0?`you pay ${gap.toFixed(0)} days before you collect`:'you collect before you pay'}/>
+            </div>
+          </>
+        )
+      })()}
 
       <div style={card}>
         <SectionHeader title="Payable -- Supplier Credit" action={P.canEditPlan?<button style={addBtn(true)} onClick={()=>addLine('payable')}>+ Add Supplier Credit Line</button>:null}/>
@@ -4901,23 +5228,39 @@ function UncategorizedCostsSection({config,P}:{config:GenericModelConfig;P:any})
 }
 
 // ── ACTUALS & WORKING CAPITAL TAB (toggle between two existing components) ──
+// Rounded "subtab pill" mode switcher (cyan active pill), matching the
+// Intelligence tab's section pills and the approved mockup .subtab style.
+function subtabPill(active: boolean): React.CSSProperties {
+  return {fontFamily:'monospace',fontSize:'0.72rem',padding:'0.42rem 0.85rem',
+    border:`1px solid ${active?C.cyan:C.border}`,borderRadius:8,
+    background:active?C.cyan:C.white,color:active?C.navy:C.slate,
+    cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap',
+    display:'inline-flex',alignItems:'center',gap:'0.4rem'}
+}
+
 function ActualsAndWorkingCapitalTab({config,result,months,cc,P,onSave,onCloseStatusChanged}) {
   const [mode, setMode] = useState<'actuals'|'workingcapital'|'uncategorized'>('actuals')
+  // Count of field-recorded costs still needing a category -- surfaced as a
+  // small badge on the "Needs Categorizing" pill. Read-only: fetching the
+  // count here does not change UncategorizedCostsSection's own behaviour.
+  const [uncatCount, setUncatCount] = useState(0)
+  useEffect(()=>{
+    let active = true
+    fetch(`/api/field/admin/uncategorized-costs?client_id=${encodeURIComponent(config.client_id)}`)
+      .then(r=>r.ok?r.json():{pendingCosts:[]})
+      .then(d=>{ if(active) setUncatCount((d.pendingCosts||[]).length) })
+      .catch(()=>{})
+    return ()=>{ active=false }
+  },[config.client_id])
   return (
     <div>
-      <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
-        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='actuals'?'var(--cv-header)':C.white,color:mode==='actuals'?'var(--cv-on-accent)':C.slate,
-          borderRadius:4,cursor:'pointer',fontWeight:mode==='actuals'?700:400}}
-          onClick={()=>setMode('actuals')}>Monthly Actuals</button>
-        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='workingcapital'?'var(--cv-header)':C.white,color:mode==='workingcapital'?'var(--cv-on-accent)':C.slate,
-          borderRadius:4,cursor:'pointer',fontWeight:mode==='workingcapital'?700:400}}
-          onClick={()=>setMode('workingcapital')}>Working Capital (Trade Credit)</button>
-        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='uncategorized'?'var(--cv-header)':C.white,color:mode==='uncategorized'?'var(--cv-on-accent)':C.slate,
-          borderRadius:4,cursor:'pointer',fontWeight:mode==='uncategorized'?700:400}}
-          onClick={()=>setMode('uncategorized')}>Needs Categorizing</button>
+      <div style={{display:'flex',gap:'0.4rem',marginBottom:'1.25rem',overflowX:'auto'}}>
+        <button style={subtabPill(mode==='actuals')} onClick={()=>setMode('actuals')}>Monthly Actuals</button>
+        <button style={subtabPill(mode==='workingcapital')} onClick={()=>setMode('workingcapital')}>Working Capital · Trade Credit</button>
+        <button style={subtabPill(mode==='uncategorized')} onClick={()=>setMode('uncategorized')}>
+          Needs Categorizing
+          {uncatCount>0 && <b style={{color:mode==='uncategorized'?C.navy:C.amber}}>{uncatCount}</b>}
+        </button>
       </div>
       {mode==='actuals' && <ActualsTab config={config} months={months} cc={cc} P={P} onSave={onSave} onCloseStatusChanged={onCloseStatusChanged}/>}
       {mode==='workingcapital' && <WorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={onSave}/>}
