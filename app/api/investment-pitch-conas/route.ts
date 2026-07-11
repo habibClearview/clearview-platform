@@ -144,9 +144,9 @@ Capital: Shareholder ${fmt(inputs.capitalStructure?.shareholderContribution||0,c
     if(hasApiKey){
       const [vp,bm,sg,rm,rec]=await Promise.all([
         callClaude(`Write 2 punchy sentences on the value proposition of CONAS Agricultural Hub for an investment brief. It is a crop aggregator with 5 Input Profit Centres and an FGE network in Northern Uganda. Who does it serve, what problem does it solve, what makes it distinctive? No jargon.\n${context}`),
-        callClaude(`Write 2-3 sentences on how CONAS makes money — crop aggregation, input distribution through FGEs, irrigation kit deployment, input credit recovery. Mention the gross margin and EBITDA. Data:\n${context}`),
+        callClaude(`Write 2 or 3 sentences on how CONAS makes money, covering crop aggregation, input distribution through FGEs, irrigation kit deployment, and input credit recovery. Mention the gross margin and EBITDA. Data:\n${context}`),
         callClaude(`Write 2 sentences on scale potential of CONAS. Current FGE count is ${m.fgeCount}. What enables it to grow without rebuilding? Mention the licensing model and FGE network structure. Data:\n${context}`),
-        callClaude(`Name 2 specific risks for CONAS Agricultural Hub and one mitigation for each. Be honest and concrete — consider seasonal concentration, input credit recovery, grant dependency. Format: Risk 1: [name] — [one sentence]. Mitigation: [one sentence]. Risk 2: same.\n${context}`),
+        callClaude(`Name 2 specific risks for CONAS Agricultural Hub and one mitigation for each. Be honest and concrete. Consider seasonal concentration, input credit recovery, and grant dependency. Do not use dashes anywhere. Format: Risk 1: [name]. [one sentence]. Mitigation: [one sentence]. Risk 2: same format.\n${context}`),
         callClaude(`Write 3 sentences giving an investment recommendation for CONAS Agricultural Hub. State clearly: investment-ready, near-ready with conditions, or earlier stage? What is the single most important thing that would improve the case?\n${context}`),
       ])
       valueProposition=vp;businessModel=bm;scaleGrowth=sg;riskMitigation=rm;recommendation=rec
@@ -201,8 +201,8 @@ Capital: Shareholder ${fmt(inputs.capitalStructure?.shareholderContribution||0,c
       children.push(sectionHeader('Value Proposition & Business Model'))
       children.push(spacer(0,80))
       children.push(infoBox(
-        ['VALUE PROPOSITION','',...(valueProposition?valueProposition.split('\n').filter(Boolean):['—'])],
-        ['HOW IT MAKES MONEY','',...(businessModel?businessModel.split('\n').filter(Boolean):['—'])],
+        ['VALUE PROPOSITION','',...(valueProposition?valueProposition.split('\n').filter(Boolean):['Not provided'])],
+        ['HOW IT MAKES MONEY','',...(businessModel?businessModel.split('\n').filter(Boolean):['Not provided'])],
       ))
       children.push(spacer(0,200))
     }
@@ -271,7 +271,7 @@ Capital: Shareholder ${fmt(inputs.capitalStructure?.shareholderContribution||0,c
         new Paragraph({alignment:AlignmentType.CENTER,children:[
           new TextRun({text:'Powered by ',color:'AAAAAA',size:16,font:'Arial'}),
           new TextRun({text:'Canvas Coach Clearview',color:CYAN,size:16,font:'Arial',bold:true}),
-          new TextRun({text:'  ·  habibonifade.com  ·  Confidential — not for circulation without permission',color:'AAAAAA',size:16,font:'Arial'}),
+          new TextRun({text:'  ·  habibonifade.com  ·  Confidential. Not for circulation without permission',color:'AAAAAA',size:16,font:'Arial'}),
         ]}),
       ]})]})]
     }))
