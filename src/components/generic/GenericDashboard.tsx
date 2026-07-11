@@ -17,6 +17,7 @@ import { computeLiquidityReadinessScore, computeLRSTimeSeries, computeFitScore, 
 import { combinedActual, computeActualsTotals, applyPeriodActual, buildHybridConsolidated, computeCatalogueLineTotal } from '@/lib/actuals'
 import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
 import { yearStartPeriod, canCloseCalendarYear, computeYearEndBalanceSheet } from '@/lib/annual-close'
+import BuildStamp from '@/components/BuildStamp'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
@@ -561,6 +562,7 @@ export default function GenericDashboard({
 
   return (
     <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif",background:C.cream,color:C.navy,minHeight:'100vh'}}>
+      <BuildStamp/>
       {/* Header */}
       <header style={{background:C.navy,borderBottom:`3px solid ${C.cyan}`}}>
         <div style={{maxWidth:1600,margin:'0 auto',padding:'1.25rem 1.5rem',display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>

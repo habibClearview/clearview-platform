@@ -9,6 +9,7 @@ import {
 } from '@/lib/coach-types'
 import { supabase } from '@/lib/supabase'
 import SpreadsheetUpload from '@/components/intake/SpreadsheetUpload'
+import BuildStamp from '@/components/BuildStamp'
 
 // \u2500\u2500\u2500 DESIGN TOKENS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 const C = {
@@ -718,6 +719,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   const mainNavTabs=[['overview','Overview'],['clients','All Clients'],['programmes','Programmes'],['team','Team']]
   return(
     <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif",background:C.cream,color:C.navy,minHeight:'100vh'}}>
+      <BuildStamp/>
       <header style={{background:C.navy,borderBottom:`3px solid ${C.cyan}`}}>
         <div style={{maxWidth:1600,margin:'0 auto',padding:'1.25rem 1.5rem',display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
           <div>
