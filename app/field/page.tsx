@@ -7,6 +7,7 @@ import {
   clearSyncedSales, clearSyncedCosts, clearSyncedUncategorizedCosts,
   setStoredToken, type QueuedSale, type QueuedCost, type QueuedUncategorizedCost,
 } from '@/lib/field-db'
+import BuildStamp from '@/components/BuildStamp'
 
 const C = {
   navy:'#1B2A4A', cyan:'#00B4D8', cream:'#F8F4EE', white:'#FFFFFF',
@@ -404,6 +405,7 @@ export default function FieldCapturePage() {
   if (!token) {
     return (
       <div style={{minHeight:'100vh',background:C.cream,display:'flex',alignItems:'center',justifyContent:'center',padding:'1.5rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+        <BuildStamp/>
         <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:10,padding:'1.75rem',maxWidth:380,width:'100%'}}>
           <div style={{fontFamily:'monospace',fontSize:'0.68rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.5rem'}}>CLEARVIEW FIELD</div>
           <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',color:C.navy,margin:'0 0 1rem'}}>Enter your access link</h1>
@@ -443,6 +445,7 @@ export default function FieldCapturePage() {
 
   return (
     <div style={{minHeight:'100vh',background:C.cream,fontFamily:"'Segoe UI',system-ui,sans-serif",paddingBottom:'2rem'}}>
+      <BuildStamp/>
       <header style={{background:C.navy,padding:'1rem 1.1rem',color:C.white,display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
         <div>
           <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:C.cyan}}>CLEARVIEW FIELD</div>
