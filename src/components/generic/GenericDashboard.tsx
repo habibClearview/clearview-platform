@@ -72,6 +72,21 @@ function cleanStory(text: string): string {
       if (re.test(t)) { t = t.replace(re, '').trim(); t = t.charAt(0).toUpperCase() + t.slice(1); changed = true }
     }
   }
+  // Strip markdown and symbol formatting the model sometimes emits despite the
+  // house style: headings, bold/italic stars, code ticks, bullet markers, and
+  // dashes used as punctuation. In-word hyphens (e.g. "break-even") are kept.
+  t = t
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')     // # headings
+    .replace(/\*\*(.+?)\*\*/g, '$1')         // **bold**
+    .replace(/\*(.+?)\*/g, '$1')             // *italic*
+    .replace(/^\s*[-*•·]\s+/gm, '')          // "- " or "* " bullet lines
+    .replace(/[`#*]/g, '')                    // any stray ticks, hashes, stars
+    .replace(/\s*[–—]\s*/g, ', ')            // en/em dash used as punctuation
+    .replace(/\s+-\s+/g, ', ')               // spaced hyphen used as a dash
+    .replace(/\n{3,}/g, '\n\n')             // collapse runs of blank lines
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\s+([,.;:])/g, '$1')          // tidy space before punctuation
+    .trim()
   return t
 }
 
@@ -3550,6 +3565,7 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,clo
   const [generatingNarrative, setGeneratingNarrative] = useState(false)
   const [generatingHealth, setGeneratingHealth] = useState(false)
   const [expandedStory, setExpandedStory] = useState<string|null>(null)
+  const [healthOpen, setHealthOpen] = useState(false)
   const [discountRate, setDiscountRate] = useState(0.15) // 15% default -- a reasonable starting assumption for an African SME's cost of capital, but always adjustable, never presented as definitive
 
   useEffect(()=>{
@@ -3727,13 +3743,13 @@ Financial summary:
 - Break-even revenue: ${cc} ${m.business_breakeven.toLocaleString()}
 - Staff cost as % of revenue: ${(m.staff_cost_pct*100).toFixed(1)}%
 
-Write a clear, plain-English health check report for the CEO. Include: 1) Overall status (Green/Amber/Red with reason) 2) Two or three things going well 3) Two or three areas of concern 4) Three specific actions this month. Maximum 300 words.`
+Write a short health check for the CEO in plain continuous prose. Begin with the overall status, one of Green, Amber or Red, and the one reason for it, in a single sentence. Then a sentence or two on what is going well, then the main concerns, then the most important actions this month. Plain sentences only. No lists, no numbered points, no headings, no bold, no dashes, no symbols. Under 150 words.`
       const response = await fetch('/api/ai-generate',{
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({prompt,max_tokens:1000})
+        body:JSON.stringify({prompt,max_tokens:500})
       })
       const data = await response.json()
-      const text = data.text||'Report unavailable'
+      const text = cleanStory(data.text||'Report unavailable')
       const {data:saved} = await supabase.from('ai_health_checks').upsert({
         client_id:clientId, period:targetPeriod, report_text:text,
         triggered_by:'manual', generated_at:new Date().toISOString(), visible_to_ceo:true,
@@ -3765,7 +3781,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
       const data = await response.json()
       const text = data.text||'Narrative unavailable'
       const {data:saved} = await supabase.from('coach_briefings').insert([{
-        client_id:clientId, briefing_text:text, visit_context:'Monthly Narrative',
+        client_id:clientId, briefing_text:cleanStory(text), visit_context:'Monthly Narrative',
         period_covered:new Date().toLocaleString('en-GB',{month:'long',year:'numeric'}),
         generated_at:new Date().toISOString(),
       }]).select().single()
@@ -3870,20 +3886,22 @@ Write a status report, not a letter. Do not address the reader. Do not open with
             </div>
           </div>
 
-          <SectionLabel>Business health check</SectionLabel>
+          <SectionLabel>Business health check <span style={{fontWeight:400,textTransform:'none',letterSpacing:0,color:C.slate}}>· for your coach</span></SectionLabel>
           <div style={{...card,padding:0,overflow:'hidden'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.8rem 1.1rem',borderBottom:`1px solid ${C.border}`,gap:'0.5rem',flexWrap:'wrap'}}>
-              <span style={{fontFamily:'Georgia,serif',fontWeight:700,fontSize:'0.95rem',color:C.navy}}>Business health check</span>
-              <button style={solidBtn(C.purple,true)} disabled={generatingHealth} onClick={generateHealthCheck}>{generatingHealth?'Generating...':'Generate This Month'}</button>
+            <div onClick={()=>setHealthOpen(o=>!o)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.8rem 1.1rem',borderBottom:healthOpen?`1px solid ${C.border}`:'none',gap:'0.5rem',flexWrap:'wrap',cursor:'pointer'}}>
+              <span style={{fontFamily:'Georgia,serif',fontWeight:700,fontSize:'0.95rem',color:C.navy}}>Business health check{latestHealth&&<span style={{fontFamily:'monospace',fontSize:'0.8rem',color:C.slate,fontWeight:400}}> · {new Date(latestHealth.period).toLocaleString('en-GB',{month:'short',year:'numeric'})}</span>}</span>
+              <span style={{display:'flex',gap:'0.5rem',alignItems:'center'}}>
+                <button onClick={(e)=>{e.stopPropagation();generateHealthCheck()}} style={solidBtn(C.purple,true)} disabled={generatingHealth}>{generatingHealth?'Generating...':'Generate This Month'}</button>
+                <span style={{color:C.slate,fontFamily:'monospace'}}>{healthOpen?'▴':'▾'}</span>
+              </span>
             </div>
-            <div style={{padding:'1rem 1.2rem'}}>
-              {latestHealth ? (
-                <>
-                  <div style={{fontSize:'0.86rem',color:C.slate,marginBottom:'0.6rem',fontFamily:'monospace'}}>{new Date(latestHealth.period).toLocaleString('en-GB',{month:'long',year:'numeric'})}</div>
-                  <div style={{fontSize:'0.92rem',color:C.navy,lineHeight:1.8,whiteSpace:'pre-wrap'}}>{latestHealth.report_text}</div>
-                </>
-              ) : <p style={{color:C.slate,fontSize:'0.92rem',margin:0}}>No health check generated yet this month.</p>}
-            </div>
+            {healthOpen && (
+              <div style={{padding:'1rem 1.2rem'}}>
+                {latestHealth ? (
+                  <div style={{fontSize:'0.92rem',color:C.navy,lineHeight:1.7,whiteSpace:'pre-wrap',maxWidth:'74ch'}}>{cleanStory(latestHealth.report_text)}</div>
+                ) : <p style={{color:C.slate,fontSize:'0.92rem',margin:0}}>No health check generated yet this month.</p>}
+              </div>
+            )}
           </div>
 
           <SectionLabel>Previous months&#39; stories</SectionLabel>
