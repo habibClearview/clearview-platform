@@ -84,6 +84,23 @@ whose own "graduation" is being paid directly by clients. Implications:
 Streams 2 and 3 are the coach's OWN commercial base (independent revenue) — the graduation metric.
 Surface "independent clients" count and the independent share of revenue on the coach's home tab.
 
+## Coach Team & Payments (online loop) — feeds the coach's own Clearview
+
+The coach's "Team & Payments" tab turns the co-implementer relationship into an online loop:
+- **Access:** coach assigns each co-implementer to specific clients at a level (View / Edit / Full). Preserve the existing permission mechanism.
+- **Timesheets:** co-implementers are **paid by the day** but **log hours per task**; the platform rolls hours into days (default 8h = 1 day) × the person's **day rate**.
+- **Expenses & advances:** expense reclaims (with receipts) and advances that must be **reconciled** against actual spend, with due dates.
+- **Invoice:** the platform **auto-drafts one invoice per co-implementer per period** = approved days × rate + approved expenses − advance taken, with a due date; **viewable and downloadable by both** coach and co-implementer.
+- Each issued invoice **posts into the coach's own Clearview** as cost-to-serve for those engagements (a payable until paid), keeping per-engagement margin honest.
+
+Open build decisions: day length (default 8h), day rate per co-implementer vs per engagement, whether an unreconciled advance blocks the next invoice.
+
+## Co-implementer login is a GtCV-phase feature (not Clearview)
+
+What a co-implementer sees when THEY log in (their assigned clients, their gates/zone work, their own
+timesheet/expense entry) belongs to the **online GtCV** build, not Clearview. The coach runs Clearview
+himself. Build the co-implementer login as part of the GtCV-online project, after Clearview is client-ready.
+
 ## GtCV zone progression is gate-driven, not AI
 
 A client's position on the 9-zone tracker advances when a **decision gate is signed off as complied-with**
