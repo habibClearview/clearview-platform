@@ -46,6 +46,35 @@ function navBtn(active: boolean): React.CSSProperties {
     fontWeight:active?700:400,whiteSpace:'nowrap'}
 }
 
+// Strip patronising preamble and waffle from any AI narrative before it is
+// shown. The generation prompt and house style already forbid these, but
+// older stored stories still contain them and models occasionally slip, so
+// this cleans the displayed text regardless of what is stored.
+function cleanStory(text: string): string {
+  if (!text) return text
+  let t = text.trim()
+  const preambles = [
+    /^let me be (honest|clear|straight)( with you)?[,.:;\s-]+/i,
+    /^(to be|being) (honest|frank|clear)[,.:;\s-]+/i,
+    /^honestly[,.:;\s-]+/i,
+    /^here(?:'s| is| are)[^.!?]*[.:]\s+/i,
+    /^i (want|need|have) to (flag|say|tell you|be honest)[^.!?]*[.:,]\s+/i,
+    /^let me tell you[,.:;\s-]+/i,
+    /^in (summary|short|brief)[,.:;\s-]+/i,
+    /^a (quick )?note (on|about)[^.!?]*[.:]\s+/i,
+    /^(so|well|now|look|first(ly)?|overall)[,]\s+/i,
+    /^this (is a |month'?s )?(status )?report[^.!?]*[.:]\s+/i,
+  ]
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const re of preambles) {
+      if (re.test(t)) { t = t.replace(re, '').trim(); t = t.charAt(0).toUpperCase() + t.slice(1); changed = true }
+    }
+  }
+  return t
+}
+
 // ── Shared components ────────────────────────────────────────
 function KPI({label,value,sub,color}:{label:string;value:string;sub?:string;color?:string}) {
   const accent = color || C.cyan
@@ -747,7 +776,7 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGo
           {story ? (
             <>
               <div style={{fontSize:'0.72rem',color:C.slate,marginBottom:'0.6rem'}}>{story.period_covered||''}{story.generated_at?` · generated ${new Date(story.generated_at).toLocaleDateString('en-GB')}`:''}</div>
-              <div style={{flex:1,minHeight:0,fontSize:'0.85rem',color:C.navy,lineHeight:1.7,whiteSpace:'pre-wrap',overflowY:'auto'}}>{story.briefing_text}</div>
+              <div style={{flex:1,minHeight:0,fontSize:'0.85rem',color:C.navy,lineHeight:1.7,whiteSpace:'pre-wrap',overflowY:'auto'}}>{cleanStory(story.briefing_text)}</div>
             </>
           ) : (
             <div style={{flex:1,display:'flex',alignItems:'center'}}>
@@ -3198,7 +3227,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
             {narrative ? (
               <div>
                 <div style={{fontSize:'0.75rem',color:C.slate,marginBottom:'0.75rem'}}>{narrative.period_covered} · Generated {new Date(narrative.generated_at).toLocaleDateString('en-GB')}</div>
-                <div style={{fontSize:'0.9rem',color:C.navy,lineHeight:1.85,whiteSpace:'pre-wrap'}}>{narrative.briefing_text}</div>
+                <div style={{fontSize:'0.9rem',color:C.navy,lineHeight:1.85,whiteSpace:'pre-wrap'}}>{cleanStory(narrative.briefing_text)}</div>
               </div>
             ) : <p style={{color:C.slate,fontSize:'0.85rem'}}>Generate a plain-English story of how the business is doing this month, written for the CEO.</p>}
           </div>
