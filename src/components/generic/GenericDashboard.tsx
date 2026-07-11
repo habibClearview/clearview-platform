@@ -655,7 +655,7 @@ export default function GenericDashboard({
       <main style={{maxWidth:1600,margin:'0 auto',padding:'1.5rem'}}>
         {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} pendingApprovalCount={pendingApprovalCount} onGoToApprovals={()=>setView('approvals')} onGoToIntelligence={()=>setView('intelligence')}/>}
         {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P}/>}
-        {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods}/>}
+        {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods} onNavigate={setView}/>}
         {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
         {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods}/>}
         {view==='cashflow'    && <CashFlowTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
@@ -3125,16 +3125,134 @@ function findCashWarningMonths(result:any, months:string[]) {
   return warnings
 }
 
-function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,closedPeriods}) {
+// ── Clearview Intelligence: mockup-faithful building blocks ──────
+// Section label: the small uppercase monospace kicker that heads each
+// band in the approved mockups (".lab"). Optional right-aligned link.
+function SectionLabel({children,right}:{children:React.ReactNode;right?:React.ReactNode}) {
+  return (
+    <div style={{fontFamily:'monospace',fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase',color:C.slate,margin:'1.4rem 0 0.7rem',display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:'0.75rem'}}>
+      <span>{children}</span>{right}
+    </div>
+  )
+}
+
+// Driver / trade-credit stat card: border-left accent, no donut (mockup ".sc"
+// without an svg). Value and rating colours are passed explicitly since the
+// mockups colour them independently of the border.
+function StatCard({label,value,rating,color,valueColor,ratingColor}:{label:string;value:string;rating?:string;color:string;valueColor?:string;ratingColor?:string}) {
+  return (
+    <div style={{background:C.white,borderRadius:14,padding:'1rem 1.15rem',display:'flex',alignItems:'center',gap:'0.85rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)',borderLeft:`4px solid ${color}`}}>
+      <div style={{minWidth:0}}>
+        <div style={{fontSize:'0.66rem',color:C.slate}}>{label}</div>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.35rem',fontWeight:700,color:valueColor||C.navy,lineHeight:1.05}}>{value}</div>
+        {rating&&<div style={{fontSize:'0.7rem',fontWeight:700,color:ratingColor||color,marginTop:'0.2rem'}}>{rating}</div>}
+      </div>
+    </div>
+  )
+}
+
+// Small progress ring used in the going-concern factor cards and LRS
+// dimension cards. Geometry matches the mockup rings (r17 in a 42 box).
+function MiniDonut({frac,color,center,size=42}:{frac:number;color:string;center:React.ReactNode;size?:number}) {
+  const cx=size/2, r=cx-4, circ=2*Math.PI*r, f=Math.max(0,Math.min(1,frac||0))
+  return (
+    <div style={{position:'relative',flex:'0 0 auto',width:size,height:size}}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={cx} cy={cx} r={r} fill="none" style={{stroke:'var(--cv-border-soft)'}} strokeWidth="5"/>
+        <circle cx={cx} cy={cx} r={r} fill="none" style={{stroke:color}} strokeWidth="5" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ*(1-f)} transform={`rotate(-90 ${cx} ${cx})`}/>
+      </svg>
+      <span style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'monospace',fontWeight:700,fontSize:'0.64rem',color}}>{center}</span>
+    </div>
+  )
+}
+
+// SVG polygon radar. Generic over any number of axes -- pentagon for the
+// five going-concern factors, heptagon for the seven LRS dimensions. Each
+// axis carries a 0..1 fraction. Rings/spokes use theme border tokens.
+function RadarChart({axes,color}:{axes:{label:string;frac:number}[];color:string}) {
+  const cx=150, cy=145, R=104, n=axes.length
+  const ang=(i:number)=> -Math.PI/2 + i*2*Math.PI/n
+  const pt=(i:number,rad:number):[number,number]=>[cx+rad*Math.cos(ang(i)), cy+rad*Math.sin(ang(i))]
+  const poly = axes.map((a,i)=>{const [x,y]=pt(i,R*Math.max(0,Math.min(1,a.frac||0)));return `${x.toFixed(1)},${y.toFixed(1)}`}).join(' ')
+  return (
+    <svg width="100%" viewBox="0 0 300 290" style={{maxWidth:300}}>
+      <g fill="none" style={{stroke:'var(--cv-border-soft)'}}>{[0.25,0.5,0.75,1].map((f,i)=><circle key={i} cx={cx} cy={cy} r={R*f}/>)}</g>
+      <g style={{stroke:'var(--cv-border-soft)'}}>{axes.map((a,i)=>{const [x,y]=pt(i,R);return <line key={i} x1={cx} y1={cy} x2={x} y2={y}/>})}</g>
+      <polygon points={poly} fill={color} fillOpacity={0.17} stroke={color} strokeWidth="2"/>
+      <g fontSize="8" style={{fill:C.slate}} textAnchor="middle" fontFamily="monospace">
+        {axes.map((a,i)=>{const [x,y]=pt(i,R+18);return <text key={i} x={x} y={y+3}>{a.label}</text>})}
+      </g>
+    </svg>
+  )
+}
+
+// "Do this next" action prompt. Wide gradient banner (going concern) or a
+// compact in-grid card (LRS), both with the cyan accent from the mockups.
+function ActionBanner({kicker,title,body,lift,cta,onCta,compact}:{kicker:string;title:string;body:string;lift?:string;cta:string;onCta?:()=>void;compact?:boolean}) {
+  if (compact) return (
+    <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-cyan-40)',borderTop:`3px solid ${C.cyan}`,borderRadius:14,boxShadow:'0 6px 20px var(--cv-shadow-2)',padding:'0.75rem 0.85rem',display:'flex',flexDirection:'column'}}>
+      <div style={{fontFamily:'monospace',fontSize:'0.56rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.teal,fontWeight:700,marginBottom:'0.3rem'}}>{kicker}</div>
+      <div style={{fontWeight:700,fontSize:'0.8rem',lineHeight:1.2,marginBottom:'0.25rem',color:C.navy}}>{title}</div>
+      <div style={{fontSize:'0.66rem',color:C.slate,lineHeight:1.35,flex:1}}>{body}</div>
+      {lift&&<div style={{fontFamily:'monospace',fontSize:'0.64rem',color:C.green,fontWeight:700,marginTop:'0.3rem'}}>&#9650; {lift}</div>}
+      <div onClick={onCta} role="button" tabIndex={0} style={{marginTop:'0.45rem',fontFamily:'monospace',fontSize:'0.66rem',fontWeight:700,color:C.navy,background:C.cyan,borderRadius:8,padding:'0.38rem 0.5rem',textAlign:'center',cursor:onCta?'pointer':'default'}}>{cta}</div>
+    </div>
+  )
+  return (
+    <div style={{marginTop:'0.85rem',background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-cyan-40)',borderLeft:`4px solid ${C.cyan}`,borderRadius:14,padding:'0.85rem 1.1rem',display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap'}}>
+      <div style={{flex:1,minWidth:200}}>
+        <div style={{fontFamily:'monospace',fontSize:'0.58rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.teal,fontWeight:700}}>{kicker}</div>
+        <div style={{fontWeight:700,fontSize:'0.9rem',color:C.navy}}>{title}</div>
+        <div style={{fontSize:'0.78rem',color:C.slate}}>{body}</div>
+      </div>
+      <div onClick={onCta} role="button" tabIndex={0} style={{marginLeft:'auto',fontFamily:'monospace',fontSize:'0.7rem',fontWeight:700,color:C.navy,background:C.cyan,borderRadius:8,padding:'0.5rem 0.8rem',cursor:onCta?'pointer':'default'}}>{cta}</div>
+    </div>
+  )
+}
+
+// Grouped investor/bank metric card (mockup ".mg"). Only rows with a real
+// value are passed in; nothing is fabricated.
+function MetricGroup({title,color,rows}:{title:string;color:string;rows:{k:string;v:string;vColor?:string}[]}) {
+  return (
+    <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,boxShadow:'0 8px 24px var(--cv-shadow-2)',overflow:'hidden'}}>
+      <div style={{padding:'0.65rem 0.9rem',fontFamily:'monospace',fontSize:'0.6rem',letterSpacing:'0.06em',textTransform:'uppercase',color:'var(--cv-on-accent)',fontWeight:700,background:color}}>{title}</div>
+      {rows.map((r,i)=>(
+        <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'0.45rem 0.9rem',borderTop:'1px solid var(--cv-border-soft)',fontSize:'0.76rem'}}>
+          <span style={{color:C.slate}}>{r.k}</span>
+          <span style={{fontFamily:'monospace',fontWeight:700,color:r.vColor||C.navy}}>{r.v}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Card that heads a section with a Georgia serif title (mockup ".card-h").
+const cardHead: React.CSSProperties = {padding:'0.8rem 1.1rem',borderBottom:`1px solid ${C.border}`,fontFamily:'Georgia,serif',fontWeight:700,fontSize:'0.95rem',color:C.navy}
+
+// Split a generated story into a bold headline (first line / sentence) and
+// the remaining body, matching the mockup story card.
+function splitStory(text:string):{head:string;body:string} {
+  const t=(text||'').trim()
+  if(!t) return {head:'',body:''}
+  const nl=t.indexOf('\n')
+  if(nl>0) return {head:t.slice(0,nl).trim(), body:t.slice(nl+1).trim()}
+  const mm=t.match(/^([\s\S]*?[.!?])\s+([\s\S]+)$/)
+  if(mm) return {head:mm[1].trim(), body:mm[2].trim()}
+  return {head:t, body:''}
+}
+
+function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,closedPeriods,onNavigate}) {
   const [activeSection,setActiveSection]=useState('summary')
   const [healthReports, setHealthReports] = useState<any[]>([])
   const [investmentAssessments, setInvestmentAssessments] = useState<any[]>([])
   const [events, setEvents] = useState<any[]>([])
   const [fieldAppPeriods, setFieldAppPeriods] = useState<Set<string>>(new Set())
   const [narrative, setNarrative] = useState<any>(null)
+  const [previousStories, setPreviousStories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [generatingNarrative, setGeneratingNarrative] = useState(false)
   const [generatingHealth, setGeneratingHealth] = useState(false)
+  const [expandedStory, setExpandedStory] = useState<string|null>(null)
   const [discountRate, setDiscountRate] = useState(0.15) // 15% default -- a reasonable starting assumption for an African SME's cost of capital, but always adjustable, never presented as definitive
 
   useEffect(()=>{
@@ -3142,13 +3260,16 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,clo
       supabase.from('ai_health_checks').select('*').eq('client_id',clientId).order('period',{ascending:false}).limit(1),
       supabase.from('investment_readiness').select('*').eq('client_id',clientId).order('generated_at',{ascending:false}).limit(1),
       supabase.from('management_events').select('*').eq('client_id',clientId).order('date',{ascending:false}).limit(1000),
-      supabase.from('coach_briefings').select('*').eq('client_id',clientId).order('generated_at',{ascending:false}).limit(1),
+      supabase.from('coach_briefings').select('*').eq('client_id',clientId).order('generated_at',{ascending:false}).limit(12),
       supabase.from('generic_actuals').select('period,field_line_values').eq('client_id',clientId),
     ]).then(([h,i,e,n,a])=>{
       setHealthReports(h.data||[])
       setInvestmentAssessments(i.data||[])
       setEvents(e.data||[])
       setNarrative(n.data?.[0]||null)
+      // The most recent briefing is the current month's story; older rows
+      // populate the collapsed "previous months' stories" list in Summary.
+      setPreviousStories((n.data||[]).slice(1))
       // A period counts as having real field-app data if ANY business
       // unit's row for that period has a non-empty field_line_values --
       // used by Liquidity Readiness's Visibility dimension (Transactions
@@ -3250,6 +3371,48 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,clo
     customersAcquired:0,irr:null,revenuePerHead:0,assess,
   })
 
+  // ── Derived figures for the mockup-faithful sections ─────────
+  // All read from the engine outputs already computed above; none of these
+  // change any scoring or lib calculation, they only present existing data.
+  const tc = s.tradeCredit
+  const scoreColorLRS = (v:number) => v>=70?C.green:v>=50?C.teal:v>=30?C.amber:C.red
+  const lastIdx = Math.max(0, months_n-1)
+  // Latest full calendar year (12 months); falls back to the last group for
+  // very short plans. Used for the investor/bank coverage ratios, which are
+  // annual by convention -- the engine's *total_* metrics sum the whole plan.
+  const fullYearGroups = yearGroups.filter((g:any)=>g.monthIndices.length>=12)
+  const lastYearGroup = fullYearGroups[fullYearGroups.length-1] || yearGroups[yearGroups.length-1] || {monthIndices:months.map((_:string,i:number)=>i)}
+  const sumOver = (arr:number[], idxs:number[]) => idxs.reduce((sum:number,i:number)=>sum+(arr[i]||0),0)
+  // No depreciation/amortisation is modelled, so EBIT == EBITDA here.
+  const annualEbit = sumOver(result.con.ebitda, lastYearGroup.monthIndices)
+  const annualInterest = sumOver(debtSched.totalInterest, lastYearGroup.monthIndices)
+  const loanLiab = result.bs.loan_liability?.[lastIdx] || 0
+  const totalEquityLast = result.bs.total_equity?.[lastIdx] || 0
+  const capitalEmployed = totalEquityLast + loanLiab
+  const ebitdaMargin = m.total_revenue>0 ? m.total_ebitda/m.total_revenue : null
+  const roce = capitalEmployed>0 ? annualEbit/capitalEmployed : null
+  const debtToEbitda = (s.hasDebt && annualEbit>0) ? loanLiab/annualEbit : null
+  const gearing = (s.hasDebt && totalEquityLast>0) ? loanLiab/totalEquityLast : null
+  const interestCover = annualInterest>0 ? annualEbit/annualInterest : null
+  const latestOpex = result.con.opex?.[lastIdx] || 0
+  const currentCash = result.cf.close?.[lastIdx] || 0
+  const runwayMonths = latestOpex>0 ? currentCash/latestOpex : null
+  // Revenue CAGR across full calendar years only, so a partial start/end year
+  // can't distort it; N/A when there aren't two full years to compare.
+  const annualRevs = fullYearGroups.map((g:any)=>sumOver(result.con.rev, g.monthIndices))
+  const revenueCagr = (annualRevs.length>=2 && annualRevs[0]>0)
+    ? Math.pow(annualRevs[annualRevs.length-1]/annualRevs[0], 1/(annualRevs.length-1)) - 1 : null
+  // Payback: first month the cumulative capital-at-risk cash flow turns
+  // non-negative, from the same series NPV/IRR already use. N/A with no
+  // capital at risk (nothing to pay back).
+  const paybackYears = (() => {
+    if (capitalAtRisk<=0) return null
+    let cum=0
+    for (let i=0;i<lrsCashFlows.length;i++){ cum+=lrsCashFlows[i]; if (cum>=0) return i/12 }
+    return null
+  })()
+  const cashWarnMin = warnings.length>0 ? warnings.reduce((a,b)=>b.balance<a.balance?b:a) : null
+
   async function generateHealthCheck() {
     setGeneratingHealth(true)
     const targetPeriod = new Date().toISOString().slice(0,7)+'-01'
@@ -3309,200 +3472,261 @@ Write a status report, not a letter. Do not address the reader. Do not open with
         period_covered:new Date().toLocaleString('en-GB',{month:'long',year:'numeric'}),
         generated_at:new Date().toISOString(),
       }]).select().single()
-      if (saved) setNarrative(saved)
+      if (saved) {
+        setNarrative(prev => { if (prev) setPreviousStories(list => [prev, ...list]); return saved })
+      }
     } catch(e) { alert('Narrative generation failed') }
     setGeneratingNarrative(false)
   }
 
   const tabList:[string,string][] = [
-    ['summary','Summary'],['narrative',"This Month's Story"],['credit','Credit Risk'],
+    ['summary','Summary'],['credit','Credit Risk'],
     ['going_concern','Going Concern'],['liquidity_readiness','Liquidity Readiness'],
     ['coach','Coach Assessment'],['events','Marketing Events'],
   ]
 
   return (
     <div>
-      <div style={{...card,background:'var(--cv-header)',marginBottom:'1.25rem'}}>
-        <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.3rem'}}>CLEARVIEW BUSINESS INTELLIGENCE</div>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:'var(--cv-on-accent)',marginBottom:'0.5rem'}}>{config.business_name}</div>
-        <div style={{display:'flex',gap:'1.5rem',flexWrap:'wrap'}}>
-          <div><div style={{fontSize:'0.65rem',color:'var(--cv-wa-50)'}}>CREDIT RISK</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.classColor}}>{s.score}/100</div></div>
-          <div><div style={{fontSize:'0.65rem',color:'var(--cv-wa-50)'}}>GOING CONCERN</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.gcColor}}>{s.gcScore}/20</div></div>
-          <div><div style={{fontSize:'0.65rem',color:'var(--cv-wa-50)'}}>INVESTMENT READY</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.irColor}}>{s.irScore}/30</div></div>
-          <div><div style={{fontSize:'0.65rem',color:'var(--cv-wa-50)'}}>CASH WARNINGS</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:warnings.length>0?C.red:C.green}}>{warnings.length}</div></div>
-        </div>
-      </div>
-
-      <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',marginBottom:'1.5rem',borderBottom:`2px solid ${C.border}`,paddingBottom:'0.75rem'}}>
+      <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',marginBottom:'1.2rem',overflowX:'auto'}}>
         {tabList.map(t=>(
-          <button key={t[0]} onClick={()=>setActiveSection(t[0])} style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1rem',border:`1px solid ${activeSection===t[0]?C.cyan:C.border}`,borderRadius:5,background:activeSection===t[0]?C.cyan:C.white,color:activeSection===t[0]?C.navy:C.slate,cursor:'pointer',fontWeight:activeSection===t[0]?700:400}}>{t[1]}</button>
+          <button key={t[0]} onClick={()=>setActiveSection(t[0])} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.42rem 0.85rem',border:`1px solid ${activeSection===t[0]?C.cyan:C.border}`,borderRadius:8,background:activeSection===t[0]?C.cyan:C.white,color:activeSection===t[0]?C.navy:C.slate,cursor:'pointer',fontWeight:activeSection===t[0]?700:400,whiteSpace:'nowrap'}}>{t[1]}</button>
         ))}
       </div>
 
-      {activeSection==='summary'&&(
+      {activeSection==='summary'&&(() => {
+        const {head,body} = splitStory(narrative ? cleanStory(narrative.briefing_text) : '')
+        const lrsWord = lrsCurrent.score>=70?'Strong':lrsCurrent.score>=50?'Building':lrsCurrent.score>=30?'Developing':'Early'
+        const minCashMonthLabel = months[(m.min_cash_month||1)-1] || `Month ${m.min_cash_month}`
+        return (
         <div>
-          <div style={kpiGrid}>
-            <KPI label="Credit Risk" value={`${s.score}/100`} sub={s.classification} color={s.classColor}/>
-            <KPI label="Going Concern" value={`${s.gcScore}/20`} sub={s.gcRating} color={s.gcColor}/>
-            <KPI label="Investment Readiness" value={`${s.irScore}/30`} sub={s.irTier} color={s.irColor}/>
-            <KPI label="Debt Service Coverage (min)" value={dscrLabel(s)} color={dscrColor(s,C)}/>
-            <KPI label="Break-Even Revenue" value={fmt(m.business_breakeven,cc)} color={C.amber}/>
-            <KPI label="Staff Cost %" value={pct(m.staff_cost_pct)} color={m.staff_cost_pct<0.3?C.green:m.staff_cost_pct<0.5?C.amber:C.red}/>
-            <KPI label="Days to Collect (DSO)" value={`${s.tradeCredit.dso.toFixed(0)}d`} color={C.navy}/>
-            <KPI label="Days to Pay (DPO)" value={`${s.tradeCredit.dpo.toFixed(0)}d`} color={C.navy}/>
-            <KPI label="Cash Conversion Gap" value={`${s.tradeCredit.cashConversionGap.toFixed(0)}d`} color={s.tradeCredit.cashConversionGap<=0?C.green:s.tradeCredit.cashConversionGap>30?C.red:C.amber}/>
+          <SectionLabel>Where the business stands</SectionLabel>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(215px,1fr))',gap:'1rem'}}>
+            <ScoreDonut label="Credit Risk" display={`${s.score}/100`} frac={s.score/100} rating={s.classification} color={s.classColor}/>
+            <ScoreDonut label="Going Concern" display={`${s.gcScore}/20`} frac={s.gcScore/20} rating={s.gcRating} color={s.gcColor}/>
+            <ScoreDonut label="Investment Readiness" display={`${s.irScore}/30`} frac={s.irScore/30} rating={s.irTier} color={s.irColor}/>
+            <ScoreDonut label="Liquidity Readiness" display={`${Math.round(lrsCurrent.score)}/100`} frac={lrsCurrent.score/100} rating={lrsWord} color={scoreColorLRS(lrsCurrent.score)}/>
           </div>
-          <div style={{background:'var(--cv-header)',borderRadius:8,padding:'1rem 1.25rem'}}>
-            <div style={{fontFamily:'monospace',fontSize:'0.65rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.75rem'}}>READING THE PICTURE</div>
-            {[
-              [!s.hasDebt?'info':s.dscrMin===null?'info':s.dscrMin>=1.5?'ok':s.dscrMin>=1.0?'info':'warn',
-                `Debt service coverage: ${!s.hasDebt?'No debt obligations on this plan.':s.dscrMin===null?'Debt exists but no repayment has fallen due yet.':`Minimum DSCR ${s.dscrMin.toFixed(2)}x across periods with a repayment due. ${s.dscrMin>=1.5?'Strong.':s.dscrMin>=1.0?'Adequate but watch closely.':'Weak: not generating enough to service obligations in the tightest period.'}`}`],
-              [s.cashGaps===0?'ok':'warn', `Cash position: ${s.cashGaps===0?'Positive throughout the period.':'Negative in '+s.cashGaps+' month(s).'}`],
-              [s.revTrend==='Growing'?'ok':s.revTrend==='Stable'?'info':'warn', `Revenue trend: ${s.revTrend} from start to end of period.`],
-              [s.irScore>=17?'ok':'info', `Investment readiness: ${s.irTier} (${s.irScore}/30).`],
-              [(s.tradeCredit.dso>0||s.tradeCredit.dpo>0)?(s.tradeCredit.cashConversionGap<=0?'ok':s.tradeCredit.cashConversionGap>30?'warn':'info'):'info',
-                (s.tradeCredit.dso>0||s.tradeCredit.dpo>0)
-                  ? `Trade credit: collecting in ${s.tradeCredit.dso.toFixed(0)} days, paying suppliers in ${s.tradeCredit.dpo.toFixed(0)} days. ${s.tradeCredit.cashConversionGap<=0?'Effectively supplier-financed -- a healthy position.':'Cash is tied up for '+s.tradeCredit.cashConversionGap.toFixed(0)+' days waiting to collect before suppliers are paid.'}`
-                  : 'Trade credit: no supplier or customer credit data entered yet.'],
-            ].map((item,i)=>{
-              const col = item[0]==='ok'?C.green:item[0]==='warn'?C.red:C.teal
-              return(
-                <div key={i} style={{display:'flex',gap:'0.6rem',marginBottom:'0.5rem',fontSize:'0.84rem',color:'var(--cv-on-accent)',lineHeight:1.5}}>
-                  <span style={{width:8,height:8,borderRadius:'50%',background:col,marginTop:'0.45rem',flexShrink:0,display:'inline-block'}}/>
-                  <span>{item[1]}</span>
+
+          <SectionLabel>This month&#39;s story</SectionLabel>
+          <div style={{...card,padding:0,overflow:'hidden'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.9rem 1.2rem',borderBottom:`1px solid ${C.border}`,flexWrap:'wrap',gap:'0.5rem'}}>
+              <div>
+                <span style={{fontFamily:'Georgia,serif',fontWeight:700,fontSize:'1.05rem',color:C.navy}}>This Month&#39;s Story</span>
+                <span style={{fontFamily:'monospace',fontSize:'0.55rem',color:C.purple,border:`1px solid ${C.purple}`,borderRadius:4,padding:'0.1rem 0.38rem',marginLeft:'0.4rem'}}>OPUS</span>
+                {narrative&&<div style={{fontSize:'0.68rem',color:C.slate,fontFamily:'monospace',marginTop:'0.15rem'}}>{narrative.period_covered} · generated {new Date(narrative.generated_at).toLocaleDateString('en-GB')}</div>}
+              </div>
+              <div style={{display:'flex',gap:'0.5rem'}}>
+                <button onClick={()=>window.print()} style={{...addBtn(true,C.cyan),color:C.teal,fontWeight:700}}>Print</button>
+                <button onClick={generateNarrative} disabled={generatingNarrative} style={solidBtn(C.purple,true)}>{generatingNarrative?'Writing...':(narrative?'Regenerate':'Generate')}</button>
+              </div>
+            </div>
+            <div style={{padding:'1.1rem 1.3rem',fontSize:'0.92rem',lineHeight:1.7,color:C.navy,maxWidth:'74ch'}}>
+              {narrative ? (
+                <>
+                  {head&&<div style={{fontWeight:700,fontSize:'1rem',marginBottom:'0.45rem'}}>{head}</div>}
+                  {body&&<div style={{whiteSpace:'pre-wrap'}}>{body}</div>}
+                </>
+              ) : <p style={{color:C.slate,margin:0}}>Generate a plain-English story of how the business is doing this month, written for the CEO.</p>}
+            </div>
+          </div>
+
+          <SectionLabel>Watch &amp; key numbers</SectionLabel>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(290px,1fr))',gap:'1rem'}}>
+            <div style={{background:'var(--cv-tint-red)',border:`1px solid ${C.red}`,borderLeft:`4px solid ${C.red}`,borderRadius:16,boxShadow:'0 8px 26px var(--cv-shadow-2)',padding:'1rem 1.15rem'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'0.5rem',fontWeight:700,color:C.red,fontSize:'0.92rem',marginBottom:'0.35rem'}}><span aria-hidden="true">&#9888;</span> Cash flow early warning</div>
+              {warnings.length===0 ? (
+                <div style={{fontSize:'0.82rem',color:C.slate,lineHeight:1.5}}>No cash shortfall projected across the planning period.</div>
+              ) : (
+                <>
+                  <div style={{fontSize:'0.82rem',color:C.navy,lineHeight:1.5}}>Cash falls below zero. Lowest point is <b>{fmt(m.min_cash,cc)} in {minCashMonthLabel}</b>, with <b>{warnings.length} month{warnings.length>1?'s':''}</b> at risk across the plan.</div>
+                  <div style={{margin:'0.6rem 0 0.2rem'}}>
+                    {(() => {
+                      const vals = result.cf.close; const nn=vals.length; if(!nn) return null
+                      const W=300,H=52, mx=Math.max(...vals,0), mn=Math.min(...vals,0), sp=(mx-mn)||1
+                      const xx=(i:number)=> nn<=1?0:(i/(nn-1))*W
+                      const yy=(v:number)=> (H-6)-((v-mn)/sp)*(H-12)
+                      const pts=vals.map((v:number,i:number)=>`${xx(i).toFixed(1)},${yy(v).toFixed(1)}`).join(' ')
+                      return <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="52" preserveAspectRatio="none"><line x1="0" y1={yy(0)} x2={W} y2={yy(0)} style={{stroke:C.red}} strokeDasharray="3 3" opacity="0.5"/><polyline fill="none" style={{stroke:C.red}} strokeWidth="2" points={pts}/></svg>
+                    })()}
+                  </div>
+                  <span onClick={()=>onNavigate&&onNavigate('cashflow')} style={{fontFamily:'monospace',fontSize:'0.68rem',color:C.red,fontWeight:700,cursor:'pointer'}}>See Cash Flow &rarr;</span>
+                </>
+              )}
+            </div>
+            <div style={{...card,padding:0,overflow:'hidden',margin:0}}>
+              <div style={cardHead}>Key numbers</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr'}}>
+                {([
+                  ['Debt service (min)', dscrLabel(s), dscrColor(s,C)],
+                  ['Break-even revenue', fmt(m.business_breakeven,cc), C.navy],
+                  ['Days to collect (DSO)', `${tc.dso.toFixed(0)}d`, C.navy],
+                  ['Days to pay (DPO)', `${tc.dpo.toFixed(0)}d`, C.navy],
+                  ['Cash conversion gap', `${tc.cashConversionGap.toFixed(0)}d`, tc.cashConversionGap<=0?C.green:tc.cashConversionGap>30?C.red:C.amber],
+                  ['Staff cost % revenue', pct(m.staff_cost_pct), C.navy],
+                ] as [string,string,string][]).map(([l,v,col],i)=>(
+                  <div key={i} style={{padding:'0.7rem 1.15rem',borderTop:'1px solid var(--cv-border-soft)',borderRight:i%2===0?'1px solid var(--cv-border-soft)':undefined}}>
+                    <div style={{fontFamily:'monospace',fontSize:'0.55rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate,marginBottom:'0.25rem'}}>{l}</div>
+                    <div style={{fontFamily:'monospace',fontWeight:700,fontSize:'1rem',color:col}}>{v}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <SectionLabel>Business health check</SectionLabel>
+          <div style={{...card,padding:0,overflow:'hidden'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.8rem 1.1rem',borderBottom:`1px solid ${C.border}`,gap:'0.5rem',flexWrap:'wrap'}}>
+              <span style={{fontFamily:'Georgia,serif',fontWeight:700,fontSize:'0.95rem',color:C.navy}}>Business health check</span>
+              <button style={solidBtn(C.purple,true)} disabled={generatingHealth} onClick={generateHealthCheck}>{generatingHealth?'Generating...':'Generate This Month'}</button>
+            </div>
+            <div style={{padding:'1rem 1.2rem'}}>
+              {latestHealth ? (
+                <>
+                  <div style={{fontSize:'0.75rem',color:C.slate,marginBottom:'0.6rem',fontFamily:'monospace'}}>{new Date(latestHealth.period).toLocaleString('en-GB',{month:'long',year:'numeric'})}</div>
+                  <div style={{fontSize:'0.88rem',color:C.navy,lineHeight:1.8,whiteSpace:'pre-wrap'}}>{latestHealth.report_text}</div>
+                </>
+              ) : <p style={{color:C.slate,fontSize:'0.85rem',margin:0}}>No health check generated yet this month.</p>}
+            </div>
+          </div>
+
+          <SectionLabel>Previous months&#39; stories</SectionLabel>
+          <div style={{...card,padding:0,overflow:'hidden'}}>
+            {previousStories.length===0 ? (
+              <div style={{padding:'1rem 1.2rem',color:C.slate,fontSize:'0.82rem'}}>No earlier stories yet. Each regenerated story moves the current one into this list.</div>
+            ) : previousStories.map((st:any,i:number)=>{
+              const open = expandedStory===(st.id||String(i))
+              const key = st.id||String(i)
+              return (
+                <div key={key}>
+                  <div onClick={()=>setExpandedStory(open?null:key)} style={{display:'flex',alignItems:'center',gap:'0.8rem',padding:'0.8rem 1.2rem',borderTop:i===0?undefined:'1px solid var(--cv-border-soft)',cursor:'pointer'}}>
+                    <span style={{fontFamily:'monospace',fontSize:'0.7rem',color:C.slate,width:90,flex:'0 0 auto'}}>{st.period_covered||new Date(st.generated_at).toLocaleDateString('en-GB',{month:'short',year:'numeric'})}</span>
+                    <span style={{flex:1,fontSize:'0.8rem',color:C.navy,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:open?'normal':'nowrap',lineHeight:1.5}}>{cleanStory(st.briefing_text)}</span>
+                    <span style={{color:C.slate,fontFamily:'monospace'}}>{open?'▴':'▾'}</span>
+                  </div>
                 </div>
               )
             })}
           </div>
         </div>
-      )}
+        )
+      })()}
 
-      {activeSection==='narrative'&&(
+      {activeSection==='credit'&&(() => {
+        const hasTc = tc.dso>0||tc.dpo>0
+        const gap = tc.cashConversionGap
+        const trendCol = s.revTrend==='Growing'?C.green:s.revTrend==='Stable'?C.amber:C.red
+        const gapCol = gap<=0?C.green:gap>30?C.red:C.amber
+        return (
         <div>
-          <div style={card}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
-              <div style={secH}>This Month's Story</div>
-              <button style={solidBtn(C.purple,true)} disabled={generatingNarrative} onClick={generateNarrative}>{generatingNarrative?'Writing...':'Generate Narrative'}</button>
-            </div>
-            {narrative ? (
-              <div>
-                <div style={{fontSize:'0.75rem',color:C.slate,marginBottom:'0.75rem'}}>{narrative.period_covered} · Generated {new Date(narrative.generated_at).toLocaleDateString('en-GB')}</div>
-                <div style={{fontSize:'0.9rem',color:C.navy,lineHeight:1.85,whiteSpace:'pre-wrap'}}>{cleanStory(narrative.briefing_text)}</div>
-              </div>
-            ) : <p style={{color:C.slate,fontSize:'0.85rem'}}>Generate a plain-English story of how the business is doing this month, written for the CEO.</p>}
+          <SectionLabel>Credit Risk · Score</SectionLabel>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(215px,1fr))',gap:'1rem'}}>
+            <ScoreDonut label="Credit Risk" display={`${s.score}/100`} frac={s.score/100} rating={s.classification} color={s.classColor}/>
+            <StatCard label="Minimum DSCR" value={dscrLabel(s)} rating={!s.hasDebt?'No debt':s.dscrMin===null?'Not yet due':dscrRating(s)} color={dscrColor(s,C)} valueColor={dscrColor(s,C)} ratingColor={dscrColor(s,C)}/>
+            <StatCard label="Revenue trend" value={s.revTrend} rating={s.revTrend==='Growing'?'Healthy':s.revTrend==='Stable'?'Steady':'Watch'} color={trendCol} valueColor={trendCol} ratingColor={trendCol}/>
+            <StatCard label="Cash-negative months" value={String(s.cashGaps)} rating={s.cashGaps===0?'None':'Risk'} color={s.cashGaps===0?C.green:C.red} valueColor={s.cashGaps===0?C.green:C.red} ratingColor={s.cashGaps===0?C.green:C.red}/>
           </div>
-          <div style={card}>
-            <div style={secH}>Cash Flow Early Warning</div>
-            {warnings.length===0 ? (
-              <div style={{padding:'0.85rem 1rem',background:'var(--cv-tint-green)',border:`1px solid ${C.green}`,borderRadius:8,color:C.green,fontSize:'0.9rem',fontWeight:600,display:'flex',alignItems:'center',gap:'0.55rem'}}>
-                <span aria-hidden="true" style={{fontSize:'1.1rem'}}>✓</span> No cash shortfall projected across the planning period.
+
+          <SectionLabel right={<span onClick={()=>onNavigate&&onNavigate('actuals_wc')} style={{color:C.teal,textTransform:'none',letterSpacing:0,cursor:'pointer'}}>Enter on Actuals &amp; Working Capital &rarr;</span>}>Payment behaviour · trade credit</SectionLabel>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(215px,1fr))',gap:'1rem'}}>
+            <StatCard label="Days to collect (DSO)" value={hasTc?`${tc.dso.toFixed(0)}d`:'n/a'} rating={hasTc?(tc.dso>45?'Slow':'Normal'):'No data'} color={hasTc&&tc.dso>45?C.red:C.green} valueColor={hasTc&&tc.dso>45?C.red:C.navy} ratingColor={hasTc&&tc.dso>45?C.red:C.slate}/>
+            <StatCard label="Days to pay (DPO)" value={hasTc?`${tc.dpo.toFixed(0)}d`:'n/a'} rating={hasTc?'Normal':'No data'} color={C.green} ratingColor={C.slate}/>
+            <StatCard label="Cash conversion gap" value={hasTc?`${gap.toFixed(0)}d`:'n/a'} rating={hasTc?(gap<=0?'Supplier-financed':gap>30?'Cash tied up':'Manageable'):'No data'} color={gapCol} valueColor={hasTc?gapCol:C.navy} ratingColor={hasTc?gapCol:C.slate}/>
+            <StatCard label="Peak receivable" value={fmt(tc.peakReceivable,cc)} rating={tc.peakReceivable>0?'Exposure':'None'} color={C.amber} ratingColor={C.amber}/>
+          </div>
+
+          <SectionLabel>Credit Risk — the numbers</SectionLabel>
+          <ScoreTrendCard title="Credit Risk Trend" years={scoreSeries.years} monthsByYear={monthsByYearLabel} rows={[
+            {label:'Credit Risk Score /100', getValue:(r:any)=>r.score, getColor:(r:any)=>r.classColor},
+            {label:'Rating', getValue:(r:any)=>r.classification, getColor:(r:any)=>r.classColor},
+            {label:'Minimum DSCR', getValue:(r:any)=>dscrLabel(r), getColor:(r:any)=>dscrColor(r,C)},
+            {label:'Trade credit · DSO (days)', getValue:(r:any)=>r.tradeCredit.dso.toFixed(0), getColor:()=>C.navy},
+            {label:'Trade credit · DPO (days)', getValue:(r:any)=>r.tradeCredit.dpo.toFixed(0), getColor:()=>C.navy},
+            {label:'Trade credit · Cash conversion gap', getValue:(r:any)=>r.tradeCredit.cashConversionGap.toFixed(0), getColor:(r:any)=>r.tradeCredit.cashConversionGap<=0?C.green:r.tradeCredit.cashConversionGap>60?C.red:C.amber},
+            {label:'Trade credit · Receivables outstanding', getValue:(r:any)=>fmt(r.tradeCredit.peakReceivable,cc), getColor:()=>C.navy},
+          ]}/>
+        </div>
+        )
+      })()}
+
+      {activeSection==='going_concern'&&(() => {
+        const facColor = (f:number) => f>=0.7?C.green:f>=0.4?C.amber:C.red
+        const hasTc = tc.dso>0||tc.dpo>0
+        const gcFactors = [
+          {key:'debt', name:'Debt Service Coverage', radar:'Debt service', sc:s.gcDebtServiceFactor, max:4,
+            headVal: dscrLabel(s), headRating: !s.hasDebt?'No debt':s.dscrMin===null?'Not yet due':dscrRating(s),
+            sub:`DSCR ${dscrLabel(s)}${s.hasDebt&&s.dscrMin!==null&&s.dscrMin<1?' — not covering debt in the tightest month.':'.'}`},
+          {key:'liq', name:'Liquidity Position', radar:'Liquidity', sc:s.gcLiquidityFactor, max:4,
+            headVal: m.min_cash>=0?'Positive':'Negative', headRating: m.min_cash>=0?'Covered':`${s.cashGaps} month${s.cashGaps>1?'s':''} at risk`,
+            sub:`Minimum cash ${fmt(m.min_cash,cc)}${s.cashGaps>0?`, negative in ${s.cashGaps} month(s).`:'.'}`},
+          {key:'rev', name:'Revenue Sustainability', radar:'Revenue', sc:s.gcRevenueSustainabilityFactor, max:4,
+            headVal: s.revTrend, headRating: s.revTrend,
+            sub: hasTc?`Cash conversion gap ${tc.cashConversionGap.toFixed(0)} days; revenue ${s.revTrend.toLowerCase()}.`:`Revenue trend ${s.revTrend.toLowerCase()} across the plan.`},
+          {key:'prof', name:'Operational Profitability', radar:'Profitability', sc:s.gcProfitabilityFactor, max:3,
+            headVal: fmt(m.total_ebitda,cc), headRating: m.total_ebitda>=0?'Profitable':'Loss-making',
+            sub:`EBITDA ${m.total_ebitda>=0?'positive':'negative'}, margin ${ebitdaMargin!==null?pct(ebitdaMargin):'n/a'}.`},
+          {key:'mgmt', name:'Management & Governance', radar:'Management', sc:s.gcManagementFactor, max:5,
+            headVal: `${s.gcManagementFactor}/5`, headRating: 'Assessed',
+            sub:'Set on the Coach Assessment tab.'},
+        ]
+        const weakest = [...gcFactors].sort((a,b)=>(a.sc/a.max)-(b.sc/b.max))
+        const heads = weakest.slice(0,2)
+        const cashIssue = s.cashGaps>0 || (s.hasDebt && s.dscrMin!==null && s.dscrMin<1)
+        return (
+        <div>
+          <div style={{...card,marginBottom:'1.1rem'}}>
+            <h2 style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',margin:'0 0 0.4rem',color:C.navy}}>Going Concern</h2>
+            <p style={{fontSize:'0.82rem',color:C.slate,lineHeight:1.5,margin:0}}>Whether the business can keep operating and meet its obligations over the next year. One score out of 20, built from five factors: debt service, liquidity, revenue sustainability, operational profitability, and management.</p>
+          </div>
+
+          <SectionLabel>Score &amp; key drivers</SectionLabel>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:'1rem'}}>
+            <ScoreDonut label="Going Concern" display={`${s.gcScore}/20`} frac={s.gcScore/20} rating={s.gcRating} color={s.gcColor}/>
+            {heads.map(f=>(
+              <ScoreDonut key={f.key} label={f.name} display={f.headVal} frac={f.sc/f.max} rating={f.headRating} color={facColor(f.sc/f.max)}/>
+            ))}
+          </div>
+
+          <SectionLabel>Five factors</SectionLabel>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gridAutoRows:'1fr',gap:'0.85rem'}}>
+            <div style={{...card,margin:0,padding:0,overflow:'hidden',gridColumn:'1 / 3',gridRow:'1 / 3',display:'flex',flexDirection:'column'}}>
+              <div style={cardHead}>Going concern profile</div>
+              <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'0.4rem'}}>
+                <RadarChart color={s.gcColor} axes={gcFactors.map(f=>({label:f.radar,frac:f.sc/f.max}))}/>
               </div>
-            ) : (
-              <div>
-                <div style={{background:'var(--cv-tint-red)',border:`1px solid ${C.red}`,borderRadius:10,padding:'0.9rem 1rem',marginBottom:'0.85rem'}}>
-                  <div style={{fontSize:'0.68rem',fontFamily:'monospace',letterSpacing:'0.1em',color:C.red,fontWeight:700}}>⚠ CASH RUNS SHORT</div>
-                  <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',color:C.navy,fontWeight:700,marginTop:'0.25rem',lineHeight:1.3}}>
-                    First shortfall in {warnings[0].month} · deepest point {fmt(Math.min(...warnings.map(w=>w.balance)),cc)}
+            </div>
+            {gcFactors.map(f=>{
+              const col = facColor(f.sc/f.max)
+              return (
+                <div key={f.key} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,boxShadow:'0 6px 20px var(--cv-shadow-1)',borderTop:`3px solid ${col}`,padding:'0.8rem 0.9rem',display:'flex',flexDirection:'column'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'0.65rem'}}>
+                    <MiniDonut frac={f.sc/f.max} color={col} center={`${f.sc}/${f.max}`}/>
+                    <div style={{fontWeight:700,fontSize:'0.8rem',lineHeight:1.15,color:C.navy}}>{f.name}</div>
                   </div>
-                  <div style={{fontSize:'0.82rem',color:C.slate,marginTop:'0.35rem',lineHeight:1.5}}>
-                    {warnings.length} month{warnings.length>1?'s':''} fall below zero. Cover the gap with a short-term facility, bring collections forward, or delay non-critical spend before {warnings[0].month}.
-                  </div>
+                  <div style={{fontSize:'0.68rem',color:C.slate,marginTop:'0.5rem',borderTop:'1px solid var(--cv-border-soft)',paddingTop:'0.45rem',flex:1}}>{f.sub}</div>
                 </div>
-                {warnings.map((w,i)=>(
-                  <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'0.55rem 0.8rem',background:'var(--cv-tint-red)',borderRadius:6,marginBottom:'0.4rem'}}>
-                    <span style={{fontWeight:600,color:C.navy}}>{w.month}</span>
-                    <span style={{fontFamily:'monospace',color:C.red,fontWeight:700}}>{fmt(w.balance,cc)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+              )
+            })}
           </div>
-          <div style={card}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
-              <div style={secH}>Business Health Check</div>
-              <button style={solidBtn(C.purple,true)} disabled={generatingHealth} onClick={generateHealthCheck}>{generatingHealth?'Generating...':'Generate This Month'}</button>
-            </div>
-            {latestHealth ? (
-              <div>
-                <div style={{fontSize:'0.75rem',color:C.slate,marginBottom:'0.75rem'}}>{new Date(latestHealth.period).toLocaleString('en-GB',{month:'long',year:'numeric'})}</div>
-                <div style={{fontSize:'0.88rem',color:C.navy,lineHeight:1.8,whiteSpace:'pre-wrap'}}>{latestHealth.report_text}</div>
-              </div>
-            ) : <p style={{color:C.slate,fontSize:'0.85rem'}}>No health check generated yet this month.</p>}
-          </div>
+
+          <ActionBanner kicker="Do this next"
+            title={cashIssue?'Fix the cash shortfall to lift the score':`Strengthen ${weakest[0].name}`}
+            body={cashIssue?`Liquidity and debt service are the two weak factors. Closing the ${s.cashGaps} negative month${s.cashGaps>1?'s':''} raises Going Concern the fastest.`:`${weakest[0].name} is the lowest factor at ${weakest[0].sc}/${weakest[0].max}. Improving it lifts Going Concern the most.`}
+            cta={cashIssue?'Open Cash Flow →':'Review Coach Assessment →'}
+            onCta={cashIssue?(()=>onNavigate&&onNavigate('cashflow')):(()=>setActiveSection('coach'))}/>
+
+          <SectionLabel>Score trend · month by month, collapsible to years</SectionLabel>
+          <ScoreTrendCard title="Going Concern Trend" years={scoreSeries.years} monthsByYear={monthsByYearLabel} rows={[
+            {label:'Going Concern /20', getValue:(r:any)=>r.gcScore, getColor:(r:any)=>r.gcColor},
+            {label:'Rating', getValue:(r:any)=>r.gcRating, getColor:(r:any)=>r.gcColor},
+            {label:'Debt Service /4', getValue:(r:any)=>r.gcDebtServiceFactor, getColor:(r:any)=>facColor(r.gcDebtServiceFactor/4)},
+            {label:'Liquidity /4', getValue:(r:any)=>r.gcLiquidityFactor, getColor:(r:any)=>facColor(r.gcLiquidityFactor/4)},
+            {label:'Revenue Sustainability /4', getValue:(r:any)=>r.gcRevenueSustainabilityFactor, getColor:(r:any)=>facColor(r.gcRevenueSustainabilityFactor/4)},
+            {label:'Operational Profitability /3', getValue:(r:any)=>r.gcProfitabilityFactor, getColor:(r:any)=>facColor(r.gcProfitabilityFactor/3)},
+            {label:'Management /5', getValue:(r:any)=>r.gcManagementFactor, getColor:(r:any)=>facColor(r.gcManagementFactor/5)},
+          ]}/>
         </div>
-      )}
-
-      {activeSection==='credit'&&(
-        <div style={card}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1.25rem',flexWrap:'wrap',gap:'0.75rem'}}>
-            <div style={secH}>Credit Risk Dashboard</div>
-            <div style={{display:'flex',alignItems:'center',gap:'1rem'}}>
-              <div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:s.classColor,lineHeight:1}}>{s.score}</div>
-              <div><div style={{fontSize:'0.75rem',color:C.slate}}>out of 100</div><Badge2 label={s.classification} color={s.classColor}/></div>
-            </div>
-          </div>
-          <div style={kpiGrid}>
-            <KPI label="Minimum DSCR" value={dscrLabel(s)} color={dscrColor(s,C)}/>
-            <KPI label="Revenue Trend" value={s.revTrend} color={s.revTrend==='Growing'?C.green:s.revTrend==='Stable'?C.amber:C.red}/>
-            <KPI label="Cash-Negative Months" value={String(s.cashGaps)} color={s.cashGaps===0?C.green:C.red}/>
-            <KPI label="Annual EBITDA" value={fmt(m.total_ebitda,cc)} color={m.total_ebitda>=0?C.green:C.red}/>
-          </div>
-          <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.75rem',fontFamily:'monospace'}}>
-            <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}><th style={{padding:'7px 10px',textAlign:'left',minWidth:120}}>Metric</th>{months.map((mo,i)=><th key={i} style={{padding:'7px 8px',textAlign:'right',whiteSpace:'nowrap'}}>{mo}</th>)}</tr></thead>
-            <tbody>
-              <tr style={{background:'var(--cv-cream)'}}><td style={{padding:'6px 10px',fontWeight:600}}>EBITDA</td>{result.con.ebitda.map((v:number,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right',color:v>=0?C.green:C.red}}>{fmt(v,cc)}</td>)}</tr>
-              <tr><td style={{padding:'6px 10px',fontWeight:600}}>Debt Service</td>{debtSched.totalRepayment.map((v:number,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right'}}>{fmt(v,cc)}</td>)}</tr>
-              <tr style={{background:'var(--cv-alt)'}}><td style={{padding:'6px 10px',fontWeight:700}}>DSCR</td>{s.dscrVals.map((v:number|null,i:number)=><td key={i} style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:v===null?C.slate:v>=1.5?C.green:v>=1.0?C.amber:C.red}}>{v===null?'–':`${v.toFixed(2)}x`}</td>)}</tr>
-            </tbody>
-          </table></div>
-        </div>
-      )}
-
-      {activeSection==='credit'&&(
-        <ScoreTrendCard title="Credit Risk Trend" years={scoreSeries.years} monthsByYear={monthsByYearLabel} rows={[
-          {label:'Credit Risk Score /100', getValue:(r:any)=>r.score, getColor:(r:any)=>r.classColor},
-          {label:'Rating', getValue:(r:any)=>r.classification, getColor:(r:any)=>r.classColor},
-          {label:'DSCR', getValue:(r:any)=>dscrLabel(r), getColor:(r:any)=>dscrColor(r,C)},
-          {label:'Trade Credit: DPO (days)', getValue:(r:any)=>r.tradeCredit.dpo.toFixed(0), getColor:()=>C.navy},
-          {label:'Trade Credit: DSO (days)', getValue:(r:any)=>r.tradeCredit.dso.toFixed(0), getColor:()=>C.navy},
-          {label:'Trade Credit: Cash Conversion Gap', getValue:(r:any)=>r.tradeCredit.cashConversionGap.toFixed(0), getColor:(r:any)=>r.tradeCredit.cashConversionGap<=0?C.green:r.tradeCredit.cashConversionGap>60?C.red:C.amber},
-        ]}/>
-      )}
-
-      {activeSection==='going_concern'&&(
-        <div style={card}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem',flexWrap:'wrap',gap:'0.75rem'}}>
-            <div style={secH}>Going Concern Assessment</div>
-            <div style={{display:'flex',alignItems:'center',gap:'1rem'}}><div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:s.gcColor,lineHeight:1}}>{s.gcScore}</div><div><div style={{fontSize:'0.75rem',color:C.slate}}>out of 20</div><Badge2 label={s.gcRating} color={s.gcColor}/></div></div>
-          </div>
-          {[
-            {name:'Debt Service Coverage',sc:s.gcDebtServiceFactor,max:4,ev:dscrLabel(s),field:null},
-            {name:'Liquidity Position',sc:s.gcLiquidityFactor,max:4,ev:'Min cash: '+fmt(m.min_cash,cc),field:null},
-            {name:'Revenue Sustainability',sc:s.gcRevenueSustainabilityFactor,max:4,ev:'Revenue trend: '+s.revTrend,field:null},
-            {name:'Operational Profitability',sc:s.gcProfitabilityFactor,max:4,ev:'Annual EBITDA: '+fmt(m.total_ebitda,cc),field:null},
-            {name:'Management & Governance',sc:s.gcManagementFactor,max:5,ev:'Coach assessment',field:'managementCapability'},
-          ].map(ind=>(
-            <div key={ind.name} style={{marginBottom:'1rem',paddingBottom:'1rem',borderBottom:`1px solid ${C.border}`}}>
-              <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}><span style={{fontWeight:600,fontSize:'0.88rem',color:C.navy}}>{ind.name}</span><span style={{fontFamily:'monospace',fontWeight:700,color:ind.sc>=3?C.green:ind.sc>=2?C.amber:C.red}}>{ind.sc}/{ind.max}</span></div>
-              <div style={{background:'var(--cv-track)',borderRadius:999,height:7}}><div style={{width:(ind.sc/ind.max*100)+'%',height:'100%',background:ind.sc>=3?C.green:ind.sc>=2?C.amber:C.red,borderRadius:999}}/></div>
-              <div style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.3rem'}}>{ind.ev}</div>
-              {ind.field!=null&&<div style={{fontSize:'0.72rem',color:C.teal,marginTop:'0.3rem',fontStyle:'italic'}}>Set on the Coach Assessment tab</div>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {activeSection==='going_concern'&&(
-        <ScoreTrendCard title="Going Concern Trend" years={scoreSeries.years} monthsByYear={monthsByYearLabel} rows={[
-          {label:'Going Concern Score /20', getValue:(r:any)=>r.gcScore, getColor:(r:any)=>r.gcColor},
-          {label:'Rating', getValue:(r:any)=>r.gcRating, getColor:(r:any)=>r.gcColor},
-          {label:'Debt Service Coverage /4', getValue:(r:any)=>r.gcDebtServiceFactor, getColor:(r:any)=>r.gcDebtServiceFactor>=3?C.green:r.gcDebtServiceFactor>=2?C.amber:C.red},
-          {label:'Liquidity Position /4', getValue:(r:any)=>r.gcLiquidityFactor, getColor:(r:any)=>r.gcLiquidityFactor>=3?C.green:r.gcLiquidityFactor>=2?C.amber:C.red},
-          {label:'Revenue Sustainability /4', getValue:(r:any)=>r.gcRevenueSustainabilityFactor, getColor:(r:any)=>r.gcRevenueSustainabilityFactor>=3?C.green:r.gcRevenueSustainabilityFactor>=2?C.amber:C.red},
-          {label:'Operational Profitability /3', getValue:(r:any)=>r.gcProfitabilityFactor, getColor:(r:any)=>r.gcProfitabilityFactor>=3?C.green:C.amber},
-          {label:'Management & Governance /4', getValue:(r:any)=>r.gcManagementFactor, getColor:(r:any)=>r.gcManagementFactor>=3?C.green:r.gcManagementFactor>=2?C.amber:C.red},
-        ]}/>
-      )}
+        )
+      })()}
 
       {activeSection==='liquidity_readiness'&&(() => {
         // Reuses capitalAtRisk/lrsCashFlows/lrsAnnualIrr already computed
@@ -3522,54 +3746,118 @@ Write a status report, not a letter. Do not address the reader. Do not open with
         const scoreColor = (v:number) => v>=70?C.green:v>=50?C.teal:v>=30?C.amber:C.red
         return (
           <div>
-            <div style={card}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.5rem',flexWrap:'wrap',gap:'0.75rem'}}>
-                <div style={secH}>Liquidity Readiness Score</div>
-                <div style={{display:'flex',alignItems:'center',gap:'1rem'}}>
-                  <div style={{fontFamily:'Georgia,serif',fontSize:'2.5rem',fontWeight:700,color:scoreColor(lrsCurrent.score),lineHeight:1}}>{Math.round(lrsCurrent.score)}</div>
-                  <div style={{fontSize:'0.75rem',color:C.slate}}>out of 100</div>
-                </div>
-              </div>
-              <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1.25rem',lineHeight:1.6}}>
-                The extent to which this business has the characteristics required for productive liquidity to flow into it --
-                one core score across seven weighted dimensions. A Bank Fit or Investor Fit score below is the same seven
-                dimensions, simply weighted differently for that specific lens; the business's underlying data never changes.
+            <div style={{...card,marginBottom:'1.1rem'}}>
+              <h2 style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',margin:'0 0 0.4rem',color:C.navy}}>Liquidity Readiness Score</h2>
+              <p style={{fontSize:'0.82rem',color:C.slate,lineHeight:1.5,margin:0}}>
+                How ready this business is for productive liquidity to flow into it, as one core score across seven weighted
+                dimensions. Bank Fit and Investor Fit are the same seven dimensions weighted for each lens; the underlying data never changes.
               </p>
-              <InvestmentPitchDownload clientId={clientId}/>
-              {dimLabels.map(([key,label])=>{
-                const dim = lrsCurrent.dimensions[key]
-                const weight = LRS_WEIGHTS[key]
-                return (
-                  <div key={key} style={{marginBottom:'1.1rem',paddingBottom:'1.1rem',borderBottom:`1px solid ${C.border}`}}>
-                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}>
-                      <span style={{fontWeight:700,fontSize:'0.9rem',color:C.navy}}>{label} <span style={{fontWeight:400,color:C.slate,fontSize:'0.75rem'}}>({(weight*100).toFixed(0)}% weight)</span></span>
-                      <span style={{fontFamily:'monospace',fontWeight:700,color:scoreColor(dim.score)}}>{Math.round(dim.score)}/100</span>
-                    </div>
-                    <div style={{background:'var(--cv-track)',borderRadius:999,height:7,marginBottom:'0.5rem'}}><div style={{width:dim.score+'%',height:'100%',background:scoreColor(dim.score),borderRadius:999}}/></div>
-                    {dim.indicators.map(ind=>(
-                      <div key={ind.label} style={{display:'flex',justifyContent:'space-between',fontSize:'0.74rem',color:C.slate,padding:'0.15rem 0'}}>
-                        <span>{ind.label}</span>
-                        <span style={{fontFamily:'monospace'}}>{Math.round(ind.value)}/100 — {ind.note}</span>
-                      </div>
-                    ))}
-                  </div>
-                )
-              })}
-              <div style={{display:'flex',gap:'1.5rem',marginTop:'1rem'}}>
-                {Object.entries(FIT_SCORE_PRESETS).map(([key,preset])=>(
-                  <div key={key}>
-                    <div style={{fontSize:'0.7rem',color:C.slate}}>{preset.label}</div>
-                    <div style={{fontFamily:'monospace',fontWeight:700,fontSize:'1.1rem',color:scoreColor(computeFitScore(lrsCurrent,preset.weights))}}>{Math.round(computeFitScore(lrsCurrent,preset.weights))}/100</div>
-                  </div>
-                ))}
-              </div>
-              {latestInvestment&&(
-                <div style={{marginTop:'1.25rem',paddingTop:'1.25rem',borderTop:`1px solid ${C.border}`}}>
-                  <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy,marginBottom:'0.5rem'}}>AI Narrative Assessment</div>
-                  <div style={{fontSize:'0.85rem',color:C.navy,lineHeight:1.75,whiteSpace:'pre-wrap'}}>{latestInvestment.assessment_text}</div>
-                </div>
-              )}
             </div>
+            <InvestmentPitchDownload clientId={clientId}/>
+
+            <SectionLabel>Score &amp; fit</SectionLabel>
+            {(() => {
+              const bankFit = computeFitScore(lrsCurrent, FIT_SCORE_PRESETS.bank.weights)
+              const investorFit = computeFitScore(lrsCurrent, FIT_SCORE_PRESETS.investor.weights)
+              const lrsWord = lrsCurrent.score>=70?'Strong':lrsCurrent.score>=50?'Building':lrsCurrent.score>=30?'Developing':'Early'
+              return (
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:'1rem'}}>
+                  <ScoreDonut label="Liquidity Readiness" display={`${Math.round(lrsCurrent.score)}/100`} frac={lrsCurrent.score/100} rating={lrsWord} color={scoreColor(lrsCurrent.score)}/>
+                  <ScoreDonut label="Bank Fit" display={`${Math.round(bankFit)}/100`} frac={bankFit/100} rating="Re-weighted" color={scoreColor(bankFit)}/>
+                  <ScoreDonut label="Investor Fit" display={`${Math.round(investorFit)}/100`} frac={investorFit/100} rating="Re-weighted" color={scoreColor(investorFit)}/>
+                </div>
+              )
+            })()}
+
+            <SectionLabel>Seven weighted dimensions</SectionLabel>
+            {(() => {
+              const dims = dimLabels.map(([key,label])=>({key,label,dim:lrsCurrent.dimensions[key],weight:LRS_WEIGHTS[key]}))
+              const weakest = [...dims].sort((a,b)=>a.dim.score-b.dim.score)[0]
+              const maxLift = Math.max(1, Math.round(weakest.weight*(100-weakest.dim.score)))
+              const fieldWeak = weakest.key==='visibility'
+              return (
+                <div style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gridAutoRows:'1fr',gap:'0.85rem'}}>
+                  <div style={{...card,margin:0,padding:0,overflow:'hidden',gridColumn:'1 / 3',gridRow:'1 / 3',display:'flex',flexDirection:'column'}}>
+                    <div style={cardHead}>Readiness profile</div>
+                    <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'0.4rem'}}>
+                      <RadarChart color={C.teal} axes={dims.map(d=>({label:d.label.split(' ')[0],frac:d.dim.score/100}))}/>
+                    </div>
+                  </div>
+                  {dims.map(d=>{
+                    const col = scoreColor(d.dim.score)
+                    return (
+                      <div key={d.key} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,boxShadow:'0 6px 20px var(--cv-shadow-1)',borderTop:`3px solid ${col}`,padding:'0.75rem 0.85rem'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
+                          <MiniDonut frac={d.dim.score/100} color={col} center={Math.round(d.dim.score)}/>
+                          <div><div style={{fontWeight:700,fontSize:'0.78rem',lineHeight:1.12,color:C.navy}}>{d.label}</div><div style={{fontSize:'0.6rem',color:C.slate,fontFamily:'monospace'}}>{(d.weight*100).toFixed(0)}%</div></div>
+                        </div>
+                        <div style={{marginTop:'0.5rem',display:'grid',gap:'0.1rem',borderTop:'1px solid var(--cv-border-soft)',paddingTop:'0.4rem'}}>
+                          {d.dim.indicators.slice(0,2).map(ind=>(
+                            <div key={ind.label} style={{display:'flex',justifyContent:'space-between',gap:'0.5rem',fontSize:'0.64rem',color:C.slate}}><span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ind.label}</span><b style={{fontFamily:'monospace',color:C.navy,fontWeight:700}}>{Math.round(ind.value)}</b></div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <ActionBanner compact kicker="Do this next"
+                    title={fieldWeak?'Post monthly sales in Field':`Improve ${weakest.label}`}
+                    body={`${weakest.label} is weakest at ${Math.round(weakest.dim.score)} and lifts the score fastest.`}
+                    lift={`up to +${maxLift}`}
+                    cta={fieldWeak?'Open Clearview Field →':'Open Coach Assessment →'}
+                    onCta={fieldWeak?(()=>onNavigate&&onNavigate('actuals_wc')):(()=>setActiveSection('coach'))}/>
+                </div>
+              )
+            })()}
+
+            <SectionLabel>Metrics investors and banks look at</SectionLabel>
+            {(() => {
+              const npvL = computeNPV(lrsCashFlows, annualRateToMonthlyRate(discountRate))
+              const profitRows:{k:string;v:string;vColor?:string}[] = [
+                {k:'Gross margin', v: pct(m.gross_margin)},
+                {k:'EBITDA margin', v: ebitdaMargin!==null?pct(ebitdaMargin):'n/a'},
+                {k:'Net margin', v: pct(m.net_margin)},
+              ]
+              if (roce!==null) profitRows.push({k:'ROCE', v: pct(roce)})
+              const debtRows:{k:string;v:string;vColor?:string}[] = [
+                {k:'DSCR (min)', v: dscrLabel(s), vColor: dscrColor(s,C)},
+              ]
+              if (interestCover!==null) debtRows.push({k:'Interest cover', v:`${interestCover.toFixed(1)}x`})
+              if (debtToEbitda!==null) debtRows.push({k:'Debt / EBITDA', v:`${debtToEbitda.toFixed(1)}x`})
+              if (gearing!==null) debtRows.push({k:'Gearing', v:`${gearing.toFixed(1)}x`})
+              const liqRows:{k:string;v:string;vColor?:string}[] = []
+              if (runwayMonths!==null) liqRows.push({k:'Cash runway', v:`${runwayMonths.toFixed(1)} mo`, vColor: runwayMonths>=3?C.navy:C.amber})
+              liqRows.push({k:'Cash cycle', v:`${tc.cashConversionGap.toFixed(0)}d`, vColor: tc.cashConversionGap<=0?C.green:tc.cashConversionGap>30?C.red:C.amber})
+              const retRows:{k:string;v:string;vColor?:string}[] = [
+                {k:'Revenue CAGR', v: revenueCagr!==null?pct(revenueCagr):'n/a'},
+                {k:'NPV', v: fmt(npvL,cc), vColor: npvL>=0?C.green:C.red},
+                {k:'IRR', v: lrsAnnualIrr!==null?pct(lrsAnnualIrr):'n/a'},
+                {k:'Payback', v: paybackYears!==null?`${paybackYears.toFixed(1)}y`:'n/a'},
+              ]
+              return (
+                <>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'1rem'}}>
+                    <MetricGroup title="Profitability" color={C.green} rows={profitRows}/>
+                    <MetricGroup title="Debt & coverage" color={C.red} rows={debtRows}/>
+                    <MetricGroup title="Liquidity" color={C.cyan} rows={liqRows}/>
+                    <MetricGroup title="Returns & value" color={C.purple} rows={retRows}/>
+                  </div>
+                  <p style={{fontSize:'0.68rem',color:C.slate,marginTop:'0.5rem',lineHeight:1.5}}>
+                    Current ratio and quick ratio are omitted: this model does not split the balance sheet into current vs
+                    non-current items, so they cannot be derived honestly. EBIT equals EBITDA here as no depreciation is modelled;
+                    coverage ratios use the latest full financial year.
+                  </p>
+                </>
+              )
+            })()}
+
+            {latestInvestment&&(
+              <div style={{...card,marginTop:'1.1rem'}}>
+                <div style={{fontWeight:700,fontSize:'0.85rem',color:C.navy,marginBottom:'0.5rem'}}>AI Narrative Assessment</div>
+                <div style={{fontSize:'0.85rem',color:C.navy,lineHeight:1.75,whiteSpace:'pre-wrap'}}>{latestInvestment.assessment_text}</div>
+              </div>
+            )}
+
+            <SectionLabel>Score trend · month by month, collapsible to years</SectionLabel>
 
             <ScoreTrendCard title="Liquidity Readiness Trend" years={lrsSeries.years} monthsByYear={lrsMonthsByYearLabel} rows={[
               {label:'Liquidity Readiness Score /100', getValue:(r:any)=>Math.round(r.score), getColor:(r:any)=>scoreColor(r.score)},
