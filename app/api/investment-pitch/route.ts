@@ -11,6 +11,7 @@ import {
 } from 'docx'
 import { runGenericModel, buildMonthLabels, type GenericModelConfig } from '@/lib/generic-engine'
 import { computeScores, defaultCoachAssessment, computeTradeCredit, dscrLabel, dscrColor, dscrRating } from '@/lib/scoring-engine'
+import { CLEARVIEW_STYLE } from '@/lib/ai-style'
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -140,7 +141,7 @@ async function callClaude(prompt: string): Promise<string> {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: 'claude-opus-4-8', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] }),
+    body: JSON.stringify({ model: 'claude-opus-4-8', max_tokens: 3000, system: CLEARVIEW_STYLE, messages: [{ role: 'user', content: prompt }] }),
   })
   const data = await response.json()
   return data.content?.[0]?.text || ''

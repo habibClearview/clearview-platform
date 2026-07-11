@@ -10,6 +10,7 @@ import {
 } from 'docx'
 import { runCONASModel, defaultCONASInputs } from '@/lib/conas-engine'
 import { computeScores, defaultCoachAssessment, dscrLabel, dscrColor, dscrRating } from '@/lib/scoring-engine'
+import { CLEARVIEW_STYLE } from '@/lib/ai-style'
 
 const CONAS_CLIENT_ID = '1556298e-5fa0-4d6a-ae86-da8c708ec6ee'
 
@@ -89,7 +90,7 @@ async function callClaude(prompt:string):Promise<string>{
   const response=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
     headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
-    body:JSON.stringify({model:'claude-opus-4-8',max_tokens:1500,messages:[{role:'user',content:prompt}]}),
+    body:JSON.stringify({model:'claude-opus-4-8',max_tokens:1500,system:CLEARVIEW_STYLE,messages:[{role:'user',content:prompt}]}),
   })
   const data=await response.json()
   return data.content?.[0]?.text||''
