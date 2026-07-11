@@ -11,7 +11,7 @@ import {
   type GenericModelConfig, type GenericBusinessUnit,
   type GenericPlanLine, type LineCategory, type LineType, type UnitType,
 } from '@/lib/generic-engine'
-import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor, computeScoresTimeSeries } from '@/lib/scoring-engine'
+import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor, dscrRating, computeScoresTimeSeries } from '@/lib/scoring-engine'
 import { computeNPV, computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary, annualRateToMonthlyRate, monthlyRateToAnnualRate } from '@/lib/investment-metrics'
 import { computeLiquidityReadinessScore, computeLRSTimeSeries, computeFitScore, FIT_SCORE_PRESETS, LRS_WEIGHTS } from '@/lib/liquidity-readiness'
 import { combinedActual, computeActualsTotals, applyPeriodActual, buildHybridConsolidated, computeCatalogueLineTotal } from '@/lib/actuals'
@@ -610,6 +610,57 @@ export default function GenericDashboard({
     </div>
   )
 }
+// ── Overview visuals: donut score card + revenue/cost trend chart ──
+function ScoreDonut({label,display,frac,rating,color,onClick}:{label:string;display:string;frac:number;rating:string;color:string;onClick?:()=>void}) {
+  const r=26, circ=2*Math.PI*r, f=Math.max(0,Math.min(1,frac||0))
+  return (
+    <div onClick={onClick} style={{background:C.white,borderRadius:14,padding:'1.05rem 1.15rem',borderLeft:`4px solid ${color}`,boxShadow:'0 1px 2px rgba(16,42,67,0.05), 0 12px 32px rgba(16,42,67,0.06)',display:'flex',alignItems:'center',gap:'0.9rem',cursor:onClick?'pointer':'default'}}>
+      <svg width="60" height="60" viewBox="0 0 62 62" style={{flexShrink:0}}>
+        <circle cx="31" cy="31" r={r} fill="none" stroke="#E6ECF2" strokeWidth="6"/>
+        <circle cx="31" cy="31" r={r} fill="none" stroke={color} strokeWidth="6" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ*(1-f)} transform="rotate(-90 31 31)"/>
+      </svg>
+      <div style={{minWidth:0}}>
+        <div style={{fontSize:'0.68rem',color:C.slate,marginBottom:'0.18rem'}}>{label}</div>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.45rem',fontWeight:700,color:C.navy,lineHeight:1}}>{display}</div>
+        <div style={{fontSize:'0.72rem',fontWeight:700,color,marginTop:'0.22rem'}}>{rating}</div>
+      </div>
+    </div>
+  )
+}
+
+function TrendChart({months,revenue,cost,ebitda,cc}:{months:string[];revenue:number[];cost:number[];ebitda:number[];cc:string}) {
+  const n=months.length
+  if(!n) return null
+  const W=680,H=220,padL=48,padR=14,padT=14,padB=26
+  const all=[...revenue,...cost,...ebitda].filter(v=>typeof v==='number'&&isFinite(v))
+  const maxV=Math.max(1,...all), minV=Math.min(0,...all)
+  const span=(maxV-minV)||1
+  const x=(i:number)=> padL+(n<=1?0:(i/(n-1))*(W-padL-padR))
+  const y=(v:number)=> padT+(1-(((v||0)-minV)/span))*(H-padT-padB)
+  const path=(arr:number[])=>arr.map((v,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(v||0).toFixed(1)}`).join(' ')
+  const area=`${path(revenue)} L${x(n-1).toFixed(1)},${y(minV).toFixed(1)} L${x(0).toFixed(1)},${y(minV).toFixed(1)} Z`
+  const ticks=[minV,minV+span/2,maxV]
+  const xi=Array.from(new Set([0,Math.round((n-1)/3),Math.round(2*(n-1)/3),n-1]))
+  const short=(v:number)=>{const a=Math.abs(v);return a>=1e9?`${(v/1e9).toFixed(1)}B`:a>=1e6?`${(v/1e6).toFixed(0)}M`:a>=1e3?`${(v/1e3).toFixed(0)}K`:`${Math.round(v)}`}
+  return (
+    <div style={{overflowX:'auto'}}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:'block',minWidth:420}}>
+        {ticks.map((t,i)=>(<g key={i}>
+          <line x1={padL} y1={y(t)} x2={W-padR} y2={y(t)} stroke="#EEF1F6"/>
+          <text x={4} y={y(t)+3} fontSize="9" fill={C.slate} fontFamily="monospace">{short(t)}</text>
+        </g>))}
+        <path d={area} fill={C.cyan} opacity="0.1"/>
+        <path d={path(cost)} fill="none" stroke={C.amber} strokeWidth="2"/>
+        <path d={path(ebitda)} fill="none" stroke={C.green} strokeWidth="2"/>
+        <path d={path(revenue)} fill="none" stroke={C.teal} strokeWidth="2.5"/>
+        {xi.map(i=>(<text key={i} x={x(i)} y={H-7} fontSize="9" fill={C.slate} textAnchor="middle" fontFamily="monospace">{months[i]||`M${i+1}`}</text>))}
+      </svg>
+    </div>
+  )
+}
+
+const ovLabel: React.CSSProperties = {fontFamily:'monospace',fontSize:'0.68rem',letterSpacing:'0.14em',color:C.slate,textTransform:'uppercase',margin:'0.25rem 0 0.7rem'}
+
 // ── OVERVIEW TAB ─────────────────────────────────────────────
 function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGoToApprovals,onGoToIntelligence}) {
   if (!result) return (
@@ -639,16 +690,19 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGo
           narrative/coach assessment/events behind them stay in Clearview
           Intelligence -- this just removes the need to click through
           just to see where the business currently stands on each. */}
-      {s&&(
-        <div style={{...card,background:C.navy,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'1rem'}}>
-          <div style={{display:'flex',gap:'2rem',flexWrap:'wrap'}}>
-            <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>CREDIT RISK</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.classColor}}>{s.score}/100</div></div>
-            <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>GOING CONCERN</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.gcColor}}>{s.gcScore}/20</div></div>
-            <div><div style={{fontSize:'0.65rem',color:'rgba(255,255,255,0.5)'}}>INVESTMENT READY</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:s.irColor}}>{s.irScore}/30</div></div>
-          </div>
-          <button type="button" style={{...addBtn(true),background:'transparent',color:C.white,borderColor:'rgba(255,255,255,0.3)'}} onClick={onGoToIntelligence}>See full analysis →</button>
+      {s&&(<>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:'0.5rem'}}>
+          <div style={ovLabel}>Clearview Intelligence</div>
+          <button type="button" style={{...addBtn(true),borderColor:C.border,color:C.teal,marginBottom:'0.7rem'}} onClick={onGoToIntelligence}>See full analysis →</button>
         </div>
-      )}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(215px,1fr))',gap:'1rem',marginBottom:'1.6rem'}}>
+          <ScoreDonut label="Credit Risk" display={`${s.score}/100`} frac={s.score/100} rating={s.classification} color={s.classColor} onClick={onGoToIntelligence}/>
+          <ScoreDonut label="Going Concern" display={`${s.gcScore}/20`} frac={s.gcScore/20} rating={s.gcRating} color={s.gcColor} onClick={onGoToIntelligence}/>
+          <ScoreDonut label="Investment Readiness" display={`${s.irScore}/30`} frac={s.irScore/30} rating={s.irTier} color={s.irColor} onClick={onGoToIntelligence}/>
+          <ScoreDonut label="Debt Service" display={dscrLabel(s)} frac={s.hasDebt?Math.min((s.dscrMin||0)/2.5,1):0} rating={s.hasDebt?dscrRating(s):'No debt'} color={dscrColor(s,{green:C.green,amber:C.amber,red:C.red,slate:C.slate})} onClick={onGoToIntelligence}/>
+        </div>
+      </>)}
+      <div style={ovLabel}>Financial Snapshot</div>
       <div style={kpiGrid}>
         <KPI label="Total Revenue" value={fmt(m.total_revenue,cc)} color={C.navy}/>
         <KPI label="Gross Profit" value={fmt(m.total_gp,cc)} sub={pct(m.gross_margin)} color={m.total_gp>=0?C.green:C.red}/>
@@ -657,6 +711,19 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGo
         <KPI label="Breakeven" value={fmt(m.business_breakeven,cc)} sub="Annual revenue needed" color={C.amber}/>
         <KPI label="Revenue/Head" value={fmt(m.revenue_per_head,cc)} sub={`${m.total_headcount} staff`} color={C.purple}/>
       </div>
+      {result.con&&Array.isArray(result.con.rev)&&(
+        <>
+          <div style={ovLabel}>Revenue and Cost Trend</div>
+          <div style={card}>
+            <div style={{display:'flex',gap:'1.4rem',marginBottom:'0.9rem',fontSize:'0.72rem',color:C.slate,flexWrap:'wrap'}}>
+              <span><span style={{display:'inline-block',width:10,height:10,borderRadius:10,background:C.teal,marginRight:6,verticalAlign:'middle'}}/>Revenue</span>
+              <span><span style={{display:'inline-block',width:10,height:10,borderRadius:10,background:C.amber,marginRight:6,verticalAlign:'middle'}}/>Total cost</span>
+              <span><span style={{display:'inline-block',width:10,height:10,borderRadius:10,background:C.green,marginRight:6,verticalAlign:'middle'}}/>EBITDA</span>
+            </div>
+            <TrendChart months={months} revenue={result.con.rev} cost={result.con.rev.map((r:number,i:number)=>r-((result.con.ebitda&&result.con.ebitda[i])||0))} ebitda={result.con.ebitda||[]} cc={cc}/>
+          </div>
+        </>
+      )}
       {/* Unit performance cards */}
       <div style={{...secH,marginTop:'0.5rem'}}>Business Unit Performance</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
