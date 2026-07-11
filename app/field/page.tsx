@@ -15,7 +15,28 @@ const C = {
   red:'#C0392B', green:'#1A7A4A', amber:'#B8860B',
 }
 
-interface CatalogueItem { id:string; name:string; item_type:'product'|'service'; price:number; unit_label?:string; plan_line_id:string }
+// Dark-theme palette for the redesigned field UI (picture-first, numbers-only,
+// large touch targets). Presentation only -- no logic depends on these.
+const D = {
+  bg:'#0E1B2E',        // page background (dark navy)
+  bg2:'#12233B',       // slightly lighter panel / input background
+  card:'#16283F',      // card surface
+  cardHi:'#1B3253',    // raised / active card surface
+  border:'rgba(255,255,255,0.10)',
+  white:'#FFFFFF',
+  text:'#FFFFFF',
+  muted:'rgba(255,255,255,0.58)',
+  faint:'rgba(255,255,255,0.40)',
+  cyan:'#00B4D8',      // primary accent (Money in / active)
+  cyanDim:'rgba(0,180,216,0.15)',
+  green:'#1F8A4C',     // confirm actions
+  amber:'#E0A100',     // waiting to sync
+  amberDim:'rgba(224,161,0,0.14)',
+  red:'#C0392B',       // money out
+  redDim:'rgba(192,57,43,0.14)',
+}
+
+interface CatalogueItem { id:string; name:string; item_type:'product'|'service'; price:number; unit_label?:string; plan_line_id:string; image?:string; image_url?:string }
 interface CostLine { id:string; name:string; category:string }
 interface Customer { id:string; name:string; phone?:string; village?:string }
 interface HistoryEntry {
@@ -77,6 +98,9 @@ export default function FieldCapturePage() {
   const [queueOpen, setQueueOpen] = useState(false)
   const [editingSaleId, setEditingSaleId] = useState<string|null>(null)
   const [editingCostId, setEditingCostId] = useState<string|null>(null)
+  // Presentation-only: which capture flow the grid screen is showing.
+  // 'in' = record a sale (Money in), 'out' = record a cost (Money out).
+  const [flow, setFlow] = useState<'in'|'out'>('in')
   const syncNowRef = useRef<()=>void>(()=>{})
 
   useEffect(()=>{
@@ -402,18 +426,30 @@ export default function FieldCapturePage() {
 
   useEffect(()=>{ syncNowRef.current = syncNow })
 
+  // ---- Dark-theme presentation helpers (styles + tiny speech helper) ----
+  // Tap-to-hear for low-literacy operators. Guarded + wrapped so it can never
+  // throw on browsers without the Web Speech API.
+  function say(text:string) {
+    try {
+      if (typeof window!=='undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel()
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(text))
+      }
+    } catch {}
+  }
+
   if (!token) {
     return (
-      <div style={{minHeight:'100vh',background:C.cream,display:'flex',alignItems:'center',justifyContent:'center',padding:'1.5rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+      <div style={{minHeight:'100vh',background:D.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:'1.5rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
         <BuildStamp/>
-        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:10,padding:'1.75rem',maxWidth:380,width:'100%'}}>
-          <div style={{fontFamily:'monospace',fontSize:'0.68rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.5rem'}}>CLEARVIEW FIELD</div>
-          <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',color:C.navy,margin:'0 0 1rem'}}>Enter your access link</h1>
-          <p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.6,marginBottom:'1.2rem'}}>Paste the code you were given, or open this page using the link directly.</p>
-          <input style={{width:'100%',padding:'0.75rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'0.95rem',boxSizing:'border-box',marginBottom:'0.85rem'}}
+        <div style={{background:D.card,border:`1px solid ${D.border}`,borderRadius:18,padding:'1.9rem',maxWidth:420,width:'100%'}}>
+          <div style={{fontFamily:'monospace',fontSize:'0.68rem',letterSpacing:'0.12em',color:D.cyan,marginBottom:'0.6rem'}}>CLEARVIEW FIELD</div>
+          <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.6rem',color:D.text,margin:'0 0 1rem'}}>Enter your access link</h1>
+          <p style={{fontSize:'0.9rem',color:D.muted,lineHeight:1.6,marginBottom:'1.2rem'}}>Paste the code you were given, or open this page using the link directly.</p>
+          <input style={{width:'100%',padding:'0.9rem',background:D.bg2,border:`1px solid ${D.border}`,borderRadius:12,fontSize:'1rem',color:D.text,boxSizing:'border-box',marginBottom:'0.9rem'}}
             placeholder="Paste your access code here" value={tokenInput} onChange={e=>setTokenInput(e.target.value)}/>
-          {authError && <div style={{color:C.red,fontSize:'0.82rem',marginBottom:'0.85rem'}}>{authError}</div>}
-          <button style={{width:'100%',padding:'0.85rem',background:C.navy,color:C.white,border:'none',borderRadius:6,fontSize:'0.95rem',fontWeight:600,cursor:'pointer'}}
+          {authError && <div style={{color:'#FF8B7E',fontSize:'0.85rem',marginBottom:'0.9rem'}}>{authError}</div>}
+          <button style={{width:'100%',padding:'1rem',background:D.cyan,color:'#062230',border:'none',borderRadius:12,fontSize:'1rem',fontWeight:700,cursor:'pointer'}}
             disabled={loading || !tokenInput} onClick={()=>authenticate(tokenInput.trim())}>{loading?'Checking...':'Continue'}</button>
         </div>
       </div>
@@ -421,334 +457,453 @@ export default function FieldCapturePage() {
   }
 
   if (loading && !auth) {
-    return <div style={{minHeight:'100vh',background:C.cream,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Georgia,serif',color:C.navy}}>Loading...</div>
+    return <div style={{minHeight:'100vh',background:D.bg,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Georgia,serif',fontSize:'1.2rem',color:D.text}}>Loading...</div>
   }
 
   if (!auth) {
     return (
-      <div style={{minHeight:'100vh',background:C.cream,display:'flex',alignItems:'center',justifyContent:'center',padding:'1.5rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
-        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:10,padding:'1.75rem',maxWidth:380,width:'100%',textAlign:'center'}}>
-          <div style={{color:C.red,marginBottom:'1rem'}}>{authError || 'Could not load your data.'}</div>
-          <button style={{padding:'0.7rem 1.4rem',background:C.navy,color:C.white,border:'none',borderRadius:6,cursor:'pointer'}}
+      <div style={{minHeight:'100vh',background:D.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:'1.5rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+        <div style={{background:D.card,border:`1px solid ${D.border}`,borderRadius:18,padding:'1.9rem',maxWidth:420,width:'100%',textAlign:'center'}}>
+          <div style={{color:'#FF8B7E',marginBottom:'1.1rem'}}>{authError || 'Could not load your data.'}</div>
+          <button style={{padding:'0.85rem 1.6rem',background:D.cyan,color:'#062230',border:'none',borderRadius:12,fontWeight:700,cursor:'pointer'}}
             onClick={()=>token && authenticate(token)}>Try Again</button>
         </div>
       </div>
     )
   }
 
-  const inp: React.CSSProperties = {width:'100%',padding:'0.65rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'0.9rem',boxSizing:'border-box',marginBottom:'0.7rem'}
-  const lbl: React.CSSProperties = {display:'block',fontSize:'0.78rem',fontWeight:600,color:C.navy,marginBottom:'0.25rem'}
+  // Dark-theme style constants (self-contained inline styles, no new deps).
+  const inp: React.CSSProperties = {width:'100%',padding:'0.85rem',background:D.bg2,border:`1px solid ${D.border}`,borderRadius:12,fontSize:'1rem',color:D.text,boxSizing:'border-box',marginBottom:'0.7rem'}
+  const lbl: React.CSSProperties = {display:'block',fontSize:'0.85rem',fontWeight:600,color:D.muted,marginBottom:'0.35rem'}
+  const cardStyle: React.CSSProperties = {background:D.card,border:`1px solid ${D.border}`,borderRadius:18,padding:'1.15rem'}
+  const tileStyle: React.CSSProperties = {background:D.card,border:`1px solid ${D.border}`,borderRadius:18,padding:'0.75rem',textAlign:'center',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:'0.45rem',color:D.text}
+  const tileImgStyle: React.CSSProperties = {width:'100%',aspectRatio:'1 / 1',borderRadius:14,background:D.bg2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2.6rem',overflow:'hidden'}
+  const stepBtnStyle: React.CSSProperties = {width:64,height:64,borderRadius:16,border:'none',background:D.bg2,color:D.text,fontSize:'2rem',fontWeight:800,cursor:'pointer',flexShrink:0,lineHeight:1}
+  const primaryBtnStyle: React.CSSProperties = {width:'100%',padding:'1.05rem',background:D.green,color:D.white,border:'none',borderRadius:14,fontSize:'1.1rem',fontWeight:800,cursor:'pointer'}
+
   const pendingCount = salesQueue.length + costsQueue.length + uncategorizedCostsQueue.length
   const searchLower = search.trim().toLowerCase()
   const products = auth.catalogue.filter(c=>c.item_type==='product' && (!searchLower || c.name.toLowerCase().includes(searchLower)))
   const services = auth.catalogue.filter(c=>c.item_type==='service' && (!searchLower || c.name.toLowerCase().includes(searchLower)))
+  const tiles = [...products, ...services]  // products first, then services
+
+  const currency = auth.client.currency
+  const effectivePrice = selectedItem ? (saleForm.override ? Number(saleForm.override_price||0) : selectedItem.price) : 0
+  const qtyNum = Number(saleForm.quantity||0)
+
+  // Speaker button used next to labels for low-literacy operators.
+  const speaker = (text:string) => (
+    <button type="button" aria-label={`Hear: ${text}`} onClick={()=>say(text)}
+      style={{background:'transparent',border:'none',color:D.cyan,fontSize:'1rem',cursor:'pointer',padding:'0 0.25rem',lineHeight:1}}>🔊</button>
+  )
+
+  // Reusable image / fallback thumbnail for a catalogue item.
+  const itemThumb = (item:CatalogueItem, size:number) => {
+    const src = item.image_url || item.image
+    if (src) return <img src={src} alt="" style={{width:size,height:size,borderRadius:14,objectFit:'cover'}}/>
+    return <span aria-hidden="true">{item.item_type==='service'?'🛠️':'📦'}</span>
+  }
+
+  // Shared Money-out (cost) capture card -- reused by the grid "Money out"
+  // flow and by cost editing (mode==='cost-form'). Same handlers as before:
+  // addCostToQueue / addUncategorizedCostToQueue.
+  const costCard = (
+    <div style={{...cardStyle,border:`1px solid ${D.red}`}}>
+      <div style={{display:'flex',alignItems:'center',gap:'0.4rem',fontWeight:800,fontSize:'1.15rem',color:D.text,marginBottom:'0.9rem'}}>
+        {editingCostId?'Edit money out':'Money out'} {speaker('Money out. What did you spend on?')}
+      </div>
+      <label style={lbl}>What did you spend on?</label>
+      <select style={inp} value={costForm.plan_line_id} onChange={e=>setCostForm(f=>({...f,plan_line_id:e.target.value,description:''}))}>
+        <option value="">Select...</option>
+        {auth.cost_lines.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
+        {!editingCostId && <option value="__other__">Something else (not listed)</option>}
+      </select>
+      {costForm.plan_line_id==='__other__' ? (
+        <>
+          <label style={lbl}>What was this cost for?</label>
+          <input style={inp} value={costForm.description} onChange={e=>setCostForm(f=>({...f,description:e.target.value}))} placeholder="e.g. Motorbike repair"/>
+          <div style={{fontSize:'0.78rem',color:D.faint,marginTop:'-0.2rem',marginBottom:'0.7rem'}}>
+            This will be recorded and reviewed by your coach, who will assign it to the right category.
+          </div>
+        </>
+      ) : null}
+      <label style={lbl}>Amount ({currency})</label>
+      <input type="number" inputMode="numeric" style={{...inp,fontSize:'1.4rem',fontWeight:700}} value={costForm.amount} onChange={e=>setCostForm(f=>({...f,amount:e.target.value}))} placeholder="0"/>
+      {costForm.plan_line_id!=='__other__' && (
+        <>
+          <label style={lbl}>Notes (optional)</label>
+          <input style={inp} value={costForm.notes} onChange={e=>setCostForm(f=>({...f,notes:e.target.value}))}/>
+        </>
+      )}
+      <button onClick={costForm.plan_line_id==='__other__'?addUncategorizedCostToQueue:addCostToQueue}
+        disabled={costForm.plan_line_id==='__other__'?(!costForm.description||!costForm.amount):(!costForm.plan_line_id||!costForm.amount)}
+        style={{...primaryBtnStyle,background:D.red,marginTop:'0.4rem',opacity:(costForm.plan_line_id==='__other__'?(!costForm.description||!costForm.amount):(!costForm.plan_line_id||!costForm.amount))?0.5:1}}>
+        {editingCostId?'Save changes':'Save money out'}
+      </button>
+      {editingCostId && (
+        <button onClick={()=>{setMode('grid');setEditingCostId(null);setCostForm({plan_line_id:'',amount:'',notes:'',description:''})}}
+          style={{width:'100%',marginTop:'0.6rem',padding:'0.85rem',background:'transparent',color:D.muted,border:`1px solid ${D.border}`,borderRadius:12,cursor:'pointer',fontSize:'0.95rem'}}>Cancel</button>
+      )}
+    </div>
+  )
 
   return (
-    <div style={{minHeight:'100vh',background:C.cream,fontFamily:"'Segoe UI',system-ui,sans-serif",paddingBottom:'2rem'}}>
+    <div style={{minHeight:'100vh',background:D.bg,fontFamily:"'Segoe UI',system-ui,sans-serif",paddingBottom:'2.5rem',color:D.text}}>
       <BuildStamp/>
-      <header style={{background:C.navy,padding:'1rem 1.1rem',color:C.white,display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-        <div>
-          <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:C.cyan}}>CLEARVIEW FIELD</div>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',marginTop:'0.15rem'}}>{auth.unit.name}</div>
-          <div style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.6)',marginTop:'0.1rem'}}>{auth.operator.display_name} · {auth.client.name}</div>
-        </div>
-        {(mode==='grid' || mode==='history' || mode==='stock') && (
-          <div style={{display:'flex',gap:'0.5rem'}}>
-            {mode==='grid' && (
-              <button onClick={loadStock}
-                style={{background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.25)',color:C.white,borderRadius:6,padding:'0.5rem 0.75rem',fontSize:'0.72rem',cursor:'pointer',whiteSpace:'nowrap'}}>
-                Stock
-              </button>
-            )}
-            <button onClick={mode==='grid'?loadHistory:()=>setMode('grid')}
-              style={{background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.25)',color:C.white,borderRadius:6,padding:'0.5rem 0.75rem',fontSize:'0.72rem',cursor:'pointer',whiteSpace:'nowrap'}}>
-              {mode==='grid'?'History':'← Back'}
-            </button>
+      <div style={{maxWidth:460,margin:'0 auto',padding:'1.1rem 1rem'}}>
+        {/* ---- Header ---- */}
+        <header style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1rem'}}>
+          <div>
+            <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:D.cyan}}>CLEARVIEW FIELD</div>
+            <div style={{fontFamily:'Georgia,serif',fontSize:'2rem',fontWeight:700,marginTop:'0.1rem',lineHeight:1.1}}>
+              {mode==='history'?'History':mode==='stock'?'Stock':'Record'}
+            </div>
+            <div style={{fontSize:'0.82rem',color:D.muted,marginTop:'0.25rem'}}>{auth.operator.display_name} · {auth.unit.name}</div>
           </div>
-        )}
-      </header>
+          {(mode==='grid' || mode==='history' || mode==='stock') && (
+            <div style={{display:'flex',gap:'0.45rem',flexShrink:0}}>
+              {mode==='grid' && (
+                <button onClick={loadStock}
+                  style={{background:D.card,border:`1px solid ${D.border}`,color:D.text,borderRadius:10,padding:'0.55rem 0.8rem',fontSize:'0.78rem',cursor:'pointer',whiteSpace:'nowrap'}}>
+                  Stock
+                </button>
+              )}
+              <button onClick={mode==='grid'?loadHistory:()=>setMode('grid')}
+                style={{background:D.card,border:`1px solid ${D.border}`,color:D.text,borderRadius:10,padding:'0.55rem 0.8rem',fontSize:'0.78rem',cursor:'pointer',whiteSpace:'nowrap'}}>
+                {mode==='grid'?'History':'← Back'}
+              </button>
+            </div>
+          )}
+        </header>
 
-      <div style={{padding:'1rem'}}>
-        {/* Compact sync bar -- kept short so it never pushes the product grid down */}
-        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'0.75rem 1rem',marginBottom:'0.85rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.6rem'}}>
-          <button onClick={()=>setQueueOpen(o=>!o)} style={{background:'none',border:'none',padding:0,cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:'0.6rem'}}>
-            <span aria-hidden="true" style={{width:12,height:12,borderRadius:'50%',flexShrink:0,background:pendingCount===0?C.green:C.amber,boxShadow:`0 0 0 4px ${pendingCount===0?'#E4F5EC':'#FBF0D8'}`}}/>
-            <span>
-              <div style={{fontSize:'0.65rem',color:C.slate,fontFamily:'monospace'}}>{pendingCount===0?'ALL SAVED & SENT':'WAITING TO SEND'} {queueOpen?'▾':'▸'}</div>
-              <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',fontWeight:700,color:pendingCount===0?C.green:C.navy}}>{pendingCount===0?'Up to date':`${pendingCount} entr${pendingCount===1?'y':'ies'}`}</div>
+        {/* ---- Sync-status banner (with manual Sync now) ---- */}
+        <div style={{background:pendingCount===0?'transparent':D.amberDim,border:pendingCount===0?`1px solid ${D.border}`:`1px solid ${D.amber}`,borderRadius:14,padding:'0.75rem 0.9rem',marginBottom:'0.9rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.6rem'}}>
+          <button onClick={()=>setQueueOpen(o=>!o)} style={{background:'none',border:'none',padding:0,cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:'0.55rem',color:D.text,minWidth:0}}>
+            <span aria-hidden="true" style={{fontSize:'1rem',flexShrink:0,color:pendingCount===0?D.green:D.amber}}>{pendingCount===0?'✓':'↑'}</span>
+            <span style={{minWidth:0}}>
+              {pendingCount===0
+                ? <div style={{fontSize:'0.9rem',fontWeight:600,color:D.green}}>Up to date</div>
+                : <div style={{fontSize:'0.9rem',fontWeight:600,color:D.amber}}>{pendingCount} record{pendingCount===1?'':'s'} waiting to sync, will send when online {queueOpen?'▾':'▸'}</div>}
             </span>
           </button>
-          <button disabled={syncing||pendingCount===0} onClick={syncNow}
-            style={{padding:'0.6rem 1rem',background:pendingCount===0?C.border:C.teal,color:C.white,border:'none',borderRadius:6,fontWeight:600,cursor:pendingCount===0?'default':'pointer',fontSize:'0.82rem',whiteSpace:'nowrap'}}>
-            {syncing?'Syncing...':'Sync Now'}
-          </button>
+          {pendingCount>0 && (
+            <button disabled={syncing} onClick={syncNow}
+              style={{padding:'0.6rem 0.95rem',background:D.cyan,color:'#062230',border:'none',borderRadius:10,fontWeight:700,cursor:'pointer',fontSize:'0.82rem',whiteSpace:'nowrap',flexShrink:0,opacity:syncing?0.6:1}}>
+              {syncing?'Syncing...':'Sync now'}
+            </button>
+          )}
         </div>
         {(lastSync || syncMsg) && (
-          <div style={{marginBottom:'0.85rem',fontSize:'0.75rem'}}>
-            {lastSync && <div style={{color:C.slate}}>Last synced {lastSync}</div>}
-            {syncMsg && <div style={{color:syncMsg.startsWith('Synced')?C.green:C.red,marginTop:'0.2rem'}}>{syncMsg}</div>}
+          <div style={{marginBottom:'0.9rem',fontSize:'0.78rem'}}>
+            {lastSync && <div style={{color:D.faint}}>Last synced {lastSync}</div>}
+            {syncMsg && <div style={{color:syncMsg.startsWith('Synced')?'#5FD08A':'#FF8B7E',marginTop:'0.2rem'}}>{syncMsg}</div>}
           </div>
         )}
 
-        {mode==='grid' && (
-          <>
-            {/* Search -- always visible, right above the products it filters */}
-            <input
-              style={{...inp,marginBottom:'0.85rem',fontSize:'0.95rem',padding:'0.75rem'}}
-              placeholder="🔍 Search products or services..."
-              aria-label="Search products or services"
-              value={search} onChange={e=>setSearch(e.target.value)}
-            />
-
-            {products.length>0 && <>
-              <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:C.slate,marginBottom:'0.5rem'}}>📦 PRODUCTS</div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.6rem',marginBottom:'1rem'}}>
-                {products.map(item=>(
-                  <button key={item.id} onClick={()=>openSaleDetail(item)}
-                    style={{background:C.white,border:`1px solid ${C.border}`,borderTop:`4px solid ${C.teal}`,borderRadius:10,padding:'0.95rem 0.8rem',textAlign:'left',cursor:'pointer',minHeight:'90px',display:'flex',flexDirection:'column',gap:'0.28rem'}}>
-                    <div style={{fontSize:'1.5rem',lineHeight:1}} aria-hidden="true">📦</div>
-                    <div style={{fontWeight:700,fontSize:'0.9rem',color:C.navy,lineHeight:1.2}}>{item.name}</div>
-                    <div style={{fontSize:'0.78rem',color:C.slate,fontWeight:600}}>{fmt(item.price,auth.client.currency)}{item.unit_label?` / ${item.unit_label}`:''}</div>
-                  </button>
-                ))}
-              </div>
-            </>}
-            {services.length>0 && <>
-              <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:C.slate,marginBottom:'0.5rem'}}>🛠️ SERVICES</div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.6rem',marginBottom:'1rem'}}>
-                {services.map(item=>(
-                  <button key={item.id} onClick={()=>openSaleDetail(item)}
-                    style={{background:C.white,border:`1px solid ${C.border}`,borderTop:`4px solid ${C.cyan}`,borderRadius:10,padding:'0.95rem 0.8rem',textAlign:'left',cursor:'pointer',minHeight:'90px',display:'flex',flexDirection:'column',gap:'0.28rem'}}>
-                    <div style={{fontSize:'1.5rem',lineHeight:1}} aria-hidden="true">🛠️</div>
-                    <div style={{fontWeight:700,fontSize:'0.9rem',color:C.navy,lineHeight:1.2}}>{item.name}</div>
-                    <div style={{fontSize:'0.78rem',color:C.slate,fontWeight:600}}>{fmt(item.price,auth.client.currency)}{item.unit_label?` / ${item.unit_label}`:''}</div>
-                  </button>
-                ))}
-              </div>
-            </>}
-            {products.length===0 && services.length===0 && searchLower && (
-              <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.2rem',textAlign:'center',color:C.slate,fontSize:'0.85rem',marginBottom:'1rem'}}>
-                No products or services match "{search}".
-              </div>
-            )}
-            {products.length===0 && services.length===0 && !searchLower && (
-              <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.2rem',textAlign:'center',color:C.slate,fontSize:'0.85rem',marginBottom:'1rem'}}>
-                No products or services set up for this unit yet. Ask your CEO or Finance Manager to add them to the Catalogue.
-              </div>
-            )}
-            {auth.cost_lines.length>0 && (
-              <button onClick={()=>{setEditingCostId(null);setCostForm({plan_line_id:'',amount:'',notes:'',description:''});setMode('cost-form')}}
-                style={{width:'100%',padding:'0.85rem',background:'#FDF2F0',color:C.red,border:`1px solid ${C.red}`,borderRadius:8,fontSize:'0.9rem',fontWeight:600,cursor:'pointer',marginBottom:'1.25rem'}}>
-                − Record a Cost or Expense
-              </button>
-            )}
-
-            {/* Queue: collapsed by default so it never buries the products above it.
-                Tap the sync bar's chevron to expand and review/edit/remove entries. */}
-            {queueOpen && pendingCount>0 && (
-              <div style={{marginBottom:'1rem'}}>
-                <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:C.slate,marginBottom:'0.5rem'}}>QUEUED ENTRIES</div>
-                {salesQueue.map(q=>(
-                  <div key={q.local_id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
-                    <div style={{minWidth:0}}>
-                      <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.item_name}</div>
-                      <div style={{fontSize:'0.72rem',color:C.slate}}>{q.quantity}{q.unit_label?` ${q.unit_label}`:''} {q.override_price?'(price overridden)':`× ${fmt(q.standard_price,auth.client.currency)}`}</div>
-                    </div>
-                    <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
-                      <div style={{fontFamily:'monospace',fontWeight:700,color:C.green,whiteSpace:'nowrap'}}>+{fmt(q.quantity*(q.override_price??q.standard_price),auth.client.currency)}</div>
-                      <button onClick={()=>openSaleEdit(q)} style={{background:'transparent',border:'none',color:C.teal,fontSize:'0.78rem',cursor:'pointer',fontWeight:600}}>Edit</button>
-                      <button onClick={()=>removeSale(q.local_id)} style={{background:'transparent',border:'none',color:C.red,fontSize:'1.1rem',cursor:'pointer'}}>×</button>
-                    </div>
-                  </div>
-                ))}
-                {costsQueue.map(q=>(
-                  <div key={q.local_id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
-                    <div style={{minWidth:0}}>
-                      <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.plan_line_name}</div>
-                      <div style={{fontSize:'0.72rem',color:C.slate}}>{q.transaction_date}</div>
-                    </div>
-                    <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
-                      <div style={{fontFamily:'monospace',fontWeight:700,color:C.red,whiteSpace:'nowrap'}}>-{fmt(q.amount,auth.client.currency)}</div>
-                      <button onClick={()=>openCostEdit(q)} style={{background:'transparent',border:'none',color:C.teal,fontSize:'0.78rem',cursor:'pointer',fontWeight:600}}>Edit</button>
-                      <button onClick={()=>removeCost(q.local_id)} style={{background:'transparent',border:'none',color:C.red,fontSize:'1.1rem',cursor:'pointer'}}>×</button>
-                    </div>
-                  </div>
-                ))}
-                {uncategorizedCostsQueue.map(q=>(
-                  <div key={q.local_id} style={{background:C.white,border:`1px solid ${C.amber}`,borderRadius:6,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
-                    <div style={{minWidth:0}}>
-                      <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.description}</div>
-                      <div style={{fontSize:'0.68rem',color:C.amber}}>Awaiting categorization · {q.transaction_date}</div>
-                    </div>
-                    <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
-                      <div style={{fontFamily:'monospace',fontWeight:700,color:C.red,whiteSpace:'nowrap'}}>-{fmt(q.amount,auth.client.currency)}</div>
-                      <button onClick={()=>removeUncategorizedCost(q.local_id)} style={{background:'transparent',border:'none',color:C.red,fontSize:'1.1rem',cursor:'pointer'}}>×</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-
-        {mode==='sale-detail' && selectedItem && (
-          <div style={{background:C.white,border:`1px solid ${C.cyan}`,borderRadius:8,padding:'1.1rem'}}>
-            <div style={{fontWeight:700,fontSize:'1rem',color:C.navy,marginBottom:'0.2rem'}}>{editingSaleId?'Edit: ':''}{selectedItem.name}</div>
-            <div style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.9rem'}}>Standard price: {fmt(selectedItem.price,auth.client.currency)}{selectedItem.unit_label?` / ${selectedItem.unit_label}`:''}</div>
-
-            <label style={lbl}>Volume {selectedItem.unit_label?`(${selectedItem.unit_label})`:'sold'}</label>
-            <input type="number" inputMode="numeric" style={inp} value={saleForm.quantity} onChange={e=>setSaleForm(f=>({...f,quantity:e.target.value}))} placeholder="0" autoFocus/>
-
-            {saleForm.quantity && Number(saleForm.quantity)>0 && (
-              <div style={{background:'#F0F4F8',borderRadius:6,padding:'0.6rem 0.8rem',marginBottom:'0.7rem',fontSize:'0.85rem',color:C.navy}}>
-                Total: <span style={{fontWeight:700}}>{fmt(Number(saleForm.quantity)*(saleForm.override?Number(saleForm.override_price||0):selectedItem.price),auth.client.currency)}</span>
-              </div>
-            )}
-
-            <label style={{display:'flex',alignItems:'center',gap:'0.5rem',fontSize:'0.8rem',color:C.slate,marginBottom:'0.7rem',cursor:'pointer'}}>
-              <input type="checkbox" checked={saleForm.override} onChange={e=>setSaleForm(f=>({...f,override:e.target.checked}))}/>
-              This was a bulk sale at a different price
-            </label>
-            {saleForm.override && (
-              <>
-                <label style={lbl}>Actual Price Used</label>
-                <input type="number" inputMode="numeric" style={inp} value={saleForm.override_price} onChange={e=>setSaleForm(f=>({...f,override_price:e.target.value}))}/>
-              </>
-            )}
-
-            <label style={lbl}>Payment Method</label>
-            <select style={inp} value={saleForm.payment_method} onChange={e=>setSaleForm(f=>({...f,payment_method:e.target.value}))}>
-              <option value="cash">Cash</option>
-              <option value="mobile_money">Mobile Money</option>
-              <option value="bank">Bank Transfer</option>
-              <option value="credit">Credit</option>
-            </select>
-
-            {auth.customers.length>0 && (
-              <>
-                <label style={lbl}>Customer (optional)</label>
-                <select style={inp} value={saleForm.customer_id} onChange={e=>setSaleForm(f=>({...f,customer_id:e.target.value}))}>
-                  <option value="">None</option>
-                  {auth.customers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </>
-            )}
-
-            <label style={lbl}>Notes (optional)</label>
-            <input style={inp} value={saleForm.notes} onChange={e=>setSaleForm(f=>({...f,notes:e.target.value}))}/>
-
-            <div style={{display:'flex',gap:'0.6rem',marginTop:'0.5rem'}}>
-              <button onClick={addSaleToQueue} disabled={!saleForm.quantity||Number(saleForm.quantity)<=0}
-                style={{flex:1,padding:'0.85rem',background:C.teal,color:C.white,border:'none',borderRadius:6,fontWeight:700,cursor:'pointer'}}>{editingSaleId?'Save Changes':'Add to Queue'}</button>
-              <button onClick={()=>{setMode('grid');setSelectedItem(null);setEditingSaleId(null)}} style={{padding:'0.85rem 1rem',background:'transparent',color:C.slate,border:`1px solid ${C.border}`,borderRadius:6,cursor:'pointer'}}>Cancel</button>
-            </div>
-          </div>
-        )}
-
-        {mode==='cost-form' && (
-          <div style={{background:C.white,border:`1px solid ${C.red}`,borderRadius:8,padding:'1.1rem'}}>
-            <div style={{fontWeight:700,fontSize:'1rem',color:C.navy,marginBottom:'0.7rem'}}>{editingCostId?'Edit Cost / Expense':'Record a Cost or Expense'}</div>
-            <label style={lbl}>What is this for?</label>
-            <select style={inp} value={costForm.plan_line_id} onChange={e=>setCostForm(f=>({...f,plan_line_id:e.target.value,description:''}))}>
-              <option value="">Select...</option>
-              {auth.cost_lines.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
-              {!editingCostId && <option value="__other__">Something else (not listed)</option>}
-            </select>
-            {costForm.plan_line_id==='__other__' ? (
-              <>
-                <label style={lbl}>What was this cost for?</label>
-                <input style={inp} value={costForm.description} onChange={e=>setCostForm(f=>({...f,description:e.target.value}))} placeholder="e.g. Motorbike repair"/>
-                <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.3rem',marginBottom:'0.6rem'}}>
-                  This will be recorded and reviewed by your coach, who will assign it to the right category.
+        {/* ---- Expandable queue review (edit/remove) ---- */}
+        {queueOpen && pendingCount>0 && (
+          <div style={{marginBottom:'1rem'}}>
+            <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:D.faint,marginBottom:'0.5rem'}}>QUEUED ENTRIES</div>
+            {salesQueue.map(q=>(
+              <div key={q.local_id} style={{background:D.card,border:`1px solid ${D.border}`,borderRadius:12,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
+                <div style={{minWidth:0}}>
+                  <div style={{fontWeight:600,fontSize:'0.9rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.quantity}{q.unit_label?` ${q.unit_label}`:''} {q.item_name}</div>
+                  <div style={{fontSize:'0.72rem',color:D.faint}}>{q.override_price?'(price overridden)':`× ${fmt(q.standard_price,currency)}`}</div>
                 </div>
-              </>
-            ) : null}
-            <label style={lbl}>Amount ({auth.client.currency})</label>
-            <input type="number" inputMode="numeric" style={inp} value={costForm.amount} onChange={e=>setCostForm(f=>({...f,amount:e.target.value}))} placeholder="0"/>
-            {costForm.plan_line_id!=='__other__' && (
-              <>
-                <label style={lbl}>Notes (optional)</label>
-                <input style={inp} value={costForm.notes} onChange={e=>setCostForm(f=>({...f,notes:e.target.value}))}/>
-              </>
-            )}
-            <div style={{display:'flex',gap:'0.6rem',marginTop:'0.5rem'}}>
-              <button onClick={costForm.plan_line_id==='__other__'?addUncategorizedCostToQueue:addCostToQueue}
-                disabled={costForm.plan_line_id==='__other__'?(!costForm.description||!costForm.amount):(!costForm.plan_line_id||!costForm.amount)}
-                style={{flex:1,padding:'0.85rem',background:C.red,color:C.white,border:'none',borderRadius:6,fontWeight:700,cursor:'pointer'}}>{editingCostId?'Save Changes':'Add to Queue'}</button>
-              <button onClick={()=>{setMode('grid');setEditingCostId(null)}} style={{padding:'0.85rem 1rem',background:'transparent',color:C.slate,border:`1px solid ${C.border}`,borderRadius:6,cursor:'pointer'}}>Cancel</button>
-            </div>
-          </div>
-        )}
-
-        {mode==='history' && (
-          <div>
-            <div style={{fontWeight:700,fontSize:'1rem',color:C.navy,marginBottom:'0.85rem'}}>Your Recent Activity</div>
-            {historyLoading && <div style={{textAlign:'center',color:C.slate,padding:'2rem',fontSize:'0.85rem'}}>Loading...</div>}
-            {!historyLoading && historyError && (
-              <div style={{background:'#FDF2F0',border:`1px solid ${C.red}`,borderRadius:8,padding:'1rem',color:C.red,fontSize:'0.85rem'}}>{historyError}</div>
-            )}
-            {!historyLoading && !historyError && historyEntries.length===0 && (
-              <div style={{textAlign:'center',color:C.slate,padding:'2rem',fontSize:'0.85rem'}}>Nothing recorded yet. Once you sync an entry, it&apos;ll show up here.</div>
-            )}
-            {!historyLoading && !historyError && historyEntries.map(entry=>(
-              <div key={entry.id} style={{background:C.white,border:`1px solid ${C.border}`,borderLeft:`4px solid ${entry.transaction_type==='sale'?C.green:C.red}`,borderRadius:8,padding:'0.85rem 1rem',marginBottom:'0.6rem'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'0.5rem'}}>
-                  <div>
-                    <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>{entry.plan_line_name}</div>
-                    <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.15rem'}}>
-                      {entry.transaction_date} {entry.quantity?`· ${entry.quantity}${entry.unit_label?` ${entry.unit_label}`:''} × ${fmt(entry.unit_price??0,auth.client.currency)}`:''}
-                    </div>
-                    {entry.notes && <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.15rem',fontStyle:'italic'}}>{entry.notes}</div>}
-                  </div>
-                  <div style={{fontWeight:700,fontSize:'0.95rem',color:entry.transaction_type==='sale'?C.green:C.red,whiteSpace:'nowrap'}}>
-                    {entry.transaction_type==='sale'?'+':'−'}{fmt(entry.amount,auth.client.currency)}
-                  </div>
+                <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
+                  <div style={{fontFamily:'monospace',fontWeight:700,color:'#5FD08A',whiteSpace:'nowrap'}}>+{fmt(q.quantity*(q.override_price??q.standard_price),currency)}</div>
+                  <button onClick={()=>openSaleEdit(q)} style={{background:'transparent',border:'none',color:D.cyan,fontSize:'0.82rem',cursor:'pointer',fontWeight:600}}>Edit</button>
+                  <button onClick={()=>removeSale(q.local_id)} style={{background:'transparent',border:'none',color:'#FF8B7E',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
                 </div>
-                {entry.price_alert && <div style={{fontSize:'0.68rem',color:C.amber,marginTop:'0.4rem'}}>⚠ Price was overridden from the standard catalogue price</div>}
+              </div>
+            ))}
+            {costsQueue.map(q=>(
+              <div key={q.local_id} style={{background:D.card,border:`1px solid ${D.border}`,borderRadius:12,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
+                <div style={{minWidth:0}}>
+                  <div style={{fontWeight:600,fontSize:'0.9rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.plan_line_name}</div>
+                  <div style={{fontSize:'0.72rem',color:D.faint}}>{q.transaction_date}</div>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
+                  <div style={{fontFamily:'monospace',fontWeight:700,color:'#FF8B7E',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</div>
+                  <button onClick={()=>openCostEdit(q)} style={{background:'transparent',border:'none',color:D.cyan,fontSize:'0.82rem',cursor:'pointer',fontWeight:600}}>Edit</button>
+                  <button onClick={()=>removeCost(q.local_id)} style={{background:'transparent',border:'none',color:'#FF8B7E',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
+                </div>
+              </div>
+            ))}
+            {uncategorizedCostsQueue.map(q=>(
+              <div key={q.local_id} style={{background:D.card,border:`1px solid ${D.amber}`,borderRadius:12,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
+                <div style={{minWidth:0}}>
+                  <div style={{fontWeight:600,fontSize:'0.9rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.description}</div>
+                  <div style={{fontSize:'0.68rem',color:D.amber}}>Awaiting categorization · {q.transaction_date}</div>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
+                  <div style={{fontFamily:'monospace',fontWeight:700,color:'#FF8B7E',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</div>
+                  <button onClick={()=>removeUncategorizedCost(q.local_id)} style={{background:'transparent',border:'none',color:'#FF8B7E',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
+                </div>
               </div>
             ))}
           </div>
         )}
 
+        {/* ================= GRID (Record) ================= */}
+        {mode==='grid' && (
+          <>
+            {/* Money in / Money out toggle */}
+            <div style={{display:'flex',gap:'0.6rem',marginBottom:'1.1rem'}}>
+              <button onClick={()=>setFlow('in')}
+                style={{flex:1,padding:'0.95rem',borderRadius:14,fontSize:'1rem',fontWeight:700,cursor:'pointer',
+                  background:flow==='in'?D.cyan:'transparent',color:flow==='in'?'#062230':D.text,
+                  border:flow==='in'?'none':`1px solid ${D.border}`}}>
+                + Money in
+              </button>
+              <button onClick={()=>{setFlow('out');setEditingCostId(null);setCostForm({plan_line_id:'',amount:'',notes:'',description:''})}}
+                style={{flex:1,padding:'0.95rem',borderRadius:14,fontSize:'1rem',fontWeight:700,cursor:'pointer',
+                  background:flow==='out'?D.red:'transparent',color:flow==='out'?D.white:D.text,
+                  border:flow==='out'?'none':`1px solid ${D.border}`}}>
+                − Money out
+              </button>
+            </div>
+
+            {flow==='in' ? (
+              <>
+                <div style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'1.05rem',fontWeight:700,marginBottom:'0.7rem'}}>
+                  What did you sell? {speaker('What did you sell?')}
+                </div>
+                <input
+                  style={{...inp,marginBottom:'0.9rem'}}
+                  placeholder="🔍 Search products or services..."
+                  aria-label="Search products or services"
+                  value={search} onChange={e=>setSearch(e.target.value)}
+                />
+                {tiles.length>0 ? (
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.7rem',marginBottom:'1.25rem'}}>
+                    {tiles.map(item=>(
+                      <button key={item.id} onClick={()=>openSaleDetail(item)} style={tileStyle}>
+                        <div style={tileImgStyle}>{itemThumb(item,120)}</div>
+                        <div style={{fontWeight:700,fontSize:'1rem',lineHeight:1.15}}>{item.name}</div>
+                        <div style={{fontSize:'0.85rem',color:D.cyan,fontWeight:700}}>{fmt(item.price,currency)}{item.unit_label?` / ${item.unit_label}`:''}</div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{...cardStyle,textAlign:'center',color:D.muted,fontSize:'0.9rem',marginBottom:'1.25rem'}}>
+                    {searchLower
+                      ? `No products or services match "${search}".`
+                      : 'No products or services set up for this unit yet. Ask your CEO or Finance Manager to add them to the Catalogue.'}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{marginBottom:'1.25rem'}}>
+                {costCard}
+              </div>
+            )}
+
+            {/* ---- Today's records ---- */}
+            {pendingCount>0 && (
+              <>
+                <div style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'1.05rem',fontWeight:700,marginBottom:'0.7rem'}}>
+                  Today&apos;s records {speaker("Today's records")}
+                </div>
+                <div>
+                  {salesQueue.map(q=>{
+                    const item = auth.catalogue.find(c=>c.id===q.catalogue_item_id)
+                    return (
+                      <button key={q.local_id} onClick={()=>openSaleEdit(q)}
+                        style={{width:'100%',textAlign:'left',background:D.card,border:`1px solid ${D.border}`,borderRadius:12,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',alignItems:'center',gap:'0.7rem',cursor:'pointer',color:D.text}}>
+                        <span style={{width:38,height:38,borderRadius:10,background:D.bg2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.3rem',flexShrink:0,overflow:'hidden'}}>
+                          {item?itemThumb(item,38):'📦'}
+                        </span>
+                        <span style={{minWidth:0,flex:1}}>
+                          <span style={{display:'block',fontWeight:600,fontSize:'0.92rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.quantity}{q.unit_label?` ${q.unit_label}`:''} {q.item_name}</span>
+                          <span style={{display:'inline-block',fontSize:'0.66rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
+                        </span>
+                        <span style={{fontFamily:'monospace',fontWeight:700,color:'#5FD08A',whiteSpace:'nowrap',flexShrink:0}}>+{fmt(q.quantity*(q.override_price??q.standard_price),currency)}</span>
+                      </button>
+                    )
+                  })}
+                  {costsQueue.map(q=>(
+                    <button key={q.local_id} onClick={()=>openCostEdit(q)}
+                      style={{width:'100%',textAlign:'left',background:D.card,border:`1px solid ${D.border}`,borderRadius:12,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',alignItems:'center',gap:'0.7rem',cursor:'pointer',color:D.text}}>
+                      <span style={{width:38,height:38,borderRadius:10,background:D.bg2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.3rem',flexShrink:0}}>💸</span>
+                      <span style={{minWidth:0,flex:1}}>
+                        <span style={{display:'block',fontWeight:600,fontSize:'0.92rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.plan_line_name}</span>
+                        <span style={{display:'inline-block',fontSize:'0.66rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
+                      </span>
+                      <span style={{fontFamily:'monospace',fontWeight:700,color:'#FF8B7E',whiteSpace:'nowrap',flexShrink:0}}>-{fmt(q.amount,currency)}</span>
+                    </button>
+                  ))}
+                  {uncategorizedCostsQueue.map(q=>(
+                    <div key={q.local_id}
+                      style={{width:'100%',background:D.card,border:`1px solid ${D.border}`,borderRadius:12,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',alignItems:'center',gap:'0.7rem',color:D.text}}>
+                      <span style={{width:38,height:38,borderRadius:10,background:D.bg2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.3rem',flexShrink:0}}>❓</span>
+                      <span style={{minWidth:0,flex:1}}>
+                        <span style={{display:'block',fontWeight:600,fontSize:'0.92rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.description}</span>
+                        <span style={{display:'inline-block',fontSize:'0.66rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
+                      </span>
+                      <span style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
+                        <span style={{fontFamily:'monospace',fontWeight:700,color:'#FF8B7E',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</span>
+                        <button onClick={()=>removeUncategorizedCost(q.local_id)} style={{background:'transparent',border:'none',color:'#FF8B7E',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {/* ================= SALE DETAIL ================= */}
+        {mode==='sale-detail' && selectedItem && (
+          <div style={cardStyle}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'0.5rem',marginBottom:'1rem'}}>
+              <div>
+                <div style={{display:'flex',alignItems:'center',gap:'0.4rem',fontWeight:800,fontSize:'1.4rem',lineHeight:1.1}}>
+                  {selectedItem.name} sale {speaker(`${selectedItem.name} sale`)}
+                </div>
+                <div style={{fontSize:'0.85rem',color:D.cyan,marginTop:'0.2rem'}}>Money in</div>
+              </div>
+              <button onClick={()=>{setMode('grid');setSelectedItem(null);setEditingSaleId(null)}}
+                aria-label="Close" style={{background:D.bg2,border:'none',color:D.text,width:40,height:40,borderRadius:12,fontSize:'1.3rem',cursor:'pointer',flexShrink:0,lineHeight:1}}>×</button>
+            </div>
+
+            {/* Quantity stepper */}
+            <div style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'1rem',fontWeight:700,color:D.muted,marginBottom:'0.55rem'}}>
+              How much? (quantity){selectedItem.unit_label?` in ${selectedItem.unit_label}`:''} {speaker('How much? Quantity')}
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:'0.8rem',marginBottom:'1.1rem'}}>
+              <button aria-label="Less" onClick={()=>setSaleForm(f=>({...f,quantity:String(Math.max(0,(Number(f.quantity||0)||0)-1))}))} style={stepBtnStyle}>−</button>
+              <input type="number" inputMode="numeric" aria-label="Quantity" value={saleForm.quantity}
+                onChange={e=>setSaleForm(f=>({...f,quantity:e.target.value}))} placeholder="0"
+                style={{flex:1,minWidth:0,textAlign:'center',fontSize:'2rem',fontWeight:800,padding:'0.6rem',background:D.bg2,border:`1px solid ${D.border}`,borderRadius:14,color:D.text,boxSizing:'border-box'}} autoFocus/>
+              <button aria-label="More" onClick={()=>setSaleForm(f=>({...f,quantity:String((Number(f.quantity||0)||0)+1)}))} style={stepBtnStyle}>+</button>
+            </div>
+
+            {/* Price stepper (touching it flags an override) */}
+            <div style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'1rem',fontWeight:700,color:D.muted,marginBottom:'0.55rem'}}>
+              Price for each unit {speaker('Price for each unit')}
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:'0.8rem',marginBottom:'0.5rem'}}>
+              <button aria-label="Lower price" onClick={()=>setSaleForm(f=>({...f,override:true,override_price:String(Math.max(0,(Number(f.override?f.override_price:selectedItem.price)||0)-100))}))} style={stepBtnStyle}>−</button>
+              <input type="number" inputMode="numeric" aria-label="Price for each unit"
+                value={saleForm.override?saleForm.override_price:String(selectedItem.price)}
+                onChange={e=>setSaleForm(f=>({...f,override:true,override_price:e.target.value}))}
+                style={{flex:1,minWidth:0,textAlign:'center',fontSize:'1.6rem',fontWeight:800,padding:'0.6rem',background:D.bg2,border:`1px solid ${D.border}`,borderRadius:14,color:D.text,boxSizing:'border-box'}}/>
+              <button aria-label="Raise price" onClick={()=>setSaleForm(f=>({...f,override:true,override_price:String((Number(f.override?f.override_price:selectedItem.price)||0)+100)}))} style={stepBtnStyle}>+</button>
+            </div>
+            {saleForm.override && (
+              <div style={{fontSize:'0.75rem',color:D.amber,marginBottom:'0.6rem'}}>Using a custom price (standard is {fmt(selectedItem.price,currency)})</div>
+            )}
+
+            {/* Total */}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',background:D.bg2,borderRadius:14,padding:'0.9rem 1.05rem',marginBottom:'1rem'}}>
+              <span style={{fontSize:'1.1rem',fontWeight:700,color:D.muted}}>Total</span>
+              <span style={{fontSize:'1.5rem',fontWeight:800,color:D.text}}>{fmt(qtyNum*effectivePrice,currency)}</span>
+            </div>
+
+            {/* Secondary details (kept, smaller/below) */}
+            <div style={{background:D.bg2,borderRadius:14,padding:'0.85rem',marginBottom:'1rem'}}>
+              <label style={lbl}>Payment method</label>
+              <select style={inp} value={saleForm.payment_method} onChange={e=>setSaleForm(f=>({...f,payment_method:e.target.value}))}>
+                <option value="cash">Cash</option>
+                <option value="mobile_money">Mobile Money</option>
+                <option value="bank">Bank Transfer</option>
+                <option value="credit">Credit</option>
+              </select>
+              {auth.customers.length>0 && (
+                <>
+                  <label style={lbl}>Customer (optional)</label>
+                  <select style={inp} value={saleForm.customer_id} onChange={e=>setSaleForm(f=>({...f,customer_id:e.target.value}))}>
+                    <option value="">None</option>
+                    {auth.customers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </>
+              )}
+              <label style={lbl}>Add a note (optional)</label>
+              <input style={{...inp,marginBottom:0}} value={saleForm.notes} onChange={e=>setSaleForm(f=>({...f,notes:e.target.value}))}/>
+            </div>
+
+            <button onClick={addSaleToQueue} disabled={!saleForm.quantity||Number(saleForm.quantity)<=0}
+              style={{...primaryBtnStyle,opacity:(!saleForm.quantity||Number(saleForm.quantity)<=0)?0.5:1}}>
+              {editingSaleId?'Save changes':'Save sale'}
+            </button>
+            <button onClick={()=>{setMode('grid');setSelectedItem(null);setEditingSaleId(null)}}
+              style={{width:'100%',marginTop:'0.6rem',padding:'0.85rem',background:'transparent',color:D.muted,border:`1px solid ${D.border}`,borderRadius:12,cursor:'pointer',fontSize:'0.95rem'}}>Cancel</button>
+          </div>
+        )}
+
+        {/* ================= COST FORM (edit) ================= */}
+        {mode==='cost-form' && costCard}
+
+        {/* ================= HISTORY ================= */}
+        {mode==='history' && (
+          <div>
+            {historyLoading && <div style={{textAlign:'center',color:D.muted,padding:'2rem',fontSize:'0.9rem'}}>Loading...</div>}
+            {!historyLoading && historyError && (
+              <div style={{background:D.redDim,border:`1px solid ${D.red}`,borderRadius:14,padding:'1rem',color:'#FF8B7E',fontSize:'0.9rem'}}>{historyError}</div>
+            )}
+            {!historyLoading && !historyError && historyEntries.length===0 && (
+              <div style={{textAlign:'center',color:D.muted,padding:'2rem',fontSize:'0.9rem'}}>Nothing recorded yet. Once you sync an entry, it&apos;ll show up here.</div>
+            )}
+            {!historyLoading && !historyError && historyEntries.map(entry=>(
+              <div key={entry.id} style={{background:D.card,border:`1px solid ${D.border}`,borderLeft:`4px solid ${entry.transaction_type==='sale'?D.green:D.red}`,borderRadius:12,padding:'0.85rem 1rem',marginBottom:'0.6rem'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'0.5rem'}}>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:'0.92rem'}}>{entry.plan_line_name}</div>
+                    <div style={{fontSize:'0.74rem',color:D.faint,marginTop:'0.15rem'}}>
+                      {entry.transaction_date} {entry.quantity?`· ${entry.quantity}${entry.unit_label?` ${entry.unit_label}`:''} × ${fmt(entry.unit_price??0,currency)}`:''}
+                    </div>
+                    {entry.notes && <div style={{fontSize:'0.74rem',color:D.faint,marginTop:'0.15rem',fontStyle:'italic'}}>{entry.notes}</div>}
+                  </div>
+                  <div style={{fontWeight:800,fontSize:'1rem',color:entry.transaction_type==='sale'?'#5FD08A':'#FF8B7E',whiteSpace:'nowrap'}}>
+                    {entry.transaction_type==='sale'?'+':'−'}{fmt(entry.amount,currency)}
+                  </div>
+                </div>
+                {entry.price_alert && <div style={{fontSize:'0.7rem',color:D.amber,marginTop:'0.4rem'}}>⚠ Price was overridden from the standard catalogue price</div>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ================= STOCK ================= */}
         {mode==='stock' && (
           <div>
-            <div style={{fontWeight:700,fontSize:'1rem',color:C.navy,marginBottom:'0.85rem'}}>Stock on Hand</div>
-            {stockLoading && <div style={{textAlign:'center',color:C.slate,padding:'2rem',fontSize:'0.85rem'}}>Loading...</div>}
+            {stockLoading && <div style={{textAlign:'center',color:D.muted,padding:'2rem',fontSize:'0.9rem'}}>Loading...</div>}
             {!stockLoading && stockError && (
-              <div style={{background:'#FDF2F0',border:`1px solid ${C.red}`,borderRadius:8,padding:'1rem',color:C.red,fontSize:'0.85rem'}}>{stockError}</div>
+              <div style={{background:D.redDim,border:`1px solid ${D.red}`,borderRadius:14,padding:'1rem',color:'#FF8B7E',fontSize:'0.9rem'}}>{stockError}</div>
             )}
             {!stockLoading && !stockError && stockLevels.length===0 && (
-              <div style={{textAlign:'center',color:C.slate,padding:'2rem',fontSize:'0.85rem'}}>No stock recorded yet. Record a sale or receive stock for a catalogue item to start tracking it here.</div>
+              <div style={{textAlign:'center',color:D.muted,padding:'2rem',fontSize:'0.9rem'}}>No stock recorded yet. Record a sale or receive stock for a catalogue item to start tracking it here.</div>
             )}
             {!stockLoading && !stockError && stockLevels.map(level=>{
               const low = level.reorder_threshold != null && level.quantity_on_hand <= level.reorder_threshold
               return (
-                <div key={level.id} style={{background:C.white,border:`1px solid ${low?C.amber:C.border}`,borderRadius:8,padding:'0.85rem 1rem',marginBottom:'0.6rem'}}>
+                <div key={level.id} style={{background:D.card,border:`1px solid ${low?D.amber:D.border}`,borderRadius:12,padding:'0.85rem 1rem',marginBottom:'0.6rem'}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
                     <div>
-                      <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy}}>{level.catalogue?.name || 'Item'}</div>
-                      {low && <div style={{fontSize:'0.68rem',color:C.amber,marginTop:'0.1rem'}}>⚠ At or below reorder threshold ({level.reorder_threshold})</div>}
+                      <div style={{fontWeight:700,fontSize:'0.92rem'}}>{level.catalogue?.name || 'Item'}</div>
+                      {low && <div style={{fontSize:'0.7rem',color:D.amber,marginTop:'0.1rem'}}>⚠ At or below reorder threshold ({level.reorder_threshold})</div>}
                     </div>
-                    <div style={{fontFamily:'monospace',fontWeight:700,fontSize:'1rem',color:C.navy,whiteSpace:'nowrap'}}>
+                    <div style={{fontFamily:'monospace',fontWeight:700,fontSize:'1.1rem',whiteSpace:'nowrap'}}>
                       {level.quantity_on_hand}{level.catalogue?.unit_label?` ${level.catalogue.unit_label}`:''}
                     </div>
                   </div>
                   {receivingItemId===level.catalogue_item_id ? (
                     <div style={{display:'flex',gap:'0.5rem',marginTop:'0.6rem'}}>
                       <input type="number" autoFocus value={receiveQty} onChange={e=>setReceiveQty(e.target.value)}
-                        placeholder="Quantity received" style={{flex:1,padding:'0.5rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'0.82rem'}}/>
+                        placeholder="Quantity received" style={{flex:1,minWidth:0,padding:'0.6rem',background:D.bg2,border:`1px solid ${D.border}`,borderRadius:10,fontSize:'0.9rem',color:D.text,boxSizing:'border-box'}}/>
                       <button disabled={receiving} onClick={()=>receiveStock(level.catalogue_item_id)}
-                        style={{padding:'0.5rem 0.85rem',background:C.teal,color:C.white,border:'none',borderRadius:6,fontSize:'0.78rem',cursor:'pointer',fontWeight:600}}>
+                        style={{padding:'0.6rem 0.9rem',background:D.green,color:D.white,border:'none',borderRadius:10,fontSize:'0.85rem',cursor:'pointer',fontWeight:700}}>
                         {receiving?'Saving...':'Confirm'}
                       </button>
                       <button onClick={()=>{setReceivingItemId(null);setReceiveQty('')}}
-                        style={{padding:'0.5rem 0.85rem',background:'transparent',color:C.slate,border:`1px solid ${C.border}`,borderRadius:6,fontSize:'0.78rem',cursor:'pointer'}}>
+                        style={{padding:'0.6rem 0.9rem',background:'transparent',color:D.muted,border:`1px solid ${D.border}`,borderRadius:10,fontSize:'0.85rem',cursor:'pointer'}}>
                         Cancel
                       </button>
                     </div>
                   ) : (
                     <button onClick={()=>{setReceivingItemId(level.catalogue_item_id);setReceiveQty('')}}
-                      style={{marginTop:'0.6rem',padding:'0.4rem 0.75rem',background:'transparent',color:C.teal,border:`1px solid ${C.teal}`,borderRadius:6,fontSize:'0.75rem',cursor:'pointer',fontWeight:600}}>
+                      style={{marginTop:'0.6rem',padding:'0.5rem 0.85rem',background:'transparent',color:D.cyan,border:`1px solid ${D.cyan}`,borderRadius:10,fontSize:'0.82rem',cursor:'pointer',fontWeight:700}}>
                       + Receive Stock
                     </button>
                   )}
