@@ -466,12 +466,12 @@ export default function FieldCapturePage() {
       <div style={{minHeight:'100vh',background:D.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:'1.5rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
         <BuildStamp/>
         <div style={{background:D.card,border:`1px solid ${D.border}`,borderRadius:18,padding:'1.9rem',maxWidth:420,width:'100%'}}>
-          <div style={{fontFamily:'monospace',fontSize:'0.68rem',letterSpacing:'0.12em',color:D.cyan,marginBottom:'0.6rem'}}>CLEARVIEW FIELD</div>
+          <div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.12em',color:D.cyan,marginBottom:'0.6rem'}}>CLEARVIEW FIELD</div>
           <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.6rem',color:D.text,margin:'0 0 1rem'}}>Enter your access link</h1>
           <p style={{fontSize:'0.9rem',color:D.muted,lineHeight:1.6,marginBottom:'1.2rem'}}>Paste the code you were given, or open this page using the link directly.</p>
           <input style={{width:'100%',padding:'0.9rem',background:D.bg2,border:`1px solid ${D.border}`,borderRadius:12,fontSize:'1rem',color:D.text,boxSizing:'border-box',marginBottom:'0.9rem'}}
             placeholder="Paste your access code here" value={tokenInput} onChange={e=>setTokenInput(e.target.value)}/>
-          {authError && <div style={{color:'var(--cv-red-text)',fontSize:'0.85rem',marginBottom:'0.9rem'}}>{authError}</div>}
+          {authError && <div style={{color:'var(--cv-red-text)',fontSize:'0.92rem',marginBottom:'0.9rem'}}>{authError}</div>}
           <button style={{width:'100%',padding:'1rem',background:D.cyan,color:'var(--cv-on-cyan)',border:'none',borderRadius:12,fontSize:'1rem',fontWeight:700,cursor:'pointer'}}
             disabled={loading || !tokenInput} onClick={()=>authenticate(tokenInput.trim())}>{loading?'Checking...':'Continue'}</button>
         </div>
@@ -497,7 +497,7 @@ export default function FieldCapturePage() {
 
   // Dark-theme style constants (self-contained inline styles, no new deps).
   const inp: React.CSSProperties = {width:'100%',padding:'0.85rem',background:D.bg2,border:`1px solid ${D.border}`,borderRadius:12,fontSize:'1rem',color:D.text,boxSizing:'border-box',marginBottom:'0.7rem'}
-  const lbl: React.CSSProperties = {display:'block',fontSize:'0.85rem',fontWeight:600,color:D.muted,marginBottom:'0.35rem'}
+  const lbl: React.CSSProperties = {display:'block',fontSize:'0.92rem',fontWeight:600,color:D.muted,marginBottom:'0.35rem'}
   const cardStyle: React.CSSProperties = {background:D.card,border:`1px solid ${D.border}`,borderRadius:18,padding:'1.15rem'}
   const tileStyle: React.CSSProperties = {background:D.card,border:`1px solid ${D.border}`,borderRadius:18,padding:'0.75rem',textAlign:'center',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:'0.45rem',color:D.text}
   const tileImgStyle: React.CSSProperties = {width:'100%',aspectRatio:'1 / 1',borderRadius:14,background:D.bg2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2.6rem',overflow:'hidden'}
@@ -545,7 +545,7 @@ export default function FieldCapturePage() {
         <>
           <label style={lbl}>What was this cost for?</label>
           <input style={inp} value={costForm.description} onChange={e=>setCostForm(f=>({...f,description:e.target.value}))} placeholder="e.g. Motorbike repair"/>
-          <div style={{fontSize:'0.78rem',color:D.faint,marginTop:'-0.2rem',marginBottom:'0.7rem'}}>
+          <div style={{fontSize:'0.86rem',color:D.faint,marginTop:'-0.2rem',marginBottom:'0.7rem'}}>
             This will be recorded and reviewed by your coach, who will assign it to the right category.
           </div>
         </>
@@ -577,27 +577,27 @@ export default function FieldCapturePage() {
         {/* ---- Header ---- */}
         <header style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1rem'}}>
           <div>
-            <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:D.cyan}}>CLEARVIEW FIELD</div>
+            <div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.12em',color:D.cyan}}>CLEARVIEW FIELD</div>
             <div style={{fontFamily:'Georgia,serif',fontSize:'2rem',fontWeight:700,marginTop:'0.1rem',lineHeight:1.1}}>
               {mode==='history'?'History':mode==='stock'?'Stock':'Record'}
             </div>
-            <div style={{fontSize:'0.82rem',color:D.muted,marginTop:'0.25rem'}}>{auth.operator.display_name} · {auth.unit.name}</div>
+            <div style={{fontSize:'0.92rem',color:D.muted,marginTop:'0.25rem'}}>{auth.operator.display_name} · {auth.unit.name}</div>
           </div>
           <div style={{display:'flex',gap:'0.45rem',flexShrink:0}}>
             <button onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle light/dark theme"
-              style={{background:D.card,border:`1px solid ${D.border}`,color:D.text,borderRadius:10,padding:'0.55rem 0.7rem',fontSize:'0.78rem',cursor:'pointer',whiteSpace:'nowrap'}}>
+              style={{background:D.card,border:`1px solid ${D.border}`,color:D.text,borderRadius:10,padding:'0.55rem 0.7rem',fontSize:'0.86rem',cursor:'pointer',whiteSpace:'nowrap'}}>
               {theme==='dark'?'☀':'☾'} Theme
             </button>
             {(mode==='grid' || mode==='history' || mode==='stock') && (
               <>
                 {mode==='grid' && (
                   <button onClick={loadStock}
-                    style={{background:D.card,border:`1px solid ${D.border}`,color:D.text,borderRadius:10,padding:'0.55rem 0.8rem',fontSize:'0.78rem',cursor:'pointer',whiteSpace:'nowrap'}}>
+                    style={{background:D.card,border:`1px solid ${D.border}`,color:D.text,borderRadius:10,padding:'0.55rem 0.8rem',fontSize:'0.86rem',cursor:'pointer',whiteSpace:'nowrap'}}>
                     Stock
                   </button>
                 )}
                 <button onClick={mode==='grid'?loadHistory:()=>setMode('grid')}
-                  style={{background:D.card,border:`1px solid ${D.border}`,color:D.text,borderRadius:10,padding:'0.55rem 0.8rem',fontSize:'0.78rem',cursor:'pointer',whiteSpace:'nowrap'}}>
+                  style={{background:D.card,border:`1px solid ${D.border}`,color:D.text,borderRadius:10,padding:'0.55rem 0.8rem',fontSize:'0.86rem',cursor:'pointer',whiteSpace:'nowrap'}}>
                   {mode==='grid'?'History':'← Back'}
                 </button>
               </>
@@ -617,13 +617,13 @@ export default function FieldCapturePage() {
           </button>
           {pendingCount>0 && (
             <button disabled={syncing} onClick={syncNow}
-              style={{padding:'0.6rem 0.95rem',background:D.cyan,color:'var(--cv-on-cyan)',border:'none',borderRadius:10,fontWeight:700,cursor:'pointer',fontSize:'0.82rem',whiteSpace:'nowrap',flexShrink:0,opacity:syncing?0.6:1}}>
+              style={{padding:'0.6rem 0.95rem',background:D.cyan,color:'var(--cv-on-cyan)',border:'none',borderRadius:10,fontWeight:700,cursor:'pointer',fontSize:'0.92rem',whiteSpace:'nowrap',flexShrink:0,opacity:syncing?0.6:1}}>
               {syncing?'Syncing...':'Sync now'}
             </button>
           )}
         </div>
         {(lastSync || syncMsg) && (
-          <div style={{marginBottom:'0.9rem',fontSize:'0.78rem'}}>
+          <div style={{marginBottom:'0.9rem',fontSize:'0.86rem'}}>
             {lastSync && <div style={{color:D.faint}}>Last synced {lastSync}</div>}
             {syncMsg && <div style={{color:syncMsg.startsWith('Synced')?'var(--cv-green-text)':'var(--cv-red-text)',marginTop:'0.2rem'}}>{syncMsg}</div>}
           </div>
@@ -632,16 +632,16 @@ export default function FieldCapturePage() {
         {/* ---- Expandable queue review (edit/remove) ---- */}
         {queueOpen && pendingCount>0 && (
           <div style={{marginBottom:'1rem'}}>
-            <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:D.faint,marginBottom:'0.5rem'}}>QUEUED ENTRIES</div>
+            <div style={{fontSize:'0.8rem',fontFamily:'monospace',color:D.faint,marginBottom:'0.5rem'}}>QUEUED ENTRIES</div>
             {salesQueue.map(q=>(
               <div key={q.local_id} style={{background:D.card,border:`1px solid ${D.border}`,borderRadius:12,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
                 <div style={{minWidth:0}}>
                   <div style={{fontWeight:600,fontSize:'0.9rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.quantity}{q.unit_label?` ${q.unit_label}`:''} {q.item_name}</div>
-                  <div style={{fontSize:'0.72rem',color:D.faint}}>{q.override_price?'(price overridden)':`× ${fmt(q.standard_price,currency)}`}</div>
+                  <div style={{fontSize:'0.8rem',color:D.faint}}>{q.override_price?'(price overridden)':`× ${fmt(q.standard_price,currency)}`}</div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
                   <div style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-green-text)',whiteSpace:'nowrap'}}>+{fmt(q.quantity*(q.override_price??q.standard_price),currency)}</div>
-                  <button onClick={()=>openSaleEdit(q)} style={{background:'transparent',border:'none',color:D.cyan,fontSize:'0.82rem',cursor:'pointer',fontWeight:600}}>Edit</button>
+                  <button onClick={()=>openSaleEdit(q)} style={{background:'transparent',border:'none',color:D.cyan,fontSize:'0.92rem',cursor:'pointer',fontWeight:600}}>Edit</button>
                   <button onClick={()=>removeSale(q.local_id)} style={{background:'transparent',border:'none',color:'var(--cv-red-text)',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
                 </div>
               </div>
@@ -650,11 +650,11 @@ export default function FieldCapturePage() {
               <div key={q.local_id} style={{background:D.card,border:`1px solid ${D.border}`,borderRadius:12,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
                 <div style={{minWidth:0}}>
                   <div style={{fontWeight:600,fontSize:'0.9rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.plan_line_name}</div>
-                  <div style={{fontSize:'0.72rem',color:D.faint}}>{q.transaction_date}</div>
+                  <div style={{fontSize:'0.8rem',color:D.faint}}>{q.transaction_date}</div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
                   <div style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</div>
-                  <button onClick={()=>openCostEdit(q)} style={{background:'transparent',border:'none',color:D.cyan,fontSize:'0.82rem',cursor:'pointer',fontWeight:600}}>Edit</button>
+                  <button onClick={()=>openCostEdit(q)} style={{background:'transparent',border:'none',color:D.cyan,fontSize:'0.92rem',cursor:'pointer',fontWeight:600}}>Edit</button>
                   <button onClick={()=>removeCost(q.local_id)} style={{background:'transparent',border:'none',color:'var(--cv-red-text)',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
                 </div>
               </div>
@@ -663,7 +663,7 @@ export default function FieldCapturePage() {
               <div key={q.local_id} style={{background:D.card,border:`1px solid ${D.amber}`,borderRadius:12,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
                 <div style={{minWidth:0}}>
                   <div style={{fontWeight:600,fontSize:'0.9rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.description}</div>
-                  <div style={{fontSize:'0.68rem',color:D.amber}}>Awaiting categorization · {q.transaction_date}</div>
+                  <div style={{fontSize:'0.8rem',color:D.amber}}>Awaiting categorization · {q.transaction_date}</div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
                   <div style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</div>
@@ -710,7 +710,7 @@ export default function FieldCapturePage() {
                       <button key={item.id} onClick={()=>openSaleDetail(item)} style={tileStyle}>
                         <div style={tileImgStyle}>{itemThumb(item,120)}</div>
                         <div style={{fontWeight:700,fontSize:'1rem',lineHeight:1.15}}>{item.name}</div>
-                        <div style={{fontSize:'0.85rem',color:D.cyan,fontWeight:700}}>{fmt(item.price,currency)}{item.unit_label?` / ${item.unit_label}`:''}</div>
+                        <div style={{fontSize:'0.92rem',color:D.cyan,fontWeight:700}}>{fmt(item.price,currency)}{item.unit_label?` / ${item.unit_label}`:''}</div>
                       </button>
                     ))}
                   </div>
@@ -745,7 +745,7 @@ export default function FieldCapturePage() {
                         </span>
                         <span style={{minWidth:0,flex:1}}>
                           <span style={{display:'block',fontWeight:600,fontSize:'0.92rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.quantity}{q.unit_label?` ${q.unit_label}`:''} {q.item_name}</span>
-                          <span style={{display:'inline-block',fontSize:'0.66rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
+                          <span style={{display:'inline-block',fontSize:'0.72rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
                         </span>
                         <span style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-green-text)',whiteSpace:'nowrap',flexShrink:0}}>+{fmt(q.quantity*(q.override_price??q.standard_price),currency)}</span>
                       </button>
@@ -757,7 +757,7 @@ export default function FieldCapturePage() {
                       <span style={{width:38,height:38,borderRadius:10,background:D.bg2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.3rem',flexShrink:0}}>💸</span>
                       <span style={{minWidth:0,flex:1}}>
                         <span style={{display:'block',fontWeight:600,fontSize:'0.92rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.plan_line_name}</span>
-                        <span style={{display:'inline-block',fontSize:'0.66rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
+                        <span style={{display:'inline-block',fontSize:'0.72rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
                       </span>
                       <span style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap',flexShrink:0}}>-{fmt(q.amount,currency)}</span>
                     </button>
@@ -768,7 +768,7 @@ export default function FieldCapturePage() {
                       <span style={{width:38,height:38,borderRadius:10,background:D.bg2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.3rem',flexShrink:0}}>❓</span>
                       <span style={{minWidth:0,flex:1}}>
                         <span style={{display:'block',fontWeight:600,fontSize:'0.92rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.description}</span>
-                        <span style={{display:'inline-block',fontSize:'0.66rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
+                        <span style={{display:'inline-block',fontSize:'0.72rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
                       </span>
                       <span style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
                         <span style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</span>
@@ -790,7 +790,7 @@ export default function FieldCapturePage() {
                 <div style={{display:'flex',alignItems:'center',gap:'0.4rem',fontWeight:800,fontSize:'1.4rem',lineHeight:1.1}}>
                   {selectedItem.name} sale {speaker(`${selectedItem.name} sale`)}
                 </div>
-                <div style={{fontSize:'0.85rem',color:D.cyan,marginTop:'0.2rem'}}>Money in</div>
+                <div style={{fontSize:'0.92rem',color:D.cyan,marginTop:'0.2rem'}}>Money in</div>
               </div>
               <button onClick={()=>{setMode('grid');setSelectedItem(null);setEditingSaleId(null)}}
                 aria-label="Close" style={{background:D.bg2,border:'none',color:D.text,width:40,height:40,borderRadius:12,fontSize:'1.3rem',cursor:'pointer',flexShrink:0,lineHeight:1}}>×</button>
@@ -821,7 +821,7 @@ export default function FieldCapturePage() {
               <button aria-label="Raise price" onClick={()=>setSaleForm(f=>({...f,override:true,override_price:String((Number(f.override?f.override_price:selectedItem.price)||0)+100)}))} style={stepBtnStyle}>+</button>
             </div>
             {saleForm.override && (
-              <div style={{fontSize:'0.75rem',color:D.amber,marginBottom:'0.6rem'}}>Using a custom price (standard is {fmt(selectedItem.price,currency)})</div>
+              <div style={{fontSize:'0.86rem',color:D.amber,marginBottom:'0.6rem'}}>Using a custom price (standard is {fmt(selectedItem.price,currency)})</div>
             )}
 
             {/* Total */}
@@ -879,16 +879,16 @@ export default function FieldCapturePage() {
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'0.5rem'}}>
                   <div>
                     <div style={{fontWeight:700,fontSize:'0.92rem'}}>{entry.plan_line_name}</div>
-                    <div style={{fontSize:'0.74rem',color:D.faint,marginTop:'0.15rem'}}>
+                    <div style={{fontSize:'0.86rem',color:D.faint,marginTop:'0.15rem'}}>
                       {entry.transaction_date} {entry.quantity?`· ${entry.quantity}${entry.unit_label?` ${entry.unit_label}`:''} × ${fmt(entry.unit_price??0,currency)}`:''}
                     </div>
-                    {entry.notes && <div style={{fontSize:'0.74rem',color:D.faint,marginTop:'0.15rem',fontStyle:'italic'}}>{entry.notes}</div>}
+                    {entry.notes && <div style={{fontSize:'0.86rem',color:D.faint,marginTop:'0.15rem',fontStyle:'italic'}}>{entry.notes}</div>}
                   </div>
                   <div style={{fontWeight:800,fontSize:'1rem',color:entry.transaction_type==='sale'?'var(--cv-green-text)':'var(--cv-red-text)',whiteSpace:'nowrap'}}>
                     {entry.transaction_type==='sale'?'+':'−'}{fmt(entry.amount,currency)}
                   </div>
                 </div>
-                {entry.price_alert && <div style={{fontSize:'0.7rem',color:D.amber,marginTop:'0.4rem'}}>⚠ Price was overridden from the standard catalogue price</div>}
+                {entry.price_alert && <div style={{fontSize:'0.8rem',color:D.amber,marginTop:'0.4rem'}}>⚠ Price was overridden from the standard catalogue price</div>}
               </div>
             ))}
           </div>
@@ -911,7 +911,7 @@ export default function FieldCapturePage() {
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
                     <div>
                       <div style={{fontWeight:700,fontSize:'0.92rem'}}>{level.catalogue?.name || 'Item'}</div>
-                      {low && <div style={{fontSize:'0.7rem',color:D.amber,marginTop:'0.1rem'}}>⚠ At or below reorder threshold ({level.reorder_threshold})</div>}
+                      {low && <div style={{fontSize:'0.8rem',color:D.amber,marginTop:'0.1rem'}}>⚠ At or below reorder threshold ({level.reorder_threshold})</div>}
                     </div>
                     <div style={{fontFamily:'monospace',fontWeight:700,fontSize:'1.1rem',whiteSpace:'nowrap'}}>
                       {level.quantity_on_hand}{level.catalogue?.unit_label?` ${level.catalogue.unit_label}`:''}
@@ -922,17 +922,17 @@ export default function FieldCapturePage() {
                       <input type="number" autoFocus value={receiveQty} onChange={e=>setReceiveQty(e.target.value)}
                         placeholder="Quantity received" style={{flex:1,minWidth:0,padding:'0.6rem',background:D.bg2,border:`1px solid ${D.border}`,borderRadius:10,fontSize:'0.9rem',color:D.text,boxSizing:'border-box'}}/>
                       <button disabled={receiving} onClick={()=>receiveStock(level.catalogue_item_id)}
-                        style={{padding:'0.6rem 0.9rem',background:D.green,color:D.white,border:'none',borderRadius:10,fontSize:'0.85rem',cursor:'pointer',fontWeight:700}}>
+                        style={{padding:'0.6rem 0.9rem',background:D.green,color:D.white,border:'none',borderRadius:10,fontSize:'0.92rem',cursor:'pointer',fontWeight:700}}>
                         {receiving?'Saving...':'Confirm'}
                       </button>
                       <button onClick={()=>{setReceivingItemId(null);setReceiveQty('')}}
-                        style={{padding:'0.6rem 0.9rem',background:'transparent',color:D.muted,border:`1px solid ${D.border}`,borderRadius:10,fontSize:'0.85rem',cursor:'pointer'}}>
+                        style={{padding:'0.6rem 0.9rem',background:'transparent',color:D.muted,border:`1px solid ${D.border}`,borderRadius:10,fontSize:'0.92rem',cursor:'pointer'}}>
                         Cancel
                       </button>
                     </div>
                   ) : (
                     <button onClick={()=>{setReceivingItemId(level.catalogue_item_id);setReceiveQty('')}}
-                      style={{marginTop:'0.6rem',padding:'0.5rem 0.85rem',background:'transparent',color:D.cyan,border:`1px solid ${D.cyan}`,borderRadius:10,fontSize:'0.82rem',cursor:'pointer',fontWeight:700}}>
+                      style={{marginTop:'0.6rem',padding:'0.5rem 0.85rem',background:'transparent',color:D.cyan,border:`1px solid ${D.cyan}`,borderRadius:10,fontSize:'0.92rem',cursor:'pointer',fontWeight:700}}>
                       + Receive Stock
                     </button>
                   )}
