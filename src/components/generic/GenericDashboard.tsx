@@ -663,6 +663,12 @@ const ovLabel: React.CSSProperties = {fontFamily:'monospace',fontSize:'0.68rem',
 
 // ── OVERVIEW TAB ─────────────────────────────────────────────
 function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGoToApprovals,onGoToIntelligence}) {
+  const [story,setStory] = useState<any>(null)
+  useEffect(()=>{
+    if(!config.client_id) return
+    supabase.from('coach_briefings').select('*').eq('client_id',config.client_id).order('generated_at',{ascending:false}).limit(1)
+      .then(({data}:any)=>setStory(data?.[0]||null))
+  },[config.client_id])
   if (!result) return (
     <div style={card}>
       <div style={{...secH,marginBottom:'0.5rem'}}>Welcome to Clearview</div>
@@ -711,19 +717,38 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGo
         <KPI label="Breakeven" value={fmt(m.business_breakeven,cc)} sub="Annual revenue needed" color={C.amber}/>
         <KPI label="Revenue/Head" value={fmt(m.revenue_per_head,cc)} sub={`${m.total_headcount} staff`} color={C.purple}/>
       </div>
-      {result.con&&Array.isArray(result.con.rev)&&(
-        <>
-          <div style={ovLabel}>Revenue and Cost Trend</div>
-          <div style={card}>
-            <div style={{display:'flex',gap:'1.4rem',marginBottom:'0.9rem',fontSize:'0.72rem',color:C.slate,flexWrap:'wrap'}}>
+      <div style={ovLabel}>Overview</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(330px,1fr))',gap:'1.25rem',marginBottom:'1.6rem',alignItems:'start'}}>
+        {result.con&&Array.isArray(result.con.rev)&&(
+          <div style={{...card,marginBottom:0}}>
+            <div style={{...secH,fontSize:'1rem',marginBottom:'0.55rem'}}>Revenue and cost trend</div>
+            <div style={{display:'flex',gap:'1.2rem',marginBottom:'0.75rem',fontSize:'0.72rem',color:C.slate,flexWrap:'wrap'}}>
               <span><span style={{display:'inline-block',width:10,height:10,borderRadius:10,background:C.teal,marginRight:6,verticalAlign:'middle'}}/>Revenue</span>
               <span><span style={{display:'inline-block',width:10,height:10,borderRadius:10,background:C.amber,marginRight:6,verticalAlign:'middle'}}/>Total cost</span>
               <span><span style={{display:'inline-block',width:10,height:10,borderRadius:10,background:C.green,marginRight:6,verticalAlign:'middle'}}/>EBITDA</span>
             </div>
             <TrendChart months={months} revenue={result.con.rev} cost={result.con.rev.map((r:number,i:number)=>r-((result.con.ebitda&&result.con.ebitda[i])||0))} ebitda={result.con.ebitda||[]} cc={cc}/>
           </div>
-        </>
-      )}
+        )}
+        <div style={{...card,marginBottom:0}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.5rem'}}>
+            <div style={{...secH,fontSize:'1rem',marginBottom:0}}>This Month&apos;s Story</div>
+            <span style={{fontFamily:'monospace',fontSize:'0.58rem',letterSpacing:'0.1em',color:C.purple,border:`1px solid ${C.purple}`,borderRadius:4,padding:'0.1rem 0.42rem'}}>OPUS</span>
+          </div>
+          {story ? (
+            <>
+              <div style={{fontSize:'0.72rem',color:C.slate,marginBottom:'0.6rem'}}>{story.period_covered||''}{story.generated_at?` · generated ${new Date(story.generated_at).toLocaleDateString('en-GB')}`:''}</div>
+              <div style={{fontSize:'0.86rem',color:C.navy,lineHeight:1.75,whiteSpace:'pre-wrap',maxHeight:340,overflowY:'auto'}}>{story.briefing_text}</div>
+            </>
+          ) : (
+            <p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.7}}>
+              No month story yet. Open{' '}
+              <span onClick={onGoToIntelligence} style={{color:C.teal,fontWeight:700,cursor:'pointer',textDecoration:'underline'}}>Clearview Intelligence</span>
+              {' '}and generate This Month&apos;s Story to see it here.
+            </p>
+          )}
+        </div>
+      </div>
       {/* Unit performance cards */}
       <div style={{...secH,marginTop:'0.5rem'}}>Business Unit Performance</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
