@@ -46,6 +46,29 @@ function navBtn(active: boolean): React.CSSProperties {
     fontWeight:active?700:400,whiteSpace:'nowrap'}
 }
 
+// Spend-request categories. Plain-language labels from the approved mockup
+// mapped onto the ORIGINAL stored category keys (cost_of_sales / staff /
+// direct_opex / shared). Expanding the label list is UI-only: submitted and
+// stored values stay inside the original key set, so existing rows, the P&L
+// mapping, and the FM->CEO approval flow are all unaffected. No schema change.
+const SPEND_CATEGORY_OPTIONS: {label:string;value:string}[] = [
+  {label:'Cost of sales',          value:'cost_of_sales'},
+  {label:'Staff & casual labour',  value:'staff'},
+  {label:'Travel & accommodation', value:'direct_opex'},
+  {label:'Marketing & promotion',  value:'direct_opex'},
+  {label:'Equipment',              value:'direct_opex'},
+  {label:'Rent & utilities',       value:'shared'},
+  {label:'Other',                  value:'direct_opex'},
+]
+// Colour tag per stored category key (used by the category chips).
+function categoryColor(cat?: string): string {
+  return cat==='cost_of_sales' ? C.red
+    : cat==='staff' ? C.purple
+    : cat==='shared' ? C.amber
+    : cat==='direct_opex' ? C.teal
+    : C.slate
+}
+
 // Strip patronising preamble and waffle from any AI narrative before it is
 // shown. The generation prompt and house style already forbid these, but
 // older stored stories still contain them and models occasionally slip, so
@@ -54,6 +77,7 @@ function cleanStory(text: string): string {
   if (!text) return text
   let t = text.trim()
   const preambles = [
+    /^(dear|hello|hi|hey|greetings)\b[^.!?\n]{0,40}[,:]\s+/i,
     /^let me be (honest|clear|straight)( with you)?[,.:;\s-]+/i,
     /^(to be|being) (honest|frank|clear)[,.:;\s-]+/i,
     /^honestly[,.:;\s-]+/i,
@@ -104,6 +128,32 @@ function KPI({label,value,sub,color}:{label:string;value:string;sub?:string;colo
 
 function Badge({text,color}:{text:string;color?:string}) {
   return <span style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>
+}
+
+// Rounded category chip for spend requests (matches the mockup's .cat pill).
+function CategoryTag({category}:{category?:string}) {
+  if (!category) return null
+  return <span style={{fontFamily:'monospace',fontSize:'0.66rem',fontWeight:700,borderRadius:20,padding:'0.14rem 0.55rem',background:categoryColor(category),color:'var(--cv-on-accent)',whiteSpace:'nowrap',textTransform:'capitalize',display:'inline-block'}}>{category.replace(/_/g,' ')}</span>
+}
+
+// FM -> CEO -> Done approval-stage tracker dots (mockup .stage). Reads only
+// the spend request's existing status + review timestamps; no new data.
+function StageTracker({r}:{r:any}) {
+  const done=C.green, on=C.amber, wait='var(--cv-border)', bad=C.red
+  let fm:string, ceo:string, fin:string
+  if (r.status==='approved')          { fm=done; ceo=done; fin=done }
+  else if (r.status==='rejected')     { if (r.ceo_decided_at) { fm=done; ceo=bad; fin=wait } else { fm=bad; ceo=wait; fin=wait } }
+  else if (r.status==='pending_ceo')  { fm=done; ceo=on; fin=wait }
+  else                                { fm=on; ceo=wait; fin=wait } // pending_fm
+  const dot=(c:string)=><span style={{width:9,height:9,borderRadius:'50%',background:c,display:'inline-block',flexShrink:0}}/>
+  const lab:React.CSSProperties={fontFamily:'monospace',fontSize:'0.68rem',color:C.slate}
+  return (
+    <div style={{display:'flex',alignItems:'center',gap:'0.4rem',flexWrap:'wrap'}} aria-label="Approval stage">
+      {dot(fm)}<span style={lab}>FM</span>
+      {dot(ceo)}<span style={lab}>CEO</span>
+      {dot(fin)}<span style={lab}>Done</span>
+    </div>
+  )
 }
 
 function Spinner() {
@@ -488,6 +538,21 @@ export default function GenericDashboard({
       return next
     })
   }
+  // Set an explicit theme mode. Reuses the exact persistence the header
+  // toggle uses (localStorage 'cv-theme' + document.documentElement.dataset
+  // .theme), so the Appearance control in Settings and the header stay in
+  // sync. Passed down to SettingsTab. 'auto' resolves to the device's current
+  // preference via matchMedia and is stored as the concrete light/dark value
+  // it resolves to -- the app has no separate 'auto' persistence to invent.
+  const setThemeMode = (mode: 'light'|'dark'|'auto') => {
+    const resolved: 'light'|'dark' = mode === 'auto'
+      ? (typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      : mode
+    setTheme(resolved)
+    localStorage.setItem('cv-theme', resolved)
+    if (resolved === 'dark') document.documentElement.dataset.theme = 'dark'
+    else delete document.documentElement.dataset.theme
+  }
 
   useEffect(() => {
     if (!clientId) return
@@ -676,7 +741,7 @@ export default function GenericDashboard({
         {view==='cashflow'    && <CashFlowTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
         {view==='balancesheet'&& <BalanceSheetTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods} onCloseStatusChanged={loadClosedPeriods}/>}
         {view==='actuals_wc'  && <ActualsAndWorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} onCloseStatusChanged={loadClosedPeriods}/>}
-        {view==='settings'    && <SettingsAndAdminTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={saveConfig}/>}
+        {view==='settings'    && <SettingsAndAdminTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={saveConfig} theme={theme} setThemeMode={setThemeMode}/>}
       </main>
 
       <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.72rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>
@@ -2124,7 +2189,7 @@ function SpendRequestsTab({clientId,config,cc,P}) {
               {config.business_units.filter(u=>u.active&&(!P.unitIds.length||P.unitIds.includes(u.id))).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
             </select></div>
             <div><label style={lbl}>Category</label><select style={inp} value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}>
-              {['cost_of_sales','staff','direct_opex','shared'].map(c=><option key={c} value={c}>{c.replace('_',' ')}</option>)}
+              {SPEND_CATEGORY_OPTIONS.map((o,i)=><option key={i} value={o.value}>{o.label}</option>)}
             </select></div>
             <div><label style={lbl}>Amount ({cc})</label><input type="number" style={inp} value={form.amount||''} onChange={e=>setForm(f=>({...f,amount:Number(e.target.value)}))}/></div>
             <div style={{gridColumn:'1/-1'}}><label style={lbl}>Description</label><textarea style={{...inp,minHeight:60,resize:'vertical'}} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></div>
@@ -2135,18 +2200,27 @@ function SpendRequestsTab({clientId,config,cc,P}) {
           </div>
         </div>
       )}
+      {!showForm&&(
+        <div style={{...card,padding:'0.9rem 1.15rem',fontSize:'0.88rem',lineHeight:1.55,color:C.navy}}>
+          <b>Categories a request can use:</b> <span style={{color:C.slate}}>Cost of sales · Staff &amp; casual labour · Travel &amp; accommodation · Marketing &amp; promotion · Equipment · Rent &amp; utilities · Other.</span> A <b style={{color:C.teal}}>promotion</b> is raised as one <b>Marketing Event</b> that bundles its costs (venue, temporary promo staff, travel, hotel) and carries the expected revenue lift, so once it runs you can see whether it paid off.
+        </div>
+      )}
       {requests.length===0&&!showForm&&<div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No requests yet.</div>}
       {requests.map(r=>(
         <div key={r.id} style={{...card,borderLeft:`4px solid ${statusColor(r.status)}`}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'0.5rem'}}>
-            <div>
-              <div style={{fontWeight:700,fontSize:'0.92rem',color:C.navy}}>{r.description}</div>
-              <div style={{fontSize:'0.86rem',color:C.slate}}>
-                {config.business_units.find(u=>u.id===r.unit_id)?.name||'General'} · {r.category?.replace('_',' ')} · {r.requested_by_name} · {new Date(r.created_at).toLocaleDateString('en-GB')}
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'0.75rem'}}>
+            <div style={{flex:1,minWidth:220}}>
+              <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap'}}>
+                <span style={{fontWeight:700,fontSize:'1rem',color:C.navy}}>{r.description}</span>
+                <CategoryTag category={r.category}/>
+              </div>
+              <div style={{fontSize:'0.86rem',color:C.slate,marginTop:'0.15rem'}}>
+                {config.business_units.find(u=>u.id===r.unit_id)?.name||'General'} · {r.requested_by_name} · {new Date(r.created_at).toLocaleDateString('en-GB')}
               </div>
             </div>
-            <div style={{display:'flex',gap:'0.5rem',alignItems:'center'}}>
-              <span style={{fontFamily:'monospace',fontWeight:700,color:C.navy}}>{fmt(r.amount,cc)}</span>
+            <div style={{display:'flex',gap:'1rem',alignItems:'center',flexWrap:'wrap'}}>
+              <StageTracker r={r}/>
+              <span style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy,whiteSpace:'nowrap'}}>{fmt(r.amount,cc)}</span>
               <Badge text={r.status.replace('_',' ')} color={statusColor(r.status)}/>
             </div>
           </div>
@@ -2199,23 +2273,47 @@ function ApprovalsTab({clientId,config,cc,P}) {
   const pendingFM = requests.filter(r=>r.status==='pending_fm')
   const pendingCEO = requests.filter(r=>r.status==='pending_ceo')
 
+  // KPIs computed only from the already-fetched pending queue -- no extra
+  // query, no fabricated figures. "Awaiting you" counts what this user can
+  // action given their role; "Value pending" sums those same requests.
+  const awaitingList = [...(isFM?pendingFM:[]), ...((isCEO||delegatedApprover)?pendingCEO:[])]
+  const awaitingCount = awaitingList.length
+  const valuePending = awaitingList.reduce((s,r)=>s+(r.amount||0),0)
+
+  const reqRow = (r:any) => (
+    <div style={{display:'flex',alignItems:'flex-start',gap:'1rem',flexWrap:'wrap',justifyContent:'space-between'}}>
+      <div style={{flex:1,minWidth:220}}>
+        <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap'}}>
+          <span style={{fontWeight:700,fontSize:'1rem',color:C.navy}}>{r.description}</span>
+          <CategoryTag category={r.category}/>
+        </div>
+        <div style={{fontSize:'0.86rem',color:C.slate,marginTop:'0.15rem'}}>{config.business_units.find(u=>u.id===r.unit_id)?.name||'General'} · {r.requested_by_name} · {new Date(r.created_at).toLocaleDateString('en-GB')}</div>
+        {r.fm_note&&<div style={{fontSize:'0.86rem',color:C.slate,fontStyle:'italic',marginTop:'0.25rem'}}>FM note: {r.fm_note}</div>}
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap'}}>
+        <StageTracker r={r}/>
+        <span style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy,whiteSpace:'nowrap'}}>{fmt(r.amount,cc)}</span>
+      </div>
+    </div>
+  )
+
   if (loading) return <Spinner/>
   return (
     <div>
       <div style={secH}>Approvals</div>
+      {awaitingCount>0&&(
+        <div style={kpiGrid}>
+          <KPI label="Awaiting you" value={String(awaitingCount)} color={C.amber}/>
+          <KPI label="Value pending" value={fmt(valuePending,cc)} color={C.navy}/>
+        </div>
+      )}
       {isFM&&pendingFM.length>0&&(
-        <div style={{...card,border:`1px solid ${C.amber}`}}>
-          <div style={{fontWeight:700,color:C.amber,marginBottom:'0.75rem'}}>Pending FM Review ({pendingFM.length})</div>
+        <div style={{...card,borderLeft:`4px solid ${C.amber}`}}>
+          <div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.amber,marginBottom:'0.9rem'}}>Pending FM Review ({pendingFM.length})</div>
           {pendingFM.map(r=>(
-            <div key={r.id} style={{border:`1px solid ${C.border}`,borderRadius:6,padding:'0.85rem',marginBottom:'0.75rem',background:C.white}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.5rem'}}>
-                <div>
-                  <div style={{fontWeight:700,color:C.navy}}>{r.description}</div>
-                  <div style={{fontSize:'0.86rem',color:C.slate}}>{config.business_units.find(u=>u.id===r.unit_id)?.name||'General'} · {r.requested_by_name} · {new Date(r.created_at).toLocaleDateString('en-GB')}</div>
-                </div>
-                <span style={{fontFamily:'monospace',fontWeight:700,color:C.navy}}>{fmt(r.amount,cc)}</span>
-              </div>
-              <textarea style={{...inp,minHeight:50,resize:'vertical',marginBottom:'0.5rem'}} placeholder="Add note (optional)" value={notes[r.id]||''} onChange={e=>setNotes(n=>({...n,[r.id]:e.target.value}))}/>
+            <div key={r.id} style={{border:'1px solid var(--cv-border-soft)',borderRadius:12,padding:'1rem 1.1rem',marginBottom:'0.85rem',background:C.lightBg}}>
+              {reqRow(r)}
+              <textarea style={{...inp,minHeight:50,resize:'vertical',margin:'0.75rem 0 0.5rem'}} placeholder="Add note (optional)" value={notes[r.id]||''} onChange={e=>setNotes(n=>({...n,[r.id]:e.target.value}))}/>
               <div style={{display:'flex',gap:'0.5rem'}}>
                 <button style={solidBtn(C.cyan,true)} onClick={()=>fmAction(r.id,true)}>Forward to CEO</button>
                 <button style={solidBtn(C.red,true)} onClick={()=>fmAction(r.id,false)}>Reject</button>
@@ -2225,19 +2323,12 @@ function ApprovalsTab({clientId,config,cc,P}) {
         </div>
       )}
       {(isCEO||delegatedApprover)&&pendingCEO.length>0&&(
-        <div style={{...card,border:`1px solid ${C.cyan}`}}>
-          <div style={{fontWeight:700,color:C.navy,marginBottom:'0.75rem'}}>Awaiting CEO Approval ({pendingCEO.length})</div>
+        <div style={{...card,borderLeft:`4px solid ${C.cyan}`}}>
+          <div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.cyan,marginBottom:'0.9rem'}}>Awaiting CEO Approval ({pendingCEO.length})</div>
           {pendingCEO.map(r=>(
-            <div key={r.id} style={{border:`1px solid ${C.border}`,borderRadius:6,padding:'0.85rem',marginBottom:'0.75rem',background:C.white}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.5rem'}}>
-                <div>
-                  <div style={{fontWeight:700,color:C.navy}}>{r.description}</div>
-                  <div style={{fontSize:'0.86rem',color:C.slate}}>{config.business_units.find(u=>u.id===r.unit_id)?.name||'General'} · {r.requested_by_name} · {new Date(r.created_at).toLocaleDateString('en-GB')}</div>
-                  {r.fm_note&&<div style={{fontSize:'0.86rem',color:C.slate,fontStyle:'italic',marginTop:'0.25rem'}}>FM note: {r.fm_note}</div>}
-                </div>
-                <span style={{fontFamily:'monospace',fontWeight:700,color:C.navy}}>{fmt(r.amount,cc)}</span>
-              </div>
-              <textarea style={{...inp,minHeight:50,resize:'vertical',marginBottom:'0.5rem'}} placeholder="Add note (optional)" value={notes[r.id]||''} onChange={e=>setNotes(n=>({...n,[r.id]:e.target.value}))}/>
+            <div key={r.id} style={{border:'1px solid var(--cv-border-soft)',borderRadius:12,padding:'1rem 1.1rem',marginBottom:'0.85rem',background:C.lightBg}}>
+              {reqRow(r)}
+              <textarea style={{...inp,minHeight:50,resize:'vertical',margin:'0.75rem 0 0.5rem'}} placeholder="Add note (optional)" value={notes[r.id]||''} onChange={e=>setNotes(n=>({...n,[r.id]:e.target.value}))}/>
               <div style={{display:'flex',gap:'0.5rem'}}>
                 <button style={solidBtn(C.green,true)} onClick={()=>ceoAction(r.id,true)}>Approve</button>
                 <button style={solidBtn(C.red,true)} onClick={()=>ceoAction(r.id,false)}>Reject</button>
@@ -2323,10 +2414,15 @@ function TeamTab({clientId,config,P}) {
       )}
       {members.length===0&&!showInvite&&<div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No team members yet.</div>}
       {members.map(m=>(
-        <div key={m.id} style={{...card,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.5rem'}}>
+        <div key={m.id} style={{...card,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.75rem'}}>
+          <div style={{display:'flex',gap:'0.85rem',alignItems:'flex-start'}}>
+            <div style={{width:38,height:38,borderRadius:10,background:'var(--cv-header)',color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,flexShrink:0}}>{(m.full_name||'?').split(' ').map((w:string)=>w[0]).join('').toUpperCase().slice(0,2)}</div>
           <div>
-            <div style={{fontWeight:700,color:C.navy}}>{m.full_name}</div>
-            <div style={{fontSize:'0.86rem',color:C.slate}}>{m.email} · {roles.find(r=>r[0]===m.role)?.[1]||m.role}</div>
+            <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap'}}>
+              <span style={{fontWeight:700,fontSize:'1rem',color:C.navy}}>{m.full_name}</span>
+              <span style={{fontFamily:'monospace',fontSize:'0.68rem',fontWeight:700,border:`1px solid ${C.border}`,borderRadius:20,padding:'0.14rem 0.55rem',color:C.slate,whiteSpace:'nowrap'}}>{roles.find(r=>r[0]===m.role)?.[1]||m.role}</span>
+            </div>
+            <div style={{fontSize:'0.86rem',color:C.slate,marginTop:'0.15rem'}}>{m.email}</div>
             {m.assigned_unit_ids?.length>0&&(
               <div style={{fontSize:'0.86rem',color:C.slate,marginTop:'0.2rem'}}>
                 Units: {m.assigned_unit_ids.map((id:string)=>config.business_units.find(u=>u.id===id)?.name||id).join(', ')}
@@ -2342,6 +2438,7 @@ function TeamTab({clientId,config,P}) {
                 Can manage Field Catalogue (prices & products)
               </label>
             )}
+          </div>
           </div>
           <Badge text={m.status||'active'} color={m.status==='invited'?C.amber:C.green}/>
         </div>
@@ -3214,7 +3311,7 @@ function StockAndTransfersSection({clientId,businessUnits}:{clientId:string;busi
   )
 }
 
-function SettingsTab({config,P,onSave}) {
+function SettingsTab({config,P,onSave,theme,setThemeMode}) {
   const [form, setForm] = useState({...config})
   const [saving, setSaving] = useState(false)
   const [activeSection, setActiveSection] = useState('general')
@@ -3246,11 +3343,9 @@ function SettingsTab({config,P,onSave}) {
 
   return (
     <div>
-      <div style={{display:'flex',gap:'0.35rem',marginBottom:'1.25rem',borderBottom:`1px solid ${C.border}`,paddingBottom:'0.5rem'}}>
+      <div style={{display:'flex',gap:'0.4rem',marginBottom:'1.4rem',flexWrap:'wrap'}}>
         {sections.map(([id,label])=>(
-          <button key={id} style={{fontFamily:'monospace',fontSize:'0.8rem',padding:'0.4rem 0.85rem',border:'none',
-            background:activeSection===id?'var(--cv-header)':C.white,color:activeSection===id?'var(--cv-on-accent)':C.slate,
-            borderRadius:4,cursor:'pointer'}} onClick={()=>setActiveSection(id)}>{label}</button>
+          <button key={id} style={subtabPill(activeSection===id)} onClick={()=>setActiveSection(id)}>{label}</button>
         ))}
       </div>
 
@@ -3285,6 +3380,22 @@ function SettingsTab({config,P,onSave}) {
             <div><label style={lbl}>Opening Cash Balance</label><input type="number" style={inp} value={form.settings.opening_cash_balance||0} onChange={e=>setForm(f=>({...f,settings:{...f.settings,opening_cash_balance:Number(e.target.value)}}))}/></div>
           </div>
           {form.plan_lines.length>0 && <ExtendHorizonControl form={form} setForm={setForm}/>}
+          <div style={{marginTop:'1.25rem',paddingTop:'1.15rem',borderTop:`1px solid ${C.border}`,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.8rem'}}>
+            <div>
+              <label style={lbl}>Appearance</label>
+              <div style={{display:'inline-flex',background:C.lightBg,border:`1px solid ${C.border}`,borderRadius:9,padding:3,gap:2}}>
+                {([['light','Light'],['dark','Dark'],['auto','Auto']] as const).map(([mode,label])=>{
+                  const active = theme===mode
+                  return (
+                    <button key={mode} type="button" onClick={()=>setThemeMode?.(mode)}
+                      style={{fontFamily:'monospace',fontSize:'0.74rem',fontWeight:700,padding:'0.4rem 0.85rem',border:'none',borderRadius:7,cursor:'pointer',
+                        background:active?'var(--cv-header)':'transparent',color:active?'var(--cv-on-accent)':C.slate}}>{label}</button>
+                  )
+                })}
+              </div>
+              <div style={hint}>Light and dark are saved on this device. Auto matches your device setting now.</div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -5377,15 +5488,9 @@ function ApprovalsAndSpendTab({clientId,config,cc,P}) {
   const [mode, setMode] = useState<'approvals'|'requests'>('approvals')
   return (
     <div>
-      <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
-        <button style={{fontFamily:'monospace',fontSize:'0.86rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='approvals'?'var(--cv-header)':C.white,color:mode==='approvals'?'var(--cv-on-accent)':C.slate,
-          borderRadius:4,cursor:'pointer',fontWeight:mode==='approvals'?700:400}}
-          onClick={()=>setMode('approvals')}>Approvals</button>
-        <button style={{fontFamily:'monospace',fontSize:'0.86rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='requests'?'var(--cv-header)':C.white,color:mode==='requests'?'var(--cv-on-accent)':C.slate,
-          borderRadius:4,cursor:'pointer',fontWeight:mode==='requests'?700:400}}
-          onClick={()=>setMode('requests')}>My Spend Requests</button>
+      <div style={{display:'flex',gap:'0.4rem',marginBottom:'1.4rem',flexWrap:'wrap'}}>
+        <button style={subtabPill(mode==='approvals')} onClick={()=>setMode('approvals')}>Approvals</button>
+        <button style={subtabPill(mode==='requests')} onClick={()=>setMode('requests')}>My Spend Requests</button>
       </div>
       {mode==='approvals' && <ApprovalsTab clientId={clientId} config={config} cc={cc} P={P}/>}
       {mode==='requests' && <SpendRequestsTab clientId={clientId} config={config} cc={cc} P={P}/>}
@@ -5393,33 +5498,18 @@ function ApprovalsAndSpendTab({clientId,config,cc,P}) {
   )
 }
 // ── SETTINGS & ADMIN TAB (Settings + Scenarios + Team merged, toggle) ──
-function SettingsAndAdminTab({config,result,months,cc,clientId,P,onSave}) {
+function SettingsAndAdminTab({config,result,months,cc,clientId,P,onSave,theme,setThemeMode}) {
   const [mode, setMode] = useState<'settings'|'scenarios'|'team'|'catalogue'|'field'>('settings')
   return (
     <div>
-      <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
-        <button style={{fontFamily:'monospace',fontSize:'0.86rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='settings'?'var(--cv-header)':C.white,color:mode==='settings'?'var(--cv-on-accent)':C.slate,
-          borderRadius:4,cursor:'pointer',fontWeight:mode==='settings'?700:400}}
-          onClick={()=>setMode('settings')}>General Settings</button>
-        <button style={{fontFamily:'monospace',fontSize:'0.86rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='scenarios'?'var(--cv-header)':C.white,color:mode==='scenarios'?'var(--cv-on-accent)':C.slate,
-          borderRadius:4,cursor:'pointer',fontWeight:mode==='scenarios'?700:400}}
-          onClick={()=>setMode('scenarios')}>Scenarios</button>
-        <button style={{fontFamily:'monospace',fontSize:'0.86rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='team'?'var(--cv-header)':C.white,color:mode==='team'?'var(--cv-on-accent)':C.slate,
-          borderRadius:4,cursor:'pointer',fontWeight:mode==='team'?700:400}}
-          onClick={()=>setMode('team')}>Team</button>
-        <button style={{fontFamily:'monospace',fontSize:'0.86rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='catalogue'?'var(--cv-header)':C.white,color:mode==='catalogue'?'var(--cv-on-accent)':C.slate,
-          borderRadius:4,cursor:'pointer',fontWeight:mode==='catalogue'?700:400}}
-          onClick={()=>setMode('catalogue')}>Catalogue</button>
-        <button style={{fontFamily:'monospace',fontSize:'0.86rem',padding:'0.5rem 1.1rem',border:'none',
-          background:mode==='field'?'var(--cv-header)':C.white,color:mode==='field'?'var(--cv-on-accent)':C.slate,
-          borderRadius:4,cursor:'pointer',fontWeight:mode==='field'?700:400}}
-          onClick={()=>setMode('field')}>Clearview Field</button>
+      <div style={{display:'flex',gap:'0.4rem',marginBottom:'1.4rem',flexWrap:'wrap'}}>
+        <button style={subtabPill(mode==='settings')} onClick={()=>setMode('settings')}>General Settings</button>
+        <button style={subtabPill(mode==='scenarios')} onClick={()=>setMode('scenarios')}>Scenarios</button>
+        <button style={subtabPill(mode==='team')} onClick={()=>setMode('team')}>Team</button>
+        <button style={subtabPill(mode==='catalogue')} onClick={()=>setMode('catalogue')}>Catalogue</button>
+        <button style={subtabPill(mode==='field')} onClick={()=>setMode('field')}>Clearview Field</button>
       </div>
-      {mode==='settings' && <SettingsTab config={config} P={P} onSave={onSave}/>}
+      {mode==='settings' && <SettingsTab config={config} P={P} onSave={onSave} theme={theme} setThemeMode={setThemeMode}/>}
       {mode==='scenarios' && <ScenariosTab config={config} result={result} months={months} cc={cc} P={P} onSave={onSave}/>}
       {mode==='team' && <TeamTab clientId={clientId} config={config} P={P}/>}
       {mode==='catalogue' && <CatalogueManager clientId={clientId} config={config} P={P}/>}
