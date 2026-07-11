@@ -3803,10 +3803,348 @@ function TradeCreditLineGrid({line,months,cc,canEdit,updateLineName,removeLine,u
   )
 }
 // ── P&L TAB (Unit + Consolidated merged with toggle) ─────────
+// ── PLAN vs ACTUAL VARIANCE VIEW ──────────────────────────────
+// Additive to the P&L "Statement" view -- it changes nothing there.
+// Every number shown here is either read straight off `result` (the
+// engine's own plan arrays rev/cogs/staff/opex + derived gp/ebitda and
+// its actual arrays act_*), or summed from config.plan_lines / the loaded
+// per-line actuals using the SAME formulas the engine uses internally
+// (sell*vol for spread revenue, buy*vol for the spread's cost-of-sales
+// contribution, fee*engagements for service revenue, monthly_plan
+// otherwise), so a group's line detail reconciles with its header. No
+// calculation in src/lib is touched.
+function PLVarianceView({ config, result, months, cc, view, selUnit, setSelUnit, lineActuals }) {
+  const [period, setPeriod] = useState<'month'|'quarter'|'ytd'>('ytd')
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const toggle = (k:string) => setExpanded(e => ({ ...e, [k]: !e[k] }))
+
+  // Scenario multipliers, read the same way the engine reads them, so the
+  // per-line plan we compute here matches the plan totals on `result`.
+  const activeScenario = config.settings?.scenarios?.find((s:any)=>s.active) || { rev_mult:1, cost_mult:1 }
+  const rev_mult = activeScenario.rev_mult ?? 1
+  const cost_mult = activeScenario.cost_mult ?? 1
+  const n = months.length
+
+  // "Today" as a column index against the plan start -- same UTC arithmetic
+  // the engine uses, so today lands on exactly the same month.
+  const startD = new Date(config.start_date)
+  const now = new Date()
+  let todayIdx = (now.getUTCFullYear()-startD.getUTCFullYear())*12 + (now.getUTCMonth()-startD.getUTCMonth())
+  todayIdx = Math.max(0, Math.min(n-1, todayIdx))
+
+  // Every period option is bounded at the current month, so plan and actual
+  // are always summed over the SAME already-elapsed months -- a true
+  // like-for-like variance, never plan-over-a-full-quarter vs actual-over-
+  // one-month.
+  const rangeIdx: number[] = (() => {
+    if (period==='month') return [todayIdx]
+    if (period==='ytd') return Array.from({length: todayIdx+1}, (_,i)=>i)
+    const qStartCal = Math.floor(now.getUTCMonth()/3)*3
+    const back = now.getUTCMonth() - qStartCal
+    const qStart = Math.max(0, todayIdx - back)
+    return Array.from({length: todayIdx - qStart + 1}, (_,i)=> qStart+i)
+  })()
+  const rangeLabel = rangeIdx.length===1 ? months[rangeIdx[0]] : `${months[rangeIdx[0]]} – ${months[rangeIdx[rangeIdx.length-1]]}`
+
+  const sumRange = (arr:(number|null|undefined)[]) => rangeIdx.reduce((s,i)=> s + (arr?.[i] ?? 0), 0)
+
+  const unitIds: string[] = view==='consolidated'
+    ? config.business_units.filter((u:any)=>u.active).map((u:any)=>u.id)
+    : [selUnit]
+
+  // Per-line actual (combined manual + Field, exactly as elsewhere in this
+  // file) summed over the range; null when the line has NO recorded actual
+  // anywhere in range -> shown as a dash, never fabricated.
+  function lineActualInfo(lineId:string): number|null {
+    let total = 0, hasAny = false
+    unitIds.forEach(uid => {
+      const byMonth = lineActuals?.[uid]
+      if (!byMonth) return
+      rangeIdx.forEach(i => {
+        const v = byMonth[i]?.[lineId]
+        if (v !== undefined) { total += v; hasAny = true }
+      })
+    })
+    return hasAny ? total : null
+  }
+
+  // Per-line PLAN over the range, using the exact formulas the engine uses
+  // to build its category totals.
+  function linePlanRange(line:any, role:'revenue'|'cost'): number {
+    let t = 0
+    rangeIdx.forEach(m => {
+      if (line.line_type==='spread' && line.sell_price && line.volume && line.buy_price) {
+        t += role==='revenue'
+          ? (line.sell_price[m]||0)*(line.volume[m]||0)*rev_mult
+          : (line.buy_price[m]||0)*(line.volume[m]||0)*cost_mult
+      } else if (line.line_type==='service_fee' && line.fee_per_engagement && line.engagements && line.cost_per_engagement) {
+        t += role==='revenue'
+          ? (line.fee_per_engagement[m]||0)*(line.engagements[m]||0)*rev_mult
+          : (line.cost_per_engagement[m]||0)*(line.engagements[m]||0)*cost_mult
+      } else {
+        t += (line.monthly_plan?.[m]||0) * (role==='revenue' ? rev_mult : cost_mult)
+      }
+    })
+    return t
+  }
+
+  function drillLines(groupKey:string): {id:string;name:string;plan:number;actual:number|null;kind:'revenue'|'cost'}[] {
+    const active = config.plan_lines.filter((l:any)=> l.active && unitIds.includes(l.unit_id))
+    if (groupKey==='revenue') {
+      return active.filter((l:any)=> l.category==='revenue').map((l:any)=>(
+        { id:l.id, name:l.name, plan: linePlanRange(l,'revenue'), actual: lineActualInfo(l.id), kind:'revenue' as const }
+      ))
+    }
+    if (groupKey==='cost_of_sales') {
+      const rows: any[] = []
+      active.filter((l:any)=> l.category==='cost_of_sales').forEach((l:any)=>{
+        rows.push({ id:l.id, name:l.name, plan: linePlanRange(l,'cost'), actual: lineActualInfo(l.id), kind:'cost' })
+      })
+      // The spread/service buy-side costs are folded into COGS by the engine
+      // but are NOT their own cost_of_sales plan_lines -- surface them so the
+      // group's PLAN reconciles with its header. They have no independent
+      // actual (the line's actual is booked against revenue), so actual is a
+      // dash by construction.
+      active.filter((l:any)=> l.line_type==='spread').forEach((l:any)=>{
+        rows.push({ id:l.id+'::cogs', name:`${l.name} — buy cost`, plan: linePlanRange(l,'cost'), actual:null, kind:'cost' })
+      })
+      active.filter((l:any)=> l.line_type==='service_fee').forEach((l:any)=>{
+        rows.push({ id:l.id+'::svc', name:`${l.name} — delivery cost`, plan: linePlanRange(l,'cost'), actual:null, kind:'cost' })
+      })
+      return rows
+    }
+    if (groupKey==='staff') {
+      return active.filter((l:any)=> l.category==='staff').map((l:any)=>(
+        { id:l.id, name:l.name, plan: linePlanRange(l,'cost'), actual: lineActualInfo(l.id), kind:'cost' as const }
+      ))
+    }
+    if (groupKey==='direct_opex') {
+      return active.filter((l:any)=> l.category==='direct_opex').map((l:any)=>(
+        { id:l.id, name:l.name, plan: linePlanRange(l,'cost'), actual: lineActualInfo(l.id), kind:'cost' as const }
+      ))
+    }
+    return []
+  }
+
+  const pl = view==='unit' ? result.unitPL[selUnit] : null
+  const con = result.con
+
+  type Kind = 'revenue'|'cost'|'profit'
+  interface StmtRow { key:string; label:string; kind:Kind; bold?:boolean; highlight?:boolean; plan:number; actual:number|null; drill?:string; note?:string }
+
+  let rows: StmtRow[] = []
+  if (view==='unit') {
+    if (!pl) return <div style={card}><p style={{color:C.slate}}>No data for this unit.</p></div>
+    rows = [
+      { key:'rev',    label:'Revenue',                   kind:'revenue', bold:true, plan:sumRange(pl.rev),    actual:sumRange(pl.act_rev),    drill:'revenue' },
+      { key:'cogs',   label:'Cost of sales',             kind:'cost',               plan:sumRange(pl.cogs),   actual:sumRange(pl.act_cogs),   drill:'cost_of_sales' },
+      { key:'gp',     label:'Gross profit',              kind:'profit',  bold:true, highlight:true, plan:sumRange(pl.gp),  actual:sumRange(pl.act_gp) },
+      { key:'staff',  label:'Staff costs',               kind:'cost',               plan:sumRange(pl.staff),  actual:sumRange(pl.act_staff),  drill:'staff' },
+      { key:'opex',   label:'Other operating expenses',  kind:'cost',               plan:sumRange(pl.opex),   actual:sumRange(pl.act_opex),   drill:'direct_opex' },
+      { key:'shared', label:'Shared costs (allocated)',  kind:'cost',               plan:sumRange(pl.shared), actual:sumRange(pl.shared),     note:'allocated — no separate actual' },
+      { key:'ebitda', label:'EBITDA',                    kind:'profit',  bold:true, highlight:true, plan:sumRange(pl.ebitda), actual:sumRange(pl.act_ebitda) },
+    ]
+  } else {
+    // Actual total operating costs at the consolidated level are not stored
+    // as a single actual array, but equal actual GP minus actual EBITDA by
+    // construction (the engine's own identity), so derive them from those.
+    const actTotOpex = rangeIdx.reduce((s,i)=> s + ((con.act_gp[i]!=null && con.act_ebitda[i]!=null) ? (con.act_gp[i]-con.act_ebitda[i]) : 0), 0)
+    rows = [
+      { key:'rev',      label:'Revenue',               kind:'revenue', bold:true, plan:sumRange(con.rev),  actual:sumRange(con.act_rev),  drill:'revenue' },
+      { key:'cogs',     label:'Cost of sales',         kind:'cost',               plan:sumRange(con.cogs), actual:sumRange(con.act_cogs), drill:'cost_of_sales' },
+      { key:'gp',       label:'Gross profit',          kind:'profit',  bold:true, highlight:true, plan:sumRange(con.gp), actual:sumRange(con.act_gp) },
+      { key:'opex',     label:'Total operating costs', kind:'cost',               plan:sumRange(con.opex), actual:actTotOpex, note:'staff + overheads + shared' },
+      { key:'ebitda',   label:'EBITDA',                kind:'profit',  bold:true, highlight:true, plan:sumRange(con.ebitda), actual:sumRange(con.act_ebitda) },
+      { key:'interest', label:'Finance costs',         kind:'cost',               plan:sumRange(con.interest), actual:sumRange(con.interest), note:'from loan terms — not a plan/actual figure' },
+      { key:'nbt',      label:'Profit before tax',     kind:'profit',  bold:true, plan:sumRange(con.nbt),  actual:sumRange(con.act_nbt) },
+      { key:'tax',      label:'Tax',                   kind:'cost',               plan:sumRange(con.tax),  actual:sumRange(con.act_tax) },
+      { key:'npat',     label:'Profit for the period', kind:'profit',  bold:true, highlight:true, plan:sumRange(con.npat), actual:sumRange(con.act_npat) },
+    ]
+  }
+
+  // Favourable variance: for a cost, spending LESS than plan is good; for
+  // revenue/profit, EARNING more is good. Positive => favourable (green).
+  const favVar = (kind:Kind, plan:number, actual:number) => kind==='cost' ? (plan - actual) : (actual - plan)
+  const favColor = (f:number) => f > 0.5 ? C.green : f < -0.5 ? C.red : C.slate
+  const costDisp = (v:number) => `(${fmtFull(Math.abs(v), cc)})`
+  const signMoney = (v:number) => `${v>=0?'+':'−'}${fmtFull(Math.abs(v), cc)}`
+  const signPct  = (v:number) => `${v>=0?'+':'−'}${pct(Math.abs(v))}`
+  const valDisp = (kind:Kind, v:number) => kind==='cost' ? costDisp(v) : fmtFull(v, cc)
+
+  const periods: [string,string][] = [['month','This month'],['quarter','Quarter'],['ytd','Year to date']]
+  const headlineKeys = view==='unit' ? ['rev','cogs','gp','ebitda'] : ['rev','cogs','gp','ebitda']
+  const headlineRows = headlineKeys.map(k => rows.find(r=>r.key===k)).filter(Boolean) as StmtRow[]
+
+  const th: React.CSSProperties = { padding:'8px 10px', textAlign:'right', fontWeight:600, fontSize:'0.72rem' }
+
+  return (
+    <div>
+      {/* Unit selector (unit view only) -- mirrors the Statement view control */}
+      {view==='unit' && (
+        <div style={{display:'flex',gap:'0.45rem',marginBottom:'1rem',flexWrap:'wrap'}}>
+          {config.business_units.filter((u:any)=>u.active).map((u:any)=>(
+            <button key={u.id} style={{fontFamily:'monospace',fontSize:'0.71rem',padding:'0.45rem 0.85rem',
+              border:`2px solid ${selUnit===u.id?(u.color||C.cyan):C.border}`,borderRadius:4,
+              background:selUnit===u.id?(u.color||C.cyan):C.white,
+              color:selUnit===u.id?'var(--cv-on-accent)':C.navy,cursor:'pointer'}}
+              onClick={()=>setSelUnit(u.id)}>{u.name}</button>
+          ))}
+        </div>
+      )}
+
+      {/* Period selector */}
+      <div style={{display:'flex',alignItems:'center',gap:'0.75rem',flexWrap:'wrap',marginBottom:'1.1rem'}}>
+        <div style={{display:'inline-flex',border:`1px solid ${C.border}`,borderRadius:6,overflow:'hidden'}}>
+          {periods.map(([id,label])=>(
+            <button key={id} onClick={()=>setPeriod(id as any)}
+              style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.42rem 0.9rem',border:'none',cursor:'pointer',
+                background:period===id?'var(--cv-header)':C.white,color:period===id?'var(--cv-on-accent)':C.slate,
+                fontWeight:period===id?700:400}}>{label}</button>
+          ))}
+        </div>
+        <span style={{fontSize:'0.72rem',color:C.slate}}>Comparing plan vs actual over <strong style={{color:C.navy}}>{rangeLabel}</strong></span>
+      </div>
+
+      {/* Headline strip */}
+      <div style={{...kpiGrid,marginBottom:'1.25rem'}}>
+        {headlineRows.map(r=>{
+          const actual = r.actual ?? 0
+          const f = favVar(r.kind, r.plan, actual)
+          const fp = r.plan!==0 ? f/Math.abs(r.plan) : 0
+          const col = favColor(f)
+          return (
+            <div key={r.key} style={{background:C.white,borderRadius:14,padding:'1.1rem 1.25rem 1.2rem',borderTop:`3px solid ${col}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}>
+              <div style={{fontFamily:'monospace',fontSize:'0.58rem',letterSpacing:'0.13em',color:C.slate,textTransform:'uppercase',marginBottom:'0.4rem'}}>{r.label} vs plan</div>
+              <div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:C.navy,lineHeight:1.05}}>{r.actual===null?'—':valDisp(r.kind, actual)}</div>
+              <div style={{fontSize:'0.72rem',marginTop:'0.35rem',color:col,fontWeight:600}}>
+                {r.actual===null?'no actual yet':`${signMoney(f)} · ${signPct(fp)}`}
+              </div>
+              <div style={{fontSize:'0.64rem',color:C.slate,marginTop:'0.12rem'}}>plan {valDisp(r.kind, r.plan)}</div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Variance table */}
+      <div style={{...card,padding:0,overflow:'hidden'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.85rem 1.1rem',borderBottom:`1px solid ${C.border}`}}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy}}>
+            {view==='unit' ? `${config.business_units.find((u:any)=>u.id===selUnit)?.name} — Plan vs Actual` : `${config.business_name} — Consolidated Plan vs Actual`}
+          </div>
+          <div style={{fontSize:'0.68rem',color:C.slate}}>{rangeLabel}</div>
+        </div>
+        <div style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',width:'100%',fontSize:'0.8rem'}}>
+            <thead>
+              <tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
+                <th style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'0.72rem'}}>Line</th>
+                <th style={th}>Plan</th>
+                <th style={th}>Actual</th>
+                <th style={th}>Variance</th>
+                <th style={th}>Var %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r,ri)=>{
+                const hasActual = r.actual !== null
+                const actual = r.actual ?? 0
+                const f = favVar(r.kind, r.plan, actual)
+                const fp = r.plan!==0 ? f/Math.abs(r.plan) : 0
+                const col = favColor(f)
+                const canDrill = !!r.drill
+                const open = canDrill && expanded[r.key]
+                const bg = r.highlight?'var(--cv-tint-cyan)':r.bold?C.lightBg:(ri%2===0?C.cream:C.white)
+                const lines = open ? drillLines(r.drill as string) : []
+                // Biggest unfavourable driver within the group (most negative
+                // favourable variance, and only if it is genuinely unfavourable).
+                let worstId = ''; let worstF = 0
+                lines.forEach(l=>{ if(l.actual!==null){ const lf=favVar(l.kind,l.plan,l.actual); if(lf<worstF){worstF=lf;worstId=l.id} } })
+                return (
+                  <React.Fragment key={r.key}>
+                    <tr style={{background:bg,cursor:canDrill?'pointer':'default'}} onClick={canDrill?()=>toggle(r.key):undefined}>
+                      <td style={{padding:'8px 10px',fontWeight:r.bold?700:400,color:C.navy,minWidth:200,fontSize:'0.8rem'}}>
+                        {canDrill && <span style={{display:'inline-block',width:14,color:C.slate}}>{open?'▾':'▸'}</span>}
+                        {r.label}
+                        {r.note && <span style={{fontSize:'0.62rem',color:C.slate,marginLeft:6,fontWeight:400}}>{r.note}</span>}
+                      </td>
+                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',color:C.navy,fontWeight:r.bold?700:400}}>{valDisp(r.kind, r.plan)}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',color:C.navy,fontWeight:r.bold?700:400}}>{hasActual?valDisp(r.kind, actual):'—'}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',color:col,fontWeight:700}}>{hasActual?signMoney(f):'—'}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.76rem',color:col,fontWeight:600}}>{hasActual?signPct(fp):'—'}</td>
+                    </tr>
+                    {open && lines.length===0 && (
+                      <tr style={{background:C.white}}><td colSpan={5} style={{padding:'6px 10px 6px 30px',fontSize:'0.72rem',color:C.slate}}>No component lines.</td></tr>
+                    )}
+                    {open && lines.map(l=>{
+                      const lHas = l.actual !== null
+                      const lAct = l.actual ?? 0
+                      const lf = favVar(l.kind, l.plan, lAct)
+                      const lfp = l.plan!==0 ? lf/Math.abs(l.plan) : 0
+                      const lcol = favColor(lf)
+                      return (
+                        <tr key={r.key+'/'+l.id} style={{background:'var(--cv-bg-2)'}}>
+                          <td style={{padding:'6px 10px 6px 34px',fontSize:'0.75rem',color:C.slate}}>
+                            {l.name}
+                            {l.id===worstId && <span style={{fontFamily:'monospace',fontSize:'0.58rem',padding:'0.05rem 0.35rem',borderRadius:4,background:C.red,color:'var(--cv-on-accent)',marginLeft:6}}>biggest driver</span>}
+                          </td>
+                          <td style={{padding:'6px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.72rem',color:C.slate}}>{valDisp(l.kind, l.plan)}</td>
+                          <td style={{padding:'6px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.72rem',color:C.slate}}>{lHas?valDisp(l.kind, lAct):'—'}</td>
+                          <td style={{padding:'6px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.72rem',color:lHas?lcol:C.slate,fontWeight:600}}>{lHas?signMoney(lf):'—'}</td>
+                          <td style={{padding:'6px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.72rem',color:lHas?lcol:C.slate}}>{lHas?signPct(lfp):'—'}</td>
+                        </tr>
+                      )
+                    })}
+                  </React.Fragment>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div style={{padding:'0.6rem 1.1rem',borderTop:`1px solid ${C.border}`,fontSize:'0.66rem',color:C.slate,lineHeight:1.5}}>
+          Costs shown in (parentheses). Green = favourable (more revenue or less cost than plan); red = unfavourable. Lines with no recorded actual show a dash — never a fabricated figure.
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PLTab({config,result,months,cc,P,closedPeriods}) {
+  const [plMode, setPlMode] = useState<'statement'|'variance'>('statement')
   const [viewMode, setViewMode] = useState<'unit'|'consolidated'|'margins'>('unit')
   const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active)?.id||'')
+  // Per-line actuals for the Plan vs Actual drill-down. Loaded the same way
+  // the top-level hybrid P&L loads generic_actuals (line_values combined with
+  // field_line_values via combinedActual), but keyed by [unit][monthIndex]
+  // [lineId] so a period-bounded sum is trivial and reconciles with the
+  // engine's act_* arrays. Reading only -- no calculation change.
+  const [lineActuals, setLineActuals] = useState<Record<string, Record<number, Record<string, number>>>>({})
+  useEffect(() => {
+    const clientId = config?.client_id
+    if (!clientId) return
+    supabase.from('generic_actuals').select('unit_id,period,line_values,field_line_values')
+      .eq('client_id', clientId)
+      .then(({data, error}) => {
+        if (error) { console.error('Failed to load generic_actuals for P&L variance drill-down:', error); return }
+        const start = new Date(config.start_date)
+        const map: Record<string, Record<number, Record<string, number>>> = {}
+        ;(data||[]).forEach((row:any) => {
+          const lv = row.line_values || {}
+          const flv = row.field_line_values || {}
+          const ids = new Set([...Object.keys(lv), ...Object.keys(flv)])
+          if (ids.size === 0) return
+          const d = new Date(row.period)
+          const mIdx = (d.getUTCFullYear()-start.getUTCFullYear())*12 + (d.getUTCMonth()-start.getUTCMonth())
+          if (mIdx < 0) return
+          if (!map[row.unit_id]) map[row.unit_id] = {}
+          if (!map[row.unit_id][mIdx]) map[row.unit_id][mIdx] = {}
+          ids.forEach(id => { map[row.unit_id][mIdx][id] = (map[row.unit_id][mIdx][id]||0) + combinedActual(id, lv, flv) })
+        })
+        setLineActuals(map)
+      })
+  }, [config?.client_id, config?.start_date])
+
   if (!result) return <div style={card}><p style={{color:C.slate}}>Set up your planning data first.</p></div>
+  const varView: 'unit'|'consolidated' = viewMode==='consolidated' ? 'consolidated' : 'unit'
 
   // Which month indices correspond to a CLOSED period -- distinct from
   // "has actual data" (actualMask below). A month can have actual data
@@ -3828,6 +4166,15 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
 
   return (
     <div>
+      {/* View-mode toggle: Statement (unchanged) vs Plan vs Actual variance */}
+      <div style={{display:'inline-flex',border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',marginBottom:'1.1rem'}}>
+        {([['statement','Statement'],['variance','Plan vs Actual']] as [string,string][]).map(([id,label])=>(
+          <button key={id} onClick={()=>setPlMode(id as any)}
+            style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.55rem 1.3rem',border:'none',cursor:'pointer',
+              background:plMode===id?C.cyan:C.white,color:plMode===id?C.navy:C.slate,fontWeight:plMode===id?700:400}}>{label}</button>
+        ))}
+      </div>
+
       <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
         <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
           background:viewMode==='unit'?'var(--cv-header)':C.white,color:viewMode==='unit'?'var(--cv-on-accent)':C.slate,
@@ -3837,15 +4184,22 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
           background:viewMode==='consolidated'?'var(--cv-header)':C.white,color:viewMode==='consolidated'?'var(--cv-on-accent)':C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:viewMode==='consolidated'?700:400}}
           onClick={()=>setViewMode('consolidated')}>Consolidated</button>
-        <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
-          background:viewMode==='margins'?'var(--cv-header)':C.white,color:viewMode==='margins'?'var(--cv-on-accent)':C.slate,
-          borderRadius:4,cursor:'pointer',fontWeight:viewMode==='margins'?700:400}}
-          onClick={()=>setViewMode('margins')}>Margins & Break-Even</button>
+        {plMode==='statement' && (
+          <button style={{fontFamily:'monospace',fontSize:'0.75rem',padding:'0.5rem 1.1rem',border:'none',
+            background:viewMode==='margins'?'var(--cv-header)':C.white,color:viewMode==='margins'?'var(--cv-on-accent)':C.slate,
+            borderRadius:4,cursor:'pointer',fontWeight:viewMode==='margins'?700:400}}
+            onClick={()=>setViewMode('margins')}>Margins & Break-Even</button>
+        )}
       </div>
 
-      {viewMode==='margins' && <MarginsTab config={config} result={result} months={months} cc={cc}/>}
+      {plMode==='variance' && (
+        <PLVarianceView config={config} result={result} months={months} cc={cc}
+          view={varView} selUnit={selUnit} setSelUnit={setSelUnit} lineActuals={lineActuals}/>
+      )}
 
-      {viewMode==='unit' && (() => {
+      {plMode==='statement' && viewMode==='margins' && <MarginsTab config={config} result={result} months={months} cc={cc}/>}
+
+      {plMode==='statement' && viewMode==='unit' && (() => {
         const pl = result.unitPL[selUnit]
         if (!pl) return <div style={card}><p style={{color:C.slate}}>No data for this unit.</p></div>
         // One signal per month for this unit, under the calendar rule: a
@@ -3931,7 +4285,7 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
         )
       })()}
 
-      {viewMode==='consolidated' && (() => {
+      {plMode==='statement' && viewMode==='consolidated' && (() => {
         // buildHybridConsolidated is the single source of truth for
         // turning the consolidated P&L into hybrid (actual-or-plan, per
         // the calendar rule) arrays -- also used by the Annual tab, so
