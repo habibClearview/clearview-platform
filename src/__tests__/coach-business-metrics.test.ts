@@ -4,6 +4,7 @@ import {
   averageDaysToCollect, revenueStreams, dealCards, dealWinRate,
   canvasProgress, coImplementerNamesForClient, engagementDisplayStatus, coImplementerWorkload,
   healthStatusFromReportText, portfolioHealthCounts, groupClientsByProgramme,
+  dealFunnel, clientCountForProgramme, programmeCanvasSpread,
   type FeeClient, type DealProgramme,
 } from '../lib/coach-business-metrics'
 
@@ -206,7 +207,7 @@ describe('dealCards', () => {
 describe('canvasProgress', () => {
   it('a client with no canvas rows at all is 0/0, never a fabricated 9', () => {
     const r = canvasProgress([])
-    expect(r).toEqual({ doneCount: 0, totalCount: 0, currentLabel: 'Not started' })
+    expect(r).toEqual({ doneCount: 0, totalCount: 0, currentLabel: 'Not started', currentIndex: -1 })
   })
   it('counts only real rows present, in the real stage order', () => {
     const r = canvasProgress([
@@ -327,5 +328,48 @@ describe('groupClientsByProgramme', () => {
     expect(r).toHaveLength(1)
     expect(r[0].programme).toBeNull()
     expect(r[0].clients.map(c => c.id)).toEqual(['a'])
+  })
+})
+
+describe('dealFunnel', () => {
+  function prog(over: Partial<DealProgramme> = {}): DealProgramme {
+    return { id: 'x', name: 'X', deal_currency: 'USD', ...over }
+  }
+  it('counts and sums each visible stage', () => {
+    const r = dealFunnel([
+      prog({ id: 'a', deal_stage: 'conversation', deal_value: 60_000 }),
+      prog({ id: 'b', deal_stage: 'conversation', deal_value: 36_000 }),
+      prog({ id: 'c', deal_stage: 'won', deal_value: 112_000 }),
+    ])
+    const byStage = Object.fromEntries(r.stages.map(s => [s.stage, s]))
+    expect(byStage.conversation).toMatchObject({ count: 2, value: 96_000 })
+    expect(byStage.won).toMatchObject({ count: 1, value: 112_000 })
+    expect(byStage.scoping).toMatchObject({ count: 0, value: 0 })
+  })
+  it('conversion is won / (won + lost), 0 with nothing closed yet', () => {
+    expect(dealFunnel([prog({ deal_stage: 'conversation' })]).conversionPct).toBe(0)
+    const r = dealFunnel([prog({ id: 'a', deal_stage: 'won' }), prog({ id: 'b', deal_stage: 'lost' }), prog({ id: 'c', deal_stage: 'won' })])
+    expect(r.conversionPct).toBeCloseTo(2 / 3)
+  })
+})
+
+describe('clientCountForProgramme', () => {
+  it('counts real clients under a programme', () => {
+    const r = clientCountForProgramme('p1', [{ programme_id: 'p1' }, { programme_id: 'p1' }, { programme_id: 'p2' }])
+    expect(r).toBe(2)
+  })
+})
+
+describe('programmeCanvasSpread', () => {
+  it('returns null when no client in the programme has started a canvas', () => {
+    expect(programmeCanvasSpread([{ doneCount: 0, totalCount: 0, currentLabel: 'Not started', currentIndex: -1 }])).toBeNull()
+  })
+  it('finds the furthest and nearest among clients who have actually started', () => {
+    const r = programmeCanvasSpread([
+      { doneCount: 6, totalCount: 9, currentLabel: 'DP07 · pilot 1', currentIndex: 7 },
+      { doneCount: 4, totalCount: 9, currentLabel: 'DP05 · market entry', currentIndex: 5 },
+      { doneCount: 0, totalCount: 0, currentLabel: 'Not started', currentIndex: -1 },
+    ])
+    expect(r).toEqual({ furthestLabel: 'DP07 · pilot 1', nearestLabel: 'DP05 · market entry', startedCount: 2 })
   })
 })
