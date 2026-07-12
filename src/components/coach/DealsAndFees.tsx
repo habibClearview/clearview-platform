@@ -28,15 +28,15 @@ const C = {
 const card = {background:C.white,border:'1px solid var(--cv-border-soft)',borderRadius:14,padding:'1.35rem 1.5rem',marginBottom:'1.25rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)'}
 const secH = {fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
 const inp  = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'0.92rem',fontFamily:'inherit',background:'var(--cv-bg-2)',color:C.navy,boxSizing:'border-box'}
-const lbl  = {display:'block',fontWeight:600,fontSize:'0.82rem',marginBottom:'0.2rem',color:C.navy}
-const hint = {fontSize:'0.78rem',color:C.slate,lineHeight:1.4}
+const lbl  = {display:'block',fontWeight:600,fontSize:'0.86rem',marginBottom:'0.2rem',color:C.navy}
+const hint = {fontSize:'0.8rem',color:C.slate,lineHeight:1.4}
 const fGrid= {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:'0.8rem'}
 const th   = {padding:'0.4rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`,whiteSpace:'nowrap'}
 const td   = {padding:'0.4rem 0.6rem',verticalAlign:'top'}
 function addBtn(sm=false,col=C.cyan){return{fontFamily:'monospace',fontSize:sm?'0.7rem':'0.74rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:6,background:'transparent',color:col,cursor:'pointer'}}
 function solidBtn(col=C.cyan,sm=false){return{fontFamily:'monospace',fontSize:sm?'0.74rem':'0.8rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:'var(--cv-on-accent)',cursor:'pointer'}}
 function subPill(active,col=C.cyan){return{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
-function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily:'monospace',fontSize:'0.68rem',letterSpacing:'0.1em',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'0.76rem',color:C.slate,marginTop:'0.2rem'}}>{sub}</div>}</div>)}
+function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.1em',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'0.8rem',color:C.slate,marginTop:'0.2rem'}}>{sub}</div>}</div>)}
 function Badge({text,color}){return<span style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
 
 const num=(v)=>{const n=Number(v);return Number.isFinite(n)?n:0}
@@ -124,19 +124,19 @@ function DealsPipeline({programmes,setProgrammes,clients}){
           return(
             <div key={stage.id} style={{background:C.lightBg,borderRadius:12,padding:'0.75rem',borderTop:`3px solid ${stage.color}`}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:'0.5rem'}}>
-                <span style={{fontWeight:700,fontSize:'0.82rem',color:stage.color}}>{stage.label}</span>
-                <span style={{fontSize:'0.7rem',color:C.slate}}>{inStage.length} · {fmtMoney(stageValue,cur)}</span>
+                <span style={{fontWeight:700,fontSize:'0.86rem',color:stage.color}}>{stage.label}</span>
+                <span style={{fontSize:'0.72rem',color:C.slate}}>{inStage.length} · {fmtMoney(stageValue,cur)}</span>
               </div>
               {inStage.length===0&&<div style={{...hint,padding:'0.5rem 0'}}>—</div>}
               {inStage.map(p=>(
                 <div key={p.id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'0.6rem 0.7rem',marginBottom:'0.5rem',cursor:'pointer'}} onClick={()=>startEdit(p)}>
-                  <div style={{fontWeight:600,fontSize:'0.82rem',color:C.navy}}>{p.name}</div>
+                  <div style={{fontWeight:600,fontSize:'0.86rem',color:C.navy}}>{p.name}</div>
                   <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.15rem'}}>{p.funder||'—'}</div>
-                  <div style={{display:'flex',justifyContent:'space-between',marginTop:'0.35rem',fontSize:'0.74rem'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginTop:'0.35rem',fontSize:'0.8rem'}}>
                     <span style={{fontWeight:600,color:C.navy}}>{p.deal_value?fmtMoney(p.deal_value,p.deal_currency||cur):'—'}</span>
                     {p.deal_probability!=null&&p.deal_probability!==''&&<span style={{color:C.slate}}>{num(p.deal_probability)}%</span>}
                   </div>
-                  {p.deal_expected_close&&<div style={{fontSize:'0.68rem',color:C.slate,marginTop:'0.2rem'}}>close {p.deal_expected_close}</div>}
+                  {p.deal_expected_close&&<div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.2rem'}}>close {p.deal_expected_close}</div>}
                 </div>
               ))}
             </div>
@@ -144,7 +144,7 @@ function DealsPipeline({programmes,setProgrammes,clients}){
         })}
       </div>
 
-      {msg&&<div style={{fontSize:'0.78rem',color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
+      {msg&&<div style={{fontSize:'0.8rem',color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
 
       {editId&&form&&(()=>{const p=programmes.find(x=>x.id===editId);return(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>
@@ -200,7 +200,7 @@ function EngagementFees({clients,setClients,programmes}){
         <KPI label="Unpaid" value={fmtMoney(byStatus('unpaid'),cur)} color={C.red}/>
       </div>
 
-      {msg&&<div style={{fontSize:'0.78rem',color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
+      {msg&&<div style={{fontSize:'0.8rem',color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
 
       <div style={card}>
         <div style={{overflowX:'auto'}}>

@@ -134,7 +134,7 @@ function Badge({text,color}:{text:string;color?:string}) {
 // Rounded category chip for spend requests (matches the mockup's .cat pill).
 function CategoryTag({category}:{category?:string}) {
   if (!category) return null
-  return <span style={{fontFamily:'monospace',fontSize:'0.66rem',fontWeight:700,borderRadius:20,padding:'0.14rem 0.55rem',background:categoryColor(category),color:'var(--cv-on-accent)',whiteSpace:'nowrap',textTransform:'capitalize',display:'inline-block'}}>{category.replace(/_/g,' ')}</span>
+  return <span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,borderRadius:20,padding:'0.14rem 0.55rem',background:categoryColor(category),color:'var(--cv-on-accent)',whiteSpace:'nowrap',textTransform:'capitalize',display:'inline-block'}}>{category.replace(/_/g,' ')}</span>
 }
 
 // FM -> CEO -> Done approval-stage tracker dots (mockup .stage). Reads only
@@ -147,7 +147,7 @@ function StageTracker({r}:{r:any}) {
   else if (r.status==='pending_ceo')  { fm=done; ceo=on; fin=wait }
   else                                { fm=on; ceo=wait; fin=wait } // pending_fm
   const dot=(c:string)=><span style={{width:9,height:9,borderRadius:'50%',background:c,display:'inline-block',flexShrink:0}}/>
-  const lab:React.CSSProperties={fontFamily:'monospace',fontSize:'0.68rem',color:C.slate}
+  const lab:React.CSSProperties={fontFamily:'monospace',fontSize:'0.72rem',color:C.slate}
   return (
     <div style={{display:'flex',alignItems:'center',gap:'0.4rem',flexWrap:'wrap'}} aria-label="Approval stage">
       {dot(fm)}<span style={lab}>FM</span>
@@ -2202,7 +2202,7 @@ function SpendRequestsTab({clientId,config,cc,P}) {
         </div>
       )}
       {!showForm&&(
-        <div style={{...card,padding:'0.9rem 1.15rem',fontSize:'0.88rem',lineHeight:1.55,color:C.navy}}>
+        <div style={{...card,padding:'0.9rem 1.15rem',fontSize:'0.92rem',lineHeight:1.55,color:C.navy}}>
           <b>Categories a request can use:</b> <span style={{color:C.slate}}>Cost of sales · Staff &amp; casual labour · Travel &amp; accommodation · Marketing &amp; promotion · Equipment · Rent &amp; utilities · Other.</span> A <b style={{color:C.teal}}>promotion</b> is raised as one <b>Marketing Event</b> that bundles its costs (venue, temporary promo staff, travel, hotel) and carries the expected revenue lift, so once it runs you can see whether it paid off.
         </div>
       )}
@@ -2417,11 +2417,11 @@ function TeamTab({clientId,config,P}) {
       {members.map(m=>(
         <div key={m.id} style={{...card,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.75rem'}}>
           <div style={{display:'flex',gap:'0.85rem',alignItems:'flex-start'}}>
-            <div style={{width:38,height:38,borderRadius:10,background:'var(--cv-header)',color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,flexShrink:0}}>{(m.full_name||'?').split(' ').map((w:string)=>w[0]).join('').toUpperCase().slice(0,2)}</div>
+            <div style={{width:38,height:38,borderRadius:10,background:'var(--cv-header)',color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'monospace',fontSize:'0.8rem',fontWeight:700,flexShrink:0}}>{(m.full_name||'?').split(' ').map((w:string)=>w[0]).join('').toUpperCase().slice(0,2)}</div>
           <div>
             <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap'}}>
               <span style={{fontWeight:700,fontSize:'1rem',color:C.navy}}>{m.full_name}</span>
-              <span style={{fontFamily:'monospace',fontSize:'0.68rem',fontWeight:700,border:`1px solid ${C.border}`,borderRadius:20,padding:'0.14rem 0.55rem',color:C.slate,whiteSpace:'nowrap'}}>{roles.find(r=>r[0]===m.role)?.[1]||m.role}</span>
+              <span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,border:`1px solid ${C.border}`,borderRadius:20,padding:'0.14rem 0.55rem',color:C.slate,whiteSpace:'nowrap'}}>{roles.find(r=>r[0]===m.role)?.[1]||m.role}</span>
             </div>
             <div style={{fontSize:'0.86rem',color:C.slate,marginTop:'0.15rem'}}>{m.email}</div>
             {m.assigned_unit_ids?.length>0&&(
@@ -3389,7 +3389,7 @@ function SettingsTab({config,P,onSave,theme,setThemeMode}) {
                   const active = theme===mode
                   return (
                     <button key={mode} type="button" onClick={()=>setThemeMode?.(mode)}
-                      style={{fontFamily:'monospace',fontSize:'0.74rem',fontWeight:700,padding:'0.4rem 0.85rem',border:'none',borderRadius:7,cursor:'pointer',
+                      style={{fontFamily:'monospace',fontSize:'0.8rem',fontWeight:700,padding:'0.4rem 0.85rem',border:'none',borderRadius:7,cursor:'pointer',
                         background:active?'var(--cv-header)':'transparent',color:active?'var(--cv-on-accent)':C.slate}}>{label}</button>
                   )
                 })}

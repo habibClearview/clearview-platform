@@ -37,7 +37,7 @@ function solidBtn(col=C.cyan,sm=false){return{fontFamily:'monospace',fontSize:sm
 function subPill(active,col=C.cyan){return{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
 
 function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem 1.15rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.12em',color:C.slate,textTransform:'uppercase',marginBottom:'0.4rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'0.8rem',color:C.slate,marginTop:'0.22rem'}}>{sub}</div>}</div>)}
-function DPDot({status}){const col=status==='\u2713'?C.green:status==='\u25d0'?C.cyan:status==='\u26a0'?C.amber:C.border;return<span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:18,height:18,borderRadius:'50%',background:col,color:'var(--cv-on-accent)',fontSize:'0.62rem',fontWeight:700,flexShrink:0}}>{status||'\u25cb'}</span>}
+function DPDot({status}){const col=status==='\u2713'?C.green:status==='\u25d0'?C.cyan:status==='\u26a0'?C.amber:C.border;return<span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:18,height:18,borderRadius:'50%',background:col,color:'var(--cv-on-accent)',fontSize:'0.72rem',fontWeight:700,flexShrink:0}}>{status||'\u25cb'}</span>}
 function Badge({text,color}){return<span style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
 function Spinner(){return<div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'3rem',color:C.slate,fontSize:'0.9rem'}}>Loading...</div>}
 // Donut score circle \u2014 reused for real scores that already exist in the data (e.g. the readiness self-assessment). No score is invented.
@@ -117,13 +117,13 @@ function ClientCard({client,programmes,onClick}){
   return(
     <div style={{background:C.white,border:`1px solid ${C.border}`,borderTop:`4px solid ${CLIENT_TYPE_COLORS[client.type]||C.cyan}`,borderRadius:8,padding:'1rem 1.1rem',cursor:'pointer'}} onClick={onClick}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.35rem'}}>
-        <div style={{fontWeight:700,fontSize:'0.88rem',color:C.navy,lineHeight:1.3}}>{client.name}</div>
+        <div style={{fontWeight:700,fontSize:'0.92rem',color:C.navy,lineHeight:1.3}}>{client.name}</div>
         <div style={{display:'flex',gap:'0.3rem',flexShrink:0,marginLeft:'0.5rem'}}>
-          {client.clearview_active&&<span style={{fontFamily:'monospace',fontSize:'0.58rem',color:C.teal,border:`1px solid ${C.teal}`,borderRadius:3,padding:'0.05rem 0.3rem'}}>CRV</span>}
-          {client.engagement_mode==='canvas'&&<span style={{fontFamily:'monospace',fontSize:'0.58rem',color:C.purple,border:`1px solid ${C.purple}`,borderRadius:3,padding:'0.05rem 0.3rem'}}>GtCV</span>}
+          {client.clearview_active&&<span style={{fontFamily:'monospace',fontSize:'0.72rem',color:C.teal,border:`1px solid ${C.teal}`,borderRadius:3,padding:'0.05rem 0.3rem'}}>CRV</span>}
+          {client.engagement_mode==='canvas'&&<span style={{fontFamily:'monospace',fontSize:'0.72rem',color:C.purple,border:`1px solid ${C.purple}`,borderRadius:3,padding:'0.05rem 0.3rem'}}>GtCV</span>}
         </div>
       </div>
-      <div style={{fontSize:'0.7rem',color:C.slate,marginBottom:'0.35rem'}}>{CLIENT_TYPE_LABELS[client.type]} \u00b7 {prog?.name||'\u2014'}</div>
+      <div style={{fontSize:'0.72rem',color:C.slate,marginBottom:'0.35rem'}}>{CLIENT_TYPE_LABELS[client.type]} \u00b7 {prog?.name||'\u2014'}</div>
       {client.contact_name&&<div style={{fontSize:'0.72rem',color:C.navy,marginBottom:'0.3rem'}}>{client.contact_name}</div>}
       <Badge text={statusLabel(client.status)} color={statusColor(client.status)}/>
     </div>
@@ -151,7 +151,7 @@ function DeleteClientConfirm({client,onCancel,onDeleted}){
   return(
     <div style={{...card,border:`2px solid ${C.red}`,background:'var(--cv-tint-red)'}}>
       <div style={{fontWeight:700,color:C.red,marginBottom:'0.5rem'}}>Delete {client.name}?</div>
-      <p style={{fontSize:'0.85rem',color:C.navy,lineHeight:1.7,marginBottom:'0.85rem'}}>This permanently deletes this client, their entire financial model, and all submitted actuals. This cannot be undone. Type the client's name below to confirm.</p>
+      <p style={{fontSize:'0.86rem',color:C.navy,lineHeight:1.7,marginBottom:'0.85rem'}}>This permanently deletes this client, their entire financial model, and all submitted actuals. This cannot be undone. Type the client's name below to confirm.</p>
       <input style={{...inp,marginBottom:'0.75rem'}} placeholder={client.name} value={text} onChange={e=>setText(e.target.value)} autoFocus/>
       {(()=>{const isMatch=text.trim().toLowerCase()===client.name.trim().toLowerCase();return(
       <div style={{display:'flex',gap:'0.6rem'}}>
@@ -191,7 +191,7 @@ function ClearviewHealthSummary({clients}){
   }
 
   if(financialClients.length===0)return null
-  if(loading)return<div style={{...card,textAlign:'center',padding:'1.5rem',color:C.slate,fontSize:'0.85rem'}}>Loading Clearview health summary...</div>
+  if(loading)return<div style={{...card,textAlign:'center',padding:'1.5rem',color:C.slate,fontSize:'0.86rem'}}>Loading Clearview health summary...</div>
 
   const flagged = financialClients.filter(c=>{
     const r=summaries[c.id]
@@ -220,8 +220,8 @@ function ClearviewHealthSummary({clients}){
             <div style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
               <span style={{fontSize:'1rem'}}>{status.dot}</span>
               <div>
-                <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{c.name}</div>
-                <div style={{fontSize:'0.7rem',color:C.slate}}>{report?`Last reviewed ${new Date(report.generated_at).toLocaleDateString('en-GB')}`:'No health check generated yet'}</div>
+                <div style={{fontWeight:600,fontSize:'0.86rem',color:C.navy}}>{c.name}</div>
+                <div style={{fontSize:'0.72rem',color:C.slate}}>{report?`Last reviewed ${new Date(report.generated_at).toLocaleDateString('en-GB')}`:'No health check generated yet'}</div>
               </div>
             </div>
             <Badge text={status.label} color={status.color}/>
@@ -367,7 +367,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   }
 
   if(loading)return<Spinner/>
-  if(error)return<div style={{padding:'2rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}><div style={{color:C.red,marginBottom:'1.5rem'}}>Error loading data: {error}</div><p style={{color:C.slate,fontSize:'0.85rem',marginBottom:'1rem'}}>This is usually caused by a stale session. Sign out and sign back in to fix it.</p><button onClick={onSignOut} style={{fontFamily:'monospace',fontSize:'0.85rem',padding:'0.6rem 1.4rem',border:'none',borderRadius:6,background:'var(--cv-header)',color:'var(--cv-on-accent)',cursor:'pointer'}}>Sign Out and Refresh</button></div>
+  if(error)return<div style={{padding:'2rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}><div style={{color:C.red,marginBottom:'1.5rem'}}>Error loading data: {error}</div><p style={{color:C.slate,fontSize:'0.86rem',marginBottom:'1rem'}}>This is usually caused by a stale session. Sign out and sign back in to fix it.</p><button onClick={onSignOut} style={{fontFamily:'monospace',fontSize:'0.86rem',padding:'0.6rem 1.4rem',border:'none',borderRadius:6,background:'var(--cv-header)',color:'var(--cv-on-accent)',cursor:'pointer'}}>Sign Out and Refresh</button></div>
 
   const selClient=clients.find(c=>c.id===selClientId)
   const selClientFullData=clientData[selClientId]||{}
@@ -395,8 +395,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             {newSubmissions.map(c=>(
               <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.5rem 0.75rem',background:C.white,borderRadius:5,marginBottom:'0.4rem',border:`1px solid ${C.border}`}}>
                 <div>
-                  <div style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>{c.name}</div>
-                  <div style={{fontSize:'0.7rem',color:C.slate}}>{c.contact_name}{c.created_at?(' \u00b7 submitted '+new Date(c.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})):''}</div>
+                  <div style={{fontWeight:600,fontSize:'0.86rem',color:C.navy}}>{c.name}</div>
+                  <div style={{fontSize:'0.72rem',color:C.slate}}>{c.contact_name}{c.created_at?(' \u00b7 submitted '+new Date(c.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})):''}</div>
                 </div>
                 <button style={addBtn(true,C.teal)} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}>Review {'\u2192'}</button>
               </div>
@@ -419,7 +419,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem',flexWrap:'wrap',gap:'0.5rem'}}>
                 <div>
                   <div style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>{prog.name}</div>
-                  <div style={{fontSize:'0.75rem',color:C.slate,marginTop:'0.15rem'}}>{prog.funder} \u00b7 {prog.country} \u00b7 {prog.type==='donor_programme'?'Donor Programme':'Direct Client'}</div>
+                  <div style={{fontSize:'0.8rem',color:C.slate,marginTop:'0.15rem'}}>{prog.funder} \u00b7 {prog.country} \u00b7 {prog.type==='donor_programme'?'Donor Programme':'Direct Client'}</div>
                 </div>
                 <button style={addBtn(true)} onClick={()=>{setSelProgId(prog.id);setView('programmes')}}>Manage \u2192</button>
               </div>
@@ -503,13 +503,13 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         <div style={{...card,background:'var(--cv-header)',color:'var(--cv-on-accent)',marginBottom:'1.25rem'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
             <div>
-              <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.3rem'}}>{CLIENT_TYPE_LABELS[selClient.type]} · {prog?.name||'—'} · Clearview Financial Model</div>
+              <div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.3rem'}}>{CLIENT_TYPE_LABELS[selClient.type]} · {prog?.name||'—'} · Clearview Financial Model</div>
               <h2 style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0 0 0.25rem'}}>{selClient.name}</h2>
-              <div style={{fontSize:'0.77rem',color:'var(--cv-wa-60)'}}>{selClient.contact_name&&`${selClient.contact_name} · `}{selClient.country} · {selClient.sector}</div>
+              <div style={{fontSize:'0.8rem',color:'var(--cv-wa-60)'}}>{selClient.contact_name&&`${selClient.contact_name} · `}{selClient.country} · {selClient.sector}</div>
             </div>
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
-              <a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily:'monospace',fontSize:'0.78rem',padding:'0.4rem 1rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none',fontWeight:700}}>Open Clearview Financial Model ↗</a>
+              <a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily:'monospace',fontSize:'0.8rem',padding:'0.4rem 1rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none',fontWeight:700}}>Open Clearview Financial Model ↗</a>
               <CopyIntakeLink client={selClient}/>
               <button onClick={()=>setShowDeleteConfirm(true)} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Delete Client</button>
             </div>
@@ -523,9 +523,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           />
         )}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'1rem',marginBottom:'1.25rem'}}>
-          <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 1 — Open Clearview</div><p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.7,margin:0}}>Click "Open Clearview Financial Model" above. Go to Settings to define business units and revenue lines.</p></div>
-          <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 2 — Define Business Units</div><p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.7,margin:0}}>In Settings, add business units. Set each unit type: product, service, or aggregator.</p></div>
-          <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 3 — Enter the Plan</div><p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.7,margin:0}}>Go to Planning to add revenue and cost lines. Enter monthly figures for the full planning period.</p></div>
+          <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 1 — Open Clearview</div><p style={{fontSize:'0.86rem',color:C.slate,lineHeight:1.7,margin:0}}>Click "Open Clearview Financial Model" above. Go to Settings to define business units and revenue lines.</p></div>
+          <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 2 — Define Business Units</div><p style={{fontSize:'0.86rem',color:C.slate,lineHeight:1.7,margin:0}}>In Settings, add business units. Set each unit type: product, service, or aggregator.</p></div>
+          <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'0.95rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 3 — Enter the Plan</div><p style={{fontSize:'0.86rem',color:C.slate,lineHeight:1.7,margin:0}}>Go to Planning to add revenue and cost lines. Enter monthly figures for the full planning period.</p></div>
         </div>
         <div style={card}><TabCover client={selClient} prog={prog} onUpdate={updates=>updateClient(selClient.id,updates)}/></div>
       </div>
@@ -543,13 +543,13 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         <div style={{...card,background:'var(--cv-header)',color:'var(--cv-on-accent)',marginBottom:'1.25rem'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
             <div>
-              <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.3rem'}}>{CLIENT_TYPE_LABELS[selClient.type]} \u00b7 {prog?.name||'\u2014'} \u00b7 {isCanvas?'Full GtCV Canvas':'Clearview Financial'}</div>
+              <div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.3rem'}}>{CLIENT_TYPE_LABELS[selClient.type]} \u00b7 {prog?.name||'\u2014'} \u00b7 {isCanvas?'Full GtCV Canvas':'Clearview Financial'}</div>
               <h2 style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0 0 0.25rem'}}>{selClient.name}</h2>
-              <div style={{fontSize:'0.77rem',color:'var(--cv-wa-60)'}}>{selClient.contact_name&&`${selClient.contact_name} \u00b7 `}{selClient.country} \u00b7 {selClient.sector}</div>
+              <div style={{fontSize:'0.8rem',color:'var(--cv-wa-60)'}}>{selClient.contact_name&&`${selClient.contact_name} \u00b7 `}{selClient.country} \u00b7 {selClient.sector}</div>
             </div>
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
-              {selClient.clearview_active&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily:'monospace',fontSize:'0.7rem',padding:'0.22rem 0.6rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none'}}>Open Clearview \u2197</a>}
+              {selClient.clearview_active&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.22rem 0.6rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none'}}>Open Clearview \u2197</a>}
               <button style={addBtn(true)} onClick={printSection}>Print</button>
             </div>
           </div>
@@ -564,13 +564,13 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               const isActive=activeTab===tab.id
               const dpCanvas=canvas.find(dp=>dp.dp_id===tab.dpId)
               return(
-                <button key={tab.id} onClick={()=>setActiveTab(tab.id)} style={{width:'100%',textAlign:'left',padding:'0.6rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:isActive?'var(--cv-header)':C.white,color:isActive?'var(--cv-on-accent)':C.navy,cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:'0.78rem',fontFamily:"'Segoe UI',system-ui,sans-serif",fontWeight:isActive?700:400}}>
+                <button key={tab.id} onClick={()=>setActiveTab(tab.id)} style={{width:'100%',textAlign:'left',padding:'0.6rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:isActive?'var(--cv-header)':C.white,color:isActive?'var(--cv-on-accent)':C.navy,cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:'0.8rem',fontFamily:"'Segoe UI',system-ui,sans-serif",fontWeight:isActive?700:400}}>
                   <span>
-                    <span style={{fontFamily:'monospace',fontSize:'0.65rem',color:isActive?C.cyan:C.slate,marginRight:'0.4rem'}}>{String(tab.number).padStart(2,'0')}</span>
+                    <span style={{fontFamily:'monospace',fontSize:'0.72rem',color:isActive?C.cyan:C.slate,marginRight:'0.4rem'}}>{String(tab.number).padStart(2,'0')}</span>
                     {tab.label}
                   </span>
                   {dpCanvas&&<DPDot status={dpCanvas.status}/>}
-                  {tab.coachOnly&&<span style={{fontSize:'0.6rem',color:isActive?C.cyan:C.amber}}>\ud83d\udc41</span>}
+                  {tab.coachOnly&&<span style={{fontSize:'0.72rem',color:isActive?C.cyan:C.amber}}>\ud83d\udc41</span>}
                 </button>
               )
             })}
@@ -643,12 +643,12 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           <div>
             <div style={{...card,background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                <div><div style={{fontFamily:'monospace',fontSize:'0.62rem',color:C.cyan,letterSpacing:'0.12em',marginBottom:'0.3rem'}}>{prog.type==='donor_programme'?'DONOR PROGRAMME':'DIRECT CLIENT'}</div><h2 style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0 0 0.2rem'}}>{prog.name}</h2><div style={{fontSize:'0.77rem',color:'var(--cv-wa-60)'}}>{prog.funder} \u00b7 {prog.country}</div></div>
-                <button style={{fontFamily:'monospace',fontSize:'0.7rem',padding:'0.3rem 0.8rem',border:'1px solid var(--cv-wa-30)',borderRadius:4,background:'transparent',color:'var(--cv-wa-80)',cursor:'pointer'}} onClick={()=>{setProgForm({...prog});setEditingProg(true)}}>Edit</button>
+                <div><div style={{fontFamily:'monospace',fontSize:'0.72rem',color:C.cyan,letterSpacing:'0.12em',marginBottom:'0.3rem'}}>{prog.type==='donor_programme'?'DONOR PROGRAMME':'DIRECT CLIENT'}</div><h2 style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0 0 0.2rem'}}>{prog.name}</h2><div style={{fontSize:'0.8rem',color:'var(--cv-wa-60)'}}>{prog.funder} \u00b7 {prog.country}</div></div>
+                <button style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.3rem 0.8rem',border:'1px solid var(--cv-wa-30)',borderRadius:4,background:'transparent',color:'var(--cv-wa-80)',cursor:'pointer'}} onClick={()=>{setProgForm({...prog});setEditingProg(true)}}>Edit</button>
               </div>
             </div>
-            <div style={card}><div style={secH}>Client Organisations</div>{clients.filter(c=>c.programme_id===prog.id).map(c=><div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.75rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.45rem'}}><div><div style={{fontWeight:600,fontSize:'0.85rem'}}>{c.name}</div><div style={{fontSize:'0.72rem',color:C.slate}}>{CLIENT_TYPE_LABELS[c.type]} \u00b7 {statusLabel(c.status)}</div></div><button style={addBtn(true)} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}>Open \u2192</button></div>)}</div>
-            {prog.notes&&<div style={card}><div style={secH}>Notes</div><div style={{fontSize:'0.82rem',color:C.slate,lineHeight:1.6}}>{prog.notes}</div></div>}
+            <div style={card}><div style={secH}>Client Organisations</div>{clients.filter(c=>c.programme_id===prog.id).map(c=><div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.75rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.45rem'}}><div><div style={{fontWeight:600,fontSize:'0.86rem'}}>{c.name}</div><div style={{fontSize:'0.72rem',color:C.slate}}>{CLIENT_TYPE_LABELS[c.type]} \u00b7 {statusLabel(c.status)}</div></div><button style={addBtn(true)} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}>Open \u2192</button></div>)}</div>
+            {prog.notes&&<div style={card}><div style={secH}>Notes</div><div style={{fontSize:'0.86rem',color:C.slate,lineHeight:1.6}}>{prog.notes}</div></div>}
           </div>
         )}
       </div>
@@ -657,7 +657,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       <div>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem'}}><div style={secH}>Programmes</div><button style={addBtn()} onClick={()=>setShowNew(!showNew)}>+ New Programme</button></div>
         {showNew&&<NewProgrammeForm onSave={async p=>{const {data,error}=await supabase.from('programmes').insert([p]).select().single();if(!error&&data){setPrograms(prev=>[...prev,data]);setShowNew(false)}}} onCancel={()=>setShowNew(false)}/>}
-        {programmes.map(p=><div key={p.id} style={{...card,cursor:'pointer'}} onClick={()=>setSelProgId(p.id)}><div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}><div><div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,color:C.navy}}>{p.name}</div><div style={{fontSize:'0.77rem',color:C.slate,marginTop:'0.18rem'}}>{p.funder} \u00b7 {p.country} \u00b7 {clients.filter(c=>c.programme_id===p.id).length} clients</div></div><span style={{fontFamily:'monospace',fontSize:'0.65rem',padding:'0.12rem 0.45rem',borderRadius:4,background:p.type==='donor_programme'?C.amber:C.teal,color:'var(--cv-on-accent)'}}>{p.type==='donor_programme'?'Donor':'Direct'}</span></div></div>)}
+        {programmes.map(p=><div key={p.id} style={{...card,cursor:'pointer'}} onClick={()=>setSelProgId(p.id)}><div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}><div><div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,color:C.navy}}>{p.name}</div><div style={{fontSize:'0.8rem',color:C.slate,marginTop:'0.18rem'}}>{p.funder} \u00b7 {p.country} \u00b7 {clients.filter(c=>c.programme_id===p.id).length} clients</div></div><span style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.12rem 0.45rem',borderRadius:4,background:p.type==='donor_programme'?C.amber:C.teal,color:'var(--cv-on-accent)'}}>{p.type==='donor_programme'?'Donor':'Direct'}</span></div></div>)}
       </div>
     )
   }
@@ -678,7 +678,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               const ci=coImplementers.find(c=>c.id===ts.co_implementer_id)
               const cl=clients.find(c=>c.id===ts.client_id)
               return(<div key={ts.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.75rem',border:`1px solid ${C.amber}`,borderRadius:5,marginBottom:'0.45rem',background:C.white}}>
-                <div><div style={{fontWeight:600,fontSize:'0.84rem'}}>{ci?.name||'Unknown'} \u2014 {ts.date}</div><div style={{fontSize:'0.75rem',color:C.slate}}>{cl?.name||'Unknown'} \u00b7 {ts.hours}h \u00b7 {ts.dp_id||''} \u00b7 {ts.description}</div></div>
+                <div><div style={{fontWeight:600,fontSize:'0.86rem'}}>{ci?.name||'Unknown'} \u2014 {ts.date}</div><div style={{fontSize:'0.8rem',color:C.slate}}>{cl?.name||'Unknown'} \u00b7 {ts.hours}h \u00b7 {ts.dp_id||''} \u00b7 {ts.description}</div></div>
                 <div style={{display:'flex',gap:'0.4rem'}}>
                   <button style={solidBtn(C.green,true)} onClick={()=>approveTs(ts.id)}>Approve</button>
                   <button style={solidBtn(C.red,true)} onClick={()=>rejectTs(ts.id)}>Reject</button>
@@ -694,22 +694,22 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           const pendingHours=ciTs.filter(t=>t.status==='submitted').reduce((s,t)=>s+(Number(t.hours)||0),0)
           return(<div key={ci.id} style={card}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.65rem'}}>
-              <div><div style={{fontWeight:700,fontSize:'0.9rem',color:C.navy}}>{ci.name}</div><div style={{fontSize:'0.77rem',color:C.slate}}>{ci.email} \u00b7 {ci.country}</div>{ci.specialisation&&<div style={{fontSize:'0.74rem',color:C.slate}}>{ci.specialisation}</div>}</div>
+              <div><div style={{fontWeight:700,fontSize:'0.9rem',color:C.navy}}>{ci.name}</div><div style={{fontSize:'0.8rem',color:C.slate}}>{ci.email} \u00b7 {ci.country}</div>{ci.specialisation&&<div style={{fontSize:'0.8rem',color:C.slate}}>{ci.specialisation}</div>}</div>
               <div style={{textAlign:'right'}}><div style={{fontFamily:'monospace',fontSize:'0.72rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem'}}>{ci.active?'Active':'Inactive'}</div>{ci.rate_per_day>0&&<div style={{fontSize:'0.72rem',color:C.slate}}>{ci.currency} {Number(ci.rate_per_day).toLocaleString()}/day</div>}</div>
             </div>
-            <div style={{display:'flex',gap:'1.5rem',fontSize:'0.78rem',color:C.slate,marginBottom:'0.5rem'}}>
+            <div style={{display:'flex',gap:'1.5rem',fontSize:'0.8rem',color:C.slate,marginBottom:'0.5rem'}}>
               <span style={{display:'flex',alignItems:'center',gap:'0.4rem',flexWrap:'wrap'}}>Clients:{(ci.client_ids||[]).length===0?<strong style={{color:C.slate}}>None</strong>:(ci.client_ids||[]).map(id=><span key={id} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.12rem 0.55rem',borderRadius:20,background:'var(--cv-cyan-dim)',color:C.teal,border:`1px solid ${C.border}`}}>{clients.find(c=>c.id===id)?.name||id}</span>)}</span>
               <span>Approved: <strong style={{color:C.green}}>{approvedHours}h</strong></span>
               <span>Pending: <strong style={{color:C.amber}}>{pendingHours}h</strong></span>
             </div>
             {/* Timesheet table */}
             {ciTs.length>0&&<div style={{overflowX:'auto'}}>
-              <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.76rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.8rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
                 <thead><tr style={{background:C.lightBg}}>{['Date','Client','DP','Hours','Description','Status'].map(h=><th key={h} style={{padding:'0.4rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`}}>{h}</th>)}</tr></thead>
                 <tbody>{ciTs.slice(0,10).map((ts,i)=><tr key={ts.id} style={{background:i%2===0?C.cream:C.white}}>
                   <td style={{padding:'0.4rem 0.6rem'}}>{ts.date}</td>
                   <td style={{padding:'0.4rem 0.6rem'}}>{clients.find(c=>c.id===ts.client_id)?.name||'\u2014'}</td>
-                  <td style={{padding:'0.4rem 0.6rem',fontFamily:'monospace',fontSize:'0.68rem'}}>{ts.dp_id||'\u2014'}</td>
+                  <td style={{padding:'0.4rem 0.6rem',fontFamily:'monospace',fontSize:'0.72rem'}}>{ts.dp_id||'\u2014'}</td>
                   <td style={{padding:'0.4rem 0.6rem'}}>{ts.hours}</td>
                   <td style={{padding:'0.4rem 0.6rem',maxWidth:180}}>{ts.description}</td>
                   <td style={{padding:'0.4rem 0.6rem'}}><Badge text={ts.status} color={ts.status==='approved'?C.green:ts.status==='submitted'?C.amber:ts.status==='rejected'?C.red:C.slate}/></td>
@@ -730,13 +730,13 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       <header style={{background:'var(--cv-header)',borderBottom:`3px solid ${C.cyan}`}}>
         <div style={{maxWidth:1600,margin:'0 auto',padding:'1.25rem 1.5rem',display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
           <div>
-            <div style={{fontFamily:'monospace',fontSize:'0.62rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>CANVAS COACH \u2014 COACH DASHBOARD</div>
+            <div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>CANVAS COACH \u2014 COACH DASHBOARD</div>
             <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0.1rem 0 0.15rem'}}>{userName}</h1>
-            <div style={{fontSize:'0.76rem',color:'var(--cv-wa-60)'}}>{activeClients.length} active \u00b7 {programmes.length} programme{programmes.length!==1?'s':''} \u00b7 {clearviewLive.length} Clearview live \u00b7 {canvasClients.length} canvas engagement{canvasClients.length!==1?'s':''}{pending>0&&<span style={{marginLeft:8,color:C.amber}}>\u00b7 \u23f3 {pending} pending</span>}</div>
+            <div style={{fontSize:'0.8rem',color:'var(--cv-wa-60)'}}>{activeClients.length} active \u00b7 {programmes.length} programme{programmes.length!==1?'s':''} \u00b7 {clearviewLive.length} Clearview live \u00b7 {canvasClients.length} canvas engagement{canvasClients.length!==1?'s':''}{pending>0&&<span style={{marginLeft:8,color:C.amber}}>\u00b7 \u23f3 {pending} pending</span>}</div>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}>
-            <span style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem'}}>Super Coach</span>
-            <button onClick={onSignOut} style={{fontFamily:'monospace',fontSize:'0.65rem',background:'transparent',border:`1px solid var(--cv-wa-25)`,borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
+            <span style={{fontFamily:'monospace',fontSize:'0.72rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem'}}>Super Coach</span>
+            <button onClick={onSignOut} style={{fontFamily:'monospace',fontSize:'0.72rem',background:'transparent',border:`1px solid var(--cv-wa-25)`,borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
           </div>
         </div>
       </header>
@@ -755,7 +755,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         {view==='deals'&&<DealsAndFees programmes={programmes} setProgrammes={setPrograms} clients={clients} setClients={setClients}/>}
         {view==='review'&&<ReviewQueue clients={clients}/>}
       </main>
-      <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.67rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach \u00b7 Coach Dashboard \u00b7 habibonifade.com \u00b7 Confidential</footer>
+      <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.72rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach \u00b7 Coach Dashboard \u00b7 habibonifade.com \u00b7 Confidential</footer>
     </div>
   )
 }
@@ -792,14 +792,14 @@ function TabCover({client,prog,onUpdate}){
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
             {[['Organisation',client.name],['Programme',prog?.name||'\u2014'],['Funder',prog?.funder||'\u2014'],['Lead Consultant','The Canvas Coach'],['Contact',client.contact_name||'\u2014'],['Email',client.contact_email||'\u2014'],['Country',client.country],['Sector',client.sector],['Start Date',client.start_date||'\u2014'],['Target Handover',client.expected_close||'\u2014'],['Status',statusLabel(client.status)],['Engagement Mode',client.engagement_mode==='canvas'?'Full GtCV Canvas':'Clearview Financial']].map(([k,v])=>(
               <div key={k} style={{padding:'0.75rem 1rem',background:C.lightBg,borderRadius:6}}>
-                <div style={{fontSize:'0.7rem',color:C.slate,marginBottom:'0.2rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>{k}</div>
+                <div style={{fontSize:'0.72rem',color:C.slate,marginBottom:'0.2rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>{k}</div>
                 <div style={{fontSize:'0.9rem',fontWeight:600,color:C.navy}}>{v}</div>
               </div>
             ))}
           </div>
-          {client.notes&&<div style={{...card,background:C.cream}}><p style={{margin:0,fontSize:'0.85rem',color:C.slate,fontStyle:'italic'}}>{client.notes}</p></div>}
+          {client.notes&&<div style={{...card,background:C.cream}}><p style={{margin:0,fontSize:'0.86rem',color:C.slate,fontStyle:'italic'}}>{client.notes}</p></div>}
           <div style={{textAlign:'center',padding:'1.5rem',borderTop:`1px solid ${C.border}`,marginTop:'1rem'}}>
-            <div style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.cyan,letterSpacing:'0.1em',marginBottom:'0.3rem'}}>CANVAS COACH</div>
+            <div style={{fontFamily:'monospace',fontSize:'0.72rem',color:C.cyan,letterSpacing:'0.1em',marginBottom:'0.3rem'}}>CANVAS COACH</div>
             <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>Grant-to-Commercial Viability Canvas</div>
             <div style={{fontSize:'0.8rem',color:C.slate,marginTop:'0.3rem'}}>habibonifade.com</div>
           </div>
@@ -815,29 +815,29 @@ function TabHowToStart({client}){
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 2 \u2014 How to Start</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       <div style={card}>
         <h3 style={{fontFamily:'Georgia,serif',color:C.navy,marginTop:0}}>Welcome to your Canvas Coach engagement platform</h3>
-        <p style={{fontSize:'0.88rem',lineHeight:1.7,color:C.slate}}>This platform is where the work of your engagement lives. It tracks every decision you make, every piece of evidence you produce, and every milestone you reach on your journey to commercial independence.</p>
+        <p style={{fontSize:'0.92rem',lineHeight:1.7,color:C.slate}}>This platform is where the work of your engagement lives. It tracks every decision you make, every piece of evidence you produce, and every milestone you reach on your journey to commercial independence.</p>
         <h4 style={{color:C.navy,fontFamily:'Georgia,serif'}}>What this platform tracks</h4>
-        <ul style={{fontSize:'0.88rem',lineHeight:1.8,color:C.slate}}>
+        <ul style={{fontSize:'0.92rem',lineHeight:1.8,color:C.slate}}>
           <li>Your progress through 9 Decision Points, each building on the last</li>
           <li>Evidence you produce at each stage: documents, interviews, financial data, observations</li>
           <li>Decisions made and who made them, all numbered and referenced</li>
           <li>Your commercial readiness, measured at the start, middle, and end of the engagement</li>
         </ul>
         <h4 style={{color:C.navy,fontFamily:'Georgia,serif'}}>What {client.name} does here</h4>
-        <ul style={{fontSize:'0.88rem',lineHeight:1.8,color:C.slate}}>
+        <ul style={{fontSize:'0.92rem',lineHeight:1.8,color:C.slate}}>
           <li>Enter evidence and link to documents as you complete each component</li>
           <li>Your CEO signs off each Decision Point when the work is done</li>
           <li>Record what you learned from customer conversations and pilot deliveries</li>
           <li>Review the Engagement Tracker (Tab 7) to see where you are and what comes next</li>
         </ul>
         <h4 style={{color:C.navy,fontFamily:'Georgia,serif'}}>What your coach does here</h4>
-        <ul style={{fontSize:'0.88rem',lineHeight:1.8,color:C.slate}}>
+        <ul style={{fontSize:'0.92rem',lineHeight:1.8,color:C.slate}}>
           <li>Reviews your evidence and guides next steps</li>
           <li>Can authorise progress if a gate is delayed, with a note visible to everyone</li>
           <li>Manages the overall engagement record</li>
         </ul>
         <div style={{background:'var(--cv-tint-cyan)',padding:16,borderRadius:6,borderLeft:`4px solid ${C.cyan}`,marginTop:'1rem'}}>
-          <strong style={{color:C.navy}}>Your data is saved automatically.</strong> <span style={{color:C.slate,fontSize:'0.88rem'}}>You do not need to click save. Every entry is recorded the moment you complete it.</span>
+          <strong style={{color:C.navy}}>Your data is saved automatically.</strong> <span style={{color:C.slate,fontSize:'0.92rem'}}>You do not need to click save. Every entry is recorded the moment you complete it.</span>
         </div>
       </div>
     </div>
@@ -847,10 +847,10 @@ function TabHowToStart({client}){
 function TabCoachRef(){
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 3 \u2014 Coach Quick Reference</h3><div style={{display:'flex',gap:'0.5rem'}}><span style={{fontFamily:'monospace',fontSize:'0.65rem',color:C.amber,border:`1px solid ${C.amber}`,borderRadius:4,padding:'0.2rem 0.5rem'}}>Coach only \u2014 not visible to client</span><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 3 \u2014 Coach Quick Reference</h3><div style={{display:'flex',gap:'0.5rem'}}><span style={{fontFamily:'monospace',fontSize:'0.72rem',color:C.amber,border:`1px solid ${C.amber}`,borderRadius:4,padding:'0.2rem 0.5rem'}}>Coach only \u2014 not visible to client</span><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       <div style={{...card,background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`}}>
         <h4 style={{fontFamily:'Georgia,serif',color:C.navy,marginTop:0}}>Delivery Rhythm</h4>
-        <ul style={{fontSize:'0.85rem',lineHeight:1.8,color:C.navy}}>
+        <ul style={{fontSize:'0.86rem',lineHeight:1.8,color:C.navy}}>
           <li><strong>Kick-off immersion:</strong> 3 days on-site. Baseline, Phase 0, DP01 and DP02.</li>
           <li><strong>Customer validation visit:</strong> 2 days. Real customer conversations and debrief.</li>
           <li><strong>Iteration 1 pilot visit:</strong> 3 days. Consultant leads with 2 real clients, CEO observes.</li>
@@ -858,19 +858,19 @@ function TabCoachRef(){
           <li><strong>Between visits:</strong> in-country associate provides daily continuity. 2 remote sessions per week.</li>
         </ul>
         <h4 style={{fontFamily:'Georgia,serif',color:C.navy}}>Gate Escalation Protocol</h4>
-        <ul style={{fontSize:'0.85rem',lineHeight:1.8,color:C.navy}}>
+        <ul style={{fontSize:'0.86rem',lineHeight:1.8,color:C.navy}}>
           <li>Gate not signed within 5 working days of completion: escalate to CEO directly by phone or WhatsApp.</li>
           <li>Gate not signed within 10 working days: use Coach Authorise Progress with a mandatory note.</li>
           <li>All coach-authorised progress is visible to the Ignite funder view \u2014 be specific in the note.</li>
         </ul>
         <h4 style={{fontFamily:'Georgia,serif',color:C.navy}}>Commercial Readiness Diagnostic Points</h4>
-        <ul style={{fontSize:'0.85rem',lineHeight:1.8,color:C.navy}}>
+        <ul style={{fontSize:'0.86rem',lineHeight:1.8,color:C.navy}}>
           <li><strong>Baseline:</strong> DP06 \u2014 before pilots begin.</li>
           <li><strong>Mid-point:</strong> DP07 \u2014 after Iteration 1.</li>
           <li><strong>Final:</strong> DP09 \u2014 at engagement close.</li>
         </ul>
         <h4 style={{fontFamily:'Georgia,serif',color:C.navy}}>Non-Negotiables</h4>
-        <ul style={{fontSize:'0.85rem',lineHeight:1.8,color:C.navy}}>
+        <ul style={{fontSize:'0.86rem',lineHeight:1.8,color:C.navy}}>
           <li>Independence Test 4 (client presents commercial model unassisted) must be Yes before handover.</li>
           <li>Pilot clients must pay \u2014 even a nominal amount. Zero-payment pilots do not count.</li>
           <li>The financial model must be understood by the CEO and Finance Manager, not just the consultant.</li>
@@ -886,29 +886,29 @@ function TabIPFramework(){
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 4 \u2014 IP Framework Reference</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       <div style={card}>
         <h4 style={{fontFamily:'Georgia,serif',color:C.navy,marginTop:0}}>Three-Stage Adoption Test</h4>
-        <p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.6}}>Before any service can be sold commercially, three things must be true about the buyer. All three must be present \u2014 one or two is not enough.</p>
+        <p style={{fontSize:'0.86rem',color:C.slate,lineHeight:1.6}}>Before any service can be sold commercially, three things must be true about the buyer. All three must be present \u2014 one or two is not enough.</p>
         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'1rem',marginBottom:'1.5rem'}}>
           {[{n:'01',t:'Willingness',d:'The customer sees the problem as real and worth solving. They want a solution and are open to engaging with a provider.'},{n:'02',t:'Ability',d:'The customer has the financial means to pay for the solution at the price offered. Budget exists and can be accessed.'},{n:'03',t:'Prioritisation',d:'The customer ranks this problem high enough to spend budget on it now, not next quarter or next year.'}].map(s=>(
             <div key={s.n} style={{background:C.cream,padding:16,borderRadius:8,borderTop:`3px solid ${C.cyan}`}}>
-              <p style={{fontSize:'0.65rem',color:C.cyan,fontWeight:700,letterSpacing:1,margin:'0 0 4px',textTransform:'uppercase',fontFamily:'monospace'}}>{s.n}</p>
+              <p style={{fontSize:'0.72rem',color:C.cyan,fontWeight:700,letterSpacing:1,margin:'0 0 4px',textTransform:'uppercase',fontFamily:'monospace'}}>{s.n}</p>
               <p style={{fontFamily:'Georgia,serif',fontWeight:700,margin:'0 0 8px',fontSize:'1rem',color:C.navy}}>{s.t}</p>
-              <p style={{margin:0,fontSize:'0.82rem',color:C.slate}}>{s.d}</p>
+              <p style={{margin:0,fontSize:'0.86rem',color:C.slate}}>{s.d}</p>
             </div>
           ))}
         </div>
         <h4 style={{fontFamily:'Georgia,serif',color:C.navy}}>Asset Liquidity Hierarchy</h4>
-        <p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.6}}>In agricultural markets, assets serve different financial functions. Understanding this helps diagnose customer budget behaviour.</p>
+        <p style={{fontSize:'0.86rem',color:C.slate,lineHeight:1.6}}>In agricultural markets, assets serve different financial functions. Understanding this helps diagnose customer budget behaviour.</p>
         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'1rem',marginBottom:'1.5rem'}}>
           {[{t:'Poultry',sub:'ATM equivalent',d:'Easily converted to cash. Sold when small amounts are needed quickly.'},{t:'Small ruminants',sub:'Savings equivalent',d:'Converted for planned medium expenses. Goats and sheep are liquid but not instant.'},{t:'Large ruminants',sub:'Fixed asset equivalent',d:'Sold for major planned expenses only. Cattle represent significant stored value.'}].map(a=>(
             <div key={a.t} style={{background:C.cream,padding:16,borderRadius:8,borderTop:`3px solid ${C.teal}`}}>
               <p style={{fontFamily:'Georgia,serif',fontWeight:700,margin:'0 0 2px',fontSize:'0.95rem',color:C.navy}}>{a.t}</p>
-              <p style={{fontSize:'0.7rem',color:C.teal,margin:'0 0 8px',fontWeight:600}}>{a.sub}</p>
-              <p style={{margin:0,fontSize:'0.82rem',color:C.slate}}>{a.d}</p>
+              <p style={{fontSize:'0.72rem',color:C.teal,margin:'0 0 8px',fontWeight:600}}>{a.sub}</p>
+              <p style={{margin:0,fontSize:'0.86rem',color:C.slate}}>{a.d}</p>
             </div>
           ))}
         </div>
         <h4 style={{fontFamily:'Georgia,serif',color:C.navy}}>Six Fit Tests \u2014 Commercial Readiness Diagnostic</h4>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.82rem'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.86rem'}}>
           <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Test','Name','What it diagnoses'].map(h=><th key={h} style={{padding:'8px 12px',textAlign:'left'}}>{h}</th>)}</tr></thead>
           <tbody>{[['01','Problem\u2013Provider Fit','Does the organisation have the right to own this problem in this market?'],['02','Problem\u2013Solution Fit','Does the service solve the problem as the client experiences it?'],['03','Solution\u2013Problem Owner Fit','Is the solution designed for the actor with budget, not just the beneficiary?'],['04','Solution\u2013Pilot Fit','Can this be tested meaningfully within the engagement timeline?'],['05','Solution\u2013Market Fit','Is there demonstrated willingness to pay at a cost-recovery price?'],['06','Solution\u2013Scale Channel Fit','Are there channels to reach beyond the founding clients independently?']].map(([n,name,desc],i)=>(
             <tr key={n} style={{background:i%2===0?C.cream:C.white}}>
@@ -947,7 +947,7 @@ function TabEngagementSetup({client,fileLinks,notifications,onUpdate,onUpdateFil
       </div>
       <div style={card}>
         <div style={secH}>Document Links</div>
-        <p style={{fontSize:'0.82rem',color:C.slate,marginBottom:'1rem'}}>Add links to Google Drive, Dropbox, or any URL for key documents.</p>
+        <p style={{fontSize:'0.86rem',color:C.slate,marginBottom:'1rem'}}>Add links to Google Drive, Dropbox, or any URL for key documents.</p>
         {links.map((l,i)=>(
           <div key={i} style={{display:'grid',gridTemplateColumns:'1fr 2fr auto',gap:'0.75rem',alignItems:'end',marginBottom:'0.75rem'}}>
             <div><label style={lbl}>Label</label><input style={inp} value={l.label} onChange={e=>updLink(i,'label',e.target.value)} placeholder="e.g. Engagement Brief"/></div>
@@ -959,7 +959,7 @@ function TabEngagementSetup({client,fileLinks,notifications,onUpdate,onUpdateFil
       </div>
       <div style={card}>
         <div style={secH}>Email Notifications</div>
-        <label style={{display:'flex',alignItems:'center',gap:'0.6rem',fontSize:'0.85rem',color:C.navy,marginBottom:'1rem',cursor:'pointer'}}><input type="checkbox" checked={notif.enabled} onChange={e=>setNotif(n=>({...n,enabled:e.target.checked}))}/> Enable automatic email notifications</label>
+        <label style={{display:'flex',alignItems:'center',gap:'0.6rem',fontSize:'0.86rem',color:C.navy,marginBottom:'1rem',cursor:'pointer'}}><input type="checkbox" checked={notif.enabled} onChange={e=>setNotif(n=>({...n,enabled:e.target.checked}))}/> Enable automatic email notifications</label>
         {notif.enabled&&(
           <div>
             {notif.recipients.map((r,i)=>(
@@ -969,7 +969,7 @@ function TabEngagementSetup({client,fileLinks,notifications,onUpdate,onUpdateFil
                   <div><label style={lbl}>Email</label><input style={inp} value={r.email} onChange={e=>updRecipient(i,'email',e.target.value)}/></div>
                   <div><label style={lbl}>Role</label><input style={inp} value={r.role} onChange={e=>updRecipient(i,'role',e.target.value)} placeholder="e.g. CEO, Programme Officer"/></div>
                 </div>
-                <div style={{display:'flex',gap:'1.25rem',flexWrap:'wrap',fontSize:'0.82rem',marginTop:'0.75rem'}}>
+                <div style={{display:'flex',gap:'1.25rem',flexWrap:'wrap',fontSize:'0.86rem',marginTop:'0.75rem'}}>
                   {[['notify_gate_signed','Gate signed'],['notify_gate_authorised','Coach authorisation'],['notify_evidence_submitted','Evidence submitted'],['notify_dp_complete','DP complete']].map(([f,label])=>(
                     <label key={f} style={{display:'flex',alignItems:'center',gap:'0.4rem',cursor:'pointer'}}><input type="checkbox" checked={r[f]} onChange={e=>updRecipient(i,f,e.target.checked)}/>{label}</label>
                   ))}
@@ -1016,16 +1016,16 @@ function TabDiagnostic({client,diagnostic,userRole,userName,onUpdate}){
       <div style={card}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
           <div style={secH}>Readiness Self-Assessment</div>
-          <div style={{background:score<6?'var(--cv-tint-amber-2)':score>=8?'var(--cv-tint-green)':'var(--cv-tint-cyan)',padding:'6px 14px',borderRadius:6,fontWeight:700,color:score<6?C.amber:score>=8?C.green:C.cyan,fontSize:'0.85rem'}}>{score} / {READINESS_QUESTIONS.length} \u2014 {score<6?'Below threshold \u2014 discuss with coach':score>=8?'Strong readiness':'Moderate readiness'}</div>
+          <div style={{background:score<6?'var(--cv-tint-amber-2)':score>=8?'var(--cv-tint-green)':'var(--cv-tint-cyan)',padding:'6px 14px',borderRadius:6,fontWeight:700,color:score<6?C.amber:score>=8?C.green:C.cyan,fontSize:'0.86rem'}}>{score} / {READINESS_QUESTIONS.length} \u2014 {score<6?'Below threshold \u2014 discuss with coach':score>=8?'Strong readiness':'Moderate readiness'}</div>
         </div>
         <div style={{maxWidth:280,marginBottom:'1rem'}}>
           <ScoreDonut label="Readiness self-assessment" display={`${score} / ${READINESS_QUESTIONS.length}`} frac={READINESS_QUESTIONS.length?score/READINESS_QUESTIONS.length:0} rating={score<6?'Below threshold':score>=8?'Strong readiness':'Moderate readiness'} color={score<6?C.amber:score>=8?C.green:C.cyan}/>
         </div>
         {answers.map((a,i)=>(
-          <div key={a.id} style={{display:'flex',alignItems:'center',gap:'1rem',padding:'0.65rem 0',borderBottom:`1px solid ${C.border}`,fontSize:'0.85rem'}}>
+          <div key={a.id} style={{display:'flex',alignItems:'center',gap:'1rem',padding:'0.65rem 0',borderBottom:`1px solid ${C.border}`,fontSize:'0.86rem'}}>
             <div style={{display:'flex',gap:'0.4rem',flexShrink:0}}>
               {[true,false,null].map((v,vi)=>(
-                <button key={vi} onClick={()=>{if(!locked){const newAnswers=[...answers];newAnswers[i]={...newAnswers[i],answer:v};onUpdate({readiness_answers:newAnswers})}}} style={{padding:'3px 10px',borderRadius:4,fontSize:'0.75rem',cursor:locked?'default':'pointer',background:a.answer===v?(v===true?C.green:v===false?C.red:C.slate):C.white,color:a.answer===v?'var(--cv-on-accent)':C.slate,border:`1px solid ${C.border}`}}>
+                <button key={vi} onClick={()=>{if(!locked){const newAnswers=[...answers];newAnswers[i]={...newAnswers[i],answer:v};onUpdate({readiness_answers:newAnswers})}}} style={{padding:'3px 10px',borderRadius:4,fontSize:'0.8rem',cursor:locked?'default':'pointer',background:a.answer===v?(v===true?C.green:v===false?C.red:C.slate):C.white,color:a.answer===v?'var(--cv-on-accent)':C.slate,border:`1px solid ${C.border}`}}>
                   {v===true?'Yes':v===false?'No':'?'}
                 </button>
               ))}
@@ -1036,7 +1036,7 @@ function TabDiagnostic({client,diagnostic,userRole,userName,onUpdate}){
       </div>
       <div style={card}>
         <div style={secH}>Engagement Commitment</div>
-        <div style={{background:C.cream,padding:16,borderRadius:8,marginBottom:16,fontSize:'0.85rem',lineHeight:1.7,color:C.navy}}>
+        <div style={{background:C.cream,padding:16,borderRadius:8,marginBottom:16,fontSize:'0.86rem',lineHeight:1.7,color:C.navy}}>
           <p>By signing below, {client.name} confirms that:</p>
           <ol style={{color:C.slate}}>
             <li>We have read and understood how this engagement works.</li>
@@ -1060,7 +1060,7 @@ function TabTracker({client,canvas}){
     <div>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 7 \u2014 Engagement Tracker</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       <div style={{overflowX:'auto'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.82rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.86rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
           <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Phase','Zone / Decision Point','Core Question','Status','Components','CEO Sign-Off'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left',fontWeight:600,whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
           <tbody>
             {dpOrder.map((dpId,i)=>{
@@ -1071,9 +1071,9 @@ function TabTracker({client,canvas}){
                 <tr key={dpId} style={{background:i%2===0?C.cream:C.white}}>
                   <td style={{padding:'9px 12px',fontWeight:700,color:C.cyan,fontFamily:'monospace'}}>{dpLabels[dpId]}</td>
                   <td style={{padding:'9px 12px',fontWeight:600,color:C.navy}}>{dp?.label||dpId}</td>
-                  <td style={{padding:'9px 12px',color:C.slate,maxWidth:220,fontSize:'0.78rem'}}>{dp?.core_question||'\u2014'}</td>
-                  <td style={{padding:'9px 12px'}}>{dp?<div style={{display:'flex',alignItems:'center',gap:'0.4rem'}}><DPDot status={dp.status}/><span style={{fontSize:'0.78rem'}}>{dp.status}</span></div>:<Badge text="Not started" color={C.slate}/>}</td>
-                  <td style={{padding:'9px 12px',fontFamily:'monospace',fontSize:'0.78rem'}}>{dp?`${completedComps}/${totalComps}`:'\u2014'}</td>
+                  <td style={{padding:'9px 12px',color:C.slate,maxWidth:220,fontSize:'0.8rem'}}>{dp?.core_question||'\u2014'}</td>
+                  <td style={{padding:'9px 12px'}}>{dp?<div style={{display:'flex',alignItems:'center',gap:'0.4rem'}}><DPDot status={dp.status}/><span style={{fontSize:'0.8rem'}}>{dp.status}</span></div>:<Badge text="Not started" color={C.slate}/>}</td>
+                  <td style={{padding:'9px 12px',fontFamily:'monospace',fontSize:'0.8rem'}}>{dp?`${completedComps}/${totalComps}`:'\u2014'}</td>
                   <td style={{padding:'9px 12px'}}>{dp?.ceo_signed_off?<Badge text={`CEO \u2713 ${dp.ceo_signed_off_at?.split('T')[0]||''}`} color={C.green}/>:'\u2014'}</td>
                 </tr>
               )
@@ -1111,11 +1111,11 @@ function TabDecisions({client,decisions,userRole,userName,onAdd,onUpdate}){
       {decisions.map(d=>(
         <div key={d.id} style={{...card,borderLeft:`4px solid ${C.cyan}`}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.5rem'}}>
-            <span style={{fontFamily:'monospace',fontSize:'0.75rem',fontWeight:700,color:C.cyan}}>{d.reference}</span>
-            <span style={{fontSize:'0.75rem',color:C.slate}}>{d.date} \u00b7 {d.dp_id||'\u2014'}</span>
+            <span style={{fontFamily:'monospace',fontSize:'0.8rem',fontWeight:700,color:C.cyan}}>{d.reference}</span>
+            <span style={{fontSize:'0.8rem',color:C.slate}}>{d.date} \u00b7 {d.dp_id||'\u2014'}</span>
           </div>
-          <p style={{margin:'0 0 0.5rem',fontSize:'0.88rem',color:C.navy}}>{d.decision}</p>
-          <div style={{display:'flex',gap:'1.5rem',fontSize:'0.78rem',color:C.slate}}>
+          <p style={{margin:'0 0 0.5rem',fontSize:'0.92rem',color:C.navy}}>{d.decision}</p>
+          <div style={{display:'flex',gap:'1.5rem',fontSize:'0.8rem',color:C.slate}}>
             <span>Made by: <strong style={{color:C.navy}}>{d.made_by}</strong></span>
             {d.authorised_by&&<span>Authorised by: <strong style={{color:C.navy}}>{d.authorised_by}</strong></span>}
             {d.evidence_ref&&<span>Evidence: <strong style={{color:C.cyan}}>{d.evidence_ref}</strong></span>}
@@ -1155,11 +1155,11 @@ function TabEvidence({client,evidence,onAdd,onUpdate}){
             <tr key={e.id} style={{background:i%2===0?C.cream:C.white}}>
               <td style={{padding:'8px 10px',fontFamily:'monospace',fontWeight:700,color:C.cyan}}>{e.reference}</td>
               <td style={{padding:'8px 10px'}}>{e.date}</td>
-              <td style={{padding:'8px 10px',fontFamily:'monospace',fontSize:'0.75rem'}}>{e.dp_id||'\u2014'}</td>
+              <td style={{padding:'8px 10px',fontFamily:'monospace',fontSize:'0.8rem'}}>{e.dp_id||'\u2014'}</td>
               <td style={{padding:'8px 10px'}}>{e.type}</td>
               <td style={{padding:'8px 10px',maxWidth:240}}>{e.description}</td>
               <td style={{padding:'8px 10px'}}><Badge text={e.status} color={e.status==='accepted'?C.green:e.status==='queried'?C.amber:C.slate}/></td>
-              <td style={{padding:'8px 10px'}}>{e.url?<a href={e.url} target="_blank" rel="noopener noreferrer" style={{color:C.cyan,fontSize:'0.78rem'}}>Open</a>:'\u2014'}</td>
+              <td style={{padding:'8px 10px'}}>{e.url?<a href={e.url} target="_blank" rel="noopener noreferrer" style={{color:C.cyan,fontSize:'0.8rem'}}>Open</a>:'\u2014'}</td>
             </tr>
           ))}</tbody>
         </table>
@@ -1184,7 +1184,7 @@ function TabHandover({client,handover,canvas,userRole,onUpdate}){
           {!locked&&canViewCoachGuidance(userRole)&&(
             <div style={{display:'flex',gap:'0.5rem',marginBottom:'0.75rem',flexWrap:'wrap'}}>
               {['yes','no','partial','not_assessed'].map(s=>(
-                <button key={s} style={{padding:'4px 12px',borderRadius:5,fontSize:'0.75rem',cursor:'pointer',background:test.status===s?'var(--cv-header)':C.white,color:test.status===s?'var(--cv-on-accent)':C.slate,border:`1px solid ${C.border}`}} onClick={()=>onUpdate(test.id,{status:s})}>{s.replace('_',' ')}</button>
+                <button key={s} style={{padding:'4px 12px',borderRadius:5,fontSize:'0.8rem',cursor:'pointer',background:test.status===s?'var(--cv-header)':C.white,color:test.status===s?'var(--cv-on-accent)':C.slate,border:`1px solid ${C.border}`}} onClick={()=>onUpdate(test.id,{status:s})}>{s.replace('_',' ')}</button>
               ))}
             </div>
           )}
@@ -1212,13 +1212,13 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
       <div style={{background:'var(--cv-header)',borderRadius:8,padding:'1.5rem',marginBottom:'1.5rem',color:'var(--cv-on-accent)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
           <div>
-            <p style={{margin:'0 0 4px',fontSize:'0.7rem',color:C.cyan,fontFamily:'monospace',letterSpacing:'0.08em'}}>{dp.label?.split('\u2014')[0]?.trim()}</p>
+            <p style={{margin:'0 0 4px',fontSize:'0.72rem',color:C.cyan,fontFamily:'monospace',letterSpacing:'0.08em'}}>{dp.label?.split('\u2014')[0]?.trim()}</p>
             <h2 style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',margin:'0 0 0.5rem',color:'var(--cv-on-accent)'}}>{dp.core_question}</h2>
-            <p style={{margin:0,fontSize:'0.78rem',color:'var(--cv-wa-60)'}}>Session time: {dp.session_time}</p>
+            <p style={{margin:0,fontSize:'0.8rem',color:'var(--cv-wa-60)'}}>Session time: {dp.session_time}</p>
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:'0.5rem',alignItems:'flex-end'}}>
-            <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}><DPDot status={dp.status}/><span style={{fontSize:'0.78rem',color:'var(--cv-on-accent)'}}>{dp.status}</span></div>
-            <p style={{margin:0,fontSize:'0.78rem',color:C.cyan}}>{completedComps}/{totalComps} components</p>
+            <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}><DPDot status={dp.status}/><span style={{fontSize:'0.8rem',color:'var(--cv-on-accent)'}}>{dp.status}</span></div>
+            <p style={{margin:0,fontSize:'0.8rem',color:C.cyan}}>{completedComps}/{totalComps} components</p>
             <button style={addBtn(true)} onClick={()=>window.print()}>Print</button>
           </div>
         </div>
@@ -1228,8 +1228,8 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
       <div style={card}>
         <div style={secH}>What good looks like for this Decision Point</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginBottom:'1rem'}}>
-          <div style={{background:'var(--cv-tint-green)',padding:14,borderRadius:6}}><p style={{fontWeight:700,color:C.green,margin:'0 0 6px',fontSize:'0.78rem'}}>A strong answer</p><p style={{margin:0,fontSize:'0.85rem',color:C.navy}}>{dp.commitment}</p></div>
-          <div style={{background:'var(--cv-tint-red)',padding:14,borderRadius:6}}><p style={{fontWeight:700,color:C.red,margin:'0 0 6px',fontSize:'0.78rem'}}>Output required</p><p style={{margin:0,fontSize:'0.85rem',color:C.navy}}>{dp.output_required}</p></div>
+          <div style={{background:'var(--cv-tint-green)',padding:14,borderRadius:6}}><p style={{fontWeight:700,color:C.green,margin:'0 0 6px',fontSize:'0.8rem'}}>A strong answer</p><p style={{margin:0,fontSize:'0.86rem',color:C.navy}}>{dp.commitment}</p></div>
+          <div style={{background:'var(--cv-tint-red)',padding:14,borderRadius:6}}><p style={{fontWeight:700,color:C.red,margin:'0 0 6px',fontSize:'0.8rem'}}>Output required</p><p style={{margin:0,fontSize:'0.86rem',color:C.navy}}>{dp.output_required}</p></div>
         </div>
       </div>
 
@@ -1243,12 +1243,12 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
               <div style={{display:'flex',alignItems:'center',gap:'0.75rem',padding:'0.75rem 1rem',cursor:'pointer',background:expanded?C.lightBg:C.white}} onClick={()=>setExpandedComp(expanded?null:comp.id)}>
                 <DPDot status={comp.status}/>
                 <div style={{flex:1}}>
-                  <span style={{fontWeight:600,fontSize:'0.85rem',color:C.navy}}>Component {comp.component_number} \u2014 {comp.title}</span>
+                  <span style={{fontWeight:600,fontSize:'0.86rem',color:C.navy}}>Component {comp.component_number} \u2014 {comp.title}</span>
                 </div>
                 <div style={{display:'flex',gap:'0.4rem',alignItems:'center',flexShrink:0}}>
                   {comp.ceo_signed_off&&<Badge text="CEO \u2713" color={C.green}/>}
                   {comp.evidence_recorded&&<Badge text="Evidence" color={C.teal}/>}
-                  {canEdit(userRole)&&<select value={comp.status} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();onUpdateComp(comp.component_number,{status:e.target.value})}} style={{fontFamily:'monospace',fontSize:'0.7rem',padding:'0.2rem 0.3rem',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',cursor:'pointer'}}>
+                  {canEdit(userRole)&&<select value={comp.status} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();onUpdateComp(comp.component_number,{status:e.target.value})}} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.2rem 0.3rem',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',cursor:'pointer'}}>
                     {['\u25cb','\u25d0','\u2713','\u26a0'].map(s=><option key={s} value={s}>{s}</option>)}
                   </select>}
                   <span style={{fontSize:'0.72rem',color:C.slate}}>{expanded?'\u25b2':'\u25bc'}</span>
@@ -1258,12 +1258,12 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
                 <div style={{padding:'1rem',borderTop:`1px solid ${C.border}`,background:C.white}}>
                   {/* Five layers */}
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.75rem',marginBottom:'1rem'}}>
-                    <div style={{background:'var(--cv-bg-2)',borderRadius:6,padding:'0.75rem'}}><p style={{fontWeight:700,color:C.navy,margin:'0 0 4px',fontSize:'0.75rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>What it is</p><p style={{margin:0,fontSize:'0.83rem',color:C.slate}}>{comp.what_it_is||'Content will be loaded from canvas-types.'}</p></div>
-                    <div style={{background:'var(--cv-tint-amber)',borderRadius:6,padding:'0.75rem'}}><p style={{fontWeight:700,color:C.amber,margin:'0 0 4px',fontSize:'0.75rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Why it matters</p><p style={{margin:0,fontSize:'0.83rem',color:C.slate}}>{comp.why_it_matters||'\u2014'}</p></div>
+                    <div style={{background:'var(--cv-bg-2)',borderRadius:6,padding:'0.75rem'}}><p style={{fontWeight:700,color:C.navy,margin:'0 0 4px',fontSize:'0.8rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>What it is</p><p style={{margin:0,fontSize:'0.86rem',color:C.slate}}>{comp.what_it_is||'Content will be loaded from canvas-types.'}</p></div>
+                    <div style={{background:'var(--cv-tint-amber)',borderRadius:6,padding:'0.75rem'}}><p style={{fontWeight:700,color:C.amber,margin:'0 0 4px',fontSize:'0.8rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Why it matters</p><p style={{margin:0,fontSize:'0.86rem',color:C.slate}}>{comp.why_it_matters||'\u2014'}</p></div>
                   </div>
-                  <div style={{background:'var(--cv-tint-cyan)',borderRadius:6,padding:'0.75rem',marginBottom:'0.75rem',borderLeft:`4px solid ${C.cyan}`}}><p style={{fontWeight:700,color:C.cyan,margin:'0 0 4px',fontSize:'0.75rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Action trigger</p><p style={{margin:0,fontSize:'0.83rem',color:C.navy}}>{comp.action_trigger||'\u2014'}</p></div>
-                  <div style={{background:'var(--cv-tint-green)',borderRadius:6,padding:'0.75rem',marginBottom:'0.75rem'}}><p style={{fontWeight:700,color:C.green,margin:'0 0 4px',fontSize:'0.75rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Signal to look for</p><p style={{margin:0,fontSize:'0.83rem',color:C.navy}}>{comp.signal_to_look_for||'\u2014'}</p></div>
-                  {canViewCoachGuidance(userRole)&&<div style={{background:'var(--cv-tint-amber)',borderRadius:6,padding:'0.75rem',marginBottom:'1rem',borderLeft:`4px solid ${C.amber}`}}><p style={{fontWeight:700,color:C.amber,margin:'0 0 4px',fontSize:'0.75rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Coach guidance (not visible to client)</p><p style={{margin:0,fontSize:'0.83rem',color:C.navy}}>{comp.coach_guidance||'\u2014'}</p></div>}
+                  <div style={{background:'var(--cv-tint-cyan)',borderRadius:6,padding:'0.75rem',marginBottom:'0.75rem',borderLeft:`4px solid ${C.cyan}`}}><p style={{fontWeight:700,color:C.cyan,margin:'0 0 4px',fontSize:'0.8rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Action trigger</p><p style={{margin:0,fontSize:'0.86rem',color:C.navy}}>{comp.action_trigger||'\u2014'}</p></div>
+                  <div style={{background:'var(--cv-tint-green)',borderRadius:6,padding:'0.75rem',marginBottom:'0.75rem'}}><p style={{fontWeight:700,color:C.green,margin:'0 0 4px',fontSize:'0.8rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Signal to look for</p><p style={{margin:0,fontSize:'0.86rem',color:C.navy}}>{comp.signal_to_look_for||'\u2014'}</p></div>
+                  {canViewCoachGuidance(userRole)&&<div style={{background:'var(--cv-tint-amber)',borderRadius:6,padding:'0.75rem',marginBottom:'1rem',borderLeft:`4px solid ${C.amber}`}}><p style={{fontWeight:700,color:C.amber,margin:'0 0 4px',fontSize:'0.8rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Coach guidance (not visible to client)</p><p style={{margin:0,fontSize:'0.86rem',color:C.navy}}>{comp.coach_guidance||'\u2014'}</p></div>}
                   {/* Evidence fields */}
                   <div style={{borderTop:`1px solid ${C.border}`,paddingTop:'0.75rem'}}>
                     <label style={{...lbl,color:C.teal}}>Evidence recorded</label>
@@ -1313,7 +1313,7 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
           <div>
             {canSignOff(userRole)&&userRole==='ceo'&&(
               <div style={{background:C.cream,padding:'1.25rem',borderRadius:8,marginBottom:'1rem'}}>
-                <p style={{fontSize:'0.88rem',color:C.navy,lineHeight:1.7,margin:'0 0 1rem'}}>When all components are complete, click below to sign off and unlock the next Decision Point.</p>
+                <p style={{fontSize:'0.92rem',color:C.navy,lineHeight:1.7,margin:'0 0 1rem'}}>When all components are complete, click below to sign off and unlock the next Decision Point.</p>
                 <button style={solidBtn('var(--cv-header)')} onClick={()=>onUpdateDP({ceo_signed_off:true,ceo_signed_off_at:new Date().toISOString(),status:'\u2713',completed_at:new Date().toISOString()})}>I confirm this Decision Point is complete \u2014 CEO Sign-Off</button>
               </div>
             )}
@@ -1346,7 +1346,7 @@ function TabInterviewBriefing({client,interviews,onAdd}){
   return(
     <div>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 21 \u2014 Interview Briefing</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ New Briefing</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
-      <div style={{...card,background:C.cream,fontSize:'0.85rem',color:C.slate,lineHeight:1.7}}>An interview briefing is prepared before each customer validation visit. It sets the objective, target respondent profile, and key questions for the interviewer.</div>
+      <div style={{...card,background:C.cream,fontSize:'0.86rem',color:C.slate,lineHeight:1.7}}>An interview briefing is prepared before each customer validation visit. It sets the objective, target respondent profile, and key questions for the interviewer.</div>
       {adding&&(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>
           <div style={fGrid}>
@@ -1365,10 +1365,10 @@ function TabInterviewBriefing({client,interviews,onAdd}){
       )}
       {interviews.filter(i=>i.objective).map(i=>(
         <div key={i.id} style={{...card,borderLeft:`4px solid ${C.cyan}`}}>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.5rem'}}><span style={{fontFamily:'monospace',fontSize:'0.75rem',fontWeight:700,color:C.cyan}}>{i.reference}</span><span style={{fontSize:'0.75rem',color:C.slate}}>{i.date} \u00b7 {i.dp_id}</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.5rem'}}><span style={{fontFamily:'monospace',fontSize:'0.8rem',fontWeight:700,color:C.cyan}}>{i.reference}</span><span style={{fontSize:'0.8rem',color:C.slate}}>{i.date} \u00b7 {i.dp_id}</span></div>
           <p style={{fontWeight:600,color:C.navy,margin:'0 0 0.4rem'}}>Objective: {i.objective}</p>
-          <p style={{fontSize:'0.82rem',color:C.slate,margin:'0 0 0.4rem'}}>Respondent profile: {i.respondent}</p>
-          {i.key_questions&&<div style={{background:C.lightBg,borderRadius:5,padding:'0.75rem',marginTop:'0.5rem'}}><p style={{fontWeight:600,fontSize:'0.78rem',color:C.navy,margin:'0 0 0.4rem'}}>Key Questions:</p><pre style={{fontSize:'0.82rem',color:C.slate,margin:0,whiteSpace:'pre-wrap',fontFamily:'inherit'}}>{i.key_questions}</pre></div>}
+          <p style={{fontSize:'0.86rem',color:C.slate,margin:'0 0 0.4rem'}}>Respondent profile: {i.respondent}</p>
+          {i.key_questions&&<div style={{background:C.lightBg,borderRadius:5,padding:'0.75rem',marginTop:'0.5rem'}}><p style={{fontWeight:600,fontSize:'0.8rem',color:C.navy,margin:'0 0 0.4rem'}}>Key Questions:</p><pre style={{fontSize:'0.86rem',color:C.slate,margin:0,whiteSpace:'pre-wrap',fontFamily:'inherit'}}>{i.key_questions}</pre></div>}
         </div>
       ))}
     </div>
@@ -1405,12 +1405,12 @@ function TabInterviewCapture({client,interviews,onAdd,onUpdate}){
       )}
       {interviews.filter(i=>i.respondent).map(i=>(
         <div key={i.id} style={{...card,borderLeft:`4px solid ${C.cyan}`}}>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.5rem'}}><span style={{fontFamily:'monospace',fontSize:'0.75rem',fontWeight:700,color:C.cyan}}>{i.reference}</span><span style={{fontSize:'0.75rem',color:C.slate}}>{i.date} \u00b7 {i.dp_id}</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.5rem'}}><span style={{fontFamily:'monospace',fontSize:'0.8rem',fontWeight:700,color:C.cyan}}>{i.reference}</span><span style={{fontSize:'0.8rem',color:C.slate}}>{i.date} \u00b7 {i.dp_id}</span></div>
           <p style={{fontWeight:600,color:C.navy,margin:'0 0 0.3rem'}}>{i.respondent} \u2014 {i.role}, {i.organisation}</p>
-          <p style={{fontSize:'0.78rem',color:C.slate,margin:'0 0 0.75rem'}}>Interviewer: {i.interviewer}</p>
-          {i.key_quotes&&<div style={{background:'var(--cv-tint-cyan)',borderRadius:5,padding:'0.75rem',marginBottom:'0.5rem',borderLeft:`3px solid ${C.cyan}`}}><p style={{fontWeight:600,fontSize:'0.78rem',color:C.cyan,margin:'0 0 0.4rem'}}>Key Quotes:</p><p style={{margin:0,fontSize:'0.83rem',color:C.navy,fontStyle:'italic',lineHeight:1.6}}>{i.key_quotes}</p></div>}
-          {i.observations&&<p style={{fontSize:'0.82rem',color:C.slate,margin:'0 0 0.4rem'}}><strong>Observations:</strong> {i.observations}</p>}
-          {i.follow_up&&<p style={{fontSize:'0.82rem',color:C.amber,margin:0}}><strong>Follow-up:</strong> {i.follow_up}</p>}
+          <p style={{fontSize:'0.8rem',color:C.slate,margin:'0 0 0.75rem'}}>Interviewer: {i.interviewer}</p>
+          {i.key_quotes&&<div style={{background:'var(--cv-tint-cyan)',borderRadius:5,padding:'0.75rem',marginBottom:'0.5rem',borderLeft:`3px solid ${C.cyan}`}}><p style={{fontWeight:600,fontSize:'0.8rem',color:C.cyan,margin:'0 0 0.4rem'}}>Key Quotes:</p><p style={{margin:0,fontSize:'0.86rem',color:C.navy,fontStyle:'italic',lineHeight:1.6}}>{i.key_quotes}</p></div>}
+          {i.observations&&<p style={{fontSize:'0.86rem',color:C.slate,margin:'0 0 0.4rem'}}><strong>Observations:</strong> {i.observations}</p>}
+          {i.follow_up&&<p style={{fontSize:'0.86rem',color:C.amber,margin:0}}><strong>Follow-up:</strong> {i.follow_up}</p>}
         </div>
       ))}
     </div>
@@ -1422,13 +1422,13 @@ function TabInterviewReporting({interviews}){
   return(
     <div>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 23 \u2014 Interview Reporting</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
-      <div style={{...card,background:C.cream,fontSize:'0.85rem',color:C.slate,lineHeight:1.7}}>Interview reports summarise what was heard across all interviews for a given Decision Point: what we heard, what it means, and what we do next.</div>
+      <div style={{...card,background:C.cream,fontSize:'0.86rem',color:C.slate,lineHeight:1.7}}>Interview reports summarise what was heard across all interviews for a given Decision Point: what we heard, what it means, and what we do next.</div>
       {byDP.length===0&&<div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No interviews recorded yet.</div>}
       {byDP.map(({dp,items})=>(
         <div key={dp} style={card}>
           <div style={secH}>{dp.toUpperCase()} \u2014 {items.length} interview{items.length!==1?'s':''}</div>
-          <div style={{marginBottom:'1rem'}}><p style={{fontWeight:700,color:C.navy,margin:'0 0 0.5rem'}}>What we heard:</p>{items.map(i=><div key={i.id} style={{marginBottom:'0.4rem',fontSize:'0.83rem'}}>{i.respondent&&<span style={{fontWeight:600,color:C.navy}}>{i.respondent}: </span>}<span style={{color:C.slate,fontStyle:'italic'}}>{i.key_quotes||'No quotes recorded.'}</span></div>)}</div>
-          <div style={{borderTop:`1px solid ${C.border}`,paddingTop:'0.75rem'}}><p style={{fontWeight:700,color:C.navy,margin:'0 0 0.5rem'}}>Follow-up actions:</p>{items.filter(i=>i.follow_up).map(i=><div key={i.id} style={{fontSize:'0.83rem',color:C.amber,marginBottom:'0.3rem'}}>\u00b7 {i.follow_up}</div>)}{items.filter(i=>i.follow_up).length===0&&<p style={{fontSize:'0.83rem',color:C.slate}}>No follow-up actions recorded.</p>}</div>
+          <div style={{marginBottom:'1rem'}}><p style={{fontWeight:700,color:C.navy,margin:'0 0 0.5rem'}}>What we heard:</p>{items.map(i=><div key={i.id} style={{marginBottom:'0.4rem',fontSize:'0.86rem'}}>{i.respondent&&<span style={{fontWeight:600,color:C.navy}}>{i.respondent}: </span>}<span style={{color:C.slate,fontStyle:'italic'}}>{i.key_quotes||'No quotes recorded.'}</span></div>)}</div>
+          <div style={{borderTop:`1px solid ${C.border}`,paddingTop:'0.75rem'}}><p style={{fontWeight:700,color:C.navy,margin:'0 0 0.5rem'}}>Follow-up actions:</p>{items.filter(i=>i.follow_up).map(i=><div key={i.id} style={{fontSize:'0.86rem',color:C.amber,marginBottom:'0.3rem'}}>\u00b7 {i.follow_up}</div>)}{items.filter(i=>i.follow_up).length===0&&<p style={{fontSize:'0.86rem',color:C.slate}}>No follow-up actions recorded.</p>}</div>
         </div>
       ))}
     </div>
@@ -1459,7 +1459,7 @@ function TabHypothesis({client,hypotheses,onAdd,onUpdate}){
         <tbody>{hypotheses.length===0?<tr><td colSpan={7} style={{padding:'2rem',textAlign:'center',color:C.slate}}>No hypotheses recorded.</td></tr>:hypotheses.map((h,i)=>(
           <tr key={h.id} style={{background:i%2===0?C.cream:C.white,verticalAlign:'top'}}>
             <td style={{padding:'8px 10px',fontFamily:'monospace',fontWeight:700,color:C.cyan,whiteSpace:'nowrap'}}>{h.reference}</td>
-            <td style={{padding:'8px 10px',fontFamily:'monospace',fontSize:'0.75rem'}}>{h.dp_id}</td>
+            <td style={{padding:'8px 10px',fontFamily:'monospace',fontSize:'0.8rem'}}>{h.dp_id}</td>
             <td style={{padding:'8px 10px',maxWidth:200}}><input style={{...inp,background:'transparent',border:'none',padding:0}} value={h.hypothesis||''} onChange={e=>onUpdate(h.id,{hypothesis:e.target.value})}/></td>
             <td style={{padding:'8px 10px',maxWidth:150}}><input style={{...inp,background:'transparent',border:'none',padding:0}} value={h.evidence_for||''} onChange={e=>onUpdate(h.id,{evidence_for:e.target.value})} placeholder="Add..."/></td>
             <td style={{padding:'8px 10px',maxWidth:150}}><input style={{...inp,background:'transparent',border:'none',padding:0}} value={h.evidence_against||''} onChange={e=>onUpdate(h.id,{evidence_against:e.target.value})} placeholder="Add..."/></td>
@@ -1479,7 +1479,7 @@ function TabPilotObservation({client,pilots,onAdd,onUpdate}){
   return(
     <div>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 25 \u2014 Pilot Observation</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Record Observation</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
-      <div style={{...card,background:C.cream,fontSize:'0.85rem',color:C.slate,lineHeight:1.7}}>One form per pilot delivery. Completed by the lead consultant during or immediately after the visit.</div>
+      <div style={{...card,background:C.cream,fontSize:'0.86rem',color:C.slate,lineHeight:1.7}}>One form per pilot delivery. Completed by the lead consultant during or immediately after the visit.</div>
       {adding&&(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>
           <div style={fGrid}>
@@ -1503,15 +1503,15 @@ function TabPilotObservation({client,pilots,onAdd,onUpdate}){
       )}
       {pilots.map(p=>(
         <div key={p.id} style={{...card,borderLeft:`4px solid ${p.iteration===1?C.cyan:C.teal}`}}>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.5rem'}}><Badge text={`Iteration ${p.iteration}`} color={p.iteration===1?C.cyan:C.teal}/><span style={{fontSize:'0.75rem',color:C.slate}}>{p.date}</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.5rem'}}><Badge text={`Iteration ${p.iteration}`} color={p.iteration===1?C.cyan:C.teal}/><span style={{fontSize:'0.8rem',color:C.slate}}>{p.date}</span></div>
           <p style={{fontWeight:600,color:C.navy,margin:'0 0 0.5rem'}}>{p.client_name}</p>
-          <p style={{fontSize:'0.83rem',color:C.slate,margin:'0 0 0.75rem'}}>{p.service_delivered}</p>
+          <p style={{fontSize:'0.86rem',color:C.slate,margin:'0 0 0.75rem'}}>{p.service_delivered}</p>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.75rem',marginBottom:'0.75rem'}}>
-            <div style={{background:'var(--cv-tint-green)',borderRadius:5,padding:'0.75rem'}}><p style={{fontWeight:600,color:C.green,margin:'0 0 0.4rem',fontSize:'0.78rem'}}>Went well</p><p style={{margin:0,fontSize:'0.83rem',color:C.navy}}>{p.went_well}</p></div>
-            <div style={{background:'var(--cv-tint-red)',borderRadius:5,padding:'0.75rem'}}><p style={{fontWeight:600,color:C.red,margin:'0 0 0.4rem',fontSize:'0.78rem'}}>Did not work</p><p style={{margin:0,fontSize:'0.83rem',color:C.navy}}>{p.did_not_work}</p></div>
+            <div style={{background:'var(--cv-tint-green)',borderRadius:5,padding:'0.75rem'}}><p style={{fontWeight:600,color:C.green,margin:'0 0 0.4rem',fontSize:'0.8rem'}}>Went well</p><p style={{margin:0,fontSize:'0.86rem',color:C.navy}}>{p.went_well}</p></div>
+            <div style={{background:'var(--cv-tint-red)',borderRadius:5,padding:'0.75rem'}}><p style={{fontWeight:600,color:C.red,margin:'0 0 0.4rem',fontSize:'0.8rem'}}>Did not work</p><p style={{margin:0,fontSize:'0.86rem',color:C.navy}}>{p.did_not_work}</p></div>
           </div>
-          {p.client_feedback&&<div style={{background:'var(--cv-tint-cyan)',borderRadius:5,padding:'0.75rem',marginBottom:'0.5rem',borderLeft:`3px solid ${C.cyan}`}}><p style={{fontWeight:600,fontSize:'0.78rem',color:C.cyan,margin:'0 0 0.4rem'}}>Client feedback:</p><p style={{margin:0,fontSize:'0.83rem',color:C.navy,fontStyle:'italic'}}>{p.client_feedback}</p></div>}
-          {p.adjustments_made&&<p style={{fontSize:'0.83rem',color:C.amber,margin:0}}><strong>Adjustments for next iteration:</strong> {p.adjustments_made}</p>}
+          {p.client_feedback&&<div style={{background:'var(--cv-tint-cyan)',borderRadius:5,padding:'0.75rem',marginBottom:'0.5rem',borderLeft:`3px solid ${C.cyan}`}}><p style={{fontWeight:600,fontSize:'0.8rem',color:C.cyan,margin:'0 0 0.4rem'}}>Client feedback:</p><p style={{margin:0,fontSize:'0.86rem',color:C.navy,fontStyle:'italic'}}>{p.client_feedback}</p></div>}
+          {p.adjustments_made&&<p style={{fontSize:'0.86rem',color:C.amber,margin:0}}><strong>Adjustments for next iteration:</strong> {p.adjustments_made}</p>}
         </div>
       ))}
     </div>
