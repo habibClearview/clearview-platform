@@ -15,7 +15,8 @@ import DealsAndFees from '@/components/coach/DealsAndFees'
 import ReviewQueue from '@/components/coach/ReviewQueue'
 import {
   engagementSplit, independentClients, feesReceivedInYear, outstandingInvoiced,
-  averageDaysToCollect, revenueStreams, dealCards,
+  averageDaysToCollect, revenueStreams, dealCards, dealWinRate,
+  canvasProgress, coImplementerNamesForClient, engagementDisplayStatus, coImplementerWorkload,
 } from '@/lib/coach-business-metrics'
 
 // \u2500\u2500\u2500 DESIGN TOKENS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -54,10 +55,69 @@ function fmtGlance(n,cur){const sym=cur==='USD'?'$':(cur||'')+' ';const abs=Math
 function Kicker({children,style}){return<div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.75rem',...style}}>{children}</div>}
 function GlanceKPI({label,value,sub,color}){return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem',borderLeft:`4px solid ${color||C.navy}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)'}}><div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.4rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'0.86rem',color:C.slate,marginTop:'0.3rem'}}>{sub}</div>}</div>)}
 function GlanceBar({frac,color}){return<div style={{height:6,borderRadius:3,background:'var(--cv-track)',marginTop:'0.75rem',overflow:'hidden'}}><div style={{height:'100%',width:`${Math.round(Math.max(0,Math.min(1,frac||0))*100)}%`,background:color,borderRadius:3}}/></div>}
-function RevenueStreamCard({label,value,tag,barFrac,currency,color}){return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem',borderTop:`3px solid ${color}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>{fmtGlance(value,currency)}</div><Badge text={tag} color={color}/><GlanceBar frac={barFrac} color={color}/></div>)}
+function RevenueStreamCard({label,value,description,tag,barFrac,currency,color}){return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem',borderTop:`3px solid ${color}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,color:C.navy}}>{label}</div><div style={{fontSize:'0.86rem',color:C.slate,margin:'0.15rem 0 0.7rem'}}>{description}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>{fmtGlance(value,currency)}</div><Badge text={tag} color={color}/><GlanceBar frac={barFrac} color={color}/></div>)}
 const DEAL_STAGE_META={conversation:{label:'Early conversation',color:C.slate},scoping:{label:'Scoping',color:C.cyan},proposal:{label:'Proposal · deciding',color:C.amber},won:{label:'Won · in delivery',color:C.green},lost:{label:'Lost',color:C.red}}
 function DealPipelineCard({deal}){const meta=DEAL_STAGE_META[deal.stage]||{label:deal.stage,color:C.slate};return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem',borderTop:`3px solid ${meta.color}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>{deal.name}</div><div style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.5rem'}}>{deal.subtitle}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>{fmtGlance(deal.value,deal.currency)}</div><Badge text={meta.label} color={meta.color}/><GlanceBar frac={deal.barFrac} color={meta.color}/></div>)}
-function MyBusinessGlance({clients,programmes}){
+
+// ─── Engagements table (real canvas progress; NO margin % -- that field
+// does not exist anywhere in the schema, so it is deliberately omitted
+// rather than fabricated) ──────────────────────────────────────────
+const STATUS_COLOR={closed:C.slate,paid:C.green,invoiced:C.amber,unpaid:C.red,unset:C.border}
+function EngagementsTable({clients,programmes,coImplementers,canvasByClient}){
+  const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
+  return(
+    <div style={card}>
+      <div style={{overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.86rem'}}>
+          <thead><tr style={{background:C.navy}}>{['Served','Payer','Canvas progress','Fee','Co-implementer','Status'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left',fontWeight:400,fontSize:'0.72rem',color:'var(--cv-on-accent)',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
+          <tbody>
+            {clients.map(c=>{
+              const prog=canvasProgress(canvasByClient[c.id]||[])
+              const payer=c.programme_id?(programmesById[c.programme_id]?.funder||programmesById[c.programme_id]?.name||'programme'):'self · independent'
+              const cis=coImplementerNamesForClient(c.id,coImplementers)
+              const status=engagementDisplayStatus(c)
+              return(
+                <tr key={c.id} style={{borderBottom:'1px solid var(--cv-border-soft)'}}>
+                  <td style={{padding:'10px 12px'}}>
+                    <div style={{fontWeight:700}}>{c.name}</div>
+                    <span className="mode" style={{fontFamily:'monospace',fontSize:'0.6rem',fontWeight:700,borderRadius:4,padding:'0.08rem 0.4rem',color:c.engagement_mode==='canvas'?C.purple:C.teal,border:`1px solid ${c.engagement_mode==='canvas'?C.purple:C.teal}`}}>{c.engagement_mode==='canvas'?'GtCV':'Clearview'}</span>
+                  </td>
+                  <td style={{padding:'10px 12px',fontSize:'0.78rem',color:C.slate}}>{payer}</td>
+                  <td style={{padding:'10px 12px',fontSize:'0.78rem',color:C.slate}}>{prog.totalCount>0?`${prog.doneCount}/${prog.totalCount} · ${prog.currentLabel}`:'No canvas yet'}</td>
+                  <td style={{padding:'10px 12px',fontFamily:'monospace',fontSize:'0.82rem'}}>{c.engagement_fee?fmtGlance(c.engagement_fee,c.fee_currency||'USD'):'—'}</td>
+                  <td style={{padding:'10px 12px',fontSize:'0.78rem'}}>{cis.length>0?cis.join(', '):'—'}</td>
+                  <td style={{padding:'10px 12px'}}><Badge text={status.label} color={STATUS_COLOR[status.key]}/></td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ─── Co-implementer performance -- only what's honestly computable. ────
+// "On-time gates", "utilisation %", and a red/amber issue flag were checked
+// against the real schema and none of them exist (no due-date field, no
+// capacity field, no structured flag field) -- deliberately not shown here.
+function CoImplementerPerfCard({ci,workload}){
+  const initials=(ci.name||'?').split(' ').filter(Boolean).map(w=>w[0]).slice(0,2).join('').toUpperCase()
+  return(
+    <div style={{...card,padding:'1rem 1.1rem',marginBottom:0}}>
+      <div style={{display:'flex',alignItems:'center',gap:'0.7rem',marginBottom:'0.8rem'}}>
+        <div style={{width:38,height:38,borderRadius:10,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700}}>{initials}</div>
+        <div><div style={{fontWeight:700,fontSize:'0.98rem'}}>{ci.name}</div><div style={{fontSize:'0.78rem',color:C.slate}}>{ci.country||''}{ci.country&&' · '}{(ci.client_ids||[]).length} engagement{(ci.client_ids||[]).length===1?'':'s'}</div></div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'0.6rem'}}>
+        <div><div style={{fontFamily:'monospace',fontSize:'0.6rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Approved</div><div style={{fontWeight:700,fontSize:'1.05rem',fontFamily:'Georgia,serif'}}>{workload.approvedHours}h</div></div>
+        <div><div style={{fontFamily:'monospace',fontSize:'0.6rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Pending</div><div style={{fontWeight:700,fontSize:'1.05rem',fontFamily:'Georgia,serif',color:workload.pendingHours>0?C.amber:C.navy}}>{workload.pendingHours}h</div></div>
+        <div><div style={{fontFamily:'monospace',fontSize:'0.6rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Sessions/mo</div><div style={{fontWeight:700,fontSize:'1.05rem',fontFamily:'Georgia,serif'}}>{workload.sessionsThisMonth}</div></div>
+      </div>
+    </div>
+  )
+}
+function MyBusinessGlance({clients,programmes,coImplementers}){
   const split=engagementSplit(clients)
   const indep=independentClients(clients)
   const feeCur=clients.find(c=>c.fee_currency)?.fee_currency||'USD'
@@ -67,24 +127,60 @@ function MyBusinessGlance({clients,programmes}){
   const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
   const rs=revenueStreams(clients,programmesById)
   const deals=dealCards(programmes)
-  const streamColor={programme_advisory:C.navy,self_funded_gtcv:C.purple,clearview_subscriptions:C.teal}
+  const winRate=dealWinRate(programmes)
+  const streamColor={programme_advisory:C.slate,self_funded_gtcv:C.purple,clearview_subscriptions:C.teal}
+
+  // Real canvas progress + timesheet data, fetched once for the whole list --
+  // avoids an N+1 query per client. Empty/failed fetch degrades to "no data
+  // yet" per client, never a fabricated number.
+  const [canvasByClient,setCanvasByClient]=useState({})
+  const [tsEntries,setTsEntries]=useState([])
+  useEffect(()=>{
+    let cancelled=false
+    const clientIds=clients.map(c=>c.id)
+    if(clientIds.length===0)return
+    Promise.all([
+      supabase.from('canvas_decision_points').select('client_id,dp_id,status').in('client_id',clientIds),
+      supabase.from('coach_timesheet_entries').select('co_implementer_id,hours,status,entry_date'),
+    ]).then(([{data:dps},{data:entries}])=>{
+      if(cancelled)return
+      const grouped={}
+      ;(dps||[]).forEach(d=>{(grouped[d.client_id]=grouped[d.client_id]||[]).push(d)})
+      setCanvasByClient(grouped)
+      setTsEntries(entries||[])
+    }).catch(()=>{})
+    return ()=>{cancelled=true}
+  },[clients])
+
   return(
     <div style={{marginBottom:'1.75rem'}}>
       <Kicker>My business at a glance</Kicker>
       <div className="cv-grid-4" style={{marginBottom:'1.5rem'}}>
         <GlanceKPI label="Active Engagements" value={String(split.total)} sub={`${split.gtcv} GtCV · ${split.clearview} Clearview`} color={C.navy}/>
-        <GlanceKPI label="Fees Paid Up · This Year" value={fmtGlance(paidThisYear,feeCur)} sub="received & cleared" color={C.teal}/>
+        <GlanceKPI label="Fees Paid Up · This Year" value={fmtGlance(paidThisYear,feeCur)} sub="received & cleared" color={C.green}/>
         <GlanceKPI label="Invoiced · My Own DSO" value={fmtGlance(outstanding,feeCur)} sub={dso!=null?`avg ${Math.round(dso)} days to collect`:'no collections recorded yet'} color={C.amber}/>
         <GlanceKPI label="Independent Clients" value={String(indep.count)} sub={`self-paying · ${Math.round(indep.revenueShare*100)}% of revenue`} color={C.purple}/>
       </div>
       <Kicker>Revenue streams <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; two of the three are independent &mdash; your own commercial base, growing off programme money</span></Kicker>
       <div className="cv-grid-3" style={{marginBottom:'1.5rem'}}>
-        {rs.streams.map(s=><RevenueStreamCard key={s.key} label={s.label} value={s.value} tag={s.tag} barFrac={s.barFrac} currency={feeCur} color={streamColor[s.key]}/>)}
+        {rs.streams.map(s=><RevenueStreamCard key={s.key} label={s.label} value={s.value} description={s.description} tag={s.tag} barFrac={s.barFrac} currency={feeCur} color={streamColor[s.key]}/>)}
       </div>
       {deals.length>0&&(<>
-        <Kicker>Programme deals <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; who actually pays for the programme-funded stream</span></Kicker>
-        <div className="cv-grid-3">
+        <Kicker>Programme deals <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; who actually pays for the programme-funded stream. {Math.round(winRate.pct*100)}% won ({winRate.wonCount} of {winRate.totalCount}).</span></Kicker>
+        <div className="cv-grid-3" style={{marginBottom:'1.5rem'}}>
           {deals.map(d=><DealPipelineCard key={d.id} deal={d}/>)}
+        </div>
+      </>)}
+      {clients.length>0&&(<>
+        <Kicker>Engagements <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; who we serve, and how far along the canvas they are</span></Kicker>
+        <div style={{marginBottom:'1.5rem'}}>
+          <EngagementsTable clients={clients} programmes={programmes} coImplementers={coImplementers} canvasByClient={canvasByClient}/>
+        </div>
+      </>)}
+      {coImplementers.length>0&&(<>
+        <Kicker>Co-implementer workload <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; hours and sessions from real timesheets. On-time gates, utilisation, and issue flags aren&#39;t tracked yet, so they&#39;re not shown here rather than guessed.</span></Kicker>
+        <div className="cv-grid-3">
+          {coImplementers.map(ci=><CoImplementerPerfCard key={ci.id} ci={ci} workload={coImplementerWorkload(ci.id,tsEntries)}/>)}
         </div>
       </>)}
     </div>
@@ -452,7 +548,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           </div>
         )}
         {pending>0&&<div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontWeight:600,color:C.amber}}>\u23f3 {pending} timesheet{pending>1?'s':''} awaiting approval</span><button style={addBtn(true,C.amber)} onClick={()=>setView('team')}>Review \u2192</button></div>}
-        <MyBusinessGlance clients={clients} programmes={programmes}/>
+        <MyBusinessGlance clients={clients} programmes={programmes} coImplementers={coImplementers}/>
         {programmes.map(prog=>{
           const progClients=clients.filter(c=>c.programme_id===prog.id)
           return(
