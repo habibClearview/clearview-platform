@@ -335,12 +335,17 @@ export default function FieldCapturePage() {
           catalogue_item_id: s.catalogue_item_id, quantity: s.quantity,
           override_price: s.override_price, payment_method: s.payment_method,
           customer_id: s.customer_id, transaction_date: s.transaction_date, notes: s.notes,
+          // Real moment of sale (from the offline queue), so a mobile-money sale
+          // can be matched to its payment on a time window later. transaction_date
+          // is day-only and synced_at is end-of-day, so neither would work.
+          captured_at: s.queued_at ? new Date(s.queued_at).toISOString() : undefined,
         })),
         ...costsSnapshot.map(c=>({
           local_id: c.local_id,
           plan_line_id: c.plan_line_id, plan_line_name: c.plan_line_name,
           transaction_type: 'expense', category: 'direct_opex', amount: c.amount,
           transaction_date: c.transaction_date, notes: c.notes,
+          captured_at: c.queued_at ? new Date(c.queued_at).toISOString() : undefined,
         })),
       ]
       const uncategorized_costs = uncategorizedSnapshot.map(u=>({

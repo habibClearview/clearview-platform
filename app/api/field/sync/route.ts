@@ -91,6 +91,10 @@ export async function POST(req: NextRequest) {
             payment_method: t.payment_method || null,
             customer_id: t.customer_id || null,
             transaction_date: t.transaction_date || new Date().toISOString().split('T')[0],
+            // Real capture time from the field queue; enables payment
+            // reconciliation on a time window. Nullable -- older clients that
+            // don't send it just can't be window-matched, which is safe.
+            captured_at: t.captured_at || null,
             operator_id: operator.id,
             notes: t.notes || null,
             device_id: device_id || null,
@@ -121,6 +125,7 @@ export async function POST(req: NextRequest) {
               client_id: operator.client_id,
               business_unit_id: operator.business_unit_id,
               transaction_date: t.transaction_date || new Date().toISOString().split('T')[0],
+              captured_at: t.captured_at || null,
               operator_id: operator.id,
               notes: null,
               device_id: device_id || null,
@@ -182,6 +187,7 @@ export async function POST(req: NextRequest) {
           payment_method: t.payment_method || null,
           customer_id: t.customer_id || null,
           transaction_date: t.transaction_date || new Date().toISOString().split('T')[0],
+          captured_at: t.captured_at || null,
           operator_id: operator.id,
           notes: t.notes || null,
           device_id: device_id || null,
