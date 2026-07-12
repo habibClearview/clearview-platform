@@ -3960,7 +3960,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
           <div style={{...card,padding:0,overflow:'hidden'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.9rem 1.2rem',borderBottom:`1px solid ${C.border}`,flexWrap:'wrap',gap:'0.5rem'}}>
               <div>
-                <span style={{fontFamily:'Georgia,serif',fontWeight:700,fontSize:'1.05rem',color:C.navy}}>This Month&#39;s Story</span>
+                <span style={{fontFamily:'Georgia,serif',fontWeight:700,fontSize:'1.05rem',color:C.navy}}>{head||'This Month’s Story'}</span>
                 <span style={{fontFamily:'monospace',fontSize:'0.72rem',color:C.purple,border:`1px solid ${C.purple}`,borderRadius:4,padding:'0.1rem 0.38rem',marginLeft:'0.4rem'}}>OPUS</span>
                 {narrative&&<div style={{fontSize:'0.8rem',color:C.slate,fontFamily:'monospace',marginTop:'0.15rem'}}>{narrative.period_covered} · generated {new Date(narrative.generated_at).toLocaleDateString('en-GB')}</div>}
               </div>
@@ -3971,10 +3971,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
             </div>
             <div style={{padding:'1.1rem 1.3rem',fontSize:'0.92rem',lineHeight:1.7,color:C.navy,maxWidth:'74ch'}}>
               {narrative ? (
-                <>
-                  {head&&<div style={{fontWeight:700,fontSize:'1rem',marginBottom:'0.45rem'}}>{head}</div>}
-                  {body&&<div style={{whiteSpace:'pre-wrap'}}>{body}</div>}
-                </>
+                body&&<div style={{whiteSpace:'pre-wrap'}}>{body}</div>
               ) : <p style={{color:C.slate,margin:0}}>Generate a plain-English story of how the business is doing this month, written for the CEO.</p>}
             </div>
           </div>
