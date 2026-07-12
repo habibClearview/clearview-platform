@@ -126,10 +126,17 @@ function CoImplementerPerfCard({ci,workload}){
 // the health status that's already live (ai_health_checks). Canvas clients
 // show real canvas progress instead of a health status, since ai_health_checks
 // only ever covers Clearview/financial clients (never GtCV).
-const HEALTH_COLOR={'Needs attention':C.red,'Watch':C.amber,'Healthy':C.green,'Reviewed':C.teal,'No data':C.slate}
+const HEALTH_COLOR={'Needs attention':C.red,'Watch':C.amber,'Healthy':C.green,'Reviewed':C.teal,'No data':C.slate,'Not yet reviewed':C.cyan,'No financial data yet':C.slate}
 function ClientHealthTab({clients,programmes}){
   const [reportByClient,setReportByClient]=useState({})
   const [canvasByClient,setCanvasByClient]=useState({})
+  // Whether a client has ANY real generic_actuals row -- a genuinely
+  // different question from "has an AI health check been generated". Without
+  // this, a client with real financial data on file but no AI report yet
+  // looked identical to a client with nothing recorded at all, both reading
+  // "No data". That's exactly what was reported as wrong: real data existed,
+  // the label just didn't say so.
+  const [hasActuals,setHasActuals]=useState(new Set())
   const [loading,setLoading]=useState(true)
   const financialClients=clients.filter(c=>c.engagement_mode==='financial'&&c.clearview_active)
   const canvasClients=clients.filter(c=>c.engagement_mode==='canvas')
@@ -141,7 +148,8 @@ function ClientHealthTab({clients,programmes}){
     Promise.all([
       supabase.from('ai_health_checks').select('client_id,period,report_text,generated_at').in('client_id',financialClients.map(c=>c.id)).order('period',{ascending:false}),
       supabase.from('canvas_decision_points').select('client_id,dp_id,status').in('client_id',canvasClients.map(c=>c.id)),
-    ]).then(([{data:reports},{data:dps}])=>{
+      supabase.from('generic_actuals').select('client_id').in('client_id',financialClients.map(c=>c.id)),
+    ]).then(([{data:reports},{data:dps},{data:actuals}])=>{
       if(cancelled)return
       const latestByClient={}
       ;(reports||[]).forEach(r=>{if(!latestByClient[r.client_id])latestByClient[r.client_id]=r})
@@ -149,12 +157,23 @@ function ClientHealthTab({clients,programmes}){
       const grouped={}
       ;(dps||[]).forEach(d=>{(grouped[d.client_id]=grouped[d.client_id]||[]).push(d)})
       setCanvasByClient(grouped)
+      setHasActuals(new Set((actuals||[]).map(a=>a.client_id)))
       setLoading(false)
     }).catch(()=>setLoading(false))
     return ()=>{cancelled=true}
   },[clients])
 
   if(loading)return<div style={{...card,textAlign:'center',padding:'2rem',color:C.slate}}>Loading portfolio health...</div>
+
+  // Same health-status classification everywhere, but the DISPLAYED label for
+  // a client with no AI report is now honest about which case it is.
+  function displayStatus(c){
+    const s=healthStatusFromReportText(reportByClient[c.id]?.report_text)
+    if(s.label!=='No data')return s
+    return hasActuals.has(c.id)
+      ? {label:'Not yet reviewed',dot:'🔵'}
+      : {label:'No financial data yet',dot:'⚪'}
+  }
 
   const counts=portfolioHealthCounts(financialClients,reportByClient)
   const flagged=financialClients.filter(c=>{
@@ -210,7 +229,7 @@ function ClientHealthTab({clients,programmes}){
             {g.clients.map(c=>{
               const isCanvas=c.engagement_mode==='canvas'
               const prog=isCanvas?canvasProgress(canvasByClient[c.id]||[]):null
-              const status=isCanvas?null:healthStatusFromReportText(reportByClient[c.id]?.report_text)
+              const status=isCanvas?null:displayStatus(c)
               const accent=isCanvas?C.purple:(status?HEALTH_COLOR[status.label]:C.slate)
               return(
                 <div key={c.id} style={{border:'1px solid var(--cv-border-soft)',borderTop:`4px solid ${accent}`,borderRadius:13,padding:'1rem 1.05rem',cursor:'pointer',background:C.white}} onClick={()=>window.open(`/dashboard/${c.slug}`,'_blank')}>
@@ -556,6 +575,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   const [selClientId,setSelClientId]=useState(null)
   const [selProgId,setSelProgId]=useState(null)
   const [showDeleteConfirm,setShowDeleteConfirm]=useState(false)
+  const [showEditClient,setShowEditClient]=useState(false)
+  useEffect(()=>{setShowEditClient(false);setShowDeleteConfirm(false)},[selClientId])
   const [clientData,setClientData]=useState({})
   const [clientLoading,setClientLoading]=useState(false)
   const [activeTab,setActiveTab]=useState('cover')
@@ -647,7 +668,6 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'0.75rem'}}>
           <button style={addBtn(true,C.teal)} onClick={refreshOverview} disabled={refreshingOv}>{refreshingOv?'Refreshing...':'\u21bb Refresh client list'}</button>
         </div>
-        <ClearviewHealthSummary clients={clients}/>
         {newSubmissions.length>0&&(
           <div style={{background:'var(--cv-tint-cyan)',border:`1px solid ${C.teal}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem'}}>
             <div style={{fontWeight:700,color:C.teal,marginBottom:'0.6rem'}}>New Clearview data capture submissions ({newSubmissions.length})</div>
@@ -712,7 +732,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           <button style={addBtn()} onClick={()=>{setShowNew(!showNew);setShowUpload(false)}}>+ New Client</button>
         </div>
         {showUpload&&<SpreadsheetUpload onSuccess={(clientId)=>{setShowUpload(false);supabase.from('engagement_clients').select('*').eq('id',clientId).single().then(({data})=>{if(data)setClients(prev=>[...prev,data])})}}/>}
-        {showNew&&<NewClientForm onSave={async c=>{
+        {showNew&&<NewClientForm programmes={programmes} onSave={async c=>{
           const {data,error}=await supabase.from('engagement_clients').insert([c]).select().single()
           if(!error&&data){setClients(prev=>[...prev,data]);setShowNew(false)}
         }} onCancel={()=>setShowNew(false)}/>}
@@ -763,10 +783,19 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
               <a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily:'monospace',fontSize:'0.8rem',padding:'0.4rem 1rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none',fontWeight:700}}>Open Clearview Financial Model ↗</a>
               <CopyIntakeLink client={selClient}/>
+              <button onClick={()=>setShowEditClient(true)} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Edit Setup</button>
               <button onClick={()=>setShowDeleteConfirm(true)} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Delete Client</button>
             </div>
           </div>
         </div>
+        {showEditClient&&(
+          <EditClientForm
+            client={selClient}
+            programmes={programmes}
+            onSave={patch=>{setClients(prev=>prev.map(c=>c.id!==selClient.id?c:{...c,...patch}));setShowEditClient(false)}}
+            onCancel={()=>setShowEditClient(false)}
+          />
+        )}
         {showDeleteConfirm&&(
           <DeleteClientConfirm
             client={selClient}
@@ -802,10 +831,19 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
               {selClient.clearview_active&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.22rem 0.6rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none'}}>Open Clearview \u2197</a>}
+              <button onClick={()=>setShowEditClient(true)} style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.22rem 0.6rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Edit Setup</button>
               <button style={addBtn(true)} onClick={printSection}>Print</button>
             </div>
           </div>
         </div>
+        {showEditClient&&(
+          <EditClientForm
+            client={selClient}
+            programmes={programmes}
+            onSave={patch=>{setClients(prev=>prev.map(c=>c.id!==selClient.id?c:{...c,...patch}));setShowEditClient(false)}}
+            onCancel={()=>setShowEditClient(false)}
+          />
+        )}
 
         {/* Two-column layout: sidebar + content */}
         <div style={{display:'grid',gridTemplateColumns:'220px 1fr',gap:'1.5rem',alignItems:'start'}}>
@@ -1772,8 +1810,28 @@ function TabPilotObservation({client,pilots,onAdd,onUpdate}){
 }
 
 // \u2500\u2500\u2500 FORM COMPONENTS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function NewClientForm({onSave,onCancel}){
-  const [f,setF]=useState({name:'',type:'service_lsp',engagement_mode:'canvas',programme_id:'prog_csj',country:'Uganda',sector:'',contact_name:'',contact_email:'',contact_phone:'',notes:''})
+// Shared by NewClientForm and EditClientForm so the two can never drift --
+// a client's programme was previously hardcoded to 'prog_csj' with no way to
+// change it (every new client silently landed on Climate Smart Jobs, no
+// matter what the coach actually meant). This is the real fix: the coach
+// explicitly picks a real programme, or "No programme (independent)".
+function ClientSetupFields({f,setF,programmes}){
+  return(
+    <div style={fGrid}>
+      <div><label style={lbl}>Name *</label><input style={inp} value={f.name} onChange={e=>setF(x=>({...x,name:e.target.value}))}/></div>
+      <div><label style={lbl}>Type *</label><select style={inp} value={f.type} onChange={e=>setF(x=>({...x,type:e.target.value}))}><option value="crop_aggregator">Crop Aggregator</option><option value="livestock_aggregator">Livestock Aggregator</option><option value="farmer_group_enterprise">Farmer Group Enterprise</option><option value="service_lsp">Service LSP</option></select></div>
+      <div><label style={lbl}>Engagement Mode *</label><select style={inp} value={f.engagement_mode} onChange={e=>setF(x=>({...x,engagement_mode:e.target.value}))}><option value="canvas">Full GtCV Canvas</option><option value="financial">Clearview Financial Only</option></select></div>
+      <div><label style={lbl}>Programme</label><select style={inp} value={f.programme_id||''} onChange={e=>setF(x=>({...x,programme_id:e.target.value||null}))}><option value="">No programme (independent · self-paying)</option>{programmes.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+      <div><label style={lbl}>Country</label><input style={inp} value={f.country} onChange={e=>setF(x=>({...x,country:e.target.value}))}/></div>
+      <div><label style={lbl}>Sector</label><input style={inp} value={f.sector} onChange={e=>setF(x=>({...x,sector:e.target.value}))}/></div>
+      <div><label style={lbl}>CEO Name</label><input style={inp} value={f.contact_name} onChange={e=>setF(x=>({...x,contact_name:e.target.value}))}/></div>
+      <div><label style={lbl}>CEO Email</label><input type="email" style={inp} value={f.contact_email} onChange={e=>setF(x=>({...x,contact_email:e.target.value}))}/></div>
+    </div>
+  )
+}
+
+function NewClientForm({onSave,onCancel,programmes}){
+  const [f,setF]=useState({name:'',type:'service_lsp',engagement_mode:'canvas',programme_id:null,country:'Uganda',sector:'',contact_name:'',contact_email:'',contact_phone:'',notes:''})
   function doSave(){
     if(!f.name)return
     const slug=f.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'')
@@ -1782,17 +1840,42 @@ function NewClientForm({onSave,onCancel}){
   return(
     <div style={{...card,border:`1px solid ${C.cyan}`,marginBottom:'1.25rem'}}>
       <div style={secH}>New Client Organisation</div>
-      <div style={fGrid}>
-        <div><label style={lbl}>Name *</label><input style={inp} value={f.name} onChange={e=>setF(x=>({...x,name:e.target.value}))}/></div>
-        <div><label style={lbl}>Type *</label><select style={inp} value={f.type} onChange={e=>setF(x=>({...x,type:e.target.value}))}><option value="crop_aggregator">Crop Aggregator</option><option value="livestock_aggregator">Livestock Aggregator</option><option value="farmer_group_enterprise">Farmer Group Enterprise</option><option value="service_lsp">Service LSP</option></select></div>
-        <div><label style={lbl}>Engagement Mode *</label><select style={inp} value={f.engagement_mode} onChange={e=>setF(x=>({...x,engagement_mode:e.target.value}))}><option value="canvas">Full GtCV Canvas</option><option value="financial">Clearview Financial Only</option></select></div>
-        <div><label style={lbl}>Country</label><input style={inp} value={f.country} onChange={e=>setF(x=>({...x,country:e.target.value}))}/></div>
-        <div><label style={lbl}>Sector</label><input style={inp} value={f.sector} onChange={e=>setF(x=>({...x,sector:e.target.value}))}/></div>
-        <div><label style={lbl}>CEO Name</label><input style={inp} value={f.contact_name} onChange={e=>setF(x=>({...x,contact_name:e.target.value}))}/></div>
-        <div><label style={lbl}>CEO Email</label><input type="email" style={inp} value={f.contact_email} onChange={e=>setF(x=>({...x,contact_email:e.target.value}))}/></div>
-      </div>
+      <ClientSetupFields f={f} setF={setF} programmes={programmes}/>
       <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
         <button style={solidBtn()} onClick={doSave}>Create Client</button>
+        <button style={{...addBtn(),borderColor:C.border,color:C.slate}} onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+// The real fix for "client setup cannot be edited anywhere" -- no such form
+// existed before. Edits the actual engagement_clients row (name, type,
+// engagement_mode, programme_id, country, sector, CEO contact); canvas
+// progress, actuals, and everything else are untouched.
+function EditClientForm({client,programmes,onSave,onCancel}){
+  const [f,setF]=useState({
+    name:client.name||'',type:client.type||'service_lsp',engagement_mode:client.engagement_mode||'canvas',
+    programme_id:client.programme_id||null,country:client.country||'',sector:client.sector||'',
+    contact_name:client.contact_name||'',contact_email:client.contact_email||'',
+  })
+  const [saving,setSaving]=useState(false)
+  const [msg,setMsg]=useState(null)
+  async function doSave(){
+    if(!f.name)return setMsg('Name is required.')
+    setSaving(true)
+    const {error}=await supabase.from('engagement_clients').update({...f,updated_at:new Date().toISOString()}).eq('id',client.id)
+    setSaving(false)
+    if(error)return setMsg('Could not save: '+error.message)
+    onSave(f)
+  }
+  return(
+    <div style={{...card,border:`1px solid ${C.cyan}`,marginBottom:'1.25rem'}}>
+      <div style={secH}>Edit Client Organisation</div>
+      <ClientSetupFields f={f} setF={setF} programmes={programmes}/>
+      {msg&&<div style={{...hint,color:C.red,marginTop:'0.6rem'}}>{msg}</div>}
+      <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
+        <button style={solidBtn()} disabled={saving} onClick={doSave}>{saving?'Saving…':'Save changes'}</button>
         <button style={{...addBtn(),borderColor:C.border,color:C.slate}} onClick={onCancel}>Cancel</button>
       </div>
     </div>
