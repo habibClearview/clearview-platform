@@ -28,17 +28,17 @@ const C = {
 }
 const card = {background:C.white,border:'1px solid var(--cv-border-soft)',borderRadius:14,padding:'1.35rem 1.5rem',marginBottom:'1.25rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)'}
 const secH = {fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
-const inp  = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'0.92rem',fontFamily:'inherit',background:'var(--cv-bg-2)',color:C.navy,boxSizing:'border-box'}
-const lbl  = {display:'block',fontWeight:600,fontSize:'0.86rem',marginBottom:'0.2rem',color:C.navy}
-const hint = {fontSize:'0.8rem',color:C.slate,lineHeight:1.4}
+const inp  = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'1.13rem',fontFamily:'inherit',background:'var(--cv-bg-2)',color:C.navy,boxSizing:'border-box'}
+const lbl  = {display:'block',fontWeight:600,fontSize:'1.07rem',marginBottom:'0.2rem',color:C.navy}
+const hint = {fontSize:'1.01rem',color:C.slate,lineHeight:1.4}
 const fGrid= {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:'0.8rem'}
 const th   = {padding:'0.4rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`,whiteSpace:'nowrap'}
 const td   = {padding:'0.4rem 0.6rem',verticalAlign:'top'}
-function addBtn(sm=false,col=C.cyan){return{fontFamily:'monospace',fontSize:sm?'0.7rem':'0.74rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:6,background:'transparent',color:col,cursor:'pointer'}}
-function solidBtn(col=C.cyan,sm=false){return{fontFamily:'monospace',fontSize:sm?'0.74rem':'0.8rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:'var(--cv-on-accent)',cursor:'pointer'}}
-function subPill(active,col=C.cyan){return{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
-function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily:'monospace',fontSize:'0.92rem',letterSpacing:'0.1em',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'0.86rem',color:C.slate,marginTop:'0.2rem'}}>{sub}</div>}</div>)}
-function Badge({text,color}){return<span style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
+function addBtn(sm=false,col=C.cyan){return{fontFamily:'monospace',fontSize:sm?'0.91rem':'0.95rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:6,background:'transparent',color:col,cursor:'pointer'}}
+function solidBtn(col=C.cyan,sm=false){return{fontFamily:'monospace',fontSize:sm?'0.95rem':'1.01rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:'var(--cv-on-accent)',cursor:'pointer'}}
+function subPill(active,col=C.cyan){return{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
+function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily:'monospace',fontSize:'1.13rem',letterSpacing:'0.1em',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.2rem'}}>{sub}</div>}</div>)}
+function Badge({text,color}){return<span style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
 
 const num=(v)=>{const n=Number(v);return Number.isFinite(n)?n:0}
 const fmtMoney=(n,cur)=>`${cur||'USD'} ${num(n).toLocaleString(undefined,{maximumFractionDigits:0})}`
@@ -135,22 +135,22 @@ function DealsPipeline({programmes,setProgrammes,clients}){
     <div>
       <p style={{...hint,marginBottom:'1rem'}}>The programme is the paying customer (the budget holder). Track each programme deal through the pipeline; weighted value = deal value × probability for open stages.</p>
 
-      <div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.6rem'}}>Pipeline · programme contracts</div>
+      <div style={{fontFamily:'monospace',fontSize:'0.93rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.6rem'}}>Pipeline · programme contracts</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'0.6rem',marginBottom:'1.25rem'}}>
         {funnel.stages.map(s=>{
           const meta=FUNNEL_STAGE_META[s.stage]
           return(
             <div key={s.stage} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:10,padding:'0.7rem 0.8rem',borderTop:`4px solid ${meta.color}`}}>
-              <div style={{fontFamily:'monospace',fontSize:'0.6rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>{meta.label}</div>
+              <div style={{fontFamily:'monospace',fontSize:'0.81rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>{meta.label}</div>
               <div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,margin:'0.15rem 0',color:C.navy}}>{s.count}</div>
-              <div style={{fontFamily:'monospace',fontSize:'0.72rem',color:C.slate}}>{fmtMoney(s.value,s.currency)}</div>
+              <div style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.slate}}>{fmtMoney(s.value,s.currency)}</div>
             </div>
           )
         })}
         <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:10,padding:'0.7rem 0.8rem',borderTop:`4px solid ${C.navy}`}}>
-          <div style={{fontFamily:'monospace',fontSize:'0.6rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Conversion</div>
+          <div style={{fontFamily:'monospace',fontSize:'0.81rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Conversion</div>
           <div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,margin:'0.15rem 0',color:C.navy}}>{Math.round(funnel.conversionPct*100)}%</div>
-          <div style={{fontFamily:'monospace',fontSize:'0.72rem',color:C.slate}}>won / closed</div>
+          <div style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.slate}}>won / closed</div>
         </div>
       </div>
 
@@ -162,7 +162,7 @@ function DealsPipeline({programmes,setProgrammes,clients}){
       </div>
 
       {independentStreams.some(s=>s.value>0)&&(<>
-        <div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.6rem'}}>Independent revenue <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>· not programme deals -- self-paying clients, tracked here for the full revenue picture</span></div>
+        <div style={{fontFamily:'monospace',fontSize:'0.93rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.6rem'}}>Independent revenue <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>· not programme deals -- self-paying clients, tracked here for the full revenue picture</span></div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'0.85rem',marginBottom:'1.25rem'}}>
           {independentStreams.map(s=><KPI key={s.key} label={s.label} value={fmtMoney(s.value,cur)} sub={s.description} color={s.key==='clearview_subscriptions'?C.teal:C.purple}/>)}
         </div>
@@ -175,8 +175,8 @@ function DealsPipeline({programmes,setProgrammes,clients}){
           return(
             <div key={stage.id} style={{background:C.lightBg,borderRadius:12,padding:'0.75rem',borderTop:`3px solid ${stage.color}`}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:'0.5rem'}}>
-                <span style={{fontWeight:700,fontSize:'0.86rem',color:stage.color}}>{stage.label}</span>
-                <span style={{fontSize:'0.72rem',color:C.slate}}>{inStage.length} · {fmtMoney(stageValue,cur)}</span>
+                <span style={{fontWeight:700,fontSize:'1.07rem',color:stage.color}}>{stage.label}</span>
+                <span style={{fontSize:'0.93rem',color:C.slate}}>{inStage.length} · {fmtMoney(stageValue,cur)}</span>
               </div>
               {inStage.length===0&&<div style={{...hint,padding:'0.5rem 0'}}>—</div>}
               {inStage.map(p=>{
@@ -184,14 +184,14 @@ function DealsPipeline({programmes,setProgrammes,clients}){
                 const spread=p.deal_stage==='won'?programmeCanvasSpread(clients.filter(c=>c.programme_id===p.id).map(c=>canvasProgress(canvasByClient[c.id]||[]))):null
                 return(
                 <div key={p.id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'0.6rem 0.7rem',marginBottom:'0.5rem',cursor:'pointer'}} onClick={()=>startEdit(p)}>
-                  <div style={{fontWeight:600,fontSize:'0.86rem',color:C.navy}}>{p.name}</div>
-                  <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.15rem'}}>{p.funder||'—'}{lsps>0&&` · ${lsps} LSP${lsps===1?'':'s'}`}</div>
-                  <div style={{display:'flex',justifyContent:'space-between',marginTop:'0.35rem',fontSize:'0.8rem'}}>
+                  <div style={{fontWeight:600,fontSize:'1.07rem',color:C.navy}}>{p.name}</div>
+                  <div style={{fontSize:'0.93rem',color:C.slate,marginTop:'0.15rem'}}>{p.funder||'—'}{lsps>0&&` · ${lsps} LSP${lsps===1?'':'s'}`}</div>
+                  <div style={{display:'flex',justifyContent:'space-between',marginTop:'0.35rem',fontSize:'1.01rem'}}>
                     <span style={{fontWeight:600,color:C.navy}}>{p.deal_value?fmtMoney(p.deal_value,p.deal_currency||cur):'—'}</span>
                     {p.deal_probability!=null&&p.deal_probability!==''&&<span style={{color:C.slate}}>{num(p.deal_probability)}%</span>}
                   </div>
-                  {p.deal_expected_close&&<div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.2rem'}}>close {p.deal_expected_close}</div>}
-                  {spread&&<div style={{fontSize:'0.72rem',color:C.teal,marginTop:'0.2rem'}}>Furthest {spread.furthestLabel} · Nearest {spread.nearestLabel}</div>}
+                  {p.deal_expected_close&&<div style={{fontSize:'0.93rem',color:C.slate,marginTop:'0.2rem'}}>close {p.deal_expected_close}</div>}
+                  {spread&&<div style={{fontSize:'0.93rem',color:C.teal,marginTop:'0.2rem'}}>Furthest {spread.furthestLabel} · Nearest {spread.nearestLabel}</div>}
                 </div>
               )})}
             </div>
@@ -199,7 +199,7 @@ function DealsPipeline({programmes,setProgrammes,clients}){
         })}
       </div>
 
-      {msg&&<div style={{fontSize:'0.8rem',color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
+      {msg&&<div style={{fontSize:'1.01rem',color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
 
       {editId&&form&&(()=>{const p=programmes.find(x=>x.id===editId);return(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>
@@ -263,11 +263,11 @@ function EngagementFees({clients,setClients,programmes}){
         <KPI label="Unpaid" value={fmtMoney(byStatus('unpaid'),cur)} color={C.red}/>
       </div>
 
-      {msg&&<div style={{fontSize:'0.8rem',color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
+      {msg&&<div style={{fontSize:'1.01rem',color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
 
       <div style={card}>
         <div style={{overflowX:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.8rem'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
             <thead><tr style={{background:C.lightBg}}>{['Engagement','Programme','Fee','Status',''].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>
               {clients.length===0&&<tr><td style={{...td,color:C.slate}} colSpan={5}>No engagements yet.</td></tr>}

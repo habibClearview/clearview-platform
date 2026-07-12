@@ -34,17 +34,17 @@ const C = {
 }
 const card = {background:C.white,border:'1px solid var(--cv-border-soft)',borderRadius:14,padding:'1.35rem 1.5rem',marginBottom:'1.25rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)'}
 const secH = {fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
-const inp  = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'0.92rem',fontFamily:'inherit',background:'var(--cv-bg-2)',color:C.navy,boxSizing:'border-box'}
-const lbl  = {display:'block',fontWeight:600,fontSize:'0.86rem',marginBottom:'0.2rem',color:C.navy}
-const hint = {fontSize:'0.8rem',color:C.slate,lineHeight:1.4}
+const inp  = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'1.13rem',fontFamily:'inherit',background:'var(--cv-bg-2)',color:C.navy,boxSizing:'border-box'}
+const lbl  = {display:'block',fontWeight:600,fontSize:'1.07rem',marginBottom:'0.2rem',color:C.navy}
+const hint = {fontSize:'1.01rem',color:C.slate,lineHeight:1.4}
 const fGrid= {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'0.8rem'}
 const th   = {padding:'0.4rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`,whiteSpace:'nowrap'}
 const td   = {padding:'0.4rem 0.6rem',verticalAlign:'top'}
-function addBtn(sm=false,col=C.cyan){return{fontFamily:'monospace',fontSize:sm?'0.7rem':'0.74rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:6,background:'transparent',color:col,cursor:'pointer'}}
-function solidBtn(col=C.cyan,sm=false){return{fontFamily:'monospace',fontSize:sm?'0.74rem':'0.8rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:'var(--cv-on-accent)',cursor:'pointer'}}
-function subPill(active,col=C.cyan){return{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
-function Badge({text,color}){return<span style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
-function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily:'monospace',fontSize:'0.92rem',letterSpacing:'0.1em',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'0.86rem',color:C.slate,marginTop:'0.2rem'}}>{sub}</div>}</div>)}
+function addBtn(sm=false,col=C.cyan){return{fontFamily:'monospace',fontSize:sm?'0.91rem':'0.95rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:6,background:'transparent',color:col,cursor:'pointer'}}
+function solidBtn(col=C.cyan,sm=false){return{fontFamily:'monospace',fontSize:sm?'0.95rem':'1.01rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:'var(--cv-on-accent)',cursor:'pointer'}}
+function subPill(active,col=C.cyan){return{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
+function Badge({text,color}){return<span style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
+function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily:'monospace',fontSize:'1.13rem',letterSpacing:'0.1em',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.2rem'}}>{sub}</div>}</div>)}
 
 // ─── helpers ─────────────────────────────────────────────────
 const num = (v)=>{const n=Number(v);return Number.isFinite(n)?n:0}
@@ -105,14 +105,14 @@ function AccessSection({coImplementers,setCoImplementers,clients,setMsg}){
           return(
             <div key={ci.id} style={{display:'grid',gridTemplateColumns:'220px 1fr',gap:'1rem',padding:'0.9rem 0',borderTop:`1px solid ${C.border}`}}>
               <div>
-                <div style={{fontWeight:700,fontSize:'0.95rem',color:C.navy}}>{ci.name}</div>
-                <div style={{fontSize:'0.8rem',color:C.slate}}>{ci.country||'Co-implementer'}</div>
-                {rateOf(ci)>0&&<div style={{fontFamily:'monospace',fontSize:'0.78rem',color:C.teal,marginTop:'0.2rem',fontWeight:700}}>{fmtMoney(rateOf(ci),curOf(ci))}/day</div>}
+                <div style={{fontWeight:700,fontSize:'1.16rem',color:C.navy}}>{ci.name}</div>
+                <div style={{fontSize:'1.01rem',color:C.slate}}>{ci.country||'Co-implementer'}</div>
+                {rateOf(ci)>0&&<div style={{fontFamily:'monospace',fontSize:'0.99rem',color:C.teal,marginTop:'0.2rem',fontWeight:700}}>{fmtMoney(rateOf(ci),curOf(ci))}/day</div>}
               </div>
               <div style={{border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden'}}>
-                {assigned.length===0&&<div style={{padding:'0.5rem 0.8rem',fontSize:'0.86rem',color:C.slate}}>No clients assigned</div>}
+                {assigned.length===0&&<div style={{padding:'0.5rem 0.8rem',fontSize:'1.07rem',color:C.slate}}>No clients assigned</div>}
                 {assigned.map(c=>(
-                  <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.45rem 0.8rem',borderTop:`1px solid ${C.border}`,fontSize:'0.9rem'}}>
+                  <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.45rem 0.8rem',borderTop:`1px solid ${C.border}`,fontSize:'1.11rem'}}>
                     <span>{c.name}</span>
                     <span style={{color:C.slate,cursor:'pointer',fontWeight:700}} onClick={()=>unassign(ci,c.id)} title="Remove access">×</span>
                   </div>
@@ -203,7 +203,7 @@ export default function TeamPayments({coImplementers=[],setCoImplementers,client
         <KPI label="Invoices issued" value={issuedThisPeriod.length} sub={`${period}`} color={C.purple}/>
       </div>
 
-      {accessMsg&&<div style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.6rem'}}>{accessMsg}</div>}
+      {accessMsg&&<div style={{fontSize:'1.01rem',color:C.slate,marginBottom:'0.6rem'}}>{accessMsg}</div>}
       <AccessSection coImplementers={coImplementers} setCoImplementers={setCoImplementers} clients={clients} setMsg={setAccessMsg}/>
 
       {coImplementers.length===0
@@ -270,22 +270,22 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
     <div style={card}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'1rem',flexWrap:'wrap',marginBottom:'0.75rem'}}>
         <div>
-          <div style={{fontWeight:700,fontSize:'0.95rem',color:C.navy}}>{ci.name}</div>
-          <div style={{fontSize:'0.8rem',color:C.slate}}>{ci.email}{ci.country?` · ${ci.country}`:''}{ci.specialisation?` · ${ci.specialisation}`:''}</div>
-          <div style={{fontSize:'0.8rem',color:C.slate,marginTop:'0.2rem'}}>Clients: {assignedClients.length?assignedClients.map(c=>c.name).join(', '):'none assigned'}</div>
+          <div style={{fontWeight:700,fontSize:'1.16rem',color:C.navy}}>{ci.name}</div>
+          <div style={{fontSize:'1.01rem',color:C.slate}}>{ci.email}{ci.country?` · ${ci.country}`:''}{ci.specialisation?` · ${ci.specialisation}`:''}</div>
+          <div style={{fontSize:'1.01rem',color:C.slate,marginTop:'0.2rem'}}>Clients: {assignedClients.length?assignedClients.map(c=>c.name).join(', '):'none assigned'}</div>
         </div>
         <div style={{textAlign:'right'}}>
-          <div style={{fontFamily:'monospace',fontSize:'0.72rem',color:d.rate>0?C.slate:C.amber,marginBottom:'0.3rem'}}>{d.rate>0?`${fmtMoney(d.rate,curOf(ci))}/day`:'no day rate set'}</div>
+          <div style={{fontFamily:'monospace',fontSize:'0.93rem',color:d.rate>0?C.slate:C.amber,marginBottom:'0.3rem'}}>{d.rate>0?`${fmtMoney(d.rate,curOf(ci))}/day`:'no day rate set'}</div>
           <div style={{display:'flex',gap:'0.35rem',alignItems:'center',justifyContent:'flex-end'}}>
-            <input style={{...inp,width:90,padding:'0.28rem 0.45rem',fontSize:'0.8rem'}} type="number" value={rateDraft} placeholder="rate" onChange={e=>setRateDraft(e.target.value)}/>
-            <select style={{...inp,width:70,padding:'0.28rem 0.35rem',fontSize:'0.8rem'}} value={curDraft} onChange={e=>setCurDraft(e.target.value)}>{['USD','GBP','EUR','UGX','NGN','KES'].map(x=><option key={x}>{x}</option>)}</select>
+            <input style={{...inp,width:90,padding:'0.28rem 0.45rem',fontSize:'1.01rem'}} type="number" value={rateDraft} placeholder="rate" onChange={e=>setRateDraft(e.target.value)}/>
+            <select style={{...inp,width:70,padding:'0.28rem 0.35rem',fontSize:'1.01rem'}} value={curDraft} onChange={e=>setCurDraft(e.target.value)}>{['USD','GBP','EUR','UGX','NGN','KES'].map(x=><option key={x}>{x}</option>)}</select>
             <button style={addBtn(true)} disabled={savingRate} onClick={saveRate}>{savingRate?'…':'Set rate'}</button>
           </div>
         </div>
       </div>
 
       {/* period draft strip */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',gap:'0.6rem',padding:'0.7rem 0.85rem',background:C.lightBg,borderRadius:8,marginBottom:'0.85rem',fontSize:'0.8rem'}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',gap:'0.6rem',padding:'0.7rem 0.85rem',background:C.lightBg,borderRadius:8,marginBottom:'0.85rem',fontSize:'1.01rem'}}>
         <div><div style={hint}>Approved days</div><strong>{fmtDays(d.days)}</strong> <span style={hint}>({d.approvedHours}h)</span></div>
         <div><div style={hint}>Time</div><strong>{fmtMoney(d.timeAmount,curOf(ci))}</strong></div>
         <div><div style={hint}>Expenses</div><strong>{fmtMoney(d.expApproved,curOf(ci))}</strong></div>
@@ -298,7 +298,7 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
           <button key={id} style={subPill(tab===id,id==='advances'&&d.openAdvances.length?C.amber:C.cyan)} onClick={()=>setTab(id)}>{label}</button>)}
       </div>
 
-      {msg&&<div style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.6rem'}}>{msg}</div>}
+      {msg&&<div style={{fontSize:'1.01rem',color:C.slate,marginBottom:'0.6rem'}}>{msg}</div>}
 
       {tab==='timesheets'&&<TimesheetSection ci={ci} period={period} userName={userName} assignedClients={assignedClients} clientName={clientName} entries={entries} setEntries={setEntries} setMsg={setMsg}/>}
       {tab==='expenses'&&<ExpenseSection ci={ci} period={period} userName={userName} assignedClients={assignedClients} clientName={clientName} expenses={expenses} setExpenses={setExpenses} setMsg={setMsg}/>}
@@ -328,7 +328,7 @@ function TimesheetSection({ci,period,userName,assignedClients,clientName,entries
   return(
     <div>
       <div style={{overflowX:'auto',marginBottom:'0.75rem'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.8rem'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
           <thead><tr style={{background:C.lightBg}}>{['Date','Client','Task','Hours','Days','Status',''].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
           <tbody>
             {rows.length===0&&<tr><td style={{...td,color:C.slate}} colSpan={7}>No timesheet entries for {period}.</td></tr>}
@@ -375,7 +375,7 @@ function ExpenseSection({ci,period,userName,assignedClients,clientName,expenses,
   return(
     <div>
       <div style={{overflowX:'auto',marginBottom:'0.75rem'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.8rem'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
           <thead><tr style={{background:C.lightBg}}>{['Date','Client','Description','Category','Amount','Receipt','Status',''].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
           <tbody>
             {rows.length===0&&<tr><td style={{...td,color:C.slate}} colSpan={8}>No expenses for {period}.</td></tr>}
@@ -426,7 +426,7 @@ function AdvanceSection({ci,advances,setAdvances,setMsg}){
     <div>
       <p style={{...hint,marginBottom:'0.6rem'}}>Advances are reconciled against actual spend by their due date. While an advance is unreconciled it is netted off the next invoice, and it blocks that invoice from issuing if it exceeds the period's earnings.</p>
       <div style={{overflowX:'auto',marginBottom:'0.75rem'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.8rem'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
           <thead><tr style={{background:C.lightBg}}>{['Date','Amount','Reason','Due','Status',''].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
           <tbody>
             {rows.length===0&&<tr><td style={{...td,color:C.slate}} colSpan={6}>No advances.</td></tr>}
@@ -531,7 +531,7 @@ td,th{padding:.5rem .6rem;border-bottom:1px solid #ddd} .tot{font-weight:700;fon
           </div>
         : <div style={{...card,margin:0,marginBottom:'0.85rem',border:`1px solid ${C.border}`}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.5rem'}}><strong>Draft invoice {invoiceNumber}</strong><span style={hint}>auto-calculated · due {dueDate}</span></div>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.86rem'}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.07rem'}}>
               <tbody>
                 <tr><td style={td}>Consulting — {fmtDays(d.days)} day(s) @ {fmtMoney(d.rate,cur)}</td><td style={{...td,textAlign:'right'}}>{fmtMoney(d.timeAmount,cur)}</td></tr>
                 {d.expApproved>0&&<tr><td style={td}>Approved expense reclaims</td><td style={{...td,textAlign:'right'}}>{fmtMoney(d.expApproved,cur)}</td></tr>}
@@ -539,8 +539,8 @@ td,th{padding:.5rem .6rem;border-bottom:1px solid #ddd} .tot{font-weight:700;fon
                 <tr><td style={{...td,fontWeight:700,borderTop:`2px solid ${C.border}`}}>Net payable</td><td style={{...td,textAlign:'right',fontWeight:700,color:C.teal,borderTop:`2px solid ${C.border}`}}>{fmtMoney(d.net,cur)}</td></tr>
               </tbody>
             </table>
-            {d.blocked&&<div style={{marginTop:'0.7rem',padding:'0.6rem 0.8rem',borderRadius:6,background:'var(--cv-tint-amber)',border:`1px solid ${C.red}`,color:C.red,fontSize:'0.8rem'}}>⛔ Blocked: an unreconciled advance of {fmtMoney(d.openAdvanceTotal,cur)} exceeds this period's earnings. Reconcile the advance before issuing.</div>}
-            {!d.blocked&&d.advanceApplied>0&&<div style={{marginTop:'0.7rem',fontSize:'0.8rem',color:C.slate}}>Issuing will net off and reconcile the open advance of {fmtMoney(d.advanceApplied,cur)}.</div>}
+            {d.blocked&&<div style={{marginTop:'0.7rem',padding:'0.6rem 0.8rem',borderRadius:6,background:'var(--cv-tint-amber)',border:`1px solid ${C.red}`,color:C.red,fontSize:'1.01rem'}}>⛔ Blocked: an unreconciled advance of {fmtMoney(d.openAdvanceTotal,cur)} exceeds this period's earnings. Reconcile the advance before issuing.</div>}
+            {!d.blocked&&d.advanceApplied>0&&<div style={{marginTop:'0.7rem',fontSize:'1.01rem',color:C.slate}}>Issuing will net off and reconcile the open advance of {fmtMoney(d.advanceApplied,cur)}.</div>}
             <div style={{display:'flex',gap:'0.5rem',marginTop:'0.85rem'}}>
               <button style={{...solidBtn(),opacity:(nothingToBill||d.blocked||busy)?0.5:1,cursor:(nothingToBill||d.blocked||busy)?'not-allowed':'pointer'}} disabled={nothingToBill||d.blocked||busy} onClick={issue}>{busy?'Issuing…':'Issue invoice'}</button>
               <button style={addBtn()} onClick={()=>download(previewInv)}>Preview / download draft</button>
@@ -548,9 +548,9 @@ td,th{padding:.5rem .6rem;border-bottom:1px solid #ddd} .tot{font-weight:700;fon
           </div>}
 
       {invoices.length>0&&<div>
-        <div style={{...secH,fontSize:'0.9rem'}}>Invoice history</div>
+        <div style={{...secH,fontSize:'1.11rem'}}>Invoice history</div>
         <div style={{overflowX:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.8rem'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
             <thead><tr style={{background:C.lightBg}}>{['Number','Period','Days','Net','Due','Status',''].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>{invoices.map((iv,i)=><tr key={iv.id} style={{background:i%2?C.white:C.cream}}>
               <td style={td}>{iv.invoice_number}</td><td style={td}>{iv.period}</td><td style={td}>{fmtDays(iv.days)}</td>
