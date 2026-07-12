@@ -18,6 +18,7 @@ import { combinedActual, computeActualsTotals, applyPeriodActual, buildHybridCon
 import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
 import { yearStartPeriod, canCloseCalendarYear, computeYearEndBalanceSheet } from '@/lib/annual-close'
 import BuildStamp from '@/components/BuildStamp'
+import VerificationRecognition from '@/components/generic/VerificationRecognition'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
@@ -3906,6 +3907,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
   const tabList:[string,string][] = [
     ['summary','Summary'],['credit','Credit Risk'],
     ['going_concern','Going Concern'],['liquidity_readiness','Liquidity Readiness'],
+    ['verification','Verification & Recognition'],
     ['coach','Coach Assessment'],['events','Marketing Events'],
   ]
 
@@ -3916,6 +3918,29 @@ Write a status report, not a letter. Do not address the reader. Do not open with
           <button key={t[0]} onClick={()=>setActiveSection(t[0])} style={{fontFamily:'monospace',fontSize:'0.8rem',padding:'0.42rem 0.85rem',border:`1px solid ${activeSection===t[0]?C.cyan:C.border}`,borderRadius:8,background:activeSection===t[0]?C.cyan:C.white,color:activeSection===t[0]?C.navy:C.slate,cursor:'pointer',fontWeight:activeSection===t[0]?700:400,whiteSpace:'nowrap'}}>{t[1]}</button>
         ))}
       </div>
+
+      {activeSection==='verification'&&(() => {
+        // All derived from figures already computed above -- no new scoring,
+        // no fabricated data. Record-based badges reflect real state now; the
+        // Payments Verified badge and confidence lift arrive once
+        // reconciliation runs against a linked wallet.
+        const monthsElapsed = periodIsActual.length
+        const monthsWithActuals = periodIsActual.filter(Boolean).length
+        const monthsClosed = monthsClosedFlags.filter(Boolean).length
+        const fieldDataMonths = monthsWithFieldAppFlags.filter(Boolean).length
+        return (
+        <div>
+          <SectionLabel>Verification &amp; Recognition</SectionLabel>
+          <VerificationRecognition
+            clientId={clientId}
+            monthsElapsed={monthsElapsed}
+            monthsWithActuals={monthsWithActuals}
+            monthsClosed={monthsClosed}
+            fieldDataMonths={fieldDataMonths}
+          />
+        </div>
+        )
+      })()}
 
       {activeSection==='summary'&&(() => {
         const {head,body} = splitStory(narrative ? cleanStory(narrative.briefing_text) : '')
