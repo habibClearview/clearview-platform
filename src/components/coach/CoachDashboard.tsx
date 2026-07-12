@@ -17,6 +17,7 @@ import {
   engagementSplit, independentClients, feesReceivedInYear, outstandingInvoiced,
   averageDaysToCollect, revenueStreams, dealCards, dealWinRate,
   canvasProgress, coImplementerNamesForClient, engagementDisplayStatus, coImplementerWorkload,
+  healthStatusFromReportText, portfolioHealthCounts, groupClientsByProgramme,
 } from '@/lib/coach-business-metrics'
 
 // \u2500\u2500\u2500 DESIGN TOKENS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -114,6 +115,120 @@ function CoImplementerPerfCard({ci,workload}){
         <div><div style={{fontFamily:'monospace',fontSize:'0.6rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Pending</div><div style={{fontWeight:700,fontSize:'1.05rem',fontFamily:'Georgia,serif',color:workload.pendingHours>0?C.amber:C.navy}}>{workload.pendingHours}h</div></div>
         <div><div style={{fontFamily:'monospace',fontSize:'0.6rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Sessions/mo</div><div style={{fontWeight:700,fontSize:'1.05rem',fontFamily:'Georgia,serif'}}>{workload.sessionsThisMonth}</div></div>
       </div>
+    </div>
+  )
+}
+
+// ─── Client Health tab ──────────────────────────────────────────────
+// The mockup's numeric "Avg Commercial Readiness /18" and "Avg Liquidity
+// Readiness /100" dials do not exist at the coach layer (see
+// coach-business-metrics.ts) -- swapped for real portfolio-wide counts of
+// the health status that's already live (ai_health_checks). Canvas clients
+// show real canvas progress instead of a health status, since ai_health_checks
+// only ever covers Clearview/financial clients (never GtCV).
+const HEALTH_COLOR={'Needs attention':C.red,'Watch':C.amber,'Healthy':C.green,'Reviewed':C.teal,'No data':C.slate}
+function ClientHealthTab({clients,programmes}){
+  const [reportByClient,setReportByClient]=useState({})
+  const [canvasByClient,setCanvasByClient]=useState({})
+  const [loading,setLoading]=useState(true)
+  const financialClients=clients.filter(c=>c.engagement_mode==='financial'&&c.clearview_active)
+  const canvasClients=clients.filter(c=>c.engagement_mode==='canvas')
+
+  useEffect(()=>{
+    let cancelled=false
+    const clientIds=clients.map(c=>c.id)
+    if(clientIds.length===0){setLoading(false);return}
+    Promise.all([
+      supabase.from('ai_health_checks').select('client_id,period,report_text,generated_at').in('client_id',financialClients.map(c=>c.id)).order('period',{ascending:false}),
+      supabase.from('canvas_decision_points').select('client_id,dp_id,status').in('client_id',canvasClients.map(c=>c.id)),
+    ]).then(([{data:reports},{data:dps}])=>{
+      if(cancelled)return
+      const latestByClient={}
+      ;(reports||[]).forEach(r=>{if(!latestByClient[r.client_id])latestByClient[r.client_id]=r})
+      setReportByClient(latestByClient)
+      const grouped={}
+      ;(dps||[]).forEach(d=>{(grouped[d.client_id]=grouped[d.client_id]||[]).push(d)})
+      setCanvasByClient(grouped)
+      setLoading(false)
+    }).catch(()=>setLoading(false))
+    return ()=>{cancelled=true}
+  },[clients])
+
+  if(loading)return<div style={{...card,textAlign:'center',padding:'2rem',color:C.slate}}>Loading portfolio health...</div>
+
+  const counts=portfolioHealthCounts(financialClients,reportByClient)
+  const flagged=financialClients.filter(c=>{
+    const label=healthStatusFromReportText(reportByClient[c.id]?.report_text).label
+    return label==='Needs attention'||label==='Watch'
+  }).sort((a,b)=>{
+    const rank={'Needs attention':0,'Watch':1}
+    const la=healthStatusFromReportText(reportByClient[a.id]?.report_text).label
+    const lb=healthStatusFromReportText(reportByClient[b.id]?.report_text).label
+    return (rank[la]??2)-(rank[lb]??2)
+  })
+  const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
+  const groups=groupClientsByProgramme(clients,programmesById)
+
+  return(
+    <div>
+      <Kicker>Portfolio at a glance</Kicker>
+      <div className="cv-grid-4" style={{marginBottom:'1.5rem'}}>
+        <GlanceKPI label="Portfolio Clients" value={String(clients.length)} sub={`${canvasClients.length} GtCV · ${financialClients.length} Clearview`} color={C.navy}/>
+        <GlanceKPI label="Need Attention" value={String(counts.needsAttention)} sub="flagged red this period" color={C.red}/>
+        <GlanceKPI label="Watch" value={String(counts.watch)} sub="flagged amber this period" color={C.amber}/>
+        <GlanceKPI label="Healthy" value={String(counts.healthy)} sub="green health check" color={C.green}/>
+      </div>
+
+      {flagged.length>0&&(
+        <div style={{...card,border:'1px solid #F1C9C2',borderLeft:`4px solid ${C.red}`}}>
+          <div style={{fontWeight:700,fontSize:'1.02rem',color:C.red,marginBottom:'0.7rem'}}>⚠ {flagged.length} client{flagged.length===1?'':'s'} flagged this week</div>
+          {flagged.map(c=>{
+            const report=reportByClient[c.id]
+            const status=healthStatusFromReportText(report?.report_text)
+            const why=report?.report_text?(report.report_text.length>140?report.report_text.slice(0,140)+'…':report.report_text):'No health check generated yet.'
+            return(
+              <div key={c.id} style={{display:'flex',alignItems:'center',gap:'0.9rem',padding:'0.7rem 0',borderTop:'1px solid #F4F1F0',cursor:'pointer'}} onClick={()=>window.open(`/dashboard/${c.slug}`,'_blank')}>
+                <Badge text={status.label} color={HEALTH_COLOR[status.label]}/>
+                <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700}}>{c.name}</div><div style={{fontSize:'0.86rem',color:C.slate}}>{why}</div></div>
+                <span style={{fontFamily:'monospace',fontSize:'0.8rem',fontWeight:700,color:C.red,flexShrink:0}}>Open →</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <Kicker>By programme</Kicker>
+      {groups.map((g,i)=>(
+        <div key={g.programme?.id||'independent'} style={{...card,marginBottom:'1.3rem'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem',flexWrap:'wrap',gap:'0.5rem'}}>
+            <div>
+              <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>{g.programme?g.programme.name:'Independent clients'}</div>
+              <div style={{fontSize:'0.86rem',color:C.slate,marginTop:'0.15rem'}}>{g.programme?[g.programme.funder,g.programme.country].filter(Boolean).join(' · '):'Self-paying, no programme'} · {g.clients.length} client{g.clients.length===1?'':'s'}</div>
+            </div>
+          </div>
+          <div className="cv-grid-3">
+            {g.clients.map(c=>{
+              const isCanvas=c.engagement_mode==='canvas'
+              const prog=isCanvas?canvasProgress(canvasByClient[c.id]||[]):null
+              const status=isCanvas?null:healthStatusFromReportText(reportByClient[c.id]?.report_text)
+              const accent=isCanvas?C.purple:(status?HEALTH_COLOR[status.label]:C.slate)
+              return(
+                <div key={c.id} style={{border:'1px solid var(--cv-border-soft)',borderTop:`4px solid ${accent}`,borderRadius:13,padding:'1rem 1.05rem',cursor:'pointer',background:C.white}} onClick={()=>window.open(`/dashboard/${c.slug}`,'_blank')}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'0.5rem'}}>
+                    <div style={{fontWeight:700,fontSize:'1.02rem'}}>{c.name}</div>
+                    <span style={{fontFamily:'monospace',fontSize:'0.58rem',fontWeight:700,borderRadius:4,padding:'0.08rem 0.38rem',color:isCanvas?C.purple:C.teal,border:`1px solid ${isCanvas?C.purple:C.teal}`,flexShrink:0}}>{isCanvas?'GtCV':'Clearview'}</span>
+                  </div>
+                  {isCanvas?(
+                    <div style={{fontFamily:'monospace',fontSize:'0.78rem',color:C.slate,marginTop:'0.6rem'}}>{prog.totalCount>0?`${prog.doneCount}/${prog.totalCount} · ${prog.currentLabel}`:'No canvas yet'}</div>
+                  ):(
+                    <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginTop:'0.6rem'}}><span>{status.dot}</span><Badge text={status.label} color={HEALTH_COLOR[status.label]}/></div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -860,7 +975,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   }
 
   // \u2500\u2500 HEADER + SHELL \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-  const mainNavTabs=[['overview','My Business'],['clients','Clients'],['programmes','Programmes'],['deals','Programmes & Deals'],['team','Team'],['payments','Team & Payments'],['review','Review Queue']]
+  const mainNavTabs=[['overview','My Business'],['health','Client Health'],['clients','Clients'],['programmes','Programmes'],['deals','Programmes & Deals'],['team','Team'],['payments','Team & Payments'],['review','Review Queue']]
   return(
     <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif",background:C.cream,color:C.navy,minHeight:'100vh'}}>
       <BuildStamp/>
@@ -890,6 +1005,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         {view==='team'&&<TeamView/>}
         {view==='payments'&&<TeamPayments coImplementers={coImplementers} clients={clients} userName={userName}/>}
         {view==='deals'&&<DealsAndFees programmes={programmes} setProgrammes={setPrograms} clients={clients} setClients={setClients}/>}
+        {view==='health'&&<ClientHealthTab clients={clients} programmes={programmes}/>}
         {view==='review'&&<ReviewQueue clients={clients}/>}
       </main>
       <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.72rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach \u00b7 Coach Dashboard \u00b7 habibonifade.com \u00b7 Confidential</footer>

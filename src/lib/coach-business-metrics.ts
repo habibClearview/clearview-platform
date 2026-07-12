@@ -232,3 +232,59 @@ export function coImplementerWorkload(coImplementerId: string, entries: Timeshee
   }).length
   return { pendingHours, approvedHours, sessionsThisMonth }
 }
+
+// ─── Client Health (portfolio view) ────────────────────────────────
+// The mockup's "Avg Commercial Readiness /18" and "Avg Liquidity Readiness
+// /100" dials do NOT exist at the coach layer: those scores are computed
+// live inside each CLIENT's own dashboard session from that client's
+// actuals/config, and are never written anywhere the coach's portfolio view
+// can read across every client at once. Building those numbers here would
+// mean inventing them. Instead this uses the real signal that already
+// exists and is already live: ai_health_checks (an AI-generated report per
+// Clearview client per period), classified by the SAME keyword logic
+// already shipped in ClearviewHealthSummary -- extracted here so it's
+// tested once instead of living only inline in a component.
+export type HealthLabel = 'Needs attention' | 'Watch' | 'Healthy' | 'Reviewed' | 'No data'
+export interface HealthStatus { label: HealthLabel; dot: string }
+export function healthStatusFromReportText(text?: string | null): HealthStatus {
+  if (!text) return { label: 'No data', dot: '⚪' }
+  const lower = text.toLowerCase()
+  if (lower.includes('red') || lower.includes('at risk') || lower.includes('concern')) return { label: 'Needs attention', dot: '🔴' }
+  if (lower.includes('amber') || lower.includes('caution')) return { label: 'Watch', dot: '🟡' }
+  if (lower.includes('green') || lower.includes('healthy') || lower.includes('strong')) return { label: 'Healthy', dot: '🟢' }
+  return { label: 'Reviewed', dot: '🔵' }
+}
+
+export interface HealthReport { client_id: string; report_text?: string | null; generated_at?: string | null; period?: string | null }
+export interface PortfolioHealthCounts { needsAttention: number; watch: number; healthy: number; reviewed: number; noData: number }
+/** Counts across every financial/Clearview client's latest health report -- real counts of a real, already-computed status, never an averaged score. */
+export function portfolioHealthCounts(clients: { id: string }[], latestReportByClient: Record<string, HealthReport | null>): PortfolioHealthCounts {
+  const counts: PortfolioHealthCounts = { needsAttention: 0, watch: 0, healthy: 0, reviewed: 0, noData: 0 }
+  for (const c of clients) {
+    const label = healthStatusFromReportText(latestReportByClient[c.id]?.report_text).label
+    if (label === 'Needs attention') counts.needsAttention++
+    else if (label === 'Watch') counts.watch++
+    else if (label === 'Healthy') counts.healthy++
+    else if (label === 'Reviewed') counts.reviewed++
+    else counts.noData++
+  }
+  return counts
+}
+
+export interface ProgrammeGroup<C> { programme: DealProgramme | null; clients: C[] }
+/** Groups clients under their real programme; clients with no programme_id land in a null-programme ("independent") bucket -- never dropped. */
+export function groupClientsByProgramme<C extends { programme_id?: string | null }>(
+  clients: C[], programmesById: Record<string, DealProgramme>,
+): ProgrammeGroup<C>[] {
+  const groups = new Map<string, ProgrammeGroup<C>>()
+  const independent: C[] = []
+  for (const c of clients) {
+    const programme = c.programme_id ? programmesById[c.programme_id] : undefined
+    if (!programme) { independent.push(c); continue }
+    if (!groups.has(programme.id)) groups.set(programme.id, { programme, clients: [] })
+    groups.get(programme.id)!.clients.push(c)
+  }
+  const result = Array.from(groups.values())
+  if (independent.length > 0) result.push({ programme: null, clients: independent })
+  return result
+}

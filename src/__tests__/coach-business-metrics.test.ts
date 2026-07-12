@@ -3,6 +3,7 @@ import {
   engagementSplit, independentClients, feesReceivedInYear, outstandingInvoiced,
   averageDaysToCollect, revenueStreams, dealCards, dealWinRate,
   canvasProgress, coImplementerNamesForClient, engagementDisplayStatus, coImplementerWorkload,
+  healthStatusFromReportText, portfolioHealthCounts, groupClientsByProgramme,
   type FeeClient, type DealProgramme,
 } from '../lib/coach-business-metrics'
 
@@ -274,5 +275,57 @@ describe('coImplementerWorkload', () => {
   it('a co-implementer with no entries gets all zeros, not undefined/NaN', () => {
     const r = coImplementerWorkload('ci9', entries, now)
     expect(r).toEqual({ pendingHours: 0, approvedHours: 0, sessionsThisMonth: 0 })
+  })
+})
+
+describe('healthStatusFromReportText', () => {
+  it('has no data when there is no report yet', () => {
+    expect(healthStatusFromReportText(null).label).toBe('No data')
+    expect(healthStatusFromReportText(undefined).label).toBe('No data')
+  })
+  it('classifies red/at-risk/concern language as Needs attention', () => {
+    expect(healthStatusFromReportText('Cash goes negative, credit risk is a concern.').label).toBe('Needs attention')
+  })
+  it('classifies amber/caution language as Watch', () => {
+    expect(healthStatusFromReportText('Margin trend needs caution this quarter.').label).toBe('Watch')
+  })
+  it('classifies green/healthy/strong language as Healthy', () => {
+    expect(healthStatusFromReportText('A strong, healthy quarter across the board.').label).toBe('Healthy')
+  })
+  it('falls back to Reviewed for neutral text', () => {
+    expect(healthStatusFromReportText('The business recorded steady revenue this month.').label).toBe('Reviewed')
+  })
+})
+
+describe('portfolioHealthCounts', () => {
+  it('counts real statuses across the portfolio, never averaging them into a fake score', () => {
+    const clients = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }]
+    const reports = {
+      a: { client_id: 'a', report_text: 'at risk, credit concern' },
+      b: { client_id: 'b', report_text: 'strong and healthy' },
+      c: { client_id: 'c', report_text: null },
+      d: null,
+    }
+    const r = portfolioHealthCounts(clients, reports)
+    expect(r).toEqual({ needsAttention: 1, watch: 0, healthy: 1, reviewed: 0, noData: 2 })
+  })
+})
+
+describe('groupClientsByProgramme', () => {
+  const programmesById = { p1: { id: 'p1', name: 'Tanager' } }
+  it('groups clients under their real programme', () => {
+    const r = groupClientsByProgramme(
+      [{ id: 'a', programme_id: 'p1' }, { id: 'b', programme_id: 'p1' }],
+      programmesById,
+    )
+    expect(r).toHaveLength(1)
+    expect(r[0].programme?.name).toBe('Tanager')
+    expect(r[0].clients.map(c => c.id)).toEqual(['a', 'b'])
+  })
+  it('puts clients with no programme in a null-programme bucket, never drops them', () => {
+    const r = groupClientsByProgramme([{ id: 'a', programme_id: null }], programmesById)
+    expect(r).toHaveLength(1)
+    expect(r[0].programme).toBeNull()
+    expect(r[0].clients.map(c => c.id)).toEqual(['a'])
   })
 })
