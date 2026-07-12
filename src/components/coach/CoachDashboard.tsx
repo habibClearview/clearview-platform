@@ -1003,7 +1003,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         {view==='client'&&<ClientDetailView/>}
         {view==='programmes'&&<ProgrammesView/>}
         {view==='team'&&<TeamView/>}
-        {view==='payments'&&<TeamPayments coImplementers={coImplementers} clients={clients} userName={userName}/>}
+        {view==='payments'&&<TeamPayments coImplementers={coImplementers} setCoImplementers={setCoImplementers} clients={clients} userName={userName}/>}
         {view==='deals'&&<DealsAndFees programmes={programmes} setProgrammes={setPrograms} clients={clients} setClients={setClients}/>}
         {view==='health'&&<ClientHealthTab clients={clients} programmes={programmes}/>}
         {view==='review'&&<ReviewQueue clients={clients}/>}

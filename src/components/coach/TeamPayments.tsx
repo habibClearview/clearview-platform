@@ -69,7 +69,73 @@ function recentPeriods(n=8){
 }
 const EXPENSE_CATEGORIES=['travel','accommodation','comms','materials','other']
 
-export default function TeamPayments({coImplementers=[],clients=[],userName='Coach'}){
+// ─── ACCESS — real client_ids assignment, no invented access level ────
+// Per-client permission GRADES (Edit/View/Full) and a red/amber health flag
+// were checked against the schema before building this: neither exists
+// anywhere (co_implementers only has a flat client_ids array, and there is
+// no structured flag field on any table). Showing a working-looking dropdown
+// or badge with nothing behind it would be worse than not having it, so
+// this shows only what's real: the actual assignment, addable and
+// removable, writing straight to co_implementers.client_ids.
+function AccessSection({coImplementers,setCoImplementers,clients,setMsg}){
+  const [addingFor,setAddingFor]=useState(null)
+  async function assign(ci,clientId){
+    if(!clientId||(ci.client_ids||[]).includes(clientId))return
+    const next=[...(ci.client_ids||[]),clientId]
+    const {error}=await supabase.from('co_implementers').update({client_ids:next}).eq('id',ci.id)
+    if(error)return setMsg('Could not assign client: '+error.message)
+    setCoImplementers&&setCoImplementers(prev=>prev.map(x=>x.id!==ci.id?x:{...x,client_ids:next}))
+    setAddingFor(null)
+  }
+  async function unassign(ci,clientId){
+    const next=(ci.client_ids||[]).filter(id=>id!==clientId)
+    const {error}=await supabase.from('co_implementers').update({client_ids:next}).eq('id',ci.id)
+    if(error)return setMsg('Could not remove client: '+error.message)
+    setCoImplementers&&setCoImplementers(prev=>prev.map(x=>x.id!==ci.id?x:{...x,client_ids:next}))
+  }
+  return(
+    <div style={card}>
+      <div style={secH}>Co-implementers &amp; client access</div>
+      <p style={{...hint,marginBottom:'1rem'}}>Each co-implementer's assigned clients. Access today is binary -- assigned or not -- there is no permission grade (Edit/View/Full) stored anywhere yet, so none is shown here.</p>
+      {coImplementers.length===0
+        ? <div style={{color:C.slate,textAlign:'center',padding:'1.5rem'}}>No co-implementers yet. Add them in the Team tab.</div>
+        : coImplementers.map(ci=>{
+          const assigned=(ci.client_ids||[]).map(id=>clients.find(c=>c.id===id)).filter(Boolean)
+          const available=clients.filter(c=>!(ci.client_ids||[]).includes(c.id))
+          return(
+            <div key={ci.id} style={{display:'grid',gridTemplateColumns:'220px 1fr',gap:'1rem',padding:'0.9rem 0',borderTop:`1px solid ${C.border}`}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:'0.95rem',color:C.navy}}>{ci.name}</div>
+                <div style={{fontSize:'0.8rem',color:C.slate}}>{ci.country||'Co-implementer'}</div>
+                {rateOf(ci)>0&&<div style={{fontFamily:'monospace',fontSize:'0.78rem',color:C.teal,marginTop:'0.2rem',fontWeight:700}}>{fmtMoney(rateOf(ci),curOf(ci))}/day</div>}
+              </div>
+              <div style={{border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden'}}>
+                {assigned.length===0&&<div style={{padding:'0.5rem 0.8rem',fontSize:'0.86rem',color:C.slate}}>No clients assigned</div>}
+                {assigned.map(c=>(
+                  <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.45rem 0.8rem',borderTop:`1px solid ${C.border}`,fontSize:'0.9rem'}}>
+                    <span>{c.name}</span>
+                    <span style={{color:C.slate,cursor:'pointer',fontWeight:700}} onClick={()=>unassign(ci,c.id)} title="Remove access">×</span>
+                  </div>
+                ))}
+                <div style={{padding:'0.5rem 0.8rem',borderTop:`1px solid ${C.border}`}}>
+                  {addingFor===ci.id?(
+                    <select style={{...inp,width:'auto'}} autoFocus value="" onChange={e=>assign(ci,e.target.value)} onBlur={()=>setAddingFor(null)}>
+                      <option value="">Select a client…</option>
+                      {available.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  ):(
+                    <button style={addBtn(true)} onClick={()=>setAddingFor(ci.id)} disabled={available.length===0}>{available.length===0?'All clients assigned':'+ Assign client'}</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+    </div>
+  )
+}
+
+export default function TeamPayments({coImplementers=[],setCoImplementers,clients=[],userName='Coach'}){
   const [entries,setEntries]=useState([])
   const [expenses,setExpenses]=useState([])
   const [advances,setAdvances]=useState([])
@@ -77,6 +143,7 @@ export default function TeamPayments({coImplementers=[],clients=[],userName='Coa
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState(null)
   const [period,setPeriod]=useState(currentPeriod())
+  const [accessMsg,setAccessMsg]=useState(null)
   const clientName=useCallback((id)=>clients.find(c=>c.id===id)?.name||(id?String(id):'—'),[clients])
 
   useEffect(()=>{
@@ -135,6 +202,9 @@ export default function TeamPayments({coImplementers=[],clients=[],userName='Coa
         <KPI label="Open advances" value={openAdvancesAll.length} sub={openAdvancesAll.length?'blocking invoices':'none outstanding'} color={openAdvancesAll.length?C.amber:C.green}/>
         <KPI label="Invoices issued" value={issuedThisPeriod.length} sub={`${period}`} color={C.purple}/>
       </div>
+
+      {accessMsg&&<div style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.6rem'}}>{accessMsg}</div>}
+      <AccessSection coImplementers={coImplementers} setCoImplementers={setCoImplementers} clients={clients} setMsg={setAccessMsg}/>
 
       {coImplementers.length===0
         ? <div style={{...card,color:C.slate,textAlign:'center',padding:'2.5rem'}}>No co-implementers yet. Add them in the Team tab, then set a day rate here.</div>
