@@ -9,9 +9,14 @@ import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   HeadingLevel, BorderStyle, WidthType, AlignmentType, ShadingType,
 } from 'docx'
-import { runGenericModel, buildMonthLabels, type GenericModelConfig } from '@/lib/generic-engine'
+import { runGenericModel, buildMonthLabels, buildYearGroups, type GenericModelConfig } from '@/lib/generic-engine'
 import { computeScores, defaultCoachAssessment, computeTradeCredit, dscrLabel, dscrColor, dscrRating } from '@/lib/scoring-engine'
 import { CLEARVIEW_STYLE } from '@/lib/ai-style'
+import { computeLiquidityReadinessScore, computeLRSTimeSeries, computeFitScore, FIT_SCORE_PRESETS, LRS_WEIGHTS } from '@/lib/liquidity-readiness'
+import { computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary, monthlyRateToAnnualRate } from '@/lib/investment-metrics'
+import { periodForMonthIndex } from '@/lib/month-end-close'
+import { assessConfidence } from '@/lib/confidence'
+import { buildPeriodSignals, partitionBadges, CONFIDENCE_DISPLAY, BADGE_DISPLAY, READINESS_DISPLAY, type ReadinessStatus } from '@/lib/verification-display'
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -167,11 +172,19 @@ export async function POST(req: NextRequest) {
       { data: configRow },
       { data: coachBriefing },
       { data: events },
+      { data: actualsRows },
+      { data: periodCloseRows },
+      { data: providerLinks },
+      { data: providerTx },
     ] = await Promise.all([
       admin.from('engagement_clients').select('*').eq('id', clientId).single(),
       admin.from('generic_model_config').select('*').eq('client_id', clientId).single(),
       admin.from('coach_briefings').select('*').eq('client_id', clientId).order('generated_at', { ascending: false }).limit(1).maybeSingle(),
       admin.from('management_events').select('*').eq('client_id', clientId).order('date', { ascending: false }),
+      admin.from('generic_actuals').select('period,field_line_values').eq('client_id', clientId),
+      admin.from('generic_period_close').select('period,closed').eq('client_id', clientId).eq('closed', true),
+      admin.from('provider_links').select('status').eq('client_id', clientId),
+      admin.from('provider_transactions').select('amount,reconciliation_state').eq('client_id', clientId),
     ])
 
     if (!configRow) return NextResponse.json({ error: 'No financial model found. Set up the financial plan first.' }, { status: 404 })
@@ -214,6 +227,82 @@ export async function POST(req: NextRequest) {
     const tc = s.tradeCredit
     const hasTCData = tc.dso > 0 || tc.dpo > 0
 
+    // ── Liquidity Readiness Score: seven dimensions + Bank/Investor Fit ──
+    // Same construction as the live Liquidity Readiness tab (GenericDashboard.tsx)
+    // and VerificationRecognition.tsx -- built from real engine outputs and real
+    // reconciliation tables, never estimated for the document.
+    const periodIsActual: boolean[] = result.con.act_ebitda.map((v: number | null) => v !== null)
+    const monthsN = periodIsActual.length
+    const closedPeriodsSet = new Set((periodCloseRows || []).map((r: any) => r.period))
+    const fieldAppPeriodsSet = new Set<string>()
+    ;(actualsRows || []).forEach((row: any) => {
+      if (row.field_line_values && Object.keys(row.field_line_values).length > 0) fieldAppPeriodsSet.add(row.period)
+    })
+    const monthsClosedFlags = Array.from({ length: monthsN }, (_, i) => closedPeriodsSet.has(periodForMonthIndex(config.start_date, i)))
+    const monthsWithFieldAppFlags = Array.from({ length: monthsN }, (_, i) => fieldAppPeriodsSet.has(periodForMonthIndex(config.start_date, i)))
+
+    const yearGroups = buildYearGroups(config.start_date, config.planning_months)
+    const monthLabelsFull = buildMonthLabels(config.start_date, config.planning_months)
+    const capitalStructure = config.settings.capital_structure
+    const capitalAtRisk = (capitalStructure?.shareholder_contribution || 0) + (capitalStructure?.grant_recoverable || 0)
+    const lrsCashFlows = buildInvestmentCashFlows(capitalAtRisk, result.cf.op_cash, result.cf.inv_cash)
+    const lrsMonthlyIrr = computeIRR(lrsCashFlows)
+    const lrsAnnualIrr = lrsMonthlyIrr !== null ? monthlyRateToAnnualRate(lrsMonthlyIrr) : null
+    const lrsCustomerGrowth = computeCustomerGrowthSummary(events || [])
+    const lrsSeries = computeLRSTimeSeries({
+      rev: result.con.rev, ebitda: result.con.ebitda, grossProfit: result.con.gp,
+      cashClose: result.cf.close, opex: result.con.opex,
+      totalEquityByMonth: result.bs.total_equity, totalLiabilitiesByMonth: result.bs.total_liabilities,
+      businessBreakeven: result.metrics.business_breakeven,
+      monthsWithActuals: periodIsActual, monthsClosed: monthsClosedFlags, monthsWithFieldApp: monthsWithFieldAppFlags,
+      customersAcquiredTotal: lrsCustomerGrowth.totalCustomersAcquired,
+      irr: lrsAnnualIrr, revenuePerHead: result.metrics.revenue_per_head,
+      dscrMin: s.dscrMin, hasDebt: s.hasDebt, cashGaps: s.cashGaps, tradeCreditDpo: tc.dpo,
+      assess,
+    }, yearGroups, monthLabelsFull)
+    const lrsCurrent = lrsSeries.years[lrsSeries.years.length - 1]?.result || computeLiquidityReadinessScore({
+      annualRevenue: 0, annualEbitda: 0, annualGrossProfit: 0, cashClose: [0], monthlyOpex: [0], businessBreakeven: 0,
+      totalEquity: 0, totalLiabilities: 0, dscrMin: null, hasDebt: false, cashGaps: 0, tradeCreditDpo: 0,
+      monthsOfActualData: 0, monthsElapsed: 0, monthsClosed: 0, fieldAppMonths: 0, revenueGrowthRate: 0,
+      customersAcquired: 0, irr: null, revenuePerHead: 0, assess,
+    })
+    const bankFit = computeFitScore(lrsCurrent, FIT_SCORE_PRESETS.bank.weights)
+    const investorFit = computeFitScore(lrsCurrent, FIT_SCORE_PRESETS.investor.weights)
+    const lrsWord = lrsCurrent.score >= 70 ? 'Strong' : lrsCurrent.score >= 50 ? 'Building' : lrsCurrent.score >= 30 ? 'Developing' : 'Early'
+    const scoreColorLRS = (v: number) => v >= 70 ? GREEN : v >= 50 ? CYAN : v >= 30 ? AMBER : RED
+
+    // ── Verification & Recognition: readiness, confidence, badges ──
+    // Same construction as VerificationRecognition.tsx -- reconciliation figures
+    // default to zero for a cash-only/unlinked business, which the confidence
+    // model treats as "no verification signal", never as a penalty.
+    const STATUS_RANK: Record<ReadinessStatus, number> = { not_started: 0, wallet_activated: 1, link_pending: 2, tier1_active: 3 }
+    let readiness: ReadinessStatus = 'not_started'
+    ;(providerLinks || []).forEach((r: any) => {
+      const st = (r.status as ReadinessStatus) || 'not_started'
+      if (STATUS_RANK[st] > STATUS_RANK[readiness]) readiness = st
+    })
+    let matchedValue = 0, unattributedValue = 0
+    ;(providerTx || []).forEach((t: any) => {
+      if (t.reconciliation_state === 'matched') matchedValue += Number(t.amount) || 0
+      else if (t.reconciliation_state === 'unattributed_inbound') unattributedValue += Number(t.amount) || 0
+    })
+    const monthsWithActualsCount = periodIsActual.filter(Boolean).length
+    const monthsClosedCount = monthsClosedFlags.filter(Boolean).length
+    const signals = buildPeriodSignals({
+      declaredValue: m.total_revenue,
+      matchedValue, unattributedInboundValue: unattributedValue,
+      hasActuals: monthsWithActualsCount > 0,
+      recordsComplete: monthsN > 0 && monthsWithActualsCount >= monthsN,
+      cogsConsistent: false,
+      internallyConsistent: true,
+      monthsConsistentStreak: monthsWithActualsCount,
+      monthClosedOnTime: monthsClosedCount > 0,
+    })
+    const confidence = assessConfidence(signals)
+    const { earned: earnedBadges, locked: lockedBadges } = partitionBadges(confidence.badges)
+    const readinessInfo = READINESS_DISPLAY[readiness]
+    const confInfo = CONFIDENCE_DISPLAY[confidence.label]
+
     // Unit summaries
     const unitLines = result.allocUnits.map((u: any) => {
       const pl = result.unitPL[u.id]
@@ -232,6 +321,9 @@ Business: ${config.business_name}, ${client?.sector || 'agribusiness'} sector, $
 Revenue: ${fmt(m.total_revenue, cc)} | Gross Margin: ${pct(m.gross_margin)} | EBITDA: ${fmt(m.total_ebitda, cc)} (${pct(m.net_margin)})
 Breakeven: ${fmt(m.business_breakeven, cc)} | Headroom: ${fmt(m.total_revenue - m.business_breakeven, cc)}
 Investment Readiness: ${s.irScore}/30 (${s.irTier}) | Credit Risk: ${s.score}/100 (${s.classification}) | DSCR: ${dscrLabel(s)}
+Liquidity Readiness: ${Math.round(lrsCurrent.score)}/100 (${lrsWord}) | Bank Fit: ${Math.round(bankFit)}/100 | Investor Fit: ${Math.round(investorFit)}/100
+Visibility: ${Math.round(lrsCurrent.dimensions.visibility.score)}/100 | Trust: ${Math.round(lrsCurrent.dimensions.trust.score)}/100
+Verification confidence this period: ${confInfo.title} (${confidence.score}/100)${earnedBadges.length > 0 ? `; badges earned: ${earnedBadges.map(b => BADGE_DISPLAY[b].title).join(', ')}` : '; no verification badges earned yet'}
 Units: ${unitLines.join('; ')}
 ${hasMarketing ? `Top marketing channel by CAC: ${channels[0]?.channel} at ${channels[0]?.cac ? fmt(channels[0].cac, cc) : 'unquantified'} per customer` : ''}
 ${hasTCData ? `DSO: ${tc.dso.toFixed(0)} days | DPO: ${tc.dpo.toFixed(0)} days | Cash conversion gap: ${tc.cashConversionGap.toFixed(0)} days` : ''}
@@ -287,6 +379,47 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
         scoreBadge('Debt Service (DSCR)', dscrLabel(s), dscrRating(s), dscrColor(s,{green:GREEN,amber:AMBER,red:RED,slate:SLATE}), w4),
       ]})],
     }))
+    children.push(spacer(0, 200))
+
+    // ── LIQUIDITY READINESS & LENDER FIT ──
+    children.push(sectionHeader('Liquidity Readiness & Lender Fit'))
+    children.push(spacer(0, 80))
+    const w3 = Math.floor(9360 / 3)
+    children.push(new Table({
+      width: { size: 9360, type: WidthType.DXA },
+      columnWidths: [w3, w3, w3],
+      borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+      rows: [new TableRow({ children: [
+        scoreBadge('Liquidity Readiness', `${Math.round(lrsCurrent.score)}/100`, lrsWord, scoreColorLRS(lrsCurrent.score), w3),
+        scoreBadge(FIT_SCORE_PRESETS.bank.label, `${Math.round(bankFit)}/100`, bankFit >= 50 ? 'Fit' : 'Developing fit', scoreColorLRS(bankFit), w3),
+        scoreBadge(FIT_SCORE_PRESETS.investor.label, `${Math.round(investorFit)}/100`, investorFit >= 50 ? 'Fit' : 'Developing fit', scoreColorLRS(investorFit), w3),
+      ]})],
+    }))
+    children.push(spacer(0, 140))
+    const lrsDims: { key: keyof typeof lrsCurrent.dimensions; label: string }[] = [
+      { key: 'marketOpportunity', label: 'Market Opportunity' },
+      { key: 'visibility', label: 'Visibility' },
+      { key: 'trust', label: 'Trust' },
+      { key: 'profitability', label: 'Profitability' },
+      { key: 'capacity', label: 'Capacity' },
+      { key: 'resilience', label: 'Resilience' },
+      { key: 'compliance', label: 'Compliance' },
+    ]
+    children.push(metricRow(lrsDims.slice(0, 4).map(d => ({
+      label: d.label, value: `${Math.round(lrsCurrent.dimensions[d.key].score)}/100`,
+      sub: `${Math.round(LRS_WEIGHTS[d.key] * 100)}% weight`, color: scoreColorLRS(lrsCurrent.dimensions[d.key].score),
+    }))))
+    children.push(spacer(0, 80))
+    children.push(metricRow(lrsDims.slice(4, 7).map(d => ({
+      label: d.label, value: `${Math.round(lrsCurrent.dimensions[d.key].score)}/100`,
+      sub: `${Math.round(LRS_WEIGHTS[d.key] * 100)}% weight`, color: scoreColorLRS(lrsCurrent.dimensions[d.key].score),
+    }))))
+    children.push(spacer(0, 160))
+    // Visibility and Trust drilldown -- the two dimensions verification lifts directly
+    children.push(infoBox(
+      ['VISIBILITY', `${Math.round(lrsCurrent.dimensions.visibility.score)}/100`, '', ...lrsCurrent.dimensions.visibility.indicators.map(ind => `${ind.label}: ${ind.note}`)],
+      ['TRUST', `${Math.round(lrsCurrent.dimensions.trust.score)}/100`, '', ...lrsCurrent.dimensions.trust.indicators.map(ind => `${ind.label}: ${ind.note}`)],
+    ))
     children.push(spacer(0, 200))
 
     // ── FINANCIAL SNAPSHOT ──
@@ -379,6 +512,33 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
       { label: 'Market Evidence', value: `${assess.marketEvidence || 'n/a'}/5`, sub: 'demand & traction', color: Number(assess.marketEvidence) >= 4 ? GREEN : AMBER },
       { label: 'Governance & Records', value: `${assess.governance || 'n/a'}/5`, sub: 'systems & compliance', color: Number(assess.governance) >= 4 ? GREEN : AMBER },
     ]))
+    children.push(spacer(0, 200))
+
+    // ── VERIFICATION & RECOGNITION ──
+    children.push(sectionHeader('Verification & Recognition'))
+    children.push(spacer(0, 80))
+    const w2 = Math.floor(9360 / 2)
+    children.push(new Table({
+      width: { size: 9360, type: WidthType.DXA },
+      columnWidths: [w2, w2],
+      borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+      rows: [new TableRow({ children: [
+        scoreBadge('Verification Status', readinessInfo.title, readinessInfo.blurb, readinessInfo.tone === 'good' ? GREEN : readinessInfo.tone === 'warn' ? AMBER : SLATE, w2),
+        scoreBadge('Confidence This Period', `${confidence.score}/100`, confInfo.title, confInfo.tone === 'good' ? GREEN : confInfo.tone === 'warn' ? AMBER : SLATE, w2),
+      ]})],
+    }))
+    children.push(spacer(0, 160))
+    if (earnedBadges.length > 0) {
+      children.push(new Paragraph({ children: [new TextRun({ text: 'Recognition Earned', bold: true, color: NAVY, size: 18, font: 'Arial', allCaps: true })], spacing: { after: 80 } }))
+      earnedBadges.forEach(b => children.push(bullet(`${BADGE_DISPLAY[b].icon}  ${BADGE_DISPLAY[b].title} — ${BADGE_DISPLAY[b].earnedBlurb}`, GREEN)))
+    } else {
+      children.push(note('No recognition badges earned yet — keep recording each month and the first ones arrive quickly.'))
+    }
+    if (lockedBadges.length > 0) {
+      children.push(spacer(80, 80))
+      children.push(new Paragraph({ children: [new TextRun({ text: 'Still To Earn', bold: true, color: SLATE, size: 18, font: 'Arial', allCaps: true })], spacing: { after: 80 } }))
+      lockedBadges.forEach(b => children.push(bullet(`${BADGE_DISPLAY[b].title} — ${BADGE_DISPLAY[b].howToEarn}`, SLATE)))
+    }
     children.push(spacer(0, 200))
 
     // ── RISK ──
