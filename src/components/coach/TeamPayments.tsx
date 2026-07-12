@@ -35,8 +35,8 @@ const C = {
 const card = {background:C.white,border:'1px solid var(--cv-border-soft)',borderRadius:14,padding:'1.35rem 1.5rem',marginBottom:'1.25rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)'}
 const secH = {fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
 const inp  = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'0.92rem',fontFamily:'inherit',background:'var(--cv-bg-2)',color:C.navy,boxSizing:'border-box'}
-const lbl  = {display:'block',fontWeight:600,fontSize:'0.82rem',marginBottom:'0.2rem',color:C.navy}
-const hint = {fontSize:'0.78rem',color:C.slate,lineHeight:1.4}
+const lbl  = {display:'block',fontWeight:600,fontSize:'0.86rem',marginBottom:'0.2rem',color:C.navy}
+const hint = {fontSize:'0.8rem',color:C.slate,lineHeight:1.4}
 const fGrid= {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'0.8rem'}
 const th   = {padding:'0.4rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`,whiteSpace:'nowrap'}
 const td   = {padding:'0.4rem 0.6rem',verticalAlign:'top'}
@@ -44,7 +44,7 @@ function addBtn(sm=false,col=C.cyan){return{fontFamily:'monospace',fontSize:sm?'
 function solidBtn(col=C.cyan,sm=false){return{fontFamily:'monospace',fontSize:sm?'0.74rem':'0.8rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:'var(--cv-on-accent)',cursor:'pointer'}}
 function subPill(active,col=C.cyan){return{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
 function Badge({text,color}){return<span style={{fontFamily:'monospace',fontSize:'0.72rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
-function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily:'monospace',fontSize:'0.68rem',letterSpacing:'0.1em',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'0.76rem',color:C.slate,marginTop:'0.2rem'}}>{sub}</div>}</div>)}
+function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.1em',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'0.8rem',color:C.slate,marginTop:'0.2rem'}}>{sub}</div>}</div>)}
 
 // ─── helpers ─────────────────────────────────────────────────
 const num = (v)=>{const n=Number(v);return Number.isFinite(n)?n:0}
@@ -201,11 +201,11 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'1rem',flexWrap:'wrap',marginBottom:'0.75rem'}}>
         <div>
           <div style={{fontWeight:700,fontSize:'0.95rem',color:C.navy}}>{ci.name}</div>
-          <div style={{fontSize:'0.76rem',color:C.slate}}>{ci.email}{ci.country?` · ${ci.country}`:''}{ci.specialisation?` · ${ci.specialisation}`:''}</div>
-          <div style={{fontSize:'0.74rem',color:C.slate,marginTop:'0.2rem'}}>Clients: {assignedClients.length?assignedClients.map(c=>c.name).join(', '):'none assigned'}</div>
+          <div style={{fontSize:'0.8rem',color:C.slate}}>{ci.email}{ci.country?` · ${ci.country}`:''}{ci.specialisation?` · ${ci.specialisation}`:''}</div>
+          <div style={{fontSize:'0.8rem',color:C.slate,marginTop:'0.2rem'}}>Clients: {assignedClients.length?assignedClients.map(c=>c.name).join(', '):'none assigned'}</div>
         </div>
         <div style={{textAlign:'right'}}>
-          <div style={{fontFamily:'monospace',fontSize:'0.7rem',color:d.rate>0?C.slate:C.amber,marginBottom:'0.3rem'}}>{d.rate>0?`${fmtMoney(d.rate,curOf(ci))}/day`:'no day rate set'}</div>
+          <div style={{fontFamily:'monospace',fontSize:'0.72rem',color:d.rate>0?C.slate:C.amber,marginBottom:'0.3rem'}}>{d.rate>0?`${fmtMoney(d.rate,curOf(ci))}/day`:'no day rate set'}</div>
           <div style={{display:'flex',gap:'0.35rem',alignItems:'center',justifyContent:'flex-end'}}>
             <input style={{...inp,width:90,padding:'0.28rem 0.45rem',fontSize:'0.8rem'}} type="number" value={rateDraft} placeholder="rate" onChange={e=>setRateDraft(e.target.value)}/>
             <select style={{...inp,width:70,padding:'0.28rem 0.35rem',fontSize:'0.8rem'}} value={curDraft} onChange={e=>setCurDraft(e.target.value)}>{['USD','GBP','EUR','UGX','NGN','KES'].map(x=><option key={x}>{x}</option>)}</select>
@@ -228,7 +228,7 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
           <button key={id} style={subPill(tab===id,id==='advances'&&d.openAdvances.length?C.amber:C.cyan)} onClick={()=>setTab(id)}>{label}</button>)}
       </div>
 
-      {msg&&<div style={{fontSize:'0.78rem',color:C.slate,marginBottom:'0.6rem'}}>{msg}</div>}
+      {msg&&<div style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.6rem'}}>{msg}</div>}
 
       {tab==='timesheets'&&<TimesheetSection ci={ci} period={period} userName={userName} assignedClients={assignedClients} clientName={clientName} entries={entries} setEntries={setEntries} setMsg={setMsg}/>}
       {tab==='expenses'&&<ExpenseSection ci={ci} period={period} userName={userName} assignedClients={assignedClients} clientName={clientName} expenses={expenses} setExpenses={setExpenses} setMsg={setMsg}/>}
@@ -258,7 +258,7 @@ function TimesheetSection({ci,period,userName,assignedClients,clientName,entries
   return(
     <div>
       <div style={{overflowX:'auto',marginBottom:'0.75rem'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.78rem'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.8rem'}}>
           <thead><tr style={{background:C.lightBg}}>{['Date','Client','Task','Hours','Days','Status',''].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
           <tbody>
             {rows.length===0&&<tr><td style={{...td,color:C.slate}} colSpan={7}>No timesheet entries for {period}.</td></tr>}
@@ -305,7 +305,7 @@ function ExpenseSection({ci,period,userName,assignedClients,clientName,expenses,
   return(
     <div>
       <div style={{overflowX:'auto',marginBottom:'0.75rem'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.78rem'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.8rem'}}>
           <thead><tr style={{background:C.lightBg}}>{['Date','Client','Description','Category','Amount','Receipt','Status',''].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
           <tbody>
             {rows.length===0&&<tr><td style={{...td,color:C.slate}} colSpan={8}>No expenses for {period}.</td></tr>}
@@ -356,7 +356,7 @@ function AdvanceSection({ci,advances,setAdvances,setMsg}){
     <div>
       <p style={{...hint,marginBottom:'0.6rem'}}>Advances are reconciled against actual spend by their due date. While an advance is unreconciled it is netted off the next invoice, and it blocks that invoice from issuing if it exceeds the period's earnings.</p>
       <div style={{overflowX:'auto',marginBottom:'0.75rem'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.78rem'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.8rem'}}>
           <thead><tr style={{background:C.lightBg}}>{['Date','Amount','Reason','Due','Status',''].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
           <tbody>
             {rows.length===0&&<tr><td style={{...td,color:C.slate}} colSpan={6}>No advances.</td></tr>}
@@ -461,7 +461,7 @@ td,th{padding:.5rem .6rem;border-bottom:1px solid #ddd} .tot{font-weight:700;fon
           </div>
         : <div style={{...card,margin:0,marginBottom:'0.85rem',border:`1px solid ${C.border}`}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.5rem'}}><strong>Draft invoice {invoiceNumber}</strong><span style={hint}>auto-calculated · due {dueDate}</span></div>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.82rem'}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.86rem'}}>
               <tbody>
                 <tr><td style={td}>Consulting — {fmtDays(d.days)} day(s) @ {fmtMoney(d.rate,cur)}</td><td style={{...td,textAlign:'right'}}>{fmtMoney(d.timeAmount,cur)}</td></tr>
                 {d.expApproved>0&&<tr><td style={td}>Approved expense reclaims</td><td style={{...td,textAlign:'right'}}>{fmtMoney(d.expApproved,cur)}</td></tr>}
@@ -480,7 +480,7 @@ td,th{padding:.5rem .6rem;border-bottom:1px solid #ddd} .tot{font-weight:700;fon
       {invoices.length>0&&<div>
         <div style={{...secH,fontSize:'0.9rem'}}>Invoice history</div>
         <div style={{overflowX:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.78rem'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.8rem'}}>
             <thead><tr style={{background:C.lightBg}}>{['Number','Period','Days','Net','Due','Status',''].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>{invoices.map((iv,i)=><tr key={iv.id} style={{background:i%2?C.white:C.cream}}>
               <td style={td}>{iv.invoice_number}</td><td style={td}>{iv.period}</td><td style={td}>{fmtDays(iv.days)}</td>
