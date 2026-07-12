@@ -172,19 +172,25 @@ const CANVAS_STAGE_LABEL: Record<string, string> = {
 }
 
 export interface CanvasDP { dp_id: string; status?: string | null }
-export interface CanvasProgress { doneCount: number; totalCount: number; currentLabel: string }
+export interface CanvasProgress { doneCount: number; totalCount: number; currentLabel: string; currentIndex: number }
 /**
  * doneCount/totalCount out of the client's REAL canvas_decision_points rows
  * (a client with no canvas rows yet -- e.g. not started, or a Clearview-only
  * client with no GtCV canvas at all -- correctly shows 0/0, never a fake 9).
  * currentLabel names the first not-done stage in the real recorded order.
+ * currentIndex is that stage's position in CANVAS_STAGE_ORDER (-1 if no
+ * canvas rows exist at all, CANVAS_STAGE_ORDER.length once complete) -- lets
+ * a caller compare progress ACROSS clients (e.g. furthest/nearest in a
+ * programme) without re-deriving the stage order itself.
  */
 export function canvasProgress(dps: CanvasDP[]): CanvasProgress {
   const byId = new Map(dps.map(d => [d.dp_id, d.status]))
   const present = CANVAS_STAGE_ORDER.filter(id => byId.has(id))
   const doneCount = present.filter(id => byId.get(id) === '✓').length
   const current = present.find(id => byId.get(id) !== '✓')
+  const currentIndex = present.length === 0 ? -1 : current ? CANVAS_STAGE_ORDER.indexOf(current) : CANVAS_STAGE_ORDER.length
   return {
+    currentIndex,
     doneCount,
     totalCount: present.length,
     currentLabel: present.length === 0 ? 'Not started' : current ? CANVAS_STAGE_LABEL[current] : 'Complete',
@@ -287,4 +293,48 @@ export function groupClientsByProgramme<C extends { programme_id?: string | null
   const result = Array.from(groups.values())
   if (independent.length > 0) result.push({ programme: null, clients: independent })
   return result
+}
+
+// ─── Programmes & Deals (pipeline funnel + real per-deal detail) ──────
+// "Owner" (who's chasing the deal) and "Do next" (a next-action narrative)
+// were checked against the schema before building the deal-funnel view and
+// DO NOT EXIST -- no owner field on programmes, no structured next-action
+// field anywhere. Neither is built here. "LSPs" (client count) and
+// "Likelihood" both map directly onto real fields already used elsewhere
+// (programme membership, deal_probability).
+const FUNNEL_STAGES = ['conversation', 'scoping', 'proposal', 'won'] as const
+export interface FunnelStage { stage: string; count: number; value: number; currency: string }
+export interface DealFunnel { stages: FunnelStage[]; conversionPct: number }
+/** conversionPct = won / (won + lost) -- of deals that reached a terminal outcome, the share that were won. 0 when nothing has closed yet, never NaN. */
+export function dealFunnel(programmes: DealProgramme[]): DealFunnel {
+  const cur = programmes.find(p => p.deal_currency)?.deal_currency || 'USD'
+  const stages = FUNNEL_STAGES.map(stage => {
+    const inStage = programmes.filter(p => (p.deal_stage || 'conversation') === stage)
+    return { stage, count: inStage.length, value: inStage.reduce((s, p) => s + (Number(p.deal_value) || 0), 0), currency: cur }
+  })
+  const won = programmes.filter(p => p.deal_stage === 'won').length
+  const lost = programmes.filter(p => p.deal_stage === 'lost').length
+  return { stages, conversionPct: won + lost > 0 ? won / (won + lost) : 0 }
+}
+
+/** Real count of engagement_clients under this programme -- the mockup's "LSPs" figure. */
+export function clientCountForProgramme(programmeId: string, clients: { programme_id?: string | null }[]): number {
+  return clients.filter(c => c.programme_id === programmeId).length
+}
+
+export interface CanvasSpread { furthestLabel: string; nearestLabel: string; startedCount: number }
+/**
+ * Across every client in a programme with at least one real canvas row,
+ * the furthest-along and least-along stage labels -- the mockup's
+ * "Furthest zone / Nearest zone" for a won deal. Clients with no canvas
+ * rows at all are excluded from the comparison (nothing to compare), and
+ * counted separately in startedCount so they're never silently folded in
+ * as "at zone 0".
+ */
+export function programmeCanvasSpread(progressList: CanvasProgress[]): CanvasSpread | null {
+  const started = progressList.filter(p => p.currentIndex >= 0)
+  if (started.length === 0) return null
+  const furthest = started.reduce((a, b) => (b.currentIndex > a.currentIndex ? b : a))
+  const nearest = started.reduce((a, b) => (b.currentIndex < a.currentIndex ? b : a))
+  return { furthestLabel: furthest.currentLabel, nearestLabel: nearest.currentLabel, startedCount: started.length }
 }

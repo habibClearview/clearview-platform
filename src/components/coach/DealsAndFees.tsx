@@ -16,8 +16,9 @@
 // Additive & self-contained: mounted as a new "Programmes & Deals" tab.
 // Existing Programmes/Client views are untouched.
 // ============================================================
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { dealFunnel, clientCountForProgramme, programmeCanvasSpread, canvasProgress, revenueStreams } from '@/lib/coach-business-metrics'
 
 const C = {
   navy:'var(--cv-navy)', cyan:'var(--cv-cyan)', cream:'var(--cv-cream)', white:'var(--cv-card)',
@@ -81,16 +82,39 @@ export default function DealsAndFees({programmes=[],setProgrammes,clients=[],set
 }
 
 // ─── DEALS PIPELINE ──────────────────────────────────────────
+const FUNNEL_STAGE_META={conversation:{label:'Conversation',color:C.slate},scoping:{label:'Scoping',color:C.cyan},proposal:{label:'Proposal in',color:C.amber},won:{label:'Won',color:C.green}}
 function DealsPipeline({programmes,setProgrammes,clients}){
   const [editId,setEditId]=useState(null)
   const [form,setForm]=useState(null)
   const [msg,setMsg]=useState(null)
+  // Real canvas progress for won-programme clients only -- "furthest/nearest
+  // zone" needs it; nothing else here does, so this stays a small, scoped
+  // fetch rather than loading every client's canvas up front.
+  const [canvasByClient,setCanvasByClient]=useState({})
+  useEffect(()=>{
+    let cancelled=false
+    const wonProgrammeIds=new Set(programmes.filter(p=>p.deal_stage==='won').map(p=>p.id))
+    const clientIds=clients.filter(c=>wonProgrammeIds.has(c.programme_id)).map(c=>c.id)
+    if(clientIds.length===0)return
+    supabase.from('canvas_decision_points').select('client_id,dp_id,status').in('client_id',clientIds)
+      .then(({data})=>{
+        if(cancelled)return
+        const grouped={}
+        ;(data||[]).forEach(d=>{(grouped[d.client_id]=grouped[d.client_id]||[]).push(d)})
+        setCanvasByClient(grouped)
+      })
+    return ()=>{cancelled=true}
+  },[programmes,clients])
 
   const cur=programmes.find(p=>p.deal_currency)?.deal_currency||'USD'
   const openDeals=programmes.filter(p=>OPEN_STAGES.includes(p.deal_stage))
   const openValue=openDeals.reduce((s,p)=>s+num(p.deal_value),0)
   const weighted=openDeals.reduce((s,p)=>s+num(p.deal_value)*num(p.deal_probability)/100,0)
   const wonValue=programmes.filter(p=>p.deal_stage==='won').reduce((s,p)=>s+num(p.deal_value),0)
+  const funnel=dealFunnel(programmes)
+  const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
+  const revStreams=revenueStreams(clients,programmesById)
+  const independentStreams=revStreams.streams.filter(s=>s.key!=='programme_advisory')
 
   function startEdit(p){setForm({deal_stage:p.deal_stage||'conversation',deal_value:p.deal_value??'',deal_probability:p.deal_probability??'',deal_currency:p.deal_currency||'USD',deal_expected_close:p.deal_expected_close||''});setEditId(p.id)}
   async function save(id){
@@ -110,12 +134,39 @@ function DealsPipeline({programmes,setProgrammes,clients}){
   return(
     <div>
       <p style={{...hint,marginBottom:'1rem'}}>The programme is the paying customer (the budget holder). Track each programme deal through the pipeline; weighted value = deal value × probability for open stages.</p>
+
+      <div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.6rem'}}>Pipeline · programme contracts</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'0.6rem',marginBottom:'1.25rem'}}>
+        {funnel.stages.map(s=>{
+          const meta=FUNNEL_STAGE_META[s.stage]
+          return(
+            <div key={s.stage} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:10,padding:'0.7rem 0.8rem',borderTop:`4px solid ${meta.color}`}}>
+              <div style={{fontFamily:'monospace',fontSize:'0.6rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>{meta.label}</div>
+              <div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,margin:'0.15rem 0',color:C.navy}}>{s.count}</div>
+              <div style={{fontFamily:'monospace',fontSize:'0.72rem',color:C.slate}}>{fmtMoney(s.value,s.currency)}</div>
+            </div>
+          )
+        })}
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:10,padding:'0.7rem 0.8rem',borderTop:`4px solid ${C.navy}`}}>
+          <div style={{fontFamily:'monospace',fontSize:'0.6rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Conversion</div>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,margin:'0.15rem 0',color:C.navy}}>{Math.round(funnel.conversionPct*100)}%</div>
+          <div style={{fontFamily:'monospace',fontSize:'0.72rem',color:C.slate}}>won / closed</div>
+        </div>
+      </div>
+
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:'0.85rem',marginBottom:'1.25rem'}}>
         <KPI label="Open pipeline" value={fmtMoney(openValue,cur)} sub={`${openDeals.length} open deal${openDeals.length!==1?'s':''}`}/>
         <KPI label="Weighted" value={fmtMoney(weighted,cur)} sub="value × probability" color={C.teal}/>
         <KPI label="Won" value={fmtMoney(wonValue,cur)} sub={`${programmes.filter(p=>p.deal_stage==='won').length} won`} color={C.green}/>
         <KPI label="Programmes" value={programmes.length} sub="total tracked" color={C.purple}/>
       </div>
+
+      {independentStreams.some(s=>s.value>0)&&(<>
+        <div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.6rem'}}>Independent revenue <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>· not programme deals -- self-paying clients, tracked here for the full revenue picture</span></div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'0.85rem',marginBottom:'1.25rem'}}>
+          {independentStreams.map(s=><KPI key={s.key} label={s.label} value={fmtMoney(s.value,cur)} sub={s.description} color={s.key==='clearview_subscriptions'?C.teal:C.purple}/>)}
+        </div>
+      </>)}
 
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'0.85rem',marginBottom:'1.25rem'}}>
         {DEAL_STAGES.map(stage=>{
@@ -128,17 +179,21 @@ function DealsPipeline({programmes,setProgrammes,clients}){
                 <span style={{fontSize:'0.72rem',color:C.slate}}>{inStage.length} · {fmtMoney(stageValue,cur)}</span>
               </div>
               {inStage.length===0&&<div style={{...hint,padding:'0.5rem 0'}}>—</div>}
-              {inStage.map(p=>(
+              {inStage.map(p=>{
+                const lsps=clientCountForProgramme(p.id,clients)
+                const spread=p.deal_stage==='won'?programmeCanvasSpread(clients.filter(c=>c.programme_id===p.id).map(c=>canvasProgress(canvasByClient[c.id]||[]))):null
+                return(
                 <div key={p.id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'0.6rem 0.7rem',marginBottom:'0.5rem',cursor:'pointer'}} onClick={()=>startEdit(p)}>
                   <div style={{fontWeight:600,fontSize:'0.86rem',color:C.navy}}>{p.name}</div>
-                  <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.15rem'}}>{p.funder||'—'}</div>
+                  <div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.15rem'}}>{p.funder||'—'}{lsps>0&&` · ${lsps} LSP${lsps===1?'':'s'}`}</div>
                   <div style={{display:'flex',justifyContent:'space-between',marginTop:'0.35rem',fontSize:'0.8rem'}}>
                     <span style={{fontWeight:600,color:C.navy}}>{p.deal_value?fmtMoney(p.deal_value,p.deal_currency||cur):'—'}</span>
                     {p.deal_probability!=null&&p.deal_probability!==''&&<span style={{color:C.slate}}>{num(p.deal_probability)}%</span>}
                   </div>
                   {p.deal_expected_close&&<div style={{fontSize:'0.72rem',color:C.slate,marginTop:'0.2rem'}}>close {p.deal_expected_close}</div>}
+                  {spread&&<div style={{fontSize:'0.72rem',color:C.teal,marginTop:'0.2rem'}}>Furthest {spread.furthestLabel} · Nearest {spread.nearestLabel}</div>}
                 </div>
-              ))}
+              )})}
             </div>
           )
         })}
