@@ -47,6 +47,13 @@ export interface LRSInputs {
   irr: number | null
   revenuePerHead: number
   assess: CoachAssessment
+  // Share (0..1) of mobile-money revenue confirmed against real payments by the
+  // reconciliation engine. OPTIONAL and additive: when undefined (no wallet
+  // linked, or reconciliation not yet run) the Visibility score is computed
+  // exactly as before. It can only ever LIFT the score -- a cash-only or
+  // unlinked business is never pushed down by the mere existence of
+  // verification. See docs/RECONCILIATION_SPEC.md §7.
+  verifiedValueShare?: number
 }
 
 export interface LRSDimensionScore {
@@ -122,22 +129,37 @@ export function computeMarketOpportunity(i: LRSInputs): LRSDimensionScore {
   }
 }
 
+// Points added to Visibility at full payment verification. An uplift, not an
+// averaged indicator, so it can only raise the score -- never dilute it.
+const VISIBILITY_VERIFICATION_UPLIFT = 15
+
 export function computeVisibility(i: LRSInputs): LRSDimensionScore {
   const digitallyCaptured = i.monthsOfActualData > 0 ? ramp(i.fieldAppMonths / i.monthsOfActualData, 0, 1) : 0
   const statementsComplete = i.monthsElapsed > 0 ? ramp(i.monthsOfActualData / i.monthsElapsed, 0, 1) : 0
   const recordsComplete = i.monthsElapsed > 0 ? ramp(i.monthsClosed / i.monthsElapsed, 0, 1) : 0
   const kpiReporting = qualitative(i.assess.kpiReporting)
   const historicalData = ramp(i.monthsOfActualData, 0, 12)
-  return {
-    score: average([digitallyCaptured, statementsComplete, recordsComplete, kpiReporting, historicalData]),
-    indicators: [
-      { label: 'Transactions Digitally Captured', value: digitallyCaptured, note: `${i.fieldAppMonths} of ${i.monthsOfActualData} actual months via Clearview Field` },
-      { label: 'Financial Statements Complete', value: statementsComplete, note: `${i.monthsOfActualData} of ${i.monthsElapsed} elapsed months have actuals` },
-      { label: 'Business Records Complete', value: recordsComplete, note: `${i.monthsClosed} of ${i.monthsElapsed} elapsed months formally closed` },
-      { label: 'KPI Reporting', value: kpiReporting, note: 'Business Profile input' },
-      { label: 'Historical Data Depth', value: historicalData, note: `${i.monthsOfActualData} months of actuals` },
-    ],
+  // Base is computed EXACTLY as before. Verification is stacked on top as a
+  // capped uplift, so with no reconciliation data (verifiedValueShare
+  // undefined) the score is byte-for-byte the previous behaviour, and a
+  // business can only be lifted by verification, never lowered.
+  const base = average([digitallyCaptured, statementsComplete, recordsComplete, kpiReporting, historicalData])
+  const verifiedShare = Math.max(0, Math.min(1, i.verifiedValueShare ?? 0))
+  const score = Math.min(100, base + VISIBILITY_VERIFICATION_UPLIFT * verifiedShare)
+  const indicators = [
+    { label: 'Transactions Digitally Captured', value: digitallyCaptured, note: `${i.fieldAppMonths} of ${i.monthsOfActualData} actual months via Clearview Field` },
+    { label: 'Financial Statements Complete', value: statementsComplete, note: `${i.monthsOfActualData} of ${i.monthsElapsed} elapsed months have actuals` },
+    { label: 'Business Records Complete', value: recordsComplete, note: `${i.monthsClosed} of ${i.monthsElapsed} elapsed months formally closed` },
+    { label: 'KPI Reporting', value: kpiReporting, note: 'Business Profile input' },
+    { label: 'Historical Data Depth', value: historicalData, note: `${i.monthsOfActualData} months of actuals` },
+  ]
+  // Only surfaced once reconciliation is configured for this client, so
+  // existing views are unchanged until verification is actually available.
+  if (i.verifiedValueShare !== undefined) {
+    const pct = Math.round(verifiedShare * 100)
+    indicators.push({ label: 'Payments Verified', value: pct, note: `${pct}% of mobile-money revenue confirmed against real payments` })
   }
+  return { score, indicators }
 }
 
 export function computeTrust(i: LRSInputs): LRSDimensionScore {
