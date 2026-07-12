@@ -13,6 +13,10 @@ import BuildStamp from '@/components/BuildStamp'
 import TeamPayments from '@/components/coach/TeamPayments'
 import DealsAndFees from '@/components/coach/DealsAndFees'
 import ReviewQueue from '@/components/coach/ReviewQueue'
+import {
+  engagementSplit, independentClients, feesReceivedInYear, outstandingInvoiced,
+  averageDaysToCollect, revenueStreams, dealCards,
+} from '@/lib/coach-business-metrics'
 
 // \u2500\u2500\u2500 DESIGN TOKENS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 const C = {
@@ -42,6 +46,50 @@ function Badge({text,color}){return<span style={{fontFamily:'monospace',fontSize
 function Spinner(){return<div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'3rem',color:C.slate,fontSize:'0.9rem'}}>Loading...</div>}
 // Donut score circle \u2014 reused for real scores that already exist in the data (e.g. the readiness self-assessment). No score is invented.
 function ScoreDonut({label,display,frac,rating,color}){const r=26,circ=2*Math.PI*r,f=Math.max(0,Math.min(1,frac||0));return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.15rem',borderLeft:`4px solid ${color}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)',display:'flex',alignItems:'center',gap:'0.9rem'}}><svg width="60" height="60" viewBox="0 0 62 62" style={{flexShrink:0}}><circle cx="31" cy="31" r={r} fill="none" style={{stroke:'var(--cv-border-soft)'}} strokeWidth="6"/><circle cx="31" cy="31" r={r} fill="none" style={{stroke:color}} strokeWidth="6" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ*(1-f)} transform="rotate(-90 31 31)"/></svg><div style={{minWidth:0}}><div style={{fontSize:'0.9rem',color:C.slate,marginBottom:'0.18rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,color:C.navy,lineHeight:1}}>{display}</div><div style={{fontSize:'0.86rem',fontWeight:700,color,marginTop:'0.22rem'}}>{rating}</div></div></div>)}
+
+// ─── "MY BUSINESS AT A GLANCE" (coach's own commercial numbers) ──────
+// Compact currency formatter matching the approved design ($182k, not
+// "USD 182,000") -- only ever formats real computed values, never invents one.
+function fmtGlance(n,cur){const sym=cur==='USD'?'$':(cur||'')+' ';const abs=Math.abs(n||0);if(abs>=1000)return`${n<0?'-':''}${sym}${(abs/1000).toFixed(abs>=10000?0:1).replace(/\.0$/,'')}k`;return`${sym}${Math.round(n||0)}`}
+function Kicker({children,style}){return<div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.75rem',...style}}>{children}</div>}
+function GlanceKPI({label,value,sub,color}){return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem',borderLeft:`4px solid ${color||C.navy}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)'}}><div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.4rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'0.86rem',color:C.slate,marginTop:'0.3rem'}}>{sub}</div>}</div>)}
+function GlanceBar({frac,color}){return<div style={{height:6,borderRadius:3,background:'var(--cv-track)',marginTop:'0.75rem',overflow:'hidden'}}><div style={{height:'100%',width:`${Math.round(Math.max(0,Math.min(1,frac||0))*100)}%`,background:color,borderRadius:3}}/></div>}
+function RevenueStreamCard({label,value,tag,barFrac,currency,color}){return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem',borderTop:`3px solid ${color}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>{fmtGlance(value,currency)}</div><Badge text={tag} color={color}/><GlanceBar frac={barFrac} color={color}/></div>)}
+const DEAL_STAGE_META={conversation:{label:'Early conversation',color:C.slate},scoping:{label:'Scoping',color:C.cyan},proposal:{label:'Proposal · deciding',color:C.amber},won:{label:'Won · in delivery',color:C.green},lost:{label:'Lost',color:C.red}}
+function DealPipelineCard({deal}){const meta=DEAL_STAGE_META[deal.stage]||{label:deal.stage,color:C.slate};return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem',borderTop:`3px solid ${meta.color}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>{deal.name}</div><div style={{fontSize:'0.8rem',color:C.slate,marginBottom:'0.5rem'}}>{deal.subtitle}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>{fmtGlance(deal.value,deal.currency)}</div><Badge text={meta.label} color={meta.color}/><GlanceBar frac={deal.barFrac} color={meta.color}/></div>)}
+function MyBusinessGlance({clients,programmes}){
+  const split=engagementSplit(clients)
+  const indep=independentClients(clients)
+  const feeCur=clients.find(c=>c.fee_currency)?.fee_currency||'USD'
+  const paidThisYear=feesReceivedInYear(clients,new Date().getFullYear())
+  const outstanding=outstandingInvoiced(clients)
+  const dso=averageDaysToCollect(clients)
+  const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
+  const rs=revenueStreams(clients,programmesById)
+  const deals=dealCards(programmes)
+  const streamColor={programme_advisory:C.navy,self_funded_gtcv:C.purple,clearview_subscriptions:C.teal}
+  return(
+    <div style={{marginBottom:'1.75rem'}}>
+      <Kicker>My business at a glance</Kicker>
+      <div className="cv-grid-4" style={{marginBottom:'1.5rem'}}>
+        <GlanceKPI label="Active Engagements" value={String(split.total)} sub={`${split.gtcv} GtCV · ${split.clearview} Clearview`} color={C.navy}/>
+        <GlanceKPI label="Fees Paid Up · This Year" value={fmtGlance(paidThisYear,feeCur)} sub="received & cleared" color={C.teal}/>
+        <GlanceKPI label="Invoiced · My Own DSO" value={fmtGlance(outstanding,feeCur)} sub={dso!=null?`avg ${Math.round(dso)} days to collect`:'no collections recorded yet'} color={C.amber}/>
+        <GlanceKPI label="Independent Clients" value={String(indep.count)} sub={`self-paying · ${Math.round(indep.revenueShare*100)}% of revenue`} color={C.purple}/>
+      </div>
+      <Kicker>Revenue streams <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; two of the three are independent &mdash; your own commercial base, growing off programme money</span></Kicker>
+      <div className="cv-grid-3" style={{marginBottom:'1.5rem'}}>
+        {rs.streams.map(s=><RevenueStreamCard key={s.key} label={s.label} value={s.value} tag={s.tag} barFrac={s.barFrac} currency={feeCur} color={streamColor[s.key]}/>)}
+      </div>
+      {deals.length>0&&(<>
+        <Kicker>Programme deals <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; who actually pays for the programme-funded stream</span></Kicker>
+        <div className="cv-grid-3">
+          {deals.map(d=><DealPipelineCard key={d.id} deal={d}/>)}
+        </div>
+      </>)}
+    </div>
+  )
+}
 
 // \u2500\u2500\u2500 SUPABASE HELPERS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 async function loadClients(){
@@ -404,14 +452,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           </div>
         )}
         {pending>0&&<div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontWeight:600,color:C.amber}}>\u23f3 {pending} timesheet{pending>1?'s':''} awaiting approval</span><button style={addBtn(true,C.amber)} onClick={()=>setView('team')}>Review \u2192</button></div>}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(165px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
-          <KPI label="Active Engagements" value={String(activeClients.length)}/>
-          <KPI label="Programmes" value={String(programmes.length)}/>
-          <KPI label="Clearview Live" value={String(clearviewLive.length)} color={C.teal}/>
-          <KPI label="Canvas Engagements" value={String(canvasClients.length)} color={C.purple}/>
-          <KPI label="Co-Implementers" value={String(coImplementers.length)}/>
-          <KPI label="Pending Approvals" value={String(pending)} color={pending>0?C.amber:C.navy}/>
-        </div>
+        <MyBusinessGlance clients={clients} programmes={programmes}/>
         {programmes.map(prog=>{
           const progClients=clients.filter(c=>c.programme_id===prog.id)
           return(

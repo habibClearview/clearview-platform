@@ -179,10 +179,18 @@ function EngagementFees({clients,setClients,programmes}){
 
   function startEdit(c){setForm({engagement_fee:c.engagement_fee??'',fee_currency:c.fee_currency||'USD',fee_status:c.fee_status||'unpaid'});setEditId(c.id)}
   async function save(id){
+    const existing=clients.find(c=>c.id===id)
+    const today=new Date().toISOString().slice(0,10)
     const patch={
       engagement_fee:form.engagement_fee===''?null:num(form.engagement_fee),
       fee_currency:form.fee_currency,
       fee_status:form.fee_status,
+      // Stamp the date the FIRST time a fee reaches invoiced/paid, so "My
+      // Business at a glance" (fees received this year, avg days to
+      // collect) can be computed honestly. A later status/amount edit never
+      // overwrites an already-recorded date.
+      ...(form.fee_status==='invoiced'&&!existing?.fee_invoiced_at?{fee_invoiced_at:today}:{}),
+      ...(form.fee_status==='paid'&&!existing?.fee_paid_at?{fee_paid_at:today}:{}),
     }
     const {error}=await supabase.from('engagement_clients').update({...patch,updated_at:new Date().toISOString()}).eq('id',id)
     if(error)return setMsg('Could not save fee: '+error.message)
