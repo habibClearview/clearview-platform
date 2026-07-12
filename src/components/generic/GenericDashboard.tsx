@@ -120,9 +120,9 @@ function KPI({label,value,sub,color}:{label:string;value:string;sub?:string;colo
   const accent = color || C.cyan
   return (
     <div style={{background:C.white,borderRadius:14,padding:'1.15rem 1.3rem 1.25rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}>
-      <div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.14em',color:C.slate,textTransform:'uppercase',marginBottom:'0.45rem'}}>{label}</div>
+      <div style={{fontFamily:'monospace',fontSize:'0.95rem',letterSpacing:'0.14em',color:C.slate,textTransform:'uppercase',marginBottom:'0.45rem'}}>{label}</div>
       <div style={{fontFamily:'Georgia,serif',fontSize:'1.75rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>
-      {sub&&<div style={{fontSize:'0.8rem',color:C.slate,marginTop:'0.32rem'}}>{sub}</div>}
+      {sub&&<div style={{fontSize:'0.86rem',color:C.slate,marginTop:'0.32rem'}}>{sub}</div>}
     </div>
   )
 }
@@ -2310,7 +2310,7 @@ function ApprovalsTab({clientId,config,cc,P}) {
       )}
       {isFM&&pendingFM.length>0&&(
         <div style={{...card,borderLeft:`4px solid ${C.amber}`}}>
-          <div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.amber,marginBottom:'0.9rem'}}>Pending FM Review ({pendingFM.length})</div>
+          <div style={{fontFamily:'monospace',fontSize:'0.95rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.amber,marginBottom:'0.9rem'}}>Pending FM Review ({pendingFM.length})</div>
           {pendingFM.map(r=>(
             <div key={r.id} style={{border:'1px solid var(--cv-border-soft)',borderRadius:12,padding:'1rem 1.1rem',marginBottom:'0.85rem',background:C.lightBg}}>
               {reqRow(r)}
@@ -2325,7 +2325,7 @@ function ApprovalsTab({clientId,config,cc,P}) {
       )}
       {(isCEO||delegatedApprover)&&pendingCEO.length>0&&(
         <div style={{...card,borderLeft:`4px solid ${C.cyan}`}}>
-          <div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.cyan,marginBottom:'0.9rem'}}>Awaiting CEO Approval ({pendingCEO.length})</div>
+          <div style={{fontFamily:'monospace',fontSize:'0.95rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.cyan,marginBottom:'0.9rem'}}>Awaiting CEO Approval ({pendingCEO.length})</div>
           {pendingCEO.map(r=>(
             <div key={r.id} style={{border:'1px solid var(--cv-border-soft)',borderRadius:12,padding:'1rem 1.1rem',marginBottom:'0.85rem',background:C.lightBg}}>
               {reqRow(r)}
@@ -3554,7 +3554,7 @@ function findCashWarningMonths(result:any, months:string[]) {
 // band in the approved mockups (".lab"). Optional right-aligned link.
 function SectionLabel({children,right}:{children:React.ReactNode;right?:React.ReactNode}) {
   return (
-    <div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.12em',textTransform:'uppercase',color:C.slate,margin:'1.4rem 0 0.7rem',display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:'0.75rem'}}>
+    <div style={{fontFamily:'monospace',fontSize:'1rem',letterSpacing:'0.12em',textTransform:'uppercase',color:C.slate,margin:'1.4rem 0 0.7rem',display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:'0.75rem'}}>
       <span>{children}</span>{right}
     </div>
   )
@@ -3615,9 +3615,9 @@ function RadarChart({axes,color}:{axes:{label:string;frac:number}[];color:string
 function ActionBanner({kicker,title,body,lift,cta,onCta,compact}:{kicker:string;title:string;body:string;lift?:string;cta:string;onCta?:()=>void;compact?:boolean}) {
   if (compact) return (
     <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-cyan-40)',borderTop:`3px solid ${C.cyan}`,borderRadius:14,boxShadow:'0 6px 20px var(--cv-shadow-2)',padding:'0.75rem 0.85rem',display:'flex',flexDirection:'column'}}>
-      <div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.teal,fontWeight:700,marginBottom:'0.3rem'}}>{kicker}</div>
-      <div style={{fontWeight:700,fontSize:'0.86rem',lineHeight:1.2,marginBottom:'0.25rem',color:C.navy}}>{title}</div>
-      <div style={{fontSize:'0.72rem',color:C.slate,lineHeight:1.35,flex:1}}>{body}</div>
+      <div style={{fontFamily:'monospace',fontSize:'0.95rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.teal,fontWeight:700,marginBottom:'0.3rem'}}>{kicker}</div>
+      <div style={{fontWeight:700,fontSize:'0.92rem',lineHeight:1.2,marginBottom:'0.25rem',color:C.navy}}>{title}</div>
+      <div style={{fontSize:'0.78rem',color:C.slate,lineHeight:1.35,flex:1}}>{body}</div>
       {lift&&<div style={{fontFamily:'monospace',fontSize:'0.72rem',color:C.green,fontWeight:700,marginTop:'0.3rem'}}>&#9650; {lift}</div>}
       <div onClick={onCta} role="button" tabIndex={0} style={{marginTop:'0.45rem',fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,color:C.navy,background:C.cyan,borderRadius:8,padding:'0.38rem 0.5rem',textAlign:'center',cursor:onCta?'pointer':'default'}}>{cta}</div>
     </div>
@@ -3625,7 +3625,7 @@ function ActionBanner({kicker,title,body,lift,cta,onCta,compact}:{kicker:string;
   return (
     <div style={{marginTop:'0.85rem',background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-cyan-40)',borderLeft:`4px solid ${C.cyan}`,borderRadius:14,padding:'0.85rem 1.1rem',display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap'}}>
       <div style={{flex:1,minWidth:200}}>
-        <div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.teal,fontWeight:700}}>{kicker}</div>
+        <div style={{fontFamily:'monospace',fontSize:'0.95rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.teal,fontWeight:700}}>{kicker}</div>
         <div style={{fontWeight:700,fontSize:'0.9rem',color:C.navy}}>{title}</div>
         <div style={{fontSize:'0.86rem',color:C.slate}}>{body}</div>
       </div>
@@ -4014,8 +4014,8 @@ Write a status report, not a letter. Do not address the reader. Do not open with
                   ['Staff cost % revenue', pct(m.staff_cost_pct), C.navy],
                 ] as [string,string,string][]).map(([l,v,col],i)=>(
                   <div key={i} style={{padding:'0.7rem 1.15rem',borderTop:'1px solid var(--cv-border-soft)',borderRight:i%2===0?'1px solid var(--cv-border-soft)':undefined}}>
-                    <div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate,marginBottom:'0.25rem'}}>{l}</div>
-                    <div style={{fontFamily:'monospace',fontWeight:700,fontSize:'1rem',color:col}}>{v}</div>
+                    <div style={{fontFamily:'monospace',fontSize:'0.95rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate,marginBottom:'0.25rem'}}>{l}</div>
+                    <div style={{fontFamily:'monospace',fontWeight:700,fontSize:'1.05rem',color:col}}>{v}</div>
                   </div>
                 ))}
               </div>
@@ -4586,22 +4586,22 @@ function WorkingCapitalTab({config,result,months,cc,P,onSave}) {
             <div style={ovLabel}>Payment behaviour · {scopeLabel}</div>
             <div className="cv-grid-3" style={{marginBottom:'1.35rem'}}>
               <div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)',borderLeft:`4px solid ${C.navy}`}}>
-                <div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.45rem'}}>Days to collect · DSO</div>
+                <div style={{fontFamily:'monospace',fontSize:'0.95rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.45rem'}}>Days to collect · DSO</div>
                 <div style={{display:'flex',alignItems:'center',gap:'0.8rem'}}>
                   <MiniDonut frac={ringFrac(dso)} color={C.amber} size={46} center=""/>
                   <div>
-                    <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy,lineHeight:1.05}}>{dso.toFixed(0)}d</div>
-                    <div style={{fontSize:'0.72rem',color:C.slate,fontFamily:'monospace'}}>{fmt(recOut,cc)} outstanding</div>
+                    <div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:C.navy,lineHeight:1.05}}>{dso.toFixed(0)}d</div>
+                    <div style={{fontSize:'0.78rem',color:C.slate,fontFamily:'monospace'}}>{fmt(recOut,cc)} outstanding</div>
                   </div>
                 </div>
               </div>
               <div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)',borderLeft:`4px solid ${C.navy}`}}>
-                <div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.45rem'}}>Days to pay · DPO</div>
+                <div style={{fontFamily:'monospace',fontSize:'0.95rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.45rem'}}>Days to pay · DPO</div>
                 <div style={{display:'flex',alignItems:'center',gap:'0.8rem'}}>
                   <MiniDonut frac={ringFrac(dpo)} color={C.teal} size={46} center=""/>
                   <div>
-                    <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy,lineHeight:1.05}}>{dpo.toFixed(0)}d</div>
-                    <div style={{fontSize:'0.72rem',color:C.slate,fontFamily:'monospace'}}>{fmt(payOut,cc)} outstanding</div>
+                    <div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:C.navy,lineHeight:1.05}}>{dpo.toFixed(0)}d</div>
+                    <div style={{fontSize:'0.78rem',color:C.slate,fontFamily:'monospace'}}>{fmt(payOut,cc)} outstanding</div>
                   </div>
                 </div>
               </div>
@@ -4896,8 +4896,8 @@ function PLVarianceView({ config, result, months, cc, view, selUnit, setSelUnit,
           const col = favColor(f)
           return (
             <div key={r.key} style={{background:C.white,borderRadius:14,padding:'1.1rem 1.25rem 1.2rem',borderTop:`3px solid ${col}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}>
-              <div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.13em',color:C.slate,textTransform:'uppercase',marginBottom:'0.4rem'}}>{r.label} vs plan</div>
-              <div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:C.navy,lineHeight:1.05}}>{r.actual===null?'—':valDisp(r.kind, actual)}</div>
+              <div style={{fontFamily:'monospace',fontSize:'0.95rem',letterSpacing:'0.13em',color:C.slate,textTransform:'uppercase',marginBottom:'0.4rem'}}>{r.label} vs plan</div>
+              <div style={{fontFamily:'Georgia,serif',fontSize:'1.6rem',fontWeight:700,color:C.navy,lineHeight:1.05}}>{r.actual===null?'—':valDisp(r.kind, actual)}</div>
               <div style={{fontSize:'0.8rem',marginTop:'0.35rem',color:col,fontWeight:600}}>
                 {r.actual===null?'no actual yet':`${signMoney(f)} · ${signPct(fp)}`}
               </div>
@@ -5775,9 +5775,9 @@ function InvestmentPitchDownload({clientId}:{clientId:string}) {
 function GlanceCard({label,value,desc,accent,valueColor,descColor}:{label:string;value:string;desc?:React.ReactNode;accent:string;valueColor?:string;descColor?:string}) {
   return (
     <div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)',borderLeft:`4px solid ${accent}`}}>
-      <div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.35rem'}}>{label}</div>
-      <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:valueColor||C.navy,lineHeight:1.1}}>{value}</div>
-      {desc&&<div style={{fontSize:'0.72rem',marginTop:'0.18rem',fontFamily:'monospace',color:descColor||C.slate,display:'flex',alignItems:'center',gap:'0.35rem'}}>{desc}</div>}
+      <div style={{fontFamily:'monospace',fontSize:'0.95rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.35rem'}}>{label}</div>
+      <div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:valueColor||C.navy,lineHeight:1.1}}>{value}</div>
+      {desc&&<div style={{fontSize:'0.78rem',marginTop:'0.18rem',fontFamily:'monospace',color:descColor||C.slate,display:'flex',alignItems:'center',gap:'0.35rem'}}>{desc}</div>}
     </div>
   )
 }
