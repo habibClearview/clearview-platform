@@ -55,16 +55,22 @@ const fmtMoney = (n,cur)=>`${cur||'USD'} ${num(n).toLocaleString(undefined,{maxi
 const fmtDays = (d)=> num(d).toLocaleString(undefined,{maximumFractionDigits:2})
 const today = ()=> new Date().toISOString().split('T')[0]
 function addDays(iso,days){const d=new Date(iso+'T00:00:00');d.setDate(d.getDate()+days);return d.toISOString().split('T')[0]}
-// Period label like 2026-07-W2 (ISO-ish week-of-month from a date)
+// Invoicing period label like 2026-07 (monthly). Timesheet/expense entries
+// keep their own real entry_date (still logged daily) -- this is only the
+// period they're grouped and invoiced under.
 function periodForDate(iso){
   const d=new Date(iso+'T00:00:00');const y=d.getFullYear();const m=String(d.getMonth()+1).padStart(2,'0')
-  const w=Math.floor((d.getDate()-1)/7)+1;return `${y}-${m}-W${w}`
+  return `${y}-${m}`
 }
 function currentPeriod(){return periodForDate(today())}
-// last N weekly periods, newest first
-function recentPeriods(n=8){
+function periodLabel(p){
+  const [y,m]=p.split('-')
+  return new Date(Number(y),Number(m)-1,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'})
+}
+// last N monthly periods, newest first
+function recentPeriods(n=12){
   const out=[];const d=new Date()
-  for(let i=0;i<n;i++){out.push(periodForDate(d.toISOString().split('T')[0]));d.setDate(d.getDate()-7)}
+  for(let i=0;i<n;i++){out.push(periodForDate(d.toISOString().split('T')[0]));d.setMonth(d.getMonth()-1)}
   return Array.from(new Set(out))
 }
 const EXPENSE_CATEGORIES=['travel','accommodation','comms','materials','other']
@@ -75,6 +81,38 @@ const EXPENSE_CATEGORIES=['travel','accommodation','comms','materials','other']
 // co-implementer to only their own folder. The bucket is private, so
 // viewing a receipt always goes through a short-lived signed URL --
 // never a permanent public link -- generated fresh on each click.
+// Last 6 months' portfolio totals -- what was actually issued, not a
+// recomputed draft (drafts are only meaningful for the current open
+// period; past periods should show what really went out).
+function PeriodTrend({invoices,entries}){
+  const periods=recentPeriods(6).slice().reverse()
+  return(
+    <div style={card}>
+      <div style={{...secH,fontSize:'1.16rem'}}>Monthly trend</div>
+      <div style={{overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
+          <thead><tr style={{background:C.lightBg}}>{['Month','Approved days','Invoices issued','Net invoiced'].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+          <tbody>
+            {periods.map(p=>{
+              const days=entries.filter(e=>e.period===p&&e.status==='approved').reduce((s,e)=>s+daysFromHours(e.hours),0)
+              const periodInvoices=invoices.filter(i=>i.period===p&&i.status!=='draft')
+              const netByCurrency={}
+              periodInvoices.forEach(i=>{netByCurrency[i.currency||'USD']=(netByCurrency[i.currency||'USD']||0)+num(i.net_amount)})
+              const netStr=Object.entries(netByCurrency).map(([cur,amt])=>fmtMoney(amt,cur)).join(', ')||'—'
+              return(<tr key={p}>
+                <td style={td}>{periodLabel(p)}</td>
+                <td style={td}>{fmtDays(days)}</td>
+                <td style={td}>{periodInvoices.length}</td>
+                <td style={td}>{netStr}</td>
+              </tr>)
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 function ReceiptUpload({coImplementerId,path,onUploaded}){
   const [busy,setBusy]=useState(false)
   const [err,setErr]=useState(null)
@@ -226,18 +264,20 @@ export default function TeamPayments({coImplementers=[],setCoImplementers,client
         <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
           <label style={{...lbl,marginBottom:0}}>Period</label>
           <select style={{...inp,width:'auto'}} value={period} onChange={e=>setPeriod(e.target.value)}>
-            {Array.from(new Set([period,...recentPeriods(12)])).map(p=><option key={p} value={p}>{p}</option>)}
+            {Array.from(new Set([period,...recentPeriods(12)])).map(p=><option key={p} value={p}>{periodLabel(p)}</option>)}
           </select>
         </div>
       </div>
       <p style={{...hint,marginBottom:'1rem'}}>Co-implementers are paid by the day but log hours per task. The platform rolls hours into days ({HOURS_PER_DAY}h = 1 day) at the person's day rate, adds approved expenses, nets off any advance taken, and auto-drafts one invoice per co-implementer per period. An unreconciled advance blocks the next invoice from issuing.</p>
 
       {canApprove&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'0.85rem',marginBottom:'1.25rem'}}>
-        <KPI label="Approved days" value={fmtDays(approvedDaysAll)} sub={`${period}`}/>
+        <KPI label="Approved days" value={fmtDays(approvedDaysAll)} sub={periodLabel(period)}/>
         <KPI label="Draft invoices (net)" value={draftNetAll?fmtMoney(draftNetAll,curOf(coImplementers[0])):'—'} sub="across team, this period" color={C.teal}/>
         <KPI label="Open advances" value={openAdvancesAll.length} sub={openAdvancesAll.length?'blocking invoices':'none outstanding'} color={openAdvancesAll.length?C.amber:C.green}/>
-        <KPI label="Invoices issued" value={issuedThisPeriod.length} sub={`${period}`} color={C.purple}/>
+        <KPI label="Invoices issued" value={issuedThisPeriod.length} sub={periodLabel(period)} color={C.purple}/>
       </div>}
+
+      {canApprove&&<PeriodTrend invoices={invoices} entries={entries}/>}
 
       {canApprove&&accessMsg&&<div style={{fontSize:'1.01rem',color:C.slate,marginBottom:'0.6rem'}}>{accessMsg}</div>}
       {canApprove&&<AccessSection coImplementers={coImplementers} setCoImplementers={setCoImplementers} clients={clients} setMsg={setAccessMsg}/>}
@@ -367,7 +407,7 @@ function TimesheetSection({ci,period,userName,assignedClients,clientName,entries
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
           <thead><tr style={{background:C.lightBg}}>{['Date','Client','Task','Hours','Days','Status',canApprove?'':null].filter(h=>h!==null).map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
           <tbody>
-            {rows.length===0&&<tr><td style={{...td,color:C.slate}} colSpan={7}>No timesheet entries for {period}.</td></tr>}
+            {rows.length===0&&<tr><td style={{...td,color:C.slate}} colSpan={7}>No timesheet entries for {periodLabel(period)}.</td></tr>}
             {rows.map((e,i)=><tr key={e.id} style={{background:i%2?C.white:C.cream}}>
               <td style={td}>{e.entry_date}</td>
               <td style={td}>{clientName(e.client_id)}</td>
@@ -419,7 +459,7 @@ function ExpenseSection({ci,period,userName,assignedClients,clientName,expenses,
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
           <thead><tr style={{background:C.lightBg}}>{['Date','Client','Description','Category','Amount','Receipt','Status',canApprove?'':null].filter(h=>h!==null).map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
           <tbody>
-            {rows.length===0&&<tr><td style={{...td,color:C.slate}} colSpan={8}>No expenses for {period}.</td></tr>}
+            {rows.length===0&&<tr><td style={{...td,color:C.slate}} colSpan={8}>No expenses for {periodLabel(period)}.</td></tr>}
             {rows.map((x,i)=><tr key={x.id} style={{background:i%2?C.white:C.cream}}>
               <td style={td}>{x.expense_date}</td>
               <td style={td}>{clientName(x.client_id)}</td>
