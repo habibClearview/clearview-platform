@@ -63,7 +63,7 @@ Complete reference for every metric, score, and computed value in the ClearView 
 | 49 | Annual P&L / Annual Cash Flow / Year-End Balance Sheet | Fully built | [§49](#49-annual-pl--annual-cash-flow--year-end-balance-sheet) |
 | 50 | Calendar-Year Close Eligibility | Fully built | [§50](#50-calendar-year-close-eligibility) |
 | 51 | Automatic COGS from Catalogue Sale (Clearview Field) | Fully built | [§51](#51-automatic-cogs-from-catalogue-sale-clearview-field) |
-| 52 | Capital Absorption Capacity | **Not built** | [§52](#52-not-built-capital-absorption-capacity) |
+| 52 | Fund Absorption Capacity | **Not built** | [§52](#52-not-built-fund-absorption-capacity) |
 | 53 | Seasonal Cash Position Projection | **Not built** (distinct from seasonal *debt repayment*, §17) | [§53](#53-not-built-seasonal-cash-position-projection) |
 
 ---
@@ -1292,9 +1292,9 @@ books_closed:           monthClosedOnTime === true
 
 ---
 
-## 52. NOT BUILT: Capital Absorption Capacity
+## 52. NOT BUILT: Fund Absorption Capacity
 
-No implementation of a metric by this name (or anything semantically equivalent — how much additional capital a business could productively deploy) exists anywhere in the scoped codebase. Confirmed by repository-wide search (`Capital Absorption`, `CapitalAbsorption`, `capital_absorption` — zero matches). If this is wanted, it would need to be scoped and designed from scratch; no partial implementation to build on.
+No implementation of a metric by this name (or anything semantically equivalent — how much additional capital a business could productively deploy) exists anywhere in the scoped codebase. Confirmed by repository-wide search (`Fund Absorption`, `FundAbsorption`, `fund_absorption` — zero matches). If this is wanted, it would need to be scoped and designed from scratch; no partial implementation to build on.
 
 ---
 

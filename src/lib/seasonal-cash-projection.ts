@@ -5,7 +5,7 @@
 // is; as more closed actuals accumulate over time, the projection gets
 // more accurate on its own.
 //
-// This directly feeds Capital Absorption Capacity's credit-capacity
+// This directly feeds Fund Absorption Capacity's credit-capacity
 // calculation (the 4-week delayed-repayment stress scenario here is a
 // required input there) -- build/verify this first.
 //
@@ -58,7 +58,7 @@ export interface SeasonalProjectionResult {
   troughMonthOffset: number | null   // 1-12: months ahead of currentMonthIndex
   troughValue: number | null
   stressClose_2wk: number[]          // delayed repayment, 14 days
-  stressClose_4wk: number[]          // delayed repayment, 28 days -- feeds §CAC credit capacity
+  stressClose_4wk: number[]          // delayed repayment, 28 days -- feeds §FAC credit capacity
   stressClose_inputRise: number[]    // input costs +15%
   dataConfidence: DataConfidence
 }

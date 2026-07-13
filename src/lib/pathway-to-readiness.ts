@@ -13,7 +13,7 @@
 // real historical points, or a flat/declining trend, it says so plainly
 // instead of manufacturing a number -- the same "insufficient data, not
 // a fabricated positive story" discipline used throughout
-// seasonal-cash-projection.ts and capital-absorption-capacity.ts.
+// seasonal-cash-projection.ts and fund-absorption-capacity.ts.
 
 import type { LRSResult } from './liquidity-readiness'
 

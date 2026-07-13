@@ -5,7 +5,7 @@ import {
   type ClientSnapshot,
 } from '../lib/portfolio-intelligence'
 import type { LRSResult } from '../lib/liquidity-readiness'
-import type { CACTypeResult, CACResult } from '../lib/capital-absorption-capacity'
+import type { FACTypeResult, FACResult } from '../lib/fund-absorption-capacity'
 
 function makeLRS(scores: Partial<Record<keyof LRSResult['dimensions'], number>> = {}): LRSResult {
   const dims = ['marketOpportunity', 'visibility', 'trust', 'profitability', 'capacity', 'resilience', 'compliance'] as const
@@ -14,16 +14,16 @@ function makeLRS(scores: Partial<Record<keyof LRSResult['dimensions'], number>> 
   return { score, dimensions }
 }
 
-function makeCACType(capacity: number | null): CACTypeResult {
+function makeFACType(capacity: number | null): FACTypeResult {
   return { capacity, low: capacity, high: capacity, reason: capacity === null ? 'unavailable' : null, conditions: [] }
 }
-function makeCAC(overrides: Partial<Record<keyof CACResult, number | null>> = {}): CACResult {
+function makeFAC(overrides: Partial<Record<keyof FACResult, number | null>> = {}): FACResult {
   return {
-    credit: makeCACType(overrides.credit as number ?? 100),
-    grant: makeCACType(overrides.grant as number ?? 200),
-    equity: makeCACType(overrides.equity as number ?? 300),
-    consignment: makeCACType((overrides.consignment as number) ?? null),
-    recoverableGrant: makeCACType(overrides.recoverableGrant as number ?? 150),
+    credit: makeFACType(overrides.credit as number ?? 100),
+    grant: makeFACType(overrides.grant as number ?? 200),
+    equity: makeFACType(overrides.equity as number ?? 300),
+    consignment: makeFACType((overrides.consignment as number) ?? null),
+    recoverableGrant: makeFACType(overrides.recoverableGrant as number ?? 150),
     dataConfidence: 'reliable',
     repayableFractionUsed: 0.5,
     repayableFractionWasDefaulted: true,
@@ -34,7 +34,7 @@ function makeSnapshot(overrides: Partial<ClientSnapshot> = {}): ClientSnapshot {
   return {
     clientId: 'c1', name: 'Test Co', sector: 'agribusiness', country: 'Uganda', programmeId: null,
     irScore: 20, irTier: 'Near Ready',
-    lrs: makeLRS(), confidenceScore: 60, confidenceBadges: [], cac: makeCAC(),
+    lrs: makeLRS(), confidenceScore: 60, confidenceBadges: [], fac: makeFAC(),
     currency: 'UGX', annualRevenue: 500_000, businessUnits: [], consentToBeNamed: false,
     ...overrides,
   }
@@ -118,43 +118,43 @@ describe('computePortfolioOverview', () => {
     expect(r.verificationDistribution.find(b => b.label === '80-100')!.count).toBe(1)
   })
 
-  it('REG: current capital absorption averages exclude nulls rather than treating them as zero', () => {
+  it('REG: current fund absorption averages exclude nulls rather than treating them as zero', () => {
     // Two businesses: one has a consignment figure, one has none (no input
     // shop unit) -- the average should be based on the one real figure,
     // not (figure + 0) / 2.
     const snaps = [
-      makeSnapshot({ cac: makeCAC({ consignment: 400 }) }),
-      makeSnapshot({ cac: makeCAC({ consignment: null }) }),
+      makeSnapshot({ fac: makeFAC({ consignment: 400 }) }),
+      makeSnapshot({ fac: makeFAC({ consignment: null }) }),
     ]
     const r = computePortfolioOverview(snaps)
-    expect(r.currentCapitalAbsorption['UGX'].consignment).toBe(400)
+    expect(r.currentFundAbsorption['UGX'].consignment).toBe(400)
   })
 
   it('REG: a capital type where every business is null reports null, not zero', () => {
-    const snaps = [makeSnapshot({ cac: makeCAC({ consignment: null }) })]
+    const snaps = [makeSnapshot({ fac: makeFAC({ consignment: null }) })]
     const r = computePortfolioOverview(snaps)
-    expect(r.currentCapitalAbsorption['UGX'].consignment).toBeNull()
+    expect(r.currentFundAbsorption['UGX'].consignment).toBeNull()
   })
 
-  it('REG: clients in different currencies produce separate per-currency capital absorption summaries, never a blended average', () => {
+  it('REG: clients in different currencies produce separate per-currency fund absorption summaries, never a blended average', () => {
     // A UGX client with credit capacity in the tens of millions and a USD
     // client with credit capacity in the thousands -- averaging these
     // directly would produce a meaningless blended figure. Each currency
     // must get its own summary computed only from its own snapshots.
     const snaps = [
-      makeSnapshot({ currency: 'UGX', cac: makeCAC({ credit: 40_000_000, consignment: 5_000_000 }) }),
-      makeSnapshot({ currency: 'UGX', cac: makeCAC({ credit: 60_000_000, consignment: null }) }),
-      makeSnapshot({ currency: 'USD', cac: makeCAC({ credit: 10_000 }) }),
+      makeSnapshot({ currency: 'UGX', fac: makeFAC({ credit: 40_000_000, consignment: 5_000_000 }) }),
+      makeSnapshot({ currency: 'UGX', fac: makeFAC({ credit: 60_000_000, consignment: null }) }),
+      makeSnapshot({ currency: 'USD', fac: makeFAC({ credit: 10_000 }) }),
     ]
     const r = computePortfolioOverview(snaps)
-    expect(Object.keys(r.currentCapitalAbsorption).sort()).toEqual(['UGX', 'USD'])
-    expect(r.currentCapitalAbsorption['UGX'].credit).toBeCloseTo(50_000_000, 6)
-    expect(r.currentCapitalAbsorption['UGX'].consignment).toBe(5_000_000)
-    expect(r.currentCapitalAbsorption['USD'].credit).toBe(10_000)
+    expect(Object.keys(r.currentFundAbsorption).sort()).toEqual(['UGX', 'USD'])
+    expect(r.currentFundAbsorption['UGX'].credit).toBeCloseTo(50_000_000, 6)
+    expect(r.currentFundAbsorption['UGX'].consignment).toBe(5_000_000)
+    expect(r.currentFundAbsorption['USD'].credit).toBe(10_000)
     // Sanity check that the old blended-average bug is gone: a naive
     // average across all three snapshots would land far below either
     // currency's true per-currency average.
-    expect(r.currentCapitalAbsorption['UGX'].credit).not.toBeCloseTo((40_000_000 + 60_000_000 + 10_000) / 3, 0)
+    expect(r.currentFundAbsorption['UGX'].credit).not.toBeCloseTo((40_000_000 + 60_000_000 + 10_000) / 3, 0)
   })
 
   it('REG: non-monetary aggregates (avgIRScore, mostCommonWeakDimension) are computed across ALL snapshots regardless of currency, not currency-scoped', () => {
