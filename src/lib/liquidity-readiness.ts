@@ -302,9 +302,33 @@ export function computeFitScore(result: LRSResult, weights: FitScoreWeights): nu
   return weightedSum / totalWeight
 }
 
+// Each preset's weights are a re-weighting of the SAME seven LRS dimensions
+// bank/investor already use -- no new inputs, no new scoring logic. Every
+// preset below sums to exactly 1.00 (verified in liquidity-readiness.test.ts).
+// Like bank/investor, these are reasonable starting assumptions about what
+// each capital type's provider cares about most, not empirically validated
+// against real lender/investor behaviour -- present them to a user with the
+// same "starting point, not a claim of precision" framing bank/investor
+// already get.
 export const FIT_SCORE_PRESETS: Record<string, { label: string; weights: FitScoreWeights }> = {
   bank: { label: 'Bank Fit', weights: { marketOpportunity: 0.15, visibility: 0.20, trust: 0.25, profitability: 0.20, capacity: 0.10, resilience: 0.05, compliance: 0.05 } },
   investor: { label: 'Investor Fit', weights: { marketOpportunity: 0.30, visibility: 0.10, trust: 0.15, profitability: 0.15, capacity: 0.15, resilience: 0.05, compliance: 0.10 } },
+  // Grant donors weight verification/visibility and governance-adjacent
+  // compliance heavily (accountability for non-repayable funds), less on
+  // profitability (a grant isn't expecting a financial return).
+  grant: { label: 'Grant Fit', weights: { marketOpportunity: 0.25, visibility: 0.20, trust: 0.20, profitability: 0.10, capacity: 0.15, resilience: 0.05, compliance: 0.05 } },
+  // Equity investors weight market opportunity and profitability most
+  // heavily (they're buying a share of future growth), and capacity more
+  // than a bank would (can the business actually scale to use the capital).
+  equity: { label: 'Equity Fit', weights: { marketOpportunity: 0.35, visibility: 0.10, trust: 0.10, profitability: 0.20, capacity: 0.15, resilience: 0.05, compliance: 0.05 } },
+  // Consignment stock depends most on trust (a supplier is extending goods
+  // with no upfront payment) and market opportunity (will it actually sell
+  // through), more than a bank would weight either.
+  consignment: { label: 'Consignment Fit', weights: { marketOpportunity: 0.30, visibility: 0.10, trust: 0.25, profitability: 0.15, capacity: 0.10, resilience: 0.05, compliance: 0.05 } },
+  // Recoverable (blended) grant sits between grant and bank -- part of it
+  // must be repaid, so it inherits some of bank's trust/visibility weight
+  // alongside grant's compliance emphasis.
+  recoverable: { label: 'Recoverable Grant Fit', weights: { marketOpportunity: 0.20, visibility: 0.20, trust: 0.20, profitability: 0.15, capacity: 0.15, resilience: 0.05, compliance: 0.05 } },
 }
 
 // ── Time series, for the collapsible year/month presentation ────

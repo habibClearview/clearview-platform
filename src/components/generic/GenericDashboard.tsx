@@ -4264,21 +4264,27 @@ Write a status report, not a letter. Do not address the reader. Do not open with
               <h2 style={{fontFamily:'Georgia,serif',fontSize:'1.32rem',margin:'0 0 0.4rem',color:C.navy}}>Liquidity Readiness Score</h2>
               <p style={{fontSize:'1.06rem',color:C.slate,lineHeight:1.5,margin:0}}>
                 How ready this business is for productive liquidity to flow into it, as one core score across seven weighted
-                dimensions. Bank Fit and Investor Fit are the same seven dimensions weighted for each lens; the underlying data never changes.
+                dimensions. Every Fit score below (Bank, Investor, Grant, Equity, Consignment, Recoverable Grant) is the same
+                seven dimensions re-weighted for what that specific capital provider cares about most; the underlying data never changes.
               </p>
             </div>
             <InvestmentPitchDownload clientId={clientId}/>
 
             <SectionLabel>Score &amp; fit</SectionLabel>
             {(() => {
-              const bankFit = computeFitScore(lrsCurrent, FIT_SCORE_PRESETS.bank.weights)
-              const investorFit = computeFitScore(lrsCurrent, FIT_SCORE_PRESETS.investor.weights)
               const lrsWord = lrsCurrent.score>=70?'Strong':lrsCurrent.score>=50?'Building':lrsCurrent.score>=30?'Developing':'Early'
+              // Every entry in FIT_SCORE_PRESETS renders here automatically --
+              // adding a new capital-type fit score never needs a UI change,
+              // only a new preset in liquidity-readiness.ts.
+              const fits = Object.entries(FIT_SCORE_PRESETS).map(([key,preset])=>({
+                key, label: preset.label, score: computeFitScore(lrsCurrent, preset.weights),
+              }))
               return (
                 <div className="cv-grid-3">
                   <ScoreDonut label="Liquidity Readiness" display={`${Math.round(lrsCurrent.score)}/100`} frac={lrsCurrent.score/100} rating={lrsWord} color={scoreColor(lrsCurrent.score)}/>
-                  <ScoreDonut label="Bank Fit" display={`${Math.round(bankFit)}/100`} frac={bankFit/100} rating="Re-weighted" color={scoreColor(bankFit)}/>
-                  <ScoreDonut label="Investor Fit" display={`${Math.round(investorFit)}/100`} frac={investorFit/100} rating="Re-weighted" color={scoreColor(investorFit)}/>
+                  {fits.map(f=>(
+                    <ScoreDonut key={f.key} label={f.label} display={`${Math.round(f.score)}/100`} frac={f.score/100} rating="Re-weighted" color={scoreColor(f.score)}/>
+                  ))}
                 </div>
               )
             })()}
