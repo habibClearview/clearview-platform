@@ -1021,7 +1021,53 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   }
 
   // \u2500\u2500 HEADER + SHELL \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-  const mainNavTabs=[['overview','My Business'],['health','Client Health'],['clients','Clients'],['programmes','Programmes'],['deals','Programmes & Deals'],['team','Team'],['payments','Team & Payments'],['review','Review Queue']]
+  // Previously 4 separate top-level entries covered the same ground as
+  // 3 others under confusingly similar names (Clients/Client Health,
+  // Programmes/Programmes & Deals, Team/Team & Payments) with no
+  // cross-linking between them. Each pair covers genuinely different
+  // ground (roster vs. status, record-editing vs. pipeline stage,
+  // roster+legacy canvas timesheet approvals vs. the day-rate payments
+  // loop) so nothing here is deleted -- they're folded into one tab
+  // each with an internal toggle, which is what a coach actually wants:
+  // one place to go for "clients", not three.
+  function ClientsHub(){
+    const [sub,setSub]=useState('health')
+    return(
+      <div>
+        <div style={{display:'flex',gap:'0.4rem',marginBottom:'1.25rem'}}>
+          <button style={subPill(sub==='health')} onClick={()=>setSub('health')}>Health overview</button>
+          <button style={subPill(sub==='roster')} onClick={()=>setSub('roster')}>All clients</button>
+        </div>
+        {sub==='health'?<ClientHealthTab clients={clients} programmes={programmes}/>:<ClientsView/>}
+      </div>
+    )
+  }
+  function ProgrammesHub(){
+    const [sub,setSub]=useState('pipeline')
+    return(
+      <div>
+        <div style={{display:'flex',gap:'0.4rem',marginBottom:'1.25rem'}}>
+          <button style={subPill(sub==='pipeline')} onClick={()=>setSub('pipeline')}>Pipeline &amp; fees</button>
+          <button style={subPill(sub==='directory')} onClick={()=>setSub('directory')}>All programmes</button>
+        </div>
+        {sub==='pipeline'?<DealsAndFees programmes={programmes} setProgrammes={setPrograms} clients={clients} setClients={setClients}/>:<ProgrammesView/>}
+      </div>
+    )
+  }
+  function TeamHub(){
+    const [sub,setSub]=useState('roster')
+    return(
+      <div>
+        <div style={{display:'flex',gap:'0.4rem',marginBottom:'1.25rem'}}>
+          <button style={subPill(sub==='roster')} onClick={()=>setSub('roster')}>Roster &amp; approvals</button>
+          <button style={subPill(sub==='payments')} onClick={()=>setSub('payments')}>Payments</button>
+        </div>
+        {sub==='roster'?<TeamView/>:<TeamPayments coImplementers={coImplementers} setCoImplementers={setCoImplementers} clients={clients} userName={userName}/>}
+      </div>
+    )
+  }
+
+  const mainNavTabs=[['overview','My Business'],['clients','Clients'],['programmes','Programmes'],['team','Team'],['review','Review Queue']]
   return(
     <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif",background:C.cream,color:C.navy,minHeight:'100vh'}}>
       <BuildStamp/>
@@ -1045,13 +1091,10 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       </nav>
       <main style={{maxWidth:1600,margin:'0 auto',padding:'1.5rem'}}>
         {view==='overview'&&<OverviewTab/>}
-        {view==='clients'&&<ClientsView/>}
+        {view==='clients'&&<ClientsHub/>}
         {view==='client'&&<ClientDetailView/>}
-        {view==='programmes'&&<ProgrammesView/>}
-        {view==='team'&&<TeamView/>}
-        {view==='payments'&&<TeamPayments coImplementers={coImplementers} setCoImplementers={setCoImplementers} clients={clients} userName={userName}/>}
-        {view==='deals'&&<DealsAndFees programmes={programmes} setProgrammes={setPrograms} clients={clients} setClients={setClients}/>}
-        {view==='health'&&<ClientHealthTab clients={clients} programmes={programmes}/>}
+        {view==='programmes'&&<ProgrammesHub/>}
+        {view==='team'&&<TeamHub/>}
         {view==='review'&&<ReviewQueue clients={clients}/>}
       </main>
       <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.93rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach \u00b7 Coach Dashboard \u00b7 habibonifade.com \u00b7 Confidential</footer>
