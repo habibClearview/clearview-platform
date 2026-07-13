@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { grantStatus, isGrantActive, generateAccessToken, expiryFromDays, GRANT_TYPE_LABELS } from '../lib/access-grants'
+import { grantStatus, isGrantActive, generateAccessToken, expiryFromDays, GRANT_TYPE_LABELS, GRANT_SCOPE_LABELS, emailSatisfiesGrant, requiresEmailConfirmation } from '../lib/access-grants'
 
 const NOW = '2026-07-13T12:00:00.000Z'
 
@@ -66,5 +66,42 @@ describe('GRANT_TYPE_LABELS', () => {
     expect(GRANT_TYPE_LABELS.programme_officer).toBeTruthy()
     expect(GRANT_TYPE_LABELS.subscriber).toBeTruthy()
     expect(GRANT_TYPE_LABELS.other).toBeTruthy()
+  })
+})
+
+describe('GRANT_SCOPE_LABELS', () => {
+  it('REG: every scope has a plain-English label', () => {
+    expect(GRANT_SCOPE_LABELS.client).toBeTruthy()
+    expect(GRANT_SCOPE_LABELS.portfolio).toBeTruthy()
+    expect(GRANT_SCOPE_LABELS.segment).toBeTruthy()
+  })
+})
+
+describe('emailSatisfiesGrant', () => {
+  it('REG: a grant with no grantee_email has no gate -- any submitted email satisfies it', () => {
+    expect(emailSatisfiesGrant({ grantee_email: null }, 'anyone@example.com')).toBe(true)
+  })
+
+  it('REG: an exact match satisfies the gate', () => {
+    expect(emailSatisfiesGrant({ grantee_email: 'investor@fund.com' }, 'investor@fund.com')).toBe(true)
+  })
+
+  it('REG: a case difference still satisfies the gate', () => {
+    expect(emailSatisfiesGrant({ grantee_email: 'Investor@Fund.com' }, 'investor@fund.com')).toBe(true)
+  })
+
+  it('REG: surrounding whitespace on the submitted email is ignored', () => {
+    expect(emailSatisfiesGrant({ grantee_email: 'investor@fund.com' }, '  investor@fund.com  ')).toBe(true)
+  })
+
+  it('REG: a genuinely different email does not satisfy the gate', () => {
+    expect(emailSatisfiesGrant({ grantee_email: 'investor@fund.com' }, 'someone-else@fund.com')).toBe(false)
+  })
+})
+
+describe('requiresEmailConfirmation', () => {
+  it('REG: true only when the coach actually set a grantee_email', () => {
+    expect(requiresEmailConfirmation({ grantee_email: 'investor@fund.com' })).toBe(true)
+    expect(requiresEmailConfirmation({ grantee_email: null })).toBe(false)
   })
 })
