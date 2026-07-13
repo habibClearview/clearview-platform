@@ -605,6 +605,7 @@ function CopyIntakeLink({client}){
 export default function CoachDashboard({onSignOut,userRole='super_coach',userName='Habib Onifade',coImplementerId=null,funderProgrammeId=null}){
   const isSuperCoach=userRole==='super_coach'
   const isFunder=userRole==='funder'
+  const isCoImplementer=userRole==='coach'
   // Both non-super_coach roles land here through the exact same data path
   // (loadClients/loadProgrammes/loadCoImplementers -- unfiltered queries
   // that RLS scopes down automatically), reusing the same Clients/
@@ -1136,6 +1137,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // clients under their programme).
   const mainNavTabs=isSuperCoach
     ?[['overview','My Business'],['clients','Clients'],['programmes','Programmes'],['team','Team'],['review','Review Queue']]
+    :isCoImplementer
+    ?[['clients','Clients'],['mypayments','My Timesheet & Expenses']]
     :[['clients','Clients']]
   const roleBadgeLabel=isSuperCoach?'Super Coach':isFunder?'Funder':'Co-Implementer'
   return(
@@ -1165,6 +1168,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         {view==='client'&&<ClientDetailView/>}
         {view==='programmes'&&<ProgrammesHub/>}
         {view==='team'&&<TeamHub/>}
+        {view==='mypayments'&&<TeamPayments coImplementers={coImplementers} setCoImplementers={setCoImplementers} clients={clients} userName={userName} canApprove={false}/>}
         {view==='review'&&<ReviewQueue clients={clients}/>}
       </main>
       <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.93rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach \u00b7 Coach Dashboard \u00b7 habibonifade.com \u00b7 Confidential</footer>
