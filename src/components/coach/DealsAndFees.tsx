@@ -81,12 +81,43 @@ export default function DealsAndFees({programmes=[],setProgrammes,clients=[],set
   )
 }
 
+// New programme, reachable directly from the deals pipeline -- previously
+// only creatable from the separate Programmes tab, so a coach opening
+// Programmes & Deals to start tracking a fresh deal had nowhere to add it.
+function NewProgrammeForm({onSave,onCancel}){
+  const [f,setF]=useState({name:'',type:'donor_programme',funder:'',country:'Uganda',start_date:'',end_date:'',notes:'',client_ids:[],co_implementer_ids:[],funder_email:'',funder_invited:false})
+  return(
+    <div style={{...card,border:`1px solid ${C.cyan}`,marginBottom:'1.25rem'}}>
+      <div style={secH}>New Programme</div>
+      <div style={fGrid}>
+        <div><label style={lbl}>Name *</label><input style={inp} value={f.name} onChange={e=>setF(x=>({...x,name:e.target.value}))}/></div>
+        <div><label style={lbl}>Type</label><select style={inp} value={f.type} onChange={e=>setF(x=>({...x,type:e.target.value}))}><option value="donor_programme">Donor Programme</option><option value="direct_client">Direct Client</option><option value="blended">Blended</option></select></div>
+        <div><label style={lbl}>Funder *</label><input style={inp} value={f.funder} onChange={e=>setF(x=>({...x,funder:e.target.value}))}/></div>
+        <div><label style={lbl}>Country</label><input style={inp} value={f.country} onChange={e=>setF(x=>({...x,country:e.target.value}))}/></div>
+        <div><label style={lbl}>Start Date</label><input type="date" style={inp} value={f.start_date} onChange={e=>setF(x=>({...x,start_date:e.target.value}))}/></div>
+        <div><label style={lbl}>End Date</label><input type="date" style={inp} value={f.end_date} onChange={e=>setF(x=>({...x,end_date:e.target.value}))}/></div>
+      </div>
+      <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
+        <button style={solidBtn()} onClick={()=>{if(!f.name||!f.funder)return;onSave({...f,id:`prog_${Date.now()}`})}}>Create Programme</button>
+        <button style={{...addBtn(),borderColor:C.border,color:C.slate}} onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
 // ─── DEALS PIPELINE ──────────────────────────────────────────
 const FUNNEL_STAGE_META={conversation:{label:'Conversation',color:C.slate},scoping:{label:'Scoping',color:C.cyan},proposal:{label:'Proposal in',color:C.amber},won:{label:'Won',color:C.green}}
 function DealsPipeline({programmes,setProgrammes,clients}){
   const [editId,setEditId]=useState(null)
   const [form,setForm]=useState(null)
   const [msg,setMsg]=useState(null)
+  const [showNew,setShowNew]=useState(false)
+  async function createProgramme(p){
+    const {data,error}=await supabase.from('programmes').insert([p]).select().single()
+    if(error)return setMsg('Could not create programme: '+error.message)
+    setProgrammes&&setProgrammes(prev=>[...prev,data])
+    setShowNew(false)
+  }
   // Real canvas progress for won-programme clients only -- "furthest/nearest
   // zone" needs it; nothing else here does, so this stays a small, scoped
   // fetch rather than loading every client's canvas up front.
@@ -133,7 +164,11 @@ function DealsPipeline({programmes,setProgrammes,clients}){
 
   return(
     <div>
-      <p style={{...hint,marginBottom:'1rem'}}>The programme is the paying customer (the budget holder). Track each programme deal through the pipeline; weighted value = deal value × probability for open stages.</p>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'1rem',marginBottom:'1rem'}}>
+        <p style={{...hint,margin:0}}>The programme is the paying customer (the budget holder). Track each programme deal through the pipeline; weighted value = deal value × probability for open stages.</p>
+        <button style={{...addBtn(),whiteSpace:'nowrap'}} onClick={()=>setShowNew(!showNew)}>+ New Programme</button>
+      </div>
+      {showNew&&<NewProgrammeForm onSave={createProgramme} onCancel={()=>setShowNew(false)}/>}
 
       <div style={{fontFamily:'monospace',fontSize:'0.93rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.6rem'}}>Pipeline · programme contracts</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'0.6rem',marginBottom:'1.25rem'}}>

@@ -138,7 +138,15 @@ function ClientHealthTab({clients,programmes}){
   // the label just didn't say so.
   const [hasActuals,setHasActuals]=useState(new Set())
   const [loading,setLoading]=useState(true)
-  const financialClients=clients.filter(c=>c.engagement_mode==='financial'&&c.clearview_active)
+  // NOT gated on clearview_active -- that flag only tracks whether the CEO
+  // portal link has been switched on in the coach's own UI (see the "Open
+  // Clearview" link elsewhere in this file). It has no editing UI once a
+  // client is created, and real generic_actuals/ai_health_checks data is
+  // routinely recorded well before (or without) that flag ever being set.
+  // Gating on it here excluded clients who plainly had real data on file --
+  // exactly what was reported. engagement_mode alone is the honest signal
+  // for "this is a financial-model client".
+  const financialClients=clients.filter(c=>c.engagement_mode==='financial')
   const canvasClients=clients.filter(c=>c.engagement_mode==='canvas')
 
   useEffect(()=>{
@@ -444,7 +452,7 @@ function DeleteClientConfirm({client,onCancel,onDeleted}){
 function ClearviewHealthSummary({clients}){
   const [summaries,setSummaries]=useState({})
   const [loading,setLoading]=useState(true)
-  const financialClients = clients.filter(c=>c.engagement_mode==='financial'&&c.clearview_active)
+  const financialClients = clients.filter(c=>c.engagement_mode==='financial')
 
   useEffect(()=>{
     if(financialClients.length===0){setLoading(false);return}
