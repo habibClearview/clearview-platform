@@ -195,12 +195,25 @@ function ClientHealthTab({clients,programmes}){
   })
   const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
   const groups=groupClientsByProgramme(clients,programmesById)
+  // Active/paused/completed -- who's actually engaged right now, distinct
+  // from health status (a paused client can still show green from its last
+  // check). This matters most to a funder, whose whole login is scoped to
+  // one programme's clients and who otherwise has no way to tell which of
+  // the entities they're paying for are still active versus stalled.
+  const activeCount=clients.filter(c=>c.status!=='complete'&&c.status!=='paused').length
+  const pausedCount=clients.filter(c=>c.status==='paused').length
+  const completedCount=clients.filter(c=>c.status==='complete').length
 
   return(
     <div>
       <Kicker>Portfolio at a glance</Kicker>
       <div className="cv-grid-4" style={{marginBottom:'1.5rem'}}>
         <GlanceKPI label="Portfolio Clients" value={String(clients.length)} sub={`${canvasClients.length} GtCV · ${financialClients.length} Clearview`} color={C.navy}/>
+        <GlanceKPI label="Active" value={String(activeCount)} sub="currently engaged" color={C.green}/>
+        <GlanceKPI label="Paused" value={String(pausedCount)} sub={pausedCount>0?'not currently responsive':'none paused'} color={pausedCount>0?C.red:C.slate}/>
+        <GlanceKPI label="Completed" value={String(completedCount)} sub="engagement closed" color={C.teal}/>
+      </div>
+      <div className="cv-grid-4" style={{marginBottom:'1.5rem'}}>
         <GlanceKPI label="Need Attention" value={String(counts.needsAttention)} sub="flagged red this period" color={C.red}/>
         <GlanceKPI label="Watch" value={String(counts.watch)} sub="flagged amber this period" color={C.amber}/>
         <GlanceKPI label="Healthy" value={String(counts.healthy)} sub="green health check" color={C.green}/>
@@ -240,10 +253,13 @@ function ClientHealthTab({clients,programmes}){
               const status=isCanvas?null:displayStatus(c)
               const accent=isCanvas?C.purple:(status?HEALTH_COLOR[status.label]:C.slate)
               return(
-                <div key={c.id} style={{border:'1px solid var(--cv-border-soft)',borderTop:`4px solid ${accent}`,borderRadius:13,padding:'1rem 1.05rem',cursor:'pointer',background:C.white}} onClick={()=>window.open(`/dashboard/${c.slug}`,'_blank')}>
+                <div key={c.id} style={{border:'1px solid var(--cv-border-soft)',borderTop:`4px solid ${c.status==='paused'?C.red:accent}`,borderRadius:13,padding:'1rem 1.05rem',cursor:'pointer',background:C.white}} onClick={()=>window.open(`/dashboard/${c.slug}`,'_blank')}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'0.5rem'}}>
                     <div style={{fontWeight:700,fontSize:'1.02rem'}}>{c.name}</div>
-                    <span style={{fontFamily:'monospace',fontSize:'0.79rem',fontWeight:700,borderRadius:4,padding:'0.08rem 0.38rem',color:isCanvas?C.purple:C.teal,border:`1px solid ${isCanvas?C.purple:C.teal}`,flexShrink:0}}>{isCanvas?'GtCV':'Clearview'}</span>
+                    <div style={{display:'flex',gap:'0.3rem',flexShrink:0}}>
+                      {c.status==='paused'&&<Badge text="Paused" color={C.red}/>}
+                      <span style={{fontFamily:'monospace',fontSize:'0.79rem',fontWeight:700,borderRadius:4,padding:'0.08rem 0.38rem',color:isCanvas?C.purple:C.teal,border:`1px solid ${isCanvas?C.purple:C.teal}`}}>{isCanvas?'GtCV':'Clearview'}</span>
+                    </div>
                   </div>
                   {isCanvas?(
                     <div style={{fontFamily:'monospace',fontSize:'0.99rem',color:C.slate,marginTop:'0.6rem'}}>{prog.totalCount>0?`${prog.doneCount}/${prog.totalCount} · ${prog.currentLabel}`:'No canvas yet'}</div>
@@ -634,6 +650,21 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   const [clientData,setClientData]=useState({})
   const [clientLoading,setClientLoading]=useState(false)
   const [activeTab,setActiveTab]=useState('cover')
+  // Lifted up from the tab components below rather than kept as their own
+  // useState: those (ClientsHub/ClientsView/ProgrammesHub/TeamHub) are
+  // defined as nested functions inside this component's own render body,
+  // so React sees a "new" component on every render of CoachDashboard
+  // (e.g. every time setClients/setCoImplementers/etc. fires anywhere in
+  // this tree) and silently remounts them, wiping any state that lived
+  // inside them -- which is exactly why a filter selection (e.g. "Paused")
+  // or the Health/All-clients toggle could reset on their own. Keeping
+  // this state up here, where CoachDashboard itself never remounts, fixes
+  // that without a full rewrite of every nested view into a top-level
+  // component.
+  const [clientsFilter,setClientsFilter]=useState('all')
+  const [clientsSub,setClientsSub]=useState('health')
+  const [programmesSub,setProgrammesSub]=useState('pipeline')
+  const [teamSub,setTeamSub]=useState('roster')
 
   // Load all top-level data on mount
   useEffect(()=>{
@@ -682,6 +713,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 
   const pending=timesheets.filter(t=>t.status==='submitted').length
   const activeClients=clients.filter(c=>c.status!=='complete'&&c.status!=='paused')
+  const pausedClients=clients.filter(c=>c.status==='paused')
   const clearviewLive=clients.filter(c=>c.clearview_active)
   const canvasClients=clients.filter(c=>c.engagement_mode==='canvas')
 
@@ -762,7 +794,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 
   // \u2500\u2500 CLIENT LIST \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   function ClientsView(){
-    const [filter,setFilter]=useState('all')
+    const filter=clientsFilter, setFilter=setClientsFilter
     const [showNew,setShowNew]=useState(false)
     const [showUpload,setShowUpload]=useState(false)
     const [refreshing,setRefreshing]=useState(false)
@@ -1100,7 +1132,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // each with an internal toggle, which is what a coach actually wants:
   // one place to go for "clients", not three.
   function ClientsHub(){
-    const [sub,setSub]=useState('health')
+    const sub=clientsSub, setSub=setClientsSub
     return(
       <div>
         <div style={{display:'flex',gap:'0.4rem',marginBottom:'1.25rem'}}>
@@ -1112,7 +1144,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     )
   }
   function ProgrammesHub(){
-    const [sub,setSub]=useState('pipeline')
+    const sub=programmesSub, setSub=setProgrammesSub
     return(
       <div>
         <div style={{display:'flex',gap:'0.4rem',marginBottom:'1.25rem'}}>
@@ -1124,7 +1156,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     )
   }
   function TeamHub(){
-    const [sub,setSub]=useState('roster')
+    const sub=teamSub, setSub=setTeamSub
     return(
       <div>
         <div style={{display:'flex',gap:'0.4rem',marginBottom:'1.25rem'}}>
@@ -1155,7 +1187,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           <div>
             <div style={{fontFamily:'monospace',fontSize:'0.93rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>CANVAS COACH \u2014 COACH DASHBOARD</div>
             <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0.1rem 0 0.15rem'}}>{userName}</h1>
-            <div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{activeClients.length} active \u00b7 {programmes.length} programme{programmes.length!==1?'s':''} \u00b7 {clearviewLive.length} Clearview live \u00b7 {canvasClients.length} canvas engagement{canvasClients.length!==1?'s':''}{pending>0&&<span style={{marginLeft:8,color:C.amber}}>\u00b7 \u23f3 {pending} pending</span>}</div>
+            <div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{activeClients.length} active \u00b7 {programmes.length} programme{programmes.length!==1?'s':''} \u00b7 {clearviewLive.length} Clearview live \u00b7 {canvasClients.length} canvas engagement{canvasClients.length!==1?'s':''}{pausedClients.length>0&&<span style={{marginLeft:8,color:C.red}}>\u00b7 {pausedClients.length} paused</span>}{pending>0&&<span style={{marginLeft:8,color:C.amber}}>\u00b7 \u23f3 {pending} pending</span>}</div>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}>
             <span style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem'}}>{roleBadgeLabel}</span>
