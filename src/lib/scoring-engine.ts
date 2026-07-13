@@ -366,6 +366,12 @@ export interface ScoringInputs {
   cashClose: number[]  // monthly closing cash balance
   totalEquity: number  // latest period total equity
   totalLiabilities: number // latest period total liabilities
+  // Monthly consolidated operating costs (staff + direct opex + shared) --
+  // OPTIONAL. Scales the Going Concern liquidity check to the business's own
+  // spend rate instead of a fixed currency amount (see gcLiquidityFactor).
+  // When absent, that check falls back to treating any negative cash as the
+  // worst band, rather than reintroducing a currency-blind constant.
+  opex?: number[]
   months: number
   debtObligations?: DebtObligation[]   // supports multiple: bank loans, non-bank facilities, etc
   tradeCreditLines?: TradeCreditLine[] // supports multiple: supplier credit, partner/customer credit
@@ -448,6 +454,7 @@ export function computeScores(inputs: ScoringInputs): ScoringResult {
   const { rev, ebitda, cashClose, totalEquity, totalLiabilities, months, assess } = inputs
   const m = months || rev.length
   const cogs = inputs.cogs || rev.map(() => 0)
+  const opex = inputs.opex
 
   // Supports multiple debt obligations (bank loans, non-bank facilities, etc) --
   // each contributes its own interest/principal schedule, summed together.
@@ -528,7 +535,19 @@ export function computeScores(inputs: ScoringInputs): ScoringResult {
   const gcDebtServiceFactor = !hasDebt ? 4
     : dscrMin === null ? 3 // debt exists but nothing due yet (grace period) -- treat as adequate, not scored as if failing
     : dscrMin >= 1.5 ? 4 : dscrMin >= 1.0 ? 3 : dscrMin >= 0.5 ? 2 : 1
-  const gcLiquidityFactor = minCash >= 0 ? 4 : minCash > -10000000 ? 1 : 0
+  // Scaled to the business's OWN average monthly spend, not a fixed
+  // currency amount -- a hardcoded threshold (formerly -10,000,000, in
+  // whatever currency the client happens to use) treated a UGX business,
+  // where that figure is a small, normal amount, identically to a USD or
+  // GBP business, where it's enormous -- silently under- or over-flagging
+  // depending purely on currency. A cash deficit smaller than one month's
+  // typical running cost is treated as "adequate, watch it"; larger (or
+  // opex data entirely unavailable, so there's nothing to scale against)
+  // is treated as the worst band.
+  const avgMonthlyOpex = opex && opex.length > 0 ? opex.reduce((a, b) => a + b, 0) / opex.length : 0
+  const gcLiquidityFactor = minCash >= 0 ? 4
+    : avgMonthlyOpex > 0 && minCash > -avgMonthlyOpex ? 1
+    : 0
   const gcProfitabilityFactor = annualEbitda > 0 ? 3 : 2
   const gcManagementFactor = assessOrDefault(assess.managementCapability)
   const gcScore = Math.min(20,
@@ -588,6 +607,7 @@ export interface ScoredPeriod {
 
 export interface ScoresTimeSeriesInputs {
   rev: number[]; ebitda: number[]; cogs: number[]; cashClose: number[]
+  opex?: number[]                   // see ScoringInputs.opex -- scales the Going Concern liquidity check
   totalEquityByMonth: number[]      // Balance Sheet total_equity, one entry per month
   totalLiabilitiesByMonth: number[] // Balance Sheet total_liabilities, one entry per month
   debtObligations?: DebtObligation[]
@@ -606,6 +626,7 @@ function scoreForRange(
     ebitda: pick(inputs.ebitda),
     cogs: pick(inputs.cogs),
     cashClose: pick(inputs.cashClose),
+    opex: inputs.opex ? pick(inputs.opex) : undefined,
     // Point-in-time balances, taken at the LAST month of the range --
     // matching how Balance Sheet itself collapses a year (endOfPeriod
     // aggregation in generic-engine.ts), never summed across the range.

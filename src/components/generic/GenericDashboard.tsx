@@ -3776,6 +3776,7 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,clo
   const monthLabelsFull = buildMonthLabels(config.start_date, config.planning_months)
   const scoreSeries = computeScoresTimeSeries({
     rev: result.con.rev, ebitda: result.con.ebitda, cogs: result.con.cogs, cashClose: result.cf.close,
+    opex: result.con.opex,
     totalEquityByMonth: result.bs.total_equity, totalLiabilitiesByMonth: result.bs.total_liabilities,
     debtObligations: bankLoanObligation,
     tradeCreditLines: config.settings.trade_credit_lines || [],
@@ -3966,6 +3967,24 @@ Write a status report, not a letter. Do not address the reader. Do not open with
         const monthsWithActuals = periodIsActual.filter(Boolean).length
         const monthsClosed = monthsClosedFlags.filter(Boolean).length
         const fieldDataMonths = monthsWithFieldAppFlags.filter(Boolean).length
+        // Real declared revenue/COGS to date -- summed only over months that
+        // actually have actuals (periodIsActual), never projected future
+        // months. This was previously never passed at all (declaredValue
+        // silently defaulted to 0), which meant "Verified" could never be
+        // reached regardless of how many payments actually matched, since
+        // matched/0 is always read as 0% verified.
+        const declaredValue = result.con.rev.reduce((s:number,_v:number,i:number)=>
+          s + (periodIsActual[i] ? (result.con.act_rev[i] ?? 0) : 0), 0)
+        const declaredCogs = result.con.cogs.reduce((s:number,_v:number,i:number)=>
+          s + (periodIsActual[i] ? (result.con.act_cogs[i] ?? 0) : 0), 0)
+        // COGS/stock triangulation (RECONCILIATION_SPEC.md §5): both
+        // revenue and COGS were genuinely recorded, and COGS doesn't
+        // exceed revenue -- a believable gross margin, corroborating a
+        // self-reported period without a payment match. A real signal,
+        // though simplified: not yet cross-checked against Clearview
+        // Field's stock-drawdown data, which would be a stronger
+        // corroboration if wired in later.
+        const cogsConsistent = declaredValue > 0 && declaredCogs >= 0 && declaredCogs <= declaredValue
         return (
         <div>
           <SectionLabel>Verification &amp; Recognition</SectionLabel>
@@ -3975,6 +3994,8 @@ Write a status report, not a letter. Do not address the reader. Do not open with
             monthsWithActuals={monthsWithActuals}
             monthsClosed={monthsClosed}
             fieldDataMonths={fieldDataMonths}
+            declaredValue={declaredValue}
+            cogsConsistent={cogsConsistent}
           />
           {/* Resolving an unattributed payment requires knowing what the
               real sale was for -- only this client's own team (whoever

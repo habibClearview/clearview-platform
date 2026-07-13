@@ -613,6 +613,43 @@ describe('Going Concern sub-indicator fields, exposed for the per-indicator tren
   })
 })
 
+describe('Going Concern liquidity factor scales to the business\'s own spend rate, not a fixed currency amount', () => {
+  it('REG: the same -8,000,000 cash deficit scores differently for a small-spend vs a large-spend business', () => {
+    // A business whose typical month costs 10,000,000 -- an 8,000,000
+    // deficit is LESS than one month's spend, so it's the "adequate,
+    // watch it" band.
+    const smallSpend = computeScores({
+      ...baseScoringInputs(), cashClose: Array(MONTHS).fill(-8_000_000),
+      opex: Array(MONTHS).fill(10_000_000), debtObligations: [],
+    })
+    expect(smallSpend.gcLiquidityFactor).toBe(1)
+    // A business whose typical month costs only 2,000,000 -- the SAME
+    // -8,000,000 deficit is four months of spend, clearly the worst band.
+    // Under the old hardcoded -10,000,000 threshold both cases would have
+    // scored identically (1), regardless of how large that deficit really
+    // was relative to either business.
+    const largeSpend = computeScores({
+      ...baseScoringInputs(), cashClose: Array(MONTHS).fill(-8_000_000),
+      opex: Array(MONTHS).fill(2_000_000), debtObligations: [],
+    })
+    expect(largeSpend.gcLiquidityFactor).toBe(0)
+  })
+
+  it('REG: with no opex data at all, any negative cash falls to the worst band rather than reintroducing a currency-blind constant', () => {
+    const result = computeScores({
+      ...baseScoringInputs(), cashClose: Array(MONTHS).fill(-1_000_000), debtObligations: [],
+    })
+    expect(result.gcLiquidityFactor).toBe(0)
+  })
+
+  it('REG: non-negative cash always scores 4, regardless of opex', () => {
+    const withOpex = computeScores({ ...baseScoringInputs(), cashClose: Array(MONTHS).fill(0), opex: Array(MONTHS).fill(5_000_000), debtObligations: [] })
+    const withoutOpex = computeScores({ ...baseScoringInputs(), cashClose: Array(MONTHS).fill(0), debtObligations: [] })
+    expect(withOpex.gcLiquidityFactor).toBe(4)
+    expect(withoutOpex.gcLiquidityFactor).toBe(4)
+  })
+})
+
 describe('Coach assessment fallback correctly preserves a genuine 0 rating', () => {
   it('REG: a coach who deliberately rates management capability at 0 (the worst case) sees gcManagementFactor as 0, not silently defaulted to 2', () => {
     const result = computeScores({
