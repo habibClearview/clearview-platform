@@ -3578,7 +3578,7 @@ function findCashWarningMonths(result:any, months:string[]) {
 // band in the approved mockups (".lab"). Optional right-aligned link.
 function SectionLabel({children,right}:{children:React.ReactNode;right?:React.ReactNode}) {
   return (
-    <div style={{fontFamily:'monospace',fontSize:'1rem',letterSpacing:'0.12em',textTransform:'uppercase',color:C.slate,margin:'1.4rem 0 0.7rem',display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:'0.75rem'}}>
+    <div style={{fontFamily:'monospace',fontSize:'1rem',letterSpacing:'0.12em',textTransform:'uppercase',color:C.slate,margin:'2rem 0 0.9rem',display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:'0.75rem'}}>
       <span>{children}</span>{right}
     </div>
   )
@@ -3761,86 +3761,111 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,clo
   // -- previously constructed twice (once for debtSched, once for the
   // score time series below), byte-for-byte identical but at real risk
   // of silently drifting apart if one were ever edited without the other.
-  const bankLoanObligation = config.settings.capital_structure?.bank_loan > 0 ? [{
+  // Memoized on the primitive capital-structure fields it actually reads
+  // (not on config.settings.capital_structure itself, which is a fresh
+  // object reference every render) so debtSched and the big score/LRS
+  // memo below don't invalidate on every keystroke elsewhere on the page.
+  const bankLoanObligation = useMemo(() => config.settings.capital_structure?.bank_loan > 0 ? [{
     drawdownMonth:1, annualRate:config.settings.capital_structure?.annual_interest_rate||0.18,
     tenorMonths:(config.settings.capital_structure?.loan_tenor_years||2)*12,
     gracePeriodMonths:0, principal:config.settings.capital_structure?.bank_loan, repaymentType:'amortising',
-  }] : []
-  const debtSched = buildDebtSchedule(bankLoanObligation, months_n)
+  }] : [], [
+    config.settings.capital_structure?.bank_loan,
+    config.settings.capital_structure?.annual_interest_rate,
+    config.settings.capital_structure?.loan_tenor_years,
+  ])
+  const debtSched = useMemo(() => buildDebtSchedule(bankLoanObligation, months_n), [bankLoanObligation, months_n])
 
   // Score trend, for the collapsible year/month presentation of Credit
-  // Risk / Going Concern / Investment Readiness -- computed once here,
-  // shared by all three ScoreTrendCard instances below. Works whether
-  // this client has any live actuals yet or not, since it only draws on
-  // whatever the engine has already produced for every month.
-  const yearGroups = buildYearGroups(config.start_date, config.planning_months)
-  const monthLabelsFull = buildMonthLabels(config.start_date, config.planning_months)
-  const scoreSeries = computeScoresTimeSeries({
-    rev: result.con.rev, ebitda: result.con.ebitda, cogs: result.con.cogs, cashClose: result.cf.close,
-    opex: result.con.opex,
-    totalEquityByMonth: result.bs.total_equity, totalLiabilitiesByMonth: result.bs.total_liabilities,
-    debtObligations: bankLoanObligation,
-    tradeCreditLines: config.settings.trade_credit_lines || [],
-    assess,
-  }, yearGroups, monthLabelsFull)
-  const monthsByYearLabel: Record<string, typeof scoreSeries.monthsByYear[number]> = {}
-  yearGroups.forEach(g => { monthsByYearLabel[g.label] = scoreSeries.monthsByYear[g.year] })
+  // Risk / Going Concern / Investment Readiness, PLUS the Liquidity
+  // Readiness Score time series and Pathway to Readiness -- all share the
+  // same yearGroups/monthLabelsFull and were previously recomputed on
+  // EVERY render regardless of what changed (each one runs a full
+  // month-by-month scoring pass across the whole plan, up to 24 months).
+  // That's the main cause of the sluggishness on this page: any
+  // unrelated state change anywhere in this ~5800-line component
+  // re-ran all of this. Memoized as one block so it only recomputes when
+  // something it actually depends on changes.
+  const {
+    yearGroups, monthLabelsFull, scoreSeries, monthsByYearLabel,
+    periodIsActual, capitalAtRisk, lrsCashFlows, lrsAnnualIrr,
+    lrsSeries, lrsMonthsByYearLabel, lrsCurrent, lrsDimensionHistory, pathwayOpportunities,
+  } = useMemo(() => {
+    const yearGroups = buildYearGroups(config.start_date, config.planning_months)
+    const monthLabelsFull = buildMonthLabels(config.start_date, config.planning_months)
+    const scoreSeries = computeScoresTimeSeries({
+      rev: result.con.rev, ebitda: result.con.ebitda, cogs: result.con.cogs, cashClose: result.cf.close,
+      opex: result.con.opex,
+      totalEquityByMonth: result.bs.total_equity, totalLiabilitiesByMonth: result.bs.total_liabilities,
+      debtObligations: bankLoanObligation,
+      tradeCreditLines: config.settings.trade_credit_lines || [],
+      assess,
+    }, yearGroups, monthLabelsFull)
+    const monthsByYearLabel: Record<string, typeof scoreSeries.monthsByYear[number]> = {}
+    yearGroups.forEach(g => { monthsByYearLabel[g.label] = scoreSeries.monthsByYear[g.year] })
 
-  // Liquidity Readiness Score time series -- same year/month structure
-  // as scoreSeries above, sharing yearGroups/monthLabelsFull.
-  const periodIsActual: boolean[] = result.con.act_ebitda.map((v:number|null) => v !== null)
-  const monthsClosedFlags: boolean[] = months.map((_:string, i:number) =>
-    closedPeriods?.has(periodForMonthIndex(config.start_date, i)) ?? false
-  )
-  const monthsWithFieldAppFlags: boolean[] = months.map((_:string, i:number) =>
-    fieldAppPeriods.has(periodForMonthIndex(config.start_date, i))
-  )
-  const capitalStructure = config.settings.capital_structure
-  const capitalAtRisk = (capitalStructure?.shareholder_contribution||0) + (capitalStructure?.grant_recoverable||0)
-  const lrsCashFlows = buildInvestmentCashFlows(capitalAtRisk, result.cf.op_cash, result.cf.inv_cash)
-  const lrsMonthlyIrr = computeIRR(lrsCashFlows)
-  const lrsAnnualIrr = lrsMonthlyIrr !== null ? monthlyRateToAnnualRate(lrsMonthlyIrr) : null
-  const lrsCustomerGrowth = computeCustomerGrowthSummary(events)
-  const lrsSeries = computeLRSTimeSeries({
-    rev: result.con.rev, ebitda: result.con.ebitda, grossProfit: result.con.gp,
-    cashClose: result.cf.close, opex: result.con.opex,
-    totalEquityByMonth: result.bs.total_equity, totalLiabilitiesByMonth: result.bs.total_liabilities,
-    businessBreakeven: result.metrics.business_breakeven,
-    monthsWithActuals: periodIsActual, monthsClosed: monthsClosedFlags, monthsWithFieldApp: monthsWithFieldAppFlags,
-    customersAcquiredTotal: lrsCustomerGrowth.totalCustomersAcquired,
-    irr: lrsAnnualIrr, revenuePerHead: result.metrics.revenue_per_head,
-    dscrMin: s.dscrMin, hasDebt: s.hasDebt, cashGaps: s.cashGaps, tradeCreditDpo: s.tradeCredit.dpo,
-    assess,
-  }, yearGroups, monthLabelsFull)
-  const lrsMonthsByYearLabel: Record<string, typeof lrsSeries.monthsByYear[number]> = {}
-  yearGroups.forEach(g => { lrsMonthsByYearLabel[g.label] = lrsSeries.monthsByYear[g.year] })
-  const lrsCurrent = lrsSeries.years[lrsSeries.years.length-1]?.result || computeLiquidityReadinessScore({
-    annualRevenue:0,annualEbitda:0,annualGrossProfit:0,cashClose:[0],monthlyOpex:[0],businessBreakeven:0,
-    totalEquity:0,totalLiabilities:0,dscrMin:null,hasDebt:false,cashGaps:0,tradeCreditDpo:0,
-    monthsOfActualData:0,monthsElapsed:0,monthsClosed:0,fieldAppMonths:0,revenueGrowthRate:0,
-    customersAcquired:0,irr:null,revenuePerHead:0,assess,
-  })
+    // Liquidity Readiness Score time series -- same year/month structure
+    // as scoreSeries above, sharing yearGroups/monthLabelsFull.
+    const periodIsActual: boolean[] = result.con.act_ebitda.map((v:number|null) => v !== null)
+    const monthsClosedFlags: boolean[] = months.map((_:string, i:number) =>
+      closedPeriods?.has(periodForMonthIndex(config.start_date, i)) ?? false
+    )
+    const monthsWithFieldAppFlags: boolean[] = months.map((_:string, i:number) =>
+      fieldAppPeriods.has(periodForMonthIndex(config.start_date, i))
+    )
+    const capitalStructure = config.settings.capital_structure
+    const capitalAtRisk = (capitalStructure?.shareholder_contribution||0) + (capitalStructure?.grant_recoverable||0)
+    const lrsCashFlows = buildInvestmentCashFlows(capitalAtRisk, result.cf.op_cash, result.cf.inv_cash)
+    const lrsMonthlyIrr = computeIRR(lrsCashFlows)
+    const lrsAnnualIrr = lrsMonthlyIrr !== null ? monthlyRateToAnnualRate(lrsMonthlyIrr) : null
+    const lrsCustomerGrowth = computeCustomerGrowthSummary(events)
+    const lrsSeries = computeLRSTimeSeries({
+      rev: result.con.rev, ebitda: result.con.ebitda, grossProfit: result.con.gp,
+      cashClose: result.cf.close, opex: result.con.opex,
+      totalEquityByMonth: result.bs.total_equity, totalLiabilitiesByMonth: result.bs.total_liabilities,
+      businessBreakeven: result.metrics.business_breakeven,
+      monthsWithActuals: periodIsActual, monthsClosed: monthsClosedFlags, monthsWithFieldApp: monthsWithFieldAppFlags,
+      customersAcquiredTotal: lrsCustomerGrowth.totalCustomersAcquired,
+      irr: lrsAnnualIrr, revenuePerHead: result.metrics.revenue_per_head,
+      dscrMin: s.dscrMin, hasDebt: s.hasDebt, cashGaps: s.cashGaps, tradeCreditDpo: s.tradeCredit.dpo,
+      assess,
+    }, yearGroups, monthLabelsFull)
+    const lrsMonthsByYearLabel: Record<string, typeof lrsSeries.monthsByYear[number]> = {}
+    yearGroups.forEach(g => { lrsMonthsByYearLabel[g.label] = lrsSeries.monthsByYear[g.year] })
+    const lrsCurrent = lrsSeries.years[lrsSeries.years.length-1]?.result || computeLiquidityReadinessScore({
+      annualRevenue:0,annualEbitda:0,annualGrossProfit:0,cashClose:[0],monthlyOpex:[0],businessBreakeven:0,
+      totalEquity:0,totalLiabilities:0,dscrMin:null,hasDebt:false,cashGaps:0,tradeCreditDpo:0,
+      monthsOfActualData:0,monthsElapsed:0,monthsClosed:0,fieldAppMonths:0,revenueGrowthRate:0,
+      customersAcquired:0,irr:null,revenuePerHead:0,assess,
+    })
 
-  // Pathway to Readiness: per-dimension score history, REAL (actual)
-  // months only -- the trailing-12-month LRS series already computed
-  // above (lrsSeries.monthsByYear) covers every month index across the
-  // whole plan including future/plan-only months, which would make a
-  // "trend" meaningless. Only months with real actuals feed the
-  // trend/timing projection in pathway-to-readiness.ts.
-  const lrsDimensionHistory = {}
-  ;(Object.keys(LRS_WEIGHTS)).forEach(dim => { lrsDimensionHistory[dim] = [] })
-  yearGroups.forEach(g => {
-    const monthsInYear = lrsSeries.monthsByYear[g.year] || []
-    g.monthIndices.forEach((m, i) => {
-      if (!periodIsActual[m]) return
-      const period = monthsInYear[i]
-      if (!period) return
-      Object.keys(LRS_WEIGHTS).forEach(dim => {
-        lrsDimensionHistory[dim].push({ monthIndex: m, score: period.result.dimensions[dim].score })
+    // Pathway to Readiness: per-dimension score history, REAL (actual)
+    // months only -- the trailing-12-month LRS series already computed
+    // above (lrsSeries.monthsByYear) covers every month index across the
+    // whole plan including future/plan-only months, which would make a
+    // "trend" meaningless. Only months with real actuals feed the
+    // trend/timing projection in pathway-to-readiness.ts.
+    const lrsDimensionHistory: Record<string, {monthIndex:number,score:number}[]> = {}
+    ;(Object.keys(LRS_WEIGHTS)).forEach(dim => { lrsDimensionHistory[dim] = [] })
+    yearGroups.forEach(g => {
+      const monthsInYear = lrsSeries.monthsByYear[g.year] || []
+      g.monthIndices.forEach((m, i) => {
+        if (!periodIsActual[m]) return
+        const period = monthsInYear[i]
+        if (!period) return
+        Object.keys(LRS_WEIGHTS).forEach(dim => {
+          lrsDimensionHistory[dim].push({ monthIndex: m, score: period.result.dimensions[dim].score })
+        })
       })
     })
-  })
-  const pathwayOpportunities = computePathwayToReadiness(lrsCurrent, LRS_WEIGHTS, lrsDimensionHistory)
+    const pathwayOpportunities = computePathwayToReadiness(lrsCurrent, LRS_WEIGHTS, lrsDimensionHistory)
+
+    return {
+      yearGroups, monthLabelsFull, scoreSeries, monthsByYearLabel,
+      periodIsActual, capitalAtRisk, lrsCashFlows, lrsAnnualIrr,
+      lrsSeries, lrsMonthsByYearLabel, lrsCurrent, lrsDimensionHistory, pathwayOpportunities,
+    }
+  }, [config, result, months, closedPeriods, fieldAppPeriods, events, bankLoanObligation, assess, s])
 
   // ── Derived figures for the mockup-faithful sections ─────────
   // All read from the engine outputs already computed above; none of these

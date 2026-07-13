@@ -18,13 +18,13 @@
   --cv-bg-2:        #F4F8FC;  /* secondary / input background */
   --cv-card:        #FFFFFF;  /* card surface (was "white") */
   --cv-card-hi:     #EEF1F6;  /* elevated / hover surface */
-  --cv-cream:       #F8F4EE;  /* dashboard page background */
+  --cv-cream:       #F5F0E8;  /* dashboard page background */
   --cv-alt:         #F0F4F8;  /* subtle panel / alt table row */
   --cv-disabled:    #F5F5F5;  /* disabled input background */
   --cv-track:       #E8ECF0;  /* progress-bar track */
 
   /* Permanently-dark header / nav (dark in BOTH themes) */
-  --cv-header:      #1B2A4A;  /* navy header + table head background */
+  --cv-header:      #1B2A41;  /* navy header + table head background */
   --cv-nav:         #142038;  /* sub-nav bar background */
 
   /* Borders & shadow */
@@ -34,24 +34,38 @@
   --cv-shadow-2:    rgba(16,42,67,0.06);
 
   /* Text */
-  --cv-navy:        #1B2A4A;  /* primary text */
+  --cv-navy:        #1B2A41;  /* primary text */
   --cv-slate:       #4A5A6A;  /* muted text */
   --cv-faint:       #7A8A9A;  /* fainter text */
   --cv-on-accent:   #FFFFFF;  /* text on accent / dark header (white both) */
   --cv-on-cyan:     #062230;  /* dark text on a cyan button (dark both) */
 
-  /* Brand accents */
-  --cv-cyan:        #00B4D8;
+  /* Brand accents. Navy/cream/green/red are the Presentation
+     Specification's exact hex values. Cyan and amber are NOT -- the
+     spec's literal #00CCCC and #E8A020 fail WCAG contrast in every
+     real usage checked (as text on white/cream: 2.0:1 and 2.2:1; as a
+     solid fill with white text on top: the same numbers, since it's
+     the identical pair of colours either direction -- both far below
+     the 3:1 minimum for large bold text/UI components, let alone the
+     4.5:1 body-text minimum). These are the closest legible values on
+     the same hue, landing at 4.5-4.6:1 -- the darkest, most saturated
+     version of "cyan" and "amber" that stays readable everywhere these
+     tokens are actually used (small badge text, table cells, not just
+     large score numbers). See docs/CALCULATIONS_REFERENCE.md-adjacent
+     reasoning: this mirrors how every other spec gap this project has
+     hit was handled -- corrected and documented, not silently shipped
+     broken or silently shipped non-compliant. */
+  --cv-cyan:        #008383;
   --cv-teal:        #1A9DAA;
-  --cv-green:       #1A7A4A;
-  --cv-amber:       #B8860B;
-  --cv-red:         #C0392B;
+  --cv-green:       #2E7D32;
+  --cv-amber:       #9E6B10;
+  --cv-red:         #C62828;
   --cv-purple:      #6B4A8B;
-  --cv-cyan-40:     rgba(0,180,216,0.40);
+  --cv-cyan-40:     rgba(0,131,131,0.40);
 
   /* Accent TEXT that must stay readable on either surface */
-  --cv-green-text:  #1A7A4A;  /* positive amounts */
-  --cv-red-text:    #C0392B;  /* negative amounts / errors */
+  --cv-green-text:  #2E7D32;  /* positive amounts */
+  --cv-red-text:    #C62828;  /* negative amounts / errors */
 
   /* Dim / tint backgrounds */
   --cv-cyan-dim:    rgba(0,180,216,0.15);
@@ -111,23 +125,24 @@
   --cv-on-accent:   #FFFFFF;
   --cv-on-cyan:     #062230;
 
-  /* Brand accents (slightly brightened for dark) */
-  --cv-cyan:        #35C6EC;
+  /* Brand accents (slightly brightened for dark, same treatment as before,
+     re-derived from the Presentation Specification's exact hex values) */
+  --cv-cyan:        #2AEBEB;
   --cv-teal:        #33C0CE;
-  --cv-green:       #35B570;
-  --cv-amber:       #E0A100;
-  --cv-red:         #E06455;
+  --cv-green:       #53AE58;
+  --cv-amber:       #F7AF2E;
+  --cv-red:         #E35555;
   --cv-purple:      #A385C4;
-  --cv-cyan-40:     rgba(53,198,236,0.45);
+  --cv-cyan-40:     rgba(42,235,235,0.45);
 
   /* Accent TEXT */
   --cv-green-text:  #5FD08A;
   --cv-red-text:    #FF8B7E;
 
   /* Dim / tint backgrounds (translucent so they read on dark surfaces) */
-  --cv-cyan-dim:    rgba(53,198,236,0.18);
-  --cv-amber-dim:   rgba(224,161,0,0.16);
-  --cv-red-dim:     rgba(224,100,85,0.16);
+  --cv-cyan-dim:    rgba(42,235,235,0.18);
+  --cv-amber-dim:   rgba(247,175,46,0.16);
+  --cv-red-dim:     rgba(227,85,85,0.16);
   --cv-tint-cyan:   rgba(53,198,236,0.12);
   --cv-tint-teal:   rgba(51,192,206,0.14);
   --cv-tint-teal-soft: rgba(51,192,206,0.07);
@@ -153,17 +168,17 @@ input:focus, select:focus { outline: 2px solid var(--cv-cyan); outline-offset: 1
    the original desktop column counts and add smaller breakpoints
    only -- the wide-screen appearance is unchanged.
    ============================================================ */
-.cv-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
-.cv-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
-.cv-grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem}
+.cv-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:1.25rem}
+.cv-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem}
+.cv-grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:1.25rem}
 @media(max-width:860px){.cv-grid-4,.cv-grid-3{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:520px){.cv-grid-4,.cv-grid-3,.cv-grid-2{grid-template-columns:1fr}}
 
 /* Radar + cards "dimension" area: the radar tile spans 2x2 on wide
    screens and the small cards fill around it; on narrow screens the
    radar drops to a full-width block and everything stacks. */
-.cv-dim-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:1fr;gap:0.85rem}
-.cv-gc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:1fr;gap:0.85rem}
+.cv-dim-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:1fr;gap:1.1rem}
+.cv-gc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:1fr;gap:1.1rem}
 .cv-dim-grid .cv-dim-radar,.cv-gc-grid .cv-dim-radar{grid-column:1 / 3;grid-row:1 / 3}
 @media(max-width:860px){
   .cv-dim-grid{grid-template-columns:repeat(2,minmax(0,1fr))}

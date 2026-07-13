@@ -33,15 +33,25 @@ function getAdminClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
-// ── Clearview brand colours ──
-const NAVY   = '1B2A4A'
-const CYAN   = '00B4D8'
-const CREAM  = 'F8F4EE'
+// ── Clearview brand colours -- exact hex from the Presentation
+// Specification, except CYAN_TEXT and AMBER. CYAN is only ever readable
+// (00CCCC on navy fill: 7.2:1) when it sits on the dark navy band used by
+// sectionHeader/the cover band/the footer -- everywhere else in this
+// document it's plain text or a border on a WHITE/cream/pale-blue
+// background, where the same bright cyan drops to under 2:1 contrast
+// (illegible) and the spec's literal amber does the same (2.2:1). Both
+// get a darker, same-hue "text-safe" value there instead, landing at
+// ~4.5-4.6:1 -- readable everywhere this document actually uses them,
+// not just in the one place a bright accent works.
+const NAVY   = '1B2A41'
+const CYAN   = '00CCCC'   // navy-fill text only (sectionHeader, cover band, footer)
+const CYAN_TEXT = '008383' // score/metric text + borders on light backgrounds
+const CREAM  = 'F5F0E8'
 const WHITE  = 'FFFFFF'
 const SLATE  = '4A5A6A'
-const GREEN  = '1A7A4A'
-const AMBER  = 'B8860B'
-const RED    = 'C0392B'
+const GREEN  = '2E7D32'
+const AMBER  = '9E6B10'
+const RED    = 'C62828'
 const BORDER = 'D8E0E8'
 const LBBLUE = 'EBF8FF'
 
@@ -74,7 +84,7 @@ function sectionHeader(text: string) {
 
 // Metric box: used in rows of 3-4
 function metricBox(label: string, value: string, sub: string, color: string, width: number) {
-  const b = { style: BorderStyle.SINGLE, size: 4, color: CYAN }
+  const b = { style: BorderStyle.SINGLE, size: 4, color: CYAN_TEXT }
   const borders = { top: b, bottom: b, left: b, right: b }
   return new TableCell({
     borders,
@@ -277,7 +287,7 @@ export async function buildInvestmentBrief(clientId: string): Promise<{ buffer: 
     const consignmentFit = computeFitScore(lrsCurrent, FIT_SCORE_PRESETS.consignment.weights)
     const recoverableFit = computeFitScore(lrsCurrent, FIT_SCORE_PRESETS.recoverable.weights)
     const lrsWord = lrsCurrent.score >= 70 ? 'Strong' : lrsCurrent.score >= 50 ? 'Building' : lrsCurrent.score >= 30 ? 'Developing' : 'Early'
-    const scoreColorLRS = (v: number) => v >= 70 ? GREEN : v >= 50 ? CYAN : v >= 30 ? AMBER : RED
+    const scoreColorLRS = (v: number) => v >= 70 ? GREEN : v >= 50 ? CYAN_TEXT : v >= 30 ? AMBER : RED
 
     // ── §SCP: Seasonal Cash Position Projection ──
     // Same inputs the calculation module expects: gross profit (not raw
@@ -422,9 +432,9 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
       columnWidths: [w4, w4, w4, w4],
       borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
       rows: [new TableRow({ children: [
-        scoreBadge('Investment Readiness', `${s.irScore}/30`, s.irTier, s.irScore >= 24 ? GREEN : s.irScore >= 17 ? CYAN : AMBER, w4),
+        scoreBadge('Investment Readiness', `${s.irScore}/30`, s.irTier, s.irScore >= 24 ? GREEN : s.irScore >= 17 ? CYAN_TEXT : AMBER, w4),
         scoreBadge('Credit Risk Score', `${s.score}/100`, s.classification, s.classification === 'Stable' ? GREEN : s.classification === 'At Risk' ? AMBER : RED, w4),
-        scoreBadge('Going Concern', `${s.gcScore}/20`, s.gcRating, s.gcRating === 'Strong' ? GREEN : s.gcRating === 'Adequate' ? CYAN : AMBER, w4),
+        scoreBadge('Going Concern', `${s.gcScore}/20`, s.gcRating, s.gcRating === 'Strong' ? GREEN : s.gcRating === 'Adequate' ? CYAN_TEXT : AMBER, w4),
         scoreBadge('Debt Service (DSCR)', dscrLabel(s), dscrRating(s), dscrColor(s,{green:GREEN,amber:AMBER,red:RED,slate:SLATE}), w4),
       ]})],
     }))
