@@ -20,6 +20,7 @@ import {
   pipelineSnapshot, recentMonthPeriods, monthlyFeeRevenue, monthlyTeamCost,
 } from '@/lib/coach-business-metrics'
 import { GRANT_TYPE_LABELS, grantStatus, generateAccessToken, expiryFromDays } from '@/lib/access-grants'
+import { READINESS_STAGE_LABELS } from '@/lib/portfolio-intelligence'
 
 // \u2500\u2500\u2500 DESIGN TOKENS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 const C = {
@@ -916,6 +917,180 @@ function CopyIntakeLink({client}){
   )
 }
 
+const LRS_DIM_LABELS={marketOpportunity:'Market Opportunity',visibility:'Visibility',trust:'Trust',profitability:'Profitability',capacity:'Capacity',resilience:'Resilience',compliance:'Compliance'}
+const CAC_TYPE_LABELS={credit:'Credit',grant:'Grant',equity:'Equity',consignment:'Consignment',recoverableGrant:'Recoverable Grant'}
+function fmtPortfolioMoney(n,cc){
+  if(n===null||n===undefined)return'n/a'
+  const v=Math.round(Math.abs(n))
+  const s=v>=1000000?`${(v/1000000).toFixed(1)}M`:v>=1000?`${(v/1000).toFixed(0)}K`:v.toString()
+  return `${cc} ${s}`
+}
+
+// Portfolio Intelligence: Habib's own bizdev/programme-design view across
+// every financial client on the platform. Levels 1 (overview) and 2
+// (segment drilldown) only -- see src/lib/portfolio-intelligence.ts for
+// what's deliberately not computed and why (no fabricated time-to-
+// readiness estimates, no hypothetical "if everyone were ready" capital
+// figures). Restricted to super_coach server-side (see
+// app/api/portfolio-intelligence/route.ts); this component doesn't
+// re-check the role, it relies on the route's own check plus the fact
+// only super_coach ever sees this tab in mainNavTabs.
+function PortfolioIntelligenceHub(){
+  const [data,setData]=useState(null)
+  const [loading,setLoading]=useState(true)
+  const [error,setError]=useState('')
+  const [filter,setFilter]=useState({})
+
+  const load=useCallback((f)=>{
+    setLoading(true);setError('')
+    supabase.auth.getSession().then(({data:{session}})=>{
+      fetch('/api/portfolio-intelligence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requesterToken:session?.access_token,filter:f})})
+        .then(r=>r.json())
+        .then(json=>{
+          if(json.error){setError(json.error);setLoading(false);return}
+          setData(json);setLoading(false)
+        })
+        .catch(e=>{setError(e.message||'Could not load portfolio data');setLoading(false)})
+    })
+  },[])
+  useEffect(()=>{load(filter)},[])
+
+  function applyFilter(next){
+    const merged={...filter,...next}
+    Object.keys(merged).forEach(k=>{if(!merged[k])delete merged[k]})
+    setFilter(merged)
+    load(merged)
+  }
+
+  if(loading)return<div style={{...card,textAlign:'center',padding:'2rem',color:C.slate}}>Loading portfolio intelligence...</div>
+  if(error)return<div style={{...card,border:`1px solid ${C.red}`}}><div style={{color:C.red,fontWeight:600}}>⚠ {error}</div></div>
+  if(!data||data.snapshotCount===0)return<div style={{...card,textAlign:'center',padding:'2rem',color:C.slate}}>No financial clients with data on file yet.</div>
+
+  const {portfolio,segment,filterOptions,snapshotCount}=data
+  const hasFilter=Object.keys(filter).length>0
+  const view=hasFilter&&segment?segment.segment:portfolio
+  const currencies=Object.keys(portfolio.currentCapitalAbsorption)
+  const pipelineEntries=[['investment_ready',C.green],['near_ready',C.cyan],['development_stage',C.amber],['pre_investment',C.red]]
+
+  return(
+    <div>
+      <Kicker>Portfolio Intelligence · {snapshotCount} financial client{snapshotCount===1?'':'s'}</Kicker>
+
+      <div style={{...card,display:'flex',flexWrap:'wrap',gap:'0.6rem',alignItems:'center'}}>
+        <select value={filter.sector||''} onChange={e=>applyFilter({sector:e.target.value})} style={{padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}>
+          <option value="">All sectors</option>
+          {filterOptions.sectors.map(s=><option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={filter.country||''} onChange={e=>applyFilter({country:e.target.value})} style={{padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}>
+          <option value="">All countries</option>
+          {filterOptions.countries.map(c=><option key={c} value={c}>{c}</option>)}
+        </select>
+        <select value={filter.readinessStage||''} onChange={e=>applyFilter({readinessStage:e.target.value})} style={{padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}>
+          <option value="">All readiness stages</option>
+          {Object.entries(READINESS_STAGE_LABELS).map(([k,l])=><option key={k} value={k}>{l}</option>)}
+        </select>
+        {hasFilter&&<button onClick={()=>{setFilter({});load({})}} style={{fontSize:'0.85rem',color:C.slate,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>Clear filters</button>}
+      </div>
+
+      {hasFilter&&<div style={{fontSize:'0.9rem',color:C.slate,marginBottom:'0.5rem'}}>Showing {view.totalBusinesses} of {portfolio.totalBusinesses} businesses matching this filter, compared against the full portfolio below.</div>}
+
+      <div className="cv-grid-4" style={{marginBottom:'1.25rem'}}>
+        <GlanceKPI label="Businesses" value={String(view.totalBusinesses)} sub={hasFilter?`of ${portfolio.totalBusinesses} portfolio-wide`:'on platform'} color={C.navy}/>
+        <GlanceKPI label="Avg Investment Readiness" value={`${Math.round(view.avgIRScore)}/30`} sub="current scores" color={C.teal}/>
+        <GlanceKPI label="Avg Verification Confidence" value={`${Math.round(view.avgConfidenceScore)}/100`} sub="current period" color={C.cyan}/>
+        <GlanceKPI label="Avg Liquidity Readiness" value={`${Math.round(view.avgLRSScore)}/100`} sub="seven dimensions" color={C.purple}/>
+      </div>
+
+      <div style={card}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.8rem'}}>Readiness pipeline</div>
+        <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
+          {pipelineEntries.map(([stage,color])=>(
+            <div key={stage} style={{flex:'1 1 140px',borderLeft:`4px solid ${color}`,padding:'0.5rem 0.8rem',background:'var(--cv-tint-cyan)',borderRadius:4}}>
+              <div style={{fontSize:'1.3rem',fontWeight:700,color}}>{view.readinessPipeline[stage]}</div>
+              <div style={{fontSize:'0.85rem',color:C.slate}}>{READINESS_STAGE_LABELS[stage]} · {Math.round(view.readinessPipelinePct[stage])}%</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={card}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.4rem'}}>
+          Seven-dimension average{hasFilter?' — this segment vs. portfolio':''}
+        </div>
+        {view.mostCommonWeakDimension&&<div style={{fontSize:'0.9rem',color:C.slate,marginBottom:'0.8rem'}}>Weakest dimension: <b style={{color:C.red}}>{LRS_DIM_LABELS[view.mostCommonWeakDimension]}</b></div>}
+        <div style={{display:'flex',flexDirection:'column',gap:'0.5rem'}}>
+          {Object.entries(view.dimensionAverages).map(([dim,avg])=>{
+            const portfolioAvg=portfolio.dimensionAverages[dim]
+            return(
+              <div key={dim} style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
+                <div style={{width:150,fontSize:'0.9rem',color:C.navy,flexShrink:0}}>{LRS_DIM_LABELS[dim]}</div>
+                <div style={{flex:1,background:'var(--cv-tint-cyan)',borderRadius:4,height:14,position:'relative'}}>
+                  <div style={{width:`${Math.max(2,avg)}%`,background:C.teal,height:'100%',borderRadius:4}}/>
+                  {hasFilter&&<div style={{position:'absolute',left:`${Math.max(0,portfolioAvg-0.5)}%`,top:-2,width:2,height:18,background:C.navy}} title={`Portfolio average: ${Math.round(portfolioAvg)}`}/>}
+                </div>
+                <div style={{width:40,fontSize:'0.88rem',color:C.slate,textAlign:'right'}}>{Math.round(avg)}</div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div style={card}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.8rem'}}>Verification confidence distribution</div>
+        <div style={{display:'flex',gap:'0.4rem',alignItems:'flex-end',height:100}}>
+          {view.verificationDistribution.map(b=>{
+            const maxCount=Math.max(1,...view.verificationDistribution.map(x=>x.count))
+            return(
+              <div key={b.label} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'0.3rem'}}>
+                <div style={{fontSize:'0.85rem',color:C.navy,fontWeight:600}}>{b.count}</div>
+                <div style={{width:'100%',height:`${Math.max(4,(b.count/maxCount)*70)}px`,background:C.cyan,borderRadius:'3px 3px 0 0'}}/>
+                <div style={{fontSize:'0.75rem',color:C.slate}}>{b.label}</div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div style={card}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.3rem'}}>Current capital absorption capacity</div>
+        <div style={{fontSize:'0.85rem',color:C.slate,marginBottom:'0.8rem'}}>Average of what each business could absorb TODAY, by type -- not a hypothetical "if all were investment-ready" ceiling. Shown separately per currency; never blended across currencies.</div>
+        {currencies.length===0?(
+          <div style={{color:C.slate,fontSize:'0.9rem'}}>Not yet available.</div>
+        ):currencies.map(cc=>(
+          <div key={cc} style={{marginBottom:'0.8rem'}}>
+            <div style={{fontFamily:'monospace',fontSize:'0.85rem',color:C.slate,marginBottom:'0.4rem'}}>{cc}</div>
+            <div className="cv-grid-4">
+              {Object.entries(portfolio.currentCapitalAbsorption[cc]).map(([type,val])=>(
+                <div key={type} style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.6rem 0.8rem'}}>
+                  <div style={{fontSize:'0.8rem',color:C.slate}}>{CAC_TYPE_LABELS[type]}</div>
+                  <div style={{fontSize:'1.05rem',fontWeight:700,color:C.navy}}>{fmtPortfolioMoney(val,cc)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {hasFilter&&segment&&(
+        <div style={card}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.8rem'}}>Weakest dimensions in this segment, ranked</div>
+          <ol style={{margin:0,paddingLeft:'1.2rem'}}>
+            {segment.weakestDimensionsInSegment.slice(0,3).map(dim=>{
+              const cmp=segment.dimensionComparison.find(d=>d.dimension===dim)
+              return(
+                <li key={dim} style={{fontSize:'0.95rem',color:C.navy,marginBottom:'0.3rem'}}>
+                  {LRS_DIM_LABELS[dim]}: {Math.round(cmp.segmentAvg)} vs. portfolio {Math.round(cmp.portfolioAvg)}
+                  {cmp.delta<0&&<span style={{color:C.red}}> ({Math.round(cmp.delta)} below portfolio)</span>}
+                </li>
+              )
+            })}
+          </ol>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function CoachDashboard({onSignOut,userRole='super_coach',userName='Habib Onifade',coImplementerId=null,funderProgrammeId=null}){
   const isSuperCoach=userRole==='super_coach'
   const isFunder=userRole==='funder'
@@ -1488,7 +1663,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // to just what they're allowed to see (their assigned clients, or the
   // clients under their programme).
   const mainNavTabs=isSuperCoach
-    ?[['overview','My Business'],['clients','Clients'],['programmes','Programmes'],['team','Team']]
+    ?[['overview','My Business'],['clients','Clients'],['programmes','Programmes'],['team','Team'],['portfolio','Portfolio Intelligence']]
     :isCoImplementer
     ?[['clients','Clients'],['mypayments','My Timesheet & Expenses']]
     :[['clients','Clients']]
@@ -1522,6 +1697,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         {view==='programmes'&&<ProgrammesHub/>}
         {view==='team'&&<TeamHub/>}
         {view==='mypayments'&&<TeamPayments coImplementers={coImplementers} setCoImplementers={setCoImplementers} clients={clients} userName={userName} canApprove={false}/>}
+        {view==='portfolio'&&<PortfolioIntelligenceHub/>}
       </main>
       <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.93rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach \u00b7 Coach Dashboard \u00b7 habibonifade.com \u00b7 Confidential</footer>
     </div>
