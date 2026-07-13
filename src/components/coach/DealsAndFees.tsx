@@ -18,7 +18,7 @@
 // ============================================================
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { dealFunnel, clientCountForProgramme, programmeCanvasSpread, canvasProgress, revenueStreams } from '@/lib/coach-business-metrics'
+import { dealFunnel, clientCountForProgramme, programmeCanvasSpread, canvasProgress, revenueStreams, weightedPipelineValue } from '@/lib/coach-business-metrics'
 
 const C = {
   navy:'var(--cv-navy)', cyan:'var(--cv-cyan)', cream:'var(--cv-cream)', white:'var(--cv-card)',
@@ -140,7 +140,11 @@ function DealsPipeline({programmes,setProgrammes,clients}){
   const cur=programmes.find(p=>p.deal_currency)?.deal_currency||'USD'
   const openDeals=programmes.filter(p=>OPEN_STAGES.includes(p.deal_stage))
   const openValue=openDeals.reduce((s,p)=>s+num(p.deal_value),0)
-  const weighted=openDeals.reduce((s,p)=>s+num(p.deal_value)*num(p.deal_probability)/100,0)
+  // Uses the same per-stage fallback the deal card's own probability bar
+  // uses -- previously this treated any deal with no probability entered as
+  // worth exactly $0, silently disagreeing with the card showing that same
+  // deal at (say) 65% likely.
+  const weighted=weightedPipelineValue(openDeals)
   const wonValue=programmes.filter(p=>p.deal_stage==='won').reduce((s,p)=>s+num(p.deal_value),0)
   const funnel=dealFunnel(programmes)
   const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
@@ -191,7 +195,7 @@ function DealsPipeline({programmes,setProgrammes,clients}){
 
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:'0.85rem',marginBottom:'1.25rem'}}>
         <KPI label="Open pipeline" value={fmtMoney(openValue,cur)} sub={`${openDeals.length} open deal${openDeals.length!==1?'s':''}`}/>
-        <KPI label="Weighted" value={fmtMoney(weighted,cur)} sub="value × probability" color={C.teal}/>
+        <KPI label="Weighted" value={fmtMoney(weighted,cur)} sub="value × probability (or a stage default, if not set)" color={C.teal}/>
         <KPI label="Won" value={fmtMoney(wonValue,cur)} sub={`${programmes.filter(p=>p.deal_stage==='won').length} won`} color={C.green}/>
         <KPI label="Programmes" value={programmes.length} sub="total tracked" color={C.purple}/>
       </div>
@@ -243,7 +247,9 @@ function DealsPipeline({programmes,setProgrammes,clients}){
             <div><label style={lbl}>Stage</label><select style={inp} value={form.deal_stage} onChange={e=>setForm(f=>({...f,deal_stage:e.target.value}))}>{DEAL_STAGES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</select></div>
             <div><label style={lbl}>Deal value</label><input type="number" style={inp} value={form.deal_value} onChange={e=>setForm(f=>({...f,deal_value:e.target.value}))}/></div>
             <div><label style={lbl}>Currency</label><select style={inp} value={form.deal_currency} onChange={e=>setForm(f=>({...f,deal_currency:e.target.value}))}>{CURRENCIES.map(x=><option key={x}>{x}</option>)}</select></div>
-            <div><label style={lbl}>Probability %</label><input type="number" min="0" max="100" style={inp} value={form.deal_probability} onChange={e=>setForm(f=>({...f,deal_probability:e.target.value}))}/></div>
+            <div><label style={lbl}>Probability %</label><input type="number" min="0" max="100" style={inp} value={form.deal_probability} onChange={e=>setForm(f=>({...f,deal_probability:e.target.value}))}/>
+              <div style={hint}>Leave blank to use a stage default instead (Conversation 20% · Scoping 40% · Proposal 65%).</div>
+            </div>
             <div><label style={lbl}>Expected close</label><input type="date" style={inp} value={form.deal_expected_close} onChange={e=>setForm(f=>({...f,deal_expected_close:e.target.value}))}/></div>
           </div>
           <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>

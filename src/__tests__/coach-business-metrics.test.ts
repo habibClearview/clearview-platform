@@ -5,6 +5,8 @@ import {
   canvasProgress, coImplementerNamesForClient, engagementDisplayStatus, coImplementerWorkload,
   healthStatusFromReportText, portfolioHealthCounts, groupClientsByProgramme,
   dealFunnel, clientCountForProgramme, programmeCanvasSpread,
+  dealProbability, weightedPipelineValue, pipelineSnapshot,
+  feesReceivedInMonth, recentMonthPeriods, monthlyFeeRevenue, monthlyTeamCost,
   type FeeClient, type DealProgramme,
 } from '../lib/coach-business-metrics'
 
@@ -371,5 +373,105 @@ describe('programmeCanvasSpread', () => {
       { doneCount: 0, totalCount: 0, currentLabel: 'Not started', currentIndex: -1 },
     ])
     expect(r).toEqual({ furthestLabel: 'DP07 · pilot 1', nearestLabel: 'DP05 · market entry', startedCount: 2 })
+  })
+})
+
+function prog2(over: Partial<DealProgramme> = {}): DealProgramme {
+  return { id: 'x', name: 'X', deal_currency: 'USD', ...over }
+}
+
+describe('dealProbability', () => {
+  it('uses the coach-entered probability when set, even 0', () => {
+    expect(dealProbability({ deal_stage: 'proposal', deal_probability: 90 })).toBeCloseTo(0.9)
+    expect(dealProbability({ deal_stage: 'proposal', deal_probability: 0 })).toBe(0)
+  })
+  it('falls back to a fixed per-stage default when unset', () => {
+    expect(dealProbability({ deal_stage: 'proposal', deal_probability: null })).toBeCloseTo(0.65)
+    expect(dealProbability({ deal_stage: 'conversation', deal_probability: undefined })).toBeCloseTo(0.2)
+    expect(dealProbability({ deal_stage: 'won', deal_probability: null })).toBeCloseTo(1)
+  })
+  it('clamps an out-of-range entered probability to 0-1', () => {
+    expect(dealProbability({ deal_stage: 'proposal', deal_probability: 150 })).toBe(1)
+    expect(dealProbability({ deal_stage: 'proposal', deal_probability: -10 })).toBe(0)
+  })
+})
+
+describe('weightedPipelineValue', () => {
+  it('matches dealCards\' own probability fallback -- REG for the bug where an unset probability silently counted as $0', () => {
+    const programmes = [
+      prog2({ id: 'a', deal_stage: 'proposal', deal_value: 100_000, deal_probability: null }), // falls back to 0.65
+      prog2({ id: 'b', deal_stage: 'conversation', deal_value: 50_000, deal_probability: 10 }),
+      prog2({ id: 'c', deal_stage: 'won', deal_value: 999_999 }), // excluded -- not open
+    ]
+    const weighted = weightedPipelineValue(programmes)
+    expect(weighted).toBeCloseTo(100_000 * 0.65 + 50_000 * 0.1, 0)
+    // Cross-check against the exact per-deal barFrac dealCards() computes,
+    // so the two truly can never diverge for the same input.
+    const cards = dealCards(programmes)
+    const recomputed = programmes
+      .filter(p => p.deal_stage !== 'won')
+      .reduce((s, p) => s + (p.deal_value || 0) * (cards.find(c => c.id === p.id)!.barFrac), 0)
+    expect(weighted).toBeCloseTo(recomputed, 0)
+  })
+  it('is zero with no open deals', () => {
+    expect(weightedPipelineValue([prog2({ deal_stage: 'won', deal_value: 50_000 })])).toBe(0)
+    expect(weightedPipelineValue([])).toBe(0)
+  })
+})
+
+describe('pipelineSnapshot', () => {
+  it('closedCount is all-time won, openCount spans every non-terminal stage', () => {
+    const r = pipelineSnapshot([
+      prog2({ id: 'a', deal_stage: 'conversation' }),
+      prog2({ id: 'b', deal_stage: 'scoping' }),
+      prog2({ id: 'c', deal_stage: 'proposal' }),
+      prog2({ id: 'd', deal_stage: 'won' }),
+      prog2({ id: 'e', deal_stage: 'won' }),
+      prog2({ id: 'f', deal_stage: 'lost' }),
+    ])
+    expect(r.closedCount).toBe(2)
+    expect(r.openCount).toBe(3)
+    expect(r.stages.map(s => s.stage)).toEqual(['conversation', 'scoping', 'proposal', 'won'])
+  })
+})
+
+describe('feesReceivedInMonth / recentMonthPeriods / monthlyFeeRevenue', () => {
+  const clients: FeeClient[] = [
+    { id: 'a', engagement_mode: 'canvas', fee_status: 'paid', fee_paid_at: '2026-06-15', engagement_fee: 1000 },
+    { id: 'b', engagement_mode: 'canvas', fee_status: 'paid', fee_paid_at: '2026-07-02', engagement_fee: 2000 },
+    { id: 'c', engagement_mode: 'canvas', fee_status: 'invoiced', fee_paid_at: null, engagement_fee: 5000 }, // not paid -- excluded
+  ]
+  it('sums paid fees whose fee_paid_at falls in the given month', () => {
+    expect(feesReceivedInMonth(clients, '2026-06')).toBe(1000)
+    expect(feesReceivedInMonth(clients, '2026-07')).toBe(2000)
+    expect(feesReceivedInMonth(clients, '2026-08')).toBe(0)
+  })
+  it('recentMonthPeriods returns n months ending at "now", oldest first', () => {
+    const r = recentMonthPeriods(3, new Date('2026-07-15T00:00:00Z'))
+    expect(r).toEqual(['2026-05', '2026-06', '2026-07'])
+  })
+  it('recentMonthPeriods rolls back across a year boundary', () => {
+    const r = recentMonthPeriods(3, new Date('2026-01-15T00:00:00Z'))
+    expect(r).toEqual(['2025-11', '2025-12', '2026-01'])
+  })
+  it('monthlyFeeRevenue buckets by period, 0 for a month with nothing collected', () => {
+    const r = monthlyFeeRevenue(clients, ['2026-05', '2026-06', '2026-07'])
+    expect(r).toEqual({ '2026-05': 0, '2026-06': 1000, '2026-07': 2000 })
+  })
+})
+
+describe('monthlyTeamCost', () => {
+  it('sums time + expenses on issued invoices, bucketed by period, excluding drafts', () => {
+    const invoices = [
+      { period: '2026-06', status: 'issued', time_amount: 900_000, expenses_amount: 50_000 },
+      { period: '2026-07', status: 'paid', time_amount: 1_200_000, expenses_amount: 0 },
+      { period: '2026-07', status: 'draft', time_amount: 5_000_000, expenses_amount: 0 }, // draft -- excluded
+    ]
+    const r = monthlyTeamCost(invoices, ['2026-06', '2026-07'])
+    expect(r).toEqual({ '2026-06': 950_000, '2026-07': 1_200_000 })
+  })
+  it('ignores an invoice period outside the requested window', () => {
+    const invoices = [{ period: '2025-01', status: 'issued', time_amount: 100, expenses_amount: 0 }]
+    expect(monthlyTeamCost(invoices, ['2026-06'])).toEqual({ '2026-06': 0 })
   })
 })
