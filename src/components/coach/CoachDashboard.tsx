@@ -12,7 +12,6 @@ import SpreadsheetUpload from '@/components/intake/SpreadsheetUpload'
 import BuildStamp from '@/components/BuildStamp'
 import TeamPayments from '@/components/coach/TeamPayments'
 import DealsAndFees from '@/components/coach/DealsAndFees'
-import ReviewQueue from '@/components/coach/ReviewQueue'
 import {
   engagementSplit, independentClients, feesReceivedInYear, feesReceivedInMonth, outstandingInvoiced,
   averageDaysToCollect, revenueStreams, dealCards, dealWinRate,
@@ -1316,7 +1315,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // to just what they're allowed to see (their assigned clients, or the
   // clients under their programme).
   const mainNavTabs=isSuperCoach
-    ?[['overview','My Business'],['clients','Clients'],['programmes','Programmes'],['team','Team'],['review','Review Queue']]
+    ?[['overview','My Business'],['clients','Clients'],['programmes','Programmes'],['team','Team']]
     :isCoImplementer
     ?[['clients','Clients'],['mypayments','My Timesheet & Expenses']]
     :[['clients','Clients']]
@@ -1350,7 +1349,6 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         {view==='programmes'&&<ProgrammesHub/>}
         {view==='team'&&<TeamHub/>}
         {view==='mypayments'&&<TeamPayments coImplementers={coImplementers} setCoImplementers={setCoImplementers} clients={clients} userName={userName} canApprove={false}/>}
-        {view==='review'&&<ReviewQueue clients={clients}/>}
       </main>
       <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.93rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach \u00b7 Coach Dashboard \u00b7 habibonifade.com \u00b7 Confidential</footer>
     </div>

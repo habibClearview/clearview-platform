@@ -19,6 +19,7 @@ import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndex
 import { yearStartPeriod, canCloseCalendarYear, computeYearEndBalanceSheet } from '@/lib/annual-close'
 import BuildStamp from '@/components/BuildStamp'
 import VerificationRecognition from '@/components/generic/VerificationRecognition'
+import PaymentReviewQueue from '@/components/generic/PaymentReviewQueue'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
@@ -3975,6 +3976,13 @@ Write a status report, not a letter. Do not address the reader. Do not open with
             monthsClosed={monthsClosed}
             fieldDataMonths={fieldDataMonths}
           />
+          {/* Resolving an unattributed payment requires knowing what the
+              real sale was for -- only this client's own team (whoever
+              manages field operators) can know that, so it lives here, not
+              on the coach's dashboard. */}
+          <div style={{marginTop:'1.5rem',paddingTop:'1.5rem',borderTop:`1px solid ${C.border}`}}>
+            <PaymentReviewQueue clientId={clientId}/>
+          </div>
         </div>
         )
       })()}
