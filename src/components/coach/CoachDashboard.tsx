@@ -19,6 +19,7 @@ import {
   healthStatusFromReportText, portfolioHealthCounts, groupClientsByProgramme,
   pipelineSnapshot, recentMonthPeriods, monthlyFeeRevenue, monthlyTeamCost,
 } from '@/lib/coach-business-metrics'
+import { GRANT_TYPE_LABELS, grantStatus, generateAccessToken, expiryFromDays } from '@/lib/access-grants'
 
 // \u2500\u2500\u2500 DESIGN TOKENS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 const C = {
@@ -135,9 +136,10 @@ const HEALTH_COLOR={'Needs attention':C.red,'Watch':C.amber,'Healthy':C.green,'R
 // the same /api/investment-pitch route the client dashboard already used;
 // no new endpoint, no new data access, just a different, coach-controlled
 // place to trigger it from.
-function InvestmentBriefButton({clientId,clientName}){
+function ClientDocumentActions({clientId,clientName}){
   const [downloading,setDownloading]=useState(false)
   const [error,setError]=useState('')
+  const [showAccess,setShowAccess]=useState(false)
   async function download(){
     setDownloading(true); setError('')
     try{
@@ -156,13 +158,141 @@ function InvestmentBriefButton({clientId,clientName}){
     setDownloading(false)
   }
   return(
-    <div style={{marginTop:'0.6rem'}}>
+    <div style={{marginTop:'0.6rem',display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
       <button
         style={{fontSize:'0.85rem',fontWeight:600,color:C.teal,background:'none',border:`1px solid ${C.teal}`,borderRadius:6,padding:'0.3rem 0.65rem',cursor:'pointer'}}
         disabled={downloading}
         onClick={download}
       >{downloading?'Generating…':'⬇ Investment Brief'}</button>
-      {error&&<div style={{fontSize:'0.78rem',color:C.red,marginTop:'0.3rem'}}>{error}</div>}
+      <button
+        style={{fontSize:'0.85rem',fontWeight:600,color:C.navy,background:'none',border:`1px solid var(--cv-border-soft)`,borderRadius:6,padding:'0.3rem 0.65rem',cursor:'pointer'}}
+        onClick={()=>setShowAccess(true)}
+      >🔗 External Access</button>
+      {error&&<div style={{width:'100%',fontSize:'0.78rem',color:C.red}}>{error}</div>}
+      {showAccess&&<ExternalAccessPanel clientId={clientId} clientName={clientName} onClose={()=>setShowAccess(false)}/>}
+    </div>
+  )
+}
+
+// Coach-managed grant/revoke of external access to a client's Investment
+// Readiness Brief. Anyone handed the resulting link can download the
+// document without a ClearView login of their own -- but ONLY while the
+// coach who issued it hasn't revoked it, and only for the one client it
+// was issued for. See supabase/migrations/2026_07_13_client_access_grants.sql
+// for the RLS that makes this coach-only to create/revoke.
+function ExternalAccessPanel({clientId,clientName,onClose}){
+  const [grants,setGrants]=useState([])
+  const [loading,setLoading]=useState(true)
+  const [name,setName]=useState('')
+  const [email,setEmail]=useState('')
+  const [type,setType]=useState('investor')
+  const [expiryDays,setExpiryDays]=useState('')
+  const [saving,setSaving]=useState(false)
+  const [error,setError]=useState('')
+  const [copiedId,setCopiedId]=useState(null)
+
+  const load=useCallback(()=>{
+    setLoading(true)
+    supabase.from('client_access_grants').select('*').eq('client_id',clientId).order('created_at',{ascending:false})
+      .then(({data})=>{setGrants(data||[]);setLoading(false)})
+  },[clientId])
+  useEffect(()=>{load()},[load])
+
+  async function createGrant(e){
+    e.preventDefault()
+    if(!name.trim()){setError('Enter a name for who this link is for.');return}
+    setSaving(true); setError('')
+    const {data:{user}}=await supabase.auth.getUser()
+    const row={
+      client_id:clientId,
+      granted_by:user?.id||null,
+      grantee_name:name.trim(),
+      grantee_email:email.trim()||null,
+      grant_type:type,
+      access_token:generateAccessToken(),
+      expires_at:expiryFromDays(expiryDays?Number(expiryDays):null,Date.now()),
+    }
+    const {error:insErr}=await supabase.from('client_access_grants').insert([row])
+    if(insErr){setError(insErr.message);setSaving(false);return}
+    setName('');setEmail('');setType('investor');setExpiryDays('')
+    setSaving(false)
+    load()
+  }
+
+  async function revoke(id){
+    await supabase.from('client_access_grants').update({revoked_at:new Date().toISOString()}).eq('id',id)
+    load()
+  }
+
+  function linkFor(token){
+    return `${window.location.origin}/api/access-grant/${token}`
+  }
+  function copyLink(grant){
+    navigator.clipboard.writeText(linkFor(grant.access_token)).then(()=>{
+      setCopiedId(grant.id)
+      setTimeout(()=>setCopiedId(null),2000)
+    })
+  }
+
+  const now=new Date().toISOString()
+  const STATUS_COLOR={active:C.green,expired:C.slate,revoked:C.red}
+
+  return(
+    <div style={{position:'fixed',inset:0,background:'rgba(11,31,51,0.45)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:'1rem'}} onClick={onClose}>
+      <div style={{...card,maxWidth:560,width:'100%',maxHeight:'85vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.9rem'}}>
+          <div>
+            <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>External Access — {clientName}</div>
+            <div style={{fontSize:'0.92rem',color:C.slate,marginTop:'0.2rem'}}>Give an investor, programme officer, or subscriber a link to this client's Investment Readiness Brief, without giving them a login. Revoke any time.</div>
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',fontSize:'1.3rem',color:C.slate,cursor:'pointer',lineHeight:1}}>×</button>
+        </div>
+
+        <form onSubmit={createGrant} style={{display:'flex',flexWrap:'wrap',gap:'0.5rem',marginBottom:'1rem',padding:'0.8rem',background:'var(--cv-tint-cyan)',borderRadius:8}}>
+          <input placeholder="Name" value={name} onChange={e=>setName(e.target.value)} style={{flex:'1 1 140px',padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}/>
+          <input placeholder="Email (optional)" value={email} onChange={e=>setEmail(e.target.value)} style={{flex:'1 1 160px',padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}/>
+          <select value={type} onChange={e=>setType(e.target.value)} style={{padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}>
+            {Object.entries(GRANT_TYPE_LABELS).map(([k,l])=><option key={k} value={k}>{l}</option>)}
+          </select>
+          <input placeholder="Expires in days (optional)" type="number" min="1" value={expiryDays} onChange={e=>setExpiryDays(e.target.value)} style={{width:170,padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}/>
+          <button type="submit" disabled={saving} style={solidBtn(C.teal)}>{saving?'Creating…':'+ Create Link'}</button>
+          {error&&<div style={{width:'100%',fontSize:'0.82rem',color:C.red}}>{error}</div>}
+        </form>
+
+        {loading?(
+          <div style={{textAlign:'center',color:C.slate,padding:'1rem'}}>Loading…</div>
+        ):grants.length===0?(
+          <div style={{textAlign:'center',color:C.slate,padding:'1rem',fontSize:'0.92rem'}}>No external access has been granted for this client yet.</div>
+        ):(
+          <div style={{display:'flex',flexDirection:'column',gap:'0.6rem'}}>
+            {grants.map(g=>{
+              const status=grantStatus(g,now)
+              return(
+                <div key={g.id} style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.7rem 0.85rem'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'0.5rem'}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:'0.96rem',color:C.navy}}>{g.grantee_name}</div>
+                      <div style={{fontSize:'0.82rem',color:C.slate}}>{GRANT_TYPE_LABELS[g.grant_type]||g.grant_type}{g.grantee_email?` · ${g.grantee_email}`:''}</div>
+                    </div>
+                    <Badge text={status==='active'?'Active':status==='expired'?'Expired':'Revoked'} color={STATUS_COLOR[status]}/>
+                  </div>
+                  <div style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.3rem'}}>
+                    Created {new Date(g.created_at).toLocaleDateString()}
+                    {g.expires_at?` · Expires ${new Date(g.expires_at).toLocaleDateString()}`:' · No expiry'}
+                    {g.last_accessed_at?` · Last used ${new Date(g.last_accessed_at).toLocaleDateString()}`:' · Not yet used'}
+                  </div>
+                  {status==='active'&&(
+                    <div style={{display:'flex',gap:'0.5rem',marginTop:'0.5rem'}}>
+                      <button onClick={()=>copyLink(g)} style={{fontSize:'0.8rem',fontWeight:600,color:C.teal,background:'none',border:`1px solid ${C.teal}`,borderRadius:6,padding:'0.25rem 0.55rem',cursor:'pointer'}}>{copiedId===g.id?'Copied!':'Copy Link'}</button>
+                      <button onClick={()=>revoke(g.id)} style={{fontSize:'0.8rem',fontWeight:600,color:C.red,background:'none',border:`1px solid ${C.red}`,borderRadius:6,padding:'0.25rem 0.55rem',cursor:'pointer'}}>Revoke</button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -306,7 +436,7 @@ function ClientHealthTab({clients,programmes}){
                   ):(
                     <>
                       <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginTop:'0.6rem'}}><span>{status.dot}</span><Badge text={status.label} color={HEALTH_COLOR[status.label]}/></div>
-                      {hasActuals.has(c.id)&&<div onClick={e=>e.stopPropagation()}><InvestmentBriefButton clientId={c.id} clientName={c.name}/></div>}
+                      {hasActuals.has(c.id)&&<div onClick={e=>e.stopPropagation()}><ClientDocumentActions clientId={c.id} clientName={c.name}/></div>}
                     </>
                   )}
                 </div>
