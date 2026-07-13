@@ -1,0 +1,25 @@
+-- ============================================================
+-- Clearview: portfolio consent-to-be-named flag.
+--
+-- Adds the one new field Portfolio Intelligence's anonymised individual
+-- profile (Level 3) needs: whether a business owner has agreed to be
+-- named (rather than shown only by an anonymised reference code) when
+-- their business appears in aggregated portfolio views. Defaults to
+-- false -- a business is anonymous by default, and only ever named
+-- after an explicit, coach-recorded consent (see AppendixNote below).
+--
+-- SAFE TO APPLY: additive only (ADD COLUMN IF NOT EXISTS). Nothing
+-- existing is dropped or altered. No new RLS needed -- engagement_clients
+-- already has a `for all` policy scoped to super_coach
+-- (2026_07_04_comprehensive_rls_audit.sql), which already covers writing
+-- this new column. Paste into the Supabase SQL editor and Run.
+--
+-- Note on consent: the business owner is the one who actually consents
+-- (this is their name, not the coach's to give away) -- the coach
+-- toggles this flag in the app only after obtaining that consent
+-- directly from the business owner, the same way the coach already
+-- decides who external access grants go to. The app UI makes this
+-- explicit at the point the toggle is shown.
+-- ============================================================
+
+alter table engagement_clients add column if not exists portfolio_consent_named boolean not null default false;

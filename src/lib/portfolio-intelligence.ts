@@ -1,10 +1,21 @@
 // Portfolio Intelligence: the aggregated, market-level view across every
 // client on the platform -- Habib's own bizdev/programme-design tool (see
 // the Product Development Specification, §5). Levels 1 (portfolio
-// overview) and 2 (segment drilldown) only; Level 3 (anonymised
-// individual profile with naming consent) needs a new consent field this
-// pass doesn't add, and export/share/presentation-mode are deliberately
-// out of scope until the visual presentation layer is worked on.
+// overview), 2 (segment drilldown), and 3 (anonymised individual profile)
+// are built; export/share/presentation-mode are deliberately out of
+// scope until the visual presentation layer is worked on.
+//
+// Level 3 profiles are identified by a deterministic reference code
+// derived from clientId, never the raw clientId or business name -- the
+// real name is only ever attached server-side (see
+// app/api/portfolio-intelligence/route.ts) when the business has
+// consented (engagement_clients.portfolio_consent_named), and this
+// module never receives clientId->name mappings it isn't explicitly
+// given. "Pathway to readiness" (specific improvements and estimated
+// timescales) is NOT built here -- it's the still-unbuilt "Pathway to
+// Readiness Report" (Product Development Specification §6.1, Report Type
+// 2), a real, separate calculation in its own right, not something to
+// bolt onto this profile with a fabricated timescale.
 //
 // Pure aggregation over an array of per-client snapshots -- the snapshot
 // assembly itself (running the financial engine, LRS, CAC, confidence for
@@ -53,6 +64,11 @@ export const READINESS_STAGE_LABELS: Record<ReadinessStage, string> = {
   investment_ready: 'Investment Ready',
 }
 
+export interface BusinessUnitContribution {
+  name: string
+  revenuePct: number  // 0-100, share of this client's total revenue
+}
+
 export interface ClientSnapshot {
   clientId: string
   name: string
@@ -63,11 +79,15 @@ export interface ClientSnapshot {
   irTier: string  // 'Investment Ready' | 'Near Ready' | 'Development Stage' | 'Pre-Investment'
   lrs: LRSResult
   confidenceScore: number  // 0-100
+  confidenceBadges: string[]  // earned badge ids -- the "evidence base" Level 3 shows
   cac: CACResult
   currency: string  // e.g. 'UGX', 'KES', 'USD' -- the client's GenericModelConfig.currency.
     // CAC figures are monetary and denominated in this currency; they must
     // never be averaged across snapshots with different currencies (see
     // currentCapitalAbsorption below).
+  annualRevenue: number  // raw revenue, for size-bracketing only -- never shown as an exact figure
+  businessUnits: BusinessUnitContribution[]  // active units with real revenue, by contribution share
+  consentToBeNamed: boolean
 }
 
 export interface SegmentFilter {
@@ -249,4 +269,102 @@ export function computeSegmentReport(allSnapshots: ClientSnapshot[], filter: Seg
     (a, b) => segment.dimensionAverages[a] - segment.dimensionAverages[b]
   )
   return { segment, portfolio, dimensionComparison, weakestDimensionsInSegment }
+}
+
+// ── Level 3: Anonymised Individual Profile ─────────────────────────
+
+// A short, stable, non-reversible-looking reference code derived from
+// clientId -- the SAME client always produces the SAME code (so a
+// coach can recognise "AG-4K7Q" as the same business across sessions),
+// but the code itself gives no way to recover the clientId. Not
+// cryptographic (doesn't need to be -- this is de-identification for
+// display, not a security boundary; the real access control is that
+// buildAnonymisedProfile below only receives a real name when the
+// route has already confirmed consent).
+// Murmur3-style finalizer -- scrambles a 32-bit integer's bits thoroughly
+// regardless of how structured the input hash was. Needed because the
+// raw FNV-1a hash below, on its own, under-diffuses for short, similar
+// inputs (e.g. "client-0" .. "client-199", differing only in their last
+// 1-3 characters) -- verified empirically: without this finalizer step,
+// 200 sequential clientIds collided down to as few as 19-46 unique codes.
+function fmix32(hash: number): number {
+  let h = hash
+  h ^= h >>> 16
+  h = Math.imul(h, 0x85ebca6b)
+  h ^= h >>> 13
+  h = Math.imul(h, 0xc2b2ae35)
+  h ^= h >>> 16
+  return h >>> 0
+}
+
+function fnv1a(str: string): number {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return hash >>> 0
+}
+
+export function anonymizedRefCode(clientId: string): string {
+  const combined = fmix32(fnv1a(clientId))
+  const code = combined.toString(36).toUpperCase().padStart(5, '0').slice(-5)
+  return `BIZ-${code}`
+}
+
+export type SizeBracket = 'Small' | 'Medium' | 'Large' | 'Very Large' | 'Not enough peers to bracket'
+
+// Quartile-based, computed from the OTHER businesses denominated in the
+// SAME currency -- comparing a UGX revenue figure against a fixed
+// absolute threshold designed for USD amounts (or vice versa) would be
+// the exact currency-mixing mistake already fixed in
+// currentCapitalAbsorption above. With fewer than 4 same-currency peers
+// there isn't a meaningful quartile split, so this says so rather than
+// forcing a bracket.
+export function revenueSizeBracket(target: ClientSnapshot, allSnapshots: ClientSnapshot[]): SizeBracket {
+  const peers = allSnapshots.filter(s => s.currency === target.currency).map(s => s.annualRevenue).sort((a, b) => a - b)
+  if (peers.length < 4) return 'Not enough peers to bracket'
+  const q = (p: number) => peers[Math.min(peers.length - 1, Math.floor(p * (peers.length - 1)))]
+  const q1 = q(0.25), q2 = q(0.5), q3 = q(0.75)
+  if (target.annualRevenue <= q1) return 'Small'
+  if (target.annualRevenue <= q2) return 'Medium'
+  if (target.annualRevenue <= q3) return 'Large'
+  return 'Very Large'
+}
+
+export interface AnonymisedProfile {
+  refCode: string
+  displayName: string  // refCode unless consentToBeNamed, in which case the real name
+  isNamed: boolean
+  sector: string | null
+  country: string | null
+  sizeBracket: SizeBracket
+  irScore: number
+  irTier: string
+  lrs: LRSResult
+  confidenceScore: number
+  confidenceBadges: string[]
+  cac: CACResult
+  currency: string
+  businessUnits: BusinessUnitContribution[]
+}
+
+export function buildAnonymisedProfile(snapshot: ClientSnapshot, allSnapshots: ClientSnapshot[]): AnonymisedProfile {
+  const refCode = anonymizedRefCode(snapshot.clientId)
+  return {
+    refCode,
+    displayName: snapshot.consentToBeNamed ? snapshot.name : refCode,
+    isNamed: snapshot.consentToBeNamed,
+    sector: snapshot.sector,
+    country: snapshot.country,
+    sizeBracket: revenueSizeBracket(snapshot, allSnapshots),
+    irScore: snapshot.irScore,
+    irTier: snapshot.irTier,
+    lrs: snapshot.lrs,
+    confidenceScore: snapshot.confidenceScore,
+    confidenceBadges: snapshot.confidenceBadges,
+    cac: snapshot.cac,
+    currency: snapshot.currency,
+    businessUnits: snapshot.businessUnits,
+  }
 }
