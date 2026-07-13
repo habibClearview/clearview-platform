@@ -3742,21 +3742,16 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,clo
     return <span style={{fontFamily:'monospace',fontSize:'1.0rem',fontWeight:700,padding:'0.25rem 0.7rem',borderRadius:20,background:color,color:'var(--cv-on-accent)'}}>{label}</span>
   }
 
-  if (loading) return <Spinner/>
-  if (!result) return (
-    <div style={{...card,textAlign:'center',padding:'2.5rem'}}>
-      <div style={{fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Set up your financial plan first</div>
-      <p style={{color:C.slate,fontSize:'1.06rem'}}>Clearview Business Intelligence needs business units and a financial plan to generate analysis.</p>
-    </div>
-  )
-
-  const m = result.metrics
-  const s = result.scores
+  // Hooks must run in the same order on every render (Rules of Hooks) --
+  // these three used to sit after the "if (loading) return" / "if
+  // (!result) return" checks below, which meant this component called a
+  // different number of hooks depending on loading/result state and
+  // crashed with "Rendered fewer/more hooks than expected" the moment
+  // either flipped (e.g. the very first render after the health-report
+  // fetch in the effect above resolves). Moved ahead of both early
+  // returns and made null-safe internally instead.
   const assess = config.settings.coach_assessment || defaultCoachAssessment()
   const months_n = months.length
-  const warnings = findCashWarningMonths(result, months)
-  const latestHealth = healthReports[0]
-  const latestInvestment = investmentAssessments[0]
   // Single source of truth for the bank loan's shape as a DebtObligation
   // -- previously constructed twice (once for debtSched, once for the
   // score time series below), byte-for-byte identical but at real risk
@@ -3785,12 +3780,20 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,clo
   // That's the main cause of the sluggishness on this page: any
   // unrelated state change anywhere in this ~5800-line component
   // re-ran all of this. Memoized as one block so it only recomputes when
-  // something it actually depends on changes.
+  // something it actually depends on changes. Guards for a null result
+  // (no business units configured yet) since this hook now runs before
+  // the "if (!result) return" below rather than after it.
   const {
     yearGroups, monthLabelsFull, scoreSeries, monthsByYearLabel,
     periodIsActual, capitalAtRisk, lrsCashFlows, lrsAnnualIrr,
     lrsSeries, lrsMonthsByYearLabel, lrsCurrent, lrsDimensionHistory, pathwayOpportunities,
   } = useMemo(() => {
+    if (!result) return {
+      yearGroups: [], monthLabelsFull: [], scoreSeries: null, monthsByYearLabel: {},
+      periodIsActual: [], capitalAtRisk: 0, lrsCashFlows: [], lrsAnnualIrr: null,
+      lrsSeries: null, lrsMonthsByYearLabel: {}, lrsCurrent: null, lrsDimensionHistory: {}, pathwayOpportunities: null,
+    }
+    const s = result.scores
     const yearGroups = buildYearGroups(config.start_date, config.planning_months)
     const monthLabelsFull = buildMonthLabels(config.start_date, config.planning_months)
     const scoreSeries = computeScoresTimeSeries({
@@ -3865,7 +3868,21 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,clo
       periodIsActual, capitalAtRisk, lrsCashFlows, lrsAnnualIrr,
       lrsSeries, lrsMonthsByYearLabel, lrsCurrent, lrsDimensionHistory, pathwayOpportunities,
     }
-  }, [config, result, months, closedPeriods, fieldAppPeriods, events, bankLoanObligation, assess, s])
+  }, [config, result, months, closedPeriods, fieldAppPeriods, events, bankLoanObligation, assess])
+
+  if (loading) return <Spinner/>
+  if (!result) return (
+    <div style={{...card,textAlign:'center',padding:'2.5rem'}}>
+      <div style={{fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Set up your financial plan first</div>
+      <p style={{color:C.slate,fontSize:'1.06rem'}}>Clearview Business Intelligence needs business units and a financial plan to generate analysis.</p>
+    </div>
+  )
+
+  const m = result.metrics
+  const s = result.scores
+  const warnings = findCashWarningMonths(result, months)
+  const latestHealth = healthReports[0]
+  const latestInvestment = investmentAssessments[0]
 
   // ── Derived figures for the mockup-faithful sections ─────────
   // All read from the engine outputs already computed above; none of these
