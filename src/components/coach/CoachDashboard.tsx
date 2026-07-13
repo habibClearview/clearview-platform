@@ -313,10 +313,16 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
           {deals.map(d=><DealPipelineCard key={d.id} deal={d}/>)}
         </div>
       </>)}
-      {clients.length>0&&(<>
+      {/* Canvas (GtCV) clients only -- they're the only ones with decision-gate
+          stages to be "how far along" through. Financial-model clients have
+          no engagement stages, so listing them here just showed "No canvas
+          yet" against every one of them; they already have their own view
+          (Client Health, Revenue Streams above) that fits what they actually
+          are. */}
+      {clients.filter(c=>c.engagement_mode==='canvas').length>0&&(<>
         <Kicker>Engagements <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; who we serve, and how far along the canvas they are</span></Kicker>
         <div style={{marginBottom:'1.5rem'}}>
-          <EngagementsTable clients={clients} programmes={programmes} coImplementers={coImplementers} canvasByClient={canvasByClient}/>
+          <EngagementsTable clients={clients.filter(c=>c.engagement_mode==='canvas')} programmes={programmes} coImplementers={coImplementers} canvasByClient={canvasByClient}/>
         </div>
       </>)}
       {coImplementers.length>0&&(<>
