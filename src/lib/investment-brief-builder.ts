@@ -24,7 +24,7 @@ import { periodForMonthIndex } from '@/lib/month-end-close'
 import { assessConfidence } from '@/lib/confidence'
 import { buildPeriodSignals, partitionBadges, CONFIDENCE_DISPLAY, BADGE_DISPLAY, READINESS_DISPLAY, type ReadinessStatus } from '@/lib/verification-display'
 import { computeSeasonalCashProjection } from '@/lib/seasonal-cash-projection'
-import { computeCapitalAbsorptionCapacity, type CACTypeResult } from '@/lib/capital-absorption-capacity'
+import { computeFundAbsorptionCapacity, type FACTypeResult } from '@/lib/fund-absorption-capacity'
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -294,7 +294,7 @@ export async function buildInvestmentBrief(clientId: string): Promise<{ buffer: 
       latestMonthlyOpex: result.con.opex[lastActualMonthIndex] ?? 0,
     })
 
-    // ── §CAC: Capital Absorption Capacity ──
+    // ── §FAC: Fund Absorption Capacity ──
     // Built on top of §SCP's stress test above. The input-shop unit is
     // resolved here by name (there is no dedicated "input shop" unit type
     // in the data model) -- consistent with how the calculation module
@@ -304,7 +304,7 @@ export async function buildInvestmentBrief(clientId: string): Promise<{ buffer: 
     const inputShopUnitPL = inputShopBusinessUnit ? result.unitPL[inputShopBusinessUnit.id] : null
     const productionCapacityIndicator = lrsCurrent.dimensions.capacity.indicators.find(ind => ind.label === 'Production Capacity')
     const recordsCompletenessIndicator = lrsCurrent.dimensions.compliance.indicators.find(ind => ind.label === 'Financial Reporting')
-    const cac = computeCapitalAbsorptionCapacity({
+    const fac = computeFundAbsorptionCapacity({
       stressClose_4wk: scp.stressClose_4wk,
       scpDataConfidence: scp.dataConfidence,
       existingAnnualRate: (config.settings.debts && config.settings.debts[0]?.annualRate) || undefined,
@@ -513,15 +513,15 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
     }
     children.push(spacer(0, 200))
 
-    // ── CAPITAL ABSORPTION CAPACITY ──
-    children.push(sectionHeader('Capital Absorption Capacity'))
+    // ── FUND ABSORPTION CAPACITY ──
+    children.push(sectionHeader('Fund Absorption Capacity'))
     children.push(spacer(0, 80))
-    const cacDisplay = (t: CACTypeResult): { value: string; sub: string; color: string } => {
+    const facDisplay = (t: FACTypeResult): { value: string; sub: string; color: string } => {
       if (t.capacity === null) return { value: 'Not yet available', sub: t.reason || 'Add 3+ months of actuals to unlock', color: AMBER }
       if (t.capacity === 0) return { value: fmt(0, cc), sub: t.reason || '', color: RED }
       return { value: `${fmt(t.low!, cc)} – ${fmt(t.high!, cc)}`, sub: 'confidence range', color: GREEN }
     }
-    const creditD = cacDisplay(cac.credit), grantD = cacDisplay(cac.grant), equityD = cacDisplay(cac.equity), consignD = cacDisplay(cac.consignment)
+    const creditD = facDisplay(fac.credit), grantD = facDisplay(fac.grant), equityD = facDisplay(fac.equity), consignD = facDisplay(fac.consignment)
     children.push(metricRow([
       { label: 'Credit (Debt)', value: creditD.value, sub: creditD.sub, color: creditD.color },
       { label: 'Grant (Non-Repayable)', value: grantD.value, sub: grantD.sub, color: grantD.color },
@@ -532,16 +532,16 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
       { label: 'Consignment Stock', value: consignD.value, sub: consignD.sub, color: consignD.color },
     ]))
     children.push(spacer(0, 80))
-    const recoverableD = cacDisplay(cac.recoverableGrant)
+    const recoverableD = facDisplay(fac.recoverableGrant)
     children.push(metricRow([
-      { label: 'Recoverable Grant (Blended)', value: recoverableD.value, sub: `${Math.round(cac.repayableFractionUsed * 100)}% repayable${cac.repayableFractionWasDefaulted ? ' — default assumption' : ''}`, color: recoverableD.color },
+      { label: 'Recoverable Grant (Blended)', value: recoverableD.value, sub: `${Math.round(fac.repayableFractionUsed * 100)}% repayable${fac.repayableFractionWasDefaulted ? ' — default assumption' : ''}`, color: recoverableD.color },
     ]))
     children.push(spacer(0, 140))
-    const cacNotes = [cac.credit, cac.grant, cac.equity, cac.consignment, cac.recoverableGrant]
+    const facNotes = [fac.credit, fac.grant, fac.equity, fac.consignment, fac.recoverableGrant]
       .flatMap(t => [...(t.reason ? [t.reason] : []), ...t.conditions])
-    if (cacNotes.length > 0) {
+    if (facNotes.length > 0) {
       children.push(new Paragraph({ children: [new TextRun({ text: 'Conditions & Reasons', bold: true, color: NAVY, size: 18, font: 'Arial', allCaps: true })], spacing: { after: 80 } }))
-      Array.from(new Set(cacNotes)).forEach(txt => children.push(bullet(txt, SLATE)))
+      Array.from(new Set(facNotes)).forEach(txt => children.push(bullet(txt, SLATE)))
     }
     children.push(spacer(0, 80))
     children.push(note('These figures size how much capital this business can absorb without creating financial distress — not whether it qualifies. Ranges reflect data confidence, not a false precision.'))

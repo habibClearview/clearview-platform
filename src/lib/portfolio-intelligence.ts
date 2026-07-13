@@ -18,7 +18,7 @@
 // bolt onto this profile with a fabricated timescale.
 //
 // Pure aggregation over an array of per-client snapshots -- the snapshot
-// assembly itself (running the financial engine, LRS, CAC, confidence for
+// assembly itself (running the financial engine, LRS, FAC, confidence for
 // every client) lives in app/api/portfolio-intelligence/route.ts, which
 // is the only place with database access. This module never touches a
 // client's raw identity beyond what's passed in.
@@ -39,14 +39,14 @@
 //    re-scored future state -- there's no defensible way to recompute
 //    what a business's financials would look like once "ready" without
 //    fabricating numbers. This instead sums each business's CURRENT
-//    Capital Absorption Capacity by type -- the real capacity today,
+//    Fund Absorption Capacity by type -- the real capacity today,
 //    clearly labelled as such, not a hypothetical ceiling.
 //
 // 3. "Time to readiness distribution" is dropped entirely for the same
 //    reason as (1) -- no data to honestly compute it from.
 
 import type { LRSResult } from './liquidity-readiness'
-import type { CACResult } from './capital-absorption-capacity'
+import type { FACResult } from './fund-absorption-capacity'
 
 export type ReadinessStage = 'pre_investment' | 'development_stage' | 'near_ready' | 'investment_ready'
 
@@ -80,11 +80,11 @@ export interface ClientSnapshot {
   lrs: LRSResult
   confidenceScore: number  // 0-100
   confidenceBadges: string[]  // earned badge ids -- the "evidence base" Level 3 shows
-  cac: CACResult
+  fac: FACResult
   currency: string  // e.g. 'UGX', 'KES', 'USD' -- the client's GenericModelConfig.currency.
-    // CAC figures are monetary and denominated in this currency; they must
+    // FAC figures are monetary and denominated in this currency; they must
     // never be averaged across snapshots with different currencies (see
-    // currentCapitalAbsorption below).
+    // currentFundAbsorption below).
   annualRevenue: number  // raw revenue, for size-bracketing only -- never shown as an exact figure
   businessUnits: BusinessUnitContribution[]  // active units with real revenue, by contribution share
   consentToBeNamed: boolean
@@ -135,7 +135,7 @@ export interface VerificationBand {
   count: number
 }
 
-export interface CapitalAbsorptionSummary {
+export interface FundAbsorptionSummary {
   credit: number | null
   grant: number | null
   equity: number | null
@@ -155,41 +155,41 @@ export interface PortfolioOverview {
   verificationDistribution: VerificationBand[]
   // Keyed by currency code (e.g. 'UGX', 'USD') -- one summary per currency
   // present in the snapshot set, each computed only from snapshots in that
-  // currency. Averaging monetary CAC figures across clients denominated in
+  // currency. Averaging monetary FAC figures across clients denominated in
   // different currencies would produce a meaningless blended number (e.g.
   // mixing tens-of-millions UGX with thousands USD), so this is never a
   // single flat summary.
-  currentCapitalAbsorption: Record<string, CapitalAbsorptionSummary>
+  currentFundAbsorption: Record<string, FundAbsorptionSummary>
 }
 
-// Averages a CAC figure across every snapshot where that type resolved to
+// Averages a FAC figure across every snapshot where that type resolved to
 // a real number (not null) -- a business with "no input shop unit" (null
 // consignment capacity) is excluded from the consignment average, not
 // counted as a zero, which would understate the real average for
 // businesses that DO have one.
-function avgCacType(snapshots: ClientSnapshot[], pick: (cac: CACResult) => number | null): number | null {
-  const values = snapshots.map(s => pick(s.cac)).filter((v): v is number => v !== null)
+function avgFacType(snapshots: ClientSnapshot[], pick: (fac: FACResult) => number | null): number | null {
+  const values = snapshots.map(s => pick(s.fac)).filter((v): v is number => v !== null)
   return values.length > 0 ? average(values) : null
 }
 
-// Groups snapshots by currency and computes one CapitalAbsorptionSummary
-// per currency, so a CAC figure is only ever averaged against other
+// Groups snapshots by currency and computes one FundAbsorptionSummary
+// per currency, so a FAC figure is only ever averaged against other
 // figures denominated in the same currency.
-function capitalAbsorptionByCurrency(snapshots: ClientSnapshot[]): Record<string, CapitalAbsorptionSummary> {
+function fundAbsorptionByCurrency(snapshots: ClientSnapshot[]): Record<string, FundAbsorptionSummary> {
   const byCurrency = new Map<string, ClientSnapshot[]>()
   snapshots.forEach(s => {
     const group = byCurrency.get(s.currency)
     if (group) group.push(s)
     else byCurrency.set(s.currency, [s])
   })
-  const result: Record<string, CapitalAbsorptionSummary> = {}
+  const result: Record<string, FundAbsorptionSummary> = {}
   byCurrency.forEach((group, currency) => {
     result[currency] = {
-      credit: avgCacType(group, c => c.credit.capacity),
-      grant: avgCacType(group, c => c.grant.capacity),
-      equity: avgCacType(group, c => c.equity.capacity),
-      consignment: avgCacType(group, c => c.consignment.capacity),
-      recoverableGrant: avgCacType(group, c => c.recoverableGrant.capacity),
+      credit: avgFacType(group, c => c.credit.capacity),
+      grant: avgFacType(group, c => c.grant.capacity),
+      equity: avgFacType(group, c => c.equity.capacity),
+      consignment: avgFacType(group, c => c.consignment.capacity),
+      recoverableGrant: avgFacType(group, c => c.recoverableGrant.capacity),
     }
   })
   return result
@@ -237,7 +237,7 @@ export function computePortfolioOverview(snapshots: ClientSnapshot[]): Portfolio
     mostCommonWeakDimension,
     dimensionAverages,
     verificationDistribution,
-    currentCapitalAbsorption: capitalAbsorptionByCurrency(snapshots),
+    currentFundAbsorption: fundAbsorptionByCurrency(snapshots),
   }
 }
 
@@ -318,7 +318,7 @@ export type SizeBracket = 'Small' | 'Medium' | 'Large' | 'Very Large' | 'Not eno
 // SAME currency -- comparing a UGX revenue figure against a fixed
 // absolute threshold designed for USD amounts (or vice versa) would be
 // the exact currency-mixing mistake already fixed in
-// currentCapitalAbsorption above. With fewer than 4 same-currency peers
+// currentFundAbsorption above. With fewer than 4 same-currency peers
 // there isn't a meaningful quartile split, so this says so rather than
 // forcing a bracket.
 export function revenueSizeBracket(target: ClientSnapshot, allSnapshots: ClientSnapshot[]): SizeBracket {
@@ -344,7 +344,7 @@ export interface AnonymisedProfile {
   lrs: LRSResult
   confidenceScore: number
   confidenceBadges: string[]
-  cac: CACResult
+  fac: FACResult
   currency: string
   businessUnits: BusinessUnitContribution[]
 }
@@ -363,7 +363,7 @@ export function buildAnonymisedProfile(snapshot: ClientSnapshot, allSnapshots: C
     lrs: snapshot.lrs,
     confidenceScore: snapshot.confidenceScore,
     confidenceBadges: snapshot.confidenceBadges,
-    cac: snapshot.cac,
+    fac: snapshot.fac,
     currency: snapshot.currency,
     businessUnits: snapshot.businessUnits,
   }

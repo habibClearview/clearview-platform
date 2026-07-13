@@ -1,4 +1,4 @@
-// Capital Absorption Capacity (§CAC). Answers, per capital type, how much
+// Fund Absorption Capacity (§FAC). Answers, per capital type, how much
 // a specific business can absorb and deploy without creating financial
 // distress -- a sizing tool, not a creditworthiness score. Computed
 // independently for five capital types, each with its own constraint:
@@ -32,7 +32,7 @@
 
 import type { DataConfidence } from './seasonal-cash-projection'
 
-export interface CACInputs {
+export interface FACInputs {
   // From §SCP
   stressClose_4wk: number[]        // 12 entries, offsets 1..12 -- [] if scpDataConfidence is 'insufficient'
   scpDataConfidence: DataConfidence
@@ -59,7 +59,7 @@ export interface CACInputs {
   repayableFraction?: number        // 0-1; defaults to 0.5 if not configured
 }
 
-export interface CACTypeResult {
+export interface FACTypeResult {
   capacity: number | null
   low: number | null
   high: number | null
@@ -67,12 +67,12 @@ export interface CACTypeResult {
   conditions: string[]
 }
 
-export interface CACResult {
-  credit: CACTypeResult
-  grant: CACTypeResult
-  equity: CACTypeResult
-  consignment: CACTypeResult
-  recoverableGrant: CACTypeResult
+export interface FACResult {
+  credit: FACTypeResult
+  grant: FACTypeResult
+  equity: FACTypeResult
+  consignment: FACTypeResult
+  recoverableGrant: FACTypeResult
   dataConfidence: DataConfidence
   repayableFractionUsed: number
   repayableFractionWasDefaulted: boolean
@@ -84,14 +84,14 @@ const EQUITY_TARGET_RETURN = 0.15
 const GRANT_BASE_PCT_OF_REVENUE = 0.25
 const GRANT_RECORDS_COMPLETENESS_THRESHOLD = 70
 
-function noneType(reason: string, conditions: string[] = []): CACTypeResult {
+function noneType(reason: string, conditions: string[] = []): FACTypeResult {
   return { capacity: null, low: null, high: null, reason, conditions }
 }
-function zeroType(reason: string, conditions: string[] = []): CACTypeResult {
+function zeroType(reason: string, conditions: string[] = []): FACTypeResult {
   return { capacity: 0, low: 0, high: 0, reason, conditions }
 }
 
-function computeCreditCapacity(i: CACInputs): CACTypeResult {
+function computeCreditCapacity(i: FACInputs): FACTypeResult {
   if (i.scpDataConfidence === 'insufficient' || i.stressClose_4wk.length === 0) {
     return noneType('Add 3+ months of actuals to unlock — seasonal cash projection is not yet reliable enough to size credit capacity.')
   }
@@ -128,7 +128,7 @@ function computeCreditCapacity(i: CACInputs): CACTypeResult {
   }
 }
 
-function computeGrantCapacity(i: CACInputs): CACTypeResult {
+function computeGrantCapacity(i: FACInputs): FACTypeResult {
   const ebitdaMargin = i.annualRevenue > 0 ? i.annualEbitda / i.annualRevenue : 0
   if (ebitdaMargin < 0) {
     return zeroType('Business not yet profitable — grant would fund losses, not growth.')
@@ -157,7 +157,7 @@ function computeGrantCapacity(i: CACInputs): CACTypeResult {
   }
 }
 
-function computeEquityCapacity(i: CACInputs): CACTypeResult {
+function computeEquityCapacity(i: FACInputs): FACTypeResult {
   if (i.annualNpat <= 0) {
     return zeroType('Business not yet profitable — equity investors require a return pathway.')
   }
@@ -176,7 +176,7 @@ function computeEquityCapacity(i: CACInputs): CACTypeResult {
   }
 }
 
-function computeConsignmentCapacity(i: CACInputs): CACTypeResult {
+function computeConsignmentCapacity(i: FACInputs): FACTypeResult {
   if (!i.inputShopUnit) {
     return noneType('No input shop unit identified — consignment capacity cannot be computed.')
   }
@@ -200,7 +200,7 @@ function computeConsignmentCapacity(i: CACInputs): CACTypeResult {
   }
 }
 
-function computeRecoverableGrantCapacity(grant: CACTypeResult, credit: CACTypeResult, repayableFraction: number): CACTypeResult {
+function computeRecoverableGrantCapacity(grant: FACTypeResult, credit: FACTypeResult, repayableFraction: number): FACTypeResult {
   if (credit.capacity === null) {
     return noneType('Credit capacity is not yet computable — recoverable grant capacity depends on it.')
   }
@@ -215,7 +215,7 @@ function computeRecoverableGrantCapacity(grant: CACTypeResult, credit: CACTypeRe
   }
 }
 
-export function computeCapitalAbsorptionCapacity(inputs: CACInputs): CACResult {
+export function computeFundAbsorptionCapacity(inputs: FACInputs): FACResult {
   const repayableFractionWasDefaulted = inputs.repayableFraction === undefined
   const repayableFractionUsed = inputs.repayableFraction ?? DEFAULT_REPAYABLE_FRACTION
 

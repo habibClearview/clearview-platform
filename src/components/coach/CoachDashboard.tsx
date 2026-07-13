@@ -924,7 +924,7 @@ function CopyIntakeLink({client}){
 }
 
 const LRS_DIM_LABELS={marketOpportunity:'Market Opportunity',visibility:'Visibility',trust:'Trust',profitability:'Profitability',capacity:'Capacity',resilience:'Resilience',compliance:'Compliance'}
-const CAC_TYPE_LABELS={credit:'Credit',grant:'Grant',equity:'Equity',consignment:'Consignment',recoverableGrant:'Recoverable Grant'}
+const FAC_TYPE_LABELS={credit:'Credit',grant:'Grant',equity:'Equity',consignment:'Consignment',recoverableGrant:'Recoverable Grant'}
 function fmtPortfolioMoney(n,cc){
   if(n===null||n===undefined)return'n/a'
   const v=Math.round(Math.abs(n))
@@ -976,7 +976,7 @@ function PortfolioIntelligenceHub(){
   const {portfolio,segment,filterOptions,snapshotCount}=data
   const hasFilter=Object.keys(filter).length>0
   const view=hasFilter&&segment?segment.segment:portfolio
-  const currencies=Object.keys(portfolio.currentCapitalAbsorption)
+  const currencies=Object.keys(portfolio.currentFundAbsorption)
   const pipelineEntries=[['investment_ready',C.green],['near_ready',C.cyan],['development_stage',C.amber],['pre_investment',C.red]]
 
   return(
@@ -1059,7 +1059,7 @@ function PortfolioIntelligenceHub(){
       </div>
 
       <div style={card}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.3rem'}}>Current capital absorption capacity</div>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.3rem'}}>Current fund absorption capacity</div>
         <div style={{fontSize:'0.85rem',color:C.slate,marginBottom:'0.8rem'}}>Average of what each business could absorb TODAY, by type -- not a hypothetical "if all were investment-ready" ceiling. Shown separately per currency; never blended across currencies.</div>
         {currencies.length===0?(
           <div style={{color:C.slate,fontSize:'0.9rem'}}>Not yet available.</div>
@@ -1067,9 +1067,9 @@ function PortfolioIntelligenceHub(){
           <div key={cc} style={{marginBottom:'0.8rem'}}>
             <div style={{fontFamily:'monospace',fontSize:'0.85rem',color:C.slate,marginBottom:'0.4rem'}}>{cc}</div>
             <div className="cv-grid-4">
-              {Object.entries(portfolio.currentCapitalAbsorption[cc]).map(([type,val])=>(
+              {Object.entries(portfolio.currentFundAbsorption[cc]).map(([type,val])=>(
                 <div key={type} style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.6rem 0.8rem'}}>
-                  <div style={{fontSize:'0.8rem',color:C.slate}}>{CAC_TYPE_LABELS[type]}</div>
+                  <div style={{fontSize:'0.8rem',color:C.slate}}>{FAC_TYPE_LABELS[type]}</div>
                   <div style={{fontSize:'1.05rem',fontWeight:700,color:C.navy}}>{fmtPortfolioMoney(val,cc)}</div>
                 </div>
               ))}
@@ -1143,10 +1143,10 @@ function PortfolioIntelligenceHub(){
               ))}
             </div>
 
-            <div style={{fontWeight:700,fontSize:'0.95rem',color:C.navy,marginBottom:'0.5rem'}}>Capital absorption capacity</div>
+            <div style={{fontWeight:700,fontSize:'0.95rem',color:C.navy,marginBottom:'0.5rem'}}>Fund absorption capacity</div>
             <div className="cv-grid-3" style={{marginBottom:'1rem'}}>
-              {Object.entries(CAC_TYPE_LABELS).map(([key,label])=>{
-                const t=openProfile.cac[key]
+              {Object.entries(FAC_TYPE_LABELS).map(([key,label])=>{
+                const t=openProfile.fac[key]
                 return(
                   <div key={key} style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.5rem 0.7rem'}}>
                     <div style={{fontSize:'0.78rem',color:C.slate}}>{label}</div>

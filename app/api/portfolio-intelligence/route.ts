@@ -3,7 +3,7 @@
 // Aggregated, portfolio-level view across every financial client on the
 // platform -- see src/lib/portfolio-intelligence.ts for the aggregation
 // math (pure, tested independently). This route's only job is to
-// assemble one ClientSnapshot per client (the same LRS/CAC construction
+// assemble one ClientSnapshot per client (the same LRS/FAC construction
 // GenericDashboard.tsx and investment-brief-builder.ts already use,
 // built independently here rather than refactored out of the shipped
 // document builder to keep this addition low-risk) and hand the array
@@ -23,7 +23,7 @@ import { periodForMonthIndex } from '@/lib/month-end-close'
 import { assessConfidence } from '@/lib/confidence'
 import { buildPeriodSignals } from '@/lib/verification-display'
 import { computeSeasonalCashProjection } from '@/lib/seasonal-cash-projection'
-import { computeCapitalAbsorptionCapacity } from '@/lib/capital-absorption-capacity'
+import { computeFundAbsorptionCapacity } from '@/lib/fund-absorption-capacity'
 import { computePortfolioOverview, computeSegmentReport, buildAnonymisedProfile, matchesFilter, type ClientSnapshot, type SegmentFilter } from '@/lib/portfolio-intelligence'
 
 function getAdminClient() {
@@ -110,7 +110,7 @@ async function buildClientSnapshot(admin: ReturnType<typeof getAdminClient>, cli
   const inputShopUnitPL = inputShopBusinessUnit ? result.unitPL[inputShopBusinessUnit.id] : null
   const productionCapacityIndicator = lrsCurrent.dimensions.capacity.indicators.find(ind => ind.label === 'Production Capacity')
   const recordsCompletenessIndicator = lrsCurrent.dimensions.compliance.indicators.find(ind => ind.label === 'Financial Reporting')
-  const cac = computeCapitalAbsorptionCapacity({
+  const fac = computeFundAbsorptionCapacity({
     stressClose_4wk: scp.stressClose_4wk,
     scpDataConfidence: scp.dataConfidence,
     existingAnnualRate: (config.settings.debts && config.settings.debts[0]?.annualRate) || undefined,
@@ -167,7 +167,7 @@ async function buildClientSnapshot(admin: ReturnType<typeof getAdminClient>, cli
     lrs: lrsCurrent,
     confidenceScore: confidence.score,
     confidenceBadges: confidence.badges,
-    cac,
+    fac,
     currency: config.currency,
     annualRevenue: m.total_revenue,
     businessUnits,
