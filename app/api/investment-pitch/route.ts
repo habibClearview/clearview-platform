@@ -17,6 +17,8 @@ import { computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary, mon
 import { periodForMonthIndex } from '@/lib/month-end-close'
 import { assessConfidence } from '@/lib/confidence'
 import { buildPeriodSignals, partitionBadges, CONFIDENCE_DISPLAY, BADGE_DISPLAY, READINESS_DISPLAY, type ReadinessStatus } from '@/lib/verification-display'
+import { computeSeasonalCashProjection } from '@/lib/seasonal-cash-projection'
+import { computeCapitalAbsorptionCapacity, type CACTypeResult } from '@/lib/capital-absorption-capacity'
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -268,8 +270,53 @@ export async function POST(req: NextRequest) {
     })
     const bankFit = computeFitScore(lrsCurrent, FIT_SCORE_PRESETS.bank.weights)
     const investorFit = computeFitScore(lrsCurrent, FIT_SCORE_PRESETS.investor.weights)
+    const grantFit = computeFitScore(lrsCurrent, FIT_SCORE_PRESETS.grant.weights)
+    const equityFit = computeFitScore(lrsCurrent, FIT_SCORE_PRESETS.equity.weights)
+    const consignmentFit = computeFitScore(lrsCurrent, FIT_SCORE_PRESETS.consignment.weights)
+    const recoverableFit = computeFitScore(lrsCurrent, FIT_SCORE_PRESETS.recoverable.weights)
     const lrsWord = lrsCurrent.score >= 70 ? 'Strong' : lrsCurrent.score >= 50 ? 'Building' : lrsCurrent.score >= 30 ? 'Developing' : 'Early'
     const scoreColorLRS = (v: number) => v >= 70 ? GREEN : v >= 50 ? CYAN : v >= 30 ? AMBER : RED
+
+    // ── §SCP: Seasonal Cash Position Projection ──
+    // Same inputs the calculation module expects: gross profit (not raw
+    // revenue) as the cash driver, and a 12-month-cycle seasonal index
+    // derived from this business's own closed actuals.
+    const lastActualMonthIndex = Math.max(0, periodIsActual.lastIndexOf(true))
+    const scp = computeSeasonalCashProjection({
+      cfClose: result.cf.close,
+      rev: result.con.rev,
+      gp: result.con.gp,
+      debtRepayment: result.debtSchedule.totalRepayment,
+      monthsClosedFlags,
+      currentMonthIndex: lastActualMonthIndex,
+      latestMonthlyOpex: result.con.opex[lastActualMonthIndex] ?? 0,
+    })
+
+    // ── §CAC: Capital Absorption Capacity ──
+    // Built on top of §SCP's stress test above. The input-shop unit is
+    // resolved here by name (there is no dedicated "input shop" unit type
+    // in the data model) -- consistent with how the calculation module
+    // itself expects this classification to be done by the caller.
+    const inputShopBusinessUnit = result.allocUnits.find((u: any) =>
+      (u.name || '').toLowerCase().includes('input') || (u.short || '').toLowerCase().includes('input'))
+    const inputShopUnitPL = inputShopBusinessUnit ? result.unitPL[inputShopBusinessUnit.id] : null
+    const productionCapacityIndicator = lrsCurrent.dimensions.capacity.indicators.find(ind => ind.label === 'Production Capacity')
+    const recordsCompletenessIndicator = lrsCurrent.dimensions.compliance.indicators.find(ind => ind.label === 'Financial Reporting')
+    const cac = computeCapitalAbsorptionCapacity({
+      stressClose_4wk: scp.stressClose_4wk,
+      scpDataConfidence: scp.dataConfidence,
+      existingAnnualRate: (config.settings.debts && config.settings.debts[0]?.annualRate) || undefined,
+      cashConversionGapDays: tc.cashConversionGap,
+      annualRevenue: m.total_revenue,
+      annualGrossProfit: m.total_gp,
+      annualEbitda: m.total_ebitda,
+      annualNpat: m.total_npat,
+      productionCapacityScore: productionCapacityIndicator?.value ?? 0,
+      governanceScore: Number(assess.governance) || 0,
+      revTrend: s.revTrend,
+      inputShopUnit: inputShopUnitPL ? { annualRevenue: inputShopUnitPL.ann_rev, annualGrossProfit: inputShopUnitPL.ann_gp } : null,
+      recordsCompletenessPct: recordsCompletenessIndicator?.value ?? 0,
+    })
 
     // ── Verification & Recognition: readiness, confidence, badges ──
     // Same construction as VerificationRecognition.tsx -- reconciliation figures
@@ -395,6 +442,13 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
         scoreBadge(FIT_SCORE_PRESETS.investor.label, `${Math.round(investorFit)}/100`, investorFit >= 50 ? 'Fit' : 'Developing fit', scoreColorLRS(investorFit), w3),
       ]})],
     }))
+    children.push(spacer(0, 100))
+    children.push(metricRow([
+      { label: FIT_SCORE_PRESETS.grant.label, value: `${Math.round(grantFit)}/100`, sub: grantFit >= 50 ? 'Fit' : 'Developing fit', color: scoreColorLRS(grantFit) },
+      { label: FIT_SCORE_PRESETS.equity.label, value: `${Math.round(equityFit)}/100`, sub: equityFit >= 50 ? 'Fit' : 'Developing fit', color: scoreColorLRS(equityFit) },
+      { label: FIT_SCORE_PRESETS.consignment.label, value: `${Math.round(consignmentFit)}/100`, sub: consignmentFit >= 50 ? 'Fit' : 'Developing fit', color: scoreColorLRS(consignmentFit) },
+      { label: FIT_SCORE_PRESETS.recoverable.label, value: `${Math.round(recoverableFit)}/100`, sub: recoverableFit >= 50 ? 'Fit' : 'Developing fit', color: scoreColorLRS(recoverableFit) },
+    ]))
     children.push(spacer(0, 140))
     const lrsDims: { key: keyof typeof lrsCurrent.dimensions; label: string }[] = [
       { key: 'marketOpportunity', label: 'Market Opportunity' },
@@ -438,6 +492,57 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
       { label: 'Staff Cost', value: pct(m.staff_cost_pct), sub: `${m.total_headcount} staff · ${fmt(m.revenue_per_head, cc)}/head`, color: m.staff_cost_pct < 0.35 ? GREEN : AMBER },
       { label: 'Business Units', value: String(config.business_units.filter((u: any) => u.active).length), sub: config.business_units.filter((u: any) => u.active).map((u: any) => u.short || u.name.slice(0,8)).join(' · '), color: NAVY },
     ]))
+    children.push(spacer(0, 200))
+
+    // ── SEASONAL CASH POSITION PROJECTION ──
+    children.push(sectionHeader('Seasonal Cash Position Projection'))
+    children.push(spacer(0, 80))
+    if (scp.dataConfidence === 'insufficient') {
+      children.push(note('Add 3+ months of closed actuals to unlock a seasonal cash projection for this business.'))
+    } else {
+      const troughStress = scp.troughMonthOffset ? scp.stressClose_4wk[scp.troughMonthOffset - 1] : null
+      children.push(metricRow([
+        { label: 'Tightest Point (12mo)', value: scp.troughValue !== null ? fmt(scp.troughValue, cc) : 'n/a', sub: scp.troughMonthOffset ? `in month ${scp.troughMonthOffset}` : '', color: (scp.troughValue ?? 0) >= 0 ? GREEN : RED },
+        { label: 'With 4-Week Payment Delay', value: troughStress !== null ? fmt(troughStress, cc) : 'n/a', sub: 'stress-tested trough', color: (troughStress ?? 0) >= 0 ? AMBER : RED },
+        { label: 'Data Confidence', value: scp.dataConfidence === 'reliable' ? 'Reliable' : 'Limited', sub: scp.dataConfidence === 'reliable' ? '6+ closed months' : '3-5 closed months', color: scp.dataConfidence === 'reliable' ? GREEN : AMBER },
+      ]))
+      children.push(spacer(0, 80))
+      children.push(note('Projection is derived from this business\'s own historical seasonal pattern, not a generic assumption. Gross profit (not raw revenue) is the cash-generating driver, so cost of sales is already accounted for.'))
+    }
+    children.push(spacer(0, 200))
+
+    // ── CAPITAL ABSORPTION CAPACITY ──
+    children.push(sectionHeader('Capital Absorption Capacity'))
+    children.push(spacer(0, 80))
+    const cacDisplay = (t: CACTypeResult): { value: string; sub: string; color: string } => {
+      if (t.capacity === null) return { value: 'Not yet available', sub: t.reason || 'Add 3+ months of actuals to unlock', color: AMBER }
+      if (t.capacity === 0) return { value: fmt(0, cc), sub: t.reason || '', color: RED }
+      return { value: `${fmt(t.low!, cc)} – ${fmt(t.high!, cc)}`, sub: 'confidence range', color: GREEN }
+    }
+    const creditD = cacDisplay(cac.credit), grantD = cacDisplay(cac.grant), equityD = cacDisplay(cac.equity), consignD = cacDisplay(cac.consignment)
+    children.push(metricRow([
+      { label: 'Credit (Debt)', value: creditD.value, sub: creditD.sub, color: creditD.color },
+      { label: 'Grant (Non-Repayable)', value: grantD.value, sub: grantD.sub, color: grantD.color },
+    ]))
+    children.push(spacer(0, 80))
+    children.push(metricRow([
+      { label: 'Equity', value: equityD.value, sub: equityD.sub, color: equityD.color },
+      { label: 'Consignment Stock', value: consignD.value, sub: consignD.sub, color: consignD.color },
+    ]))
+    children.push(spacer(0, 80))
+    const recoverableD = cacDisplay(cac.recoverableGrant)
+    children.push(metricRow([
+      { label: 'Recoverable Grant (Blended)', value: recoverableD.value, sub: `${Math.round(cac.repayableFractionUsed * 100)}% repayable${cac.repayableFractionWasDefaulted ? ' — default assumption' : ''}`, color: recoverableD.color },
+    ]))
+    children.push(spacer(0, 140))
+    const cacNotes = [cac.credit, cac.grant, cac.equity, cac.consignment, cac.recoverableGrant]
+      .flatMap(t => [...(t.reason ? [t.reason] : []), ...t.conditions])
+    if (cacNotes.length > 0) {
+      children.push(new Paragraph({ children: [new TextRun({ text: 'Conditions & Reasons', bold: true, color: NAVY, size: 18, font: 'Arial', allCaps: true })], spacing: { after: 80 } }))
+      Array.from(new Set(cacNotes)).forEach(txt => children.push(bullet(txt, SLATE)))
+    }
+    children.push(spacer(0, 80))
+    children.push(note('These figures size how much capital this business can absorb without creating financial distress — not whether it qualifies. Ranges reflect data confidence, not a false precision.'))
     children.push(spacer(0, 200))
 
     // ── VALUE PROPOSITION & BUSINESS MODEL ──
