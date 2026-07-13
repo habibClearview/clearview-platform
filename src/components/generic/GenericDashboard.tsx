@@ -480,6 +480,10 @@ export interface GenericPermissions {
   canManageTeam: boolean
   canManageCatalogue: boolean
   canViewAI: boolean
+  // Only read when role === 'funder': the coach-configurable level of
+  // detail set per programme (Programmes -> a programme -> Edit, "Funder
+  // sees"). Every other role always gets full access regardless of this.
+  funderDetailLevel?: 'summary' | 'full'
   onSignOut: () => void
 }
 
@@ -682,7 +686,19 @@ export default function GenericDashboard({
 
   // Grouped so inputs sit together and outputs sit together: Overview (home),
   // then the input tabs, then the reporting/output tabs, then admin.
-  const mainNav = [
+  // A funder never edits anything (Planning/Actuals & WC/Approvals/
+  // Settings are all editing or admin surfaces, hidden regardless of
+  // their configured detail level) and only sees the full financial
+  // statements (P&L/Cash Flow/Balance Sheet) at 'full' detail level --
+  // see programmes.funder_detail_level, set via Programmes -> a
+  // programme -> Edit -> "Funder sees".
+  const isFunder = P.role === 'funder'
+  const funderFull = isFunder && P.funderDetailLevel === 'full'
+  const mainNav = isFunder ? [
+    ['overview','Overview'],
+    ['intelligence','Clearview Intelligence'],
+    ...(funderFull ? [['pl','P&L'],['cashflow','Cash Flow'],['balancesheet','Balance Sheet']] : []),
+  ] : [
     ['overview','Overview'],
     ['intelligence','Clearview Intelligence'],
     ['planning','Planning'],
@@ -3904,7 +3920,19 @@ Write a status report, not a letter. Do not address the reader. Do not open with
     setGeneratingNarrative(false)
   }
 
-  const tabList:[string,string][] = [
+  // A funder at 'summary' detail level gets only the headline sections;
+  // at 'full' they get everything except Coach Assessment, which is the
+  // coach's own internal qualitative notes, not written for an external
+  // funder. See programmes.funder_detail_level.
+  const isFunder = P.role === 'funder'
+  const funderFull = isFunder && P.funderDetailLevel === 'full'
+  const tabList:[string,string][] = isFunder && !funderFull ? [
+    ['summary','Summary'],['liquidity_readiness','Liquidity Readiness'],
+  ] : isFunder ? [
+    ['summary','Summary'],['credit','Credit Risk'],
+    ['going_concern','Going Concern'],['liquidity_readiness','Liquidity Readiness'],
+    ['verification','Verification & Recognition'],['events','Marketing Events'],
+  ] : [
     ['summary','Summary'],['credit','Credit Risk'],
     ['going_concern','Going Concern'],['liquidity_readiness','Liquidity Readiness'],
     ['verification','Verification & Recognition'],

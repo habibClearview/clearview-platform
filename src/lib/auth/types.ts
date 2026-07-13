@@ -3,7 +3,8 @@
 // ============================================================
 export type UserRole =
   | 'super_coach'     // Habib — sees everything, invisible to client
-  | 'coach'           // Co-implementer / associate coach
+  | 'coach'           // Co-implementer / associate coach — sees only their assigned clients
+  | 'funder'          // Programme funder — sees only the clients under their programme
   | 'ceo'             // Client CEO — full control, all units
   | 'finance_manager' // Approves actuals, manages users
   | 'unit_head'       // Sees and edits their own unit only
@@ -17,6 +18,13 @@ export interface AppUser {
   client_id: string | null
   // For unit_head and accounts_assistant: which units they can access
   assigned_unit_ids: string[]
+  // Single-client roles (ceo/finance_manager/unit_head/accounts_assistant)
+  engagement_client_id: string | null
+  // 'coach' role: which co_implementers roster row this login is, so its
+  // client_ids array can be resolved -- see RLS's my_co_implementer_id().
+  co_implementer_id: string | null
+  // 'funder' role: the one programme this login is scoped to.
+  funder_programme_id: string | null
 }
 
 export function canApproveSpendrequests(role: UserRole): boolean {
@@ -36,7 +44,7 @@ export function canSubmitSpendRequest(role: UserRole): boolean {
 }
 
 export function canEnterActuals(role: UserRole): boolean {
-  return ['super_coach', 'ceo', 'finance_manager', 'unit_head', 'accounts_assistant'].includes(role)
+  return ['super_coach', 'coach', 'ceo', 'finance_manager', 'unit_head', 'accounts_assistant'].includes(role)
 }
 
 export function canSeeAllUnits(role: UserRole): boolean {
@@ -51,6 +59,7 @@ export function roleLabel(role: UserRole): string {
   const labels: Record<UserRole, string> = {
     super_coach: 'Coach',
     coach: 'Co-Implementer',
+    funder: 'Funder',
     ceo: 'CEO',
     finance_manager: 'Finance Manager',
     unit_head: 'Unit Head',

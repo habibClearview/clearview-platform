@@ -58,6 +58,7 @@ export default function GenericClientPage() {
   const slug = params?.slug as string
   const [user, setUser] = useState<any>(null)
   const [clientId, setClientId] = useState<string|null>(null)
+  const [funderDetailLevel, setFunderDetailLevel] = useState<'summary'|'full'>('summary')
   const [checking, setChecking] = useState(true)
   const [authError, setAuthError] = useState(false)
 
@@ -67,10 +68,14 @@ export default function GenericClientPage() {
       if (!session) { setChecking(false); return }
       // Load user profile
       const {data:profile} = await supabase.from('user_profiles')
-        .select('id,role,full_name,email,client_id,engagement_client_id,assigned_unit_ids,can_manage_catalogue')
+        .select('id,role,full_name,email,client_id,engagement_client_id,assigned_unit_ids,can_manage_catalogue,co_implementer_id,funder_programme_id')
         .eq('id',session.user.id).single()
       if (profile) setUser({...profile, email:session.user.email})
-      // Find client by slug from engagement_clients
+      // Find client by slug from engagement_clients. This query is
+      // RLS-scoped (the browser's own session, not the service key), so
+      // for 'coach'/'funder' roles it already returns null unless their
+      // co_implementers.client_ids / programme actually includes this
+      // client -- see 2026_07_13_funder_coimplementer_access.sql.
       const {data:client} = await supabase.from('engagement_clients')
         .select('id').eq('slug',slug).single()
       // Authorization check: does this user actually belong to the client
@@ -78,11 +83,27 @@ export default function GenericClientPage() {
       // authenticated user could navigate to any client's URL slug and
       // see that client's full dashboard, using their own role's
       // permissions. super_coach is the deliberate exception (sees every
-      // client); everyone else must have a matching engagement_client_id.
+      // client). ceo/finance_manager/unit_head/accounts_assistant must
+      // have a matching engagement_client_id. coach/funder are multi-
+      // client roles with no single engagement_client_id to compare --
+      // RLS is the real gate for them (the query above already returns no
+      // row if unauthorized), this just requires the role to be one of
+      // the two roles RLS actually grants multi-client access to.
       const isSuperCoach = profile?.role === 'super_coach'
-      const isAuthorized = isSuperCoach || (!!profile?.engagement_client_id && profile.engagement_client_id === client?.id)
+      const isDirectClientUser = !!profile?.engagement_client_id && profile.engagement_client_id === client?.id
+      const isMultiClientRoleWithAccess = (profile?.role === 'coach' || profile?.role === 'funder') && !!client
+      const isAuthorized = isSuperCoach || isDirectClientUser || isMultiClientRoleWithAccess
       if (client && isAuthorized) setClientId(client.id)
       else if (client && !isAuthorized) setAuthError(true)
+      // The coach-configurable level of detail a funder sees, read from
+      // their one programme -- irrelevant (default stays 'summary', but
+      // unused) for every other role, since only role==='funder' ever
+      // reads funderDetailLevel below.
+      if (client && isAuthorized && profile?.role === 'funder' && profile.funder_programme_id) {
+        const {data:programme} = await supabase.from('programmes')
+          .select('funder_detail_level').eq('id',profile.funder_programme_id).single()
+        if (programme?.funder_detail_level === 'full') setFunderDetailLevel('full')
+      }
       setChecking(false)
     }
     init()
@@ -110,12 +131,19 @@ export default function GenericClientPage() {
     canEditPlan: ['super_coach','coach','ceo','finance_manager','unit_head'].includes(user.role),
     canApprove: ['super_coach','ceo','finance_manager'].includes(user.role),
     canSubmitRequest: ['super_coach','finance_manager','unit_head','accounts_assistant'].includes(user.role),
-    canEnterActuals: true,
+    // Was unconditionally true for every role, including the new
+    // read-only funder role -- gated to the same roles canEditPlan etc.
+    // already cover, so no existing role's access changes.
+    canEnterActuals: ['super_coach','coach','ceo','finance_manager','unit_head','accounts_assistant'].includes(user.role),
     canManageTeam: ['super_coach','ceo'].includes(user.role),
     // The CEO and Finance Manager always have this; anyone else needs it
     // explicitly delegated via the "Manage Field Catalogue" toggle in Team.
     canManageCatalogue: ['super_coach','ceo','finance_manager'].includes(user.role) || !!user.can_manage_catalogue,
     canViewAI: ['super_coach','coach','ceo'].includes(user.role),
+    // Only meaningful for role==='funder' -- see GenericDashboard's tab
+    // filtering. Every other role always gets full access regardless of
+    // this value.
+    funderDetailLevel,
     onSignOut: async () => { await supabase.auth.signOut(); window.location.href='/' },
   }
 
