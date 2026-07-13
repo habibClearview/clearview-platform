@@ -720,7 +720,11 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     const [showNew,setShowNew]=useState(false)
     const [showUpload,setShowUpload]=useState(false)
     const [refreshing,setRefreshing]=useState(false)
-    const filtered=filter==='all'?clients:clients.filter(c=>c.type===filter||c.engagement_mode===filter)
+    const filtered=filter==='all'?clients
+      :filter==='active'?clients.filter(c=>c.status!=='complete'&&c.status!=='paused')
+      :filter==='completed'?clients.filter(c=>c.status==='complete')
+      :filter==='paused'?clients.filter(c=>c.status==='paused')
+      :clients.filter(c=>c.type===filter||c.engagement_mode===filter)
     async function refreshClients(){
       setRefreshing(true)
       try { const fresh = await loadClients(); setClients(fresh) }
@@ -731,9 +735,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       <div>
         <div style={{display:'flex',gap:'0.45rem',marginBottom:'1.25rem',flexWrap:'wrap',alignItems:'center'}}>
           <button style={addBtn(true,C.teal)} onClick={refreshClients} disabled={refreshing}>{refreshing?'Refreshing...':'\u21bb Refresh'}</button>
-          {['all','canvas','financial','crop_aggregator','livestock_aggregator','farmer_group_enterprise','service_lsp'].map(f=>(
-            <button key={f} style={subPill(filter===f)} onClick={()=>setFilter(f)}>
-              {f==='all'?'All':f==='canvas'?'GtCV Canvas':f==='financial'?'Clearview Only':CLIENT_TYPE_LABELS[f]||f}
+          {['all','active','completed','paused','canvas','financial','crop_aggregator','livestock_aggregator','farmer_group_enterprise','service_lsp'].map(f=>(
+            <button key={f} style={subPill(filter===f,f==='completed'?C.green:f==='paused'?C.red:C.cyan)} onClick={()=>setFilter(f)}>
+              {f==='all'?'All':f==='active'?'Active':f==='completed'?'Completed':f==='paused'?'Paused':f==='canvas'?'GtCV Canvas':f==='financial'?'Clearview Only':CLIENT_TYPE_LABELS[f]||f}
             </button>
           ))}
           <button style={{...addBtn(true,C.teal),marginLeft:'auto'}} onClick={()=>{setShowUpload(!showUpload);setShowNew(false)}}>Upload Spreadsheet</button>
@@ -1866,7 +1870,7 @@ function TabPilotObservation({client,pilots,onAdd,onUpdate}){
 // change it (every new client silently landed on Climate Smart Jobs, no
 // matter what the coach actually meant). This is the real fix: the coach
 // explicitly picks a real programme, or "No programme (independent)".
-function ClientSetupFields({f,setF,programmes}){
+function ClientSetupFields({f,setF,programmes,showStatus}){
   return(
     <div style={fGrid}>
       <div><label style={lbl}>Name *</label><input style={inp} value={f.name} onChange={e=>setF(x=>({...x,name:e.target.value}))}/></div>
@@ -1877,6 +1881,10 @@ function ClientSetupFields({f,setF,programmes}){
       <div><label style={lbl}>Sector</label><input style={inp} value={f.sector} onChange={e=>setF(x=>({...x,sector:e.target.value}))}/></div>
       <div><label style={lbl}>CEO Name</label><input style={inp} value={f.contact_name} onChange={e=>setF(x=>({...x,contact_name:e.target.value}))}/></div>
       <div><label style={lbl}>CEO Email</label><input type="email" style={inp} value={f.contact_email} onChange={e=>setF(x=>({...x,contact_email:e.target.value}))}/></div>
+      {/* Only the canvas client's Cover tab exposed this before -- financial-only
+          clients had no way to ever be marked complete/paused, so "active"
+          counts (header, Client Health) could never change for them. */}
+      {showStatus&&<div><label style={lbl}>Status</label><select style={inp} value={f.status||'setup'} onChange={e=>setF(x=>({...x,status:e.target.value}))}>{['setup','phase_0','dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09','complete','paused'].map(s=><option key={s} value={s}>{statusLabel(s)}</option>)}</select></div>}
     </div>
   )
 }
@@ -1908,7 +1916,7 @@ function EditClientForm({client,programmes,onSave,onCancel}){
   const [f,setF]=useState({
     name:client.name||'',type:client.type||'service_lsp',engagement_mode:client.engagement_mode||'canvas',
     programme_id:client.programme_id||null,country:client.country||'',sector:client.sector||'',
-    contact_name:client.contact_name||'',contact_email:client.contact_email||'',
+    contact_name:client.contact_name||'',contact_email:client.contact_email||'',status:client.status||'setup',
   })
   const [saving,setSaving]=useState(false)
   const [msg,setMsg]=useState(null)
@@ -1923,7 +1931,7 @@ function EditClientForm({client,programmes,onSave,onCancel}){
   return(
     <div style={{...card,border:`1px solid ${C.cyan}`,marginBottom:'1.25rem'}}>
       <div style={secH}>Edit Client Organisation</div>
-      <ClientSetupFields f={f} setF={setF} programmes={programmes}/>
+      <ClientSetupFields f={f} setF={setF} programmes={programmes} showStatus/>
       {msg&&<div style={{...hint,color:C.red,marginTop:'0.6rem'}}>{msg}</div>}
       <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
         <button style={solidBtn()} disabled={saving} onClick={doSave}>{saving?'Saving…':'Save changes'}</button>
