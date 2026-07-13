@@ -3479,6 +3479,11 @@ function SettingsTab({config,P,onSave,theme,setThemeMode}) {
               <input type="number" style={inp} value={Math.round(((form.settings.capital_structure?.annual_interest_rate||0.18)*100))}
                 onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),annual_interest_rate:Number(e.target.value)/100}}}))}/>
             </div>
+            <div><label style={lbl}>Fixed Asset Useful Life (years)</label>
+              <input type="number" min={1} style={inp} value={form.settings.capital_structure?.fixed_asset_useful_life_years||5}
+                onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),fixed_asset_useful_life_years:Number(e.target.value)}}}))}/>
+              <div style={hint}>Depreciated straight-line over this many years -- affects EBIT, tax, and the Fixed Assets balance shown on the Balance Sheet.</div>
+            </div>
           </div>
         </div>
       )}
@@ -3825,15 +3830,18 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,clo
   const fullYearGroups = yearGroups.filter((g:any)=>g.monthIndices.length>=12)
   const lastYearGroup = fullYearGroups[fullYearGroups.length-1] || yearGroups[yearGroups.length-1] || {monthIndices:months.map((_:string,i:number)=>i)}
   const sumOver = (arr:number[], idxs:number[]) => idxs.reduce((sum:number,i:number)=>sum+(arr[i]||0),0)
-  // No depreciation/amortisation is modelled, so EBIT == EBITDA here.
-  const annualEbit = sumOver(result.con.ebitda, lastYearGroup.monthIndices)
+  // EBIT = EBITDA less depreciation (result.con.ebit, from generic-engine.ts) --
+  // kept distinct from annualEbitda below since Debt/EBITDA is conventionally
+  // an EBITDA-based leverage ratio while ROCE and Interest Cover are EBIT-based.
+  const annualEbit = sumOver(result.con.ebit || result.con.ebitda, lastYearGroup.monthIndices)
+  const annualEbitda = sumOver(result.con.ebitda, lastYearGroup.monthIndices)
   const annualInterest = sumOver(debtSched.totalInterest, lastYearGroup.monthIndices)
   const loanLiab = result.bs.loan_liability?.[lastIdx] || 0
   const totalEquityLast = result.bs.total_equity?.[lastIdx] || 0
   const capitalEmployed = totalEquityLast + loanLiab
   const ebitdaMargin = m.total_revenue>0 ? m.total_ebitda/m.total_revenue : null
   const roce = capitalEmployed>0 ? annualEbit/capitalEmployed : null
-  const debtToEbitda = (s.hasDebt && annualEbit>0) ? loanLiab/annualEbit : null
+  const debtToEbitda = (s.hasDebt && annualEbitda>0) ? loanLiab/annualEbitda : null
   const gearing = (s.hasDebt && totalEquityLast>0) ? loanLiab/totalEquityLast : null
   const interestCover = annualInterest>0 ? annualEbit/annualInterest : null
   const latestOpex = result.con.opex?.[lastIdx] || 0
@@ -4347,8 +4355,8 @@ Write a status report, not a letter. Do not address the reader. Do not open with
                   <p style={{fontSize:'0.96rem',color:C.slate,marginTop:'0.5rem',lineHeight:1.5}}>
                     Current ratio = (cash + receivables outstanding) &divide; (payables outstanding + loan principal due in the next 12 months).
                     Quick ratio equals the current ratio here because no inventory is held on the balance sheet. Cash is floored at zero for the
-                    ratio (a negative balance is an overdraft, flagged separately in the cash warning). EBIT equals EBITDA here as no depreciation
-                    is modelled; coverage ratios use the latest full financial year.
+                    ratio (a negative balance is an overdraft, flagged separately in the cash warning). EBIT is EBITDA less straight-line
+                    depreciation (Settings → Capital Structure); coverage ratios use the latest full financial year.
                   </p>
                 </>
               )
@@ -5100,9 +5108,12 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
         )}
       </div>
 
-      {plMode==='statement' && viewMode==='unit' && (result.debtSchedule?.totalInterest||[]).some((v:number)=>v>0) && (
+      {plMode==='statement' && viewMode==='unit' && (
+        (result.debtSchedule?.totalInterest||[]).some((v:number)=>v>0) || (result.con?.depreciation||[]).some((v:number)=>v>0)
+      ) && (
         <div style={{marginBottom:'1.1rem',background:'var(--cv-tint-teal-soft)',border:`1px solid ${C.teal}`,borderLeft:`4px solid ${C.teal}`,borderRadius:8,padding:'0.7rem 1rem',fontSize:'0.98rem',color:C.navy,lineHeight:1.5}}>
-          This business has a loan. Interest is a whole-business cost, not allocated to one unit, so it only appears on the{' '}
+          This business has {(result.debtSchedule?.totalInterest||[]).some((v:number)=>v>0) && (result.con?.depreciation||[]).some((v:number)=>v>0) ? 'a loan and fixed assets' : (result.con?.depreciation||[]).some((v:number)=>v>0) ? 'fixed assets' : 'a loan'}.
+          {' '}Interest and depreciation are whole-business figures, not allocated to one unit, so they only appear on the{' '}
           <button onClick={()=>setViewMode('consolidated')} style={{fontFamily:'monospace',fontWeight:700,color:C.teal,background:'none',border:'none',cursor:'pointer',padding:0,textDecoration:'underline'}}>Consolidated</button> P&L, not here.
         </div>
       )}
@@ -5207,13 +5218,17 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
         // both can't silently diverge the way they did before (Annual
         // Revenue vs Gross Profit reading from two different sources).
         const { periodIsActual, rev: revValues, cogs: cogsValues, gp: gpValues, opex: opexValues,
-                ebitda: ebitdaValues, nbt: nbtValues, tax: taxValues, npat: npatValues } = buildHybridConsolidated(result.con)
+                ebitda: ebitdaValues, depreciation: depreciationValues, ebit: ebitValues,
+                nbt: nbtValues, tax: taxValues, npat: npatValues } = buildHybridConsolidated(result.con)
         const rows = [
           {label:'Revenue',values:revValues,bold:true,actualMask:periodIsActual},
           {label:'Cost of Sales',values:cogsValues,negate:true,actualMask:periodIsActual},
           {label:'Gross Profit',values:gpValues,bold:true,highlight:true,actualMask:periodIsActual},
           {label:'Total Operating Costs',values:opexValues,negate:true,actualMask:periodIsActual},
           {label:'EBITDA',values:ebitdaValues,bold:true,highlight:true,actualMask:periodIsActual},
+          // Straight-line, from Settings -> Capital Structure -> Fixed Asset Useful Life.
+          {label:'Depreciation',values:depreciationValues,negate:true},
+          {label:'EBIT',values:ebitValues,bold:true,actualMask:periodIsActual},
           {label:'Interest',values:result.con.interest,negate:true},
           {label:'Net Profit Before Tax',values:nbtValues,bold:true,actualMask:periodIsActual},
           {label:'Tax',values:taxValues,negate:true,actualMask:periodIsActual},
@@ -5864,7 +5879,17 @@ function CashFlowTab({config,result,months,cc,closedPeriods}) {
   )
   const rows = [
     {label:'Opening Cash',values:cf.open,bold:true,actualMask:cf.act_mask,aggregation:'startOfPeriod' as const},
-    {label:'Net Profit After Tax',values:result.con.npat.map((v:number,i:number)=>result.con.act_npat[i]!==null?result.con.act_npat[i]:v),actualMask:cf.act_mask},
+    // result.con.hybrid_npat is the engine's single source of truth for
+    // actual-where-available/plan-otherwise NPAT (see generic-engine.ts) --
+    // reading it directly here instead of re-deriving via npat/act_npat
+    // keeps this row byte-for-byte consistent with what cf.op_cash was
+    // actually built from.
+    {label:'Net Profit After Tax',values:result.con.hybrid_npat,actualMask:cf.act_mask},
+    // Depreciation reduced NPAT above but is a non-cash charge -- added
+    // back here, exactly like a standard indirect-method cash flow
+    // statement, since the real cash cost was already paid at purchase
+    // (see Fixed Asset Purchases below).
+    {label:'Depreciation (non-cash, added back)',values:result.con.depreciation||Array(months.length).fill(0)},
     {label:'Operating Cash Flow',values:cf.op_cash,bold:true,actualMask:cf.act_mask},
     {label:'Capital & Financing',values:cf.fin_cash},
     {label:'Fixed Asset Purchases',values:cf.inv_cash||Array(months.length).fill(0),negate:false},
@@ -6048,7 +6073,7 @@ function BalanceSheetTab({config,result,months,cc,P,closedPeriods,onCloseStatusC
   const rows = [
     {label:'ASSETS',values:Array(months.length).fill(0),bold:true,aggregation:'endOfPeriod' as const},
     {label:'Cash & Bank',values:bs.cash,actualMask:bs.act_mask,aggregation:'endOfPeriod' as const},
-    {label:'Fixed Assets',values:bs.fixed_assets,aggregation:'endOfPeriod' as const},
+    {label:'Fixed Assets (Net Book Value)',values:bs.fixed_assets,aggregation:'endOfPeriod' as const},
     {label:'Total Assets',values:bs.total_assets,bold:true,highlight:true,actualMask:bs.act_mask,aggregation:'endOfPeriod' as const},
     {label:'EQUITY',values:Array(months.length).fill(0),bold:true,aggregation:'endOfPeriod' as const},
     {label:'Share Capital',values:bs.share_capital,aggregation:'endOfPeriod' as const},

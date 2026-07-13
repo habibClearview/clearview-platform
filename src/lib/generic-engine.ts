@@ -126,6 +126,75 @@ export function defaultExpandedYears(yearGroups: YearGroup[], currentYear: numbe
   return init
 }
 
+// ── Depreciation ─────────────────────────────────────────────
+// Straight-line only -- the simplest method and the one almost every
+// SME/coach-assessment context uses by default. The asset is treated as
+// placed in service in month 1 (the same month its cash outflow hits
+// inv_cash[0]) and depreciates evenly over its useful life; net book
+// value floors at zero once fully depreciated rather than going negative
+// or continuing to charge past a fully written-down asset. A zero or
+// missing useful life means "not depreciated" (net book value stays at
+// cost for every month) rather than dividing by zero or instantly
+// expensing the whole asset, since an unset life is far more likely to
+// be a missing input than a deliberate "expense immediately" choice.
+export function buildDepreciationSchedule(cost: number, usefulLifeMonths: number, months: number): { monthlyDepreciation: number[]; netBookValue: number[] } {
+  const monthlyDepreciation = Array(months).fill(0)
+  const netBookValue = Array(months).fill(Math.max(0, cost))
+  if (cost <= 0 || usefulLifeMonths <= 0) return { monthlyDepreciation, netBookValue }
+  const perMonth = cost / usefulLifeMonths
+  let accumulated = 0
+  for (let m = 0; m < months; m++) {
+    const charge = Math.min(perMonth, Math.max(0, cost - accumulated))
+    monthlyDepreciation[m] = charge
+    accumulated += charge
+    netBookValue[m] = cost - accumulated
+  }
+  return { monthlyDepreciation, netBookValue }
+}
+
+// ── Corporate tax ────────────────────────────────────────────
+// Real corporate tax is assessed on CUMULATIVE profit within a fiscal
+// year, not as many independent monthly assessments that can't see each
+// other -- a loss earlier in the year legitimately offsets a profit
+// later in the SAME year, and a full fiscal year's loss carries forward
+// (uncapped here -- some tax regimes cap the carry-forward period or its
+// value, which isn't modelled) to offset a future year's taxable profit.
+// Taxing each month purely on its own NBT, with zero tax on a loss month
+// but no credit for it against a profitable month right afterward,
+// overstates total tax for any business with a lumpy or seasonal P&L.
+//
+// Recognises tax incrementally within a year: taxableCum tracks
+// cumulative year-to-date NBT net of the carryforward entering the year,
+// and each month's tax is the CHANGE in cumulative tax liability since
+// the prior month. This can legitimately go negative mid-year (a loss
+// month reduces a tax provision already recognised from an earlier
+// profit in the same year) -- a real, standard effect of cumulative
+// interim tax provisioning, not a bug.
+export function applyCorporateTax(
+  nbt: number[], yearGroups: YearGroup[], taxRate: number, openingNol = 0
+): { tax: number[]; npat: number[]; closingNol: number } {
+  const tax = Array(nbt.length).fill(0)
+  const npat = Array(nbt.length).fill(0)
+  let nol = Math.max(0, openingNol)
+  yearGroups.forEach(g => {
+    let cumNbt = 0
+    let cumTax = 0
+    g.monthIndices.forEach(m => {
+      cumNbt += nbt[m] ?? 0
+      const taxableCum = Math.max(0, cumNbt - nol)
+      const newCumTax = taxableCum * taxRate
+      tax[m] = newCumTax - cumTax
+      cumTax = newCumTax
+      npat[m] = (nbt[m] ?? 0) - tax[m]
+    })
+    // Roll the carryforward for the next fiscal year off this year's
+    // FINAL cumulative result, not month-by-month -- a mid-year dip that
+    // fully recovers by year-end shouldn't permanently inflate it.
+    nol = cumNbt > 0 ? Math.max(0, nol - cumNbt) : nol + (-cumNbt)
+  })
+  return { tax, npat, closingNol: nol }
+}
+
 // ── Types ────────────────────────────────────────────────────
 
 // Unit types
@@ -211,6 +280,11 @@ export interface GenericCapital {
   annual_interest_rate: number
   loan_tenor_years: number
   fixed_assets: number
+  // Straight-line depreciation life for fixed_assets. Defaults to 5 years
+  // (60 months) when absent -- a generic SME equipment/vehicle life --
+  // rather than defaulting to "no depreciation," which would silently
+  // reintroduce the exact non-compliance this field exists to fix.
+  fixed_asset_useful_life_years?: number
 }
 
 // ── Default empty config ────────────────────────────────────
@@ -242,6 +316,7 @@ export function defaultGenericConfig(overrides: Partial<GenericModelConfig> = {}
         annual_interest_rate: 0.18,
         loan_tenor_years: 2,
         fixed_assets: 0,
+        fixed_asset_useful_life_years: 5,
       },
     },
     ...overrides,
@@ -758,13 +833,40 @@ export function runGenericModel(
       }] : [])
   const debtSchedule = buildDebtSchedule(debtObligations, months)
 
+  // ── Depreciation ───────────────────────────────────────────
+  // Built the same way the debt schedule is: once, ahead of the P&L
+  // consolidation loop, so it can be deducted as a real cost before tax
+  // (EBIT = EBITDA - Depreciation, the standard waterfall) and added
+  // back in operating cash flow, since it's a non-cash allocation of a
+  // cost already paid in cash back at the point of purchase (inv_cash[0]).
+  const depreciation = buildDepreciationSchedule(
+    cap.fixed_assets ?? 0, (cap.fixed_asset_useful_life_years ?? 5) * 12, months
+  )
+
   const con = {
     rev: zero(), cogs: zero(), gp: zero(), opex: zero(),
-    ebitda: zero(), interest: debtSchedule.totalInterest, nbt: zero(), tax: zero(), npat: zero(),
+    ebitda: zero(), depreciation: depreciation.monthlyDepreciation, ebit: zero(),
+    interest: debtSchedule.totalInterest, nbt: zero(), tax: zero(), npat: zero(),
+    // Canonical hybrid NBT/Tax/NPAT (actual where available, plan for the
+    // rest of that same fiscal year) -- filled in after the tax pass
+    // below. Cash Flow, the Balance Sheet, AND the Consolidated P&L
+    // display must all read THESE, not reconstruct their own
+    // actual-else-plan substitution, since only these arrays correctly
+    // carry a fiscal year's actual-to-date tax position into its still-
+    // forecast remaining months (see applyCorporateTax) -- a plain
+    // substitution of only the final figure (actual npat where present,
+    // else plan npat) silently drops that carryforward for every future
+    // month within a fiscal year that already has actuals in it.
+    hybrid_nbt: zero(), hybrid_tax: zero(), hybrid_npat: zero(),
     act_rev: nullArr(), act_cogs: nullArr(), act_staff: nullArr(), act_opex: nullArr(),
     act_gp: nullArr(), act_ebitda: nullArr(),
     act_nbt: nullArr(), act_tax: nullArr(), act_npat: nullArr(),
   }
+  // NBT derived purely from actuals, null for a future month -- feeds the
+  // hybrid tax pass below. Kept separate from con.act_nbt (which is only
+  // filled in once, from the hybrid tax result) so the tax pass has a
+  // clean, tax-free actual NBT stream to work from.
+  const actNbtRaw = nullArr()
 
   for (let m = 0; m < months; m++) {
     let sharedPoolThisMonth = 0
@@ -800,13 +902,17 @@ export function runGenericModel(
       // shared pool between the two views.
       sharedPoolThisMonth += r.shared[m]
     })
-    // Interest is deducted before tax (standard treatment -- interest is a
-    // tax-deductible finance cost). Principal is NOT deducted here: repaying
-    // loan principal isn't an expense, it's a financing cash outflow with no
-    // P&L impact -- that's handled separately in the cash flow section below.
-    con.nbt[m]  = con.ebitda[m] - (con.interest[m] ?? 0)
-    con.tax[m]  = con.nbt[m] > 0 ? con.nbt[m] * (settings.corporate_tax_rate ?? 0.30) : 0
-    con.npat[m] = con.nbt[m] - con.tax[m]
+    // Depreciation is deducted before interest (EBIT = EBITDA -
+    // Depreciation), then interest before tax (standard waterfall --
+    // interest is a tax-deductible finance cost too). Principal is NOT
+    // deducted here: repaying loan principal isn't an expense, it's a
+    // financing cash outflow with no P&L impact -- handled separately in
+    // the cash flow section below. Tax/NPAT are NOT computed here -- real
+    // corporate tax is assessed on cumulative annual profit, not month by
+    // month in isolation, so both are filled in by applyCorporateTax()
+    // after this loop (see the tax pass below).
+    con.ebit[m] = con.ebitda[m] - depreciation.monthlyDepreciation[m]
+    con.nbt[m]  = con.ebit[m] - (con.interest[m] ?? 0)
     // Actual Gross Profit and EBITDA: the same calendar rule as
     // everywhere else in this model -- a past or current month sums
     // whatever actual was entered across every unit (zero where nothing
@@ -818,20 +924,51 @@ export function runGenericModel(
       con.act_gp[m] = (con.act_rev[m] ?? 0) - (con.act_cogs[m] ?? 0)
       con.act_ebitda[m] = con.act_gp[m]! - (con.act_staff[m] ?? 0) - (con.act_opex[m] ?? 0) - sharedPoolThisMonth
     }
-    // Actual NBT/tax/NPAT cascade from act_ebitda the same way the planned
-    // figures cascade from planned ebitda -- interest itself is NOT a
-    // plan-vs-actual figure (it's computed from the real loan's actual
-    // terms regardless of which month is "closed"), so it's safe to
-    // reuse con.interest[m] here rather than needing a separate actual
-    // interest concept. Cash Flow and Balance Sheet below both derive
-    // from NPAT, so making NPAT hybrid here is what makes them hybrid
-    // too, without needing a separate parallel calculation for each.
+    // Actual NBT cascades from act_ebitda the same way the planned figure
+    // cascades from planned ebitda -- depreciation and interest are NOT
+    // plan-vs-actual figures (depreciation is a fixed schedule, interest
+    // is computed from the real loan's actual terms regardless of which
+    // month is "closed"), so it's safe to reuse them here rather than
+    // needing separate actual concepts for either. Tax/NPAT are filled in
+    // afterward by the hybrid tax pass below, not computed per-month here.
     if (con.act_ebitda[m] !== null) {
-      con.act_nbt[m] = (con.act_ebitda[m] as number) - (con.interest[m] ?? 0)
-      con.act_tax[m] = con.act_nbt[m]! > 0 ? con.act_nbt[m]! * (settings.corporate_tax_rate ?? 0.30) : 0
-      con.act_npat[m] = con.act_nbt[m]! - con.act_tax[m]!
+      const actEbit = (con.act_ebitda[m] as number) - depreciation.monthlyDepreciation[m]
+      actNbtRaw[m] = actEbit - (con.interest[m] ?? 0)
     }
   }
+
+  // ── Corporate tax (annual cumulative, not per-month) ────────
+  // Two parallel tax passes over the SAME function so they can never
+  // diverge in method, only in which NBT stream feeds them:
+  //  - plannedTaxResult: "what the plan alone would owe," ignoring any
+  //    actuals -- this is what con.tax/con.npat mean everywhere else in
+  //    this model already (a straight plan figure, untouched by actuals).
+  //  - hybridTaxResult: actual NBT where available, plan NBT for the rest
+  //    of the SAME fiscal year. This is the one true tax/NPAT figure Cash
+  //    Flow and the Balance Sheet must use: it correctly carries whatever
+  //    real year-to-date position the actuals have produced into the
+  //    still-forecast remainder of that fiscal year. A naive substitution
+  //    of only the final npat number (actual npat where present, else
+  //    planned npat) would silently ignore that carryforward and misstate
+  //    every future month's tax within a fiscal year that already has
+  //    actuals in it.
+  const yearGroups = buildYearGroups(config.start_date, months)
+  const taxRate = settings.corporate_tax_rate ?? 0.30
+  const plannedTaxResult = applyCorporateTax(con.nbt, yearGroups, taxRate)
+  con.tax  = plannedTaxResult.tax
+  con.npat = plannedTaxResult.npat
+  const hybridNbtForTax = con.nbt.map((v, m) => actNbtRaw[m] !== null ? (actNbtRaw[m] as number) : v)
+  const hybridTaxResult = applyCorporateTax(hybridNbtForTax, yearGroups, taxRate)
+  for (let m = 0; m < months; m++) {
+    if (actNbtRaw[m] !== null) {
+      con.act_nbt[m]  = actNbtRaw[m]
+      con.act_tax[m]  = hybridTaxResult.tax[m]
+      con.act_npat[m] = hybridTaxResult.npat[m]
+    }
+  }
+  con.hybrid_nbt  = hybridNbtForTax
+  con.hybrid_tax  = hybridTaxResult.tax
+  con.hybrid_npat = hybridTaxResult.npat
 
   // ── Trade credit working capital adjustment ────────────────
   // Computed before cash flow so its cash effect can be added as a proper
@@ -847,12 +984,12 @@ export function runGenericModel(
   const tradeCreditCashEffect = tradeCredit.monthlyCashEffect
 
   // ── Cash flow ─────────────────────────────────────────────
-  // Hybrid NPAT: actual where available, planned otherwise. This single
-  // substitution is what makes Cash Flow and Balance Sheet hybrid too --
-  // both are built directly from NPAT below, the same way they're built
-  // from planned NPAT today, so correctness cascades automatically
-  // rather than needing a separate parallel actual calculation for each.
-  const hybridNpat = con.npat.map((v, m) => con.act_npat[m] !== null ? (con.act_npat[m] as number) : v)
+  // con.hybrid_npat (computed above by the tax pass) is the canonical
+  // actual-where-available, plan-otherwise NPAT -- Cash Flow and the
+  // Balance Sheet are built directly from it below, so correctness
+  // cascades automatically rather than needing a separate parallel
+  // calculation for each.
+  const hybridNpat = con.hybrid_npat
 
   const cf = {
     op_cash:  zero(), fin_cash: zero(), inv_cash: zero(), net: zero(),
@@ -883,7 +1020,11 @@ export function runGenericModel(
     // it's not an expense, just cash moving from the business to the lender.
     // Interest is already reflected in npat above (deducted before tax).
     cf.fin_cash[m] -= debtSchedule.totalPrincipal[m] ?? 0
-    cf.op_cash[m] = hybridNpat[m] + (tradeCreditCashEffect[m] ?? 0)
+    // Depreciation is added back -- it already reduced hybridNpat above,
+    // but it's a non-cash allocation of a cost the business already paid
+    // in cash back at purchase (inv_cash[0]), so it must not ALSO reduce
+    // cash again here. Standard indirect-method cash flow treatment.
+    cf.op_cash[m] = hybridNpat[m] + depreciation.monthlyDepreciation[m] + (tradeCreditCashEffect[m] ?? 0)
     cf.net[m]     = cf.op_cash[m] + cf.fin_cash[m] + cf.inv_cash[m]
     cf.open[m]    = m === 0 ? (settings.opening_cash_balance ?? 0) : cf.close[m - 1]
     cf.close[m]   = cf.open[m] + cf.net[m]
@@ -899,7 +1040,9 @@ export function runGenericModel(
   // ── Balance sheet ─────────────────────────────────────────
   const bs = {
     cash: cf.close,
-    fixed_assets: Array(months).fill(cap.fixed_assets ?? 0) as number[],
+    // Net book value -- declines via the depreciation schedule above,
+    // rather than sitting at original cost forever.
+    fixed_assets: depreciation.netBookValue,
     accounts_receivable: tradeCredit.totalReceivableOutstanding,
     total_assets: zero(),
     share_capital: Array(months).fill(cap.shareholder_contribution) as number[],
