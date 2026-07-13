@@ -69,6 +69,42 @@ function recentPeriods(n=8){
 }
 const EXPENSE_CATEGORIES=['travel','accommodation','comms','materials','other']
 
+// Real file upload to a private Supabase Storage bucket (coach-receipts),
+// not a pasted URL. Objects live under '{co_implementer_id}/...' so the
+// RLS policy in 2026_07_13_coimplementer_self_service_pay.sql can scope a
+// co-implementer to only their own folder. The bucket is private, so
+// viewing a receipt always goes through a short-lived signed URL --
+// never a permanent public link -- generated fresh on each click.
+function ReceiptUpload({coImplementerId,path,onUploaded}){
+  const [busy,setBusy]=useState(false)
+  const [err,setErr]=useState(null)
+  async function handleFile(e){
+    const file=e.target.files?.[0]
+    if(!file)return
+    setBusy(true);setErr(null)
+    const objectPath=`${coImplementerId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`
+    const {error}=await supabase.storage.from('coach-receipts').upload(objectPath,file)
+    setBusy(false)
+    if(error)return setErr(error.message)
+    onUploaded(objectPath)
+  }
+  async function view(){
+    const {data,error}=await supabase.storage.from('coach-receipts').createSignedUrl(path,3600)
+    if(!error&&data?.signedUrl)window.open(data.signedUrl,'_blank')
+    else setErr(error?.message||'Could not open receipt.')
+  }
+  return(
+    <div style={{display:'flex',alignItems:'center',gap:'0.4rem',flexWrap:'wrap'}}>
+      {path&&<button type="button" style={addBtn(true,C.teal)} onClick={view}>View</button>}
+      <label style={{...addBtn(true,path?C.slate:C.cyan),cursor:'pointer',margin:0}}>
+        {busy?'Uploading…':path?'Replace':'+ Upload'}
+        <input type="file" accept="image/*,.pdf" style={{display:'none'}} onChange={handleFile} disabled={busy}/>
+      </label>
+      {err&&<span style={{fontSize:'0.93rem',color:C.red}}>{err}</span>}
+    </div>
+  )
+}
+
 // ─── ACCESS — real client_ids assignment, no invented access level ────
 // Per-client permission GRADES (Edit/View/Full) and a red/amber health flag
 // were checked against the schema before building this: neither exists
@@ -135,7 +171,7 @@ function AccessSection({coImplementers,setCoImplementers,clients,setMsg}){
   )
 }
 
-export default function TeamPayments({coImplementers=[],setCoImplementers,clients=[],userName='Coach'}){
+export default function TeamPayments({coImplementers=[],setCoImplementers,clients=[],userName='Coach',canApprove=true}){
   const [entries,setEntries]=useState([])
   const [expenses,setExpenses]=useState([])
   const [advances,setAdvances]=useState([])
@@ -196,21 +232,21 @@ export default function TeamPayments({coImplementers=[],setCoImplementers,client
       </div>
       <p style={{...hint,marginBottom:'1rem'}}>Co-implementers are paid by the day but log hours per task. The platform rolls hours into days ({HOURS_PER_DAY}h = 1 day) at the person's day rate, adds approved expenses, nets off any advance taken, and auto-drafts one invoice per co-implementer per period. An unreconciled advance blocks the next invoice from issuing.</p>
 
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'0.85rem',marginBottom:'1.25rem'}}>
+      {canApprove&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'0.85rem',marginBottom:'1.25rem'}}>
         <KPI label="Approved days" value={fmtDays(approvedDaysAll)} sub={`${period}`}/>
         <KPI label="Draft invoices (net)" value={draftNetAll?fmtMoney(draftNetAll,curOf(coImplementers[0])):'—'} sub="across team, this period" color={C.teal}/>
         <KPI label="Open advances" value={openAdvancesAll.length} sub={openAdvancesAll.length?'blocking invoices':'none outstanding'} color={openAdvancesAll.length?C.amber:C.green}/>
         <KPI label="Invoices issued" value={issuedThisPeriod.length} sub={`${period}`} color={C.purple}/>
-      </div>
+      </div>}
 
-      {accessMsg&&<div style={{fontSize:'1.01rem',color:C.slate,marginBottom:'0.6rem'}}>{accessMsg}</div>}
-      <AccessSection coImplementers={coImplementers} setCoImplementers={setCoImplementers} clients={clients} setMsg={setAccessMsg}/>
+      {canApprove&&accessMsg&&<div style={{fontSize:'1.01rem',color:C.slate,marginBottom:'0.6rem'}}>{accessMsg}</div>}
+      {canApprove&&<AccessSection coImplementers={coImplementers} setCoImplementers={setCoImplementers} clients={clients} setMsg={setAccessMsg}/>}
 
       {coImplementers.length===0
-        ? <div style={{...card,color:C.slate,textAlign:'center',padding:'2.5rem'}}>No co-implementers yet. Add them in the Team tab, then set a day rate here.</div>
+        ? <div style={{...card,color:C.slate,textAlign:'center',padding:'2.5rem'}}>{canApprove?'No co-implementers yet. Add them in the Team tab, then set a day rate here.':'Your co-implementer profile could not be found. Contact your coach.'}</div>
         : coImplementers.map(ci=>(
             <CoImplementerPayments
-              key={ci.id} ci={ci} period={period} userName={userName} clientName={clientName} clients={clients}
+              key={ci.id} ci={ci} period={period} userName={userName} clientName={clientName} clients={clients} canApprove={canApprove}
               entries={entries} setEntries={setEntries}
               expenses={expenses} setExpenses={setExpenses}
               advances={advances} setAdvances={setAdvances}
@@ -242,7 +278,7 @@ function computeDraft(ci,period,entries,expenses,advances){
   return {approvedHours,days,rate,timeAmount,expApproved,openAdvances,openAdvanceTotal,gross,advanceApplied,net,blocked}
 }
 
-function CoImplementerPayments({ci,period,userName,clientName,clients,entries,setEntries,expenses,setExpenses,advances,setAdvances,invoices,setInvoices}){
+function CoImplementerPayments({ci,period,userName,clientName,clients,entries,setEntries,expenses,setExpenses,advances,setAdvances,invoices,setInvoices,canApprove}){
   const [tab,setTab]=useState('timesheets')
   const [savingRate,setSavingRate]=useState(false)
   const [rateDraft,setRateDraft]=useState(String(rateOf(ci)||''))
@@ -276,11 +312,11 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
         </div>
         <div style={{textAlign:'right'}}>
           <div style={{fontFamily:'monospace',fontSize:'0.93rem',color:d.rate>0?C.slate:C.amber,marginBottom:'0.3rem'}}>{d.rate>0?`${fmtMoney(d.rate,curOf(ci))}/day`:'no day rate set'}</div>
-          <div style={{display:'flex',gap:'0.35rem',alignItems:'center',justifyContent:'flex-end'}}>
+          {canApprove&&<div style={{display:'flex',gap:'0.35rem',alignItems:'center',justifyContent:'flex-end'}}>
             <input style={{...inp,width:90,padding:'0.28rem 0.45rem',fontSize:'1.01rem'}} type="number" value={rateDraft} placeholder="rate" onChange={e=>setRateDraft(e.target.value)}/>
             <select style={{...inp,width:70,padding:'0.28rem 0.35rem',fontSize:'1.01rem'}} value={curDraft} onChange={e=>setCurDraft(e.target.value)}>{['USD','GBP','EUR','UGX','NGN','KES'].map(x=><option key={x}>{x}</option>)}</select>
             <button style={addBtn(true)} disabled={savingRate} onClick={saveRate}>{savingRate?'…':'Set rate'}</button>
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -300,16 +336,16 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
 
       {msg&&<div style={{fontSize:'1.01rem',color:C.slate,marginBottom:'0.6rem'}}>{msg}</div>}
 
-      {tab==='timesheets'&&<TimesheetSection ci={ci} period={period} userName={userName} assignedClients={assignedClients} clientName={clientName} entries={entries} setEntries={setEntries} setMsg={setMsg}/>}
-      {tab==='expenses'&&<ExpenseSection ci={ci} period={period} userName={userName} assignedClients={assignedClients} clientName={clientName} expenses={expenses} setExpenses={setExpenses} setMsg={setMsg}/>}
-      {tab==='advances'&&<AdvanceSection ci={ci} advances={advances} setAdvances={setAdvances} setMsg={setMsg}/>}
-      {tab==='invoice'&&<InvoiceSection ci={ci} period={period} draft={d} clientName={clientName} entries={entries} expenses={expenses} advances={advances} setAdvances={setAdvances} invoices={ciInvoices} setInvoices={setInvoices} alreadyIssued={alreadyIssued} busy={busy} setBusy={setBusy} setMsg={setMsg}/>}
+      {tab==='timesheets'&&<TimesheetSection ci={ci} period={period} userName={userName} assignedClients={assignedClients} clientName={clientName} entries={entries} setEntries={setEntries} setMsg={setMsg} canApprove={canApprove}/>}
+      {tab==='expenses'&&<ExpenseSection ci={ci} period={period} userName={userName} assignedClients={assignedClients} clientName={clientName} expenses={expenses} setExpenses={setExpenses} setMsg={setMsg} canApprove={canApprove}/>}
+      {tab==='advances'&&<AdvanceSection ci={ci} advances={advances} setAdvances={setAdvances} setMsg={setMsg} canApprove={canApprove}/>}
+      {tab==='invoice'&&<InvoiceSection ci={ci} period={period} draft={d} clientName={clientName} entries={entries} expenses={expenses} advances={advances} setAdvances={setAdvances} invoices={ciInvoices} setInvoices={setInvoices} alreadyIssued={alreadyIssued} busy={busy} setBusy={setBusy} setMsg={setMsg} canApprove={canApprove}/>}
     </div>
   )
 }
 
 // ─── TIMESHEETS ──────────────────────────────────────────────
-function TimesheetSection({ci,period,userName,assignedClients,clientName,entries,setEntries,setMsg}){
+function TimesheetSection({ci,period,userName,assignedClients,clientName,entries,setEntries,setMsg,canApprove}){
   const rows=entries.filter(e=>e.co_implementer_id===ci.id&&e.period===period)
   const [f,setF]=useState({entry_date:today(),client_id:assignedClients[0]?.id||'',task:'',hours:''})
   async function add(){
@@ -329,7 +365,7 @@ function TimesheetSection({ci,period,userName,assignedClients,clientName,entries
     <div>
       <div style={{overflowX:'auto',marginBottom:'0.75rem'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
-          <thead><tr style={{background:C.lightBg}}>{['Date','Client','Task','Hours','Days','Status',''].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+          <thead><tr style={{background:C.lightBg}}>{['Date','Client','Task','Hours','Days','Status',canApprove?'':null].filter(h=>h!==null).map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
           <tbody>
             {rows.length===0&&<tr><td style={{...td,color:C.slate}} colSpan={7}>No timesheet entries for {period}.</td></tr>}
             {rows.map((e,i)=><tr key={e.id} style={{background:i%2?C.white:C.cream}}>
@@ -339,7 +375,7 @@ function TimesheetSection({ci,period,userName,assignedClients,clientName,entries
               <td style={td}>{e.hours}</td>
               <td style={td}>{fmtDays(daysFromHours(e.hours))}</td>
               <td style={td}><Badge text={e.status} color={e.status==='approved'?C.green:e.status==='submitted'?C.amber:C.slate}/></td>
-              <td style={td}>{e.status!=='approved'&&<button style={solidBtn(C.green,true)} onClick={()=>setStatus(e.id,'approved')}>Approve</button>}{e.status==='approved'&&<button style={addBtn(true,C.slate)} onClick={()=>setStatus(e.id,'submitted')}>Unapprove</button>}</td>
+              {canApprove&&<td style={td}>{e.status!=='approved'&&<button style={solidBtn(C.green,true)} onClick={()=>setStatus(e.id,'approved')}>Approve</button>}{e.status==='approved'&&<button style={addBtn(true,C.slate)} onClick={()=>setStatus(e.id,'submitted')}>Unapprove</button>}</td>}
             </tr>)}
           </tbody>
         </table>
@@ -356,7 +392,7 @@ function TimesheetSection({ci,period,userName,assignedClients,clientName,entries
 }
 
 // ─── EXPENSES ────────────────────────────────────────────────
-function ExpenseSection({ci,period,userName,assignedClients,clientName,expenses,setExpenses,setMsg}){
+function ExpenseSection({ci,period,userName,assignedClients,clientName,expenses,setExpenses,setMsg,canApprove}){
   const rows=expenses.filter(x=>x.co_implementer_id===ci.id&&x.period===period)
   const [f,setF]=useState({expense_date:today(),client_id:assignedClients[0]?.id||'',description:'',category:'travel',amount:'',currency:curOf(ci),receipt_url:''})
   async function add(){
@@ -372,11 +408,16 @@ function ExpenseSection({ci,period,userName,assignedClients,clientName,expenses,
     if(error)return setMsg('Could not update expense: '+error.message)
     setExpenses(prev=>prev.map(x=>x.id!==id?x:{...x,...patch}))
   }
+  async function attachReceipt(id,objectPath){
+    const {error}=await supabase.from('coach_expenses').update({receipt_url:objectPath}).eq('id',id)
+    if(error)return setMsg('Could not attach receipt: '+error.message)
+    setExpenses(prev=>prev.map(x=>x.id!==id?x:{...x,receipt_url:objectPath}))
+  }
   return(
     <div>
       <div style={{overflowX:'auto',marginBottom:'0.75rem'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
-          <thead><tr style={{background:C.lightBg}}>{['Date','Client','Description','Category','Amount','Receipt','Status',''].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+          <thead><tr style={{background:C.lightBg}}>{['Date','Client','Description','Category','Amount','Receipt','Status',canApprove?'':null].filter(h=>h!==null).map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
           <tbody>
             {rows.length===0&&<tr><td style={{...td,color:C.slate}} colSpan={8}>No expenses for {period}.</td></tr>}
             {rows.map((x,i)=><tr key={x.id} style={{background:i%2?C.white:C.cream}}>
@@ -385,9 +426,9 @@ function ExpenseSection({ci,period,userName,assignedClients,clientName,expenses,
               <td style={{...td,maxWidth:200}}>{x.description||'—'}</td>
               <td style={td}>{x.category}</td>
               <td style={td}>{fmtMoney(x.amount,x.currency)}</td>
-              <td style={td}>{x.receipt_url?<a href={x.receipt_url} target="_blank" rel="noreferrer" style={{color:C.cyan}}>view</a>:<span style={{color:C.amber}}>none</span>}</td>
+              <td style={td}><ReceiptUpload coImplementerId={ci.id} path={x.receipt_url} onUploaded={p=>attachReceipt(x.id,p)}/></td>
               <td style={td}><Badge text={x.status} color={x.status==='approved'?C.green:x.status==='rejected'?C.red:C.amber}/></td>
-              <td style={td}>{x.status!=='approved'&&<button style={solidBtn(C.green,true)} onClick={()=>setStatus(x.id,'approved')}>Approve</button>} {x.status!=='rejected'&&<button style={addBtn(true,C.red)} onClick={()=>setStatus(x.id,'rejected')}>Reject</button>}</td>
+              {canApprove&&<td style={td}>{x.status!=='approved'&&<button style={solidBtn(C.green,true)} onClick={()=>setStatus(x.id,'approved')}>Approve</button>} {x.status!=='rejected'&&<button style={addBtn(true,C.red)} onClick={()=>setStatus(x.id,'rejected')}>Reject</button>}</td>}
             </tr>)}
           </tbody>
         </table>
@@ -398,7 +439,7 @@ function ExpenseSection({ci,period,userName,assignedClients,clientName,expenses,
         <div style={{gridColumn:'span 2'}}><label style={lbl}>Description</label><input style={inp} value={f.description} onChange={e=>setF(x=>({...x,description:e.target.value}))}/></div>
         <div><label style={lbl}>Category</label><select style={inp} value={f.category} onChange={e=>setF(x=>({...x,category:e.target.value}))}>{EXPENSE_CATEGORIES.map(c=><option key={c}>{c}</option>)}</select></div>
         <div><label style={lbl}>Amount</label><input type="number" step="0.01" style={inp} value={f.amount} onChange={e=>setF(x=>({...x,amount:e.target.value}))}/></div>
-        <div><label style={lbl}>Receipt URL</label><input style={inp} value={f.receipt_url} placeholder="link to receipt" onChange={e=>setF(x=>({...x,receipt_url:e.target.value}))}/></div>
+        <div><label style={lbl}>Receipt</label><ReceiptUpload coImplementerId={ci.id} path={f.receipt_url} onUploaded={p=>setF(x=>({...x,receipt_url:p}))}/></div>
         <div><button style={solidBtn()} onClick={add}>+ Add expense</button></div>
       </div>
     </div>
@@ -406,39 +447,48 @@ function ExpenseSection({ci,period,userName,assignedClients,clientName,expenses,
 }
 
 // ─── ADVANCES ────────────────────────────────────────────────
-function AdvanceSection({ci,advances,setAdvances,setMsg}){
+function AdvanceSection({ci,advances,setAdvances,setMsg,canApprove}){
   const rows=advances.filter(a=>a.co_implementer_id===ci.id).sort((a,b)=>(b.advance_date||'').localeCompare(a.advance_date||''))
-  const [f,setF]=useState({amount:'',currency:curOf(ci),advance_date:today(),reason:'',due_date:addDays(today(),14)})
+  const [f,setF]=useState({amount:'',currency:curOf(ci),advance_date:today(),reason:'',due_date:addDays(today(),14),receipt_url:''})
   async function add(){
     if(!num(f.amount))return setMsg('Enter an advance amount.')
-    const row={co_implementer_id:ci.id,amount:num(f.amount),currency:f.currency,advance_date:f.advance_date,reason:f.reason,due_date:f.due_date||null,reconciled:false}
+    const row={co_implementer_id:ci.id,amount:num(f.amount),currency:f.currency,advance_date:f.advance_date,reason:f.reason,due_date:f.due_date||null,receipt_url:f.receipt_url||null,reconciled:false}
     const {data,error}=await supabase.from('coach_advances').insert([row]).select().single()
     if(error)return setMsg('Could not add advance: '+error.message)
-    setAdvances(prev=>[data,...prev]);setF(x=>({...x,amount:'',reason:''}));setMsg(null)
+    setAdvances(prev=>[data,...prev]);setF(x=>({...x,amount:'',reason:'',receipt_url:''}));setMsg(null)
   }
+  // Reconciling (marking an advance settled against actual spend) is a
+  // financial control -- the coach's call, not something a co-implementer
+  // can declare about their own advance.
   async function reconcile(id){
     const patch={reconciled:true,reconciled_at:new Date().toISOString()}
     const {error}=await supabase.from('coach_advances').update(patch).eq('id',id)
     if(error)return setMsg('Could not reconcile advance: '+error.message)
     setAdvances(prev=>prev.map(a=>a.id!==id?a:{...a,...patch}));setMsg('Advance reconciled.')
   }
+  async function attachReceipt(id,objectPath){
+    const {error}=await supabase.from('coach_advances').update({receipt_url:objectPath}).eq('id',id)
+    if(error)return setMsg('Could not attach receipt: '+error.message)
+    setAdvances(prev=>prev.map(a=>a.id!==id?a:{...a,receipt_url:objectPath}))
+  }
   return(
     <div>
       <p style={{...hint,marginBottom:'0.6rem'}}>Advances are reconciled against actual spend by their due date. While an advance is unreconciled it is netted off the next invoice, and it blocks that invoice from issuing if it exceeds the period's earnings.</p>
       <div style={{overflowX:'auto',marginBottom:'0.75rem'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
-          <thead><tr style={{background:C.lightBg}}>{['Date','Amount','Reason','Due','Status',''].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+          <thead><tr style={{background:C.lightBg}}>{['Date','Amount','Reason','Proof','Due','Status',canApprove?'':null].filter(h=>h!==null).map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
           <tbody>
-            {rows.length===0&&<tr><td style={{...td,color:C.slate}} colSpan={6}>No advances.</td></tr>}
+            {rows.length===0&&<tr><td style={{...td,color:C.slate}} colSpan={7}>No advances.</td></tr>}
             {rows.map((a,i)=>{
               const overdue=!a.reconciled&&a.due_date&&a.due_date<today()
               return(<tr key={a.id} style={{background:i%2?C.white:C.cream}}>
                 <td style={td}>{a.advance_date}</td>
                 <td style={td}>{fmtMoney(a.amount,a.currency)}</td>
                 <td style={{...td,maxWidth:200}}>{a.reason||'—'}</td>
+                <td style={td}><ReceiptUpload coImplementerId={ci.id} path={a.receipt_url} onUploaded={p=>attachReceipt(a.id,p)}/></td>
                 <td style={{...td,color:overdue?C.red:C.navy}}>{a.due_date||'—'}{overdue?' ⚠':''}</td>
                 <td style={td}>{a.reconciled?<Badge text="reconciled" color={C.green}/>:<Badge text={overdue?'overdue':'open'} color={overdue?C.red:C.amber}/>}</td>
-                <td style={td}>{!a.reconciled&&<button style={solidBtn(C.teal,true)} onClick={()=>reconcile(a.id)}>Reconcile</button>}{a.reconciled&&a.applied_invoice_id&&<span style={hint}>netted on invoice</span>}</td>
+                {canApprove&&<td style={td}>{!a.reconciled&&<button style={solidBtn(C.teal,true)} onClick={()=>reconcile(a.id)}>Reconcile</button>}{a.reconciled&&a.applied_invoice_id&&<span style={hint}>netted on invoice</span>}</td>}
               </tr>)
             })}
           </tbody>
@@ -450,14 +500,15 @@ function AdvanceSection({ci,advances,setAdvances,setMsg}){
         <div><label style={lbl}>Date</label><input type="date" style={inp} value={f.advance_date} onChange={e=>setF(x=>({...x,advance_date:e.target.value}))}/></div>
         <div><label style={lbl}>Due date</label><input type="date" style={inp} value={f.due_date} onChange={e=>setF(x=>({...x,due_date:e.target.value}))}/></div>
         <div style={{gridColumn:'span 2'}}><label style={lbl}>Reason</label><input style={inp} value={f.reason} onChange={e=>setF(x=>({...x,reason:e.target.value}))}/></div>
-        <div><button style={solidBtn(C.amber)} onClick={add}>+ Record advance</button></div>
+        <div><label style={lbl}>Proof</label><ReceiptUpload coImplementerId={ci.id} path={f.receipt_url} onUploaded={p=>setF(x=>({...x,receipt_url:p}))}/></div>
+        <div><button style={solidBtn(C.amber)} onClick={add}>+ Request advance</button></div>
       </div>
     </div>
   )
 }
 
 // ─── INVOICE ─────────────────────────────────────────────────
-function InvoiceSection({ci,period,draft,clientName,entries,expenses,advances,setAdvances,invoices,setInvoices,alreadyIssued,busy,setBusy,setMsg}){
+function InvoiceSection({ci,period,draft,clientName,entries,expenses,advances,setAdvances,invoices,setInvoices,alreadyIssued,busy,setBusy,setMsg,canApprove}){
   const d=draft
   const cur=curOf(ci)
   const invoiceNumber=`INV-${String(ci.id).replace(/[^a-zA-Z0-9]/g,'').slice(-6)}-${period}`
@@ -525,7 +576,7 @@ td,th{padding:.5rem .6rem;border-bottom:1px solid #ddd} .tot{font-weight:700;fon
               <div><Badge text={alreadyIssued.status} color={alreadyIssued.status==='paid'?C.green:C.teal}/> <strong style={{marginLeft:6}}>{alreadyIssued.invoice_number}</strong> · {fmtMoney(alreadyIssued.net_amount,alreadyIssued.currency)} · due {alreadyIssued.due_date||'—'}</div>
               <div style={{display:'flex',gap:'0.4rem'}}>
                 <button style={addBtn(true)} onClick={()=>download(alreadyIssued)}>Download</button>
-                {alreadyIssued.status!=='paid'&&<button style={solidBtn(C.green,true)} onClick={async()=>{const patch={status:'paid',paid_at:new Date().toISOString()};const {error}=await supabase.from('coach_invoices').update(patch).eq('id',alreadyIssued.id);if(error)return setMsg('Could not mark paid: '+error.message);setInvoices(prev=>prev.map(i=>i.id!==alreadyIssued.id?i:{...i,...patch}))}}>Mark paid</button>}
+                {canApprove&&alreadyIssued.status!=='paid'&&<button style={solidBtn(C.green,true)} onClick={async()=>{const patch={status:'paid',paid_at:new Date().toISOString()};const {error}=await supabase.from('coach_invoices').update(patch).eq('id',alreadyIssued.id);if(error)return setMsg('Could not mark paid: '+error.message);setInvoices(prev=>prev.map(i=>i.id!==alreadyIssued.id?i:{...i,...patch}))}}>Mark paid</button>}
               </div>
             </div>
           </div>
@@ -541,8 +592,9 @@ td,th{padding:.5rem .6rem;border-bottom:1px solid #ddd} .tot{font-weight:700;fon
             </table>
             {d.blocked&&<div style={{marginTop:'0.7rem',padding:'0.6rem 0.8rem',borderRadius:6,background:'var(--cv-tint-amber)',border:`1px solid ${C.red}`,color:C.red,fontSize:'1.01rem'}}>⛔ Blocked: an unreconciled advance of {fmtMoney(d.openAdvanceTotal,cur)} exceeds this period's earnings. Reconcile the advance before issuing.</div>}
             {!d.blocked&&d.advanceApplied>0&&<div style={{marginTop:'0.7rem',fontSize:'1.01rem',color:C.slate}}>Issuing will net off and reconcile the open advance of {fmtMoney(d.advanceApplied,cur)}.</div>}
+            {!canApprove&&<div style={{marginTop:'0.7rem',fontSize:'1.01rem',color:C.slate}}>This updates automatically as your timesheets and expenses are approved. Your coach issues the final invoice.</div>}
             <div style={{display:'flex',gap:'0.5rem',marginTop:'0.85rem'}}>
-              <button style={{...solidBtn(),opacity:(nothingToBill||d.blocked||busy)?0.5:1,cursor:(nothingToBill||d.blocked||busy)?'not-allowed':'pointer'}} disabled={nothingToBill||d.blocked||busy} onClick={issue}>{busy?'Issuing…':'Issue invoice'}</button>
+              {canApprove&&<button style={{...solidBtn(),opacity:(nothingToBill||d.blocked||busy)?0.5:1,cursor:(nothingToBill||d.blocked||busy)?'not-allowed':'pointer'}} disabled={nothingToBill||d.blocked||busy} onClick={issue}>{busy?'Issuing…':'Issue invoice'}</button>}
               <button style={addBtn()} onClick={()=>download(previewInv)}>Preview / download draft</button>
             </div>
           </div>}
