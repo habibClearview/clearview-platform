@@ -1111,6 +1111,7 @@ export function runGenericModel(
     ebitda: con.ebitda,
     cogs: con.cogs,
     cashClose: cf.close,
+    opex: con.opex,
     totalEquity: bs.total_equity[bs.total_equity.length - 1] || 0,
     totalLiabilities: bs.total_liabilities[bs.total_liabilities.length - 1] || 0,
     months,

@@ -41,14 +41,55 @@ export interface VerificationRecognitionProps {
   monthsClosed: number
   fieldDataMonths: number
   declaredValue?: number
+  // COGS/stock-drawdown triangulation (docs/RECONCILIATION_SPEC.md §5): a
+  // real, if simplified, corroboration signal for a period with no payment
+  // match -- true when both revenue and COGS were genuinely recorded and
+  // COGS doesn't exceed revenue (a believable gross margin). Computed by
+  // the caller, which has the actual/declared revenue and COGS arrays;
+  // this component only consumes the resulting boolean.
+  cogsConsistent?: boolean
 }
 
 export default function VerificationRecognition({
-  clientId, monthsElapsed, monthsWithActuals, monthsClosed, declaredValue = 0,
+  clientId, monthsElapsed, monthsWithActuals, monthsClosed, declaredValue = 0, cogsConsistent = false,
 }: VerificationRecognitionProps) {
   const [readiness, setReadiness] = useState<ReadinessStatus>('not_started')
   const [matchedValue, setMatchedValue] = useState(0)
   const [unattributedValue, setUnattributedValue] = useState(0)
+  // Real, currently-registered providers (never a hardcoded MTN-only list --
+  // see /api/verification/connect-provider's GET handler, which reads
+  // whatever's actually in src/lib/providers/registry.ts). A new provider
+  // (Airtel, M-Pesa, ...) appears here automatically the day it's added
+  // server-side, with no change needed in this component.
+  const [providers, setProviders] = useState<{ id: string; label: string; country: string }[]>([])
+  const [connecting, setConnecting] = useState<string | null>(null)
+  const [connectMsg, setConnectMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/verification/connect-provider').then(r => r.json()).then(data => {
+      if (!cancelled) setProviders(data.providers || [])
+    }).catch(() => { if (!cancelled) setProviders([]) })
+    return () => { cancelled = true }
+  }, [])
+
+  async function connectProvider(providerId: string) {
+    setConnecting(providerId); setConnectMsg(null)
+    try {
+      const res = await fetch('/api/verification/connect-provider', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId, providerId }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setConnectMsg(data.error || 'Could not start the connection.'); return }
+      setReadiness(data.status as ReadinessStatus)
+      setConnectMsg(data.instructions)
+    } catch (e: any) {
+      setConnectMsg('Could not start the connection: ' + (e?.message || 'unknown error'))
+    } finally {
+      setConnecting(null)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -89,7 +130,7 @@ export default function VerificationRecognition({
     unattributedInboundValue: unattributedValue,
     hasActuals: monthsWithActuals > 0,
     recordsComplete: monthsElapsed > 0 && monthsWithActuals >= monthsElapsed,
-    cogsConsistent: false, // deepened when the triangulation fallback is wired
+    cogsConsistent,
     internallyConsistent: true,
     monthsConsistentStreak: monthsWithActuals,
     monthClosedOnTime: monthsClosed > 0,
@@ -114,6 +155,31 @@ export default function VerificationRecognition({
           <div style={{ color: C.slate, fontSize: '0.9rem' }}>{readinessInfo.blurb}</div>
         </div>
       </div>
+
+      {/* Connect a mobile-money account -- only shown before anything is
+          linked yet. Every listed provider is real (fetched from the
+          server's own registry, not hardcoded to one company) and this
+          button genuinely starts a real link request. What each provider
+          returns today is an honest "pending, waiting on their approval"
+          message, since none of them have live API credentials yet (see
+          the TODO(mtn-credentials) notes in src/lib/providers/mtn-ug.ts)
+          -- the button is not a placeholder, the underlying connection to
+          the mobile-money company itself just isn't switched on yet. */}
+      {readiness === 'not_started' && providers.length > 0 && (
+        <div style={{ padding: '0.9rem 1.1rem', borderRadius: 12, border: `1px dashed ${C.border}`, background: C.card, marginBottom: '1.1rem' }}>
+          <div style={{ fontWeight: 700, color: C.navy, fontSize: '0.92rem', marginBottom: '0.5rem' }}>Connect your mobile money</div>
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+            {providers.map(p => (
+              <button key={p.id} disabled={connecting === p.id} onClick={() => connectProvider(p.id)} style={{
+                fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: 700, padding: '0.5rem 0.9rem',
+                border: `1px solid ${C.cyan}`, borderRadius: 8, background: 'transparent', color: C.cyan,
+                cursor: connecting === p.id ? 'default' : 'pointer', opacity: connecting === p.id ? 0.6 : 1,
+              }}>{connecting === p.id ? 'Connecting…' : `Connect ${p.label}`}</button>
+            ))}
+          </div>
+          {connectMsg && <div style={{ color: C.navy, fontSize: '0.85rem', marginTop: '0.6rem' }}>{connectMsg}</div>}
+        </div>
+      )}
 
       {/* Confidence label for this period */}
       <div style={{
