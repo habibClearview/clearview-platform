@@ -298,7 +298,7 @@ function ExternalAccessPanel({clientId,clientName,onClose}){
   )
 }
 
-function ClientHealthTab({clients,programmes}){
+function ClientHealthTab({clients,programmes,onUpdateClient}){
   const [reportByClient,setReportByClient]=useState({})
   const [canvasByClient,setCanvasByClient]=useState({})
   // Whether a client has ANY real generic_actuals row -- a genuinely
@@ -438,6 +438,12 @@ function ClientHealthTab({clients,programmes}){
                     <>
                       <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginTop:'0.6rem'}}><span>{status.dot}</span><Badge text={status.label} color={HEALTH_COLOR[status.label]}/></div>
                       {hasActuals.has(c.id)&&<div onClick={e=>e.stopPropagation()}><ClientDocumentActions clientId={c.id} clientName={c.name}/></div>}
+                      {hasActuals.has(c.id)&&<div onClick={e=>e.stopPropagation()}>
+                        <label style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'0.82rem',color:C.slate,marginTop:'0.5rem',cursor:'pointer'}} title="Only enable after the business owner has explicitly agreed to be named (not anonymised) in aggregated Portfolio Intelligence views.">
+                          <input type="checkbox" checked={!!c.portfolio_consent_named} onChange={e=>onUpdateClient(c.id,{portfolio_consent_named:e.target.checked})}/>
+                          Named in Portfolio Intelligence
+                        </label>
+                      </div>}
                     </>
                   )}
                 </div>
@@ -940,6 +946,7 @@ function PortfolioIntelligenceHub(){
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
   const [filter,setFilter]=useState({})
+  const [openProfile,setOpenProfile]=useState(null)
 
   const load=useCallback((f)=>{
     setLoading(true);setError('')
@@ -1085,6 +1092,81 @@ function PortfolioIntelligenceHub(){
               )
             })}
           </ol>
+        </div>
+      )}
+
+      <div style={card}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.3rem'}}>Individual business profiles</div>
+        <div style={{fontSize:'0.85rem',color:C.slate,marginBottom:'0.8rem'}}>Anonymised by default -- a business only shows its real name here once its owner has explicitly consented (toggled from the Client Health tab).</div>
+        <div className="cv-grid-3">
+          {(data.profiles||[]).map(p=>(
+            <div key={p.refCode} onClick={()=>setOpenProfile(p)} style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.7rem 0.85rem',cursor:'pointer'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'0.5rem'}}>
+                <div style={{fontWeight:700,fontSize:'0.95rem',color:C.navy,fontFamily:p.isNamed?'inherit':'monospace'}}>{p.displayName}</div>
+                {p.isNamed&&<Badge text="Verified" color={C.green}/>}
+              </div>
+              <div style={{fontSize:'0.82rem',color:C.slate,marginTop:'0.2rem'}}>{p.sector||'Sector n/a'} · {p.country||'Country n/a'} · {p.sizeBracket}</div>
+              <div style={{fontSize:'0.82rem',color:C.slate,marginTop:'0.2rem'}}>{p.irTier} · IR {Math.round(p.irScore)}/30 · Confidence {Math.round(p.confidenceScore)}/100</div>
+            </div>
+          ))}
+          {(data.profiles||[]).length===0&&<div style={{color:C.slate,fontSize:'0.9rem'}}>No businesses match the current filter.</div>}
+        </div>
+      </div>
+
+      {openProfile&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(11,31,51,0.45)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:'1rem'}} onClick={()=>setOpenProfile(null)}>
+          <div style={{...card,maxWidth:640,width:'100%',maxHeight:'85vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.9rem'}}>
+              <div>
+                <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>{openProfile.displayName}{openProfile.isNamed&&<span style={{marginLeft:'0.5rem'}}><Badge text="Verified" color={C.green}/></span>}</div>
+                <div style={{fontSize:'0.92rem',color:C.slate,marginTop:'0.2rem'}}>{openProfile.sector||'Sector n/a'} · {openProfile.country||'Country n/a'} · {openProfile.sizeBracket}</div>
+              </div>
+              <button onClick={()=>setOpenProfile(null)} style={{background:'none',border:'none',fontSize:'1.3rem',color:C.slate,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+
+            <div className="cv-grid-3" style={{marginBottom:'1rem'}}>
+              <GlanceKPI label="Investment Readiness" value={`${Math.round(openProfile.irScore)}/30`} sub={openProfile.irTier} color={C.teal}/>
+              <GlanceKPI label="Verification Confidence" value={`${Math.round(openProfile.confidenceScore)}/100`} sub={`${openProfile.confidenceBadges.length} badge${openProfile.confidenceBadges.length===1?'':'s'} earned`} color={C.cyan}/>
+              <GlanceKPI label="Liquidity Readiness" value={`${Math.round(openProfile.lrs.score)}/100`} sub="seven dimensions" color={C.purple}/>
+            </div>
+
+            <div style={{fontWeight:700,fontSize:'0.95rem',color:C.navy,marginBottom:'0.5rem'}}>Readiness scorecard</div>
+            <div style={{display:'flex',flexDirection:'column',gap:'0.4rem',marginBottom:'1rem'}}>
+              {Object.entries(openProfile.lrs.dimensions).map(([dim,d])=>(
+                <div key={dim} style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
+                  <div style={{width:150,fontSize:'0.88rem',color:C.navy,flexShrink:0}}>{LRS_DIM_LABELS[dim]}</div>
+                  <div style={{flex:1,background:'var(--cv-tint-cyan)',borderRadius:4,height:12}}>
+                    <div style={{width:`${Math.max(2,d.score)}%`,background:C.teal,height:'100%',borderRadius:4}}/>
+                  </div>
+                  <div style={{width:36,fontSize:'0.85rem',color:C.slate,textAlign:'right'}}>{Math.round(d.score)}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{fontWeight:700,fontSize:'0.95rem',color:C.navy,marginBottom:'0.5rem'}}>Capital absorption capacity</div>
+            <div className="cv-grid-3" style={{marginBottom:'1rem'}}>
+              {Object.entries(CAC_TYPE_LABELS).map(([key,label])=>{
+                const t=openProfile.cac[key]
+                return(
+                  <div key={key} style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.5rem 0.7rem'}}>
+                    <div style={{fontSize:'0.78rem',color:C.slate}}>{label}</div>
+                    <div style={{fontSize:'0.95rem',fontWeight:700,color:C.navy}}>{t.capacity===null?'n/a':fmtPortfolioMoney(t.capacity,openProfile.currency)}</div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {openProfile.businessUnits.length>0&&<>
+              <div style={{fontWeight:700,fontSize:'0.95rem',color:C.navy,marginBottom:'0.5rem'}}>Business unit structure ({openProfile.businessUnits.length} unit{openProfile.businessUnits.length===1?'':'s'})</div>
+              <div style={{display:'flex',flexDirection:'column',gap:'0.3rem'}}>
+                {openProfile.businessUnits.map(u=>(
+                  <div key={u.name} style={{display:'flex',justifyContent:'space-between',fontSize:'0.88rem',color:C.navy}}>
+                    <span>{u.name}</span><span style={{color:C.slate}}>{Math.round(u.revenuePct)}% of revenue</span>
+                  </div>
+                ))}
+              </div>
+            </>}
+          </div>
         </div>
       )}
     </div>
@@ -1628,7 +1710,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           <button style={subPill(sub==='health')} onClick={()=>setSub('health')}>Health overview</button>
           <button style={subPill(sub==='roster')} onClick={()=>setSub('roster')}>All clients</button>
         </div>
-        {sub==='health'?<ClientHealthTab clients={clients} programmes={programmes}/>:<ClientsView/>}
+        {sub==='health'?<ClientHealthTab clients={clients} programmes={programmes} onUpdateClient={updateClient}/>:<ClientsView/>}
       </div>
     )
   }

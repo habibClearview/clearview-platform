@@ -24,7 +24,7 @@ import { assessConfidence } from '@/lib/confidence'
 import { buildPeriodSignals } from '@/lib/verification-display'
 import { computeSeasonalCashProjection } from '@/lib/seasonal-cash-projection'
 import { computeCapitalAbsorptionCapacity } from '@/lib/capital-absorption-capacity'
-import { computePortfolioOverview, computeSegmentReport, type ClientSnapshot, type SegmentFilter } from '@/lib/portfolio-intelligence'
+import { computePortfolioOverview, computeSegmentReport, buildAnonymisedProfile, matchesFilter, type ClientSnapshot, type SegmentFilter } from '@/lib/portfolio-intelligence'
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -148,6 +148,14 @@ async function buildClientSnapshot(admin: ReturnType<typeof getAdminClient>, cli
   })
   const confidence = assessConfidence(signals)
 
+  const activeUnitsWithRevenue = result.allocUnits
+    .map((u: any) => ({ name: u.name, ann_rev: result.unitPL[u.id]?.ann_rev || 0 }))
+    .filter((u: any) => u.ann_rev > 0)
+  const totalUnitRevenue = activeUnitsWithRevenue.reduce((s: number, u: any) => s + u.ann_rev, 0)
+  const businessUnits = activeUnitsWithRevenue
+    .map((u: any) => ({ name: u.name, revenuePct: totalUnitRevenue > 0 ? (u.ann_rev / totalUnitRevenue) * 100 : 0 }))
+    .sort((a: any, b: any) => b.revenuePct - a.revenuePct)
+
   return {
     clientId: client.id,
     name: config.business_name,
@@ -158,8 +166,12 @@ async function buildClientSnapshot(admin: ReturnType<typeof getAdminClient>, cli
     irTier: s.irTier,
     lrs: lrsCurrent,
     confidenceScore: confidence.score,
+    confidenceBadges: confidence.badges,
     cac,
     currency: config.currency,
+    annualRevenue: m.total_revenue,
+    businessUnits,
+    consentToBeNamed: !!client.portfolio_consent_named,
   }
 }
 
@@ -179,7 +191,7 @@ export async function POST(req: NextRequest) {
     const { data: clients } = await admin.from('engagement_clients').select('*').eq('engagement_mode', 'financial')
     const financialClients = clients || []
     if (financialClients.length === 0) {
-      return NextResponse.json({ portfolio: computePortfolioOverview([]), segment: filter ? computeSegmentReport([], filter) : null, snapshotCount: 0 })
+      return NextResponse.json({ portfolio: computePortfolioOverview([]), segment: filter ? computeSegmentReport([], filter) : null, snapshotCount: 0, profiles: [], filterOptions: { sectors: [], countries: [], programmeIds: [] } })
     }
 
     const { data: configRows } = await admin.from('generic_model_config').select('*').in('client_id', financialClients.map(c => c.id))
@@ -197,8 +209,16 @@ export async function POST(req: NextRequest) {
     const distinctValues = (pick: (s: ClientSnapshot) => string | null) =>
       Array.from(new Set(snapshots.map(pick).filter((v): v is string => !!v))).sort()
 
+    // Level 3: anonymised individual profiles, matching the active
+    // filter if any. Built server-side and sent AS the final shape --
+    // the raw ClientSnapshot (which carries the real clientId and name)
+    // never leaves this route. A non-consenting business's real name is
+    // never present anywhere in this response, not just hidden in the UI.
+    const profileSnapshots = filter ? snapshots.filter(s => matchesFilter(s, filter)) : snapshots
+    const profiles = profileSnapshots.map(s => buildAnonymisedProfile(s, snapshots))
+
     return NextResponse.json({
-      portfolio, segment, snapshotCount: snapshots.length,
+      portfolio, segment, snapshotCount: snapshots.length, profiles,
       filterOptions: {
         sectors: distinctValues(s => s.sector),
         countries: distinctValues(s => s.country),

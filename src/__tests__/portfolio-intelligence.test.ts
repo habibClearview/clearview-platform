@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   computePortfolioOverview, computeSegmentReport, readinessStage, matchesFilter,
+  anonymizedRefCode, revenueSizeBracket, buildAnonymisedProfile,
   type ClientSnapshot,
 } from '../lib/portfolio-intelligence'
 import type { LRSResult } from '../lib/liquidity-readiness'
@@ -33,8 +34,8 @@ function makeSnapshot(overrides: Partial<ClientSnapshot> = {}): ClientSnapshot {
   return {
     clientId: 'c1', name: 'Test Co', sector: 'agribusiness', country: 'Uganda', programmeId: null,
     irScore: 20, irTier: 'Near Ready',
-    lrs: makeLRS(), confidenceScore: 60, cac: makeCAC(),
-    currency: 'UGX',
+    lrs: makeLRS(), confidenceScore: 60, confidenceBadges: [], cac: makeCAC(),
+    currency: 'UGX', annualRevenue: 500_000, businessUnits: [], consentToBeNamed: false,
     ...overrides,
   }
 }
@@ -209,5 +210,72 @@ describe('computeSegmentReport', () => {
     const r = computeSegmentReport(snaps, { sector: 'nonexistent' })
     expect(r.segment.totalBusinesses).toBe(0)
     expect(r.portfolio.totalBusinesses).toBe(1)
+  })
+})
+
+describe('anonymizedRefCode', () => {
+  it('REG: the same clientId always produces the same code', () => {
+    expect(anonymizedRefCode('client-abc-123')).toBe(anonymizedRefCode('client-abc-123'))
+  })
+
+  it('REG: different clientIds produce different codes (no collisions across a reasonable sample)', () => {
+    const codes = new Set(Array.from({ length: 200 }, (_, i) => anonymizedRefCode(`client-${i}`)))
+    expect(codes.size).toBe(200)
+  })
+
+  it('REG: the code never contains the raw clientId as a substring', () => {
+    const clientId = 'super-secret-client-id-99'
+    expect(anonymizedRefCode(clientId)).not.toContain(clientId)
+  })
+
+  it('REG: the code has the expected BIZ-XXXXX shape', () => {
+    expect(anonymizedRefCode('c1')).toMatch(/^BIZ-[0-9A-Z]{5}$/)
+  })
+})
+
+describe('revenueSizeBracket', () => {
+  it('REG: fewer than 4 same-currency peers reports "not enough peers" rather than a false bracket', () => {
+    const target = makeSnapshot({ currency: 'UGX', annualRevenue: 1000 })
+    const peers = [makeSnapshot({ currency: 'UGX', annualRevenue: 500 }), makeSnapshot({ currency: 'UGX', annualRevenue: 2000 })]
+    expect(revenueSizeBracket(target, [target, ...peers])).toBe('Not enough peers to bracket')
+  })
+
+  it('REG: quartiles are computed only from peers in the SAME currency -- a different-currency business never affects the bracket', () => {
+    const ugxPeers = [100, 200, 300, 400, 500].map(v => makeSnapshot({ currency: 'UGX', annualRevenue: v }))
+    const usdOutlier = makeSnapshot({ currency: 'USD', annualRevenue: 999_999_999 })
+    const target = ugxPeers[2] // annualRevenue 300, the median of the UGX group
+    const bracket = revenueSizeBracket(target, [...ugxPeers, usdOutlier])
+    expect(bracket).not.toBe('Not enough peers to bracket')
+    expect(bracket).toBe('Medium')
+  })
+
+  it('REG: the lowest-revenue peer in a group is bracketed Small, the highest Very Large', () => {
+    const group = [100, 200, 300, 400, 500].map(v => makeSnapshot({ currency: 'UGX', annualRevenue: v }))
+    expect(revenueSizeBracket(group[0], group)).toBe('Small')
+    expect(revenueSizeBracket(group[4], group)).toBe('Very Large')
+  })
+})
+
+describe('buildAnonymisedProfile', () => {
+  it('REG: a non-consenting business shows its reference code as the display name, not the real name', () => {
+    const s = makeSnapshot({ name: 'Real Business Name Ltd', consentToBeNamed: false })
+    const profile = buildAnonymisedProfile(s, [s])
+    expect(profile.isNamed).toBe(false)
+    expect(profile.displayName).toBe(profile.refCode)
+    expect(profile.displayName).not.toContain('Real Business Name')
+  })
+
+  it('REG: a consenting business shows its real name as the display name', () => {
+    const s = makeSnapshot({ name: 'Real Business Name Ltd', consentToBeNamed: true })
+    const profile = buildAnonymisedProfile(s, [s])
+    expect(profile.isNamed).toBe(true)
+    expect(profile.displayName).toBe('Real Business Name Ltd')
+  })
+
+  it('REG: the profile never exposes clientId directly -- only the derived refCode', () => {
+    const s = makeSnapshot({ clientId: 'super-secret-id' })
+    const profile = buildAnonymisedProfile(s, [s])
+    expect((profile as any).clientId).toBeUndefined()
+    expect(JSON.stringify(profile)).not.toContain('super-secret-id')
   })
 })
