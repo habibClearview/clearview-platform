@@ -25,7 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('id, role, client_id, full_name, assigned_unit_ids')
+        .select('id, role, client_id, full_name, assigned_unit_ids, engagement_client_id, co_implementer_id, funder_programme_id')
         .eq('id', userId)
         .single()
 
@@ -37,6 +37,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           full_name: data.full_name || '',
           client_id: data.client_id,
           assigned_unit_ids: data.assigned_unit_ids || [],
+          engagement_client_id: data.engagement_client_id || null,
+          co_implementer_id: data.co_implementer_id || null,
+          funder_programme_id: data.funder_programme_id || null,
         }
       }
     } catch { /* fall through */ }
@@ -51,6 +54,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       full_name: email === 'habib@habibonifade.com' ? 'Habib Onifade' : '',
       client_id: null,
       assigned_unit_ids: [],
+      engagement_client_id: null,
+      co_implementer_id: null,
+      funder_programme_id: null,
     }
   }
 

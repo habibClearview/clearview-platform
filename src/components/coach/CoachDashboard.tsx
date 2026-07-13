@@ -417,6 +417,36 @@ function ClientCard({client,programmes,onClick}){
 }
 
 // \u2500\u2500\u2500 MAIN COMPONENT \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// Sends a real Supabase Auth invite for a 'coach' (co-implementer) or
+// 'funder' login, scoped via the same columns the RLS migration reads
+// (user_profiles.co_implementer_id / funder_programme_id). Reuses the
+// exact invite mechanism already used for ceo/finance_manager/etc --
+// see app/api/invite-user/route.ts.
+function InviteLoginButton({email,fullName,role,coImplementerId,funderProgrammeId}){
+  const [busy,setBusy]=useState(false)
+  const [msg,setMsg]=useState(null)
+  async function invite(){
+    if(!email){setMsg('No email on file to invite.');return}
+    setBusy(true);setMsg(null)
+    try{
+      const {data:{session}}=await supabase.auth.getSession()
+      const res=await fetch('/api/invite-user',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email,fullName,role,clientId:null,assignedUnitIds:[],coImplementerId,funderProgrammeId,inviterToken:session?.access_token}),
+      })
+      const data=await res.json()
+      setMsg(res.ok?(data.message||'Invitation sent.'):(data.error||'Invite failed.'))
+    }catch(e){setMsg('Invite failed: '+e.message)}
+    setBusy(false)
+  }
+  return(
+    <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexWrap:'wrap'}}>
+      <button style={addBtn(true,C.teal)} disabled={busy} onClick={invite}>{busy?'Sending…':'Invite login'}</button>
+      {msg&&<span style={{fontSize:'0.93rem',color:C.slate}}>{msg}</span>}
+    </div>
+  )
+}
+
 function DeleteClientConfirm({client,onCancel,onDeleted}){
   const [text,setText]=useState('')
   const [deleting,setDeleting]=useState(false)
@@ -572,14 +602,23 @@ function CopyIntakeLink({client}){
   )
 }
 
-export default function CoachDashboard({onSignOut,userRole='super_coach',userName='Habib Onifade'}){
+export default function CoachDashboard({onSignOut,userRole='super_coach',userName='Habib Onifade',coImplementerId=null,funderProgrammeId=null}){
+  const isSuperCoach=userRole==='super_coach'
+  const isFunder=userRole==='funder'
+  // Both non-super_coach roles land here through the exact same data path
+  // (loadClients/loadProgrammes/loadCoImplementers -- unfiltered queries
+  // that RLS scopes down automatically), reusing the same Clients/
+  // ClientDetailView UI the coach already has. A funder never edits
+  // anything; a co-implementer edits only the canvas fieldwork on their
+  // own assigned clients (also RLS-enforced, not just hidden in the UI).
+  const canEditClients=!isFunder
   const [programmes,setPrograms]=useState([])
   const [clients,setClients]=useState([])
   const [coImplementers,setCoImplementers]=useState([])
   const [timesheets,setTimesheets]=useState([])
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState(null)
-  const [view,setView]=useState('overview')
+  const [view,setView]=useState(()=>isSuperCoach?'overview':'clients')
   const [selClientId,setSelClientId]=useState(null)
   const [selProgId,setSelProgId]=useState(null)
   const [showDeleteConfirm,setShowDeleteConfirm]=useState(false)
@@ -740,8 +779,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               {f==='all'?'All':f==='active'?'Active':f==='completed'?'Completed':f==='paused'?'Paused':f==='canvas'?'GtCV Canvas':f==='financial'?'Clearview Only':CLIENT_TYPE_LABELS[f]||f}
             </button>
           ))}
-          <button style={{...addBtn(true,C.teal),marginLeft:'auto'}} onClick={()=>{setShowUpload(!showUpload);setShowNew(false)}}>Upload Spreadsheet</button>
-          <button style={addBtn()} onClick={()=>{setShowNew(!showNew);setShowUpload(false)}}>+ New Client</button>
+          {isSuperCoach&&<button style={{...addBtn(true,C.teal),marginLeft:'auto'}} onClick={()=>{setShowUpload(!showUpload);setShowNew(false)}}>Upload Spreadsheet</button>}
+          {isSuperCoach&&<button style={addBtn()} onClick={()=>{setShowNew(!showNew);setShowUpload(false)}}>+ New Client</button>}
         </div>
         {showUpload&&<SpreadsheetUpload onSuccess={(clientId)=>{setShowUpload(false);supabase.from('engagement_clients').select('*').eq('id',clientId).single().then(({data})=>{if(data)setClients(prev=>[...prev,data])})}}/>}
         {showNew&&<NewClientForm programmes={programmes} onSave={async c=>{
@@ -794,9 +833,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
               <a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily:'monospace',fontSize:'1.01rem',padding:'0.4rem 1rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none',fontWeight:700}}>Open Clearview Financial Model ↗</a>
-              <CopyIntakeLink client={selClient}/>
-              <button onClick={()=>setShowEditClient(true)} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Edit Setup</button>
-              <button onClick={()=>setShowDeleteConfirm(true)} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Delete Client</button>
+              {isSuperCoach&&<CopyIntakeLink client={selClient}/>}
+              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Edit Setup</button>}
+              {isSuperCoach&&<button onClick={()=>setShowDeleteConfirm(true)} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Delete Client</button>}
             </div>
           </div>
         </div>
@@ -843,7 +882,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
               {selClient.clearview_active&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.22rem 0.6rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none'}}>Open Clearview \u2197</a>}
-              <button onClick={()=>setShowEditClient(true)} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.22rem 0.6rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Edit Setup</button>
+              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.22rem 0.6rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Edit Setup</button>}
               <button style={addBtn(true)} onClick={printSection}>Print</button>
             </div>
           </div>
@@ -931,9 +970,17 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               <div><label style={lbl}>Programme Name</label><input style={inp} value={progForm.name} onChange={e=>setProgForm(f=>({...f,name:e.target.value}))}/></div>
               <div><label style={lbl}>Type</label><select style={inp} value={progForm.type} onChange={e=>setProgForm(f=>({...f,type:e.target.value}))}><option value="donor_programme">Donor Programme</option><option value="direct_client">Direct Client</option><option value="blended">Blended</option></select></div>
               <div><label style={lbl}>Funder</label><input style={inp} value={progForm.funder} onChange={e=>setProgForm(f=>({...f,funder:e.target.value}))}/></div>
+              <div><label style={lbl}>Funder Email</label><input type="email" style={inp} value={progForm.funder_email||''} onChange={e=>setProgForm(f=>({...f,funder_email:e.target.value}))} placeholder="for their portal login"/></div>
               <div><label style={lbl}>Country</label><input style={inp} value={progForm.country} onChange={e=>setProgForm(f=>({...f,country:e.target.value}))}/></div>
               <div><label style={lbl}>Start Date</label><input type="date" style={inp} value={progForm.start_date||''} onChange={e=>setProgForm(f=>({...f,start_date:e.target.value}))}/></div>
               <div><label style={lbl}>End Date</label><input type="date" style={inp} value={progForm.end_date||''} onChange={e=>setProgForm(f=>({...f,end_date:e.target.value}))}/></div>
+              <div>
+                <label style={lbl}>Funder sees</label>
+                <select style={inp} value={progForm.funder_detail_level||'summary'} onChange={e=>setProgForm(f=>({...f,funder_detail_level:e.target.value}))}>
+                  <option value="summary">Summary only (health status, headline numbers)</option>
+                  <option value="full">Full financial dashboard</option>
+                </select>
+              </div>
               <div style={{gridColumn:'1/-1'}}><label style={lbl}>Notes</label><textarea style={{...inp,minHeight:72,resize:'vertical'}} value={progForm.notes||''} onChange={e=>setProgForm(f=>({...f,notes:e.target.value}))}/></div>
             </div>
             <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
@@ -948,6 +995,13 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 <div><div style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.cyan,letterSpacing:'0.12em',marginBottom:'0.3rem'}}>{prog.type==='donor_programme'?'DONOR PROGRAMME':'DIRECT CLIENT'}</div><h2 style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0 0 0.2rem'}}>{prog.name}</h2><div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{prog.funder} \u00b7 {prog.country}</div></div>
                 <button style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.3rem 0.8rem',border:'1px solid var(--cv-wa-30)',borderRadius:4,background:'transparent',color:'var(--cv-wa-80)',cursor:'pointer'}} onClick={()=>{setProgForm({...prog});setEditingProg(true)}}>Edit</button>
               </div>
+            </div>
+            <div style={card}>
+              <div style={secH}>Funder Access</div>
+              <p style={{...hint,marginBottom:'0.75rem'}}>The funder&#39;s login sees only the {clients.filter(c=>c.programme_id===prog.id).length} client{clients.filter(c=>c.programme_id===prog.id).length===1?'':'s'} under this programme, at the level set above ({prog.funder_detail_level==='full'?'full financial dashboard':'summary only'} -- change it via Edit).</p>
+              {prog.funder_email
+                ?<InviteLoginButton email={prog.funder_email} fullName={prog.funder||'Funder'} role="funder" coImplementerId={null} funderProgrammeId={prog.id}/>
+                :<div style={{...hint,color:C.amber}}>Add a funder email via Edit before you can invite them.</div>}
             </div>
             <div style={card}><div style={secH}>Client Organisations</div>{clients.filter(c=>c.programme_id===prog.id).map(c=><div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.75rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.45rem'}}><div><div style={{fontWeight:600,fontSize:'1.07rem'}}>{c.name}</div><div style={{fontSize:'0.93rem',color:C.slate}}>{CLIENT_TYPE_LABELS[c.type]} \u00b7 {statusLabel(c.status)}</div></div><button style={addBtn(true)} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}>Open \u2192</button></div>)}</div>
             {prog.notes&&<div style={card}><div style={secH}>Notes</div><div style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.6}}>{prog.notes}</div></div>}
@@ -997,7 +1051,11 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           return(<div key={ci.id} style={card}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.65rem'}}>
               <div><div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy}}>{ci.name}</div><div style={{fontSize:'1.01rem',color:C.slate}}>{ci.email} \u00b7 {ci.country}</div>{ci.specialisation&&<div style={{fontSize:'1.01rem',color:C.slate}}>{ci.specialisation}</div>}</div>
-              <div style={{textAlign:'right'}}><div style={{fontFamily:'monospace',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem'}}>{ci.active?'Active':'Inactive'}</div>{ci.rate_per_day>0&&<div style={{fontSize:'0.93rem',color:C.slate}}>{ci.currency} {Number(ci.rate_per_day).toLocaleString()}/day</div>}</div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontFamily:'monospace',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem'}}>{ci.active?'Active':'Inactive'}</div>
+                {ci.rate_per_day>0&&<div style={{fontSize:'0.93rem',color:C.slate,marginBottom:'0.4rem'}}>{ci.currency} {Number(ci.rate_per_day).toLocaleString()}/day</div>}
+                <InviteLoginButton email={ci.email} fullName={ci.name} role="coach" coImplementerId={ci.id} funderProgrammeId={null}/>
+              </div>
             </div>
             <div style={{display:'flex',gap:'1.5rem',fontSize:'1.01rem',color:C.slate,marginBottom:'0.5rem'}}>
               <span style={{display:'flex',alignItems:'center',gap:'0.4rem',flexWrap:'wrap'}}>Clients:{(ci.client_ids||[]).length===0?<strong style={{color:C.slate}}>None</strong>:(ci.client_ids||[]).map(id=><span key={id} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.12rem 0.55rem',borderRadius:20,background:'var(--cv-cyan-dim)',color:C.teal,border:`1px solid ${C.border}`}}>{clients.find(c=>c.id===id)?.name||id}</span>)}</span>
@@ -1071,7 +1129,15 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     )
   }
 
-  const mainNavTabs=[['overview','My Business'],['clients','Clients'],['programmes','Programmes'],['team','Team'],['review','Review Queue']]
+  // Programmes/Team are the coach's own business operations (deal terms,
+  // co-implementer pay rates) -- not appropriate for a co-implementer or
+  // funder to see. Both land straight on Clients, already scoped by RLS
+  // to just what they're allowed to see (their assigned clients, or the
+  // clients under their programme).
+  const mainNavTabs=isSuperCoach
+    ?[['overview','My Business'],['clients','Clients'],['programmes','Programmes'],['team','Team'],['review','Review Queue']]
+    :[['clients','Clients']]
+  const roleBadgeLabel=isSuperCoach?'Super Coach':isFunder?'Funder':'Co-Implementer'
   return(
     <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif",background:C.cream,color:C.navy,minHeight:'100vh'}}>
       <BuildStamp/>
@@ -1083,7 +1149,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             <div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{activeClients.length} active \u00b7 {programmes.length} programme{programmes.length!==1?'s':''} \u00b7 {clearviewLive.length} Clearview live \u00b7 {canvasClients.length} canvas engagement{canvasClients.length!==1?'s':''}{pending>0&&<span style={{marginLeft:8,color:C.amber}}>\u00b7 \u23f3 {pending} pending</span>}</div>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}>
-            <span style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem'}}>Super Coach</span>
+            <span style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem'}}>{roleBadgeLabel}</span>
             <button onClick={onSignOut} style={{fontFamily:'monospace',fontSize:'0.93rem',background:'transparent',border:`1px solid var(--cv-wa-25)`,borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
           </div>
         </div>

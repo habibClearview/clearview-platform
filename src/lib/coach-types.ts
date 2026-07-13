@@ -11,11 +11,19 @@ export type FunderRole = 'ignite_funder'
 export type AnyRole = CoachRole | ClientRole | FunderRole
 
 // ─── PERMISSIONS ─────────────────────────────────────────────
+// 'coach' is the real, logged-in-account string for a co-implementer
+// (src/lib/auth/types.ts UserRole) -- 'co_implementer' here is the older,
+// disconnected canvas-prototype string for the same real-world person.
+// Treated as synonyms everywhere in this file so a real co-implementer
+// login gets the same rights this file already intended for the role.
+function isCoImplementer(role: AnyRole): boolean {
+  return role === 'co_implementer' || role === 'coach'
+}
 export function canEdit(role: AnyRole): boolean {
-  return role === 'super_coach' || role === 'co_implementer' || role === 'ceo'
+  return role === 'super_coach' || isCoImplementer(role) || role === 'ceo'
 }
 export function canViewCoachGuidance(role: AnyRole): boolean {
-  return role === 'super_coach' || role === 'co_implementer'
+  return role === 'super_coach' || isCoImplementer(role)
 }
 export function canSignOff(role: AnyRole): boolean {
   return role === 'ceo' || role === 'super_coach'
@@ -27,7 +35,7 @@ export function canApproveTimesheets(role: AnyRole): boolean {
   return role === 'super_coach'
 }
 export function canSubmitTimesheets(role: AnyRole): boolean {
-  return role === 'co_implementer'
+  return isCoImplementer(role)
 }
 
 // ─── CLIENT TYPES ────────────────────────────────────────────

@@ -20,19 +20,34 @@ export async function POST(req: NextRequest) {
       email: string
       fullName: string
       role: string
-      clientId: string
+      clientId: string | null
       assignedUnitIds: string[]
+      // 'coach' invites: which co_implementers roster row this login is.
+      coImplementerId: string | null
+      // 'funder' invites: which programme this login is scoped to.
+      funderProgrammeId: string | null
       inviterToken: string  // JWT of the person doing the inviting — we verify their role
     }
 
-    const { email, fullName, role, clientId, assignedUnitIds, inviterToken } = body
+    const { email, fullName, role, clientId, assignedUnitIds, coImplementerId, funderProgrammeId, inviterToken } = body
 
-    // Validate inputs
-    if (!email || !fullName || !role || !clientId) {
+    // Validate inputs. clientId is only required for the client-side
+    // roles; coach/funder are scoped by coImplementerId/funderProgrammeId
+    // instead (a coach/funder isn't "of" any one client).
+    if (!email || !fullName || !role) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
+    if (['ceo', 'finance_manager', 'unit_head', 'accounts_assistant'].includes(role) && !clientId) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+    if (role === 'coach' && !coImplementerId) {
+      return NextResponse.json({ error: 'Select which co-implementer this login is for' }, { status: 400 })
+    }
+    if (role === 'funder' && !funderProgrammeId) {
+      return NextResponse.json({ error: 'Select which programme this funder login is scoped to' }, { status: 400 })
+    }
 
-    const validRoles = ['ceo', 'finance_manager', 'unit_head', 'accounts_assistant']
+    const validRoles = ['ceo', 'finance_manager', 'unit_head', 'accounts_assistant', 'coach', 'funder']
     if (!validRoles.includes(role)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
     }
@@ -57,7 +72,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Permission check:
-    // - super_coach can invite anyone
+    // - super_coach can invite anyone, including coach (co-implementer)
+    //   and funder logins -- only the coach hands those out
     // - CEO can invite finance_manager, unit_head, accounts_assistant (not another CEO)
     // - finance_manager can invite unit_head and accounts_assistant only
     const inviterRole = inviterProfile.role
@@ -70,14 +86,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'You do not have permission to assign this role' }, { status: 403 })
     }
 
-    // CEO can only invite within their own client
-    if (inviterRole !== 'super_coach' && inviterProfile.client_id !== clientId) {
+    // CEO/finance_manager can only invite within their own client
+    if (inviterRole !== 'super_coach' && clientId && inviterProfile.client_id !== clientId) {
       return NextResponse.json({ error: 'Cannot invite users to a different organisation' }, { status: 403 })
     }
 
+    // coach/funder logins land on the Coach Dashboard shell, not a
+    // single client's /dashboard/conas -- everything else keeps its
+    // existing redirect exactly as before.
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://clearview.habibonifade.com'
+    const redirectTo = (role === 'coach' || role === 'funder') ? `${appUrl}/coach` : `${appUrl}/dashboard/conas`
+
     // Send the invitation email via Supabase Auth admin API
     const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://clearview.habibonifade.com'}/dashboard/conas`,
+      redirectTo,
       data: {
         full_name: fullName,
         role,
@@ -103,10 +125,12 @@ export async function POST(req: NextRequest) {
       .from('user_profiles')
       .upsert({
         id: inviteData.user.id,
-        client_id: clientId,
+        client_id: clientId || null,
         role,
         full_name: fullName,
         assigned_unit_ids: assignedUnitIds || [],
+        co_implementer_id: role === 'coach' ? coImplementerId : null,
+        funder_programme_id: role === 'funder' ? funderProgrammeId : null,
       })
 
     if (profileErr) {
