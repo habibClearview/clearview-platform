@@ -2932,16 +2932,17 @@ function ExtendHorizonControl({form,setForm}:{form:GenericModelConfig;setForm:(n
     <div style={{marginTop:'1.25rem',paddingTop:'1.25rem',borderTop:`1px solid ${C.border}`}}>
       <div style={{fontWeight:700,color:C.navy,marginBottom:'0.5rem',fontSize:'1.04rem'}}>Extend Planning Horizon</div>
       <p style={{fontSize:'1.0rem',color:C.slate,marginBottom:'0.75rem',lineHeight:1.5}}>
-        Add more months to this client's plan without disturbing anything already entered. Currently {form.planning_months} months
-        (through {buildMonthLabels(form.start_date, form.planning_months).slice(-1)[0]}). New months start at zero, ready to plan.
+        This ADDS months on top of the plan -- it does not set a new total. Currently {form.planning_months} months
+        (through {buildMonthLabels(form.start_date, form.planning_months).slice(-1)[0]}). New months start at zero, ready to plan;
+        nothing already entered is disturbed.
       </p>
       {!confirming ? (
         <div style={{display:'flex',gap:'0.6rem',alignItems:'center'}}>
           <select style={{...inp,width:'auto'}} value={addMonths} onChange={e=>setAddMonths(Number(e.target.value))}>
-            <option value={12}>+ 12 months (1 year)</option>
-            <option value={24}>+ 24 months (2 years)</option>
-            <option value={36}>+ 36 months (3 years)</option>
-            <option value={60}>+ 60 months (5 years)</option>
+            <option value={12}>+ 12 months → {form.planning_months+12} months total</option>
+            <option value={24}>+ 24 months → {form.planning_months+24} months total</option>
+            <option value={36}>+ 36 months → {form.planning_months+36} months total</option>
+            <option value={60}>+ 60 months → {form.planning_months+60} months total</option>
           </select>
           <button style={addBtn(true)} onClick={()=>setConfirming(true)}>Extend Horizon</button>
         </div>
@@ -5099,6 +5100,13 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
         )}
       </div>
 
+      {plMode==='statement' && viewMode==='unit' && (result.debtSchedule?.totalInterest||[]).some((v:number)=>v>0) && (
+        <div style={{marginBottom:'1.1rem',background:'var(--cv-tint-teal-soft)',border:`1px solid ${C.teal}`,borderLeft:`4px solid ${C.teal}`,borderRadius:8,padding:'0.7rem 1rem',fontSize:'0.98rem',color:C.navy,lineHeight:1.5}}>
+          This business has a loan. Interest is a whole-business cost, not allocated to one unit, so it only appears on the{' '}
+          <button onClick={()=>setViewMode('consolidated')} style={{fontFamily:'monospace',fontWeight:700,color:C.teal,background:'none',border:'none',cursor:'pointer',padding:0,textDecoration:'underline'}}>Consolidated</button> P&L, not here.
+        </div>
+      )}
+
       {plMode==='variance' && (
         <PLVarianceView config={config} result={result} months={months} cc={cc}
           view={varView} selUnit={selUnit} setSelUnit={setSelUnit} lineActuals={lineActuals}/>
@@ -5864,7 +5872,12 @@ function CashFlowTab({config,result,months,cc,closedPeriods}) {
     {label:'Closing Cash',values:cf.close,bold:true,highlight:true,actualMask:cf.act_mask,aggregation:'endOfPeriod' as const},
   ]
   const debt = result.debtSchedule
-  const hasLoan = debt && debt.totalPrincipal.some((v:number)=>v>0)
+  // Checking totalPrincipal alone misses a loan whose principal repayment
+  // due date (e.g. a bullet loan's single repayment) falls beyond this
+  // plan's visible month window -- interest would still be accruing and
+  // showing on the P&L/Balance Sheet, but the whole schedule table below
+  // would silently vanish here. totalOutstanding/totalInterest catch that.
+  const hasLoan = debt && (debt.totalPrincipal.some((v:number)=>v>0) || debt.totalOutstanding.some((v:number)=>v>0) || debt.totalInterest.some((v:number)=>v>0))
   const loanRows = hasLoan ? [
     {label:'Interest',values:debt.totalInterest},
     {label:'Principal',values:debt.totalPrincipal},

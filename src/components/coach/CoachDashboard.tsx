@@ -664,6 +664,28 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   const [clientsFilter,setClientsFilter]=useState('all')
   const [clientsSub,setClientsSub]=useState('health')
   const [programmesSub,setProgrammesSub]=useState('pipeline')
+  // Light/dark theme -- same 'cv-theme' localStorage key and
+  // document.documentElement.dataset.theme mechanism GenericDashboard
+  // uses, so a coach's choice here and a client's choice there share one
+  // preference and both dashboards' shared CSS custom properties respond
+  // the same way. This was previously only wired up in GenericDashboard.
+  const [theme,setTheme]=useState('light')
+  useEffect(()=>{
+    const saved=localStorage.getItem('cv-theme')
+    const initial=saved==='light'||saved==='dark'?saved:'light'
+    setTheme(initial)
+    if(initial==='dark')document.documentElement.dataset.theme='dark'
+    else delete document.documentElement.dataset.theme
+  },[])
+  const toggleTheme=()=>{
+    setTheme(prev=>{
+      const next=prev==='dark'?'light':'dark'
+      localStorage.setItem('cv-theme',next)
+      if(next==='dark')document.documentElement.dataset.theme='dark'
+      else delete document.documentElement.dataset.theme
+      return next
+    })
+  }
   const [teamSub,setTeamSub]=useState('roster')
 
   // Load all top-level data on mount
@@ -1191,6 +1213,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           </div>
           <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}>
             <span style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem'}}>{roleBadgeLabel}</span>
+            <button onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle light/dark theme" style={{fontFamily:'monospace',fontSize:'0.93rem',background:'transparent',border:`1px solid var(--cv-wa-25)`,borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>{theme==='dark'?'☀':'☾'} Theme</button>
             <button onClick={onSignOut} style={{fontFamily:'monospace',fontSize:'0.93rem',background:'transparent',border:`1px solid var(--cv-wa-25)`,borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
           </div>
         </div>
