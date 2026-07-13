@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { runGenericModel, defaultGenericConfig, spreadLine, serviceFeeLine, buildYearGroups, collapseYear, defaultExpandedYears, extendPlanningHorizon } from '../lib/generic-engine'
+import { runGenericModel, defaultGenericConfig, spreadLine, serviceFeeLine, buildYearGroups, collapseYear, defaultExpandedYears, extendPlanningHorizon, buildDepreciationSchedule, applyCorporateTax } from '../lib/generic-engine'
 import { deriveActualOperatingCosts } from '../lib/actuals'
 
 function expectBalanceSheetBalances(result: ReturnType<typeof runGenericModel>) {
@@ -293,6 +293,119 @@ describe('Generic Engine — Capital Structure', () => {
     const taxExpected = nbtExpected > 0 ? nbtExpected * 0.30 : 0
     const npatExpected = nbtExpected - taxExpected
     expect(result.con.npat[1]).toBeCloseTo(npatExpected, 0)
+  })
+})
+
+describe('Generic Engine — Depreciation', () => {
+  it('buildDepreciationSchedule: straight-line, floors at zero once fully depreciated', () => {
+    // 12,000,000 over 5 years (60 months) = 200,000/month
+    const { monthlyDepreciation, netBookValue } = buildDepreciationSchedule(12_000_000, 60, 72)
+    expect(monthlyDepreciation[0]).toBeCloseTo(200_000, 0)
+    expect(netBookValue[0]).toBeCloseTo(11_800_000, 0)
+    expect(netBookValue[59]).toBeCloseTo(0, 0) // fully depreciated at the end of month 60
+    // No further charge or negative book value once fully depreciated
+    expect(monthlyDepreciation[60]).toBe(0)
+    expect(netBookValue[71]).toBe(0)
+  })
+
+  it('buildDepreciationSchedule: zero cost or zero useful life depreciates nothing', () => {
+    expect(buildDepreciationSchedule(0, 60, 12).monthlyDepreciation.every(v => v === 0)).toBe(true)
+    const noLife = buildDepreciationSchedule(5_000_000, 0, 12)
+    expect(noLife.monthlyDepreciation.every(v => v === 0)).toBe(true)
+    expect(noLife.netBookValue.every(v => v === 5_000_000)).toBe(true) // stays at cost, not divided by zero
+  })
+
+  it('REG: depreciation reduces EBIT below EBITDA, and NPAT less than the full charge (tax shield)', () => {
+    const withoutAsset = runGenericModel(makeConfig())
+    const cfg = makeConfig()
+    cfg.settings.capital_structure.fixed_assets = 12_000_000
+    cfg.settings.capital_structure.fixed_asset_useful_life_years = 5 // 200,000/month
+    const withAsset = runGenericModel(cfg)
+    expect(withAsset.con.depreciation[0]).toBeCloseTo(200_000, 0)
+    expect(withAsset.con.ebit[0]).toBeCloseTo(withAsset.con.ebitda[0] - 200_000, 0)
+    // Without any fixed assets, EBIT must equal EBITDA exactly (regression
+    // guard for every pre-existing test/client that has never set this).
+    expect(withoutAsset.con.ebit[0]).toBeCloseTo(withoutAsset.con.ebitda[0], 0)
+    const npatDrop = withoutAsset.con.npat[0] - withAsset.con.npat[0]
+    expect(npatDrop).toBeGreaterThan(0)
+    expect(npatDrop).toBeLessThan(200_000) // tax shield, same pattern as the loan interest test above
+    expect(npatDrop).toBeCloseTo(200_000 * (1 - 0.30), 0)
+  })
+
+  it('REG: depreciation is added back in operating cash flow (non-cash)', () => {
+    const cfg = makeConfig()
+    cfg.settings.capital_structure.fixed_assets = 12_000_000
+    cfg.settings.capital_structure.fixed_asset_useful_life_years = 5
+    const result = runGenericModel(cfg)
+    // op_cash must equal hybrid NPAT plus the depreciation add-back (no
+    // trade credit lines in this config, so no working-capital term)
+    for (const m of [0, 1, 6, 11]) {
+      expect(result.cf.op_cash[m]).toBeCloseTo(result.con.hybrid_npat[m] + result.con.depreciation[m], 0)
+    }
+  })
+
+  it('REG: balance sheet still balances with fixed assets depreciating, and net book value declines', () => {
+    const cfg = makeConfig()
+    cfg.settings.capital_structure.fixed_assets = 12_000_000
+    cfg.settings.capital_structure.fixed_asset_useful_life_years = 5
+    const result = runGenericModel(cfg)
+    expectBalanceSheetBalances(result)
+    expect(result.bs.fixed_assets[11]).toBeLessThan(result.bs.fixed_assets[0])
+    expect(result.bs.fixed_assets[0]).toBeCloseTo(12_000_000 - 200_000, 0)
+  })
+})
+
+describe('Generic Engine — Corporate tax (annual, not per-month)', () => {
+  it('applyCorporateTax: a loss month offsets a profit later in the SAME year (less total tax than naive per-month)', () => {
+    const yearGroups = buildYearGroups('2026-01-01', 12)
+    // Month 0: -1,000,000 loss. Months 1-11: +500,000 each = 5,500,000.
+    // Full-year NBT = 4,500,000. Correct annual tax = 4,500,000 x 30% = 1,350,000.
+    // A naive per-month calc would tax zero in month 0 (loss) and 30% of
+    // 500,000 in every one of the other 11 months = 1,650,000 -- MORE than
+    // the correct annual figure, since it never lets the loss offset any
+    // later month's profit.
+    const nbt = [-1_000_000, ...Array(11).fill(500_000)]
+    const { tax, npat } = applyCorporateTax(nbt, yearGroups, 0.30)
+    const totalTax = tax.reduce((a, b) => a + b, 0)
+    expect(totalTax).toBeCloseTo(1_350_000, 0)
+    expect(totalTax).toBeLessThan(1_650_000)
+    expect(npat.reduce((a, b) => a + b, 0)).toBeCloseTo(4_500_000 - 1_350_000, 0)
+    // Nothing taxed in the loss month itself
+    expect(tax[0]).toBe(0)
+  })
+
+  it('applyCorporateTax: a full fiscal year loss carries forward, uncapped, to offset next year\'s profit', () => {
+    const yearGroups = buildYearGroups('2026-01-01', 24)
+    // Year 1 (months 0-11): a flat 200,000/month loss = -2,400,000 for the year.
+    // Year 2 (months 12-23): a flat 1,000,000/month profit = 12,000,000 for the year.
+    const nbt = [...Array(12).fill(-200_000), ...Array(12).fill(1_000_000)]
+    const { tax } = applyCorporateTax(nbt, yearGroups, 0.30)
+    const year1Tax = tax.slice(0, 12).reduce((a, b) => a + b, 0)
+    const year2Tax = tax.slice(12, 24).reduce((a, b) => a + b, 0)
+    expect(year1Tax).toBe(0) // no tax on a loss year
+    // Year 2 taxable profit = 12,000,000 - 2,400,000 carryforward = 9,600,000
+    expect(year2Tax).toBeCloseTo(9_600_000 * 0.30, 0)
+  })
+
+  it('applyCorporateTax: steady positive profit gives the SAME result as simple per-month tax (no behaviour change for the common case)', () => {
+    const yearGroups = buildYearGroups('2026-01-01', 12)
+    const nbt = Array(12).fill(1_000_000)
+    const { tax } = applyCorporateTax(nbt, yearGroups, 0.30)
+    tax.forEach(t => expect(t).toBeCloseTo(300_000, 0))
+  })
+
+  it('REG: a lumpy P&L pays less total annual tax than the old per-month-independent method would have', () => {
+    const cfg = makeConfig({ start_date: '2026-01-01' })
+    // Overwrite Sales so month 0 is a steep loss and the rest of the year
+    // is flat and profitable -- same annual total revenue pattern shape
+    // as the applyCorporateTax unit test above, but exercised through the
+    // full engine (unit consolidation, shared costs, etc. included).
+    cfg.plan_lines[0].monthly_plan = [0, ...Array(11).fill(10_000_000)] // Sales
+    const result = runGenericModel(cfg)
+    const totalTax = result.con.tax.reduce((a: number, b: number) => a + b, 0)
+    const naivePerMonthTax = result.con.nbt.reduce((s: number, v: number) => s + (v > 0 ? v * 0.30 : 0), 0)
+    expect(totalTax).toBeLessThan(naivePerMonthTax)
+    expect(totalTax).toBeCloseTo(Math.max(0, result.con.nbt.reduce((a: number, b: number) => a + b, 0)) * 0.30, 0)
   })
 })
 

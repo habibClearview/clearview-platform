@@ -85,7 +85,9 @@ export function applyPeriodActual(planValues: number[], actualValues: (number | 
 // planned figures while the P&L tab correctly summed hybrid ones).
 export function buildHybridConsolidated(con: {
   rev: number[]; cogs: number[]; gp: number[]; opex: number[]; ebitda: number[]; interest: number[];
+  depreciation?: number[]; ebit?: number[];
   nbt: number[]; tax: number[]; npat: number[];
+  hybrid_nbt?: number[]; hybrid_tax?: number[]; hybrid_npat?: number[];
   act_rev: (number | null)[]; act_cogs: (number | null)[]; act_gp: (number | null)[]; act_ebitda: (number | null)[];
   act_nbt: (number | null)[]; act_tax: (number | null)[]; act_npat: (number | null)[];
 }) {
@@ -103,17 +105,34 @@ export function buildHybridConsolidated(con: {
   // WHOLE period consistently fall back to plan, never a partial mix.
   const periodIsActual: boolean[] = con.act_ebitda.map((v, m) => v !== null && con.act_gp[m] !== null)
   const actOpexTotal = con.act_ebitda.map((eb, m) => con.act_gp[m] !== null ? deriveActualOperatingCosts(con.act_gp[m] as number, eb) : null)
+  const ebitdaValues = applyPeriodActual(con.ebitda, con.act_ebitda, periodIsActual)
+  const depreciationValues = con.depreciation ?? con.ebitda.map(() => 0)
   return {
     periodIsActual,
     rev: applyPeriodActual(con.rev, con.act_rev.map(v => v ?? 0), periodIsActual),
     cogs: applyPeriodActual(con.cogs, con.act_cogs.map(v => v ?? 0), periodIsActual),
     gp: applyPeriodActual(con.gp, con.act_gp, periodIsActual),
     opex: applyPeriodActual(con.opex, actOpexTotal, periodIsActual),
-    ebitda: applyPeriodActual(con.ebitda, con.act_ebitda, periodIsActual),
+    ebitda: ebitdaValues,
+    depreciation: depreciationValues,
+    // Depreciation is a fixed schedule, not itself a plan-vs-actual
+    // figure (same treatment as interest) -- EBIT is simply hybrid EBITDA
+    // less that schedule, for whichever month is being shown.
+    ebit: con.ebit ?? ebitdaValues.map((e, m) => e - depreciationValues[m]),
     interest: con.interest,
-    nbt: applyPeriodActual(con.nbt, con.act_nbt, periodIsActual),
-    tax: applyPeriodActual(con.tax, con.act_tax, periodIsActual),
-    npat: applyPeriodActual(con.npat, con.act_npat, periodIsActual),
+    // NBT/Tax/NPAT read the engine's own hybrid_* arrays directly rather
+    // than re-deriving via applyPeriodActual(con.nbt, con.act_nbt, ...) --
+    // that per-field substitution falls back to the PURE PLAN figure for
+    // any future month, even one inside a fiscal year that already has
+    // real actuals earlier in it, silently ignoring the real year-to-date
+    // tax position those actuals produced (see applyCorporateTax in
+    // generic-engine.ts). hybrid_nbt/tax/npat already carry that forward
+    // correctly for every month, actual or still-forecast, so this is the
+    // one true figure Cash Flow, the Balance Sheet, and this P&L display
+    // must all agree on.
+    nbt: con.hybrid_nbt ?? applyPeriodActual(con.nbt, con.act_nbt, periodIsActual),
+    tax: con.hybrid_tax ?? applyPeriodActual(con.tax, con.act_tax, periodIsActual),
+    npat: con.hybrid_npat ?? applyPeriodActual(con.npat, con.act_npat, periodIsActual),
   }
 }
 
