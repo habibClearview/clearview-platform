@@ -63,6 +63,54 @@ export function outstandingInvoiced(clients: FeeClient[]): number {
   return clients.filter(c => c.fee_status === 'invoiced').reduce((s, c) => s + fee(c), 0)
 }
 
+/** Sum of fees marked paid whose fee_paid_at falls within the given calendar
+ *  month ('YYYY-MM', the same period-string convention coach_invoices uses --
+ *  see periodForDate in TeamPayments.tsx). */
+export function feesReceivedInMonth(clients: FeeClient[], period: string): number {
+  return clients
+    .filter(c => c.fee_status === 'paid' && c.fee_paid_at && c.fee_paid_at.slice(0, 7) === period)
+    .reduce((s, c) => s + fee(c), 0)
+}
+
+/** The last n calendar months as 'YYYY-MM' period keys, oldest first, ending
+ *  with the current month. */
+export function recentMonthPeriods(n: number, now: Date = new Date()): string[] {
+  const out: string[] = []
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+  for (let i = 0; i < n; i++) {
+    out.unshift(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`)
+    d.setUTCMonth(d.getUTCMonth() - 1)
+  }
+  return out
+}
+
+/** Fees collected (fee_status='paid'), bucketed by the month fee_paid_at falls
+ *  in -- one entry per requested period, 0 where nothing was collected that
+ *  month (never omitted, so a caller can always align it 1:1 with periods). */
+export function monthlyFeeRevenue(clients: FeeClient[], periods: string[]): Record<string, number> {
+  const out: Record<string, number> = {}
+  periods.forEach(p => { out[p] = feesReceivedInMonth(clients, p) })
+  return out
+}
+
+export interface CoachInvoiceForCost { period: string; status: string; time_amount?: number | null; expenses_amount?: number | null }
+/** Team cost-to-serve, bucketed by invoice period -- time + expenses on every
+ *  ISSUED (non-draft) invoice, matching "fee - cost-to-serve = margin"
+ *  (docs/gtcv/README.md). Advance amounts are deliberately excluded: an
+ *  advance is a cash-timing mechanism (already recorded as a cost when
+ *  disbursed, see coach_advances), netting it off again here would
+ *  double-count it as a cost incurred in this period too. */
+export function monthlyTeamCost(invoices: CoachInvoiceForCost[], periods: string[]): Record<string, number> {
+  const out: Record<string, number> = {}
+  periods.forEach(p => { out[p] = 0 })
+  invoices.forEach(inv => {
+    if (inv.status === 'draft') return
+    if (!(inv.period in out)) return
+    out[inv.period] += (Number(inv.time_amount) || 0) + (Number(inv.expenses_amount) || 0)
+  })
+  return out
+}
+
 /**
  * Average days between invoicing and payment, over PAID fees that have both
  * dates recorded. Returns null (not 0) when there's no data yet -- 0 days
@@ -127,10 +175,21 @@ export interface DealCard {
 // Most-progressed deals first; ties broken by value, largest first.
 const STAGE_RANK: Record<string, number> = { won: 0, proposal: 1, scoping: 2, conversation: 3, lost: 4 }
 // Design default when a deal has no coach-entered probability yet -- a fixed
-// per-stage weighting for the progress bar (not a claimed measurement), same
-// idea as the stage badge colour. A coach-entered deal_probability always
-// takes priority over this.
-const STAGE_DEFAULT_BAR: Record<string, number> = { won: 1, proposal: 0.65, scoping: 0.4, conversation: 0.2, lost: 0.05 }
+// per-stage weighting (not a claimed measurement), same idea as the stage
+// badge colour. A coach-entered deal_probability always takes priority over
+// this. Single source of truth for "how likely is this deal" -- used for
+// BOTH a deal card's progress bar and the pipeline's weighted-value total,
+// so the two can never silently disagree about the same deal (they used to:
+// the progress bar applied this fallback, the weighted total didn't, and
+// counted any deal with no probability entered as worth exactly $0).
+const STAGE_DEFAULT_PROBABILITY: Record<string, number> = { won: 1, proposal: 0.65, scoping: 0.4, conversation: 0.2, lost: 0.05 }
+export function dealProbability(p: Pick<DealProgramme, 'deal_stage' | 'deal_probability'>): number {
+  const stage = p.deal_stage || 'conversation'
+  const explicit = p.deal_probability
+  return explicit != null
+    ? Math.max(0, Math.min(1, Number(explicit) / 100))
+    : (STAGE_DEFAULT_PROBABILITY[stage] ?? 0.1)
+}
 
 /** Open + won deals, ordered by how far along they are. Bar reflects deal_probability when the coach has set it; otherwise a fixed per-stage default -- never derived from dollar value, which has no bearing on how likely/advanced a deal is. */
 export function dealCards(programmes: DealProgramme[]): DealCard[] {
@@ -138,10 +197,6 @@ export function dealCards(programmes: DealProgramme[]): DealCard[] {
   return withStage
     .map(p => {
       const stage = p.deal_stage as string
-      const probability = p.deal_probability
-      const barFrac = probability != null && probability !== undefined
-        ? Math.max(0, Math.min(1, Number(probability) / 100))
-        : (STAGE_DEFAULT_BAR[stage] ?? 0.1)
       return {
         id: p.id,
         name: p.name,
@@ -149,13 +204,36 @@ export function dealCards(programmes: DealProgramme[]): DealCard[] {
         value: Number(p.deal_value) || 0,
         currency: p.deal_currency || 'USD',
         stage,
-        barFrac,
+        barFrac: dealProbability(p),
       }
     })
     .sort((a, b) => {
       const rankDiff = (STAGE_RANK[a.stage] ?? 9) - (STAGE_RANK[b.stage] ?? 9)
       return rankDiff !== 0 ? rankDiff : b.value - a.value
     })
+}
+
+const OPEN_DEAL_STAGES = ['conversation', 'scoping', 'proposal']
+/** Sum of deal_value x probability across every OPEN deal (won/lost excluded -- nothing left to weight). Uses the same dealProbability fallback as the card progress bar. */
+export function weightedPipelineValue(programmes: DealProgramme[]): number {
+  return programmes
+    .filter(p => OPEN_DEAL_STAGES.includes(p.deal_stage || ''))
+    .reduce((s, p) => s + (Number(p.deal_value) || 0) * dealProbability(p), 0)
+}
+
+export interface PipelineSnapshot {
+  stages: { stage: string; count: number; value: number; currency: string }[]
+  closedCount: number   // won, all-time (a point-in-time count -- no stage-change history is recorded, so this cannot be "won this month")
+  openCount: number     // conversation + scoping + proposal, regardless of stage
+}
+/** A current, point-in-time read of the pipeline -- deliberately NOT a trend over time, since deal_stage is a snapshot field with no recorded history of past changes. */
+export function pipelineSnapshot(programmes: DealProgramme[]): PipelineSnapshot {
+  const funnel = dealFunnel(programmes)
+  return {
+    stages: funnel.stages,
+    closedCount: programmes.filter(p => p.deal_stage === 'won').length,
+    openCount: programmes.filter(p => OPEN_DEAL_STAGES.includes(p.deal_stage || '')).length,
+  }
 }
 
 // ─── Engagements table ─────────────────────────────────────────

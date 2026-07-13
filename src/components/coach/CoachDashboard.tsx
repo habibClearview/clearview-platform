@@ -14,10 +14,11 @@ import TeamPayments from '@/components/coach/TeamPayments'
 import DealsAndFees from '@/components/coach/DealsAndFees'
 import ReviewQueue from '@/components/coach/ReviewQueue'
 import {
-  engagementSplit, independentClients, feesReceivedInYear, outstandingInvoiced,
+  engagementSplit, independentClients, feesReceivedInYear, feesReceivedInMonth, outstandingInvoiced,
   averageDaysToCollect, revenueStreams, dealCards, dealWinRate,
   canvasProgress, coImplementerNamesForClient, engagementDisplayStatus, coImplementerWorkload,
   healthStatusFromReportText, portfolioHealthCounts, groupClientsByProgramme,
+  pipelineSnapshot, recentMonthPeriods, monthlyFeeRevenue, monthlyTeamCost,
 } from '@/lib/coach-business-metrics'
 
 // \u2500\u2500\u2500 DESIGN TOKENS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -275,11 +276,77 @@ function ClientHealthTab({clients,programmes}){
     </div>
   )
 }
+// Pipeline by stage -- a current, point-in-time bar chart (see
+// pipelineSnapshot in coach-business-metrics.ts for why this can't
+// honestly be a trend yet). Bar height = deal count in that stage; value
+// is shown as a secondary label underneath, never invented.
+function PipelineStageChart({stages}){
+  const W=560,H=178,padL=16,padR=16,padT=20,padB=34
+  const maxV=Math.max(1,...stages.map(s=>s.count))
+  const bw=(W-padL-padR)/stages.length
+  const y=v=>padT+(1-(v/maxV))*(H-padT-padB)
+  return(
+    <div style={{overflowX:'auto'}}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:'block',minWidth:340}}>
+        <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} style={{stroke:'var(--cv-border-soft)'}}/>
+        {stages.map((s,i)=>{
+          const meta=DEAL_STAGE_META[s.stage]||{color:C.slate,label:s.stage}
+          const x=padL+i*bw+bw*0.2, w=bw*0.6
+          const top=y(s.count)
+          return(
+            <g key={s.stage}>
+              <rect x={x} y={top} width={w} height={Math.max(0,(H-padB)-top)} rx={4} style={{fill:meta.color}}/>
+              {s.count>0&&<text x={x+w/2} y={top-6} fontSize="10.5" fontWeight="700" textAnchor="middle" fontFamily="monospace" style={{fill:C.navy}}>{s.count}</text>}
+              <text x={x+w/2} y={H-padB+14} fontSize="9.5" textAnchor="middle" fontFamily="monospace" style={{fill:C.slate}}>{meta.label.split(' ')[0].replace('·','')}</text>
+              <text x={x+w/2} y={H-padB+25} fontSize="8.5" textAnchor="middle" fontFamily="monospace" style={{fill:C.slate}}>{fmtGlance(s.value,s.currency)}</text>
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
+// Revenue vs cost, last 6 months -- both real, dated figures (fee_paid_at
+// for revenue, issued coach_invoices.period for cost). A month with
+// nothing collected/invoiced shows as a zero bar, not a gap or an
+// estimate.
+function RevenueCostTrendChart({periods,revenueByPeriod,costByPeriod,cur}){
+  const W=560,H=190,padL=16,padR=16,padT=18,padB=30
+  const maxV=Math.max(1,...periods.map(p=>Math.max(revenueByPeriod[p]||0,costByPeriod[p]||0)))
+  const bw=(W-padL-padR)/periods.length
+  const y=v=>padT+(1-(v/maxV))*(H-padT-padB)
+  const monthLabel=p=>{const [yr,m]=p.split('-');return new Date(Number(yr),Number(m)-1,1).toLocaleDateString('en-GB',{month:'short'})}
+  return(
+    <div style={{overflowX:'auto'}}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:'block',minWidth:380}}>
+        <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} style={{stroke:'var(--cv-border-soft)'}}/>
+        {periods.map((p,i)=>{
+          const rev=revenueByPeriod[p]||0, cost=costByPeriod[p]||0
+          const gx=padL+i*bw, barW=bw*0.3, gap=bw*0.06
+          const revX=gx+bw*0.17, costX=revX+barW+gap
+          const revTop=y(rev), costTop=y(cost)
+          return(
+            <g key={p}>
+              <rect x={revX} y={revTop} width={barW} height={Math.max(0,(H-padB)-revTop)} rx={3} style={{fill:C.teal}}/>
+              <rect x={costX} y={costTop} width={barW} height={Math.max(0,(H-padB)-costTop)} rx={3} style={{fill:C.purple}}/>
+              <text x={gx+bw/2} y={H-padB+14} fontSize="9.5" textAnchor="middle" fontFamily="monospace" style={{fill:C.slate}}>{monthLabel(p)}</text>
+            </g>
+          )
+        })}
+      </svg>
+      <div style={{display:'flex',gap:'1.1rem',fontSize:'0.87rem',fontFamily:'monospace',color:C.slate,marginTop:'0.4rem'}}>
+        <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:C.teal,marginRight:5,verticalAlign:'middle'}}/>Revenue</span>
+        <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:C.purple,marginRight:5,verticalAlign:'middle'}}/>Team cost</span>
+      </div>
+    </div>
+  )
+}
+
 function MyBusinessGlance({clients,programmes,coImplementers}){
   const split=engagementSplit(clients)
   const indep=independentClients(clients)
   const feeCur=clients.find(c=>c.fee_currency)?.fee_currency||'USD'
-  const paidThisYear=feesReceivedInYear(clients,new Date().getFullYear())
   const outstanding=outstandingInvoiced(clients)
   const dso=averageDaysToCollect(clients)
   const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
@@ -287,12 +354,31 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
   const deals=dealCards(programmes)
   const winRate=dealWinRate(programmes)
   const streamColor={programme_advisory:C.slate,self_funded_gtcv:C.purple,clearview_subscriptions:C.teal}
+  const totalPayingClients=rs.streams.reduce((s,x)=>s+x.clientCount,0)
+  const streamByKey=Object.fromEntries(rs.streams.map(s=>[s.key,s]))
+  // "Served / beneficiary" (docs/gtcv/README.md) = every organisation put
+  // through the canvas, regardless of who pays for it -- distinct from the
+  // revenue-stream cards above, which are about who's paying, not who's
+  // being served. The same real count as split.gtcv, just named for what
+  // it actually represents here.
+  const beneficiaryCount=split.gtcv
 
-  // Real canvas progress + timesheet data, fetched once for the whole list --
-  // avoids an N+1 query per client. Empty/failed fetch degrades to "no data
-  // yet" per client, never a fabricated number.
+  // Fees Paid is period-aware (month vs year, cumulative); every other
+  // count/value on this tab is a CURRENT snapshot (there's no per-stream
+  // collection date to split by period -- engagement_fee is a single
+  // static value per client, not a dated line per month), so only this
+  // one figure changes with the toggle.
+  const [period,setPeriod]=useState('month')
+  const now=new Date()
+  const currentMonthKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
+  const feesThisPeriod=period==='month'?feesReceivedInMonth(clients,currentMonthKey):feesReceivedInYear(clients,now.getFullYear())
+
+  // Real canvas progress + timesheet + invoice data, fetched once for the
+  // whole list -- avoids an N+1 query per client. Empty/failed fetch
+  // degrades to "no data yet", never a fabricated number.
   const [canvasByClient,setCanvasByClient]=useState({})
   const [tsEntries,setTsEntries]=useState([])
+  const [invoices,setInvoices]=useState([])
   useEffect(()=>{
     let cancelled=false
     const clientIds=clients.map(c=>c.id)
@@ -300,29 +386,63 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
     Promise.all([
       supabase.from('canvas_decision_points').select('client_id,dp_id,status').in('client_id',clientIds),
       supabase.from('coach_timesheet_entries').select('co_implementer_id,hours,status,entry_date'),
-    ]).then(([{data:dps},{data:entries}])=>{
+      supabase.from('coach_invoices').select('period,status,time_amount,expenses_amount'),
+    ]).then(([{data:dps},{data:entries},{data:inv}])=>{
       if(cancelled)return
       const grouped={}
       ;(dps||[]).forEach(d=>{(grouped[d.client_id]=grouped[d.client_id]||[]).push(d)})
       setCanvasByClient(grouped)
       setTsEntries(entries||[])
+      setInvoices(inv||[])
     }).catch(()=>{})
     return ()=>{cancelled=true}
   },[clients])
 
+  const trendPeriods=recentMonthPeriods(6)
+  const revenueByPeriod=monthlyFeeRevenue(clients,trendPeriods)
+  const costByPeriod=monthlyTeamCost(invoices,trendPeriods)
+  const pipeline=pipelineSnapshot(programmes)
+
   return(
     <div style={{marginBottom:'1.75rem'}}>
-      <Kicker>My business at a glance</Kicker>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem',marginBottom:'0.75rem'}}>
+        <Kicker style={{marginBottom:0}}>My business at a glance</Kicker>
+        <div style={{display:'flex',gap:'0.3rem'}}>
+          <button style={subPill(period==='month')} onClick={()=>setPeriod('month')}>This Month</button>
+          <button style={subPill(period==='year')} onClick={()=>setPeriod('year')}>This Year (cumulative)</button>
+        </div>
+      </div>
+      <div className="cv-grid-4" style={{marginBottom:'0.75rem'}}>
+        <GlanceKPI label="Paying Clients" value={String(totalPayingClients)} sub="across every revenue stream" color={C.navy}/>
+        <GlanceKPI label="Programme Advisory" value={String(streamByKey.programme_advisory?.clientCount||0)} sub="grant-funded" color={C.slate}/>
+        <GlanceKPI label="Independent Canvas Paying" value={String(streamByKey.self_funded_gtcv?.clientCount||0)} sub="self-funded GtCV" color={C.purple}/>
+        <GlanceKPI label="Clearview Subscriptions" value={String(streamByKey.clearview_subscriptions?.clientCount||0)} sub="independent · recurring" color={C.teal}/>
+      </div>
       <div className="cv-grid-4" style={{marginBottom:'1.5rem'}}>
-        <GlanceKPI label="Active Engagements" value={String(split.total)} sub={`${split.gtcv} GtCV · ${split.clearview} Clearview`} color={C.navy}/>
-        <GlanceKPI label="Fees Paid Up · This Year" value={fmtGlance(paidThisYear,feeCur)} sub="received & cleared" color={C.green}/>
+        <GlanceKPI label={`Fees Paid Up · ${period==='month'?'This Month':'This Year'}`} value={fmtGlance(feesThisPeriod,feeCur)} sub="received & cleared" color={C.green}/>
         <GlanceKPI label="Invoiced · My Own DSO" value={fmtGlance(outstanding,feeCur)} sub={dso!=null?`avg ${Math.round(dso)} days to collect`:'no collections recorded yet'} color={C.amber}/>
         <GlanceKPI label="Independent Clients" value={String(indep.count)} sub={`self-paying · ${Math.round(indep.revenueShare*100)}% of revenue`} color={C.purple}/>
+        <GlanceKPI label="Beneficiaries Served" value={String(beneficiaryCount)} sub="LSPs/agribusinesses through the canvas" color={C.cyan}/>
       </div>
       <Kicker>Revenue streams <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; two of the three are independent &mdash; your own commercial base, growing off programme money</span></Kicker>
       <div className="cv-grid-3" style={{marginBottom:'1.5rem'}}>
         {rs.streams.map(s=><RevenueStreamCard key={s.key} label={s.label} value={s.value} description={s.description} tag={s.tag} barFrac={s.barFrac} currency={feeCur} color={streamColor[s.key]}/>)}
       </div>
+      <Kicker>Revenue &amp; cost <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; last 6 months, from real collections and issued co-implementer invoices</span></Kicker>
+      <div style={{...card,marginBottom:'1.5rem'}}>
+        <RevenueCostTrendChart periods={trendPeriods} revenueByPeriod={revenueByPeriod} costByPeriod={costByPeriod} cur={feeCur}/>
+      </div>
+      <Kicker>Pipeline <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; a current snapshot, not a trend &mdash; deal stage changes aren&#39;t logged with a date yet, so this can&#39;t honestly be shown over time</span></Kicker>
+      <div className="cv-grid-3" style={{marginBottom:'0.85rem'}}>
+        <GlanceKPI label="Closed Deals" value={String(pipeline.closedCount)} sub="won, all-time" color={C.green}/>
+        <GlanceKPI label="Open Pipeline Deals" value={String(pipeline.openCount)} sub="any stage" color={C.cyan}/>
+        <GlanceKPI label={`Revenue · ${period==='month'?'This Month':'This Year'}`} value={fmtGlance(feesThisPeriod,feeCur)} sub="fees actually collected" color={C.navy}/>
+      </div>
+      {pipeline.stages.some(s=>s.count>0)&&(
+        <div style={{...card,marginBottom:'1.5rem'}}>
+          <PipelineStageChart stages={pipeline.stages}/>
+        </div>
+      )}
       {deals.length>0&&(<>
         <Kicker>Programme deals <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; who actually pays for the programme-funded stream. {Math.round(winRate.pct*100)}% won ({winRate.wonCount} of {winRate.totalCount}).</span></Kicker>
         <div className="cv-grid-3" style={{marginBottom:'1.5rem'}}>
