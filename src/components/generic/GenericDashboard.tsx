@@ -14,6 +14,7 @@ import {
 import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor, dscrRating, computeScoresTimeSeries, computeTradeCredit } from '@/lib/scoring-engine'
 import { computeNPV, computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary, annualRateToMonthlyRate, monthlyRateToAnnualRate } from '@/lib/investment-metrics'
 import { computeLiquidityReadinessScore, computeLRSTimeSeries, computeFitScore, FIT_SCORE_PRESETS, LRS_WEIGHTS } from '@/lib/liquidity-readiness'
+import { computePathwayToReadiness } from '@/lib/pathway-to-readiness'
 import { combinedActual, computeActualsTotals, applyPeriodActual, buildHybridConsolidated, computeCatalogueLineTotal } from '@/lib/actuals'
 import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
 import { yearStartPeriod, canCloseCalendarYear, computeYearEndBalanceSheet } from '@/lib/annual-close'
@@ -3820,6 +3821,27 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,clo
     customersAcquired:0,irr:null,revenuePerHead:0,assess,
   })
 
+  // Pathway to Readiness: per-dimension score history, REAL (actual)
+  // months only -- the trailing-12-month LRS series already computed
+  // above (lrsSeries.monthsByYear) covers every month index across the
+  // whole plan including future/plan-only months, which would make a
+  // "trend" meaningless. Only months with real actuals feed the
+  // trend/timing projection in pathway-to-readiness.ts.
+  const lrsDimensionHistory = {}
+  ;(Object.keys(LRS_WEIGHTS)).forEach(dim => { lrsDimensionHistory[dim] = [] })
+  yearGroups.forEach(g => {
+    const monthsInYear = lrsSeries.monthsByYear[g.year] || []
+    g.monthIndices.forEach((m, i) => {
+      if (!periodIsActual[m]) return
+      const period = monthsInYear[i]
+      if (!period) return
+      Object.keys(LRS_WEIGHTS).forEach(dim => {
+        lrsDimensionHistory[dim].push({ monthIndex: m, score: period.result.dimensions[dim].score })
+      })
+    })
+  })
+  const pathwayOpportunities = computePathwayToReadiness(lrsCurrent, LRS_WEIGHTS, lrsDimensionHistory)
+
   // ── Derived figures for the mockup-faithful sections ─────────
   // All read from the engine outputs already computed above; none of these
   // change any scoring or lib calculation, they only present existing data.
@@ -4331,6 +4353,39 @@ Write a status report, not a letter. Do not address the reader. Do not open with
                 </div>
               )
             })()}
+
+            <SectionLabel>Pathway to readiness</SectionLabel>
+            <div style={{...card,marginBottom:'1.1rem'}}>
+              <p style={{fontSize:'1.0rem',color:C.slate,lineHeight:1.5,margin:'0 0 0.9rem'}}>
+                The three areas that would raise your Liquidity Readiness Score the most, with exactly what to do about each.
+                Timing is only shown once there's enough of your own history to project a real trend from — never a guess.
+              </p>
+              {pathwayOpportunities.map(op=>{
+                const label = (dimLabels.find(([k])=>k===op.dimension)||[null,op.dimension])[1]
+                return (
+                  <div key={op.dimension} style={{borderTop:`1px solid var(--cv-border-soft)`,padding:'0.9rem 0'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:'0.5rem'}}>
+                      <div style={{fontWeight:700,fontSize:'1.05rem',color:C.navy}}>{label}</div>
+                      <div style={{fontSize:'0.95rem',color:C.slate}}>Currently {Math.round(op.currentScore)}/100 · up to +{op.potentialLift.toFixed(1)} to your overall score</div>
+                    </div>
+                    <ul style={{margin:'0.5rem 0 0.6rem',paddingLeft:'1.2rem'}}>
+                      {op.actions.map(a=><li key={a} style={{fontSize:'0.96rem',color:C.navy,marginBottom:'0.2rem'}}>{a}</li>)}
+                    </ul>
+                    {op.timing.status==='insufficient_history'&&(
+                      <div style={{fontSize:'0.9rem',color:C.slate,fontStyle:'italic'}}>Not enough of your own history yet to estimate how long this would take -- keep recording actuals and this fills in on its own.</div>
+                    )}
+                    {op.timing.status==='no_improving_trend'&&(
+                      <div style={{fontSize:'0.9rem',color:C.amber,fontStyle:'italic'}}>This area hasn't shown an improving trend recently, so a timescale can't be honestly estimated yet.</div>
+                    )}
+                    {op.timing.status==='projected'&&(
+                      <div style={{fontSize:'0.9rem',color:C.teal}}>
+                        At your recent pace ({op.timing.monthlyRate.toFixed(1)} points/month), fully closing this gap would take about {op.timing.exceedsHorizon?'36+':op.timing.monthsToClose} months.
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
 
             <SectionLabel>Metrics investors and banks look at</SectionLabel>
             {(() => {
