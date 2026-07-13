@@ -4268,7 +4268,10 @@ Write a status report, not a letter. Do not address the reader. Do not open with
                 seven dimensions re-weighted for what that specific capital provider cares about most; the underlying data never changes.
               </p>
             </div>
-            <InvestmentPitchDownload clientId={clientId}/>
+            <div style={{background:'var(--cv-tint-cyan)',borderRadius:6,padding:'0.85rem 1rem',marginBottom:'1.25rem'}}>
+              <div style={{fontWeight:700,fontSize:'1.06rem',color:C.navy}}>Investment Readiness Brief</div>
+              <div style={{fontSize:'1.0rem',color:C.slate}}>Your coach generates this document when it's needed for a lender, investor, or programme officer, and controls who it's shared with.</div>
+            </div>
 
             <SectionLabel>Score &amp; fit</SectionLabel>
             {(() => {
@@ -5791,61 +5794,6 @@ function PromotionEventsSection({clientId,config,cc,P,events,setEvents}) {
               </div>
             )
           })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── INVESTMENT PITCH DOWNLOAD ────────────────────────────────
-function InvestmentPitchDownload({clientId}:{clientId:string}) {
-  const [downloading, setDownloading] = useState(false)
-  const [error, setError] = useState('')
-
-  async function download() {
-    setDownloading(true)
-    setError('')
-    try {
-      const response = await fetch('/api/investment-pitch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId }),
-      })
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}))
-        throw new Error(errData.error || 'Could not generate the document')
-      }
-      const blob = await response.blob()
-      const disposition = response.headers.get('Content-Disposition') || ''
-      const match = disposition.match(/filename="(.+)"/)
-      const fileName = match ? match[1] : 'Investment_Summary.docx'
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = fileName
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    } catch (e: any) {
-      setError(e.message || 'Download failed')
-    }
-    setDownloading(false)
-  }
-
-  return (
-    <div style={{background:'var(--cv-tint-cyan)',borderRadius:6,padding:'0.85rem 1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.75rem'}}>
-      <div>
-        <div style={{fontWeight:700,fontSize:'1.06rem',color:C.navy}}>Investment Pitch Summary</div>
-        <div style={{fontSize:'1.0rem',color:C.slate}}>A one-page Word document with the financial summary and scores, ready to send to a lender or investor.</div>
-      </div>
-      <button style={solidBtn('var(--cv-header)')} disabled={downloading} onClick={download}>
-        {downloading ? 'Generating...' : 'Download Word Document'}
-      </button>
-      {error && (
-        <div style={{width:'100%',background:'var(--cv-tint-red)',border:`2px solid ${C.red}`,borderRadius:6,padding:'0.85rem 1rem',marginTop:'0.5rem'}}>
-          <div style={{fontWeight:700,color:C.red,fontSize:'1.06rem',marginBottom:'0.3rem'}}>⚠ Could not generate the document</div>
-          <div style={{color:C.red,fontSize:'1.0rem'}}>{error}</div>
         </div>
       )}
     </div>

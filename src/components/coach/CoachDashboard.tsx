@@ -127,6 +127,46 @@ function CoImplementerPerfCard({ci,workload}){
 // show real canvas progress instead of a health status, since ai_health_checks
 // only ever covers Clearview/financial clients (never GtCV).
 const HEALTH_COLOR={'Needs attention':C.red,'Watch':C.amber,'Healthy':C.green,'Reviewed':C.teal,'No data':C.slate,'Not yet reviewed':C.cyan,'No financial data yet':C.slate}
+
+// Generates and downloads a client's Investment Readiness Brief from the
+// COACH's own dashboard -- the coach is the one deciding who a client's
+// numbers go to (a lender, an investor, a programme officer), not the
+// client self-serving a document to send externally on their own. Reuses
+// the same /api/investment-pitch route the client dashboard already used;
+// no new endpoint, no new data access, just a different, coach-controlled
+// place to trigger it from.
+function InvestmentBriefButton({clientId,clientName}){
+  const [downloading,setDownloading]=useState(false)
+  const [error,setError]=useState('')
+  async function download(){
+    setDownloading(true); setError('')
+    try{
+      const response=await fetch('/api/investment-pitch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId})})
+      if(!response.ok){const errData=await response.json().catch(()=>({}));throw new Error(errData.error||'Could not generate the document')}
+      const blob=await response.blob()
+      const disposition=response.headers.get('Content-Disposition')||''
+      const match=disposition.match(/filename="(.+)"/)
+      const fileName=match?match[1]:`${clientName.replace(/[^a-z0-9]+/gi,'_')}_Investment_Brief.docx`
+      const url=URL.createObjectURL(blob)
+      const a=document.createElement('a')
+      a.href=url; a.download=fileName
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }catch(e){setError(e.message||'Download failed')}
+    setDownloading(false)
+  }
+  return(
+    <div style={{marginTop:'0.6rem'}}>
+      <button
+        style={{fontSize:'0.85rem',fontWeight:600,color:C.teal,background:'none',border:`1px solid ${C.teal}`,borderRadius:6,padding:'0.3rem 0.65rem',cursor:'pointer'}}
+        disabled={downloading}
+        onClick={download}
+      >{downloading?'Generating…':'⬇ Investment Brief'}</button>
+      {error&&<div style={{fontSize:'0.78rem',color:C.red,marginTop:'0.3rem'}}>{error}</div>}
+    </div>
+  )
+}
+
 function ClientHealthTab({clients,programmes}){
   const [reportByClient,setReportByClient]=useState({})
   const [canvasByClient,setCanvasByClient]=useState({})
@@ -264,7 +304,10 @@ function ClientHealthTab({clients,programmes}){
                   {isCanvas?(
                     <div style={{fontFamily:'monospace',fontSize:'0.99rem',color:C.slate,marginTop:'0.6rem'}}>{prog.totalCount>0?`${prog.doneCount}/${prog.totalCount} · ${prog.currentLabel}`:'No canvas yet'}</div>
                   ):(
-                    <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginTop:'0.6rem'}}><span>{status.dot}</span><Badge text={status.label} color={HEALTH_COLOR[status.label]}/></div>
+                    <>
+                      <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginTop:'0.6rem'}}><span>{status.dot}</span><Badge text={status.label} color={HEALTH_COLOR[status.label]}/></div>
+                      {hasActuals.has(c.id)&&<div onClick={e=>e.stopPropagation()}><InvestmentBriefButton clientId={c.id} clientName={c.name}/></div>}
+                    </>
                   )}
                 </div>
               )
