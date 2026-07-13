@@ -19,7 +19,7 @@ import {
   healthStatusFromReportText, portfolioHealthCounts, groupClientsByProgramme,
   pipelineSnapshot, recentMonthPeriods, monthlyFeeRevenue, monthlyTeamCost,
 } from '@/lib/coach-business-metrics'
-import { GRANT_TYPE_LABELS, grantStatus, generateAccessToken, expiryFromDays } from '@/lib/access-grants'
+import { GRANT_TYPE_LABELS, GRANT_SCOPE_LABELS, grantStatus, generateAccessToken, expiryFromDays } from '@/lib/access-grants'
 import { READINESS_STAGE_LABELS } from '@/lib/portfolio-intelligence'
 
 // \u2500\u2500\u2500 DESIGN TOKENS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -175,26 +175,43 @@ function ClientDocumentActions({clientId,clientName}){
   )
 }
 
-// Coach-managed grant/revoke of external access to a client's Investment
-// Readiness Brief. Anyone handed the resulting link can download the
-// document without a ClearView login of their own -- but ONLY while the
-// coach who issued it hasn't revoked it, and only for the one client it
-// was issued for. See supabase/migrations/2026_07_13_client_access_grants.sql
-// for the RLS that makes this coach-only to create/revoke.
-function ExternalAccessPanel({clientId,clientName,onClose}){
+// Coach-managed grant/revoke of external access to either ONE client's
+// Investment Readiness Brief, the WHOLE portfolio, or one filtered
+// SEGMENT of it. Anyone handed the resulting link can view/download the
+// content without a ClearView login of their own -- but ONLY while the
+// coach who issued it hasn't revoked it, only for the scope it was
+// issued for, and (if the coach entered an email) only after confirming
+// that email on the public /access/[token] page. See
+// supabase/migrations/2026_07_13_client_access_grants.sql and
+// 2026_07_13_access_grants_portfolio_scope.sql for the RLS that makes
+// this coach-only to create/revoke.
+//
+// clientId/clientName are provided when opened from a specific client's
+// page (defaults scope to 'client', still lets the coach widen scope to
+// portfolio/segment "on behalf of" that client's context); omitted when
+// opened from the Portfolio Intelligence Hub itself, in which case the
+// 'client' scope isn't offered (there's no specific client to attach it
+// to) and portfolioFilter, if the coach had a filter active there, is
+// used to prefill the segment fields and default scope to 'segment'.
+function ExternalAccessPanel({clientId,clientName,portfolioFilter,onClose}){
   const [grants,setGrants]=useState([])
   const [loading,setLoading]=useState(true)
   const [name,setName]=useState('')
   const [email,setEmail]=useState('')
   const [type,setType]=useState('investor')
   const [expiryDays,setExpiryDays]=useState('')
+  const [scope,setScope]=useState(clientId?'client':(portfolioFilter&&Object.keys(portfolioFilter).length>0?'segment':'portfolio'))
+  const [segSector,setSegSector]=useState(portfolioFilter?.sector||'')
+  const [segCountry,setSegCountry]=useState(portfolioFilter?.country||'')
+  const [segStage,setSegStage]=useState(portfolioFilter?.readinessStage||'')
   const [saving,setSaving]=useState(false)
   const [error,setError]=useState('')
   const [copiedId,setCopiedId]=useState(null)
 
   const load=useCallback(()=>{
     setLoading(true)
-    supabase.from('client_access_grants').select('*').eq('client_id',clientId).order('created_at',{ascending:false})
+    const q=supabase.from('client_access_grants').select('*').order('created_at',{ascending:false})
+    ;(clientId?q.eq('client_id',clientId):q.is('client_id',null))
       .then(({data})=>{setGrants(data||[]);setLoading(false)})
   },[clientId])
   useEffect(()=>{load()},[load])
@@ -204,8 +221,12 @@ function ExternalAccessPanel({clientId,clientName,onClose}){
     if(!name.trim()){setError('Enter a name for who this link is for.');return}
     setSaving(true); setError('')
     const {data:{user}}=await supabase.auth.getUser()
+    const segmentFilter=scope==='segment'?Object.fromEntries(Object.entries({sector:segSector.trim()||undefined,country:segCountry.trim()||undefined,readinessStage:segStage||undefined}).filter(([,v])=>v!==undefined)):null
+    if(scope==='segment'&&Object.keys(segmentFilter).length===0){setError('Choose at least one segment filter (sector, country, or readiness stage).');setSaving(false);return}
     const row={
-      client_id:clientId,
+      client_id:scope==='client'?clientId:null,
+      scope_type:scope,
+      segment_filter:segmentFilter,
       granted_by:user?.id||null,
       grantee_name:name.trim(),
       grantee_email:email.trim()||null,
@@ -226,7 +247,7 @@ function ExternalAccessPanel({clientId,clientName,onClose}){
   }
 
   function linkFor(token){
-    return `${window.location.origin}/api/access-grant/${token}`
+    return `${window.location.origin}/access/${token}`
   }
   function copyLink(grant){
     navigator.clipboard.writeText(linkFor(grant.access_token)).then(()=>{
@@ -235,45 +256,72 @@ function ExternalAccessPanel({clientId,clientName,onClose}){
     })
   }
 
+  function segmentDescription(g){
+    if(g.scope_type!=='segment'||!g.segment_filter)return null
+    const f=g.segment_filter
+    return [f.sector,f.country,f.readinessStage&&READINESS_STAGE_LABELS[f.readinessStage]].filter(Boolean).join(' · ')||'No filters set'
+  }
+
   const now=new Date().toISOString()
   const STATUS_COLOR={active:C.green,expired:C.slate,revoked:C.red}
 
   return(
     <div style={{position:'fixed',inset:0,background:'rgba(11,31,51,0.45)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:'1rem'}} onClick={onClose}>
-      <div style={{...card,maxWidth:560,width:'100%',maxHeight:'85vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+      <div style={{...card,maxWidth:600,width:'100%',maxHeight:'85vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.9rem'}}>
           <div>
-            <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>External Access — {clientName}</div>
-            <div style={{fontSize:'0.92rem',color:C.slate,marginTop:'0.2rem'}}>Give an investor, programme officer, or subscriber a link to this client's Investment Readiness Brief, without giving them a login. Revoke any time.</div>
+            <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>External Access{clientName?` — ${clientName}`:' — Portfolio'}</div>
+            <div style={{fontSize:'0.92rem',color:C.slate,marginTop:'0.2rem'}}>Give an investor, programme officer, DFI, or subscriber a read-only link -- to one business's Investment Brief, the whole portfolio, or a filtered segment -- without giving them a login. If you enter their email, they must confirm it before the link works for them. Revoke any time.</div>
           </div>
           <button onClick={onClose} style={{background:'none',border:'none',fontSize:'1.3rem',color:C.slate,cursor:'pointer',lineHeight:1}}>×</button>
         </div>
 
-        <form onSubmit={createGrant} style={{display:'flex',flexWrap:'wrap',gap:'0.5rem',marginBottom:'1rem',padding:'0.8rem',background:'var(--cv-tint-cyan)',borderRadius:8}}>
-          <input placeholder="Name" value={name} onChange={e=>setName(e.target.value)} style={{flex:'1 1 140px',padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}/>
-          <input placeholder="Email (optional)" value={email} onChange={e=>setEmail(e.target.value)} style={{flex:'1 1 160px',padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}/>
-          <select value={type} onChange={e=>setType(e.target.value)} style={{padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}>
-            {Object.entries(GRANT_TYPE_LABELS).map(([k,l])=><option key={k} value={k}>{l}</option>)}
-          </select>
-          <input placeholder="Expires in days (optional)" type="number" min="1" value={expiryDays} onChange={e=>setExpiryDays(e.target.value)} style={{width:170,padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}/>
-          <button type="submit" disabled={saving} style={solidBtn(C.teal)}>{saving?'Creating…':'+ Create Link'}</button>
-          {error&&<div style={{width:'100%',fontSize:'0.82rem',color:C.red}}>{error}</div>}
+        <form onSubmit={createGrant} style={{display:'flex',flexDirection:'column',gap:'0.5rem',marginBottom:'1rem',padding:'0.8rem',background:'var(--cv-tint-cyan)',borderRadius:8}}>
+          <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem'}}>
+            {Object.entries(GRANT_SCOPE_LABELS).filter(([k])=>k!=='client'||clientId).map(([k,l])=>(
+              <label key={k} style={{display:'flex',alignItems:'center',gap:'0.35rem',fontSize:'0.85rem',color:C.navy,cursor:'pointer',padding:'0.3rem 0.6rem',borderRadius:6,border:`1px solid ${scope===k?C.teal:'var(--cv-border-soft)'}`,background:scope===k?'var(--cv-tint-teal)':'transparent'}}>
+                <input type="radio" name="scope" checked={scope===k} onChange={()=>setScope(k)} style={{margin:0}}/>{l}
+              </label>
+            ))}
+          </div>
+          {scope==='segment'&&(
+            <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem'}}>
+              <input placeholder="Sector (optional)" value={segSector} onChange={e=>setSegSector(e.target.value)} style={{flex:'1 1 140px',padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}/>
+              <input placeholder="Country (optional)" value={segCountry} onChange={e=>setSegCountry(e.target.value)} style={{flex:'1 1 140px',padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}/>
+              <select value={segStage} onChange={e=>setSegStage(e.target.value)} style={{flex:'1 1 160px',padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}>
+                <option value="">All readiness stages</option>
+                {Object.entries(READINESS_STAGE_LABELS).map(([k,l])=><option key={k} value={k}>{l}</option>)}
+              </select>
+            </div>
+          )}
+          <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem'}}>
+            <input placeholder="Name" value={name} onChange={e=>setName(e.target.value)} style={{flex:'1 1 140px',padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}/>
+            <input placeholder="Email (recommended -- they'll need to confirm it)" value={email} onChange={e=>setEmail(e.target.value)} style={{flex:'1 1 220px',padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}/>
+            <select value={type} onChange={e=>setType(e.target.value)} style={{padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}>
+              {Object.entries(GRANT_TYPE_LABELS).map(([k,l])=><option key={k} value={k}>{l}</option>)}
+            </select>
+            <input placeholder="Expires in days (optional)" type="number" min="1" value={expiryDays} onChange={e=>setExpiryDays(e.target.value)} style={{width:170,padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}/>
+            <button type="submit" disabled={saving} style={solidBtn(C.teal)}>{saving?'Creating…':'+ Create Link'}</button>
+          </div>
+          {error&&<div style={{fontSize:'0.82rem',color:C.red}}>{error}</div>}
         </form>
 
         {loading?(
           <div style={{textAlign:'center',color:C.slate,padding:'1rem'}}>Loading…</div>
         ):grants.length===0?(
-          <div style={{textAlign:'center',color:C.slate,padding:'1rem',fontSize:'0.92rem'}}>No external access has been granted for this client yet.</div>
+          <div style={{textAlign:'center',color:C.slate,padding:'1rem',fontSize:'0.92rem'}}>No external access has been granted {clientId?'for this client':'at the portfolio level'} yet.</div>
         ):(
           <div style={{display:'flex',flexDirection:'column',gap:'0.6rem'}}>
             {grants.map(g=>{
               const status=grantStatus(g,now)
+              const segDesc=segmentDescription(g)
               return(
                 <div key={g.id} style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.7rem 0.85rem'}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'0.5rem'}}>
                     <div>
                       <div style={{fontWeight:700,fontSize:'0.96rem',color:C.navy}}>{g.grantee_name}</div>
-                      <div style={{fontSize:'0.82rem',color:C.slate}}>{GRANT_TYPE_LABELS[g.grant_type]||g.grant_type}{g.grantee_email?` · ${g.grantee_email}`:''}</div>
+                      <div style={{fontSize:'0.82rem',color:C.slate}}>{GRANT_TYPE_LABELS[g.grant_type]||g.grant_type} · {GRANT_SCOPE_LABELS[g.scope_type]||g.scope_type}{g.grantee_email?` · ${g.grantee_email}${g.email_confirmed_at?' (confirmed)':' (not yet confirmed)'}`:''}</div>
+                      {segDesc&&<div style={{fontSize:'0.8rem',color:C.teal,marginTop:'0.1rem'}}>Segment: {segDesc}</div>}
                     </div>
                     <Badge text={status==='active'?'Active':status==='expired'?'Expired':'Revoked'} color={STATUS_COLOR[status]}/>
                   </div>
@@ -947,6 +995,7 @@ function PortfolioIntelligenceHub(){
   const [error,setError]=useState('')
   const [filter,setFilter]=useState({})
   const [openProfile,setOpenProfile]=useState(null)
+  const [showAccess,setShowAccess]=useState(false)
 
   const load=useCallback((f)=>{
     setLoading(true);setError('')
@@ -997,7 +1046,9 @@ function PortfolioIntelligenceHub(){
           {Object.entries(READINESS_STAGE_LABELS).map(([k,l])=><option key={k} value={k}>{l}</option>)}
         </select>
         {hasFilter&&<button onClick={()=>{setFilter({});load({})}} style={{fontSize:'0.85rem',color:C.slate,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>Clear filters</button>}
+        <button onClick={()=>setShowAccess(true)} style={{marginLeft:'auto',fontSize:'0.85rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>🔗 External Access</button>
       </div>
+      {showAccess&&<ExternalAccessPanel portfolioFilter={hasFilter?filter:undefined} onClose={()=>setShowAccess(false)}/>}
 
       {hasFilter&&<div style={{fontSize:'0.9rem',color:C.slate,marginBottom:'0.5rem'}}>Showing {view.totalBusinesses} of {portfolio.totalBusinesses} businesses matching this filter, compared against the full portfolio below.</div>}
 

@@ -1,10 +1,14 @@
 // External access grants (§ coach-managed access model). A coach hands an
-// investor, programme officer, or subscriber a link to a client's
-// Investment Readiness Brief without giving them a real login and without
-// the client ever self-serving the document to a third party directly.
-// Every grant is created, time-limited, and revocable by the coach who
-// manages that client -- see supabase/migrations for the RLS that
-// enforces this (client_access_grants, scoped via can_view_client()).
+// investor, programme officer, DFI, or subscriber a link to either ONE
+// client's Investment Readiness Brief, the WHOLE portfolio, or one
+// filtered SEGMENT of the portfolio -- without giving them a real login,
+// and without a client or the coach's own portfolio ever being
+// self-served to a third party directly. Every grant is created,
+// time-limited, and revocable by whoever manages the scope it covers --
+// see supabase/migrations for the RLS that enforces this
+// (client_access_grants, scoped via can_view_client() for a client grant,
+// super_coach-only for a portfolio/segment grant -- see
+// 2026_07_13_access_grants_portfolio_scope.sql).
 //
 // Pure logic only, deliberately kept out of the DB layer and the route
 // handler: whether a grant is still usable is a fact about its own
@@ -20,9 +24,32 @@ export const GRANT_TYPE_LABELS: Record<GrantType, string> = {
   other: 'Other',
 }
 
+export type GrantScope = 'client' | 'portfolio' | 'segment'
+
+export const GRANT_SCOPE_LABELS: Record<GrantScope, string> = {
+  client: 'One business (Investment Brief)',
+  portfolio: 'Whole portfolio (Portfolio Intelligence)',
+  segment: 'One segment (filtered Portfolio Intelligence)',
+}
+
+// Mirrors SegmentFilter in portfolio-intelligence.ts -- duplicated here
+// (rather than imported) so this module has zero dependency on the
+// portfolio aggregation code, matching its existing "pure, standalone"
+// scope. Kept in sync manually; both are small and rarely change.
+export interface GrantSegmentFilter {
+  sector?: string
+  country?: string
+  programmeId?: string
+  readinessStage?: 'pre_investment' | 'development_stage' | 'near_ready' | 'investment_ready'
+  minConfidence?: number
+  maxConfidence?: number
+}
+
 export interface AccessGrant {
   id: string
-  client_id: string
+  client_id: string | null   // null unless scope_type === 'client'
+  scope_type: GrantScope
+  segment_filter: GrantSegmentFilter | null  // only meaningful when scope_type === 'segment'
   grantee_name: string
   grantee_email: string | null
   grant_type: GrantType
@@ -31,6 +58,7 @@ export interface AccessGrant {
   expires_at: string | null
   revoked_at: string | null
   last_accessed_at: string | null
+  email_confirmed_at: string | null
 }
 
 export type GrantStatus = 'active' | 'expired' | 'revoked'
@@ -43,6 +71,23 @@ export function grantStatus(grant: Pick<AccessGrant, 'revoked_at' | 'expires_at'
 
 export function isGrantActive(grant: Pick<AccessGrant, 'revoked_at' | 'expires_at'>, nowIso: string): boolean {
   return grantStatus(grant, nowIso) === 'active'
+}
+
+// Whether a submitted email satisfies this grant's email gate. A grant
+// created with no grantee_email at all has nothing to check against --
+// treated as "no gate configured" (true) rather than permanently locked
+// out, since the coach chose not to set one. Comparison is
+// case-insensitive and trims whitespace -- an email typo in case only
+// should never lock a legitimate recipient out.
+export function emailSatisfiesGrant(grant: Pick<AccessGrant, 'grantee_email'>, submittedEmail: string): boolean {
+  if (!grant.grantee_email) return true
+  return grant.grantee_email.trim().toLowerCase() === submittedEmail.trim().toLowerCase()
+}
+
+// Whether this grant requires an email confirmation step at all before
+// its content is revealed -- only when the coach actually entered one.
+export function requiresEmailConfirmation(grant: Pick<AccessGrant, 'grantee_email'>): boolean {
+  return !!grant.grantee_email
 }
 
 // 24 random bytes as hex -- opaque, unguessable, and carries no
