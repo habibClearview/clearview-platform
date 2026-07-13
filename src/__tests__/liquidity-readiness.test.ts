@@ -268,6 +268,46 @@ describe('computeFitScore — re-weighting the same dimensions for a specific li
   })
 })
 
+describe('FIT_SCORE_PRESETS — Capital Fit scores (Bank, Investor, Grant, Equity, Consignment, Recoverable Grant)', () => {
+  const ALL_SEVEN_DIMENSIONS = ['marketOpportunity', 'visibility', 'trust', 'profitability', 'capacity', 'resilience', 'compliance']
+
+  it('REG: every preset\'s weights sum to exactly 1.00 -- catches a typo in any preset, present or future', () => {
+    Object.entries(FIT_SCORE_PRESETS).forEach(([key, preset]) => {
+      const total = Object.values(preset.weights).reduce((a, b) => a + b, 0)
+      expect(total, `${key} (${preset.label}) weights sum to ${total}, not 1.00`).toBeCloseTo(1, 10)
+    })
+  })
+
+  it('REG: every preset weights all seven real LRS dimensions, nothing extra and nothing missing', () => {
+    Object.entries(FIT_SCORE_PRESETS).forEach(([key, preset]) => {
+      expect(Object.keys(preset.weights).sort(), key).toEqual([...ALL_SEVEN_DIMENSIONS].sort())
+    })
+  })
+
+  it('REG: adding the four new capital-type presets did not change Bank or Investor Fit\'s existing weights', () => {
+    expect(FIT_SCORE_PRESETS.bank.weights).toEqual({ marketOpportunity: 0.15, visibility: 0.20, trust: 0.25, profitability: 0.20, capacity: 0.10, resilience: 0.05, compliance: 0.05 })
+    expect(FIT_SCORE_PRESETS.investor.weights).toEqual({ marketOpportunity: 0.30, visibility: 0.10, trust: 0.15, profitability: 0.15, capacity: 0.15, resilience: 0.05, compliance: 0.10 })
+  })
+
+  it('REG: all six presets exist with the expected labels', () => {
+    expect(Object.keys(FIT_SCORE_PRESETS).sort()).toEqual(['bank', 'consignment', 'equity', 'grant', 'investor', 'recoverable'])
+    expect(FIT_SCORE_PRESETS.grant.label).toBe('Grant Fit')
+    expect(FIT_SCORE_PRESETS.equity.label).toBe('Equity Fit')
+    expect(FIT_SCORE_PRESETS.consignment.label).toBe('Consignment Fit')
+    expect(FIT_SCORE_PRESETS.recoverable.label).toBe('Recoverable Grant Fit')
+  })
+
+  it('REG: every preset produces a real, finite 0-100 score from the same LRS result, never NaN', () => {
+    const result = computeLiquidityReadinessScore(baseInputs())
+    Object.entries(FIT_SCORE_PRESETS).forEach(([key, preset]) => {
+      const score = computeFitScore(result, preset.weights)
+      expect(Number.isFinite(score), key).toBe(true)
+      expect(score, key).toBeGreaterThanOrEqual(0)
+      expect(score, key).toBeLessThanOrEqual(100)
+    })
+  })
+})
+
 describe('computeLRSTimeSeries — the collapsible year/month trend for Liquidity Readiness', () => {
   function makeYearGroups(monthCount: number) {
     const groups: {year: number; label: string; monthIndices: number[]}[] = []
