@@ -347,9 +347,6 @@ function computeDraft(ci,period,entries,expenses,advances){
 
 function CoImplementerPayments({ci,period,userName,clientName,clients,entries,setEntries,expenses,setExpenses,advances,setAdvances,invoices,setInvoices,canApprove,canManage,updateCI,renderInvite}){
   const [tab,setTab]=useState('timesheets')
-  const [savingRate,setSavingRate]=useState(false)
-  const [rateDraft,setRateDraft]=useState(String(rateOf(ci)||''))
-  const [curDraft,setCurDraft]=useState(curOf(ci))
   const [busy,setBusy]=useState(false)
   const [msg,setMsg]=useState(null)
   const [editingProfile,setEditingProfile]=useState(false)
@@ -362,19 +359,14 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
   const alreadyIssued=ciInvoices.find(i=>i.period===period&&i.status!=='draft')
   const issuedByCi=ciInvoices.filter(i=>i.period===period&&i.status!=='draft')
 
-  async function saveRate(){
-    setSavingRate(true)
-    const {error}=updateCI?await updateCI(ci.id,{day_rate:num(rateDraft),rate_currency:curDraft}):await supabase.from('co_implementers').update({day_rate:num(rateDraft),rate_currency:curDraft}).eq('id',ci.id)
-    setSavingRate(false)
-    if(error){setMsg('Could not save rate: '+error.message);return}
-    ci.day_rate=num(rateDraft);ci.rate_currency=curDraft
-    setMsg('Day rate saved.')
-  }
-  function startEditProfile(){setPf({name:ci.name||'',email:ci.email||'',phone:ci.phone||'',country:ci.country||'',specialisation:ci.specialisation||''});setEditingProfile(true)}
+  // Profile edit now also carries the day rate -- one form to edit a
+  // person, instead of a separate inline rate widget cluttering the header.
+  function startEditProfile(){setPf({name:ci.name||'',email:ci.email||'',phone:ci.phone||'',country:ci.country||'',specialisation:ci.specialisation||'',day_rate:String(rateOf(ci)||''),rate_currency:curOf(ci)});setEditingProfile(true)}
   async function saveProfile(){
-    const {error}=await updateCI(ci.id,pf)
+    const patch={name:pf.name,email:pf.email,phone:pf.phone,country:pf.country,specialisation:pf.specialisation,day_rate:num(pf.day_rate),rate_currency:pf.rate_currency}
+    const {error}=await updateCI(ci.id,patch)
     if(error){setMsg('Could not save profile: '+error.message);return}
-    Object.assign(ci,pf);setEditingProfile(false);setMsg('Profile saved.')
+    Object.assign(ci,patch);setEditingProfile(false);setMsg('Profile saved.')
   }
   async function toggleActive(){
     const next=!(ci.active!==false)
@@ -395,29 +387,30 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
     if(!error)ci.client_ids=next
   }
 
+  const initials=(ci.name||'?').split(' ').filter(Boolean).map(w=>w[0]).slice(0,2).join('').toUpperCase()
+
   return(
     <div style={card}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'1rem',flexWrap:'wrap',marginBottom:'0.75rem'}}>
-        <div>
-          <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexWrap:'wrap'}}>
-            <div style={{fontWeight:700,fontSize:'1.16rem',color:C.navy}}>{ci.name}</div>
-            {canManage
-              ?<button onClick={toggleActive} style={{fontFamily:'monospace',fontSize:'0.85rem',color:ci.active!==false?C.green:C.red,background:'transparent',border:`1px solid ${ci.active!==false?C.green:C.red}`,borderRadius:4,padding:'0.05rem 0.45rem',cursor:'pointer'}}>{ci.active!==false?'Active':'Inactive'}</button>
-              :<Badge text={ci.active!==false?'Active':'Inactive'} color={ci.active!==false?C.green:C.red}/>}
+      {/* Header -- one clean band: who they are on the left, rate + actions
+          on the right. The rate EDITOR lives inside Edit profile now, so the
+          corner stays tidy; only the rate chip shows here. */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'1rem',flexWrap:'wrap',paddingBottom:'0.85rem',borderBottom:'1px solid var(--cv-border-soft)',marginBottom:'0.9rem'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'0.7rem',minWidth:0}}>
+          <div style={{width:42,height:42,borderRadius:12,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'monospace',fontWeight:700,fontSize:'0.95rem',flexShrink:0}}>{initials}</div>
+          <div style={{minWidth:0}}>
+            <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexWrap:'wrap'}}>
+              <div style={{fontWeight:700,fontSize:'1.16rem',color:C.navy}}>{ci.name}</div>
+              {canManage
+                ?<button onClick={toggleActive} style={{fontFamily:'monospace',fontSize:'0.78rem',color:ci.active!==false?C.green:C.red,background:'transparent',border:`1px solid ${ci.active!==false?C.green:C.red}`,borderRadius:4,padding:'0.02rem 0.4rem',cursor:'pointer'}}>{ci.active!==false?'Active':'Inactive'}</button>
+                :<Badge text={ci.active!==false?'Active':'Inactive'} color={ci.active!==false?C.green:C.red}/>}
+            </div>
+            <div style={{fontSize:'0.95rem',color:C.slate}}>{ci.email}{ci.country?` · ${ci.country}`:''}{ci.specialisation?` · ${ci.specialisation}`:''}</div>
           </div>
-          <div style={{fontSize:'1.01rem',color:C.slate}}>{ci.email}{ci.country?` · ${ci.country}`:''}{ci.specialisation?` · ${ci.specialisation}`:''}</div>
         </div>
-        <div style={{textAlign:'right',display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'0.3rem'}}>
-          <div style={{fontFamily:'monospace',fontSize:'0.93rem',color:d.rate>0?C.slate:C.amber}}>{d.rate>0?`${fmtMoney(d.rate,curOf(ci))}/day`:'no day rate set'}</div>
-          {canManage&&<div style={{display:'flex',gap:'0.35rem',alignItems:'center',justifyContent:'flex-end'}}>
-            <input style={{...inp,width:90,padding:'0.28rem 0.45rem',fontSize:'1.01rem'}} type="number" value={rateDraft} placeholder="rate" onChange={e=>setRateDraft(e.target.value)}/>
-            <select style={{...inp,width:70,padding:'0.28rem 0.35rem',fontSize:'1.01rem'}} value={curDraft} onChange={e=>setCurDraft(e.target.value)}>{['USD','GBP','EUR','UGX','NGN','KES'].map(x=><option key={x}>{x}</option>)}</select>
-            <button style={addBtn(true)} disabled={savingRate} onClick={saveRate}>{savingRate?'…':'Set rate'}</button>
-          </div>}
-          <div style={{display:'flex',gap:'0.35rem'}}>
-            {canManage&&<button style={addBtn(true)} onClick={()=>editingProfile?setEditingProfile(false):startEditProfile()}>{editingProfile?'Cancel':'Edit profile'}</button>}
-            {renderInvite&&renderInvite(ci)}
-          </div>
+        <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexWrap:'wrap'}}>
+          <span style={{fontFamily:'monospace',fontSize:'0.85rem',background:d.rate>0?'var(--cv-tint-cyan)':'var(--cv-tint-amber)',color:d.rate>0?C.cyan:C.amber,borderRadius:999,padding:'0.25rem 0.7rem'}}>{d.rate>0?`${fmtMoney(d.rate,curOf(ci))} / day`:'no day rate set'}</span>
+          {canManage&&<button style={addBtn(true)} onClick={()=>editingProfile?setEditingProfile(false):startEditProfile()}>{editingProfile?'Cancel':'Edit profile'}</button>}
+          {renderInvite&&renderInvite(ci)}
         </div>
       </div>
 
@@ -429,6 +422,7 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
             <div><label style={lbl}>Phone</label><input style={inp} value={pf.phone} onChange={e=>setPf(f=>({...f,phone:e.target.value}))}/></div>
             <div><label style={lbl}>Country</label><input style={inp} value={pf.country} onChange={e=>setPf(f=>({...f,country:e.target.value}))}/></div>
             <div><label style={lbl}>Specialisation</label><input style={inp} value={pf.specialisation} onChange={e=>setPf(f=>({...f,specialisation:e.target.value}))}/></div>
+            <div><label style={lbl}>Day rate</label><div style={{display:'flex',gap:'0.3rem'}}><input type="number" style={inp} value={pf.day_rate} onChange={e=>setPf(f=>({...f,day_rate:e.target.value}))}/><select style={{...inp,width:80}} value={pf.rate_currency} onChange={e=>setPf(f=>({...f,rate_currency:e.target.value}))}>{['USD','GBP','EUR','UGX','NGN','KES'].map(x=><option key={x}>{x}</option>)}</select></div></div>
           </div>
           <button style={{...solidBtn(),marginTop:'0.75rem'}} onClick={saveProfile}>Save profile</button>
         </div>
@@ -455,14 +449,6 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
         <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'0.55rem 0.7rem'}}><div style={{fontFamily:'monospace',fontSize:'0.78rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Invoices issued</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.22rem',fontWeight:700,color:C.purple}}>{issuedByCi.length}</div></div>
       </div>}
 
-      {/* Invoice math breakdown (time + expenses − advance = net). */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',gap:'0.6rem',padding:'0.7rem 0.85rem',background:C.lightBg,borderRadius:8,marginBottom:'0.85rem',fontSize:'1.01rem'}}>
-        <div><div style={hint}>Approved days</div><strong>{fmtDays(d.days)}</strong> <span style={hint}>({d.approvedHours}h)</span></div>
-        <div><div style={hint}>Time</div><strong>{fmtMoney(d.timeAmount,curOf(ci))}</strong></div>
-        <div><div style={hint}>Expenses</div><strong>{fmtMoney(d.expApproved,curOf(ci))}</strong></div>
-        <div><div style={hint}>Advance netted</div><strong style={{color:d.advanceApplied?C.amber:C.navy}}>−{fmtMoney(d.advanceApplied,curOf(ci))}</strong></div>
-        <div><div style={hint}>Net invoice</div><strong style={{color:C.teal}}>{fmtMoney(d.net,curOf(ci))}</strong></div>
-      </div>
 
       <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',marginBottom:'0.85rem'}}>
         {[['timesheets','Timesheets'],['expenses','Expenses'],['advances',`Advances${d.openAdvances.length?` (${d.openAdvances.length})`:''}`],['invoice','Invoice']].map(([id,label])=>
