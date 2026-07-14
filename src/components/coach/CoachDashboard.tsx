@@ -88,7 +88,10 @@ function PiKpiCard({label,value,rev,sub,total,color,deltaBadge}){return(
 )}
 function MiniDistBar({segments}){return(<div style={{display:'flex',height:6,borderRadius:3,overflow:'hidden',marginTop:'0.55rem'}}>{segments.map((s,i)=><div key={i} style={{width:`${s.pct}%`,background:s.color}}/>)}</div>)}
 function PiKpiRow({children,cols}){return<div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gap:'0.9rem'}}>{children}</div>}
-const DEAL_STAGE_META={conversation:{label:'Interview Stage',color:C.slate},scoping:{label:'Negotiation',color:C.cyan},proposal:{label:'Proposal Sent',color:C.amber},won:{label:'Won',color:C.green},lost:{label:'Lost',color:C.red}}
+// Real order: proposal sent, maybe an interview/discussion, then
+// negotiation, then won or lost -- see the matching comment in
+// DealsAndFees.tsx's DEAL_STAGES.
+const DEAL_STAGE_META={conversation:{label:'Proposal Sent',color:C.slate},scoping:{label:'Interview Stage',color:C.cyan},proposal:{label:'Negotiation',color:C.amber},won:{label:'Won',color:C.green},lost:{label:'Lost',color:C.red}}
 const CLIENT_SERVICE_TABS=[
   {key:'advisory',label:'Advisory'},
   {key:'financial',label:'Financial Model'},
@@ -1153,6 +1156,11 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // that without a full rewrite of every nested view into a top-level
   // component.
   const [clientsService,setClientsService]=useState('financial')
+  // Set when a Pipeline deal is marked Won, so the Clients tab opens
+  // straight into "+ New Client" pre-filled with the programme and a
+  // note of what was won -- lifted to the top level (not local to
+  // ClientsView) for the same remount-safety reason as clientsService.
+  const [newClientPrefill,setNewClientPrefill]=useState(null)
   const [programmesSub,setProgrammesSub]=useState('pipeline')
   // Light/dark theme -- same 'cv-theme' localStorage key and
   // document.documentElement.dataset.theme mechanism GenericDashboard
@@ -1363,7 +1371,13 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
     const clientsById=Object.fromEntries(clients.map(c=>[c.id,c]))
 
+    async function updateSubscription(seId,patch){
+      setServiceEngagements(prev=>prev.map(se=>se.id!==seId?se:{...se,...patch}))
+      await supabase.from('service_engagements').update(patch).eq('id',seId)
+    }
+
     let blocks=[]
+    let subscriptionRows=[]
     if(service==='financial'||service==='canvas'){
       const inService=clients.filter(c=>c.engagement_mode===service)
       const byPayer=new Map()
@@ -1374,6 +1388,14 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         byPayer.get(key).beneficiaries.push(c)
       })
       blocks=Array.from(byPayer.values())
+    }else if(service==='portfolio_intelligence'){
+      // Subscription health needs more than a status pill -- level, paid-up-to
+      // date, and billing term (see supabase/migrations/2026_07_14_pipeline_and_subscriptions.sql).
+      subscriptionRows=serviceEngagements.filter(se=>se.service_type==='portfolio_intelligence').map(se=>{
+        const payerClient=se.payer_client_id?clientsById[se.payer_client_id]:null
+        const ben=se.beneficiary_client_id?clientsById[se.beneficiary_client_id]:payerClient
+        return {se,client:ben}
+      }).filter(r=>r.client)
     }else{
       const inService=serviceEngagements.filter(se=>se.service_type===service)
       const byPayer=new Map()
@@ -1401,13 +1423,14 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         <div style={{display:'flex',gap:'0.45rem',marginBottom:'1.25rem',flexWrap:'wrap',alignItems:'center'}}>
           <button style={addBtn(true,C.teal)} onClick={refreshClients} disabled={refreshing}>{refreshing?'Refreshing...':'↻ Refresh'}</button>
           {isSuperCoach&&<button style={{...addBtn(true,C.teal),marginLeft:'auto'}} onClick={()=>{setShowUpload(!showUpload);setShowNew(false)}}>Upload Spreadsheet</button>}
-          {isSuperCoach&&<button style={addBtn()} onClick={()=>{setShowNew(!showNew);setShowUpload(false)}}>+ New Client</button>}
+          {isSuperCoach&&<button style={addBtn()} onClick={()=>{setShowNew(!showNew);setShowUpload(false);setNewClientPrefill(null)}}>+ New Client</button>}
         </div>
         {showUpload&&<SpreadsheetUpload onSuccess={(clientId)=>{setShowUpload(false);supabase.from('engagement_clients').select('*').eq('id',clientId).single().then(({data})=>{if(data)setClients(prev=>[...prev,data])})}}/>}
-        {showNew&&<NewClientForm programmes={programmes} onSave={async c=>{
+        {(showNew||newClientPrefill)&&<NewClientForm programmes={programmes} initial={newClientPrefill} onSave={async c=>{
           const {data,error}=await supabase.from('engagement_clients').insert([c]).select().single()
-          if(!error&&data){setClients(prev=>[...prev,data]);setShowNew(false)}
-        }} onCancel={()=>setShowNew(false)}/>}
+          if(!error&&data){setClients(prev=>[...prev,data]);setShowNew(false);setNewClientPrefill(null)}
+        }} onCancel={()=>{setShowNew(false);setNewClientPrefill(null)}}/>}
+        {newClientPrefill&&<div style={{fontSize:'0.85rem',color:C.teal,marginTop:'-0.9rem',marginBottom:'1rem'}}>Pre-filled from the Pipeline deal you just marked Won.</div>}
 
         {flagged.length>0&&(
           <div style={{...card,border:'1px solid #F1C9C2',borderLeft:`4px solid ${C.red}`}}>
@@ -1431,7 +1454,33 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           {CLIENT_SERVICE_TABS.map(t=><button key={t.key} style={subPill(service===t.key)} onClick={()=>setService(t.key)}>{t.label}</button>)}
         </div>
 
-        {blocks.length===0?(
+        {service==='portfolio_intelligence'?(
+          subscriptionRows.length===0?(
+            <div style={{...card,color:C.slate}}>No subscribers yet.</div>
+          ):(
+            <div style={{...card,padding:0,overflow:'hidden'}}>
+              <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
+                  <thead><tr style={{background:C.navy}}>{['Client','Level','Paid Up To','Term','Status'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left',fontWeight:400,fontSize:'0.93rem',color:'var(--cv-on-accent)',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {subscriptionRows.map(({se,client:c})=>{
+                      const dueSoon=se.paid_through_date&&new Date(se.paid_through_date)<new Date(Date.now()+14*86400000)
+                      return(
+                        <tr key={se.id} style={{borderBottom:'1px solid var(--cv-border-soft)'}}>
+                          <td style={{padding:'10px 12px',fontWeight:700,cursor:'pointer'}} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}>{c.name}</td>
+                          <td style={{padding:'10px 12px'}}><input style={{...inp,width:120,padding:'0.3rem 0.5rem'}} placeholder="e.g. Standard" value={se.subscription_level||''} onChange={e=>updateSubscription(se.id,{subscription_level:e.target.value})}/></td>
+                          <td style={{padding:'10px 12px'}}><input type="date" style={{...inp,width:150,padding:'0.3rem 0.5rem'}} value={se.paid_through_date||''} onChange={e=>updateSubscription(se.id,{paid_through_date:e.target.value||null})}/></td>
+                          <td style={{padding:'10px 12px'}}><select style={{...inp,width:110,padding:'0.3rem 0.5rem'}} value={se.billing_term||''} onChange={e=>updateSubscription(se.id,{billing_term:e.target.value||null})}><option value="">—</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select></td>
+                          <td style={{padding:'10px 12px'}}>{se.paid_through_date?<Badge text={dueSoon?'Renewal due':'Paid up'} color={dueSoon?C.amber:C.green}/>:<Badge text="No date set" color={C.slate}/>}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        ):blocks.length===0?(
           <div style={{...card,color:C.slate}}>No clients on {CLIENT_SERVICE_TABS.find(t=>t.key===service)?.label} yet.</div>
         ):blocks.map((b,i)=>(
           <div key={i} style={{...card,padding:0,overflow:'hidden'}}>
@@ -1836,7 +1885,17 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           <button style={subPill(sub==='pipeline')} onClick={()=>setSub('pipeline')}>Pipeline &amp; fees</button>
           <button style={subPill(sub==='directory')} onClick={()=>setSub('directory')}>All programmes</button>
         </div>
-        {sub==='pipeline'?<DealsAndFees programmes={programmes} setProgrammes={setPrograms} clients={clients} setClients={setClients}/>:<ProgrammesView/>}
+        {sub==='pipeline'?<DealsAndFees programmes={programmes} setProgrammes={setPrograms} clients={clients} setClients={setClients} onWinDeal={p=>{
+          const services=p.deal_services||[]
+          const engagementMode=services.includes('canvas')?'canvas':services.includes('financial')?'financial':'canvas'
+          // A direct/independent prospect IS the beneficiary -- pre-fill their
+          // name too. A donor programme's beneficiary isn't known yet (the
+          // deal was with the funder, not a named enterprise), so only the
+          // programme link and a note carry over.
+          const namePrefill=p.type==='donor_programme'?'':p.name
+          setNewClientPrefill({programme_id:p.id,name:namePrefill,engagement_mode:engagementMode,notes:`Won via Pipeline · ${p.name}`})
+          setView('clients')
+        }}/>:<ProgrammesView/>}
       </div>
     )
   }
@@ -1859,7 +1918,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // to just what they're allowed to see (their assigned clients, or the
   // clients under their programme).
   const mainNavTabs=isSuperCoach
-    ?[['overview','My Business'],['clients','Clients'],['programmes','Programmes'],['team','Team'],['portfolio','Portfolio Intelligence']]
+    ?[['overview','My Business'],['clients','Clients'],['programmes','Pipeline'],['team','Team'],['portfolio','Portfolio Intelligence']]
     :isCoImplementer
     ?[['clients','Clients'],['mypayments','My Timesheet & Expenses']]
     :[['clients','Clients']]
@@ -2793,8 +2852,8 @@ function ClientSetupFields({f,setF,programmes,showStatus}){
   )
 }
 
-function NewClientForm({onSave,onCancel,programmes}){
-  const [f,setF]=useState({name:'',type:'service_lsp',engagement_mode:'canvas',programme_id:null,country:'Uganda',sector:'',contact_name:'',contact_email:'',contact_phone:'',notes:''})
+function NewClientForm({onSave,onCancel,programmes,initial}){
+  const [f,setF]=useState({name:'',type:'service_lsp',engagement_mode:'canvas',programme_id:null,country:'Uganda',sector:'',contact_name:'',contact_email:'',contact_phone:'',notes:'',...initial})
   function doSave(){
     if(!f.name)return
     const slug=f.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'')

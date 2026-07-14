@@ -45,10 +45,15 @@ const fmtMoney=(n,cur)=>`${cur||'USD'} ${num(n).toLocaleString(undefined,{maximu
 const CURRENCIES=['USD','GBP','EUR','UGX','NGN','KES']
 
 // deal pipeline
+// Real order: you hear about the opportunity and send a proposal, maybe get
+// called in for an interview/discussion, then negotiate terms, then it's
+// won or lost. Underlying ids (conversation/scoping/proposal) are just
+// historical field names from an earlier labelling pass -- not renamed
+// here to avoid a data migration; only the display order/labels changed.
 const DEAL_STAGES=[
-  {id:'conversation',label:'Interview Stage',color:C.slate},
-  {id:'scoping',label:'Negotiation',color:C.cyan},
-  {id:'proposal',label:'Proposal Sent',color:C.amber},
+  {id:'conversation',label:'Proposal Sent',color:C.slate},
+  {id:'scoping',label:'Interview Stage',color:C.cyan},
+  {id:'proposal',label:'Negotiation',color:C.amber},
   {id:'won',label:'Won',color:C.green},
   {id:'lost',label:'Lost',color:C.red},
 ]
@@ -63,7 +68,7 @@ const FEE_STATUSES=[
 ]
 const feeMeta=(id)=>FEE_STATUSES.find(s=>s.id===id)||{id:id||'—',label:id||'Not set',color:C.slate}
 
-export default function DealsAndFees({programmes=[],setProgrammes,clients=[],setClients}){
+export default function DealsAndFees({programmes=[],setProgrammes,clients=[],setClients,onWinDeal}){
   const [view,setView]=useState('deals')
   return(
     <div>
@@ -75,7 +80,7 @@ export default function DealsAndFees({programmes=[],setProgrammes,clients=[],set
         </div>
       </div>
       {view==='deals'
-        ? <DealsPipeline programmes={programmes} setProgrammes={setProgrammes} clients={clients}/>
+        ? <DealsPipeline programmes={programmes} setProgrammes={setProgrammes} clients={clients} onWinDeal={onWinDeal}/>
         : <EngagementFees clients={clients} setClients={setClients} programmes={programmes}/>}
     </div>
   )
@@ -106,8 +111,14 @@ function NewProgrammeForm({onSave,onCancel}){
 }
 
 // ─── DEALS PIPELINE ──────────────────────────────────────────
-const FUNNEL_STAGE_META={conversation:{label:'Conversation',color:C.slate},scoping:{label:'Scoping',color:C.cyan},proposal:{label:'Proposal in',color:C.amber},won:{label:'Won',color:C.green}}
-function DealsPipeline({programmes,setProgrammes,clients}){
+const FUNNEL_STAGE_META={conversation:{label:'Proposal Sent',color:C.slate},scoping:{label:'Interview Stage',color:C.cyan},proposal:{label:'Negotiation',color:C.amber},won:{label:'Won',color:C.green}}
+const DEAL_SERVICE_OPTIONS=[
+  {key:'advisory',label:'Advisory'},
+  {key:'canvas',label:'GtCV Canvas'},
+  {key:'financial',label:'Financial Model'},
+  {key:'portfolio_intelligence',label:'Subscription'},
+]
+function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
   const [msg,setMsg]=useState(null)
   const [showNew,setShowNew]=useState(false)
   async function createProgramme(p){
@@ -208,6 +219,16 @@ function DealsPipeline({programmes,setProgrammes,clients}){
           const meta=stageMeta(p.deal_stage)
           const lsps=clientCountForProgramme(p.id,clients)
           const spread=p.deal_stage==='won'?programmeCanvasSpread(clients.filter(c=>c.programme_id===p.id).map(c=>canvasProgress(canvasByClient[c.id]||[]))):null
+          const services=p.deal_services||[]
+          function toggleService(key){
+            const next=services.includes(key)?services.filter(s=>s!==key):[...services,key]
+            updateDeal(p.id,{deal_services:next})
+          }
+          function changeStage(newStage){
+            const wasWon=p.deal_stage==='won'
+            updateDeal(p.id,{deal_stage:newStage})
+            if(newStage==='won'&&!wasWon)onWinDeal&&onWinDeal(p)
+          }
           return(
             <div key={p.id} style={{...card,borderLeft:`4px solid ${meta.color}`,marginBottom:'0.75rem'}}>
               <div style={{display:'flex',justifyContent:'space-between',flexWrap:'wrap',gap:'0.75rem',alignItems:'flex-start'}}>
@@ -215,11 +236,19 @@ function DealsPipeline({programmes,setProgrammes,clients}){
                   <div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy}}>{p.name}</div>
                   <div style={{fontSize:'0.93rem',color:C.slate,marginTop:'0.15rem'}}>{p.funder||'—'}{lsps>0&&` · ${lsps} beneficiar${lsps===1?'y':'ies'}`}</div>
                   {spread&&<div style={{fontSize:'0.93rem',color:C.teal,marginTop:'0.15rem'}}>Furthest {spread.furthestLabel} · Nearest {spread.nearestLabel}</div>}
+                  <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginTop:'0.5rem'}}>
+                    {DEAL_SERVICE_OPTIONS.map(opt=>{
+                      const active=services.includes(opt.key)
+                      return(
+                        <button key={opt.key} onClick={()=>toggleService(opt.key)} style={{fontFamily:'monospace',fontSize:'0.78rem',border:`1px solid ${active?C.teal:C.border}`,background:active?C.teal:'transparent',color:active?'var(--cv-on-accent)':C.slate,borderRadius:999,padding:'0.15rem 0.6rem',cursor:'pointer'}}>{opt.label}</button>
+                      )
+                    })}
+                  </div>
                 </div>
                 <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
                   <div>
                     <label style={{...lbl,marginBottom:'0.15rem'}}>Stage</label>
-                    <select style={{...inp,width:'auto',padding:'0.3rem 0.5rem'}} value={p.deal_stage||'conversation'} onChange={e=>updateDeal(p.id,{deal_stage:e.target.value})}>{DEAL_STAGES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</select>
+                    <select style={{...inp,width:'auto',padding:'0.3rem 0.5rem'}} value={p.deal_stage||'conversation'} onChange={e=>changeStage(e.target.value)}>{DEAL_STAGES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</select>
                   </div>
                   <div>
                     <label style={{...lbl,marginBottom:'0.15rem'}}>Value</label>
@@ -238,6 +267,15 @@ function DealsPipeline({programmes,setProgrammes,clients}){
                   </div>
                 </div>
               </div>
+              <div style={{marginTop:'0.6rem'}}>
+                <input placeholder="Next step / note..." style={{...inp,fontSize:'0.95rem',padding:'0.35rem 0.55rem',border:`1px dashed ${C.border}`}} value={p.deal_notes||''} onChange={e=>updateDeal(p.id,{deal_notes:e.target.value})}/>
+              </div>
+              {p.deal_stage==='won'&&(
+                <div style={{marginTop:'0.6rem',display:'flex',alignItems:'center',gap:'0.6rem',background:'var(--cv-tint-green)',border:`1px solid ${C.green}`,borderRadius:8,padding:'0.5rem 0.7rem'}}>
+                  <span style={{fontSize:'0.9rem',color:C.green,fontWeight:600}}>✓ Won</span>
+                  <button style={{...solidBtn(C.green,true),marginLeft:'auto'}} onClick={()=>onWinDeal&&onWinDeal(p)}>+ Add beneficiary client →</button>
+                </div>
+              )}
             </div>
           )
         })}
