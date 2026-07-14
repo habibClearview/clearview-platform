@@ -46,9 +46,9 @@ const CURRENCIES=['USD','GBP','EUR','UGX','NGN','KES']
 
 // deal pipeline
 const DEAL_STAGES=[
-  {id:'conversation',label:'Conversation',color:C.slate},
-  {id:'scoping',label:'Scoping',color:C.cyan},
-  {id:'proposal',label:'Proposal',color:C.amber},
+  {id:'conversation',label:'Interview Stage',color:C.slate},
+  {id:'scoping',label:'Negotiation',color:C.cyan},
+  {id:'proposal',label:'Proposal Sent',color:C.amber},
   {id:'won',label:'Won',color:C.green},
   {id:'lost',label:'Lost',color:C.red},
 ]

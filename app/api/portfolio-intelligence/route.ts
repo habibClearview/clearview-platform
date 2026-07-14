@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     const snapshots = await loadAllClientSnapshots(admin, !!forceRefresh)
     if (snapshots.length === 0) {
-      return NextResponse.json({ portfolio: computePortfolioOverview([]), segment: filter ? null : null, snapshotCount: 0, profiles: [], filterOptions: { sectors: [], countries: [], programmeIds: [] } })
+      return NextResponse.json({ portfolio: computePortfolioOverview([]), segment: filter ? null : null, snapshotCount: 0, profiles: [], filterOptions: { sectors: [], countries: [], programmeIds: [] }, portfolioDimensionFailures: [], segmentDimensionFailures: null })
     }
 
     const data = buildPortfolioViewData(snapshots, filter ?? null)
