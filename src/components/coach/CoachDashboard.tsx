@@ -1183,7 +1183,6 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       return next
     })
   }
-  const [teamSub,setTeamSub]=useState('roster')
 
   // Load all top-level data on mount
   useEffect(()=>{
@@ -1893,15 +1892,35 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       setView('clients')
     }}/>
   }
+  // One unified Team view -- no sub-tabs. Everything for a person lives in
+  // their own block (profile, day rate, active toggle, clients, timesheets,
+  // expenses, advances, invoices); a summary bar + cost-of-delivery chart sit
+  // above. The old "Roster & approvals" / "Payments" split (which repeated
+  // the same people twice, on two different timesheet systems) is gone --
+  // TeamPayments' coach_timesheet_entries is the single source of truth now.
   function TeamHub(){
-    const sub=teamSub, setSub=setTeamSub
+    const [showNewCI,setShowNewCI]=useState(false)
+    // One write path for every co_implementers change (profile, active,
+    // clients, rate) -- keeps local state and Supabase in lockstep.
+    async function updateCI(id,patch){
+      const {error}=await supabase.from('co_implementers').update(patch).eq('id',id)
+      if(!error)setCoImplementers(prev=>prev.map(x=>x.id!==id?x:{...x,...patch}))
+      return {error}
+    }
+    const addMemberNode=(
+      <button style={addBtn()} onClick={()=>setShowNewCI(true)}>+ Add Co-Implementer</button>
+    )
     return(
       <div>
-        <div style={{display:'flex',gap:'0.4rem',marginBottom:'1.25rem'}}>
-          <button style={subPill(sub==='roster')} onClick={()=>setSub('roster')}>Roster &amp; approvals</button>
-          <button style={subPill(sub==='payments')} onClick={()=>setSub('payments')}>Payments</button>
-        </div>
-        {sub==='roster'?<TeamView/>:<TeamPayments coImplementers={coImplementers} setCoImplementers={setCoImplementers} clients={clients} userName={userName}/>}
+        {showNewCI&&<NewCIForm clients={clients} onSave={async ci=>{const {data,error}=await supabase.from('co_implementers').insert([ci]).select().single();if(!error&&data){setCoImplementers(prev=>[...prev,data]);setShowNewCI(false)}}} onCancel={()=>setShowNewCI(false)}/>}
+        <TeamPayments
+          coImplementers={coImplementers} setCoImplementers={setCoImplementers}
+          clients={clients} userName={userName}
+          canApprove={canApproveTimesheets(userRole)} canManage={canManageTeam(userRole)}
+          updateCI={updateCI}
+          renderInvite={ci=><InviteLoginButton email={ci.email} fullName={ci.name} role="coach" coImplementerId={ci.id} funderProgrammeId={null}/>}
+          addMemberNode={canManageTeam(userRole)?addMemberNode:null}
+        />
       </div>
     )
   }
