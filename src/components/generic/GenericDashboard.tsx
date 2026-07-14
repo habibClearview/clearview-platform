@@ -818,7 +818,7 @@ function KPITile({label,display,sub,color,onClick}:{label:string;display:string;
   const fill = color===SCORING_ENGINE_AMBER ? TILE_COLOR.amber : color
   return (
     <button type="button" onClick={onClick} disabled={!onClick} style={{background:fill,border:'none',borderRadius:14,padding:'1.05rem 1.2rem',color:'#fff',display:'flex',flexDirection:'column',gap:'0.5rem',minHeight:128,width:'100%',textAlign:'left',fontFamily:'inherit',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)',cursor:onClick?'pointer':'default'}}>
-      <div style={{fontFamily:'monospace',fontSize:'0.86rem',letterSpacing:'0.08em',textTransform:'uppercase',color:'rgba(255,255,255,0.82)'}}>{label}</div>
+      <div style={{fontFamily:'monospace',fontSize:'0.86rem',letterSpacing:'0.08em',textTransform:'uppercase',color:'#fff'}}>{label}</div>
       <div style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,lineHeight:1.1}}>{display}</div>
       <div style={{fontSize:'0.96rem',color:'rgba(255,255,255,0.9)'}}>{sub}</div>
     </button>
