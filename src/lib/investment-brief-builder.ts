@@ -143,7 +143,9 @@ function note(text: string) {
   })
 }
 
-// Score badge row
+// Score badge row -- bordered box, coloured score/rating text on a plain
+// background. Matches the approved mockup's mid-tier "score-row-3" style
+// (Liquidity Readiness / Bank Fit / Investor Fit): bordered, not filled.
 function scoreBadge(label: string, score: string, rating: string, color: string, width: number) {
   const b = { style: BorderStyle.SINGLE, size: 2, color: BORDER }
   const borders = { top: b, bottom: b, left: b, right: b }
@@ -154,6 +156,28 @@ function scoreBadge(label: string, score: string, rating: string, color: string,
       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: score, bold: true, color, size: 28, font: 'Georgia' })] }),
       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: label, color: NAVY, size: 16, bold: true, font: 'Arial' })] }),
       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: rating, color, size: 15, font: 'Arial', italics: true })] }),
+    ],
+  })
+}
+
+// Solid-fill score badge -- matches the approved mockup's top-line
+// "score-row-4" style (".score-box.solid"): a full colour fill (the same
+// GREEN/AMBER/RED/CYAN_TEXT/SLATE brand tokens used everywhere else in this
+// document) with white score/label/rating text, no border. Used only for
+// the headline Investment Readiness Scorecard row -- the one row the
+// mockup shows as solid tiles; every other score row in this document
+// stays the bordered scoreBadge/metricBox style the mockup shows for them.
+function scoreBadgeSolid(label: string, score: string, rating: string, color: string, width: number) {
+  const noBorder = { style: BorderStyle.NONE }
+  return new TableCell({
+    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+    shading: { fill: color, type: ShadingType.CLEAR },
+    width: { size: width, type: WidthType.DXA },
+    margins: { top: 100, bottom: 100, left: 120, right: 120 },
+    children: [
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: score, bold: true, color: WHITE, size: 28, font: 'Georgia' })] }),
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: label, color: WHITE, size: 16, bold: true, font: 'Arial' })] }),
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: rating, color: WHITE, size: 15, font: 'Arial', italics: true })] }),
     ],
   })
 }
@@ -432,10 +456,10 @@ ${coachBriefing?.briefing_text ? `Coach narrative: ${coachBriefing.briefing_text
       columnWidths: [w4, w4, w4, w4],
       borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
       rows: [new TableRow({ children: [
-        scoreBadge('Investment Readiness', `${s.irScore}/30`, s.irTier, s.irScore >= 24 ? GREEN : s.irScore >= 17 ? CYAN_TEXT : AMBER, w4),
-        scoreBadge('Credit Risk Score', `${s.score}/100`, s.classification, s.classification === 'Stable' ? GREEN : s.classification === 'At Risk' ? AMBER : RED, w4),
-        scoreBadge('Going Concern', `${s.gcScore}/20`, s.gcRating, s.gcRating === 'Strong' ? GREEN : s.gcRating === 'Adequate' ? CYAN_TEXT : AMBER, w4),
-        scoreBadge('Debt Service (DSCR)', dscrLabel(s), dscrRating(s), dscrColor(s,{green:GREEN,amber:AMBER,red:RED,slate:SLATE}), w4),
+        scoreBadgeSolid('Investment Readiness', `${s.irScore}/30`, s.irTier, s.irScore >= 24 ? GREEN : s.irScore >= 17 ? CYAN_TEXT : AMBER, w4),
+        scoreBadgeSolid('Credit Risk Score', `${s.score}/100`, s.classification, s.classification === 'Stable' ? GREEN : s.classification === 'At Risk' ? AMBER : RED, w4),
+        scoreBadgeSolid('Going Concern', `${s.gcScore}/20`, s.gcRating, s.gcRating === 'Strong' ? GREEN : s.gcRating === 'Adequate' ? CYAN_TEXT : AMBER, w4),
+        scoreBadgeSolid('Debt Service (DSCR)', dscrLabel(s), dscrRating(s), dscrColor(s,{green:GREEN,amber:AMBER,red:RED,slate:SLATE}), w4),
       ]})],
     }))
     children.push(spacer(0, 200))
