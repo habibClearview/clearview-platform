@@ -439,7 +439,7 @@ export interface ScoringResult {
   deToEq: number
 }
 
-const GREEN = '#1A7A4A', AMBER = '#B8860B', RED = '#C0392B', TEAL = '#1A9DAA'
+export const GREEN = '#1A7A4A', AMBER = '#B8860B', RED = '#C0392B', TEAL = '#1A9DAA'
 
 // A coach assessment field defaults to 2 only when genuinely absent
 // (null/undefined/non-numeric) -- `|| 2` would also replace a real,

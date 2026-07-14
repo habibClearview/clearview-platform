@@ -11,7 +11,7 @@ import {
   type GenericModelConfig, type GenericBusinessUnit,
   type GenericPlanLine, type LineCategory, type LineType, type UnitType,
 } from '@/lib/generic-engine'
-import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor, dscrRating, computeScoresTimeSeries, computeTradeCredit } from '@/lib/scoring-engine'
+import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor, dscrRating, computeScoresTimeSeries, computeTradeCredit, AMBER as SCORING_ENGINE_AMBER } from '@/lib/scoring-engine'
 import { computeNPV, computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary, annualRateToMonthlyRate, monthlyRateToAnnualRate } from '@/lib/investment-metrics'
 import { computeLiquidityReadinessScore, computeLRSTimeSeries, computeFitScore, FIT_SCORE_PRESETS, LRS_WEIGHTS } from '@/lib/liquidity-readiness'
 import { computePathwayToReadiness } from '@/lib/pathway-to-readiness'
@@ -47,8 +47,8 @@ const TILE_COLOR = { green:'#1A7A4A', amber:'#8A6100', red:'#C0392B', slate:'#4A
 // substitute (5.5:1). classColor/gcColor/irColor from scoring-engine still
 // hand KPITile the original shared hex, so it remaps that one value at the
 // tile boundary -- nothing about the shared AMBER token or its other uses
-// (donuts, badges) changes.
-const SCORING_ENGINE_AMBER = '#B8860B'
+// (donuts, badges) changes. Imported (as SCORING_ENGINE_AMBER) rather than
+// hardcoded here, so the two can never silently drift apart.
 
 // ── Style helpers ────────────────────────────────────────────
 const card: React.CSSProperties = {background:C.white,border:'1px solid var(--cv-border-soft)',borderRadius:14,padding:'1.4rem 1.6rem',marginBottom:'1.35rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)'}
@@ -902,7 +902,7 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGo
           <KPITile label="Credit Risk" display={`${s.score}/100`} sub={s.classification} color={s.classColor} onClick={onGoToIntelligence}/>
           <KPITile label="Going Concern" display={`${s.gcScore}/20`} sub={s.gcRating} color={s.gcColor} onClick={onGoToIntelligence}/>
           <KPITile label="Investment Readiness" display={`${s.irScore}/30`} sub={s.irTier} color={s.irColor} onClick={onGoToIntelligence}/>
-          <KPITile label="Debt Service" display={dscrLabel(s)} sub={s.hasDebt?dscrRating(s):'No debt'} color={dscrColor(s,TILE_COLOR)} onClick={onGoToIntelligence}/>
+          <KPITile label="Debt Service" display={dscrLabel(s)} sub={dscrRating(s)} color={dscrColor(s,TILE_COLOR)} onClick={onGoToIntelligence}/>
         </div>
       </>)}
       <div style={ovLabel}>Financial Snapshot</div>
