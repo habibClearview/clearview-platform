@@ -29,6 +29,17 @@ const C = {
   red:'var(--cv-red)', green:'var(--cv-green)', amber:'var(--cv-amber)', purple:'var(--cv-purple)',
   lightBg:'var(--cv-alt)', planBg:'var(--cv-card)', actualBg:'var(--cv-tint-actual)',
 }
+// Fixed, theme-independent colours for solid-fill KPI tiles (approved
+// mockup's ".kpi-card" style -- white text on a solid brand colour). These
+// are NOT the C.green/C.amber/C.red tokens above: those are CSS variables
+// that deliberately brighten in dark mode (e.g. --cv-cyan becomes #2AEBEB)
+// because they're tuned for text/stroke legibility on a dark card, not for
+// white text sitting ON TOP of them as a fill. Using the CSS vars here would
+// make dark-mode tiles a pale neon block with unreadable white text. Instead
+// this mirrors the same fixed hex literals scoring-engine.ts already uses
+// for classColor/gcColor/irColor (GREEN/AMBER/RED/TEAL), which stay
+// identical -- and WCAG-safe as a solid fill -- in both themes.
+const TILE_COLOR = { green:'#1A7A4A', amber:'#B8860B', red:'#C0392B', slate:'#4A5A6A' }
 
 // ── Style helpers ────────────────────────────────────────────
 const card: React.CSSProperties = {background:C.white,border:'1px solid var(--cv-border-soft)',borderRadius:14,padding:'1.4rem 1.6rem',marginBottom:'1.35rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)'}
@@ -787,6 +798,23 @@ function ScoreDonut({label,display,frac,rating,color,onClick}:{label:string;disp
   )
 }
 
+// Solid-colour headline tile -- matches the approved mockup's ".kpi-card"
+// (Screen 1, Individual Client Dashboard): a full saturated brand-colour
+// background with white label/value/sub, instead of ScoreDonut's ring +
+// left-border treatment. Scoped to the Overview tab's top-line score row
+// only -- ScoreDonut/GlanceKPI stay as they are everywhere else (Intelligence
+// tab, Portfolio Hub, client health cards, etc.) since the mockup doesn't
+// cover those screens and this project doesn't guess at unapproved design.
+function KPITile({label,display,sub,color,onClick}:{label:string;display:string;sub:string;color:string;onClick?:()=>void}) {
+  return (
+    <div onClick={onClick} style={{background:color,borderRadius:14,padding:'1.05rem 1.2rem',color:'#fff',display:'flex',flexDirection:'column',gap:'0.5rem',minHeight:128,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)',cursor:onClick?'pointer':'default'}}>
+      <div style={{fontFamily:'monospace',fontSize:'0.86rem',letterSpacing:'0.08em',textTransform:'uppercase',color:'rgba(255,255,255,0.82)'}}>{label}</div>
+      <div style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,lineHeight:1.1}}>{display}</div>
+      <div style={{fontSize:'0.96rem',color:'rgba(255,255,255,0.9)'}}>{sub}</div>
+    </div>
+  )
+}
+
 function TrendChart({months,revenue,cost,ebitda,cc}:{months:string[];revenue:number[];cost:number[];ebitda:number[];cc:string}) {
   const n=months.length
   if(!n) return null
@@ -861,10 +889,10 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGo
           <button type="button" style={{...addBtn(true),borderColor:C.border,color:C.teal,marginBottom:'0.7rem'}} onClick={onGoToIntelligence}>See full analysis →</button>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(215px,1fr))',gap:'1rem',marginBottom:'1.6rem'}}>
-          <ScoreDonut label="Credit Risk" display={`${s.score}/100`} frac={s.score/100} rating={s.classification} color={s.classColor} onClick={onGoToIntelligence}/>
-          <ScoreDonut label="Going Concern" display={`${s.gcScore}/20`} frac={s.gcScore/20} rating={s.gcRating} color={s.gcColor} onClick={onGoToIntelligence}/>
-          <ScoreDonut label="Investment Readiness" display={`${s.irScore}/30`} frac={s.irScore/30} rating={s.irTier} color={s.irColor} onClick={onGoToIntelligence}/>
-          <ScoreDonut label="Debt Service" display={dscrLabel(s)} frac={s.hasDebt?Math.min((s.dscrMin||0)/2.5,1):0} rating={s.hasDebt?dscrRating(s):'No debt'} color={dscrColor(s,{green:C.green,amber:C.amber,red:C.red,slate:C.slate})} onClick={onGoToIntelligence}/>
+          <KPITile label="Credit Risk" display={`${s.score}/100`} sub={s.classification} color={s.classColor} onClick={onGoToIntelligence}/>
+          <KPITile label="Going Concern" display={`${s.gcScore}/20`} sub={s.gcRating} color={s.gcColor} onClick={onGoToIntelligence}/>
+          <KPITile label="Investment Readiness" display={`${s.irScore}/30`} sub={s.irTier} color={s.irColor} onClick={onGoToIntelligence}/>
+          <KPITile label="Debt Service" display={dscrLabel(s)} sub={s.hasDebt?dscrRating(s):'No debt'} color={dscrColor(s,TILE_COLOR)} onClick={onGoToIntelligence}/>
         </div>
       </>)}
       <div style={ovLabel}>Financial Snapshot</div>
