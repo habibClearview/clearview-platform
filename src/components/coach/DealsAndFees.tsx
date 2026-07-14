@@ -16,9 +16,9 @@
 // Additive & self-contained: mounted as a new "Programmes & Deals" tab.
 // Existing Programmes/Client views are untouched.
 // ============================================================
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { clientCountForProgramme, programmeCanvasSpread, canvasProgress } from '@/lib/coach-business-metrics'
+import { clientCountForProgramme } from '@/lib/coach-business-metrics'
 
 const C = {
   navy:'var(--cv-navy)', cyan:'var(--cv-cyan)', cream:'var(--cv-cream)', white:'var(--cv-card)',
@@ -76,30 +76,6 @@ export default function DealsAndFees({programmes=[],setProgrammes,clients=[],set
   return <DealsPipeline programmes={programmes} setProgrammes={setProgrammes} clients={clients} onWinDeal={onWinDeal}/>
 }
 
-// New programme, reachable directly from the deals pipeline -- previously
-// only creatable from the separate Programmes tab, so a coach opening
-// Programmes & Deals to start tracking a fresh deal had nowhere to add it.
-function NewProgrammeForm({onSave,onCancel}){
-  const [f,setF]=useState({name:'',type:'donor_programme',funder:'',country:'Uganda',start_date:'',end_date:'',notes:'',client_ids:[],co_implementer_ids:[],funder_email:'',funder_invited:false})
-  return(
-    <div style={{...card,border:`1px solid ${C.cyan}`,marginBottom:'1.25rem'}}>
-      <div style={secH}>New Programme</div>
-      <div style={fGrid}>
-        <div><label style={lbl}>Name *</label><input style={inp} value={f.name} onChange={e=>setF(x=>({...x,name:e.target.value}))}/></div>
-        <div><label style={lbl}>Type</label><select style={inp} value={f.type} onChange={e=>setF(x=>({...x,type:e.target.value}))}><option value="donor_programme">Donor Programme</option><option value="direct_client">Direct Client</option><option value="blended">Blended</option></select></div>
-        <div><label style={lbl}>Funder *</label><input style={inp} value={f.funder} onChange={e=>setF(x=>({...x,funder:e.target.value}))}/></div>
-        <div><label style={lbl}>Country</label><input style={inp} value={f.country} onChange={e=>setF(x=>({...x,country:e.target.value}))}/></div>
-        <div><label style={lbl}>Start Date</label><input type="date" style={inp} value={f.start_date} onChange={e=>setF(x=>({...x,start_date:e.target.value}))}/></div>
-        <div><label style={lbl}>End Date</label><input type="date" style={inp} value={f.end_date} onChange={e=>setF(x=>({...x,end_date:e.target.value}))}/></div>
-      </div>
-      <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
-        <button style={solidBtn()} onClick={()=>{if(!f.name||!f.funder)return;onSave({...f,id:`prog_${Date.now()}`})}}>Create Programme</button>
-        <button style={{...addBtn(),borderColor:C.border,color:C.slate}} onClick={onCancel}>Cancel</button>
-      </div>
-    </div>
-  )
-}
-
 // ─── DEALS PIPELINE ──────────────────────────────────────────
 const DEAL_SERVICE_OPTIONS=[
   {key:'advisory',label:'Advisory'},
@@ -107,33 +83,54 @@ const DEAL_SERVICE_OPTIONS=[
   {key:'financial',label:'Financial Model'},
   {key:'portfolio_intelligence',label:'Subscription'},
 ]
+
+// A prospect you're still chasing -- the ONLY fields that matter at this
+// point are who they are, whether they'd be a donor programme or a direct
+// client, where they are in the pipeline, which service(s) are on the
+// table, and the deal value. Delivery-programme admin (funder email,
+// country, start/end dates) is deliberately NOT here -- those belong to a
+// won engagement, not a live prospect, and were the redundant fields
+// cluttering this form before. Everything else stays editable inline on
+// the prospect's block once created.
+function NewProgrammeForm({onSave,onCancel}){
+  const [f,setF]=useState({name:'',type:'donor_programme',deal_stage:'conversation',deal_services:[],deal_value:'',deal_currency:'USD'})
+  function toggleService(key){
+    setF(x=>({...x,deal_services:x.deal_services.includes(key)?x.deal_services.filter(s=>s!==key):[...x.deal_services,key]}))
+  }
+  return(
+    <div style={{...card,border:`1px solid ${C.cyan}`,marginBottom:'1.25rem'}}>
+      <div style={secH}>New Prospect</div>
+      <div style={fGrid}>
+        <div><label style={lbl}>Prospect name *</label><input style={inp} value={f.name} onChange={e=>setF(x=>({...x,name:e.target.value}))}/></div>
+        <div><label style={lbl}>Type</label><select style={inp} value={f.type} onChange={e=>setF(x=>({...x,type:e.target.value}))}><option value="donor_programme">Donor Programme</option><option value="direct_client">Direct Client</option></select></div>
+        <div><label style={lbl}>Stage</label><select style={inp} value={f.deal_stage} onChange={e=>setF(x=>({...x,deal_stage:e.target.value}))}>{DEAL_STAGES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</select></div>
+        <div><label style={lbl}>Deal value</label><div style={{display:'flex',gap:'0.3rem'}}><input type="number" placeholder="0" style={inp} value={f.deal_value} onChange={e=>setF(x=>({...x,deal_value:e.target.value}))}/><select style={{...inp,width:90}} value={f.deal_currency} onChange={e=>setF(x=>({...x,deal_currency:e.target.value}))}>{CURRENCIES.map(x=><option key={x}>{x}</option>)}</select></div></div>
+      </div>
+      <div style={{marginTop:'0.85rem'}}>
+        <label style={lbl}>Service(s) on the table</label>
+        <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginTop:'0.3rem'}}>
+          {DEAL_SERVICE_OPTIONS.map(opt=>{
+            const active=f.deal_services.includes(opt.key)
+            return<button key={opt.key} onClick={()=>toggleService(opt.key)} style={{fontFamily:'monospace',fontSize:'0.85rem',border:`1px solid ${active?C.teal:C.border}`,background:active?C.teal:'transparent',color:active?'var(--cv-on-accent)':C.slate,borderRadius:999,padding:'0.25rem 0.75rem',cursor:'pointer'}}>{opt.label}</button>
+          })}
+        </div>
+      </div>
+      <div style={{display:'flex',gap:'0.6rem',marginTop:'1rem'}}>
+        <button style={solidBtn()} onClick={()=>{if(!f.name)return;onSave({id:`prog_${Date.now()}`,name:f.name,type:f.type,deal_stage:f.deal_stage,deal_services:f.deal_services,deal_value:f.deal_value===''?null:num(f.deal_value),deal_currency:f.deal_currency,client_ids:[],co_implementer_ids:[]})}}>Add Prospect</button>
+        <button style={{...addBtn(),borderColor:C.border,color:C.slate}} onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  )
+}
 function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
   const [msg,setMsg]=useState(null)
   const [showNew,setShowNew]=useState(false)
   async function createProgramme(p){
     const {data,error}=await supabase.from('programmes').insert([p]).select().single()
-    if(error)return setMsg('Could not create programme: '+error.message)
+    if(error)return setMsg('Could not add prospect: '+error.message)
     setProgrammes&&setProgrammes(prev=>[...prev,data])
     setShowNew(false)
   }
-  // Real canvas progress for won-programme clients only -- "furthest/nearest
-  // zone" needs it; nothing else here does, so this stays a small, scoped
-  // fetch rather than loading every client's canvas up front.
-  const [canvasByClient,setCanvasByClient]=useState({})
-  useEffect(()=>{
-    let cancelled=false
-    const wonProgrammeIds=new Set(programmes.filter(p=>p.deal_stage==='won').map(p=>p.id))
-    const clientIds=clients.filter(c=>wonProgrammeIds.has(c.programme_id)).map(c=>c.id)
-    if(clientIds.length===0)return
-    supabase.from('canvas_decision_points').select('client_id,dp_id,status').in('client_id',clientIds)
-      .then(({data})=>{
-        if(cancelled)return
-        const grouped={}
-        ;(data||[]).forEach(d=>{(grouped[d.client_id]=grouped[d.client_id]||[]).push(d)})
-        setCanvasByClient(grouped)
-      })
-    return ()=>{cancelled=true}
-  },[programmes,clients])
 
   const cur=programmes.find(p=>p.deal_currency)?.deal_currency||'USD'
 
@@ -146,6 +143,8 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
     if(error)setMsg('Could not save: '+error.message)
   }
 
+  const pipelineProspects=programmes.filter(p=>clientCountForProgramme(p.id,clients)===0)
+
   return(
     <div>
       <div style={{background:C.navy,color:'var(--cv-on-accent)',borderRadius:'10px 10px 0 0',padding:'0.95rem 1.4rem',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem'}}>
@@ -156,12 +155,16 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
       {showNew&&<NewProgrammeForm onSave={createProgramme} onCancel={()=>setShowNew(false)}/>}
       {msg&&<div style={{fontSize:'1.01rem',color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
 
-      {programmes.length===0
-        ? <div style={{...hint,padding:'0.5rem 0'}}>No prospects yet.</div>
-        : programmes.map(p=>{
+      {/* A prospect drops off the pipeline the moment it becomes a client --
+          i.e. once any beneficiary client is attached to it. A Won deal with
+          no client created yet still shows (with the "+ Add beneficiary
+          client" CTA), so nothing falls through the gap between winning and
+          setting the client up. A prospect can't be a prospect and a client
+          at the same time. */}
+      {pipelineProspects.length===0
+        ? <div style={{...hint,padding:'0.5rem 0'}}>No open prospects.</div>
+        : pipelineProspects.map(p=>{
           const meta=stageMeta(p.deal_stage)
-          const lsps=clientCountForProgramme(p.id,clients)
-          const spread=p.deal_stage==='won'?programmeCanvasSpread(clients.filter(c=>c.programme_id===p.id).map(c=>canvasProgress(canvasByClient[c.id]||[]))):null
           const services=p.deal_services||[]
           function toggleService(key){
             const next=services.includes(key)?services.filter(s=>s!==key):[...services,key]
@@ -177,8 +180,7 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
               <div style={{display:'flex',justifyContent:'space-between',flexWrap:'wrap',gap:'0.75rem',alignItems:'flex-start'}}>
                 <div>
                   <div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy}}>{p.name}</div>
-                  <div style={{fontSize:'0.93rem',color:C.slate,marginTop:'0.15rem'}}>{p.funder||'—'}{lsps>0&&` · ${lsps} beneficiar${lsps===1?'y':'ies'}`}</div>
-                  {spread&&<div style={{fontSize:'0.93rem',color:C.teal,marginTop:'0.15rem'}}>Furthest {spread.furthestLabel} · Nearest {spread.nearestLabel}</div>}
+                  <div style={{fontSize:'0.93rem',color:C.slate,marginTop:'0.15rem'}}>{p.type==='donor_programme'?'Donor programme':'Direct client'}</div>
                   <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginTop:'0.5rem'}}>
                     {DEAL_SERVICE_OPTIONS.map(opt=>{
                       const active=services.includes(opt.key)
