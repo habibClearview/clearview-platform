@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { grantStatus, isGrantActive, generateAccessToken, expiryFromDays, GRANT_TYPE_LABELS, GRANT_SCOPE_LABELS, emailSatisfiesGrant, requiresEmailConfirmation } from '../lib/access-grants'
+import { grantStatus, isGrantActive, generateAccessToken, expiryFromDays, GRANT_TYPE_LABELS, GRANT_SCOPE_LABELS, emailSatisfiesGrant, requiresEmailConfirmation, generateOtpCode, otpExpiryFromNow, isOtpValid, otpAttemptsExceeded, OTP_MAX_ATTEMPTS } from '../lib/access-grants'
 
 const NOW = '2026-07-13T12:00:00.000Z'
 
@@ -103,5 +103,56 @@ describe('requiresEmailConfirmation', () => {
   it('REG: true only when the coach actually set a grantee_email', () => {
     expect(requiresEmailConfirmation({ grantee_email: 'investor@fund.com' })).toBe(true)
     expect(requiresEmailConfirmation({ grantee_email: null })).toBe(false)
+  })
+})
+
+describe('generateOtpCode', () => {
+  it('REG: produces a 6-digit numeric string', () => {
+    const code = generateOtpCode()
+    expect(code).toMatch(/^\d{6}$/)
+  })
+
+  it('REG: two calls very rarely collide across a decent sample', () => {
+    const seen = new Set(Array.from({ length: 50 }, () => generateOtpCode()))
+    expect(seen.size).toBeGreaterThan(45)
+  })
+})
+
+describe('otpExpiryFromNow', () => {
+  it('REG: returns nowMs + 15 minutes, as ISO', () => {
+    const nowMs = new Date('2026-07-14T00:00:00.000Z').getTime()
+    expect(otpExpiryFromNow(nowMs)).toBe(new Date(nowMs + 15 * 60 * 1000).toISOString())
+  })
+})
+
+describe('isOtpValid', () => {
+  const NOW2 = '2026-07-14T12:00:00.000Z'
+
+  it('REG: matching code, not yet expired, is valid', () => {
+    expect(isOtpValid({ otp_code: '123456', otp_expires_at: '2026-07-14T12:10:00.000Z' }, '123456', NOW2)).toBe(true)
+  })
+
+  it('REG: whitespace around the submitted code is ignored', () => {
+    expect(isOtpValid({ otp_code: '123456', otp_expires_at: '2026-07-14T12:10:00.000Z' }, '  123456  ', NOW2)).toBe(true)
+  })
+
+  it('REG: a wrong code is invalid', () => {
+    expect(isOtpValid({ otp_code: '123456', otp_expires_at: '2026-07-14T12:10:00.000Z' }, '000000', NOW2)).toBe(false)
+  })
+
+  it('REG: an expired code is invalid even if it matches', () => {
+    expect(isOtpValid({ otp_code: '123456', otp_expires_at: '2026-07-14T11:00:00.000Z' }, '123456', NOW2)).toBe(false)
+  })
+
+  it('REG: no code on the grant (never requested, or already used) is invalid', () => {
+    expect(isOtpValid({ otp_code: null, otp_expires_at: null }, '123456', NOW2)).toBe(false)
+  })
+})
+
+describe('otpAttemptsExceeded', () => {
+  it('REG: false below the limit, true at or above it', () => {
+    expect(otpAttemptsExceeded({ otp_attempts: 0 })).toBe(false)
+    expect(otpAttemptsExceeded({ otp_attempts: OTP_MAX_ATTEMPTS - 1 })).toBe(false)
+    expect(otpAttemptsExceeded({ otp_attempts: OTP_MAX_ATTEMPTS })).toBe(true)
   })
 })

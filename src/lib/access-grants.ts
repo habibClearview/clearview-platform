@@ -59,6 +59,10 @@ export interface AccessGrant {
   revoked_at: string | null
   last_accessed_at: string | null
   email_confirmed_at: string | null
+  otp_code: string | null
+  otp_email: string | null
+  otp_expires_at: string | null
+  otp_attempts: number
 }
 
 export type GrantStatus = 'active' | 'expired' | 'revoked'
@@ -113,4 +117,43 @@ export function generateAccessToken(): string {
 export function expiryFromDays(days: number | null | undefined, nowMs: number): string | null {
   if (!days || days <= 0) return null
   return new Date(nowMs + days * 24 * 60 * 60 * 1000).toISOString()
+}
+
+// ── One-time code verification ──────────────────────────────
+// Stronger than a plain email match: a code only the recipient's inbox
+// receives, that they have to type back in. It doesn't stop someone
+// forwarding the actual content after they've legitimately received it
+// (nothing can), but it stops a bare link -- or a link plus "here's the
+// email to type in" -- from working for a stranger by itself. Every
+// verification attempt needs a fresh code delivered to a real inbox.
+
+export const OTP_EXPIRY_MINUTES = 15
+export const OTP_MAX_ATTEMPTS = 5
+
+// 6-digit numeric code. Uses Web Crypto (see generateAccessToken above
+// for why) rather than Math.random() -- cheap to do properly, and this
+// value is a real access-control secret, not a cosmetic ID.
+export function generateOtpCode(): string {
+  const bytes = new Uint8Array(4)
+  globalThis.crypto.getRandomValues(bytes)
+  const n = new DataView(bytes.buffer).getUint32(0)
+  return String(100000 + (n % 900000))
+}
+
+export function otpExpiryFromNow(nowMs: number): string {
+  return new Date(nowMs + OTP_EXPIRY_MINUTES * 60 * 1000).toISOString()
+}
+
+// Whether a submitted code is the live, unexpired code for this grant.
+// Does NOT check attempts here -- that's a separate, explicit check
+// (otpAttemptsExceeded) so the route can tell "wrong code" apart from
+// "too many wrong codes, request a new one" and message each correctly.
+export function isOtpValid(grant: Pick<AccessGrant, 'otp_code' | 'otp_expires_at'>, submittedCode: string, nowIso: string): boolean {
+  if (!grant.otp_code || !grant.otp_expires_at) return false
+  if (grant.otp_expires_at <= nowIso) return false
+  return grant.otp_code === submittedCode.trim()
+}
+
+export function otpAttemptsExceeded(grant: Pick<AccessGrant, 'otp_attempts'>): boolean {
+  return (grant.otp_attempts || 0) >= OTP_MAX_ATTEMPTS
 }
