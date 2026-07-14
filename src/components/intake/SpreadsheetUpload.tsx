@@ -446,9 +446,17 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
       // silently discarded. A unit almost always has more than one plan
       // line (revenue plus several cost lines), so this was losing real
       // data on every upload, not an edge case.
+      // i <= pastMonths, not i < pastMonths -- pastMonths itself is the
+      // "M0 (Now)" column, the current calendar month, not a future one.
+      // The engine's own actual/plan calendar rule (isPastOrCurrentMonth
+      // in generic-engine.ts) treats the current month as actual too;
+      // excluding it here meant the exact month the client filled in as
+      // "now" was silently never written as an actual at all, only ever
+      // read back as a plan figure -- the P&L Variance view (which
+      // compares actual to plan) showed zero actual for every unit.
       const actualsByUnitPeriod: Record<string, {unit_id:string, period:string, values:Record<string,number>}> = {}
       for (const line of planLines) {
-        for (let i = 0; i < pastMonths; i++) {
+        for (let i = 0; i <= pastMonths; i++) {
           const val = line.monthly_plan[i]
           if (!val) continue
           const offset = i - pastMonths

@@ -280,9 +280,18 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
           allLines.push({id:`${p.id}_rev`})
           p.costLines.forEach((c:any)=>allLines.push({id:c.id}))
         })
+        // offset <= 0, not < 0 -- offset 0 is "this month", the current
+        // calendar month, which the form's own MonthRow input (below)
+        // explicitly lets the client enter a figure for. The engine's
+        // actual/plan calendar rule (isPastOrCurrentMonth in
+        // generic-engine.ts) treats the current month as actual too;
+        // excluding it here meant whatever the client typed into "this
+        // month" was never written as an actual, only ever read back as
+        // a plan figure -- the P&L Variance view showed zero actual for
+        // the current period.
         const actualsByPeriod: Record<string, Record<string, number>> = {}
         for (const line of allLines) {
-          for (let offset = -pastMonths; offset < 0; offset++) {
+          for (let offset = -pastMonths; offset <= 0; offset++) {
             const val = currentFigureData[line.id]?.[offset]
             if (!val) continue
             const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()+offset)
