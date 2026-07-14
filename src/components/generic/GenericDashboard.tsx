@@ -4723,6 +4723,26 @@ function WorkingCapitalTab({config,result,months,cc,P,onSave}) {
   // to just this unit's lines and this unit's rev/cogs -- nothing fabricated.
   const tc = computeTradeCredit(unitLines, cogsArr, revArr, months.length)
 
+  // ── ESTIMATE FALLBACK ──────────────────────────────────────
+  // Until the coach or client enters actual month-end payable/receivable
+  // balances above, this tab would otherwise show a flat 0d / 0 -- even
+  // though the client already told us their typical days-to-collect and
+  // days-to-pay at intake (dso_days / dpo_days). Rather than show a false
+  // zero, derive a labelled ESTIMATE from those intake figures applied to
+  // this scope's own revenue/cost of sales, using the same DSO/DPO formulas
+  // the engine uses for real data (Avg balance = days/365 * annual revenue
+  // or cost of sales). This is display-only: it does NOT feed into the cash
+  // flow, balance sheet or scoring engine -- only real entered lines do --
+  // so it can never silently distort a client's actual numbers.
+  const hasRealLines = unitLines.length > 0
+  const estDsoDays = config.settings?.dso_days || 0
+  const estDpoDays = config.settings?.dpo_days || 0
+  const annualRevForEst = revArr.reduce((a:number,b:number)=>a+b,0)
+  const annualCogsForEst = cogsArr.reduce((a:number,b:number)=>a+b,0)
+  const isEstimate = !hasRealLines && (estDsoDays>0 || estDpoDays>0)
+  const estReceivable = annualRevForEst>0 ? (estDsoDays/365)*annualRevForEst : 0
+  const estPayable = annualCogsForEst>0 ? (estDpoDays/365)*annualCogsForEst : 0
+
   function persist(next:any[]) {
     onSave({...config, settings:{...config.settings, trade_credit_lines: next}})
   }
@@ -4794,18 +4814,26 @@ function WorkingCapitalTab({config,result,months,cc,P,onSave}) {
       </div>
 
       {s && (()=>{
-        const dso=tc.dso, dpo=tc.dpo, gap=tc.cashConversionGap
-        const payOut=tc.totalPayableOutstanding[tc.totalPayableOutstanding.length-1]||0
-        const recOut=tc.totalReceivableOutstanding[tc.totalReceivableOutstanding.length-1]||0
+        const dso=isEstimate?estDsoDays:tc.dso, dpo=isEstimate?estDpoDays:tc.dpo, gap=dso-dpo
+        const payOut=isEstimate?estPayable:(tc.totalPayableOutstanding[tc.totalPayableOutstanding.length-1]||0)
+        const recOut=isEstimate?estReceivable:(tc.totalReceivableOutstanding[tc.totalReceivableOutstanding.length-1]||0)
         // Ring fill is a purely visual gauge over a 90-day reference window --
         // no new score is computed; the day counts themselves come straight
-        // from the engine's tradeCredit output.
+        // from the engine's tradeCredit output (or, when no real lines have
+        // been entered yet, from the estimate derived above).
         const ringFrac=(d:number)=>Math.max(0,Math.min(1,d/90))
         const gapCol=gap<=0?C.green:gap>30?C.red:C.amber
         const scopeLabel = selUnit===TC_ALL ? 'all units' : selUnit===TC_UNASSIGNED ? 'unassigned lines' : (activeUnits.find((u:any)=>u.id===selUnit)?.name || 'unit')
         return (
           <>
-            <div style={ovLabel}>Payment behaviour · {scopeLabel}</div>
+            <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'0.4rem'}}>
+              <div style={{...ovLabel,marginBottom:0}}>Payment behaviour · {scopeLabel}</div>
+              {isEstimate && (
+                <span style={{fontFamily:'monospace',fontSize:'0.82rem',padding:'0.15rem 0.5rem',borderRadius:4,background:C.amber+'22',color:C.amber,border:`1px solid ${C.amber}55`}}>
+                  ESTIMATE from intake -- enter actual balances below to replace
+                </span>
+              )}
+            </div>
             <div className="cv-grid-3" style={{marginBottom:'1.35rem'}}>
               <div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)',borderLeft:`4px solid ${C.navy}`}}>
                 <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.45rem'}}>Days to collect · DSO</div>
@@ -4813,7 +4841,7 @@ function WorkingCapitalTab({config,result,months,cc,P,onSave}) {
                   <MiniDonut frac={ringFrac(dso)} color={C.amber} size={46} center=""/>
                   <div>
                     <div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:C.navy,lineHeight:1.05}}>{dso.toFixed(0)}d</div>
-                    <div style={{fontSize:'0.94rem',color:C.slate,fontFamily:'monospace'}}>{fmt(recOut,cc)} outstanding</div>
+                    <div style={{fontSize:'0.94rem',color:C.slate,fontFamily:'monospace'}}>{fmt(recOut,cc)} {isEstimate?'estimated':'outstanding'}</div>
                   </div>
                 </div>
               </div>
@@ -4823,7 +4851,7 @@ function WorkingCapitalTab({config,result,months,cc,P,onSave}) {
                   <MiniDonut frac={ringFrac(dpo)} color={C.teal} size={46} center=""/>
                   <div>
                     <div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:C.navy,lineHeight:1.05}}>{dpo.toFixed(0)}d</div>
-                    <div style={{fontSize:'0.94rem',color:C.slate,fontFamily:'monospace'}}>{fmt(payOut,cc)} outstanding</div>
+                    <div style={{fontSize:'0.94rem',color:C.slate,fontFamily:'monospace'}}>{fmt(payOut,cc)} {isEstimate?'estimated':'outstanding'}</div>
                   </div>
                 </div>
               </div>
