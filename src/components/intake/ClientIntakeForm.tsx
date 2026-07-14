@@ -266,6 +266,13 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
       }])
       if (configErr) throw configErr
 
+      // Grouped into ONE combined line_values object per (unit_id, period)
+      // before upserting -- upserting once per (line, period), as this used
+      // to, replaces the whole line_values JSON column on each write, so
+      // every line but the last one processed for a given unit+period was
+      // silently discarded. A unit almost always has more than one plan
+      // line (revenue plus several cost lines), so this was losing real
+      // data on every submission, not an edge case.
       for (const key of keys) {
         const allLines: {id:string}[] = []
         const acProds = currentProducts[key] || []
@@ -273,19 +280,24 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
           allLines.push({id:`${p.id}_rev`})
           p.costLines.forEach((c:any)=>allLines.push({id:c.id}))
         })
+        const actualsByPeriod: Record<string, Record<string, number>> = {}
         for (const line of allLines) {
           for (let offset = -pastMonths; offset < 0; offset++) {
             const val = currentFigureData[line.id]?.[offset]
             if (!val) continue
             const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()+offset)
             const period = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`
-            await supabase.from('generic_actuals').upsert({
-              client_id: client.id, unit_id: key, period,
-              line_values: { [line.id]: val },
-              submitted: true, submitted_at: new Date().toISOString(),
-              submitted_by: business.contact_name, entered_by: business.contact_name,
-            }, { onConflict: 'client_id,unit_id,period' })
+            if (!actualsByPeriod[period]) actualsByPeriod[period] = {}
+            actualsByPeriod[period][line.id] = val
           }
+        }
+        for (const [period, values] of Object.entries(actualsByPeriod)) {
+          await supabase.from('generic_actuals').upsert({
+            client_id: client.id, unit_id: key, period,
+            line_values: values,
+            submitted: true, submitted_at: new Date().toISOString(),
+            submitted_by: business.contact_name, entered_by: business.contact_name,
+          }, { onConflict: 'client_id,unit_id,period' })
         }
       }
 

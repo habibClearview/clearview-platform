@@ -316,19 +316,17 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
       }
 
       const wholeKey = 'whole'
-      // Build unit id lookup by name so products can be assigned to the correct unit
+      // Build unit id lookup by name so products can be assigned to the correct unit.
+      // `units` (with headcount already resolved for the new template, 0 for the
+      // old one) came from handleFile's parse and is already sitting in `preview`
+      // -- no need to re-read the Business Details sheet here, and re-reading it
+      // isn't even possible: `bd` was a local inside handleFile, out of scope in
+      // this function, so the previous version of this block threw a
+      // ReferenceError on every single upload that reached this point.
       const unitIdByName: Record<string,string> = {}
-      // Read business units from Section F (rows 50-57)
-      const bdUnits: {name:string,headcount:number}[] = []
-      for (let r=50; r<=57; r++) {
-        const name = cellStr(bd, `A${r}`)
-        const hc = cellNum(bd, `C${r}`) || 0
-        if (name) bdUnits.push({name, headcount:hc})
-      }
-      const hasUnitsFromBD = bdUnits.length > 0
-      const keys = hasUnitsFromBD
-        ? bdUnits.map((u,i)=>({id:genId('unit'),name:u.name,headcount:u.headcount,idx:i}))
-        : (hasUnits ? units.map((u:any,i:number)=>({id:genId('unit'),name:u.name,headcount:0,idx:i})) : [{id:wholeKey,name:business.business_name,headcount:0,idx:0}])
+      const keys = hasUnits
+        ? units.map((u:any,i:number)=>({id:genId('unit'),name:u.name,headcount:u.headcount||0,idx:i}))
+        : [{id:wholeKey,name:business.business_name,headcount:0,idx:0}]
       keys.forEach((k:any,ki:number)=>{
         unitIdByName[k.name] = k.id
         businessUnits.push({
@@ -386,7 +384,15 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
       }])
       if (configErr) throw configErr
 
-      // Historical actuals: offsets < 0 relative to "this month" column
+      // Historical actuals: offsets < 0 relative to "this month" column.
+      // Grouped into ONE combined line_values object per (unit_id, period)
+      // before upserting -- upserting once per (line, period), as this used
+      // to, replaces the whole line_values JSON column on each write, so
+      // every line but the last one processed for a given unit+period was
+      // silently discarded. A unit almost always has more than one plan
+      // line (revenue plus several cost lines), so this was losing real
+      // data on every upload, not an edge case.
+      const actualsByUnitPeriod: Record<string, {unit_id:string, period:string, values:Record<string,number>}> = {}
       for (const line of planLines) {
         for (let i = 0; i < pastMonths; i++) {
           const val = line.monthly_plan[i]
@@ -394,12 +400,17 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
           const offset = i - pastMonths
           const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()+offset)
           const period = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`
-          await supabase.from('generic_actuals').upsert({
-            client_id: client.id, unit_id: line.unit_id, period,
-            line_values: { [line.id]: val }, submitted: true, submitted_at: new Date().toISOString(),
-            submitted_by: business.contact_name, entered_by: business.contact_name,
-          }, { onConflict: 'client_id,unit_id,period' })
+          const key = `${line.unit_id}|${period}`
+          if (!actualsByUnitPeriod[key]) actualsByUnitPeriod[key] = { unit_id: line.unit_id, period, values: {} }
+          actualsByUnitPeriod[key].values[line.id] = val
         }
+      }
+      for (const { unit_id, period, values } of Object.values(actualsByUnitPeriod)) {
+        await supabase.from('generic_actuals').upsert({
+          client_id: client.id, unit_id, period,
+          line_values: values, submitted: true, submitted_at: new Date().toISOString(),
+          submitted_by: business.contact_name, entered_by: business.contact_name,
+        }, { onConflict: 'client_id,unit_id,period' })
       }
 
       setSubmitted(true)
