@@ -296,7 +296,7 @@ function EngagementFees({clients,setClients,programmes}){
 
   return(
     <div>
-      <p style={{...hint,marginBottom:'1rem'}}>The engagement clients (LSPs / agribusinesses) are who is served. Track the fee agreed per engagement and whether it is paid, invoiced, or still unpaid.</p>
+      <p style={{...hint,marginBottom:'1rem'}}>The engagement clients (LSPs / agribusinesses) are who is served. Track the fee agreed per engagement and whether it is paid, invoiced, or still unpaid. <strong>Where a Programme is set</strong>, the organisation itself is a served beneficiary, not the payer -- the programme is the paying client, and any fee entered here is the programme's own budget allocation for that engagement, not something the beneficiary owes.</p>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'0.85rem',marginBottom:'1.25rem'}}>
         <KPI label="Total fees" value={fmtMoney(totalFee,cur)} sub={`${clients.length} engagements`}/>
         <KPI label="Paid" value={fmtMoney(byStatus('paid'),cur)} color={C.green}/>
@@ -316,7 +316,7 @@ function EngagementFees({clients,setClients,programmes}){
                 const isEdit=editId===c.id
                 return(<tr key={c.id} style={{background:i%2?C.white:C.cream}}>
                   <td style={{...td,fontWeight:600,color:C.navy}}>{c.name}</td>
-                  <td style={td}>{progName(c.programme_id)}</td>
+                  <td style={td}>{c.programme_id?(<>{progName(c.programme_id)} <Badge text="Beneficiary" color={C.purple}/></>):(<Badge text="Paying client" color={C.teal}/>)}</td>
                   {isEdit?(
                     <>
                       <td style={td}><div style={{display:'flex',gap:'0.3rem'}}><input type="number" style={{...inp,width:100,padding:'0.25rem 0.4rem'}} value={form.engagement_fee} onChange={e=>setForm(f=>({...f,engagement_fee:e.target.value}))}/><select style={{...inp,width:75,padding:'0.25rem 0.3rem'}} value={form.fee_currency} onChange={e=>setForm(f=>({...f,fee_currency:e.target.value}))}>{CURRENCIES.map(x=><option key={x}>{x}</option>)}</select></div></td>
