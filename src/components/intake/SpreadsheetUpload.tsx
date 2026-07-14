@@ -65,10 +65,16 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
       if (!bd) throw new Error('Business Details sheet not found. Please use the Clearview Data Capture template.')
 
       // Support both old template (sheets starting with "Products") and
-      // new template v7 (sheets named "Unit N Figures")
-      const isNewTemplate = wb.SheetNames.some(n => /unit \d+ figures/i.test(n))
+      // new template v7. A real completed v7 template names each sheet
+      // after its business unit -- "Unit 1 VET & LIVESTOCK", "Unit 2
+      // AGRO-INPUT" -- not literally "Unit N Figures" (that pattern only
+      // matches an UNUSED blank slot sheet, e.g. "Unit 5 Figures" on a
+      // business with fewer than 5 units). Matching on "starts with Unit
+      // <number>" catches every real per-unit sheet regardless of what
+      // the user named the rest of it.
+      const isNewTemplate = wb.SheetNames.some(n => /^unit\s*\d+/i.test(n))
       const productSheetNames = isNewTemplate
-        ? wb.SheetNames.filter(n => /unit \d+ figures/i.test(n))
+        ? wb.SheetNames.filter(n => /^unit\s*\d+/i.test(n))
         : wb.SheetNames.filter(n => n.toLowerCase().startsWith('products'))
 
       if (productSheetNames.length === 0) throw new Error('No Products & Figures sheet found. Please use the Clearview Data Capture template.')
@@ -141,17 +147,18 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
         const pf = wb.Sheets[sheetName]
 
         // Determine unit name for this sheet
-        // New template: unit name in cell B4 (col B, row 4)
+        // New template: unit name in cell C4 ("BUSINESS UNIT NAME:" label
+        // is in A4, the value the client typed is in C4)
         // Old template: unit name in WHICH_PART_ROW constant
         const sheetUnitName = isNewTemplate
-          ? cellStr(pf, 'B4')
+          ? cellStr(pf, 'C4')
           : cellStr(pf, `C${WHICH_PART_ROW}`)
 
         // Find month columns
-        // New template: headers in row 6, data starts col C (col index 3, 1-based)
+        // New template: headers in row 6, data starts col C (0-indexed col 2)
         // Old template: HEADER_ROW and MONTH_START_COL constants
         const headerRow = isNewTemplate ? 6 : HEADER_ROW
-        const monthStartCol = isNewTemplate ? 3 : MONTH_START_COL
+        const monthStartCol = isNewTemplate ? 2 : MONTH_START_COL
 
         let monthCols: number[] = []
         let thisMonthColIdx = -1
@@ -180,70 +187,100 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
           })
         }
 
-        // Resolve unit
+        // Resolve unit -- flagged as "unassigned" only if this sheet
+        // actually turns out to hold real data (checked below, after
+        // parsing): an unused blank template sheet (e.g. a leftover
+        // "Unit 5" slot on a business with only 4 units) still carries
+        // its placeholder instruction text in the unit-name cell, which
+        // would otherwise wrongly read as "an unmatched name" and flag a
+        // sheet the coach never actually used.
         let resolvedUnitName = ''
+        let unitNameUnmatched = false
         if (hasUnits) {
           if (!sheetUnitName) {
-            unassignedSheets.push(sheetName)
+            unitNameUnmatched = true
             resolvedUnitName = units[0]?.name || ''
           } else {
             const match = units.find(u => u.name.trim().toLowerCase() === sheetUnitName.trim().toLowerCase())
             if (match) resolvedUnitName = match.name
-            else { unassignedSheets.push(sheetName); resolvedUnitName = units[0]?.name || '' }
+            else { unitNameUnmatched = true; resolvedUnitName = units[0]?.name || '' }
           }
         }
+        let sheetHadContent = false
 
         if (isNewTemplate) {
-          // New template v7: paired rows
-          // Revenue section starts after 2 header rows (row 8 = section header, row 9 = note)
-          // Row 10 onwards: each product = 2 rows (rev row + cog row)
-          // Product name is in Col A (merged across both rows)
-          // Row type in Col B: "Sales Revenue" or "Cost of Goods"
-          // Data starts Col C (col 3)
-          // Scan rows 10 to 10+(N_REV*2) for revenue section
-          const revSectionStart = 10
-          const N_REV = 8
-
-          for (let i = 0; i < N_REV; i++) {
-            const revRow = revSectionStart + (i * 2)
-            const cogRow = revSectionStart + (i * 2) + 1
-
-            // Name from col A on the revenue row
-            const name = cellStr(pf, `A${revRow}`)
-            if (!name) continue
-
-            const revenue = readVals(revRow)
-            const cogValues = readVals(cogRow)
-
-            // Cost of goods becomes a cost line named "Cost of Goods"
-            const costLines: {name:string,values:number[]}[] = []
-            if (cogValues.some(v => v > 0)) {
-              costLines.push({ name: 'Cost of Goods', values: cogValues })
+          // New template v7: paired rows, starting row 9 (row 8 is the
+          // section header, note in C8; row 9 is the FIRST product's
+          // Sales Revenue row, immediately followed by its Cost of Goods
+          // row). Product name is in Col A on the Sales Revenue row only
+          // (blank on the Cost of Goods row below it). Data starts Col C.
+          //
+          // Reads every product-pair row until hitting the literal
+          // "STAFF COSTS" section header text, rather than assuming a
+          // fixed 8-product count or stopping at the first blank pair --
+          // a business that only filled in 2 of the template's 8 product
+          // slots (real example: a unit selling just two product lines)
+          // leaves slots 3-8 blank in the MIDDLE of the section, not at
+          // the end, so stopping at the first blank pair both missed
+          // nothing here but silently walked the row cursor no further
+          // than that blank pair, which then threw off every section
+          // below it (staff, overheads) that scans forward from wherever
+          // the revenue section left off.
+          const revSectionStart = 9
+          let r = revSectionStart
+          while (r < revSectionStart + 80) {
+            if (cellStr(pf, `A${r}`).toUpperCase().includes('STAFF COSTS')) break
+            const name = cellStr(pf, `A${r}`)
+            const revenue = readVals(r)
+            const cogValues = readVals(r + 1)
+            if (name) {
+              const costLines: {name:string,values:number[]}[] = []
+              if (cogValues.some(v => v > 0)) costLines.push({ name: 'Cost of Goods', values: cogValues })
+              allProducts.push({ name, costLines, revenue, unitName: resolvedUnitName })
+              sheetHadContent = true
             }
-
-            allProducts.push({ name, costLines, revenue, unitName: resolvedUnitName })
+            r += 2
           }
 
-          // Staff section: find it after revenue section
-          // Row 10 + N_REV*2 + 2 (section header + spacer) = staff section
-          const staffSectionStart = revSectionStart + (N_REV * 2) + 2
-          for (let i = 0; i < 4; i++) {
-            const row = staffSectionStart + i
-            const name = cellStr(pf, `A${row}`)
-            const vals = readVals(row)
-            if (name || vals.some(v => v > 0)) {
-              allCommonCosts.push({ name: name || 'Staff', values: vals, unitName: resolvedUnitName })
+          // Staff and overheads sections: every real data row in both has
+          // "Amount" in column B (the section header and blank spacer
+          // rows between sections never do), so that's used as the row
+          // marker rather than a fixed line count -- scan forward past
+          // the header/spacer to find where each section's data starts,
+          // then read every consecutive "Amount" row.
+          function findAmountRow(fromRow: number): number {
+            for (let scan = fromRow; scan < fromRow + 15; scan++) {
+              if (cellStr(pf, `B${scan}`).toUpperCase() === 'AMOUNT') return scan
             }
+            return -1
           }
-
-          // Overheads section
-          const opexSectionStart = staffSectionStart + 4 + 2
-          for (let i = 0; i < 4; i++) {
-            const row = opexSectionStart + i
-            const name = cellStr(pf, `A${row}`)
-            const vals = readVals(row)
-            if (name || vals.some(v => v > 0)) {
-              allCommonCosts.push({ name: name || 'Overheads', values: vals, unitName: resolvedUnitName })
+          function readAmountSection(fromRow: number, fallbackName: string): number {
+            let row = fromRow
+            while (cellStr(pf, `B${row}`).toUpperCase() === 'AMOUNT') {
+              const name = cellStr(pf, `A${row}`)
+              const vals = readVals(row)
+              if (name || vals.some(v => v > 0)) {
+                allCommonCosts.push({ name: name || fallbackName, values: vals, unitName: resolvedUnitName })
+                sheetHadContent = true
+              }
+              row++
+            }
+            return row
+          }
+          // Only read cost lines for a sheet that actually named at least
+          // one product -- the blank template ships with generic
+          // placeholder labels ("Staff / Salaries", "Overheads")
+          // pre-filled even on an unused unit slot, all figures zero;
+          // without this guard an unused "Unit 5" sheet on a 4-unit
+          // business would contribute two harmless-looking but noisy
+          // zero-value cost lines and a spurious "unassigned sheet"
+          // warning for a sheet the coach never touched.
+          if (sheetHadContent) {
+            const staffStart = findAmountRow(r)
+            if (staffStart > 0) {
+              const afterStaff = readAmountSection(staffStart, 'Staff')
+              const opexStart = findAmountRow(afterStaff)
+              if (opexStart > 0) readAmountSection(opexStart, 'Overheads')
             }
           }
 
@@ -259,7 +296,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
               const costName = cellStr(pf, `C${costRow}`)
               if (costName) costLines.push({ name: costName, values: readVals(costRow) })
             }
-            if (name) allProducts.push({ name, costLines, revenue: readVals(revenueRow), unitName: resolvedUnitName })
+            if (name) { allProducts.push({ name, costLines, revenue: readVals(revenueRow), unitName: resolvedUnitName }); sheetHadContent = true }
             row += ROWS_PER_PRODUCT
           }
 
@@ -271,10 +308,12 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
             for (let cl = 0; cl < 4; cl++) {
               const r = commonRow + cl
               const name = cellStr(pf, `C${r}`)
-              if (name) allCommonCosts.push({ name, values: readVals(r), unitName: resolvedUnitName })
+              if (name) { allCommonCosts.push({ name, values: readVals(r), unitName: resolvedUnitName }); sheetHadContent = true }
             }
           }
         }
+
+        if (unitNameUnmatched && sheetHadContent) unassignedSheets.push(sheetName)
       }
 
       if (allProducts.length === 0) throw new Error('No products found. Please name at least one product on a Products & Figures sheet.')
