@@ -81,33 +81,53 @@ const EXPENSE_CATEGORIES=['travel','accommodation','comms','materials','other']
 // co-implementer to only their own folder. The bucket is private, so
 // viewing a receipt always goes through a short-lived signed URL --
 // never a permanent public link -- generated fresh on each click.
-// Last 6 months' portfolio totals -- what was actually issued, not a
-// recomputed draft (drafts are only meaningful for the current open
-// period; past periods should show what really went out).
-function PeriodTrend({invoices,entries}){
+// Cost of delivery, last 6 months, as a stacked-bar chart with months on
+// the horizontal axis. "Cost of delivery" = team time cost (approved days
+// × each person's day rate) + approved expenses, per month -- i.e. what
+// the team actually cost to run that month, not what was invoiced. Only
+// approved timesheet days and approved expenses count (an unapproved day
+// or expense isn't a real cost yet), so this always ties to what you've
+// signed off. Money is summed in each person's own currency; if the team
+// spans currencies the bar heights are still comparable month-to-month
+// but the labelled total shows each currency separately.
+function CostOfDeliveryChart({coImplementers,entries,expenses}){
   const periods=recentPeriods(6).slice().reverse()
+  const rateById=Object.fromEntries(coImplementers.map(ci=>[ci.id,rateOf(ci)]))
+  const months=periods.map(p=>{
+    let time=0,exp=0
+    entries.filter(e=>e.period===p&&e.status==='approved').forEach(e=>{time+=daysFromHours(e.hours)*(rateById[e.co_implementer_id]||0)})
+    expenses.filter(x=>x.period===p&&x.status==='approved').forEach(x=>{exp+=num(x.amount)})
+    return {p,time,exp,total:time+exp}
+  })
+  const cur=curOf(coImplementers[0])
+  const maxV=Math.max(1,...months.map(m=>m.total))
+  const W=640,H=210,padL=40,padR=16,padT=16,padB=40
+  const bw=(W-padL-padR)/months.length
+  const y=v=>padT+(1-(v/maxV))*(H-padT-padB)
   return(
-    <div style={card}>
-      <div style={{...secH,fontSize:'1.16rem'}}>Monthly trend</div>
+    <div style={{...card}}>
+      <div style={{...secH,fontSize:'1.16rem',marginBottom:'0.2rem'}}>Cost of delivery — last 6 months</div>
+      <div style={{...hint,marginBottom:'0.7rem'}}>Approved team time (days × day rate) plus approved expenses, per month.</div>
       <div style={{overflowX:'auto'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
-          <thead><tr style={{background:C.lightBg}}>{['Month','Approved days','Invoices issued','Net invoiced'].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
-          <tbody>
-            {periods.map(p=>{
-              const days=entries.filter(e=>e.period===p&&e.status==='approved').reduce((s,e)=>s+daysFromHours(e.hours),0)
-              const periodInvoices=invoices.filter(i=>i.period===p&&i.status!=='draft')
-              const netByCurrency={}
-              periodInvoices.forEach(i=>{netByCurrency[i.currency||'USD']=(netByCurrency[i.currency||'USD']||0)+num(i.net_amount)})
-              const netStr=Object.entries(netByCurrency).map(([cur,amt])=>fmtMoney(amt,cur)).join(', ')||'—'
-              return(<tr key={p}>
-                <td style={td}>{periodLabel(p)}</td>
-                <td style={td}>{fmtDays(days)}</td>
-                <td style={td}>{periodInvoices.length}</td>
-                <td style={td}>{netStr}</td>
-              </tr>)
-            })}
-          </tbody>
-        </table>
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:'block',minWidth:420}}>
+          <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} style={{stroke:'var(--cv-border-soft)'}}/>
+          {months.map((m,i)=>{
+            const gx=padL+i*bw+bw*0.22, barW=bw*0.56
+            const timeTop=y(m.time), totalTop=y(m.total)
+            return(
+              <g key={m.p}>
+                <rect x={gx} y={timeTop} width={barW} height={Math.max(0,(H-padB)-timeTop)} style={{fill:C.navy}}/>
+                <rect x={gx} y={totalTop} width={barW} height={Math.max(0,timeTop-totalTop)} style={{fill:C.cyan}}/>
+                {m.total>0&&<text x={gx+barW/2} y={totalTop-4} fontSize="9" textAnchor="middle" fontFamily="monospace" style={{fill:C.slate}}>{Math.round(m.total).toLocaleString()}</text>}
+                <text x={gx+barW/2} y={H-padB+16} fontSize="9.5" textAnchor="middle" fontFamily="monospace" style={{fill:C.slate}}>{periodLabel(m.p).split(' ')[0].slice(0,3)}</text>
+              </g>
+            )
+          })}
+        </svg>
+      </div>
+      <div style={{display:'flex',gap:'1.1rem',fontSize:'0.93rem',fontFamily:'monospace',color:C.slate,marginTop:'0.4rem',flexWrap:'wrap'}}>
+        <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:C.navy,marginRight:5,verticalAlign:'middle'}}/>Time cost ({cur})</span>
+        <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:C.cyan,marginRight:5,verticalAlign:'middle'}}/>Approved expenses</span>
       </div>
     </div>
   )
@@ -209,7 +229,7 @@ function AccessSection({coImplementers,setCoImplementers,clients,setMsg}){
   )
 }
 
-export default function TeamPayments({coImplementers=[],setCoImplementers,clients=[],userName='Coach',canApprove=true}){
+export default function TeamPayments({coImplementers=[],setCoImplementers,clients=[],userName='Coach',canApprove=true,canManage=false,updateCI,renderInvite,addMemberNode}){
   const [entries,setEntries]=useState([])
   const [expenses,setExpenses]=useState([])
   const [advances,setAdvances]=useState([])
@@ -241,12 +261,18 @@ export default function TeamPayments({coImplementers=[],setCoImplementers,client
     return ()=>{alive=false}
   },[])
 
-  // ── portfolio-level derived numbers for the selected period ──
-  const periodEntries=entries.filter(e=>e.period===period)
-  const approvedDaysAll=periodEntries.filter(e=>e.status==='approved').reduce((s,e)=>s+daysFromHours(e.hours),0)
+  // ── portfolio-level summary numbers for the selected period ──
+  const activeCount=coImplementers.filter(c=>c.active!==false).length
+  // Outstanding = issued but not yet paid (across all periods -- an unpaid
+  // invoice doesn't stop being outstanding when the month rolls over).
+  const outstandingInvoices=invoices.filter(i=>i.status==='issued')
+  const outstandingTotal=outstandingInvoices.reduce((s,i)=>s+num(i.net_amount),0)
+  // Invoiced this period = net of every non-draft invoice dated to it.
+  const invoicedThisPeriod=invoices.filter(i=>i.period===period&&i.status!=='draft').reduce((s,i)=>s+num(i.net_amount),0)
+  // Uncleared advances = every advance not yet reconciled (not period-scoped).
   const openAdvancesAll=advances.filter(a=>!a.reconciled)
-  const draftNetAll=coImplementers.reduce((s,ci)=>s+Math.max(0,computeDraft(ci,period,entries,expenses,advances).net),0)
-  const issuedThisPeriod=invoices.filter(i=>i.period===period&&i.status!=='draft')
+  const unclearedAdvTotal=openAdvancesAll.reduce((s,a)=>s+num(a.amount),0)
+  const sumCur=curOf(coImplementers[0])
 
   if(loading)return<div style={{padding:'2.5rem',color:C.slate}}>Loading Team &amp; Payments…</div>
   if(error)return(
@@ -260,33 +286,33 @@ export default function TeamPayments({coImplementers=[],setCoImplementers,client
   return(
     <div>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.75rem',marginBottom:'1rem'}}>
-        <div style={secH}>Team &amp; Payments</div>
+        <div style={secH}>Team</div>
         <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
+          {canManage&&addMemberNode}
           <label style={{...lbl,marginBottom:0}}>Period</label>
           <select style={{...inp,width:'auto'}} value={period} onChange={e=>setPeriod(e.target.value)}>
             {Array.from(new Set([period,...recentPeriods(12)])).map(p=><option key={p} value={p}>{periodLabel(p)}</option>)}
           </select>
         </div>
       </div>
-      <p style={{...hint,marginBottom:'1rem'}}>Co-implementers are paid by the day but log hours per task. The platform rolls hours into days ({HOURS_PER_DAY}h = 1 day) at the person's day rate, adds approved expenses, nets off any advance taken, and auto-drafts one invoice per co-implementer per period. An unreconciled advance blocks the next invoice from issuing.</p>
 
+      {/* Summary bar -- the whole team at a glance for the selected period. */}
       {canApprove&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'0.85rem',marginBottom:'1.25rem'}}>
-        <KPI label="Approved days" value={fmtDays(approvedDaysAll)} sub={periodLabel(period)}/>
-        <KPI label="Draft invoices (net)" value={draftNetAll?fmtMoney(draftNetAll,curOf(coImplementers[0])):'—'} sub="across team, this period" color={C.teal}/>
-        <KPI label="Open advances" value={openAdvancesAll.length} sub={openAdvancesAll.length?'blocking invoices':'none outstanding'} color={openAdvancesAll.length?C.amber:C.green}/>
-        <KPI label="Invoices issued" value={issuedThisPeriod.length} sub={periodLabel(period)} color={C.purple}/>
+        <KPI label="Team" value={activeCount} sub={`active co-implementer${activeCount===1?'':'s'}`}/>
+        <KPI label="Outstanding invoices" value={outstandingTotal?fmtMoney(outstandingTotal,sumCur):'—'} sub={outstandingInvoices.length?`${outstandingInvoices.length} issued, not yet paid`:'none outstanding'} color={outstandingInvoices.length?C.amber:C.green}/>
+        <KPI label="Invoiced this period" value={invoicedThisPeriod?fmtMoney(invoicedThisPeriod,sumCur):'—'} sub={periodLabel(period)} color={C.teal}/>
+        <KPI label="Uncleared advances" value={unclearedAdvTotal?fmtMoney(unclearedAdvTotal,sumCur):'—'} sub={openAdvancesAll.length?`${openAdvancesAll.length} outstanding`:'none outstanding'} color={openAdvancesAll.length?C.red:C.green}/>
       </div>}
 
-      {canApprove&&<PeriodTrend invoices={invoices} entries={entries}/>}
-
+      {canApprove&&<CostOfDeliveryChart coImplementers={coImplementers} entries={entries} expenses={expenses}/>}
       {canApprove&&accessMsg&&<div style={{fontSize:'1.01rem',color:C.slate,marginBottom:'0.6rem'}}>{accessMsg}</div>}
-      {canApprove&&<AccessSection coImplementers={coImplementers} setCoImplementers={setCoImplementers} clients={clients} setMsg={setAccessMsg}/>}
 
       {coImplementers.length===0
-        ? <div style={{...card,color:C.slate,textAlign:'center',padding:'2.5rem'}}>{canApprove?'No co-implementers yet. Add them in the Team tab, then set a day rate here.':'Your co-implementer profile could not be found. Contact your coach.'}</div>
+        ? <div style={{...card,color:C.slate,textAlign:'center',padding:'2.5rem'}}>{canApprove?'No co-implementers yet. Add one with the button above.':'Your co-implementer profile could not be found. Contact your coach.'}</div>
         : coImplementers.map(ci=>(
             <CoImplementerPayments
               key={ci.id} ci={ci} period={period} userName={userName} clientName={clientName} clients={clients} canApprove={canApprove}
+              canManage={canManage} updateCI={updateCI} renderInvite={renderInvite}
               entries={entries} setEntries={setEntries}
               expenses={expenses} setExpenses={setExpenses}
               advances={advances} setAdvances={setAdvances}
@@ -318,49 +344,117 @@ function computeDraft(ci,period,entries,expenses,advances){
   return {approvedHours,days,rate,timeAmount,expApproved,openAdvances,openAdvanceTotal,gross,advanceApplied,net,blocked}
 }
 
-function CoImplementerPayments({ci,period,userName,clientName,clients,entries,setEntries,expenses,setExpenses,advances,setAdvances,invoices,setInvoices,canApprove}){
+function CoImplementerPayments({ci,period,userName,clientName,clients,entries,setEntries,expenses,setExpenses,advances,setAdvances,invoices,setInvoices,canApprove,canManage,updateCI,renderInvite}){
   const [tab,setTab]=useState('timesheets')
   const [savingRate,setSavingRate]=useState(false)
   const [rateDraft,setRateDraft]=useState(String(rateOf(ci)||''))
   const [curDraft,setCurDraft]=useState(curOf(ci))
   const [busy,setBusy]=useState(false)
   const [msg,setMsg]=useState(null)
+  const [editingProfile,setEditingProfile]=useState(false)
+  const [pf,setPf]=useState(null)
+  const [addingClient,setAddingClient]=useState(false)
 
   const assignedClients=clients.filter(c=>(ci.client_ids||[]).includes(c.id))
   const d=computeDraft(ci,period,entries,expenses,advances)
   const ciInvoices=invoices.filter(i=>i.co_implementer_id===ci.id).sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''))
   const alreadyIssued=ciInvoices.find(i=>i.period===period&&i.status!=='draft')
+  const issuedByCi=ciInvoices.filter(i=>i.period===period&&i.status!=='draft')
 
   async function saveRate(){
     setSavingRate(true)
-    const patch={day_rate:num(rateDraft),rate_currency:curDraft}
-    const {error}=await supabase.from('co_implementers').update(patch).eq('id',ci.id)
+    const {error}=updateCI?await updateCI(ci.id,{day_rate:num(rateDraft),rate_currency:curDraft}):await supabase.from('co_implementers').update({day_rate:num(rateDraft),rate_currency:curDraft}).eq('id',ci.id)
     setSavingRate(false)
     if(error){setMsg('Could not save rate: '+error.message);return}
-    // reflect locally so the draft recomputes (ci is a prop; mutate view only)
-    ci.day_rate=patch.day_rate;ci.rate_currency=patch.rate_currency
+    ci.day_rate=num(rateDraft);ci.rate_currency=curDraft
     setMsg('Day rate saved.')
+  }
+  function startEditProfile(){setPf({name:ci.name||'',email:ci.email||'',phone:ci.phone||'',country:ci.country||'',specialisation:ci.specialisation||''});setEditingProfile(true)}
+  async function saveProfile(){
+    const {error}=await updateCI(ci.id,pf)
+    if(error){setMsg('Could not save profile: '+error.message);return}
+    Object.assign(ci,pf);setEditingProfile(false);setMsg('Profile saved.')
+  }
+  async function toggleActive(){
+    const next=!(ci.active!==false)
+    const {error}=await updateCI(ci.id,{active:next})
+    if(error){setMsg('Could not update status: '+error.message);return}
+    ci.active=next
+  }
+  async function assignClient(clientId){
+    if(!clientId||(ci.client_ids||[]).includes(clientId))return
+    const next=[...(ci.client_ids||[]),clientId]
+    const {error}=await updateCI(ci.id,{client_ids:next})
+    if(!error)ci.client_ids=next
+    setAddingClient(false)
+  }
+  async function unassignClient(clientId){
+    const next=(ci.client_ids||[]).filter(id=>id!==clientId)
+    const {error}=await updateCI(ci.id,{client_ids:next})
+    if(!error)ci.client_ids=next
   }
 
   return(
     <div style={card}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'1rem',flexWrap:'wrap',marginBottom:'0.75rem'}}>
         <div>
-          <div style={{fontWeight:700,fontSize:'1.16rem',color:C.navy}}>{ci.name}</div>
+          <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexWrap:'wrap'}}>
+            <div style={{fontWeight:700,fontSize:'1.16rem',color:C.navy}}>{ci.name}</div>
+            {canManage
+              ?<button onClick={toggleActive} style={{fontFamily:'monospace',fontSize:'0.85rem',color:ci.active!==false?C.green:C.red,background:'transparent',border:`1px solid ${ci.active!==false?C.green:C.red}`,borderRadius:4,padding:'0.05rem 0.45rem',cursor:'pointer'}}>{ci.active!==false?'Active':'Inactive'}</button>
+              :<Badge text={ci.active!==false?'Active':'Inactive'} color={ci.active!==false?C.green:C.red}/>}
+          </div>
           <div style={{fontSize:'1.01rem',color:C.slate}}>{ci.email}{ci.country?` · ${ci.country}`:''}{ci.specialisation?` · ${ci.specialisation}`:''}</div>
-          <div style={{fontSize:'1.01rem',color:C.slate,marginTop:'0.2rem'}}>Clients: {assignedClients.length?assignedClients.map(c=>c.name).join(', '):'none assigned'}</div>
         </div>
-        <div style={{textAlign:'right'}}>
-          <div style={{fontFamily:'monospace',fontSize:'0.93rem',color:d.rate>0?C.slate:C.amber,marginBottom:'0.3rem'}}>{d.rate>0?`${fmtMoney(d.rate,curOf(ci))}/day`:'no day rate set'}</div>
-          {canApprove&&<div style={{display:'flex',gap:'0.35rem',alignItems:'center',justifyContent:'flex-end'}}>
+        <div style={{textAlign:'right',display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'0.3rem'}}>
+          <div style={{fontFamily:'monospace',fontSize:'0.93rem',color:d.rate>0?C.slate:C.amber}}>{d.rate>0?`${fmtMoney(d.rate,curOf(ci))}/day`:'no day rate set'}</div>
+          {canManage&&<div style={{display:'flex',gap:'0.35rem',alignItems:'center',justifyContent:'flex-end'}}>
             <input style={{...inp,width:90,padding:'0.28rem 0.45rem',fontSize:'1.01rem'}} type="number" value={rateDraft} placeholder="rate" onChange={e=>setRateDraft(e.target.value)}/>
             <select style={{...inp,width:70,padding:'0.28rem 0.35rem',fontSize:'1.01rem'}} value={curDraft} onChange={e=>setCurDraft(e.target.value)}>{['USD','GBP','EUR','UGX','NGN','KES'].map(x=><option key={x}>{x}</option>)}</select>
             <button style={addBtn(true)} disabled={savingRate} onClick={saveRate}>{savingRate?'…':'Set rate'}</button>
           </div>}
+          <div style={{display:'flex',gap:'0.35rem'}}>
+            {canManage&&<button style={addBtn(true)} onClick={()=>editingProfile?setEditingProfile(false):startEditProfile()}>{editingProfile?'Cancel':'Edit profile'}</button>}
+            {renderInvite&&renderInvite(ci)}
+          </div>
         </div>
       </div>
 
-      {/* period draft strip */}
+      {editingProfile&&pf&&(
+        <div style={{...card,border:`1px solid ${C.cyan}`,marginBottom:'0.75rem'}}>
+          <div style={fGrid}>
+            <div><label style={lbl}>Name</label><input style={inp} value={pf.name} onChange={e=>setPf(f=>({...f,name:e.target.value}))}/></div>
+            <div><label style={lbl}>Email</label><input type="email" style={inp} value={pf.email} onChange={e=>setPf(f=>({...f,email:e.target.value}))}/></div>
+            <div><label style={lbl}>Phone</label><input style={inp} value={pf.phone} onChange={e=>setPf(f=>({...f,phone:e.target.value}))}/></div>
+            <div><label style={lbl}>Country</label><input style={inp} value={pf.country} onChange={e=>setPf(f=>({...f,country:e.target.value}))}/></div>
+            <div><label style={lbl}>Specialisation</label><input style={inp} value={pf.specialisation} onChange={e=>setPf(f=>({...f,specialisation:e.target.value}))}/></div>
+          </div>
+          <button style={{...solidBtn(),marginTop:'0.75rem'}} onClick={saveProfile}>Save profile</button>
+        </div>
+      )}
+
+      {/* Assigned clients -- assign/remove inline, no separate access panel. */}
+      <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',alignItems:'center',marginBottom:'0.85rem',fontSize:'1.01rem',color:C.slate}}>
+        <span>Clients:</span>
+        {assignedClients.length===0&&<strong style={{color:C.slate}}>none assigned</strong>}
+        {assignedClients.map(c=><span key={c.id} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.12rem 0.55rem',borderRadius:20,background:'var(--cv-cyan-dim)',color:C.teal,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:'0.3rem'}}>{c.name}{canManage&&<span style={{cursor:'pointer',fontWeight:700}} onClick={()=>unassignClient(c.id)} title="Remove">×</span>}</span>)}
+        {canManage&&(addingClient?(
+          <select autoFocus style={{...inp,width:'auto',fontSize:'0.93rem',padding:'0.15rem 0.4rem'}} value="" onChange={e=>assignClient(e.target.value)} onBlur={()=>setAddingClient(false)}>
+            <option value="">Select a client…</option>
+            {clients.filter(c=>!(ci.client_ids||[]).includes(c.id)).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        ):<button style={addBtn(true)} onClick={()=>setAddingClient(true)}>+ Assign client</button>)}
+      </div>
+
+      {/* The four headline numbers -- one per staff member, this period. */}
+      {canApprove&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:'0.6rem',marginBottom:'0.85rem'}}>
+        <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'0.55rem 0.7rem'}}><div style={{fontFamily:'monospace',fontSize:'0.78rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Approved days</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.22rem',fontWeight:700,color:C.navy}}>{fmtDays(d.days)}</div></div>
+        <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'0.55rem 0.7rem'}}><div style={{fontFamily:'monospace',fontSize:'0.78rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Draft invoice (net)</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.22rem',fontWeight:700,color:C.teal}}>{fmtMoney(d.net,curOf(ci))}</div></div>
+        <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'0.55rem 0.7rem'}}><div style={{fontFamily:'monospace',fontSize:'0.78rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Open advances</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.22rem',fontWeight:700,color:d.openAdvanceTotal?C.red:C.navy}}>{fmtMoney(d.openAdvanceTotal,curOf(ci))}</div></div>
+        <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'0.55rem 0.7rem'}}><div style={{fontFamily:'monospace',fontSize:'0.78rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Invoices issued</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.22rem',fontWeight:700,color:C.purple}}>{issuedByCi.length}</div></div>
+      </div>}
+
+      {/* Invoice math breakdown (time + expenses − advance = net). */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',gap:'0.6rem',padding:'0.7rem 0.85rem',background:C.lightBg,borderRadius:8,marginBottom:'0.85rem',fontSize:'1.01rem'}}>
         <div><div style={hint}>Approved days</div><strong>{fmtDays(d.days)}</strong> <span style={hint}>({d.approvedHours}h)</span></div>
         <div><div style={hint}>Time</div><strong>{fmtMoney(d.timeAmount,curOf(ci))}</strong></div>
