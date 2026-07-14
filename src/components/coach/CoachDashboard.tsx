@@ -58,6 +58,11 @@ function fmtGlance(n,cur){const sym=cur==='USD'?'$':(cur||'')+' ';const abs=Math
 function Kicker({children,style}){return<div style={{fontFamily:'monospace',fontSize:'1.01rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.75rem',...style}}>{children}</div>}
 function GlanceKPI({label,value,sub,color}){return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem',borderLeft:`4px solid ${color||C.navy}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)'}}><div style={{fontFamily:'monospace',fontSize:'1.01rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.4rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.3rem'}}>{sub}</div>}</div>)}
 function GlanceBar({frac,color}){return<div style={{height:6,borderRadius:3,background:'var(--cv-track)',marginTop:'0.75rem',overflow:'hidden'}}><div style={{height:'100%',width:`${Math.round(Math.max(0,Math.min(1,frac||0))*100)}%`,background:color,borderRadius:3}}/></div>}
+// Numbered LEVEL badge + "drilled from" connector -- matches the approved
+// Portfolio Intelligence mockup's Level 1 -> 2 -> 3 drill-down structure
+// (portfolio overview -> filtered segment -> one anonymised business).
+function LevelMarker({n,label,sub}){return(<div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',margin:'1.7rem 0 0.9rem'}}><span style={{fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,color:'var(--cv-on-accent)',background:C.navy,borderRadius:20,padding:'0.15rem 0.7rem'}}>LEVEL {n}</span><span style={{fontFamily:'Georgia,serif',fontSize:'1.08rem',fontWeight:700,color:C.navy}}>{label}</span>{sub&&<span style={{color:C.slate,fontSize:'0.86rem'}}>{sub}</span>}</div>)}
+function DrillConnector({children}){return<div style={{display:'flex',justifyContent:'center',textAlign:'center',padding:'0.25rem 0',color:C.teal,fontSize:'0.92rem',fontFamily:'monospace'}}>{children}</div>}
 function RevenueStreamCard({label,value,description,tag,barFrac,currency,color}){return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem',borderTop:`3px solid ${color}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.22rem',fontWeight:700,color:C.navy}}>{label}</div><div style={{fontSize:'1.07rem',color:C.slate,margin:'0.15rem 0 0.7rem'}}>{description}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>{fmtGlance(value,currency)}</div><Badge text={tag} color={color}/><GlanceBar frac={barFrac} color={color}/></div>)}
 const DEAL_STAGE_META={conversation:{label:'Early conversation',color:C.slate},scoping:{label:'Scoping',color:C.cyan},proposal:{label:'Proposal · deciding',color:C.amber},won:{label:'Won · in delivery',color:C.green},lost:{label:'Lost',color:C.red}}
 function DealPipelineCard({deal}){const meta=DEAL_STAGE_META[deal.stage]||{label:deal.stage,color:C.slate};return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem',borderTop:`3px solid ${meta.color}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.22rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>{deal.name}</div><div style={{fontSize:'1.01rem',color:C.slate,marginBottom:'0.5rem'}}>{deal.subtitle}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>{fmtGlance(deal.value,deal.currency)}</div><Badge text={meta.label} color={meta.color}/><GlanceBar frac={deal.barFrac} color={meta.color}/></div>)}
@@ -1102,7 +1107,10 @@ function PortfolioIntelligenceHub({clients,programmes}){
       </div>
       {showAccess&&<ExternalAccessPanel portfolioFilter={hasFilter?filter:undefined} clients={clients} programmes={programmes} onClose={()=>setShowAccess(false)}/>}
 
-      {hasFilter&&<div style={{fontSize:'0.9rem',color:C.slate,marginBottom:'0.5rem'}}>Showing {view.totalBusinesses} of {portfolio.totalBusinesses} businesses matching this filter, compared against the full portfolio below.</div>}
+      {hasFilter&&(
+        <DrillConnector>↓ filtered to {[filter.programmeId&&(programmesById[filter.programmeId]?.name||'a programme'),filter.sector,filter.country,filter.readinessStage&&READINESS_STAGE_LABELS[filter.readinessStage]].filter(Boolean).join(' · ')} ↓</DrillConnector>
+      )}
+      <LevelMarker n={hasFilter?2:1} label={hasFilter?'Segment view':'Portfolio overview'} sub={hasFilter?`${view.totalBusinesses} of ${portfolio.totalBusinesses} businesses portfolio-wide`:'every financial business on the platform'}/>
 
       <div className="cv-grid-4" style={{marginBottom:'1.25rem'}}>
         <GlanceKPI label="Businesses" value={String(view.totalBusinesses)} sub={hasFilter?`of ${portfolio.totalBusinesses} portfolio-wide`:'on platform'} color={C.navy}/>
@@ -1198,8 +1206,9 @@ function PortfolioIntelligenceHub({clients,programmes}){
         </div>
       )}
 
+      <DrillConnector>↓ individual businesses within this view ↓</DrillConnector>
+      <LevelMarker n={3} label="Individual businesses" sub="click one to drill in"/>
       <div style={card}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.3rem'}}>Individual business profiles</div>
         <div style={{fontSize:'0.85rem',color:C.slate,marginBottom:'0.8rem'}}>Anonymised by default -- a business only shows its real name here once its owner has explicitly consented (toggled from the Client Health tab).</div>
         <div className="cv-grid-3">
           {(data.profiles||[]).map(p=>(
@@ -1221,6 +1230,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
           <div style={{...card,maxWidth:640,width:'100%',maxHeight:'85vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.9rem'}}>
               <div>
+                <span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,color:'var(--cv-on-accent)',background:C.navy,borderRadius:20,padding:'0.1rem 0.6rem',marginBottom:'0.4rem',display:'inline-block'}}>LEVEL 3</span>
                 <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>{openProfile.displayName}{openProfile.isNamed&&<span style={{marginLeft:'0.5rem'}}><Badge text="Verified" color={C.green}/></span>}</div>
                 <div style={{fontSize:'0.92rem',color:C.slate,marginTop:'0.2rem'}}>{openProfile.sector||'Sector n/a'} · {openProfile.country||'Country n/a'} · {openProfile.sizeBracket}</div>
               </div>
