@@ -1663,7 +1663,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 2 — Define Business Units</div><p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.7,margin:0}}>In Settings, add business units. Set each unit type: product, service, or aggregator.</p></div>
           <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 3 — Enter the Plan</div><p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.7,margin:0}}>Go to Planning to add revenue and cost lines. Enter monthly figures for the full planning period.</p></div>
         </div>
-        <div style={card}><TabCover client={selClient} prog={prog} onUpdate={updates=>updateClient(selClient.id,updates)}/></div>
+        <div style={card}><TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/></div>
       </div>
     )
 
@@ -1723,7 +1723,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 
           {/* Main content area */}
           <div>
-            {activeTab==='cover'&&<TabCover client={selClient} prog={prog} onUpdate={updates=>updateClient(selClient.id,updates)}/>}
+            {activeTab==='cover'&&<TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/>}
             {activeTab==='how_to_start'&&<TabHowToStart client={selClient}/>}
             {activeTab==='coach_ref'&&canViewCoachGuidance(userRole)&&<TabCoachRef/>}
             {activeTab==='ip_framework'&&<TabIPFramework/>}
@@ -1828,7 +1828,20 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   function TeamView(){
     const [showNew,setShowNew]=useState(false)
     const [addingClientFor,setAddingClientFor]=useState(null)
+    const [editingCiId,setEditingCiId]=useState(null)
+    const [editForm,setEditForm]=useState(null)
     const [teamMsg,setTeamMsg]=useState(null)
+    // Real profile edit -- name/email/phone/country/specialisation were
+    // only ever set once at creation (NewCIForm) with no way to change any
+    // of them again anywhere in the app, not even here where rate already
+    // was editable.
+    function startEditCi(ci){setEditForm({name:ci.name||'',email:ci.email||'',phone:ci.phone||'',country:ci.country||'',specialisation:ci.specialisation||''});setEditingCiId(ci.id)}
+    async function saveCiProfile(ciId){
+      const {error}=await supabase.from('co_implementers').update(editForm).eq('id',ciId)
+      if(error)return setTeamMsg('Could not save profile: '+error.message)
+      setCoImplementers(prev=>prev.map(x=>x.id!==ciId?x:{...x,...editForm}))
+      setEditingCiId(null);setEditForm(null)
+    }
     const pendingTs=timesheets.filter(t=>t.status==='submitted')
     async function approveTs(id){await supabase.from('timesheets').update({status:'approved',approved_by:userName,approved_at:new Date().toISOString()}).eq('id',id);setTimesheets(prev=>prev.map(t=>t.id!==id?t:{...t,status:'approved'}))}
     async function rejectTs(id){await supabase.from('timesheets').update({status:'rejected'}).eq('id',id);setTimesheets(prev=>prev.map(t=>t.id!==id?t:{...t,status:'rejected'}))}
@@ -1895,9 +1908,22 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                   ?<button onClick={()=>toggleActive(ci)} title="Click to toggle" style={{fontFamily:'monospace',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem',background:'transparent',border:`1px solid ${ci.active?C.green:C.red}`,borderRadius:4,padding:'0.1rem 0.5rem',cursor:'pointer'}}>{ci.active?'Active':'Inactive'} · click to {ci.active?'suspend':'reactivate'}</button>
                   :<div style={{fontFamily:'monospace',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem'}}>{ci.active?'Active':'Inactive'}</div>}
                 {ci.rate_per_day>0&&<div style={{fontSize:'0.93rem',color:C.slate,marginBottom:'0.4rem',marginTop:'0.3rem'}}>{ci.currency} {Number(ci.rate_per_day).toLocaleString()}/day</div>}
+                {canManageTeam(userRole)&&<button style={{...addBtn(true),marginBottom:'0.4rem'}} onClick={()=>editingCiId===ci.id?setEditingCiId(null):startEditCi(ci)}>{editingCiId===ci.id?'Cancel':'Edit profile'}</button>}
                 <InviteLoginButton email={ci.email} fullName={ci.name} role="coach" coImplementerId={ci.id} funderProgrammeId={null}/>
               </div>
             </div>
+            {editingCiId===ci.id&&editForm&&(
+              <div style={{...card,border:`1px solid ${C.cyan}`,marginBottom:'0.75rem'}}>
+                <div style={fGrid}>
+                  <div><label style={lbl}>Name</label><input style={inp} value={editForm.name} onChange={e=>setEditForm(f=>({...f,name:e.target.value}))}/></div>
+                  <div><label style={lbl}>Email</label><input type="email" style={inp} value={editForm.email} onChange={e=>setEditForm(f=>({...f,email:e.target.value}))}/></div>
+                  <div><label style={lbl}>Phone</label><input style={inp} value={editForm.phone} onChange={e=>setEditForm(f=>({...f,phone:e.target.value}))}/></div>
+                  <div><label style={lbl}>Country</label><input style={inp} value={editForm.country} onChange={e=>setEditForm(f=>({...f,country:e.target.value}))}/></div>
+                  <div><label style={lbl}>Specialisation</label><input style={inp} value={editForm.specialisation} onChange={e=>setEditForm(f=>({...f,specialisation:e.target.value}))}/></div>
+                </div>
+                <button style={{...solidBtn(),marginTop:'0.75rem'}} onClick={()=>saveCiProfile(ci.id)}>Save profile</button>
+              </div>
+            )}
             <div style={{display:'flex',gap:'1.5rem',fontSize:'1.01rem',color:C.slate,marginBottom:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
               <span style={{display:'flex',alignItems:'center',gap:'0.4rem',flexWrap:'wrap'}}>Clients:{(ci.client_ids||[]).length===0?<strong style={{color:C.slate}}>None</strong>:(ci.client_ids||[]).map(id=><span key={id} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.12rem 0.55rem',borderRadius:20,background:'var(--cv-cyan-dim)',color:C.teal,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:'0.3rem'}}>{clients.find(c=>c.id===id)?.name||id}{canManageTeam(userRole)&&<span style={{cursor:'pointer',fontWeight:700}} onClick={()=>unassignClient(ci,id)} title="Remove this client">×</span>}</span>)}</span>
               {canManageTeam(userRole)&&(addingClientFor===ci.id?(
@@ -2029,16 +2055,17 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 // TAB CONTENT COMPONENTS
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
-function TabCover({client,prog,onUpdate}){
+function TabCover({client,prog,programmes,onUpdate}){
   const [editing,setEditing]=useState(false)
   const [form,setForm]=useState({...client})
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 1 \u2014 Cover</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn(true)} onClick={()=>setEditing(!editing)}>{editing?'Cancel':'Edit'}</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 1 \u2014 Cover</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn(true)} onClick={()=>{setForm({...client});setEditing(!editing)}}>{editing?'Cancel':'Edit'}</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       {editing?(
         <div style={card}>
           <div style={fGrid}>
             <div><label style={lbl}>Organisation Name</label><input style={inp} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></div>
+            <div><label style={lbl}>Programme</label><select style={inp} value={form.programme_id||''} onChange={e=>setForm(f=>({...f,programme_id:e.target.value||null}))}><option value="">No programme (independent \u00b7 self-paying)</option>{(programmes||[]).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
             <div><label style={lbl}>Contact Name</label><input style={inp} value={form.contact_name} onChange={e=>setForm(f=>({...f,contact_name:e.target.value}))}/></div>
             <div><label style={lbl}>Contact Email</label><input style={inp} value={form.contact_email} onChange={e=>setForm(f=>({...f,contact_email:e.target.value}))}/></div>
             <div><label style={lbl}>Country</label><input style={inp} value={form.country} onChange={e=>setForm(f=>({...f,country:e.target.value}))}/></div>
