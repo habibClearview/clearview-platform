@@ -15,14 +15,17 @@
 // field, never the underlying data.
 //
 // POST is the actual redemption: requires the recipient's email if the
-// coach set one on the grant (emailSatisfiesGrant), then returns either
-// the Investment Brief document (scope_type 'client') or the portfolio/
-// segment aggregation data as JSON (scope_type 'portfolio' | 'segment').
+// coach set one on the grant (emailSatisfiesGrant), then returns a Word
+// document in every case -- the Investment Brief for a 'client' grant,
+// or the Portfolio Intelligence brief for a 'portfolio'/'segment' grant
+// (the exact same document, and the exact same builder, a coach can
+// download for themselves from /api/portfolio-brief).
 // ============================================================
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { buildInvestmentBrief } from '@/lib/investment-brief-builder'
 import { loadAllClientSnapshots, buildPortfolioViewData } from '@/lib/portfolio-snapshot-loader'
+import { buildPortfolioBrief } from '@/lib/portfolio-brief-builder'
 import { isGrantActive, grantStatus, emailSatisfiesGrant, requiresEmailConfirmation, GRANT_TYPE_LABELS, GRANT_SCOPE_LABELS, type GrantSegmentFilter } from '@/lib/access-grants'
 import type { SegmentFilter } from '@/lib/portfolio-intelligence'
 
@@ -116,7 +119,14 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     const snapshots = await loadAllClientSnapshots(admin)
     const filter: SegmentFilter | null = grant.scope_type === 'segment' ? (grant.segment_filter || null) : null
     const data = buildPortfolioViewData(snapshots, filter)
-    return NextResponse.json({ ...data, scopeType: grant.scope_type, scopeFilter: filter })
+    const { buffer, fileName } = await buildPortfolioBrief(data, grant.scope_type as 'portfolio' | 'segment', filter)
+    return new NextResponse(new Uint8Array(buffer), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'Content-Disposition': `attachment; filename="${fileName}"`,
+      },
+    })
   } catch (err: any) {
     console.error('Access grant redemption error:', err)
     return NextResponse.json({ error: err.message || 'An unexpected error occurred' }, { status: err.status || 500 })
