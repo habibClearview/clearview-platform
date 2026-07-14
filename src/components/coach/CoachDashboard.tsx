@@ -450,12 +450,21 @@ function ClientHealthTab({clients,programmes,onUpdateClient}){
   const activeCount=clients.filter(c=>c.status!=='complete'&&c.status!=='paused').length
   const pausedCount=clients.filter(c=>c.status==='paused').length
   const completedCount=clients.filter(c=>c.status==='complete').length
+  // Who pays vs who is served (docs/gtcv/README.md): a programme_id means a
+  // donor programme is the budget holder for this engagement -- the
+  // organisation itself is a served beneficiary, not a paying client. Only
+  // entries with no programme_id are self-paying. Previously every row here
+  // was labelled "Client" regardless, which is what read as wrong to an
+  // actual coach with one paying client (a programme) and several
+  // beneficiary businesses served under it.
+  const payingCount=clients.filter(c=>!c.programme_id).length
+  const beneficiaryPayerCount=clients.filter(c=>!!c.programme_id).length
 
   return(
     <div>
       <Kicker>Portfolio at a glance</Kicker>
       <div className="cv-grid-4" style={{marginBottom:'1.5rem'}}>
-        <GlanceKPI label="Portfolio Clients" value={String(clients.length)} sub={`${canvasClients.length} GtCV · ${financialClients.length} Clearview`} color={C.navy}/>
+        <GlanceKPI label="Portfolio" value={String(clients.length)} sub={`${payingCount} paying client${payingCount===1?'':'s'} · ${beneficiaryPayerCount} beneficiar${beneficiaryPayerCount===1?'y':'ies'} served`} color={C.navy}/>
         <GlanceKPI label="Active" value={String(activeCount)} sub="currently engaged" color={C.green}/>
         <GlanceKPI label="Paused" value={String(pausedCount)} sub={pausedCount>0?'not currently responsive':'none paused'} color={pausedCount>0?C.red:C.slate}/>
         <GlanceKPI label="Completed" value={String(completedCount)} sub="engagement closed" color={C.teal}/>
@@ -468,7 +477,7 @@ function ClientHealthTab({clients,programmes,onUpdateClient}){
 
       {flagged.length>0&&(
         <div style={{...card,border:'1px solid #F1C9C2',borderLeft:`4px solid ${C.red}`}}>
-          <div style={{fontWeight:700,fontSize:'1.02rem',color:C.red,marginBottom:'0.7rem'}}>⚠ {flagged.length} client{flagged.length===1?'':'s'} flagged this week</div>
+          <div style={{fontWeight:700,fontSize:'1.02rem',color:C.red,marginBottom:'0.7rem'}}>⚠ {flagged.length} flagged this week</div>
           {flagged.map(c=>{
             const report=reportByClient[c.id]
             const status=healthStatusFromReportText(report?.report_text)
@@ -490,7 +499,7 @@ function ClientHealthTab({clients,programmes,onUpdateClient}){
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem',flexWrap:'wrap',gap:'0.5rem'}}>
             <div>
               <div style={{fontFamily:'Georgia,serif',fontSize:'1.32rem',fontWeight:700,color:C.navy}}>{g.programme?g.programme.name:'Independent clients'}</div>
-              <div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.15rem'}}>{g.programme?[g.programme.funder,g.programme.country].filter(Boolean).join(' · '):'Self-paying, no programme'} · {g.clients.length} client{g.clients.length===1?'':'s'}</div>
+              <div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.15rem'}}>{g.programme?[g.programme.funder,g.programme.country].filter(Boolean).join(' · '):'Self-paying, no programme'} · {g.programme?`${g.clients.length} beneficiar${g.clients.length===1?'y':'ies'} served -- ${g.programme.name} is the paying client`:`${g.clients.length} paying client${g.clients.length===1?'':'s'}`}</div>
             </div>
           </div>
           <div className="cv-grid-3">
