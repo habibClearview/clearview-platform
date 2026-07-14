@@ -18,7 +18,7 @@
 // ============================================================
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { dealFunnel, clientCountForProgramme, programmeCanvasSpread, canvasProgress, revenueStreams, weightedPipelineValue } from '@/lib/coach-business-metrics'
+import { clientCountForProgramme, programmeCanvasSpread, canvasProgress } from '@/lib/coach-business-metrics'
 
 const C = {
   navy:'var(--cv-navy)', cyan:'var(--cv-cyan)', cream:'var(--cv-cream)', white:'var(--cv-card)',
@@ -58,7 +58,6 @@ const DEAL_STAGES=[
   {id:'lost',label:'Lost',color:C.red},
 ]
 const stageMeta=(id)=>DEAL_STAGES.find(s=>s.id===id)||{id:id||'—',label:id||'No stage',color:C.slate}
-const OPEN_STAGES=['conversation','scoping','proposal']
 
 // fees
 const FEE_STATUSES=[
@@ -68,22 +67,13 @@ const FEE_STATUSES=[
 ]
 const feeMeta=(id)=>FEE_STATUSES.find(s=>s.id===id)||{id:id||'—',label:id||'Not set',color:C.slate}
 
+// Single view, no nested sub-tabs -- the Pipeline main-nav tab renders
+// straight into this. ("Engagement fees" and the old programme directory
+// view are no longer reachable from here -- see EngagementFees/ProgrammesView
+// in this file / CoachDashboard.tsx, both still defined, just not wired
+// into this tab any more.)
 export default function DealsAndFees({programmes=[],setProgrammes,clients=[],setClients,onWinDeal}){
-  const [view,setView]=useState('deals')
-  return(
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.75rem',marginBottom:'1rem'}}>
-        <div style={secH}>Programmes &amp; Deals</div>
-        <div style={{display:'flex',gap:'0.4rem'}}>
-          <button style={subPill(view==='deals')} onClick={()=>setView('deals')}>Deals pipeline (who pays)</button>
-          <button style={subPill(view==='fees')} onClick={()=>setView('fees')}>Engagement fees (who is served)</button>
-        </div>
-      </div>
-      {view==='deals'
-        ? <DealsPipeline programmes={programmes} setProgrammes={setProgrammes} clients={clients} onWinDeal={onWinDeal}/>
-        : <EngagementFees clients={clients} setClients={setClients} programmes={programmes}/>}
-    </div>
-  )
+  return <DealsPipeline programmes={programmes} setProgrammes={setProgrammes} clients={clients} onWinDeal={onWinDeal}/>
 }
 
 // New programme, reachable directly from the deals pipeline -- previously
@@ -111,7 +101,6 @@ function NewProgrammeForm({onSave,onCancel}){
 }
 
 // ─── DEALS PIPELINE ──────────────────────────────────────────
-const FUNNEL_STAGE_META={conversation:{label:'Proposal Sent',color:C.slate},scoping:{label:'Interview Stage',color:C.cyan},proposal:{label:'Negotiation',color:C.amber},won:{label:'Won',color:C.green}}
 const DEAL_SERVICE_OPTIONS=[
   {key:'advisory',label:'Advisory'},
   {key:'canvas',label:'GtCV Canvas'},
@@ -147,20 +136,8 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
   },[programmes,clients])
 
   const cur=programmes.find(p=>p.deal_currency)?.deal_currency||'USD'
-  const openDeals=programmes.filter(p=>OPEN_STAGES.includes(p.deal_stage))
-  const openValue=openDeals.reduce((s,p)=>s+num(p.deal_value),0)
-  // Uses the same per-stage fallback the deal card's own probability bar
-  // uses -- previously this treated any deal with no probability entered as
-  // worth exactly $0, silently disagreeing with the card showing that same
-  // deal at (say) 65% likely.
-  const weighted=weightedPipelineValue(openDeals)
-  const wonValue=programmes.filter(p=>p.deal_stage==='won').reduce((s,p)=>s+num(p.deal_value),0)
-  const funnel=dealFunnel(programmes)
-  const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
-  const revStreams=revenueStreams(clients,programmesById)
-  const independentStreams=revStreams.streams.filter(s=>s.key!=='programme_advisory')
 
-  // Every field editable directly on its own card -- no click-to-open a
+  // Every field editable directly on its own block -- no click-to-open a
   // separate form. Updates local state immediately (so the input never
   // feels laggy) and persists the same patch to Supabase right away.
   async function updateDeal(id,patch){
@@ -171,50 +148,16 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
 
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'1rem',marginBottom:'1rem'}}>
-        <p style={{...hint,margin:0}}>The programme is the paying customer (the budget holder). Track each programme deal through the pipeline; weighted value = deal value × probability for open stages.</p>
-        <button style={{...addBtn(),whiteSpace:'nowrap'}} onClick={()=>setShowNew(!showNew)}>+ New Programme</button>
+      <div style={{background:C.navy,color:'var(--cv-on-accent)',borderRadius:'10px 10px 0 0',padding:'0.95rem 1.4rem',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem'}}>
+        <div style={{fontFamily:'Georgia,serif',fontWeight:700,fontSize:'1.05rem'}}>Pipeline</div>
+        <button onClick={()=>setShowNew(!showNew)} style={{fontFamily:'monospace',fontSize:'0.85rem',fontWeight:700,background:'var(--cv-cyan)',border:'none',color:'var(--cv-on-accent)',borderRadius:6,padding:'0.4rem 0.9rem',cursor:'pointer'}}>+ New Prospect</button>
       </div>
+      <div style={{border:'1px solid var(--cv-border-soft)',borderTop:'none',borderRadius:'0 0 10px 10px',padding:'1.2rem',background:C.white}}>
       {showNew&&<NewProgrammeForm onSave={createProgramme} onCancel={()=>setShowNew(false)}/>}
-
-      <div style={{fontFamily:'monospace',fontSize:'0.93rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.6rem'}}>Pipeline · programme contracts</div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'0.6rem',marginBottom:'1.25rem'}}>
-        {funnel.stages.map(s=>{
-          const meta=FUNNEL_STAGE_META[s.stage]
-          return(
-            <div key={s.stage} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:10,padding:'0.7rem 0.8rem',borderTop:`4px solid ${meta.color}`}}>
-              <div style={{fontFamily:'monospace',fontSize:'0.81rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>{meta.label}</div>
-              <div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,margin:'0.15rem 0',color:C.navy}}>{s.count}</div>
-              <div style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.slate}}>{fmtMoney(s.value,s.currency)}</div>
-            </div>
-          )
-        })}
-        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:10,padding:'0.7rem 0.8rem',borderTop:`4px solid ${C.navy}`}}>
-          <div style={{fontFamily:'monospace',fontSize:'0.81rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Conversion</div>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,margin:'0.15rem 0',color:C.navy}}>{Math.round(funnel.conversionPct*100)}%</div>
-          <div style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.slate}}>won / closed</div>
-        </div>
-      </div>
-
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:'0.85rem',marginBottom:'1.25rem'}}>
-        <KPI label="Open pipeline" value={fmtMoney(openValue,cur)} sub={`${openDeals.length} open deal${openDeals.length!==1?'s':''}`}/>
-        <KPI label="Weighted" value={fmtMoney(weighted,cur)} sub="value × probability (or a stage default, if not set)" color={C.teal}/>
-        <KPI label="Won" value={fmtMoney(wonValue,cur)} sub={`${programmes.filter(p=>p.deal_stage==='won').length} won`} color={C.green}/>
-        <KPI label="Programmes" value={programmes.length} sub="total tracked" color={C.purple}/>
-      </div>
-
-      {independentStreams.some(s=>s.value>0)&&(<>
-        <div style={{fontFamily:'monospace',fontSize:'0.93rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.6rem'}}>Independent revenue <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>· not programme deals -- self-paying clients, tracked here for the full revenue picture</span></div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'0.85rem',marginBottom:'1.25rem'}}>
-          {independentStreams.map(s=><KPI key={s.key} label={s.label} value={fmtMoney(s.value,cur)} sub={s.description} color={s.key==='clearview_subscriptions'?C.teal:C.purple}/>)}
-        </div>
-      </>)}
-
       {msg&&<div style={{fontSize:'1.01rem',color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
 
-      <div style={{fontFamily:'monospace',fontSize:'0.93rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.6rem'}}>All programme deals <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>· stage, value, currency, probability, and close date are all editable right here -- no separate edit screen</span></div>
       {programmes.length===0
-        ? <div style={{...hint,padding:'0.5rem 0'}}>No programmes yet.</div>
+        ? <div style={{...hint,padding:'0.5rem 0'}}>No prospects yet.</div>
         : programmes.map(p=>{
           const meta=stageMeta(p.deal_stage)
           const lsps=clientCountForProgramme(p.id,clients)
@@ -279,6 +222,7 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
             </div>
           )
         })}
+      </div>
     </div>
   )
 }

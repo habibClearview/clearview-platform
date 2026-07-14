@@ -1161,7 +1161,6 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // note of what was won -- lifted to the top level (not local to
   // ClientsView) for the same remount-safety reason as clientsService.
   const [newClientPrefill,setNewClientPrefill]=useState(null)
-  const [programmesSub,setProgrammesSub]=useState('pipeline')
   // Light/dark theme -- same 'cv-theme' localStorage key and
   // document.documentElement.dataset.theme mechanism GenericDashboard
   // uses, so a coach's choice here and a client's choice there share one
@@ -1877,27 +1876,22 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   function ClientsHub(){
     return <ClientsView/>
   }
+  // Single view, no sub-tabs -- just the pipeline itself. (The old
+  // programme directory -- editing a programme's funder/country/dates --
+  // is no longer reachable from here; ProgrammesView below is still
+  // defined but unused, in case that capability needs a new home.)
   function ProgrammesHub(){
-    const sub=programmesSub, setSub=setProgrammesSub
-    return(
-      <div>
-        <div style={{display:'flex',gap:'0.4rem',marginBottom:'1.25rem'}}>
-          <button style={subPill(sub==='pipeline')} onClick={()=>setSub('pipeline')}>Pipeline &amp; fees</button>
-          <button style={subPill(sub==='directory')} onClick={()=>setSub('directory')}>All programmes</button>
-        </div>
-        {sub==='pipeline'?<DealsAndFees programmes={programmes} setProgrammes={setPrograms} clients={clients} setClients={setClients} onWinDeal={p=>{
-          const services=p.deal_services||[]
-          const engagementMode=services.includes('canvas')?'canvas':services.includes('financial')?'financial':'canvas'
-          // A direct/independent prospect IS the beneficiary -- pre-fill their
-          // name too. A donor programme's beneficiary isn't known yet (the
-          // deal was with the funder, not a named enterprise), so only the
-          // programme link and a note carry over.
-          const namePrefill=p.type==='donor_programme'?'':p.name
-          setNewClientPrefill({programme_id:p.id,name:namePrefill,engagement_mode:engagementMode,notes:`Won via Pipeline · ${p.name}`})
-          setView('clients')
-        }}/>:<ProgrammesView/>}
-      </div>
-    )
+    return <DealsAndFees programmes={programmes} setProgrammes={setPrograms} clients={clients} setClients={setClients} onWinDeal={p=>{
+      const services=p.deal_services||[]
+      const engagementMode=services.includes('canvas')?'canvas':services.includes('financial')?'financial':'canvas'
+      // A direct/independent prospect IS the beneficiary -- pre-fill their
+      // name too. A donor programme's beneficiary isn't known yet (the
+      // deal was with the funder, not a named enterprise), so only the
+      // programme link and a note carry over.
+      const namePrefill=p.type==='donor_programme'?'':p.name
+      setNewClientPrefill({programme_id:p.id,name:namePrefill,engagement_mode:engagementMode,notes:`Won via Pipeline · ${p.name}`})
+      setView('clients')
+    }}/>
   }
   function TeamHub(){
     const sub=teamSub, setSub=setTeamSub
