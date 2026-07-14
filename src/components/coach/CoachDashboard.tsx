@@ -137,7 +137,7 @@ const HEALTH_COLOR={'Needs attention':C.red,'Watch':C.amber,'Healthy':C.green,'R
 // the same /api/investment-pitch route the client dashboard already used;
 // no new endpoint, no new data access, just a different, coach-controlled
 // place to trigger it from.
-function ClientDocumentActions({clientId,clientName}){
+function ClientDocumentActions({clientId,clientName,clients,programmes}){
   const [downloading,setDownloading]=useState(false)
   const [error,setError]=useState('')
   const [showAccess,setShowAccess]=useState(false)
@@ -170,7 +170,7 @@ function ClientDocumentActions({clientId,clientName}){
         onClick={()=>setShowAccess(true)}
       >🔗 External Access</button>
       {error&&<div style={{width:'100%',fontSize:'0.78rem',color:C.red}}>{error}</div>}
-      {showAccess&&<ExternalAccessPanel clientId={clientId} clientName={clientName} onClose={()=>setShowAccess(false)}/>}
+      {showAccess&&<ExternalAccessPanel clientId={clientId} clientName={clientName} clients={clients} programmes={programmes} onClose={()=>setShowAccess(false)}/>}
     </div>
   )
 }
@@ -193,7 +193,7 @@ function ClientDocumentActions({clientId,clientName}){
 // 'client' scope isn't offered (there's no specific client to attach it
 // to) and portfolioFilter, if the coach had a filter active there, is
 // used to prefill the segment fields and default scope to 'segment'.
-function ExternalAccessPanel({clientId,clientName,portfolioFilter,onClose}){
+function ExternalAccessPanel({clientId,clientName,portfolioFilter,clients,programmes,onClose}){
   const [grants,setGrants]=useState([])
   const [loading,setLoading]=useState(true)
   const [name,setName]=useState('')
@@ -204,9 +204,21 @@ function ExternalAccessPanel({clientId,clientName,portfolioFilter,onClose}){
   const [segSector,setSegSector]=useState(portfolioFilter?.sector||'')
   const [segCountry,setSegCountry]=useState(portfolioFilter?.country||'')
   const [segStage,setSegStage]=useState(portfolioFilter?.readinessStage||'')
+  const [segProgrammeId,setSegProgrammeId]=useState(portfolioFilter?.programmeId||'')
   const [saving,setSaving]=useState(false)
   const [error,setError]=useState('')
   const [copiedId,setCopiedId]=useState(null)
+
+  // Real distinct values from the coach's own client list, not free text --
+  // a coach typing "Kenya" against a record stored as "kenya " (or any
+  // other mismatch) would silently match nothing, since matchesFilter()
+  // in portfolio-intelligence.ts is an exact string comparison. Sourcing
+  // the dropdown options from the same data being filtered guarantees
+  // whatever's picked here actually exists to match against.
+  const financialClients=(clients||[]).filter(c=>c.engagement_mode==='financial')
+  const sectorOptions=Array.from(new Set(financialClients.map(c=>c.sector).filter(Boolean))).sort()
+  const countryOptions=Array.from(new Set(financialClients.map(c=>c.country).filter(Boolean))).sort()
+  const programmesById=Object.fromEntries((programmes||[]).map(p=>[p.id,p]))
 
   const load=useCallback(()=>{
     setLoading(true)
@@ -221,8 +233,8 @@ function ExternalAccessPanel({clientId,clientName,portfolioFilter,onClose}){
     if(!name.trim()){setError('Enter a name for who this link is for.');return}
     setSaving(true); setError('')
     const {data:{user}}=await supabase.auth.getUser()
-    const segmentFilter=scope==='segment'?Object.fromEntries(Object.entries({sector:segSector.trim()||undefined,country:segCountry.trim()||undefined,readinessStage:segStage||undefined}).filter(([,v])=>v!==undefined)):null
-    if(scope==='segment'&&Object.keys(segmentFilter).length===0){setError('Choose at least one segment filter (sector, country, or readiness stage).');setSaving(false);return}
+    const segmentFilter=scope==='segment'?Object.fromEntries(Object.entries({sector:segSector||undefined,country:segCountry||undefined,programmeId:segProgrammeId||undefined,readinessStage:segStage||undefined}).filter(([,v])=>v!==undefined)):null
+    if(scope==='segment'&&Object.keys(segmentFilter).length===0){setError('Choose at least one segment filter (sector, country, programme, or readiness stage).');setSaving(false);return}
     const row={
       client_id:scope==='client'?clientId:null,
       scope_type:scope,
@@ -259,7 +271,7 @@ function ExternalAccessPanel({clientId,clientName,portfolioFilter,onClose}){
   function segmentDescription(g){
     if(g.scope_type!=='segment'||!g.segment_filter)return null
     const f=g.segment_filter
-    return [f.sector,f.country,f.readinessStage&&READINESS_STAGE_LABELS[f.readinessStage]].filter(Boolean).join(' · ')||'No filters set'
+    return [f.sector,f.country,f.programmeId&&(programmesById[f.programmeId]?.name||'Unknown programme'),f.readinessStage&&READINESS_STAGE_LABELS[f.readinessStage]].filter(Boolean).join(' · ')||'No filters set'
   }
 
   const now=new Date().toISOString()
@@ -286,12 +298,23 @@ function ExternalAccessPanel({clientId,clientName,portfolioFilter,onClose}){
           </div>
           {scope==='segment'&&(
             <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem'}}>
-              <input placeholder="Sector (optional)" value={segSector} onChange={e=>setSegSector(e.target.value)} style={{flex:'1 1 140px',padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}/>
-              <input placeholder="Country (optional)" value={segCountry} onChange={e=>setSegCountry(e.target.value)} style={{flex:'1 1 140px',padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}/>
+              <select value={segProgrammeId} onChange={e=>setSegProgrammeId(e.target.value)} style={{flex:'1 1 160px',padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}>
+                <option value="">All programmes (or independent)</option>
+                {(programmes||[]).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <select value={segSector} onChange={e=>setSegSector(e.target.value)} style={{flex:'1 1 140px',padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}>
+                <option value="">All sectors</option>
+                {sectorOptions.map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
+              <select value={segCountry} onChange={e=>setSegCountry(e.target.value)} style={{flex:'1 1 140px',padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}>
+                <option value="">All countries</option>
+                {countryOptions.map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
               <select value={segStage} onChange={e=>setSegStage(e.target.value)} style={{flex:'1 1 160px',padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}>
                 <option value="">All readiness stages</option>
                 {Object.entries(READINESS_STAGE_LABELS).map(([k,l])=><option key={k} value={k}>{l}</option>)}
               </select>
+              <div style={{width:'100%',fontSize:'0.78rem',color:C.slate}}>A programme filter shows exactly the businesses that programme is paying for -- combine it with sector/country/stage to narrow further, or leave those on "All" to get the whole programme.</div>
             </div>
           )}
           <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem'}}>
@@ -485,7 +508,7 @@ function ClientHealthTab({clients,programmes,onUpdateClient}){
                   ):(
                     <>
                       <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginTop:'0.6rem'}}><span>{status.dot}</span><Badge text={status.label} color={HEALTH_COLOR[status.label]}/></div>
-                      {hasActuals.has(c.id)&&<div onClick={e=>e.stopPropagation()}><ClientDocumentActions clientId={c.id} clientName={c.name}/></div>}
+                      {hasActuals.has(c.id)&&<div onClick={e=>e.stopPropagation()}><ClientDocumentActions clientId={c.id} clientName={c.name} clients={clients} programmes={programmes}/></div>}
                       {hasActuals.has(c.id)&&<div onClick={e=>e.stopPropagation()}>
                         <label style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'0.82rem',color:C.slate,marginTop:'0.5rem',cursor:'pointer'}} title="Only enable after the business owner has explicitly agreed to be named (not anonymised) in aggregated Portfolio Intelligence views.">
                           <input type="checkbox" checked={!!c.portfolio_consent_named} onChange={e=>onUpdateClient(c.id,{portfolio_consent_named:e.target.checked})}/>
@@ -989,13 +1012,35 @@ function fmtPortfolioMoney(n,cc){
 // app/api/portfolio-intelligence/route.ts); this component doesn't
 // re-check the role, it relies on the route's own check plus the fact
 // only super_coach ever sees this tab in mainNavTabs.
-function PortfolioIntelligenceHub(){
+function PortfolioIntelligenceHub({clients,programmes}){
   const [data,setData]=useState(null)
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
   const [filter,setFilter]=useState({})
   const [openProfile,setOpenProfile]=useState(null)
   const [showAccess,setShowAccess]=useState(false)
+  const [downloading,setDownloading]=useState(false)
+  const [downloadError,setDownloadError]=useState('')
+
+  async function downloadBrief(currentFilter){
+    setDownloading(true);setDownloadError('')
+    try{
+      const {data:{session}}=await supabase.auth.getSession()
+      const hasActiveFilter=Object.keys(currentFilter).length>0
+      const response=await fetch('/api/portfolio-brief',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requesterToken:session?.access_token,filter:hasActiveFilter?currentFilter:undefined})})
+      if(!response.ok){const errData=await response.json().catch(()=>({}));throw new Error(errData.error||'Could not generate the document')}
+      const blob=await response.blob()
+      const disposition=response.headers.get('Content-Disposition')||''
+      const match=disposition.match(/filename="(.+)"/)
+      const fileName=match?match[1]:'Clearview_Portfolio_Intelligence.docx'
+      const url=URL.createObjectURL(blob)
+      const a=document.createElement('a')
+      a.href=url; a.download=fileName
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }catch(e){setDownloadError(e.message||'Download failed')}
+    setDownloading(false)
+  }
 
   const load=useCallback((f)=>{
     setLoading(true);setError('')
@@ -1026,6 +1071,7 @@ function PortfolioIntelligenceHub(){
   const hasFilter=Object.keys(filter).length>0
   const view=hasFilter&&segment?segment.segment:portfolio
   const currencies=Object.keys(portfolio.currentFundAbsorption)
+  const programmesById=Object.fromEntries((programmes||[]).map(p=>[p.id,p]))
   const pipelineEntries=[['investment_ready',C.green],['near_ready',C.cyan],['development_stage',C.amber],['pre_investment',C.red]]
 
   return(
@@ -1033,6 +1079,10 @@ function PortfolioIntelligenceHub(){
       <Kicker>Portfolio Intelligence · {snapshotCount} financial client{snapshotCount===1?'':'s'}</Kicker>
 
       <div style={{...card,display:'flex',flexWrap:'wrap',gap:'0.6rem',alignItems:'center'}}>
+        <select value={filter.programmeId||''} onChange={e=>applyFilter({programmeId:e.target.value})} style={{padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}>
+          <option value="">All programmes</option>
+          {filterOptions.programmeIds.map(id=><option key={id} value={id}>{programmesById[id]?.name||'Unknown programme'}</option>)}
+        </select>
         <select value={filter.sector||''} onChange={e=>applyFilter({sector:e.target.value})} style={{padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}>
           <option value="">All sectors</option>
           {filterOptions.sectors.map(s=><option key={s} value={s}>{s}</option>)}
@@ -1046,9 +1096,11 @@ function PortfolioIntelligenceHub(){
           {Object.entries(READINESS_STAGE_LABELS).map(([k,l])=><option key={k} value={k}>{l}</option>)}
         </select>
         {hasFilter&&<button onClick={()=>{setFilter({});load({})}} style={{fontSize:'0.85rem',color:C.slate,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>Clear filters</button>}
-        <button onClick={()=>setShowAccess(true)} style={{marginLeft:'auto',fontSize:'0.85rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>🔗 External Access</button>
+        <button disabled={downloading} onClick={()=>downloadBrief(filter)} style={{marginLeft:'auto',fontSize:'0.85rem',fontWeight:600,color:C.teal,background:'none',border:`1px solid ${C.teal}`,borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>{downloading?'Generating…':'⬇ Word Summary'}</button>
+        <button onClick={()=>setShowAccess(true)} style={{fontSize:'0.85rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>🔗 External Access</button>
+        {downloadError&&<div style={{width:'100%',fontSize:'0.78rem',color:C.red}}>{downloadError}</div>}
       </div>
-      {showAccess&&<ExternalAccessPanel portfolioFilter={hasFilter?filter:undefined} onClose={()=>setShowAccess(false)}/>}
+      {showAccess&&<ExternalAccessPanel portfolioFilter={hasFilter?filter:undefined} clients={clients} programmes={programmes} onClose={()=>setShowAccess(false)}/>}
 
       {hasFilter&&<div style={{fontSize:'0.9rem',color:C.slate,marginBottom:'0.5rem'}}>Showing {view.totalBusinesses} of {portfolio.totalBusinesses} businesses matching this filter, compared against the full portfolio below.</div>}
 
@@ -1832,7 +1884,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         {view==='programmes'&&<ProgrammesHub/>}
         {view==='team'&&<TeamHub/>}
         {view==='mypayments'&&<TeamPayments coImplementers={coImplementers} setCoImplementers={setCoImplementers} clients={clients} userName={userName} canApprove={false}/>}
-        {view==='portfolio'&&<PortfolioIntelligenceHub/>}
+        {view==='portfolio'&&<PortfolioIntelligenceHub clients={clients} programmes={programmes}/>}
       </main>
       <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.93rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach \u00b7 Coach Dashboard \u00b7 habibonifade.com \u00b7 Confidential</footer>
     </div>

@@ -161,10 +161,33 @@ async function buildClientSnapshot(admin: SupabaseClient, client: any, configRow
   }
 }
 
+// Short-lived, single-slot, in-memory cache. Every filter click on the
+// Portfolio Intelligence Hub (sector/country/programme/stage) was
+// re-running this ENTIRE function from scratch -- a full DB round-trip
+// and a complete financial-model run for every financial client on the
+// platform -- even though only the cheap, pure aggregation step
+// (buildPortfolioViewData) actually depends on the filter. That's the
+// real cause of "the portfolio tab is slow": not the first load, but
+// every subsequent click re-paying the same cost.
+//
+// This cache only helps a warm serverless instance (Vercel may spin up
+// a fresh one at any time, in which case it's a no-op and behaves
+// exactly as before) -- a best-effort speed-up, not a guarantee. The
+// 60-second TTL trades a small amount of staleness (a client's numbers
+// updated in the last minute might not show yet) for the common case of
+// a coach clicking through several filters in one sitting -- acceptable
+// for a bizdev/portfolio-review tool that was never real-time to begin
+// with, and self-corrects on the very next request past the window.
+let snapshotCache: { data: ClientSnapshot[]; expiresAt: number } | null = null
+const SNAPSHOT_CACHE_TTL_MS = 60_000
+
 // Loads and builds a ClientSnapshot for every financial client on the
 // platform. The only DB-touching step -- both callers pass in their own
 // admin (service-role) Supabase client.
 export async function loadAllClientSnapshots(admin: SupabaseClient): Promise<ClientSnapshot[]> {
+  const now = Date.now()
+  if (snapshotCache && snapshotCache.expiresAt > now) return snapshotCache.data
+
   const { data: clients } = await admin.from('engagement_clients').select('*').eq('engagement_mode', 'financial')
   const financialClients = clients || []
   if (financialClients.length === 0) return []
@@ -175,6 +198,8 @@ export async function loadAllClientSnapshots(admin: SupabaseClient): Promise<Cli
   const snapshots = (await Promise.all(
     financialClients.map((c: any) => buildClientSnapshot(admin, c, configByClient[c.id]).catch(() => null))
   )).filter((s): s is ClientSnapshot => s !== null)
+
+  snapshotCache = { data: snapshots, expiresAt: now + SNAPSHOT_CACHE_TTL_MS }
   return snapshots
 }
 
