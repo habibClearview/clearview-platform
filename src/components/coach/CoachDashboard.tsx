@@ -13,8 +13,7 @@ import BuildStamp from '@/components/BuildStamp'
 import TeamPayments from '@/components/coach/TeamPayments'
 import DealsAndFees from '@/components/coach/DealsAndFees'
 import {
-  outstandingInvoiced, dealWinRate, canvasProgress,
-  healthStatusFromReportText, portfolioHealthCounts, groupClientsByProgramme,
+  outstandingInvoiced, dealWinRate, canvasProgress, healthStatusFromReportText,
   pipelineSnapshot, recentMonthPeriods, monthlyFeeRevenue, monthlyTeamCost,
   awaitingInvoice, clientTypeBreakdown, serviceTypeBreakdown,
 } from '@/lib/coach-business-metrics'
@@ -90,6 +89,12 @@ function PiKpiCard({label,value,rev,sub,total,color,deltaBadge}){return(
 function MiniDistBar({segments}){return(<div style={{display:'flex',height:6,borderRadius:3,overflow:'hidden',marginTop:'0.55rem'}}>{segments.map((s,i)=><div key={i} style={{width:`${s.pct}%`,background:s.color}}/>)}</div>)}
 function PiKpiRow({children,cols}){return<div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gap:'0.9rem'}}>{children}</div>}
 const DEAL_STAGE_META={conversation:{label:'Interview Stage',color:C.slate},scoping:{label:'Negotiation',color:C.cyan},proposal:{label:'Proposal Sent',color:C.amber},won:{label:'Won',color:C.green},lost:{label:'Lost',color:C.red}}
+const CLIENT_SERVICE_TABS=[
+  {key:'advisory',label:'Advisory'},
+  {key:'financial',label:'Financial Model'},
+  {key:'canvas',label:'GtCV Canvas'},
+  {key:'portfolio_intelligence',label:'Subscription'},
+]
 
 // ─── Co-implementer performance -- only what's honestly computable. ────
 // "On-time gates", "utilisation %", and a red/amber issue flag were checked
@@ -381,163 +386,6 @@ function ExternalAccessPanel({clientId,clientName,portfolioFilter,clients,progra
   )
 }
 
-function ClientHealthTab({clients,programmes,onUpdateClient}){
-  const [reportByClient,setReportByClient]=useState({})
-  const [canvasByClient,setCanvasByClient]=useState({})
-  // Whether a client has ANY real generic_actuals row -- a genuinely
-  // different question from "has an AI health check been generated". Without
-  // this, a client with real financial data on file but no AI report yet
-  // looked identical to a client with nothing recorded at all, both reading
-  // "No data". That's exactly what was reported as wrong: real data existed,
-  // the label just didn't say so.
-  const [hasActuals,setHasActuals]=useState(new Set())
-  const [loading,setLoading]=useState(true)
-  // NOT gated on clearview_active -- that flag only tracks whether the CEO
-  // portal link has been switched on in the coach's own UI (see the "Open
-  // Clearview" link elsewhere in this file). It has no editing UI once a
-  // client is created, and real generic_actuals/ai_health_checks data is
-  // routinely recorded well before (or without) that flag ever being set.
-  // Gating on it here excluded clients who plainly had real data on file --
-  // exactly what was reported. engagement_mode alone is the honest signal
-  // for "this is a financial-model client".
-  const financialClients=clients.filter(c=>c.engagement_mode==='financial')
-  const canvasClients=clients.filter(c=>c.engagement_mode==='canvas')
-
-  useEffect(()=>{
-    let cancelled=false
-    const clientIds=clients.map(c=>c.id)
-    if(clientIds.length===0){setLoading(false);return}
-    Promise.all([
-      supabase.from('ai_health_checks').select('client_id,period,report_text,generated_at').in('client_id',financialClients.map(c=>c.id)).order('period',{ascending:false}),
-      supabase.from('canvas_decision_points').select('client_id,dp_id,status').in('client_id',canvasClients.map(c=>c.id)),
-      supabase.from('generic_actuals').select('client_id').in('client_id',financialClients.map(c=>c.id)),
-    ]).then(([{data:reports},{data:dps},{data:actuals}])=>{
-      if(cancelled)return
-      const latestByClient={}
-      ;(reports||[]).forEach(r=>{if(!latestByClient[r.client_id])latestByClient[r.client_id]=r})
-      setReportByClient(latestByClient)
-      const grouped={}
-      ;(dps||[]).forEach(d=>{(grouped[d.client_id]=grouped[d.client_id]||[]).push(d)})
-      setCanvasByClient(grouped)
-      setHasActuals(new Set((actuals||[]).map(a=>a.client_id)))
-      setLoading(false)
-    }).catch(()=>setLoading(false))
-    return ()=>{cancelled=true}
-  },[clients])
-
-  if(loading)return<div style={{...card,textAlign:'center',padding:'2rem',color:C.slate}}>Loading portfolio health...</div>
-
-  // Same health-status classification everywhere, but the DISPLAYED label for
-  // a client with no AI report is now honest about which case it is.
-  function displayStatus(c){
-    const s=healthStatusFromReportText(reportByClient[c.id]?.report_text)
-    if(s.label!=='No data')return s
-    return hasActuals.has(c.id)
-      ? {label:'Not yet reviewed',dot:'🔵'}
-      : {label:'No financial data yet',dot:'⚪'}
-  }
-
-  const counts=portfolioHealthCounts(financialClients,reportByClient)
-  const flagged=financialClients.filter(c=>{
-    const label=healthStatusFromReportText(reportByClient[c.id]?.report_text).label
-    return label==='Needs attention'||label==='Watch'
-  }).sort((a,b)=>{
-    const rank={'Needs attention':0,'Watch':1}
-    const la=healthStatusFromReportText(reportByClient[a.id]?.report_text).label
-    const lb=healthStatusFromReportText(reportByClient[b.id]?.report_text).label
-    return (rank[la]??2)-(rank[lb]??2)
-  })
-  const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
-  const groups=groupClientsByProgramme(clients,programmesById)
-  // Active/paused/completed -- who's actually engaged right now, distinct
-  // from health status (a paused client can still show green from its last
-  // check). This matters most to a funder, whose whole login is scoped to
-  // one programme's clients and who otherwise has no way to tell which of
-  // the entities they're paying for are still active versus stalled.
-  const activeCount=clients.filter(c=>c.status!=='complete'&&c.status!=='paused').length
-  const pausedCount=clients.filter(c=>c.status==='paused').length
-  const completedCount=clients.filter(c=>c.status==='complete').length
-  return(
-    <div>
-      <Kicker>Portfolio at a glance <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; by service -- a business can be a Clearview Financial engagement, a GtCV Canvas engagement, or both</span></Kicker>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:'0.85rem',marginBottom:'1.5rem'}}>
-        <GlanceKPI label="Clearview Financial Portfolio" value={String(financialClients.length)} sub="financial-model engagements" color={C.teal}/>
-        <GlanceKPI label="GtCV Canvas Portfolio" value={String(canvasClients.length)} sub="canvas engagements" color={C.purple}/>
-        <GlanceKPI label="Active" value={String(activeCount)} sub="currently engaged" color={C.green}/>
-        <GlanceKPI label="Paused" value={String(pausedCount)} sub={pausedCount>0?'not currently responsive':'none paused'} color={pausedCount>0?C.red:C.slate}/>
-        <GlanceKPI label="Completed" value={String(completedCount)} sub="engagement closed" color={C.teal}/>
-      </div>
-      <div className="cv-grid-4" style={{marginBottom:'1.5rem'}}>
-        <GlanceKPI label="Need Attention" value={String(counts.needsAttention)} sub="flagged red this period" color={C.red}/>
-        <GlanceKPI label="Watch" value={String(counts.watch)} sub="flagged amber this period" color={C.amber}/>
-        <GlanceKPI label="Healthy" value={String(counts.healthy)} sub="green health check" color={C.green}/>
-      </div>
-
-      {flagged.length>0&&(
-        <div style={{...card,border:'1px solid #F1C9C2',borderLeft:`4px solid ${C.red}`}}>
-          <div style={{fontWeight:700,fontSize:'1.02rem',color:C.red,marginBottom:'0.7rem'}}>⚠ {flagged.length} flagged this week</div>
-          {flagged.map(c=>{
-            const report=reportByClient[c.id]
-            const status=healthStatusFromReportText(report?.report_text)
-            const why=report?.report_text?(report.report_text.length>140?report.report_text.slice(0,140)+'…':report.report_text):'No health check generated yet.'
-            return(
-              <div key={c.id} style={{display:'flex',alignItems:'center',gap:'0.9rem',padding:'0.7rem 0',borderTop:'1px solid #F4F1F0',cursor:'pointer'}} onClick={()=>window.open(`/dashboard/${c.slug}`,'_blank')}>
-                <Badge text={status.label} color={HEALTH_COLOR[status.label]}/>
-                <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700}}>{c.name}</div><div style={{fontSize:'1.07rem',color:C.slate}}>{why}</div></div>
-                <span style={{fontFamily:'monospace',fontSize:'1.01rem',fontWeight:700,color:C.red,flexShrink:0}}>Open →</span>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      <Kicker>By programme</Kicker>
-      {groups.map((g,i)=>(
-        <div key={g.programme?.id||'independent'} style={{...card,marginBottom:'1.3rem'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem',flexWrap:'wrap',gap:'0.5rem'}}>
-            <div>
-              <div style={{fontFamily:'Georgia,serif',fontSize:'1.32rem',fontWeight:700,color:C.navy}}>{g.programme?g.programme.name:'Independent clients'}</div>
-              <div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.15rem'}}>{g.programme?[g.programme.funder,g.programme.country].filter(Boolean).join(' · '):'Self-paying, no programme'} · {g.programme?`${g.clients.length} beneficiar${g.clients.length===1?'y':'ies'} served -- ${g.programme.name} is the paying client`:`${g.clients.length} paying client${g.clients.length===1?'':'s'}`}</div>
-            </div>
-          </div>
-          <div className="cv-grid-3">
-            {g.clients.map(c=>{
-              const isCanvas=c.engagement_mode==='canvas'
-              const prog=isCanvas?canvasProgress(canvasByClient[c.id]||[]):null
-              const status=isCanvas?null:displayStatus(c)
-              const accent=isCanvas?C.purple:(status?HEALTH_COLOR[status.label]:C.slate)
-              return(
-                <div key={c.id} style={{border:'1px solid var(--cv-border-soft)',borderTop:`4px solid ${c.status==='paused'?C.red:accent}`,borderRadius:13,padding:'1rem 1.05rem',cursor:'pointer',background:C.white}} onClick={()=>window.open(`/dashboard/${c.slug}`,'_blank')}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'0.5rem'}}>
-                    <div style={{fontWeight:700,fontSize:'1.02rem'}}>{c.name}</div>
-                    <div style={{display:'flex',gap:'0.3rem',flexShrink:0}}>
-                      {c.status==='paused'&&<Badge text="Paused" color={C.red}/>}
-                      <span style={{fontFamily:'monospace',fontSize:'0.79rem',fontWeight:700,borderRadius:4,padding:'0.08rem 0.38rem',color:isCanvas?C.purple:C.teal,border:`1px solid ${isCanvas?C.purple:C.teal}`}}>{isCanvas?'GtCV':'Clearview'}</span>
-                    </div>
-                  </div>
-                  {isCanvas?(
-                    <div style={{fontFamily:'monospace',fontSize:'0.99rem',color:C.slate,marginTop:'0.6rem'}}>{prog.totalCount>0?`${prog.doneCount}/${prog.totalCount} · ${prog.currentLabel}`:'No canvas yet'}</div>
-                  ):(
-                    <>
-                      <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginTop:'0.6rem'}}><span>{status.dot}</span><Badge text={status.label} color={HEALTH_COLOR[status.label]}/></div>
-                      {hasActuals.has(c.id)&&<div onClick={e=>e.stopPropagation()}><ClientDocumentActions clientId={c.id} clientName={c.name} clients={clients} programmes={programmes}/></div>}
-                      {hasActuals.has(c.id)&&<div onClick={e=>e.stopPropagation()}>
-                        <label style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'0.82rem',color:C.slate,marginTop:'0.5rem',cursor:'pointer'}} title="Only enable after the business owner has explicitly agreed to be named (not anonymised) in aggregated Portfolio Intelligence views.">
-                          <input type="checkbox" checked={!!c.portfolio_consent_named} onChange={e=>onUpdateClient(c.id,{portfolio_consent_named:e.target.checked})}/>
-                          Named in Portfolio Intelligence
-                        </label>
-                      </div>}
-                    </>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
 // Revenue vs cost, last 6 months -- both real, dated figures (fee_paid_at
 // for revenue, issued coach_invoices.period for cost). A month with
 // nothing collected/invoiced shows as a zero bar, not a gap or an
@@ -1304,8 +1152,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // this state up here, where CoachDashboard itself never remounts, fixes
   // that without a full rewrite of every nested view into a top-level
   // component.
-  const [clientsFilter,setClientsFilter]=useState('all')
-  const [clientsSub,setClientsSub]=useState('health')
+  const [clientsService,setClientsService]=useState('financial')
   const [programmesSub,setProgrammesSub]=useState('pipeline')
   // Light/dark theme -- same 'cv-theme' localStorage key and
   // document.documentElement.dataset.theme mechanism GenericDashboard
@@ -1439,17 +1286,110 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     )
   }
 
-  // \u2500\u2500 CLIENT LIST \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ─── CLIENT LIST ────────────────────────────────────────────────
+  // One card per beneficiary, grouped into a block per paying client (a
+  // donor programme, or an independent/subscriber client), grouped again
+  // by which of the four real services is selected. Canvas and Financial
+  // Model beneficiaries come straight off engagement_clients (the only
+  // two services with a home there via engagement_mode); Advisory and
+  // Subscription have no such field, so they come from the
+  // service_engagements table instead (see supabase/migrations/
+  // 2026_07_14_service_engagements.sql) -- an independent, error-tolerant
+  // fetch, so a missing migration just means those two panels are empty,
+  // not a broken page.
+  function BeneficiaryCard({client,seStatus,hasActuals}){
+    const label=seStatus?({active:'Active',paused:'Paused',complete:'Complete'}[seStatus]||seStatus):statusLabel(client.status)
+    const color=seStatus?({active:C.green,paused:C.amber,complete:C.slate}[seStatus]||C.slate):statusColor(client.status)
+    return(
+      <div style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.75rem 0.85rem',cursor:client.slug?'pointer':'default',background:C.white}}
+        onClick={()=>client.slug&&window.open(`/dashboard/${client.slug}`,'_blank')}>
+        <div style={{fontWeight:700,fontSize:'0.95rem',marginBottom:'0.4rem'}}>{client.name}</div>
+        <Badge text={label} color={color}/>
+        {hasActuals&&<div onClick={e=>e.stopPropagation()}><ClientDocumentActions clientId={client.id} clientName={client.name} clients={clients} programmes={programmes}/></div>}
+      </div>
+    )
+  }
+
   function ClientsView(){
-    const filter=clientsFilter, setFilter=setClientsFilter
+    const service=clientsService, setService=setClientsService
     const [showNew,setShowNew]=useState(false)
     const [showUpload,setShowUpload]=useState(false)
     const [refreshing,setRefreshing]=useState(false)
-    const filtered=filter==='all'?clients
-      :filter==='active'?clients.filter(c=>c.status!=='complete'&&c.status!=='paused')
-      :filter==='completed'?clients.filter(c=>c.status==='complete')
-      :filter==='paused'?clients.filter(c=>c.status==='paused')
-      :clients.filter(c=>c.type===filter||c.engagement_mode===filter)
+
+    // Flagged this week -- Financial Model clients only, the one service
+    // with an automated weekly AI health check today. Real flagging for
+    // GtCV/Advisory/Subscription would need a genuine signal for each (a
+    // stalled-canvas rule, etc.) that doesn't exist yet -- deferred rather
+    // than faked.
+    const [reportByClient,setReportByClient]=useState({})
+    const [hasActuals,setHasActuals]=useState(new Set())
+    const financialClients=clients.filter(c=>c.engagement_mode==='financial')
+    useEffect(()=>{
+      let cancelled=false
+      const financialIds=financialClients.map(c=>c.id)
+      if(financialIds.length===0)return
+      Promise.all([
+        supabase.from('ai_health_checks').select('client_id,period,report_text,generated_at').in('client_id',financialIds).order('period',{ascending:false}),
+        supabase.from('generic_actuals').select('client_id').in('client_id',financialIds),
+      ]).then(([{data:reports},{data:actuals}])=>{
+        if(cancelled)return
+        const latestByClient={}
+        ;(reports||[]).forEach(r=>{if(!latestByClient[r.client_id])latestByClient[r.client_id]=r})
+        setReportByClient(latestByClient)
+        setHasActuals(new Set((actuals||[]).map(a=>a.client_id)))
+      }).catch(()=>{})
+      return ()=>{cancelled=true}
+    },[clients])
+    const flagged=financialClients.filter(c=>{
+      const label=healthStatusFromReportText(reportByClient[c.id]?.report_text).label
+      return label==='Needs attention'||label==='Watch'
+    }).sort((a,b)=>{
+      const rank={'Needs attention':0,'Watch':1}
+      const la=healthStatusFromReportText(reportByClient[a.id]?.report_text).label
+      const lb=healthStatusFromReportText(reportByClient[b.id]?.report_text).label
+      return (rank[la]??2)-(rank[lb]??2)
+    })
+
+    const [serviceEngagements,setServiceEngagements]=useState([])
+    useEffect(()=>{
+      let cancelled=false
+      supabase.from('service_engagements').select('*').then(({data,error})=>{
+        if(cancelled||error)return
+        setServiceEngagements(data||[])
+      }).catch(()=>{})
+      return ()=>{cancelled=true}
+    },[])
+
+    const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
+    const clientsById=Object.fromEntries(clients.map(c=>[c.id,c]))
+
+    let blocks=[]
+    if(service==='financial'||service==='canvas'){
+      const inService=clients.filter(c=>c.engagement_mode===service)
+      const byPayer=new Map()
+      inService.forEach(c=>{
+        const prog=c.programme_id?programmesById[c.programme_id]:null
+        const key=prog?`prog:${prog.id}`:`client:${c.id}`
+        if(!byPayer.has(key))byPayer.set(key,{title:prog?prog.name:c.name,meta:prog?([prog.funder,prog.country].filter(Boolean).join(' · ')||'Donor programme'):'Independent',beneficiaries:[]})
+        byPayer.get(key).beneficiaries.push(c)
+      })
+      blocks=Array.from(byPayer.values())
+    }else{
+      const inService=serviceEngagements.filter(se=>se.service_type===service)
+      const byPayer=new Map()
+      inService.forEach(se=>{
+        const prog=se.payer_programme_id?programmesById[se.payer_programme_id]:null
+        const payerClient=se.payer_client_id?clientsById[se.payer_client_id]:null
+        const key=prog?`prog:${prog.id}`:`client:${se.payer_client_id}`
+        const title=prog?prog.name:(payerClient?.name||'Unknown client')
+        const meta=prog?([prog.funder,prog.country].filter(Boolean).join(' · ')||'Donor programme'):'Independent'
+        if(!byPayer.has(key))byPayer.set(key,{title,meta,beneficiaries:[]})
+        const ben=se.beneficiary_client_id?clientsById[se.beneficiary_client_id]:payerClient
+        if(ben)byPayer.get(key).beneficiaries.push({...ben,__seStatus:se.status})
+      })
+      blocks=Array.from(byPayer.values())
+    }
+
     async function refreshClients(){
       setRefreshing(true)
       try { const fresh = await loadClients(); setClients(fresh) }
@@ -1459,12 +1399,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     return(
       <div>
         <div style={{display:'flex',gap:'0.45rem',marginBottom:'1.25rem',flexWrap:'wrap',alignItems:'center'}}>
-          <button style={addBtn(true,C.teal)} onClick={refreshClients} disabled={refreshing}>{refreshing?'Refreshing...':'\u21bb Refresh'}</button>
-          {['all','active','completed','paused','canvas','financial','crop_aggregator','livestock_aggregator','farmer_group_enterprise','service_lsp'].map(f=>(
-            <button key={f} style={subPill(filter===f,f==='completed'?C.green:f==='paused'?C.red:C.cyan)} onClick={()=>setFilter(f)}>
-              {f==='all'?'All':f==='active'?'Active':f==='completed'?'Completed':f==='paused'?'Paused':f==='canvas'?'GtCV Canvas':f==='financial'?'Clearview Only':CLIENT_TYPE_LABELS[f]||f}
-            </button>
-          ))}
+          <button style={addBtn(true,C.teal)} onClick={refreshClients} disabled={refreshing}>{refreshing?'Refreshing...':'↻ Refresh'}</button>
           {isSuperCoach&&<button style={{...addBtn(true,C.teal),marginLeft:'auto'}} onClick={()=>{setShowUpload(!showUpload);setShowNew(false)}}>Upload Spreadsheet</button>}
           {isSuperCoach&&<button style={addBtn()} onClick={()=>{setShowNew(!showNew);setShowUpload(false)}}>+ New Client</button>}
         </div>
@@ -1473,11 +1408,45 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           const {data,error}=await supabase.from('engagement_clients').insert([c]).select().single()
           if(!error&&data){setClients(prev=>[...prev,data]);setShowNew(false)}
         }} onCancel={()=>setShowNew(false)}/>}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(250px,1fr))',gap:'1rem'}}>
-          {filtered.map(c=><ClientCard key={c.id} client={c} programmes={programmes}
-            onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}
-            onEdit={isSuperCoach?()=>{setSelClientId(c.id);setActiveTab('cover');setView('client');setShowEditClient(true)}:undefined}/>)}
+
+        {flagged.length>0&&(
+          <div style={{...card,border:'1px solid #F1C9C2',borderLeft:`4px solid ${C.red}`}}>
+            <div style={{fontWeight:700,fontSize:'1.02rem',color:C.red,marginBottom:'0.7rem'}}>⚠ {flagged.length} flagged this week <span style={{fontWeight:400,fontSize:'0.85rem',color:C.slate}}>· Financial Model clients only for now</span></div>
+            {flagged.map(c=>{
+              const report=reportByClient[c.id]
+              const status=healthStatusFromReportText(report?.report_text)
+              const why=report?.report_text?(report.report_text.length>140?report.report_text.slice(0,140)+'…':report.report_text):'No health check generated yet.'
+              return(
+                <div key={c.id} style={{display:'flex',alignItems:'center',gap:'0.9rem',padding:'0.7rem 0',borderTop:'1px solid #F4F1F0',cursor:'pointer'}} onClick={()=>window.open(`/dashboard/${c.slug}`,'_blank')}>
+                  <Badge text={status.label} color={HEALTH_COLOR[status.label]}/>
+                  <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700}}>{c.name}</div><div style={{fontSize:'1.07rem',color:C.slate}}>{why}</div></div>
+                  <span style={{fontFamily:'monospace',fontSize:'1.01rem',fontWeight:700,color:C.red,flexShrink:0}}>Open →</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',marginBottom:'1.5rem'}}>
+          {CLIENT_SERVICE_TABS.map(t=><button key={t.key} style={subPill(service===t.key)} onClick={()=>setService(t.key)}>{t.label}</button>)}
         </div>
+
+        {blocks.length===0?(
+          <div style={{...card,color:C.slate}}>No clients on {CLIENT_SERVICE_TABS.find(t=>t.key===service)?.label} yet.</div>
+        ):blocks.map((b,i)=>(
+          <div key={i} style={{...card,padding:0,overflow:'hidden'}}>
+            <div style={{background:'var(--cv-alt)',padding:'0.85rem 1.1rem',borderBottom:'1px solid var(--cv-border-soft)',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.5rem'}}>
+              <div>
+                <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>{b.title}</div>
+                <div style={{fontSize:'0.86rem',color:C.slate}}>{b.meta}</div>
+              </div>
+              <div style={{fontFamily:'monospace',fontSize:'0.82rem',color:C.slate}}>{b.beneficiaries.length} beneficiar{b.beneficiaries.length===1?'y':'ies'}</div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))',gap:'0.75rem',padding:'1rem 1.1rem'}}>
+              {b.beneficiaries.map(c=><BeneficiaryCard key={c.id+(c.__seStatus||'')} client={c} seStatus={c.__seStatus} hasActuals={hasActuals.has(c.id)}/>)}
+            </div>
+          </div>
+        ))}
       </div>
     )
   }
@@ -1857,16 +1826,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // each with an internal toggle, which is what a coach actually wants:
   // one place to go for "clients", not three.
   function ClientsHub(){
-    const sub=clientsSub, setSub=setClientsSub
-    return(
-      <div>
-        <div style={{display:'flex',gap:'0.4rem',marginBottom:'1.25rem'}}>
-          <button style={subPill(sub==='health')} onClick={()=>setSub('health')}>Health overview</button>
-          <button style={subPill(sub==='roster')} onClick={()=>setSub('roster')}>Beneficiaries</button>
-        </div>
-        {sub==='health'?<ClientHealthTab clients={clients} programmes={programmes} onUpdateClient={updateClient}/>:<ClientsView/>}
-      </div>
-    )
+    return <ClientsView/>
   }
   function ProgrammesHub(){
     const sub=programmesSub, setSub=setProgrammesSub
