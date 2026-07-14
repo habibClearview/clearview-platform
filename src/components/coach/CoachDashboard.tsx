@@ -13,8 +13,7 @@ import BuildStamp from '@/components/BuildStamp'
 import TeamPayments from '@/components/coach/TeamPayments'
 import DealsAndFees from '@/components/coach/DealsAndFees'
 import {
-  outstandingInvoiced, dealCards, dealWinRate,
-  canvasProgress, coImplementerNamesForClient, engagementDisplayStatus, coImplementerWorkload,
+  outstandingInvoiced, dealWinRate, canvasProgress,
   healthStatusFromReportText, portfolioHealthCounts, groupClientsByProgramme,
   pipelineSnapshot, recentMonthPeriods, monthlyFeeRevenue, monthlyTeamCost,
   awaitingInvoice, clientTypeBreakdown, serviceTypeBreakdown,
@@ -91,63 +90,45 @@ function PiKpiCard({label,value,rev,sub,total,color,deltaBadge}){return(
 function MiniDistBar({segments}){return(<div style={{display:'flex',height:6,borderRadius:3,overflow:'hidden',marginTop:'0.55rem'}}>{segments.map((s,i)=><div key={i} style={{width:`${s.pct}%`,background:s.color}}/>)}</div>)}
 function PiKpiRow({children,cols}){return<div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gap:'0.9rem'}}>{children}</div>}
 const DEAL_STAGE_META={conversation:{label:'Interview Stage',color:C.slate},scoping:{label:'Negotiation',color:C.cyan},proposal:{label:'Proposal Sent',color:C.amber},won:{label:'Won',color:C.green},lost:{label:'Lost',color:C.red}}
-function DealPipelineCard({deal}){const meta=DEAL_STAGE_META[deal.stage]||{label:deal.stage,color:C.slate};return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem',borderTop:`3px solid ${meta.color}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.22rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>{deal.name}</div><div style={{fontSize:'1.01rem',color:C.slate,marginBottom:'0.5rem'}}>{deal.subtitle}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>{fmtGlance(deal.value,deal.currency)}</div><Badge text={meta.label} color={meta.color}/><GlanceBar frac={deal.barFrac} color={meta.color}/></div>)}
-
-// ─── Engagements table (real canvas progress; NO margin % -- that field
-// does not exist anywhere in the schema, so it is deliberately omitted
-// rather than fabricated) ──────────────────────────────────────────
-const STATUS_COLOR={closed:C.slate,paid:C.green,invoiced:C.amber,unpaid:C.red,unset:C.border}
-function EngagementsTable({clients,programmes,coImplementers,canvasByClient}){
-  const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
-  return(
-    <div style={card}>
-      <div style={{overflowX:'auto'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.07rem'}}>
-          <thead><tr style={{background:C.navy}}>{['Served','Payer','Canvas progress','Fee','Co-implementer','Status'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left',fontWeight:400,fontSize:'0.93rem',color:'var(--cv-on-accent)',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
-          <tbody>
-            {clients.map(c=>{
-              const prog=canvasProgress(canvasByClient[c.id]||[])
-              const payer=c.programme_id?(programmesById[c.programme_id]?.funder||programmesById[c.programme_id]?.name||'programme'):'self · independent'
-              const cis=coImplementerNamesForClient(c.id,coImplementers)
-              const status=engagementDisplayStatus(c)
-              return(
-                <tr key={c.id} style={{borderBottom:'1px solid var(--cv-border-soft)'}}>
-                  <td style={{padding:'10px 12px'}}>
-                    <div style={{fontWeight:700}}>{c.name}</div>
-                    <span className="mode" style={{fontFamily:'monospace',fontSize:'0.81rem',fontWeight:700,borderRadius:4,padding:'0.08rem 0.4rem',color:c.engagement_mode==='canvas'?C.purple:C.teal,border:`1px solid ${c.engagement_mode==='canvas'?C.purple:C.teal}`}}>{c.engagement_mode==='canvas'?'GtCV':'Clearview'}</span>
-                  </td>
-                  <td style={{padding:'10px 12px',fontSize:'0.99rem',color:C.slate}}>{payer}</td>
-                  <td style={{padding:'10px 12px',fontSize:'0.99rem',color:C.slate}}>{prog.totalCount>0?`${prog.doneCount}/${prog.totalCount} · ${prog.currentLabel}`:'No canvas yet'}</td>
-                  <td style={{padding:'10px 12px',fontFamily:'monospace',fontSize:'1.03rem'}}>{c.engagement_fee?fmtGlance(c.engagement_fee,c.fee_currency||'USD'):'—'}</td>
-                  <td style={{padding:'10px 12px',fontSize:'0.99rem'}}>{cis.length>0?cis.join(', '):'—'}</td>
-                  <td style={{padding:'10px 12px'}}><Badge text={status.label} color={STATUS_COLOR[status.key]}/></td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
 
 // ─── Co-implementer performance -- only what's honestly computable. ────
 // "On-time gates", "utilisation %", and a red/amber issue flag were checked
 // against the real schema and none of them exist (no due-date field, no
 // capacity field, no structured flag field) -- deliberately not shown here.
-function CoImplementerPerfCard({ci,workload}){
+// Per co-implementer: how many clients they're actually serving, which
+// service each one is (GtCV Canvas vs Clearview Financial Model), and --
+// only where it means something -- the GtCV stage. Financial-model clients
+// have no decision-gate stages at all, so no stage is shown for them
+// rather than a fake "N/A".
+function CoImplementerPerfCard({ci,clients,canvasByClient}){
   const initials=(ci.name||'?').split(' ').filter(Boolean).map(w=>w[0]).slice(0,2).join('').toUpperCase()
+  const byId=Object.fromEntries(clients.map(c=>[c.id,c]))
+  const served=(ci.client_ids||[]).map(id=>byId[id]).filter(Boolean)
   return(
     <div style={{...card,padding:'1rem 1.1rem',marginBottom:0}}>
       <div style={{display:'flex',alignItems:'center',gap:'0.7rem',marginBottom:'0.8rem'}}>
         <div style={{width:38,height:38,borderRadius:10,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'monospace',fontSize:'0.99rem',fontWeight:700}}>{initials}</div>
-        <div><div style={{fontWeight:700,fontSize:'1.19rem'}}>{ci.name}</div><div style={{fontSize:'0.99rem',color:C.slate}}>{ci.country||''}{ci.country&&' · '}{(ci.client_ids||[]).length} engagement{(ci.client_ids||[]).length===1?'':'s'}</div></div>
+        <div><div style={{fontWeight:700,fontSize:'1.19rem'}}>{ci.name}</div><div style={{fontSize:'0.99rem',color:C.slate}}>{ci.country||''}{ci.country&&' · '}Serving {served.length} client{served.length===1?'':'s'}</div></div>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'0.6rem'}}>
-        <div><div style={{fontFamily:'monospace',fontSize:'0.81rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Approved</div><div style={{fontWeight:700,fontSize:'1.05rem',fontFamily:'Georgia,serif'}}>{workload.approvedHours}h</div></div>
-        <div><div style={{fontFamily:'monospace',fontSize:'0.81rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Pending</div><div style={{fontWeight:700,fontSize:'1.05rem',fontFamily:'Georgia,serif',color:workload.pendingHours>0?C.amber:C.navy}}>{workload.pendingHours}h</div></div>
-        <div><div style={{fontFamily:'monospace',fontSize:'0.81rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Sessions/mo</div><div style={{fontWeight:700,fontSize:'1.05rem',fontFamily:'Georgia,serif'}}>{workload.sessionsThisMonth}</div></div>
-      </div>
+      {served.length===0?(
+        <div style={{fontSize:'0.95rem',color:C.slate}}>No clients assigned yet.</div>
+      ):(
+        <div style={{display:'flex',flexDirection:'column',gap:'0.5rem'}}>
+          {served.map(c=>{
+            const isCanvas=c.engagement_mode==='canvas'
+            const stageLabel=isCanvas?canvasProgress(canvasByClient[c.id]||[]).currentLabel:null
+            return(
+              <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem',fontSize:'0.95rem',borderTop:'1px solid var(--cv-border-soft)',paddingTop:'0.5rem'}}>
+                <div style={{minWidth:0}}>
+                  <div style={{fontWeight:600,color:C.navy,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</div>
+                  <div style={{fontSize:'0.85rem',color:C.slate}}>{isCanvas?'GtCV Canvas':'Clearview Financial Model'}</div>
+                </div>
+                {stageLabel&&<Badge text={stageLabel} color={C.purple}/>}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -599,7 +580,6 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
   const outstanding=outstandingInvoiced(clients)
   const awaitingIssue=awaitingInvoice(clients)
   const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
-  const deals=dealCards(programmes)
   const winRate=dealWinRate(programmes)
 
   // Four periods, one selector -- every card on this tab that can honestly
@@ -614,7 +594,6 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
   // whole list -- avoids an N+1 query per client. Empty/failed fetch
   // degrades to "no data yet", never a fabricated number.
   const [canvasByClient,setCanvasByClient]=useState({})
-  const [tsEntries,setTsEntries]=useState([])
   const [invoices,setInvoices]=useState([])
   useEffect(()=>{
     let cancelled=false
@@ -622,14 +601,12 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
     if(clientIds.length===0)return
     Promise.all([
       supabase.from('canvas_decision_points').select('client_id,dp_id,status').in('client_id',clientIds),
-      supabase.from('coach_timesheet_entries').select('co_implementer_id,hours,status,entry_date'),
       supabase.from('coach_invoices').select('period,status,time_amount,expenses_amount'),
-    ]).then(([{data:dps},{data:entries},{data:inv}])=>{
+    ]).then(([{data:dps},{data:inv}])=>{
       if(cancelled)return
       const grouped={}
       ;(dps||[]).forEach(d=>{(grouped[d.client_id]=grouped[d.client_id]||[]).push(d)})
       setCanvasByClient(grouped)
-      setTsEntries(entries||[])
       setInvoices(inv||[])
     }).catch(()=>{})
     return ()=>{cancelled=true}
@@ -709,29 +686,14 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
 
       </PiBody>
 
-      {deals.length>0&&(<>
-        <Kicker>Programme deals <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; who actually pays for the programme-funded stream. {Math.round(winRate.pct*100)}% won ({winRate.wonCount} of {winRate.totalCount}).</span></Kicker>
-        <div className="cv-grid-3" style={{marginBottom:'1.5rem'}}>
-          {deals.map(d=><DealPipelineCard key={d.id} deal={d}/>)}
-        </div>
-      </>)}
-      {/* Canvas (GtCV) clients only -- they're the only ones with decision-gate
-          stages to be "how far along" through. Financial-model clients have
-          no engagement stages, so listing them here just showed "No canvas
-          yet" against every one of them; they already have their own view
-          (Client Health, above) that fits what they actually are. */}
-      {clients.filter(c=>c.engagement_mode==='canvas').length>0&&(<>
-        <Kicker>Engagements <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; who we serve, and how far along the canvas they are</span></Kicker>
-        <div style={{marginBottom:'1.5rem'}}>
-          <EngagementsTable clients={clients.filter(c=>c.engagement_mode==='canvas')} programmes={programmes} coImplementers={coImplementers} canvasByClient={canvasByClient}/>
-        </div>
-      </>)}
-      {coImplementers.length>0&&(<>
-        <Kicker>Co-implementer workload <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; hours and sessions from real timesheets. On-time gates, utilisation, and issue flags aren&#39;t tracked yet, so they&#39;re not shown here rather than guessed.</span></Kicker>
+      <Kicker>Team <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; number of clients each co-implementer is serving, which service, and their GtCV stage (Clearview financial-model clients have no stage to show)</span></Kicker>
+      {coImplementers.length===0?(
+        <div style={{...card,color:C.slate}}>No co-implementers on the team yet.</div>
+      ):(
         <div className="cv-grid-3">
-          {coImplementers.map(ci=><CoImplementerPerfCard key={ci.id} ci={ci} workload={coImplementerWorkload(ci.id,tsEntries)}/>)}
+          {coImplementers.map(ci=><CoImplementerPerfCard key={ci.id} ci={ci} clients={clients} canvasByClient={canvasByClient}/>)}
         </div>
-      </>)}
+      )}
     </div>
   )
 }
