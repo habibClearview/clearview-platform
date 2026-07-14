@@ -39,7 +39,16 @@ const C = {
 // this mirrors the same fixed hex literals scoring-engine.ts already uses
 // for classColor/gcColor/irColor (GREEN/AMBER/RED/TEAL), which stay
 // identical -- and WCAG-safe as a solid fill -- in both themes.
-const TILE_COLOR = { green:'#1A7A4A', amber:'#B8860B', red:'#C0392B', slate:'#4A5A6A' }
+const TILE_COLOR = { green:'#1A7A4A', amber:'#8A6100', red:'#C0392B', slate:'#4A5A6A' }
+// scoring-engine.ts's shared AMBER token ('#B8860B') is tuned for coloured
+// TEXT on a light/dark card (donut rings, badges) -- fine at that use, but
+// only ~3.25:1 against white, below WCAG AA's 4.5:1 floor for the solid
+// white-on-fill tiles below. TILE_COLOR.amber above is a darker, tile-safe
+// substitute (5.5:1). classColor/gcColor/irColor from scoring-engine still
+// hand KPITile the original shared hex, so it remaps that one value at the
+// tile boundary -- nothing about the shared AMBER token or its other uses
+// (donuts, badges) changes.
+const SCORING_ENGINE_AMBER = '#B8860B'
 
 // ── Style helpers ────────────────────────────────────────────
 const card: React.CSSProperties = {background:C.white,border:'1px solid var(--cv-border-soft)',borderRadius:14,padding:'1.4rem 1.6rem',marginBottom:'1.35rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)'}
@@ -806,12 +815,13 @@ function ScoreDonut({label,display,frac,rating,color,onClick}:{label:string;disp
 // tab, Portfolio Hub, client health cards, etc.) since the mockup doesn't
 // cover those screens and this project doesn't guess at unapproved design.
 function KPITile({label,display,sub,color,onClick}:{label:string;display:string;sub:string;color:string;onClick?:()=>void}) {
+  const fill = color===SCORING_ENGINE_AMBER ? TILE_COLOR.amber : color
   return (
-    <div onClick={onClick} style={{background:color,borderRadius:14,padding:'1.05rem 1.2rem',color:'#fff',display:'flex',flexDirection:'column',gap:'0.5rem',minHeight:128,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)',cursor:onClick?'pointer':'default'}}>
+    <button type="button" onClick={onClick} disabled={!onClick} style={{background:fill,border:'none',borderRadius:14,padding:'1.05rem 1.2rem',color:'#fff',display:'flex',flexDirection:'column',gap:'0.5rem',minHeight:128,width:'100%',textAlign:'left',fontFamily:'inherit',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)',cursor:onClick?'pointer':'default'}}>
       <div style={{fontFamily:'monospace',fontSize:'0.86rem',letterSpacing:'0.08em',textTransform:'uppercase',color:'rgba(255,255,255,0.82)'}}>{label}</div>
       <div style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,lineHeight:1.1}}>{display}</div>
       <div style={{fontSize:'0.96rem',color:'rgba(255,255,255,0.9)'}}>{sub}</div>
-    </div>
+    </button>
   )
 }
 
