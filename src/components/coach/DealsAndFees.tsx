@@ -108,8 +108,6 @@ function NewProgrammeForm({onSave,onCancel}){
 // ─── DEALS PIPELINE ──────────────────────────────────────────
 const FUNNEL_STAGE_META={conversation:{label:'Conversation',color:C.slate},scoping:{label:'Scoping',color:C.cyan},proposal:{label:'Proposal in',color:C.amber},won:{label:'Won',color:C.green}}
 function DealsPipeline({programmes,setProgrammes,clients}){
-  const [editId,setEditId]=useState(null)
-  const [form,setForm]=useState(null)
   const [msg,setMsg]=useState(null)
   const [showNew,setShowNew]=useState(false)
   async function createProgramme(p){
@@ -151,19 +149,13 @@ function DealsPipeline({programmes,setProgrammes,clients}){
   const revStreams=revenueStreams(clients,programmesById)
   const independentStreams=revStreams.streams.filter(s=>s.key!=='programme_advisory')
 
-  function startEdit(p){setForm({deal_stage:p.deal_stage||'conversation',deal_value:p.deal_value??'',deal_probability:p.deal_probability??'',deal_currency:p.deal_currency||'USD',deal_expected_close:p.deal_expected_close||''});setEditId(p.id)}
-  async function save(id){
-    const patch={
-      deal_stage:form.deal_stage,
-      deal_value:form.deal_value===''?null:num(form.deal_value),
-      deal_probability:form.deal_probability===''?null:num(form.deal_probability),
-      deal_currency:form.deal_currency,
-      deal_expected_close:form.deal_expected_close||null,
-    }
-    const {error}=await supabase.from('programmes').update({...patch,updated_at:new Date().toISOString()}).eq('id',id)
-    if(error)return setMsg('Could not save deal: '+error.message)
+  // Every field editable directly on its own card -- no click-to-open a
+  // separate form. Updates local state immediately (so the input never
+  // feels laggy) and persists the same patch to Supabase right away.
+  async function updateDeal(id,patch){
     setProgrammes&&setProgrammes(prev=>prev.map(p=>p.id!==id?p:{...p,...patch}))
-    setEditId(null);setMsg(null)
+    const {error}=await supabase.from('programmes').update({...patch,updated_at:new Date().toISOString()}).eq('id',id)
+    if(error)setMsg('Could not save: '+error.message)
   }
 
   return(
@@ -207,58 +199,48 @@ function DealsPipeline({programmes,setProgrammes,clients}){
         </div>
       </>)}
 
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'0.85rem',marginBottom:'1.25rem'}}>
-        {DEAL_STAGES.map(stage=>{
-          const inStage=programmes.filter(p=>(p.deal_stage||'conversation')===stage.id)
-          const stageValue=inStage.reduce((s,p)=>s+num(p.deal_value),0)
+      {msg&&<div style={{fontSize:'1.01rem',color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
+
+      <div style={{fontFamily:'monospace',fontSize:'0.93rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.6rem'}}>All programme deals <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>· stage, value, currency, probability, and close date are all editable right here -- no separate edit screen</span></div>
+      {programmes.length===0
+        ? <div style={{...hint,padding:'0.5rem 0'}}>No programmes yet.</div>
+        : programmes.map(p=>{
+          const meta=stageMeta(p.deal_stage)
+          const lsps=clientCountForProgramme(p.id,clients)
+          const spread=p.deal_stage==='won'?programmeCanvasSpread(clients.filter(c=>c.programme_id===p.id).map(c=>canvasProgress(canvasByClient[c.id]||[]))):null
           return(
-            <div key={stage.id} style={{background:C.lightBg,borderRadius:12,padding:'0.75rem',borderTop:`3px solid ${stage.color}`}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:'0.5rem'}}>
-                <span style={{fontWeight:700,fontSize:'1.07rem',color:stage.color}}>{stage.label}</span>
-                <span style={{fontSize:'0.93rem',color:C.slate}}>{inStage.length} · {fmtMoney(stageValue,cur)}</span>
-              </div>
-              {inStage.length===0&&<div style={{...hint,padding:'0.5rem 0'}}>—</div>}
-              {inStage.map(p=>{
-                const lsps=clientCountForProgramme(p.id,clients)
-                const spread=p.deal_stage==='won'?programmeCanvasSpread(clients.filter(c=>c.programme_id===p.id).map(c=>canvasProgress(canvasByClient[c.id]||[]))):null
-                return(
-                <div key={p.id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'0.6rem 0.7rem',marginBottom:'0.5rem',cursor:'pointer'}} onClick={()=>startEdit(p)}>
-                  <div style={{fontWeight:600,fontSize:'1.07rem',color:C.navy}}>{p.name}</div>
-                  <div style={{fontSize:'0.93rem',color:C.slate,marginTop:'0.15rem'}}>{p.funder||'—'}{lsps>0&&` · ${lsps} LSP${lsps===1?'':'s'}`}</div>
-                  <div style={{display:'flex',justifyContent:'space-between',marginTop:'0.35rem',fontSize:'1.01rem'}}>
-                    <span style={{fontWeight:600,color:C.navy}}>{p.deal_value?fmtMoney(p.deal_value,p.deal_currency||cur):'—'}</span>
-                    {p.deal_probability!=null&&p.deal_probability!==''&&<span style={{color:C.slate}}>{num(p.deal_probability)}%</span>}
-                  </div>
-                  {p.deal_expected_close&&<div style={{fontSize:'0.93rem',color:C.slate,marginTop:'0.2rem'}}>close {p.deal_expected_close}</div>}
-                  {spread&&<div style={{fontSize:'0.93rem',color:C.teal,marginTop:'0.2rem'}}>Furthest {spread.furthestLabel} · Nearest {spread.nearestLabel}</div>}
-                  <div style={{fontSize:'0.86rem',color:C.cyan,marginTop:'0.3rem',fontWeight:600}}>Click to move to a different stage →</div>
+            <div key={p.id} style={{...card,borderLeft:`4px solid ${meta.color}`,marginBottom:'0.75rem'}}>
+              <div style={{display:'flex',justifyContent:'space-between',flexWrap:'wrap',gap:'0.75rem',alignItems:'flex-start'}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy}}>{p.name}</div>
+                  <div style={{fontSize:'0.93rem',color:C.slate,marginTop:'0.15rem'}}>{p.funder||'—'}{lsps>0&&` · ${lsps} beneficiar${lsps===1?'y':'ies'}`}</div>
+                  {spread&&<div style={{fontSize:'0.93rem',color:C.teal,marginTop:'0.15rem'}}>Furthest {spread.furthestLabel} · Nearest {spread.nearestLabel}</div>}
                 </div>
-              )})}
+                <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
+                  <div>
+                    <label style={{...lbl,marginBottom:'0.15rem'}}>Stage</label>
+                    <select style={{...inp,width:'auto',padding:'0.3rem 0.5rem'}} value={p.deal_stage||'conversation'} onChange={e=>updateDeal(p.id,{deal_stage:e.target.value})}>{DEAL_STAGES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</select>
+                  </div>
+                  <div>
+                    <label style={{...lbl,marginBottom:'0.15rem'}}>Value</label>
+                    <div style={{display:'flex',gap:'0.25rem'}}>
+                      <input type="number" placeholder="0" style={{...inp,width:100,padding:'0.3rem 0.5rem'}} value={p.deal_value??''} onChange={e=>updateDeal(p.id,{deal_value:e.target.value===''?null:num(e.target.value)})}/>
+                      <select style={{...inp,width:75,padding:'0.3rem 0.3rem'}} value={p.deal_currency||cur} onChange={e=>updateDeal(p.id,{deal_currency:e.target.value})}>{CURRENCIES.map(x=><option key={x}>{x}</option>)}</select>
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{...lbl,marginBottom:'0.15rem'}}>Probability %</label>
+                    <input type="number" min="0" max="100" placeholder="stage default" style={{...inp,width:100,padding:'0.3rem 0.5rem'}} value={p.deal_probability??''} onChange={e=>updateDeal(p.id,{deal_probability:e.target.value===''?null:num(e.target.value)})}/>
+                  </div>
+                  <div>
+                    <label style={{...lbl,marginBottom:'0.15rem'}}>Expected close</label>
+                    <input type="date" style={{...inp,width:'auto',padding:'0.3rem 0.5rem'}} value={p.deal_expected_close||''} onChange={e=>updateDeal(p.id,{deal_expected_close:e.target.value||null})}/>
+                  </div>
+                </div>
+              </div>
             </div>
           )
         })}
-      </div>
-
-      {msg&&<div style={{fontSize:'1.01rem',color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
-
-      {editId&&form&&(()=>{const p=programmes.find(x=>x.id===editId);return(
-        <div style={{...card,border:`1px solid ${C.cyan}`}}>
-          <div style={{...secH,marginBottom:'0.85rem'}}>Deal — {p?.name}</div>
-          <div style={fGrid}>
-            <div><label style={lbl}>Stage</label><select style={inp} value={form.deal_stage} onChange={e=>setForm(f=>({...f,deal_stage:e.target.value}))}>{DEAL_STAGES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</select></div>
-            <div><label style={lbl}>Deal value</label><input type="number" style={inp} value={form.deal_value} onChange={e=>setForm(f=>({...f,deal_value:e.target.value}))}/></div>
-            <div><label style={lbl}>Currency</label><select style={inp} value={form.deal_currency} onChange={e=>setForm(f=>({...f,deal_currency:e.target.value}))}>{CURRENCIES.map(x=><option key={x}>{x}</option>)}</select></div>
-            <div><label style={lbl}>Probability %</label><input type="number" min="0" max="100" style={inp} value={form.deal_probability} onChange={e=>setForm(f=>({...f,deal_probability:e.target.value}))}/>
-              <div style={hint}>Leave blank to use a stage default instead (Conversation 20% · Scoping 40% · Proposal 65%).</div>
-            </div>
-            <div><label style={lbl}>Expected close</label><input type="date" style={inp} value={form.deal_expected_close} onChange={e=>setForm(f=>({...f,deal_expected_close:e.target.value}))}/></div>
-          </div>
-          <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
-            <button style={solidBtn()} onClick={()=>save(editId)}>Save deal</button>
-            <button style={addBtn(true,C.slate)} onClick={()=>{setEditId(null);setMsg(null)}}>Cancel</button>
-          </div>
-        </div>
-      )})()}
     </div>
   )
 }
