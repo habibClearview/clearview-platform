@@ -1618,6 +1618,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 3 — Enter the Plan</div><p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.7,margin:0}}>Go to Planning to add revenue and cost lines. Enter monthly figures for the full planning period.</p></div>
         </div>
         <div style={card}><TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/></div>
+        {!selClient.programme_id&&<ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>}
       </div>
     )
 
@@ -1677,7 +1678,10 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 
           {/* Main content area */}
           <div>
-            {activeTab==='cover'&&<TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/>}
+            {activeTab==='cover'&&<>
+              <TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/>
+              {!selClient.programme_id&&<ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>}
+            </>}
             {activeTab==='how_to_start'&&<TabHowToStart client={selClient}/>}
             {activeTab==='coach_ref'&&canViewCoachGuidance(userRole)&&<TabCoachRef/>}
             {activeTab==='ip_framework'&&<TabIPFramework/>}
@@ -1762,6 +1766,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 :<div style={{...hint,color:C.amber}}>Add a funder email via Edit before you can invite them.</div>}
             </div>
             <div style={card}><div style={secH}>Client Organisations</div>{clients.filter(c=>c.programme_id===prog.id).map(c=><div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.75rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.45rem'}}><div><div style={{fontWeight:600,fontSize:'1.07rem'}}>{c.name}</div><div style={{fontSize:'0.93rem',color:C.slate}}>{CLIENT_TYPE_LABELS[c.type]} \u00b7 {statusLabel(c.status)}</div></div><button style={addBtn(true)} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}>Open \u2192</button></div>)}</div>
+            <ServicesSection payerType="programme" payerId={prog.id} clients={clients}/>
             {prog.notes&&<div style={card}><div style={secH}>Notes</div><div style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.6}}>{prog.notes}</div></div>}
           </div>
         )}
@@ -2051,6 +2056,115 @@ function TabCover({client,prog,programmes,onUpdate}){
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// A payer (a programme, or an independent client paying for itself) can
+// hold more than one service at once -- e.g. a programme paying for the
+// Clearview financial model for several beneficiaries today does not mean
+// it can't ALSO pay for GtCV canvas for a different beneficiary, direct
+// advisory, or a Portfolio Intelligence subscription. This is additive to
+// (not a replacement for) the single engagement_mode already on each
+// beneficiary's own client record -- nothing that already works reads
+// from this table. Loads and fails independently of the rest of the
+// dashboard: service_engagements is a brand-new table that won't exist
+// until the migration is applied, and that must never block the whole
+// page from loading.
+const SERVICE_TYPE_LABELS={advisory:'Advisory',canvas:'GtCV Canvas',financial:'Clearview Financial Model',portfolio_intelligence:'Portfolio Intelligence Subscription'}
+function ServicesSection({payerType,payerId,clients}){
+  const [rows,setRows]=useState([])
+  const [loading,setLoading]=useState(true)
+  const [migrationNeeded,setMigrationNeeded]=useState(false)
+  const [showNew,setShowNew]=useState(false)
+  const [msg,setMsg]=useState(null)
+  const payerCol=payerType==='programme'?'payer_programme_id':'payer_client_id'
+
+  useEffect(()=>{
+    let cancelled=false
+    setLoading(true)
+    supabase.from('service_engagements').select('*').eq(payerCol,payerId).order('created_at',{ascending:false})
+      .then(({data,error})=>{
+        if(cancelled)return
+        if(error){setMigrationNeeded(true);setLoading(false);return}
+        setRows(data||[])
+        setLoading(false)
+      })
+    return ()=>{cancelled=true}
+  },[payerCol,payerId])
+
+  async function addService(f){
+    const row={id:`svc_${Date.now()}`,[payerCol]:payerId,beneficiary_client_id:f.beneficiary_client_id||null,service_type:f.service_type,status:'active',fee:f.fee===''?null:Number(f.fee),fee_currency:f.fee_currency,notes:f.notes||null}
+    const {data,error}=await supabase.from('service_engagements').insert([row]).select().single()
+    if(error)return setMsg('Could not add service: '+error.message)
+    setRows(prev=>[data,...prev]);setShowNew(false);setMsg(null)
+  }
+  async function updateService(id,patch){
+    setRows(prev=>prev.map(r=>r.id!==id?r:{...r,...patch}))
+    const {error}=await supabase.from('service_engagements').update({...patch,updated_at:new Date().toISOString()}).eq('id',id)
+    if(error)setMsg('Could not save: '+error.message)
+  }
+  async function removeService(id){
+    const {error}=await supabase.from('service_engagements').delete().eq('id',id)
+    if(error)return setMsg('Could not remove: '+error.message)
+    setRows(prev=>prev.filter(r=>r.id!==id))
+  }
+
+  if(loading)return null
+  if(migrationNeeded)return(
+    <div style={{...card,border:`1px solid ${C.amber}`,background:'var(--cv-tint-amber)'}}>
+      <div style={secH}>Services</div>
+      <p style={hint}>This needs one additive database change first: apply <code>supabase/migrations/2026_07_14_service_engagements.sql</code> in the Supabase SQL editor, then reload. Nothing existing is affected.</p>
+    </div>
+  )
+
+  return(
+    <div style={card}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.75rem'}}>
+        <div style={secH}>Services</div>
+        <button style={addBtn()} onClick={()=>setShowNew(!showNew)}>+ Add Service</button>
+      </div>
+      <p style={{...hint,marginBottom:'0.75rem'}}>Every service this payer is engaged for -- can hold more than one at once, each with its own beneficiary, fee, and status.</p>
+      {msg&&<div style={{...hint,color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
+      {showNew&&<NewServiceForm clients={clients} onSave={addService} onCancel={()=>setShowNew(false)}/>}
+      {rows.length===0
+        ?<div style={{...hint,padding:'0.5rem 0'}}>No services logged yet.</div>
+        :rows.map(r=>{
+          const beneficiary=clients.find(c=>c.id===r.beneficiary_client_id)
+          return(
+            <div key={r.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.75rem',flexWrap:'wrap',padding:'0.6rem 0.75rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.45rem'}}>
+              <div>
+                <div style={{fontWeight:600,fontSize:'1.07rem',color:C.navy}}>{SERVICE_TYPE_LABELS[r.service_type]||r.service_type}</div>
+                <div style={{fontSize:'0.93rem',color:C.slate}}>{beneficiary?`for ${beneficiary.name}`:'no specific beneficiary'}{r.fee?` · ${fmtGlance(r.fee,r.fee_currency||'USD')}`:''}</div>
+              </div>
+              <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}>
+                <select style={{...inp,width:'auto',padding:'0.25rem 0.4rem',fontSize:'0.93rem'}} value={r.status} onChange={e=>updateService(r.id,{status:e.target.value})}>
+                  <option value="active">Active</option>
+                  <option value="paused">Paused</option>
+                  <option value="complete">Complete</option>
+                </select>
+                <button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>removeService(r.id)} title="Remove">×</button>
+              </div>
+            </div>
+          )
+        })}
+    </div>
+  )
+}
+function NewServiceForm({clients,onSave,onCancel}){
+  const [f,setF]=useState({service_type:'advisory',beneficiary_client_id:'',fee:'',fee_currency:'USD',notes:''})
+  return(
+    <div style={{...card,border:`1px solid ${C.cyan}`,marginBottom:'0.75rem'}}>
+      <div style={fGrid}>
+        <div><label style={lbl}>Service</label><select style={inp} value={f.service_type} onChange={e=>setF(x=>({...x,service_type:e.target.value}))}>{Object.entries(SERVICE_TYPE_LABELS).map(([k,l])=><option key={k} value={k}>{l}</option>)}</select></div>
+        <div><label style={lbl}>Beneficiary (optional)</label><select style={inp} value={f.beneficiary_client_id} onChange={e=>setF(x=>({...x,beneficiary_client_id:e.target.value}))}><option value="">No specific beneficiary</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+        <div><label style={lbl}>Fee</label><input type="number" style={inp} value={f.fee} onChange={e=>setF(x=>({...x,fee:e.target.value}))}/></div>
+        <div><label style={lbl}>Currency</label><select style={inp} value={f.fee_currency} onChange={e=>setF(x=>({...x,fee_currency:e.target.value}))}><option>USD</option><option>GBP</option><option>EUR</option><option>UGX</option><option>NGN</option><option>KES</option></select></div>
+      </div>
+      <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
+        <button style={solidBtn()} onClick={()=>{if(!f.service_type)return;onSave(f)}}>Add Service</button>
+        <button style={{...addBtn(),borderColor:C.border,color:C.slate}} onClick={onCancel}>Cancel</button>
+      </div>
     </div>
   )
 }
