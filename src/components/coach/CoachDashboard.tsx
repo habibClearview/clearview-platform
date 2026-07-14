@@ -1435,26 +1435,6 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         )}
         {pending>0&&<div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontWeight:600,color:C.amber}}>\u23f3 {pending} timesheet{pending>1?'s':''} awaiting approval</span><button style={addBtn(true,C.amber)} onClick={()=>setView('team')}>Review \u2192</button></div>}
         <MyBusinessGlance clients={clients} programmes={programmes} coImplementers={coImplementers}/>
-        {programmes.map(prog=>{
-          const progClients=clients.filter(c=>c.programme_id===prog.id)
-          return(
-            <div key={prog.id} style={card}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem',flexWrap:'wrap',gap:'0.5rem'}}>
-                <div>
-                  <div style={{fontFamily:'Georgia,serif',fontSize:'1.22rem',fontWeight:700,color:C.navy}}>{prog.name}</div>
-                  <div style={{fontSize:'1.01rem',color:C.slate,marginTop:'0.15rem'}}>{prog.funder} \u00b7 {prog.country} \u00b7 {prog.type==='donor_programme'?'Donor Programme':'Direct Client'}</div>
-                </div>
-                <button style={addBtn(true)} onClick={()=>{setSelProgId(prog.id);setView('programmes')}}>Manage \u2192</button>
-              </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(215px,1fr))',gap:'0.75rem'}}>
-                {progClients.map(c=><ClientCard key={c.id} client={c} programmes={programmes}
-                  onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}
-                  onEdit={isSuperCoach?()=>{setSelClientId(c.id);setActiveTab('cover');setView('client');setShowEditClient(true)}:undefined}/>)}
-                <div style={{border:`2px dashed ${C.border}`,borderRadius:6,padding:'1rem',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',cursor:'pointer',color:C.slate,fontSize:'1.01rem',gap:'0.35rem',minHeight:120}} onClick={()=>setView('clients')}><span style={{fontSize:'1.3rem'}}>+</span><span>Add client</span></div>
-              </div>
-            </div>
-          )
-        })}
       </div>
     )
   }
