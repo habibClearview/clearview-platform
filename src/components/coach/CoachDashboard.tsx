@@ -1909,7 +1909,7 @@ function TabCover({client,prog,programmes,onUpdate}){
   const [form,setForm]=useState({...client})
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 1 \u2014 Cover</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn(true)} onClick={()=>{setForm({...client});setEditing(!editing)}}>{editing?'Cancel':'Edit'}</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>{client.engagement_mode==='canvas'?'Tab 1 \u2014 Cover':'Cover'}</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn(true)} onClick={()=>{setForm({...client});setEditing(!editing)}}>{editing?'Cancel':'Edit'}</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       {editing?(
         <div style={card}>
           <div style={fGrid}>
@@ -1931,7 +1931,7 @@ function TabCover({client,prog,programmes,onUpdate}){
       ):(
         <div style={card}>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
-            {[['Organisation',client.name],['Programme',prog?.name||'\u2014'],['Type',CLIENT_TYPE_LABELS[client.type]||'\u2014'],['Funder',prog?.funder||'\u2014'],['Lead Consultant','The Canvas Coach'],['Contact',client.contact_name||'\u2014'],['Email',client.contact_email||'\u2014'],['Country',client.country],['Sector',client.sector],['Start Date',client.start_date||'\u2014'],['Target Handover',client.expected_close||'\u2014'],['Status',statusLabel(client.status)],['Engagement Mode',client.engagement_mode==='canvas'?'Full GtCV Canvas':'Clearview Financial']].map(([k,v])=>(
+            {[['Organisation',client.name],['Programme',prog?.name||'\u2014'],['Type',CLIENT_TYPE_LABELS[client.type]||'\u2014'],['Contact',client.contact_name||'\u2014'],['Email',client.contact_email||'\u2014'],['Country',client.country],['Sector',client.sector],['Start Date',client.start_date||'\u2014'],['Target Handover',client.expected_close||'\u2014'],['Status',statusLabel(client.status)],['Engagement Mode',client.engagement_mode==='canvas'?'Full GtCV Canvas':'Clearview Financial']].map(([k,v])=>(
               <div key={k} style={{padding:'0.75rem 1rem',background:C.lightBg,borderRadius:6}}>
                 <div style={{fontSize:'0.93rem',color:C.slate,marginBottom:'0.2rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>{k}</div>
                 <div style={{fontSize:'1.11rem',fontWeight:600,color:C.navy}}>{v}</div>
