@@ -1301,8 +1301,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     const label=seStatus?({active:'Active',paused:'Paused',complete:'Complete'}[seStatus]||seStatus):statusLabel(client.status)
     const color=seStatus?({active:C.green,paused:C.amber,complete:C.slate}[seStatus]||C.slate):statusColor(client.status)
     return(
-      <div style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.75rem 0.85rem',cursor:client.slug?'pointer':'default',background:C.white}}
-        onClick={()=>client.slug&&window.open(`/dashboard/${client.slug}`,'_blank')}>
+      <div style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.75rem 0.85rem',cursor:'pointer',background:C.white}}
+        onClick={()=>{setSelClientId(client.id);setActiveTab('cover');setView('client')}}>
         <div style={{fontWeight:700,fontSize:'0.95rem',marginBottom:'0.4rem'}}>{client.name}</div>
         <Badge text={label} color={color}/>
         {hasActuals&&<div onClick={e=>e.stopPropagation()}><ClientDocumentActions clientId={client.id} clientName={client.name} clients={clients} programmes={programmes}/></div>}
