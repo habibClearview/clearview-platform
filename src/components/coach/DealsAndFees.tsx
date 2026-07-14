@@ -231,6 +231,7 @@ function DealsPipeline({programmes,setProgrammes,clients}){
                   </div>
                   {p.deal_expected_close&&<div style={{fontSize:'0.93rem',color:C.slate,marginTop:'0.2rem'}}>close {p.deal_expected_close}</div>}
                   {spread&&<div style={{fontSize:'0.93rem',color:C.teal,marginTop:'0.2rem'}}>Furthest {spread.furthestLabel} · Nearest {spread.nearestLabel}</div>}
+                  <div style={{fontSize:'0.86rem',color:C.cyan,marginTop:'0.3rem',fontWeight:600}}>Click to move to a different stage →</div>
                 </div>
               )})}
             </div>
