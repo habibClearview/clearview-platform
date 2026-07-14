@@ -63,6 +63,141 @@ export function outstandingInvoiced(clients: FeeClient[]): number {
   return clients.filter(c => c.fee_status === 'invoiced').reduce((s, c) => s + fee(c), 0)
 }
 
+/** Fee agreed but not yet invoiced -- the "awaiting issue" state, a real
+ *  fee_status value already used everywhere else in the app (see feeMeta). */
+export function awaitingInvoice(clients: FeeClient[]): number {
+  return clients.filter(c => c.fee_status === 'unpaid').reduce((s, c) => s + fee(c), 0)
+}
+
+// ─── Period selector (Month / Quarter / Year to date / Year) ──────────
+export type PeriodType = 'month' | 'quarter' | 'ytd' | 'year'
+/** The UTC calendar window a period type covers, anchored on `now`.
+ *  'ytd' and 'year' currently produce the IDENTICAL window (start of this
+ *  calendar year through today) -- they can only diverge once past-year
+ *  browsing exists (no fee is ever dated in the future), which isn't built
+ *  yet. Not a bug: the two options simply behave the same today. */
+export function periodRange(periodType: PeriodType, now: Date = new Date()): { start: Date; end: Date } {
+  const y = now.getUTCFullYear()
+  if (periodType === 'month') {
+    return { start: new Date(Date.UTC(y, now.getUTCMonth(), 1)), end: new Date(Date.UTC(y, now.getUTCMonth() + 1, 1)) }
+  }
+  if (periodType === 'quarter') {
+    const q = Math.floor(now.getUTCMonth() / 3)
+    return { start: new Date(Date.UTC(y, q * 3, 1)), end: new Date(Date.UTC(y, q * 3 + 3, 1)) }
+  }
+  return { start: new Date(Date.UTC(y, 0, 1)), end: new Date(Date.UTC(y + 1, 0, 1)) }
+}
+
+/** Cash actually collected (fee_status='paid', fee_paid_at) within the given period window. */
+export function feesReceivedInPeriod(clients: FeeClient[], periodType: PeriodType, now: Date = new Date()): number {
+  const { start, end } = periodRange(periodType, now)
+  return clients
+    .filter(c => c.fee_status === 'paid' && c.fee_paid_at && new Date(c.fee_paid_at) >= start && new Date(c.fee_paid_at) < end)
+    .reduce((s, c) => s + fee(c), 0)
+}
+
+export interface ClientTypeBucket { count: number; revenue: number }
+export interface ClientTypeBreakdown {
+  donorProgrammes: ClientTypeBucket
+  independentClients: ClientTypeBucket
+  subscribers: ClientTypeBucket
+  total: ClientTypeBucket
+}
+/**
+ * The coach's three real payer types (docs/gtcv/README.md's who-pays
+ * model): a donor programme (the funder is the paying relationship,
+ * regardless of how many beneficiaries it covers), an independent canvas
+ * client (self-funded GtCV, no programme), or a subscriber (self-funded
+ * Clearview, no programme). Revenue is cash collected within the given
+ * period -- the same cash-basis definition feesReceivedInPeriod uses, so
+ * this breakdown's total always ties out to "Fees Paid Up" for the same
+ * period.
+ */
+export function clientTypeBreakdown(
+  clients: FeeClient[],
+  programmesById: Record<string, DealProgramme>,
+  periodType: PeriodType,
+  now: Date = new Date()
+): ClientTypeBreakdown {
+  const { start, end } = periodRange(periodType, now)
+  const paidInPeriod = (c: FeeClient) =>
+    c.fee_status === 'paid' && c.fee_paid_at && new Date(c.fee_paid_at) >= start && new Date(c.fee_paid_at) < end ? fee(c) : 0
+  const donorProgrammes: ClientTypeBucket = { count: 0, revenue: 0 }
+  const independentClients: ClientTypeBucket = { count: 0, revenue: 0 }
+  const subscribers: ClientTypeBucket = { count: 0, revenue: 0 }
+  const donorProgrammeIds = new Set<string>()
+  clients.forEach(c => {
+    const programme = c.programme_id ? programmesById[c.programme_id] : undefined
+    if (programme && programme.type === 'donor_programme') {
+      donorProgrammeIds.add(programme.id)
+      donorProgrammes.revenue += paidInPeriod(c)
+    } else if (isIndependent(c) && c.engagement_mode === 'canvas') {
+      independentClients.count++
+      independentClients.revenue += paidInPeriod(c)
+    } else if (isIndependent(c) && c.engagement_mode === 'financial') {
+      subscribers.count++
+      subscribers.revenue += paidInPeriod(c)
+    }
+  })
+  donorProgrammes.count = donorProgrammeIds.size
+  const total: ClientTypeBucket = {
+    count: donorProgrammes.count + independentClients.count + subscribers.count,
+    revenue: donorProgrammes.revenue + independentClients.revenue + subscribers.revenue,
+  }
+  return { donorProgrammes, independentClients, subscribers, total }
+}
+
+export interface ServiceTypeBucket { count: number; revenue: number }
+export interface ServiceEngagementLike { service_type: string; fee?: number | null; status?: string | null }
+export interface ServiceTypeBreakdown {
+  advisory: ServiceTypeBucket
+  canvas: ServiceTypeBucket
+  financial: ServiceTypeBucket
+  portfolioIntelligence: ServiceTypeBucket
+  total: ServiceTypeBucket
+}
+/**
+ * The same clients grouped by SERVICE instead of by payer. Canvas/financial
+ * come from each client's primary engagement_mode, using the identical
+ * cash-collected-in-period definition clientTypeBreakdown uses -- so as
+ * long as no advisory/portfolio-intelligence service carries revenue yet,
+ * this total ties out exactly to clientTypeBreakdown's total (same
+ * underlying clients, grouped a different way). Advisory and Portfolio
+ * Intelligence come from service_engagements, which has no collection-date
+ * field yet (only a status) -- their revenue is the CURRENT active fee,
+ * not filtered to the period. That's a real, known gap: once a coach logs
+ * paid advisory/PI revenue, this total can drift from the client-type
+ * total until service_engagements gets its own paid-date field.
+ */
+export function serviceTypeBreakdown(
+  clients: FeeClient[],
+  serviceEngagements: ServiceEngagementLike[],
+  periodType: PeriodType,
+  now: Date = new Date()
+): ServiceTypeBreakdown {
+  const { start, end } = periodRange(periodType, now)
+  const paidInPeriod = (c: FeeClient) =>
+    c.fee_status === 'paid' && c.fee_paid_at && new Date(c.fee_paid_at) >= start && new Date(c.fee_paid_at) < end ? fee(c) : 0
+  const canvas: ServiceTypeBucket = { count: 0, revenue: 0 }
+  const financial: ServiceTypeBucket = { count: 0, revenue: 0 }
+  const advisory: ServiceTypeBucket = { count: 0, revenue: 0 }
+  const portfolioIntelligence: ServiceTypeBucket = { count: 0, revenue: 0 }
+  clients.forEach(c => {
+    if (c.engagement_mode === 'canvas') { canvas.count++; canvas.revenue += paidInPeriod(c) }
+    else if (c.engagement_mode === 'financial') { financial.count++; financial.revenue += paidInPeriod(c) }
+  })
+  serviceEngagements.forEach(se => {
+    if (se.status !== 'active') return
+    if (se.service_type === 'advisory') { advisory.count++; advisory.revenue += Number(se.fee) || 0 }
+    else if (se.service_type === 'portfolio_intelligence') { portfolioIntelligence.count++; portfolioIntelligence.revenue += Number(se.fee) || 0 }
+  })
+  const total: ServiceTypeBucket = {
+    count: canvas.count + financial.count + advisory.count + portfolioIntelligence.count,
+    revenue: canvas.revenue + financial.revenue + advisory.revenue + portfolioIntelligence.revenue,
+  }
+  return { advisory, canvas, financial, portfolioIntelligence, total }
+}
+
 /** Sum of fees marked paid whose fee_paid_at falls within the given calendar
  *  month ('YYYY-MM', the same period-string convention coach_invoices uses --
  *  see periodForDate in TeamPayments.tsx). */

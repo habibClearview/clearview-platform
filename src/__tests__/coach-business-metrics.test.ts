@@ -7,6 +7,7 @@ import {
   dealFunnel, clientCountForProgramme, programmeCanvasSpread,
   dealProbability, weightedPipelineValue, pipelineSnapshot,
   feesReceivedInMonth, recentMonthPeriods, monthlyFeeRevenue, monthlyTeamCost,
+  awaitingInvoice, periodRange, feesReceivedInPeriod, clientTypeBreakdown, serviceTypeBreakdown,
   type FeeClient, type DealProgramme,
 } from '../lib/coach-business-metrics'
 
@@ -70,6 +71,125 @@ describe('outstandingInvoiced', () => {
       client({ fee_status: 'unpaid', engagement_fee: 1_000 }),
     ])
     expect(r).toBe(20_000)
+  })
+})
+
+describe('awaitingInvoice', () => {
+  it('sums fees marked unpaid -- agreed but not yet invoiced', () => {
+    const r = awaitingInvoice([
+      client({ fee_status: 'unpaid', engagement_fee: 3_000 }),
+      client({ fee_status: 'invoiced', engagement_fee: 9_000 }),
+      client({ fee_status: 'paid', engagement_fee: 5_000 }),
+    ])
+    expect(r).toBe(3_000)
+  })
+})
+
+describe('periodRange', () => {
+  it('month: the first through last day of the current UTC month', () => {
+    const now = new Date('2026-07-14T10:00:00Z')
+    const { start, end } = periodRange('month', now)
+    expect(start.toISOString()).toBe('2026-07-01T00:00:00.000Z')
+    expect(end.toISOString()).toBe('2026-08-01T00:00:00.000Z')
+  })
+  it('quarter: groups the month into its 3-month block', () => {
+    const now = new Date('2026-07-14T10:00:00Z') // Q3: Jul-Sep
+    const { start, end } = periodRange('quarter', now)
+    expect(start.toISOString()).toBe('2026-07-01T00:00:00.000Z')
+    expect(end.toISOString()).toBe('2026-10-01T00:00:00.000Z')
+  })
+  it('ytd and year both span the full current calendar year today', () => {
+    const now = new Date('2026-07-14T10:00:00Z')
+    expect(periodRange('ytd', now)).toEqual(periodRange('year', now))
+    expect(periodRange('year', now).start.toISOString()).toBe('2026-01-01T00:00:00.000Z')
+  })
+})
+
+describe('feesReceivedInPeriod', () => {
+  it('sums only paid fees whose fee_paid_at falls within the period window', () => {
+    const now = new Date('2026-07-14T00:00:00Z')
+    const clients = [
+      client({ fee_status: 'paid', fee_paid_at: '2026-07-10', engagement_fee: 10_000 }),
+      client({ fee_status: 'paid', fee_paid_at: '2026-05-01', engagement_fee: 5_000 }), // different month AND different quarter (Q2)
+      client({ fee_status: 'invoiced', fee_paid_at: '2026-07-10', engagement_fee: 8_000 }),
+    ]
+    expect(feesReceivedInPeriod(clients, 'month', now)).toBe(10_000)
+    // 2026-07-14 falls in Q3 (Jul-Sep); the May payment is in Q2, so quarter total is just the July one.
+    expect(feesReceivedInPeriod(clients, 'quarter', now)).toBe(10_000)
+  })
+})
+
+describe('clientTypeBreakdown', () => {
+  const programmesById: Record<string, DealProgramme> = {
+    donor1: { id: 'donor1', name: 'CSJ', type: 'donor_programme' },
+  }
+  const now = new Date('2026-07-14T00:00:00Z')
+
+  it('counts a donor programme once regardless of how many beneficiaries it has', () => {
+    const clients = [
+      client({ id: 'a', programme_id: 'donor1', engagement_mode: 'financial' }),
+      client({ id: 'b', programme_id: 'donor1', engagement_mode: 'financial' }),
+      client({ id: 'c', programme_id: 'donor1', engagement_mode: 'canvas' }),
+    ]
+    const r = clientTypeBreakdown(clients, programmesById, 'year', now)
+    expect(r.donorProgrammes.count).toBe(1)
+    expect(r.total.count).toBe(1)
+  })
+
+  it('splits independent clients into canvas (independent) vs financial (subscriber)', () => {
+    const clients = [
+      client({ id: 'a', programme_id: null, engagement_mode: 'canvas' }),
+      client({ id: 'b', programme_id: null, engagement_mode: 'financial' }),
+      client({ id: 'c', programme_id: null, engagement_mode: 'financial' }),
+    ]
+    const r = clientTypeBreakdown(clients, programmesById, 'year', now)
+    expect(r.independentClients.count).toBe(1)
+    expect(r.subscribers.count).toBe(2)
+    expect(r.total.count).toBe(3)
+  })
+
+  it('revenue is cash collected within the period, and the total sums every bucket', () => {
+    const clients = [
+      client({ id: 'a', programme_id: 'donor1', engagement_mode: 'financial', fee_status: 'paid', fee_paid_at: '2026-07-01', engagement_fee: 30_000 }),
+      client({ id: 'b', programme_id: null, engagement_mode: 'canvas', fee_status: 'paid', fee_paid_at: '2026-07-01', engagement_fee: 9_600 }),
+      client({ id: 'c', programme_id: null, engagement_mode: 'financial', fee_status: 'unpaid', engagement_fee: 7_600 }),
+    ]
+    const r = clientTypeBreakdown(clients, programmesById, 'year', now)
+    expect(r.donorProgrammes.revenue).toBe(30_000)
+    expect(r.independentClients.revenue).toBe(9_600)
+    expect(r.subscribers.revenue).toBe(0) // unpaid -- not collected yet
+    expect(r.total.revenue).toBe(39_600)
+  })
+
+  it('handles an empty client list without crashing', () => {
+    const r = clientTypeBreakdown([], {}, 'month', now)
+    expect(r.total).toEqual({ count: 0, revenue: 0 })
+  })
+})
+
+describe('serviceTypeBreakdown', () => {
+  const now = new Date('2026-07-14T00:00:00Z')
+
+  it('canvas/financial totals tie out exactly to clientTypeBreakdown when no service_engagements exist', () => {
+    const programmesById: Record<string, DealProgramme> = { donor1: { id: 'donor1', name: 'CSJ', type: 'donor_programme' } }
+    const clients = [
+      client({ id: 'a', programme_id: 'donor1', engagement_mode: 'financial', fee_status: 'paid', fee_paid_at: '2026-07-01', engagement_fee: 30_000 }),
+      client({ id: 'b', programme_id: null, engagement_mode: 'canvas', fee_status: 'paid', fee_paid_at: '2026-07-01', engagement_fee: 9_600 }),
+    ]
+    const clientView = clientTypeBreakdown(clients, programmesById, 'year', now)
+    const serviceView = serviceTypeBreakdown(clients, [], 'year', now)
+    expect(serviceView.total.revenue).toBe(clientView.total.revenue)
+  })
+
+  it('counts only active service_engagements, ignoring paused/complete ones', () => {
+    const r = serviceTypeBreakdown([], [
+      { service_type: 'advisory', fee: 4_000, status: 'active' },
+      { service_type: 'advisory', fee: 9_999, status: 'paused' },
+      { service_type: 'portfolio_intelligence', fee: 5_000, status: 'active' },
+    ], 'year', now)
+    expect(r.advisory).toEqual({ count: 1, revenue: 4_000 })
+    expect(r.portfolioIntelligence).toEqual({ count: 1, revenue: 5_000 })
+    expect(r.total.revenue).toBe(9_000)
   })
 })
 

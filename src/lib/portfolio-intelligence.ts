@@ -160,6 +160,11 @@ export interface PortfolioOverview {
   // mixing tens-of-millions UGX with thousands USD), so this is never a
   // single flat summary.
   currentFundAbsorption: Record<string, FundAbsorptionSummary>
+  // Same currency-scoping rule as above, but SUMMED rather than averaged
+  // -- "the portfolio's total current credit capacity in UGX today", a
+  // real sum over every UGX business with a non-null figure (nulls
+  // excluded, not treated as zero -- same rule as the average).
+  currentFundAbsorptionTotal: Record<string, FundAbsorptionSummary>
 }
 
 // Averages a FAC figure across every snapshot where that type resolved to
@@ -172,10 +177,20 @@ function avgFacType(snapshots: ClientSnapshot[], pick: (fac: FACResult) => numbe
   return values.length > 0 ? average(values) : null
 }
 
-// Groups snapshots by currency and computes one FundAbsorptionSummary
-// per currency, so a FAC figure is only ever averaged against other
-// figures denominated in the same currency.
-function fundAbsorptionByCurrency(snapshots: ClientSnapshot[]): Record<string, FundAbsorptionSummary> {
+// Same null-exclusion rule as avgFacType, but summed -- a business with no
+// consignment unit is left out of the total entirely, not counted as 0.
+function sumFacType(snapshots: ClientSnapshot[], pick: (fac: FACResult) => number | null): number | null {
+  const values = snapshots.map(s => pick(s.fac)).filter((v): v is number => v !== null)
+  return values.length > 0 ? values.reduce((a, b) => a + b, 0) : null
+}
+
+// Groups snapshots by currency and computes one FundAbsorptionSummary per
+// currency (using `reduce`), so a FAC figure is only ever combined with
+// other figures denominated in the same currency.
+function fundAbsorptionByCurrency(
+  snapshots: ClientSnapshot[],
+  reduceFn: (group: ClientSnapshot[], pick: (fac: FACResult) => number | null) => number | null
+): Record<string, FundAbsorptionSummary> {
   const byCurrency = new Map<string, ClientSnapshot[]>()
   snapshots.forEach(s => {
     const group = byCurrency.get(s.currency)
@@ -185,11 +200,11 @@ function fundAbsorptionByCurrency(snapshots: ClientSnapshot[]): Record<string, F
   const result: Record<string, FundAbsorptionSummary> = {}
   byCurrency.forEach((group, currency) => {
     result[currency] = {
-      credit: avgFacType(group, c => c.credit.capacity),
-      grant: avgFacType(group, c => c.grant.capacity),
-      equity: avgFacType(group, c => c.equity.capacity),
-      consignment: avgFacType(group, c => c.consignment.capacity),
-      recoverableGrant: avgFacType(group, c => c.recoverableGrant.capacity),
+      credit: reduceFn(group, c => c.credit.capacity),
+      grant: reduceFn(group, c => c.grant.capacity),
+      equity: reduceFn(group, c => c.equity.capacity),
+      consignment: reduceFn(group, c => c.consignment.capacity),
+      recoverableGrant: reduceFn(group, c => c.recoverableGrant.capacity),
     }
   })
   return result
@@ -237,8 +252,36 @@ export function computePortfolioOverview(snapshots: ClientSnapshot[]): Portfolio
     mostCommonWeakDimension,
     dimensionAverages,
     verificationDistribution,
-    currentFundAbsorption: fundAbsorptionByCurrency(snapshots),
+    currentFundAbsorption: fundAbsorptionByCurrency(snapshots, avgFacType),
+    currentFundAbsorptionTotal: fundAbsorptionByCurrency(snapshots, sumFacType),
   }
+}
+
+// "Most common failure points" -- the dimensions where the group scores
+// worst, ranked weakest-first, each with the real count of businesses
+// scoring below `threshold` on that dimension. This is a straight ranking
+// of ALL SEVEN dimension averages (LRS_DIMENSION_KEYS), not a filtered
+// subset -- "top 3" just means the slice happens after sorting.
+export interface DimensionFailure {
+  dimension: keyof LRSResult['dimensions']
+  avgScore: number
+  countBelowThreshold: number
+  totalCount: number
+  threshold: number
+}
+
+export function rankedDimensionFailures(snapshots: ClientSnapshot[], threshold = 50, top = 3): DimensionFailure[] {
+  if (snapshots.length === 0) return []
+  return LRS_DIMENSION_KEYS.map(dimension => {
+    const scores = snapshots.map(s => s.lrs.dimensions[dimension].score)
+    return {
+      dimension,
+      avgScore: average(scores),
+      countBelowThreshold: scores.filter(v => v < threshold).length,
+      totalCount: snapshots.length,
+      threshold,
+    }
+  }).sort((a, b) => a.avgScore - b.avgScore).slice(0, top)
 }
 
 export interface DimensionComparison {

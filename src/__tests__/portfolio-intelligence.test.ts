@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   computePortfolioOverview, computeSegmentReport, readinessStage, matchesFilter,
-  anonymizedRefCode, revenueSizeBracket, buildAnonymisedProfile,
+  anonymizedRefCode, revenueSizeBracket, buildAnonymisedProfile, rankedDimensionFailures,
   type ClientSnapshot,
 } from '../lib/portfolio-intelligence'
 import type { LRSResult } from '../lib/liquidity-readiness'
@@ -210,6 +210,40 @@ describe('computeSegmentReport', () => {
     const r = computeSegmentReport(snaps, { sector: 'nonexistent' })
     expect(r.segment.totalBusinesses).toBe(0)
     expect(r.portfolio.totalBusinesses).toBe(1)
+  })
+})
+
+describe('rankedDimensionFailures', () => {
+  it('REG: an empty portfolio returns an empty list, not a crash', () => {
+    expect(rankedDimensionFailures([])).toEqual([])
+  })
+
+  it('REG: ranks weakest-average dimensions first, defaults to the top 3 of all seven', () => {
+    const snaps = [
+      makeSnapshot({ lrs: makeLRS({ trust: 10, resilience: 20, visibility: 30, marketOpportunity: 90, profitability: 90, capacity: 90, compliance: 90 }) }),
+    ]
+    const r = rankedDimensionFailures(snaps)
+    expect(r).toHaveLength(3)
+    expect(r.map(f => f.dimension)).toEqual(['trust', 'resilience', 'visibility'])
+  })
+
+  it('REG: countBelowThreshold only counts businesses actually below the threshold, using real per-business scores', () => {
+    const snaps = [
+      makeSnapshot({ lrs: makeLRS({ trust: 10 }) }),
+      makeSnapshot({ lrs: makeLRS({ trust: 90 }) }),
+      makeSnapshot({ lrs: makeLRS({ trust: 40 }) }),
+    ]
+    const r = rankedDimensionFailures(snaps, 50, 1)
+    expect(r[0].dimension).toBe('trust')
+    expect(r[0].countBelowThreshold).toBe(2)
+    expect(r[0].totalCount).toBe(3)
+    expect(r[0].avgScore).toBeCloseTo((10 + 90 + 40) / 3, 6)
+  })
+
+  it('REG: the `top` parameter caps how many dimensions are returned', () => {
+    const snaps = [makeSnapshot()]
+    expect(rankedDimensionFailures(snaps, 50, 1)).toHaveLength(1)
+    expect(rankedDimensionFailures(snaps, 50, 7)).toHaveLength(7)
   })
 })
 

@@ -13,11 +13,11 @@ import BuildStamp from '@/components/BuildStamp'
 import TeamPayments from '@/components/coach/TeamPayments'
 import DealsAndFees from '@/components/coach/DealsAndFees'
 import {
-  engagementSplit, independentClients, feesReceivedInYear, feesReceivedInMonth, outstandingInvoiced,
-  averageDaysToCollect, revenueStreams, dealCards, dealWinRate,
+  outstandingInvoiced, dealCards, dealWinRate,
   canvasProgress, coImplementerNamesForClient, engagementDisplayStatus, coImplementerWorkload,
   healthStatusFromReportText, portfolioHealthCounts, groupClientsByProgramme,
   pipelineSnapshot, recentMonthPeriods, monthlyFeeRevenue, monthlyTeamCost,
+  awaitingInvoice, clientTypeBreakdown, serviceTypeBreakdown,
 } from '@/lib/coach-business-metrics'
 import { GRANT_TYPE_LABELS, GRANT_SCOPE_LABELS, grantStatus, generateAccessToken, expiryFromDays } from '@/lib/access-grants'
 import { READINESS_STAGE_LABELS } from '@/lib/portfolio-intelligence'
@@ -63,8 +63,34 @@ function GlanceBar({frac,color}){return<div style={{height:6,borderRadius:3,back
 // (portfolio overview -> filtered segment -> one anonymised business).
 function LevelMarker({n,label,sub}){return(<div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',margin:'1.7rem 0 0.9rem'}}><span style={{fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,color:'var(--cv-on-accent)',background:C.navy,borderRadius:20,padding:'0.15rem 0.7rem'}}>LEVEL {n}</span><span style={{fontFamily:'Georgia,serif',fontSize:'1.08rem',fontWeight:700,color:C.navy}}>{label}</span>{sub&&<span style={{color:C.slate,fontSize:'0.86rem'}}>{sub}</span>}</div>)}
 function DrillConnector({children}){return<div style={{display:'flex',justifyContent:'center',textAlign:'center',padding:'0.25rem 0',color:C.teal,fontSize:'0.92rem',fontFamily:'monospace'}}>{children}</div>}
-function RevenueStreamCard({label,value,description,tag,barFrac,currency,color}){return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem',borderTop:`3px solid ${color}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.22rem',fontWeight:700,color:C.navy}}>{label}</div><div style={{fontSize:'1.07rem',color:C.slate,margin:'0.15rem 0 0.7rem'}}>{description}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>{fmtGlance(value,currency)}</div><Badge text={tag} color={color}/><GlanceBar frac={barFrac} color={color}/></div>)}
-const DEAL_STAGE_META={conversation:{label:'Early conversation',color:C.slate},scoping:{label:'Scoping',color:C.cyan},proposal:{label:'Proposal · deciding',color:C.amber},won:{label:'Won · in delivery',color:C.green},lost:{label:'Lost',color:C.red}}
+// Navy header + bordered body + bordered/sunk KPI cards -- the exact colour
+// tokens and card chrome from the approved Portfolio Intelligence mockup
+// (pi-header / pi-body / pi-kpi / mini-dist / delta-badge), reused here so
+// every "glance" screen in the coach dashboard shares one visual language
+// instead of each inventing its own card style.
+function PiHeaderBar({title,chips}){return(
+  <div style={{background:C.navy,color:'var(--cv-on-accent)',borderRadius:'10px 10px 0 0',padding:'0.95rem 1.4rem',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem'}}>
+    <div style={{fontFamily:'Georgia,serif',fontWeight:700,fontSize:'1.05rem'}}>{title}</div>
+    <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap'}}>{chips}</div>
+  </div>
+)}
+function PiChip({active,onClick,children}){return(
+  <button onClick={onClick} style={{fontFamily:'monospace',fontSize:'0.76rem',border:`1px solid ${active?C.cyan:'rgba(255,255,255,0.35)'}`,color:active?'#0B1420':'rgba(255,255,255,0.85)',background:active?C.cyan:'transparent',borderRadius:999,padding:'0.32rem 0.8rem',cursor:'pointer',fontWeight:active?700:400}}>{children}</button>
+)}
+function PiBody({children}){return<div style={{border:'1px solid var(--cv-border-soft)',borderTop:'none',borderRadius:'0 0 10px 10px',padding:'1.3rem',background:C.white,marginBottom:'2rem'}}>{children}</div>}
+function PiSectionHeading({label,sub}){return(<div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',margin:'1.9rem 0 0.8rem'}}><span style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>{label}</span>{sub&&<span style={{color:C.slate,fontSize:'0.85rem'}}>{sub}</span>}</div>)}
+function PiKpiCard({label,value,rev,sub,total,color,deltaBadge}){return(
+  <div style={total?{border:`2px solid ${C.cyan}`,borderRadius:10,padding:'0.9rem 1rem',background:'var(--cv-tint-cyan)'}:{border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.9rem 1rem',background:'var(--cv-bg-2)'}}>
+    <div style={{fontFamily:'monospace',fontSize:'0.74rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate}}>{label}</div>
+    <div style={{fontFamily:'Georgia,serif',fontSize:total?'1.7rem':'1.5rem',fontWeight:700,color:color||C.navy,marginTop:'0.25rem'}}>{value}</div>
+    {rev!=null&&<div style={{fontFamily:'Georgia,serif',fontSize:total?'1.18rem':'1.02rem',fontWeight:700,color:total?C.cyan:C.green,marginTop:'0.1rem'}}>{rev}</div>}
+    {sub&&<div style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.25rem'}}>{sub}</div>}
+    {deltaBadge&&<span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,borderRadius:999,padding:'0.05rem 0.5rem',display:'inline-block',marginTop:'0.35rem',background:deltaBadge.up?'var(--cv-tint-green)':'var(--cv-tint-red)',color:deltaBadge.up?C.green:C.red}}>{deltaBadge.text}</span>}
+  </div>
+)}
+function MiniDistBar({segments}){return(<div style={{display:'flex',height:6,borderRadius:3,overflow:'hidden',marginTop:'0.55rem'}}>{segments.map((s,i)=><div key={i} style={{width:`${s.pct}%`,background:s.color}}/>)}</div>)}
+function PiKpiRow({children,cols}){return<div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gap:'0.9rem'}}>{children}</div>}
+const DEAL_STAGE_META={conversation:{label:'Interview Stage',color:C.slate},scoping:{label:'Negotiation',color:C.cyan},proposal:{label:'Proposal Sent',color:C.amber},won:{label:'Won',color:C.green},lost:{label:'Lost',color:C.red}}
 function DealPipelineCard({deal}){const meta=DEAL_STAGE_META[deal.stage]||{label:deal.stage,color:C.slate};return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem',borderTop:`3px solid ${meta.color}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)'}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.22rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>{deal.name}</div><div style={{fontSize:'1.01rem',color:C.slate,marginBottom:'0.5rem'}}>{deal.subtitle}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>{fmtGlance(deal.value,deal.currency)}</div><Badge text={meta.label} color={meta.color}/><GlanceBar frac={deal.barFrac} color={meta.color}/></div>)}
 
 // ─── Engagements table (real canvas progress; NO margin % -- that field
@@ -531,37 +557,6 @@ function ClientHealthTab({clients,programmes,onUpdateClient}){
     </div>
   )
 }
-// Pipeline by stage -- a current, point-in-time bar chart (see
-// pipelineSnapshot in coach-business-metrics.ts for why this can't
-// honestly be a trend yet). Bar height = deal count in that stage; value
-// is shown as a secondary label underneath, never invented.
-function PipelineStageChart({stages}){
-  const W=560,H=178,padL=16,padR=16,padT=20,padB=34
-  const maxV=Math.max(1,...stages.map(s=>s.count))
-  const bw=(W-padL-padR)/stages.length
-  const y=v=>padT+(1-(v/maxV))*(H-padT-padB)
-  return(
-    <div style={{overflowX:'auto'}}>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:'block',minWidth:340}}>
-        <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} style={{stroke:'var(--cv-border-soft)'}}/>
-        {stages.map((s,i)=>{
-          const meta=DEAL_STAGE_META[s.stage]||{color:C.slate,label:s.stage}
-          const x=padL+i*bw+bw*0.2, w=bw*0.6
-          const top=y(s.count)
-          return(
-            <g key={s.stage}>
-              <rect x={x} y={top} width={w} height={Math.max(0,(H-padB)-top)} rx={4} style={{fill:meta.color}}/>
-              {s.count>0&&<text x={x+w/2} y={top-6} fontSize="10.5" fontWeight="700" textAnchor="middle" fontFamily="monospace" style={{fill:C.navy}}>{s.count}</text>}
-              <text x={x+w/2} y={H-padB+14} fontSize="9.5" textAnchor="middle" fontFamily="monospace" style={{fill:C.slate}}>{meta.label.split(' ')[0].replace('·','')}</text>
-              <text x={x+w/2} y={H-padB+25} fontSize="8.5" textAnchor="middle" fontFamily="monospace" style={{fill:C.slate}}>{fmtGlance(s.value,s.currency)}</text>
-            </g>
-          )
-        })}
-      </svg>
-    </div>
-  )
-}
-
 // Revenue vs cost, last 6 months -- both real, dated figures (fee_paid_at
 // for revenue, issued coach_invoices.period for cost). A month with
 // nothing collected/invoiced shows as a zero bar, not a gap or an
@@ -598,43 +593,22 @@ function RevenueCostTrendChart({periods,revenueByPeriod,costByPeriod,cur}){
   )
 }
 
+const MB_PERIOD_LABELS={month:'Month',quarter:'Quarter',ytd:'Year to date',year:'Year'}
 function MyBusinessGlance({clients,programmes,coImplementers}){
-  const split=engagementSplit(clients)
-  const indep=independentClients(clients)
-  // Real groupings for the glance numbers -- who's actually under each
-  // programme, which independent clients pay for GtCV themselves, and
-  // which independent clients are on a Clearview subscription. Same
-  // isIndependent/engagement_mode split revenueStreams() already uses.
-  // Editing which client is in which group happens on the Clients tab,
-  // not here -- this section is numbers and values only, at a glance.
-  const independentCanvasClients=clients.filter(c=>!c.programme_id&&c.engagement_mode==='canvas')
-  const subscriberClients=clients.filter(c=>!c.programme_id&&c.engagement_mode==='financial')
   const feeCur=clients.find(c=>c.fee_currency)?.fee_currency||'USD'
   const outstanding=outstandingInvoiced(clients)
-  const dso=averageDaysToCollect(clients)
+  const awaitingIssue=awaitingInvoice(clients)
   const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
-  const rs=revenueStreams(clients,programmesById)
   const deals=dealCards(programmes)
   const winRate=dealWinRate(programmes)
-  const streamColor={programme_advisory:C.slate,self_funded_gtcv:C.purple,clearview_subscriptions:C.teal}
-  const totalPayingClients=rs.streams.reduce((s,x)=>s+x.clientCount,0)
-  const streamByKey=Object.fromEntries(rs.streams.map(s=>[s.key,s]))
-  // "Served / beneficiary" (docs/gtcv/README.md) = every organisation put
-  // through the canvas, regardless of who pays for it -- distinct from the
-  // revenue-stream cards above, which are about who's paying, not who's
-  // being served. The same real count as split.gtcv, just named for what
-  // it actually represents here.
-  const beneficiaryCount=split.gtcv
 
-  // Fees Paid is period-aware (month vs year, cumulative); every other
-  // count/value on this tab is a CURRENT snapshot (there's no per-stream
-  // collection date to split by period -- engagement_fee is a single
-  // static value per client, not a dated line per month), so only this
-  // one figure changes with the toggle.
+  // Four periods, one selector -- every card on this tab that can honestly
+  // be period-scoped (client-type revenue, service-type revenue, fees paid
+  // up) uses the SAME selection, so numbers never silently disagree about
+  // which window they cover.
   const [period,setPeriod]=useState('month')
   const now=new Date()
-  const currentMonthKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
-  const feesThisPeriod=period==='month'?feesReceivedInMonth(clients,currentMonthKey):feesReceivedInYear(clients,now.getFullYear())
+  const ctb=clientTypeBreakdown(clients,programmesById,period,now)
 
   // Real canvas progress + timesheet + invoice data, fetched once for the
   // whole list -- avoids an N+1 query per client. Empty/failed fetch
@@ -661,65 +635,80 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
     return ()=>{cancelled=true}
   },[clients])
 
+  // Advisory and Portfolio Intelligence subscriptions have no home on
+  // engagement_clients (only canvas/financial do, via engagement_mode) --
+  // those two come from the service_engagements table (see ServicesSection
+  // below and supabase/migrations/2026_07_14_service_engagements.sql). Own,
+  // independent, error-tolerant fetch -- if the migration hasn't been
+  // applied yet, this quietly shows 0 for those two rather than blocking
+  // the rest of the tab from loading.
+  const [serviceEngagements,setServiceEngagements]=useState([])
+  useEffect(()=>{
+    let cancelled=false
+    supabase.from('service_engagements').select('service_type,fee,status').then(({data,error})=>{
+      if(cancelled||error)return
+      setServiceEngagements(data||[])
+    }).catch(()=>{})
+    return ()=>{cancelled=true}
+  },[])
+  const stb=serviceTypeBreakdown(clients,serviceEngagements,period,now)
+
   const trendPeriods=recentMonthPeriods(6)
   const revenueByPeriod=monthlyFeeRevenue(clients,trendPeriods)
   const costByPeriod=monthlyTeamCost(invoices,trendPeriods)
   const pipeline=pipelineSnapshot(programmes)
+  const periodLabel=MB_PERIOD_LABELS[period]
 
   return(
     <div style={{marginBottom:'1.75rem'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem',marginBottom:'0.75rem'}}>
-        <Kicker style={{marginBottom:0}}>My business at a glance</Kicker>
-        <div style={{display:'flex',gap:'0.3rem'}}>
-          <button style={subPill(period==='month')} onClick={()=>setPeriod('month')}>This Month</button>
-          <button style={subPill(period==='year')} onClick={()=>setPeriod('year')}>This Year (cumulative)</button>
-        </div>
-      </div>
+      <PiHeaderBar title="My Business" chips={
+        Object.entries(MB_PERIOD_LABELS).map(([k,l])=><PiChip key={k} active={period===k} onClick={()=>setPeriod(k)}>{l}</PiChip>)
+      }/>
+      <PiBody>
 
-      <Kicker>Your client base <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; number and value per client type -- to edit who's in which group, use the Clients tab</span></Kicker>
-      <div className="cv-grid-3" style={{marginBottom:'1.5rem'}}>
-        <GlanceKPI label="Programmes" value={String(programmes.length)}
-          sub={`${clients.filter(c=>!!c.programme_id).length} beneficiar${clients.filter(c=>!!c.programme_id).length===1?'y':'ies'} served · ${fmtGlance(programmes.reduce((s,p)=>s+(Number(p.deal_value)||0),0),programmes.find(p=>p.deal_currency)?.deal_currency||'USD')} deal value`}
-          color={C.navy}/>
-        <GlanceKPI label="Independent Clients" value={String(independentCanvasClients.length)}
-          sub={`self-funded GtCV · ${fmtGlance(independentCanvasClients.reduce((s,c)=>s+(Number(c.engagement_fee)||0),0),feeCur)} fees`}
-          color={C.purple}/>
-        <GlanceKPI label="Subscribers" value={String(subscriberClients.length)}
-          sub={`independent Clearview · ${fmtGlance(subscriberClients.reduce((s,c)=>s+(Number(c.engagement_fee)||0),0),feeCur)} fees`}
-          color={C.teal}/>
-      </div>
+        <PiSectionHeading label="Client types" sub={`number and revenue per type, this ${periodLabel.toLowerCase()} -- to edit who's in which group, use the Clients tab`}/>
+        <PiKpiRow cols={4}>
+          <PiKpiCard total label="All Clients" value={String(ctb.total.count)} rev={fmtGlance(ctb.total.revenue,feeCur)} sub={`every paying client, this ${periodLabel.toLowerCase()}`}/>
+          <PiKpiCard label="Donor Programmes" value={String(ctb.donorProgrammes.count)} rev={fmtGlance(ctb.donorProgrammes.revenue,feeCur)} sub="e.g. Climate Smart Job"/>
+          <PiKpiCard label="Independent Clients" value={String(ctb.independentClients.count)} rev={fmtGlance(ctb.independentClients.revenue,feeCur)} sub="self-funded GtCV"/>
+          <PiKpiCard label="Subscribers" value={String(ctb.subscribers.count)} rev={fmtGlance(ctb.subscribers.revenue,feeCur)} sub="independent Clearview"/>
+        </PiKpiRow>
 
-      <div className="cv-grid-4" style={{marginBottom:'0.75rem'}}>
-        <GlanceKPI label="Paying Clients" value={String(totalPayingClients)} sub="across every revenue stream" color={C.navy}/>
-        <GlanceKPI label="Programme Advisory" value={String(streamByKey.programme_advisory?.clientCount||0)} sub="grant-funded" color={C.slate}/>
-        <GlanceKPI label="Independent Canvas Paying" value={String(streamByKey.self_funded_gtcv?.clientCount||0)} sub="self-funded GtCV" color={C.purple}/>
-        <GlanceKPI label="Clearview Subscriptions" value={String(streamByKey.clearview_subscriptions?.clientCount||0)} sub="independent · recurring" color={C.teal}/>
-      </div>
-      <div className="cv-grid-4" style={{marginBottom:'1.5rem'}}>
-        <GlanceKPI label={`Fees Paid Up · ${period==='month'?'This Month':'This Year'}`} value={fmtGlance(feesThisPeriod,feeCur)} sub="received & cleared" color={C.green}/>
-        <GlanceKPI label="Invoiced · My Own DSO" value={fmtGlance(outstanding,feeCur)} sub={dso!=null?`avg ${Math.round(dso)} days to collect`:'no collections recorded yet'} color={C.amber}/>
-        <GlanceKPI label="Independent Clients" value={String(indep.count)} sub={`self-paying · ${Math.round(indep.revenueShare*100)}% of revenue`} color={C.purple}/>
-        <GlanceKPI label="Beneficiaries Served" value={String(beneficiaryCount)} sub="LSPs/agribusinesses through the canvas" color={C.cyan}/>
-      </div>
-      <Kicker>Revenue streams <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; two of the three are independent &mdash; your own commercial base, growing off programme money</span></Kicker>
-      <div className="cv-grid-3" style={{marginBottom:'1.5rem'}}>
-        {rs.streams.map(s=><RevenueStreamCard key={s.key} label={s.label} value={s.value} description={s.description} tag={s.tag} barFrac={s.barFrac} currency={feeCur} color={streamColor[s.key]}/>)}
-      </div>
-      <Kicker>Revenue &amp; cost <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; last 6 months, from real collections and issued co-implementer invoices</span></Kicker>
-      <div style={{...card,marginBottom:'1.5rem'}}>
-        <RevenueCostTrendChart periods={trendPeriods} revenueByPeriod={revenueByPeriod} costByPeriod={costByPeriod} cur={feeCur}/>
-      </div>
-      <Kicker>Pipeline <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; a current snapshot, not a trend &mdash; deal stage changes aren&#39;t logged with a date yet, so this can&#39;t honestly be shown over time</span></Kicker>
-      <div className="cv-grid-3" style={{marginBottom:'0.85rem'}}>
-        <GlanceKPI label="Closed Deals" value={String(pipeline.closedCount)} sub="won, all-time" color={C.green}/>
-        <GlanceKPI label="Open Pipeline Deals" value={String(pipeline.openCount)} sub="any stage" color={C.cyan}/>
-        <GlanceKPI label={`Revenue · ${period==='month'?'This Month':'This Year'}`} value={fmtGlance(feesThisPeriod,feeCur)} sub="fees actually collected" color={C.navy}/>
-      </div>
-      {pipeline.stages.some(s=>s.count>0)&&(
-        <div style={{...card,marginBottom:'1.5rem'}}>
-          <PipelineStageChart stages={pipeline.stages}/>
+        <PiSectionHeading label="Services" sub="number and revenue per service -- a client can hold more than one"/>
+        <PiKpiRow cols={5}>
+          <PiKpiCard total label="All Services" value={String(stb.total.count)} rev={fmtGlance(stb.total.revenue,feeCur)} sub={`service instances, this ${periodLabel.toLowerCase()}`}/>
+          <PiKpiCard label="Clearview Advisory" value={String(stb.advisory.count)} rev={fmtGlance(stb.advisory.revenue,feeCur)} color={C.slate}/>
+          <PiKpiCard label="Canvas Client (GtCV)" value={String(stb.canvas.count)} rev={fmtGlance(stb.canvas.revenue,feeCur)} color={C.purple}/>
+          <PiKpiCard label="Financial Model" value={String(stb.financial.count)} rev={fmtGlance(stb.financial.revenue,feeCur)} color={C.teal}/>
+          <PiKpiCard label="Market Intelligence Sub." value={String(stb.portfolioIntelligence.count)} rev={fmtGlance(stb.portfolioIntelligence.revenue,feeCur)} color={C.cyan}/>
+        </PiKpiRow>
+        <div style={{fontFamily:'monospace',fontSize:'0.78rem',color:C.slate,textAlign:'center',margin:'0.9rem 0 0'}}>
+          Services total always equals Client types total <b style={{color:C.cyan}}>&middot; {fmtGlance(stb.total.revenue,feeCur)} = {fmtGlance(ctb.total.revenue,feeCur)}</b> &mdash; same money, counted two ways
+          {stb.total.revenue!==ctb.total.revenue&&<span style={{color:C.amber}}> (once Advisory/Market Intelligence carry real paid revenue, these two can drift until that table gets its own collection date -- flagged, not hidden)</span>}
         </div>
-      )}
+
+        <PiSectionHeading label="Finance" sub="where the money actually stands, plus the trend behind it"/>
+        <PiKpiRow cols={4}>
+          <PiKpiCard label="Invoice Paid Up" value={fmtGlance(ctb.total.revenue,feeCur)} color={C.green} sub={`cleared this ${periodLabel.toLowerCase()}`}/>
+          <PiKpiCard label="Invoiced &middot; Not Paid" value={fmtGlance(outstanding,feeCur)} color={C.amber} sub="sent, awaiting payment (current)"/>
+          <PiKpiCard label="Awaiting Issue" value={fmtGlance(awaitingIssue,feeCur)} color={C.red} sub="fee agreed, not yet invoiced (current)"/>
+          <div style={{border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.9rem 1rem',background:'var(--cv-bg-2)'}}>
+            <div style={{fontFamily:'monospace',fontSize:'0.74rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate,marginBottom:'0.5rem'}}>Revenue vs. delivery cost &middot; last 6 months</div>
+            <RevenueCostTrendChart periods={trendPeriods} revenueByPeriod={revenueByPeriod} costByPeriod={costByPeriod} cur={feeCur}/>
+          </div>
+        </PiKpiRow>
+        <div style={{fontSize:'0.82rem',color:C.slate,margin:'0.6rem 0 0'}}>Pipeline conversion isn&#39;t shown as a trend line here -- deal-stage changes aren&#39;t logged with a date, so there&#39;s no honest history to chart. The current win rate is {Math.round(winRate.pct*100)}% ({winRate.wonCount} of {winRate.totalCount} deals with a stage set).</div>
+
+        <PiSectionHeading label="Pipeline" sub="open deals by stage &mdash; a current snapshot, not period-filtered: stage changes aren't logged with a date yet, so this can't honestly be shown for &quot;this month&quot; vs &quot;this year&quot;"/>
+        <PiKpiRow cols={4}>
+          {pipeline.stages.map(s=>{
+            const meta=DEAL_STAGE_META[s.stage]||{label:s.stage,color:C.slate}
+            return <PiKpiCard key={s.stage} label={meta.label} value={String(s.count)} color={meta.color} sub={`${fmtGlance(s.value,s.currency)} combined`}/>
+          })}
+        </PiKpiRow>
+
+      </PiBody>
+
       {deals.length>0&&(<>
         <Kicker>Programme deals <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; who actually pays for the programme-funded stream. {Math.round(winRate.pct*100)}% won ({winRate.wonCount} of {winRate.totalCount}).</span></Kicker>
         <div className="cv-grid-3" style={{marginBottom:'1.5rem'}}>
@@ -730,8 +719,7 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
           stages to be "how far along" through. Financial-model clients have
           no engagement stages, so listing them here just showed "No canvas
           yet" against every one of them; they already have their own view
-          (Client Health, Revenue Streams above) that fits what they actually
-          are. */}
+          (Client Health, above) that fits what they actually are. */}
       {clients.filter(c=>c.engagement_mode==='canvas').length>0&&(<>
         <Kicker>Engagements <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; who we serve, and how far along the canvas they are</span></Kicker>
         <div style={{marginBottom:'1.5rem'}}>

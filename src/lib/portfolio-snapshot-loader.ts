@@ -17,7 +17,7 @@ import { assessConfidence } from './confidence'
 import { buildPeriodSignals } from './verification-display'
 import { computeSeasonalCashProjection } from './seasonal-cash-projection'
 import { computeFundAbsorptionCapacity } from './fund-absorption-capacity'
-import { computePortfolioOverview, computeSegmentReport, buildAnonymisedProfile, matchesFilter, type ClientSnapshot, type SegmentFilter, type PortfolioOverview, type SegmentReport, type AnonymisedProfile } from './portfolio-intelligence'
+import { computePortfolioOverview, computeSegmentReport, buildAnonymisedProfile, matchesFilter, rankedDimensionFailures, type ClientSnapshot, type SegmentFilter, type PortfolioOverview, type SegmentReport, type AnonymisedProfile, type DimensionFailure } from './portfolio-intelligence'
 
 async function buildClientSnapshot(admin: SupabaseClient, client: any, configRow: any): Promise<ClientSnapshot | null> {
   if (!configRow) return null
@@ -209,6 +209,8 @@ export interface PortfolioViewData {
   snapshotCount: number
   profiles: AnonymisedProfile[]
   filterOptions: { sectors: string[]; countries: string[]; programmeIds: string[] }
+  portfolioDimensionFailures: DimensionFailure[]
+  segmentDimensionFailures: DimensionFailure[] | null
 }
 
 // Assembles the full response shape both /api/portfolio-intelligence (coach,
@@ -233,5 +235,7 @@ export function buildPortfolioViewData(snapshots: ClientSnapshot[], filter: Segm
       countries: distinctValues(s => s.country),
       programmeIds: distinctValues(s => s.programmeId),
     },
+    portfolioDimensionFailures: rankedDimensionFailures(snapshots),
+    segmentDimensionFailures: filter ? rankedDimensionFailures(profileSnapshots) : null,
   }
 }
