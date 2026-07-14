@@ -254,13 +254,21 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
             }
             return -1
           }
-          function readAmountSection(fromRow: number, fallbackName: string): number {
+          // section is 'staff' or 'overheads' -- carried through to
+          // confirmUpload so it can set the model's distinct 'staff' vs
+          // 'direct_opex' plan-line category (GenericDashboard's P&L
+          // shows these as separate sections, and revenue-per-head reads
+          // 'staff' specifically). Previously lost here, so every cost
+          // line -- staff and overhead alike -- landed in 'direct_opex',
+          // leaving the Staff section empty and Overheads inflated with
+          // staff costs mixed in.
+          function readAmountSection(fromRow: number, fallbackName: string, section: 'staff'|'overheads'): number {
             let row = fromRow
             while (cellStr(pf, `B${row}`).toUpperCase() === 'AMOUNT') {
               const name = cellStr(pf, `A${row}`)
               const vals = readVals(row)
               if (name || vals.some(v => v > 0)) {
-                allCommonCosts.push({ name: name || fallbackName, values: vals, unitName: resolvedUnitName })
+                allCommonCosts.push({ name: name || fallbackName, values: vals, unitName: resolvedUnitName, section })
                 sheetHadContent = true
               }
               row++
@@ -278,9 +286,9 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
           if (sheetHadContent) {
             const staffStart = findAmountRow(r)
             if (staffStart > 0) {
-              const afterStaff = readAmountSection(staffStart, 'Staff')
+              const afterStaff = readAmountSection(staffStart, 'Staff', 'staff')
               const opexStart = findAmountRow(afterStaff)
-              if (opexStart > 0) readAmountSection(opexStart, 'Overheads')
+              if (opexStart > 0) readAmountSection(opexStart, 'Overheads', 'overheads')
             }
           }
 
@@ -308,7 +316,9 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
             for (let cl = 0; cl < 4; cl++) {
               const r = commonRow + cl
               const name = cellStr(pf, `C${r}`)
-              if (name) { allCommonCosts.push({ name, values: readVals(r), unitName: resolvedUnitName }); sheetHadContent = true }
+              // Old template has no staff/overheads split -- one "Common
+              // Costs" bucket, kept as overheads to match prior behaviour.
+              if (name) { allCommonCosts.push({ name, values: readVals(r), unitName: resolvedUnitName, section: 'overheads' }); sheetHadContent = true }
             }
           }
         }
@@ -388,7 +398,12 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
 
       commonCosts.forEach((c:any) => {
         const unitId = hasUnits ? (unitIdByName[c.unitName] || keys[0].id) : wholeKey
-        planLines.push({ id: genId('common'), unit_id: unitId, name: c.name, category:'direct_opex', line_type:'standard',
+        // The model has a distinct 'staff' category from 'direct_opex'
+        // (GenericDashboard's P&L shows them as separate sections, and
+        // revenue-per-head reads 'staff' specifically) -- every cost
+        // line used to land in 'direct_opex' regardless of which section
+        // of the spreadsheet it actually came from.
+        planLines.push({ id: genId('common'), unit_id: unitId, name: c.name, category: c.section==='staff'?'staff':'direct_opex', line_type:'standard',
           monthly_plan: planArray(c.values), active:true })
       })
 
