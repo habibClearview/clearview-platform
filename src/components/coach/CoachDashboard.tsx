@@ -607,9 +607,23 @@ function RevenueCostTrendChart({periods,revenueByPeriod,costByPeriod,cur}){
   )
 }
 
-function MyBusinessGlance({clients,programmes,coImplementers}){
+function MyBusinessGlance({clients,setClients,programmes,coImplementers,onSelectClient}){
   const split=engagementSplit(clients)
   const indep=independentClients(clients)
+  // Real groupings, not just abstract counts -- who's actually under each
+  // programme, which independent clients pay for GtCV themselves, and
+  // which independent clients are on a Clearview subscription. Same
+  // isIndependent/engagement_mode split revenueStreams() already uses,
+  // just surfaced as browsable lists instead of only a number.
+  const independentCanvasClients=clients.filter(c=>!c.programme_id&&c.engagement_mode==='canvas')
+  const subscriberClients=clients.filter(c=>!c.programme_id&&c.engagement_mode==='financial')
+  const [subDateBusy,setSubDateBusy]=useState(null)
+  async function saveSubscriptionDate(clientId,value){
+    setSubDateBusy(clientId)
+    const {error}=await supabase.from('engagement_clients').update({subscription_start_date:value||null}).eq('id',clientId)
+    setSubDateBusy(null)
+    if(!error)setClients&&setClients(prev=>prev.map(c=>c.id!==clientId?c:{...c,subscription_start_date:value||null}))
+  }
   const feeCur=clients.find(c=>c.fee_currency)?.fee_currency||'USD'
   const outstanding=outstandingInvoiced(clients)
   const dso=averageDaysToCollect(clients)
@@ -676,6 +690,50 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
           <button style={subPill(period==='year')} onClick={()=>setPeriod('year')}>This Year (cumulative)</button>
         </div>
       </div>
+
+      <Kicker>Your client base <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>&middot; who you serve, grouped by who actually pays</span></Kicker>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
+        <div style={card}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.13rem',fontWeight:700,color:C.navy,marginBottom:'0.15rem'}}>Programmes</div>
+          <div style={{fontSize:'0.93rem',color:C.slate,marginBottom:'0.6rem'}}>the paying customer -- served businesses underneath are beneficiaries, not payers</div>
+          {programmes.length===0?<div style={{color:C.slate,fontSize:'0.96rem'}}>No programmes yet.</div>:programmes.map(p=>{
+            const progClients=clients.filter(c=>c.programme_id===p.id)
+            return(
+              <div key={p.id} style={{padding:'0.5rem 0',borderTop:`1px solid ${C.border}`}}>
+                <div style={{fontWeight:600,color:C.navy}}>{p.name}</div>
+                <div style={{fontSize:'0.93rem',color:C.slate}}>{progClients.length} beneficiar{progClients.length===1?'y':'ies'} served{progClients.length>0&&`: ${progClients.map(c=>c.name).join(', ')}`}</div>
+              </div>
+            )
+          })}
+        </div>
+        <div style={card}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.13rem',fontWeight:700,color:C.navy,marginBottom:'0.15rem'}}>Independent Clients</div>
+          <div style={{fontSize:'0.93rem',color:C.slate,marginBottom:'0.6rem'}}>self-funded GtCV -- paying for their own canvas engagement, no programme behind them</div>
+          {independentCanvasClients.length===0?<div style={{color:C.slate,fontSize:'0.96rem'}}>None yet.</div>:independentCanvasClients.map(c=>(
+            <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.4rem 0',borderTop:`1px solid ${C.border}`,cursor:onSelectClient?'pointer':'default'}} onClick={()=>onSelectClient&&onSelectClient(c.id)}>
+              <span style={{fontWeight:600,color:C.navy}}>{c.name}</span>
+              <span style={{fontSize:'0.93rem',color:C.slate}}>{c.engagement_fee?fmtGlance(c.engagement_fee,c.fee_currency||'USD'):'no fee set'}</span>
+            </div>
+          ))}
+        </div>
+        <div style={card}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.13rem',fontWeight:700,color:C.navy,marginBottom:'0.15rem'}}>Subscribers</div>
+          <div style={{fontSize:'0.93rem',color:C.slate,marginBottom:'0.6rem'}}>independent Clearview subscriptions -- recurring, self-paying</div>
+          {subscriberClients.length===0?<div style={{color:C.slate,fontSize:'0.96rem'}}>None yet.</div>:subscriberClients.map(c=>(
+            <div key={c.id} style={{padding:'0.4rem 0',borderTop:`1px solid ${C.border}`}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
+                <span style={{fontWeight:600,color:C.navy,cursor:onSelectClient?'pointer':'default'}} onClick={()=>onSelectClient&&onSelectClient(c.id)}>{c.name}</span>
+                <span style={{fontSize:'0.93rem',color:C.slate}}>{c.engagement_fee?fmtGlance(c.engagement_fee,c.fee_currency||'USD'):'no fee set'}</span>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:'0.4rem',marginTop:'0.2rem'}}>
+                <label style={{fontSize:'0.86rem',color:C.slate}}>Subscribed since:</label>
+                <input type="date" disabled={subDateBusy===c.id} value={c.subscription_start_date||''} onChange={e=>saveSubscriptionDate(c.id,e.target.value)} style={{fontSize:'0.86rem',padding:'0.1rem 0.3rem',border:`1px solid ${C.border}`,borderRadius:4,color:C.navy}}/>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="cv-grid-4" style={{marginBottom:'0.75rem'}}>
         <GlanceKPI label="Paying Clients" value={String(totalPayingClients)} sub="across every revenue stream" color={C.navy}/>
         <GlanceKPI label="Programme Advisory" value={String(streamByKey.programme_advisory?.clientCount||0)} sub="grant-funded" color={C.slate}/>
@@ -804,7 +862,7 @@ async function loadNotificationSettings(clientId){
 }
 
 // \u2500\u2500\u2500 CLIENT CARD \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-function ClientCard({client,programmes,onClick}){
+function ClientCard({client,programmes,onClick,onEdit}){
   const prog=programmes.find(p=>p.id===client.programme_id)
   return(
     <div style={{background:C.white,border:`1px solid ${C.border}`,borderTop:`4px solid ${CLIENT_TYPE_COLORS[client.type]||C.cyan}`,borderRadius:8,padding:'1rem 1.1rem',cursor:'pointer'}} onClick={onClick}>
@@ -815,7 +873,10 @@ function ClientCard({client,programmes,onClick}){
           {client.engagement_mode==='canvas'&&<span style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.purple,border:`1px solid ${C.purple}`,borderRadius:3,padding:'0.05rem 0.3rem'}}>GtCV</span>}
         </div>
       </div>
-      <div style={{fontSize:'0.93rem',color:C.slate,marginBottom:'0.35rem'}}>{CLIENT_TYPE_LABELS[client.type]} \u00b7 {prog?.name||'\u2014'}</div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.35rem',gap:'0.5rem'}}>
+        <div style={{fontSize:'0.93rem',color:prog?C.slate:C.amber}}>{CLIENT_TYPE_LABELS[client.type]} \u00b7 {prog?prog.name:'No programme -- self-paying'}</div>
+        {onEdit&&<button onClick={e=>{e.stopPropagation();onEdit()}} style={{fontFamily:'monospace',fontSize:'0.82rem',padding:'0.12rem 0.5rem',borderRadius:4,background:C.navy,color:'var(--cv-on-accent)',border:'none',cursor:'pointer',flexShrink:0}}>Edit</button>}
+      </div>
       {client.contact_name&&<div style={{fontSize:'0.93rem',color:C.navy,marginBottom:'0.3rem'}}>{client.contact_name}</div>}
       <Badge text={statusLabel(client.status)} color={statusColor(client.status)}/>
     </div>
@@ -1056,10 +1117,15 @@ function PortfolioIntelligenceHub({clients,programmes}){
     setDownloading(false)
   }
 
-  const load=useCallback((f)=>{
+  // The heavy lifting (a full financial-model recompute per client) is
+  // cached server-side for 60s so clicking through filters stays fast --
+  // see portfolio-snapshot-loader.ts. That means numbers can lag a change
+  // made elsewhere by up to a minute; forceRefresh bypasses the cache for
+  // the explicit "Refresh now" case.
+  const load=useCallback((f,forceRefresh)=>{
     setLoading(true);setError('')
     supabase.auth.getSession().then(({data:{session}})=>{
-      fetch('/api/portfolio-intelligence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requesterToken:session?.access_token,filter:f})})
+      fetch('/api/portfolio-intelligence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requesterToken:session?.access_token,filter:f,forceRefresh})})
         .then(r=>r.json())
         .then(json=>{
           if(json.error){setError(json.error);setLoading(false);return}
@@ -1110,7 +1176,8 @@ function PortfolioIntelligenceHub({clients,programmes}){
           {Object.entries(READINESS_STAGE_LABELS).map(([k,l])=><option key={k} value={k}>{l}</option>)}
         </select>
         {hasFilter&&<button onClick={()=>{setFilter({});load({})}} style={{fontSize:'0.85rem',color:C.slate,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>Clear filters</button>}
-        <button disabled={downloading} onClick={()=>downloadBrief(filter)} style={{marginLeft:'auto',fontSize:'0.85rem',fontWeight:600,color:C.teal,background:'none',border:`1px solid ${C.teal}`,borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>{downloading?'Generating…':'⬇ Word Summary'}</button>
+        <button title="Numbers are cached for up to 60 seconds so filtering stays fast -- click to force a fresh recompute" onClick={()=>load(filter,true)} style={{marginLeft:'auto',fontSize:'0.85rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>↻ Refresh now</button>
+        <button disabled={downloading} onClick={()=>downloadBrief(filter)} style={{fontSize:'0.85rem',fontWeight:600,color:C.teal,background:'none',border:`1px solid ${C.teal}`,borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>{downloading?'Generating…':'⬇ Word Summary'}</button>
         <button onClick={()=>setShowAccess(true)} style={{fontSize:'0.85rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>🔗 External Access</button>
         {downloadError&&<div style={{width:'100%',fontSize:'0.78rem',color:C.red}}>{downloadError}</div>}
       </div>
@@ -1462,7 +1529,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           </div>
         )}
         {pending>0&&<div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontWeight:600,color:C.amber}}>\u23f3 {pending} timesheet{pending>1?'s':''} awaiting approval</span><button style={addBtn(true,C.amber)} onClick={()=>setView('team')}>Review \u2192</button></div>}
-        <MyBusinessGlance clients={clients} programmes={programmes} coImplementers={coImplementers}/>
+        <MyBusinessGlance clients={clients} setClients={setClients} programmes={programmes} coImplementers={coImplementers}
+          onSelectClient={id=>{setSelClientId(id);setActiveTab('cover');setView('client')}}/>
         {programmes.map(prog=>{
           const progClients=clients.filter(c=>c.programme_id===prog.id)
           return(
@@ -1475,7 +1543,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 <button style={addBtn(true)} onClick={()=>{setSelProgId(prog.id);setView('programmes')}}>Manage \u2192</button>
               </div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(215px,1fr))',gap:'0.75rem'}}>
-                {progClients.map(c=><ClientCard key={c.id} client={c} programmes={programmes} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}/>)}
+                {progClients.map(c=><ClientCard key={c.id} client={c} programmes={programmes}
+                  onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}
+                  onEdit={isSuperCoach?()=>{setSelClientId(c.id);setActiveTab('cover');setView('client');setShowEditClient(true)}:undefined}/>)}
                 <div style={{border:`2px dashed ${C.border}`,borderRadius:6,padding:'1rem',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',cursor:'pointer',color:C.slate,fontSize:'1.01rem',gap:'0.35rem',minHeight:120}} onClick={()=>setView('clients')}><span style={{fontSize:'1.3rem'}}>+</span><span>Add client</span></div>
               </div>
             </div>
@@ -1520,7 +1590,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           if(!error&&data){setClients(prev=>[...prev,data]);setShowNew(false)}
         }} onCancel={()=>setShowNew(false)}/>}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(250px,1fr))',gap:'1rem'}}>
-          {filtered.map(c=><ClientCard key={c.id} client={c} programmes={programmes} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}/>)}
+          {filtered.map(c=><ClientCard key={c.id} client={c} programmes={programmes}
+            onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}
+            onEdit={isSuperCoach?()=>{setSelClientId(c.id);setActiveTab('cover');setView('client');setShowEditClient(true)}:undefined}/>)}
         </div>
       </div>
     )
@@ -1566,7 +1638,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
               <a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily:'monospace',fontSize:'1.01rem',padding:'0.4rem 1rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none',fontWeight:700}}>Open Clearview Financial Model ↗</a>
               {isSuperCoach&&<CopyIntakeLink client={selClient}/>}
-              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Edit Setup</button>}
+              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily:'monospace',fontSize:'0.93rem',fontWeight:700,padding:'0.4rem 0.85rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit Name / Type / Programme</button>}
               {isSuperCoach&&<button onClick={()=>setShowDeleteConfirm(true)} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Delete Client</button>}
             </div>
           </div>
@@ -1614,7 +1686,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
               {selClient.clearview_active&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.22rem 0.6rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none'}}>Open Clearview \u2197</a>}
-              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.22rem 0.6rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Edit Setup</button>}
+              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily:'monospace',fontSize:'0.93rem',fontWeight:700,padding:'0.22rem 0.6rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit Name / Type / Programme</button>}
               <button style={addBtn(true)} onClick={printSection}>Print</button>
             </div>
           </div>
@@ -1755,12 +1827,45 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // \u2500\u2500 TEAM VIEW \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   function TeamView(){
     const [showNew,setShowNew]=useState(false)
+    const [addingClientFor,setAddingClientFor]=useState(null)
+    const [teamMsg,setTeamMsg]=useState(null)
     const pendingTs=timesheets.filter(t=>t.status==='submitted')
     async function approveTs(id){await supabase.from('timesheets').update({status:'approved',approved_by:userName,approved_at:new Date().toISOString()}).eq('id',id);setTimesheets(prev=>prev.map(t=>t.id!==id?t:{...t,status:'approved'}))}
     async function rejectTs(id){await supabase.from('timesheets').update({status:'rejected'}).eq('id',id);setTimesheets(prev=>prev.map(t=>t.id!==id?t:{...t,status:'rejected'}))}
+    // Suspend/reactivate -- previously ci.active was set once at creation
+    // and never editable again anywhere in the app (the roster badge was
+    // read-only text). This is the real fix: a co-implementer moving off a
+    // closed engagement can be marked Inactive without deleting their
+    // record or history.
+    async function toggleActive(ci){
+      const next=!ci.active
+      const {error}=await supabase.from('co_implementers').update({active:next}).eq('id',ci.id)
+      if(error)return setTeamMsg('Could not update status: '+error.message)
+      setCoImplementers(prev=>prev.map(x=>x.id!==ci.id?x:{...x,active:next}))
+    }
+    // Reassign clients directly from the roster -- previously this was only
+    // reachable from Team → Payments → a different sub-tab, which is why
+    // "where do I move them to another client when the one they're on
+    // closes" had no obvious answer. Same underlying client_ids array
+    // AccessSection (TeamPayments.tsx) writes to, just surfaced here too.
+    async function assignClient(ci,clientId){
+      if(!clientId||(ci.client_ids||[]).includes(clientId))return
+      const next=[...(ci.client_ids||[]),clientId]
+      const {error}=await supabase.from('co_implementers').update({client_ids:next}).eq('id',ci.id)
+      if(error)return setTeamMsg('Could not assign client: '+error.message)
+      setCoImplementers(prev=>prev.map(x=>x.id!==ci.id?x:{...x,client_ids:next}))
+      setAddingClientFor(null)
+    }
+    async function unassignClient(ci,clientId){
+      const next=(ci.client_ids||[]).filter(id=>id!==clientId)
+      const {error}=await supabase.from('co_implementers').update({client_ids:next}).eq('id',ci.id)
+      if(error)return setTeamMsg('Could not remove client: '+error.message)
+      setCoImplementers(prev=>prev.map(x=>x.id!==ci.id?x:{...x,client_ids:next}))
+    }
     return(
       <div>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem'}}><div style={secH}>Canvas Coach Team</div>{canManageTeam(userRole)&&<button style={addBtn()} onClick={()=>setShowNew(!showNew)}>+ Add Co-Implementer</button>}</div>
+        {teamMsg&&<div style={{fontSize:'1.01rem',color:C.red,marginBottom:'0.75rem'}}>{teamMsg}</div>}
         {pendingTs.length>0&&canApproveTimesheets(userRole)&&(
           <div style={{...card,background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`}}>
             <div style={secH}>\u23f3 Pending Timesheet Approvals ({pendingTs.length})</div>
@@ -1786,13 +1891,23 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.65rem'}}>
               <div><div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy}}>{ci.name}</div><div style={{fontSize:'1.01rem',color:C.slate}}>{ci.email} \u00b7 {ci.country}</div>{ci.specialisation&&<div style={{fontSize:'1.01rem',color:C.slate}}>{ci.specialisation}</div>}</div>
               <div style={{textAlign:'right'}}>
-                <div style={{fontFamily:'monospace',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem'}}>{ci.active?'Active':'Inactive'}</div>
-                {ci.rate_per_day>0&&<div style={{fontSize:'0.93rem',color:C.slate,marginBottom:'0.4rem'}}>{ci.currency} {Number(ci.rate_per_day).toLocaleString()}/day</div>}
+                {canManageTeam(userRole)
+                  ?<button onClick={()=>toggleActive(ci)} title="Click to toggle" style={{fontFamily:'monospace',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem',background:'transparent',border:`1px solid ${ci.active?C.green:C.red}`,borderRadius:4,padding:'0.1rem 0.5rem',cursor:'pointer'}}>{ci.active?'Active':'Inactive'} · click to {ci.active?'suspend':'reactivate'}</button>
+                  :<div style={{fontFamily:'monospace',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem'}}>{ci.active?'Active':'Inactive'}</div>}
+                {ci.rate_per_day>0&&<div style={{fontSize:'0.93rem',color:C.slate,marginBottom:'0.4rem',marginTop:'0.3rem'}}>{ci.currency} {Number(ci.rate_per_day).toLocaleString()}/day</div>}
                 <InviteLoginButton email={ci.email} fullName={ci.name} role="coach" coImplementerId={ci.id} funderProgrammeId={null}/>
               </div>
             </div>
-            <div style={{display:'flex',gap:'1.5rem',fontSize:'1.01rem',color:C.slate,marginBottom:'0.5rem'}}>
-              <span style={{display:'flex',alignItems:'center',gap:'0.4rem',flexWrap:'wrap'}}>Clients:{(ci.client_ids||[]).length===0?<strong style={{color:C.slate}}>None</strong>:(ci.client_ids||[]).map(id=><span key={id} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.12rem 0.55rem',borderRadius:20,background:'var(--cv-cyan-dim)',color:C.teal,border:`1px solid ${C.border}`}}>{clients.find(c=>c.id===id)?.name||id}</span>)}</span>
+            <div style={{display:'flex',gap:'1.5rem',fontSize:'1.01rem',color:C.slate,marginBottom:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
+              <span style={{display:'flex',alignItems:'center',gap:'0.4rem',flexWrap:'wrap'}}>Clients:{(ci.client_ids||[]).length===0?<strong style={{color:C.slate}}>None</strong>:(ci.client_ids||[]).map(id=><span key={id} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.12rem 0.55rem',borderRadius:20,background:'var(--cv-cyan-dim)',color:C.teal,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:'0.3rem'}}>{clients.find(c=>c.id===id)?.name||id}{canManageTeam(userRole)&&<span style={{cursor:'pointer',fontWeight:700}} onClick={()=>unassignClient(ci,id)} title="Remove this client">×</span>}</span>)}</span>
+              {canManageTeam(userRole)&&(addingClientFor===ci.id?(
+                <select autoFocus style={{...inp,width:'auto',fontSize:'0.93rem',padding:'0.15rem 0.4rem'}} value="" onChange={e=>assignClient(ci,e.target.value)} onBlur={()=>setAddingClientFor(null)}>
+                  <option value="">Select a client…</option>
+                  {clients.filter(c=>!(ci.client_ids||[]).includes(c.id)).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              ):(
+                <button style={addBtn(true)} onClick={()=>setAddingClientFor(ci.id)}>+ Assign client</button>
+              ))}
               <span>Approved: <strong style={{color:C.green}}>{approvedHours}h</strong></span>
               <span>Pending: <strong style={{color:C.amber}}>{pendingHours}h</strong></span>
             </div>

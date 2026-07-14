@@ -25,7 +25,7 @@ function getAdminClient() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { requesterToken, filter } = await req.json() as { requesterToken: string; filter?: SegmentFilter }
+    const { requesterToken, filter, forceRefresh } = await req.json() as { requesterToken: string; filter?: SegmentFilter; forceRefresh?: boolean }
 
     const admin = getAdminClient()
     const { data: { user }, error: authErr } = await admin.auth.getUser(requesterToken)
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    const snapshots = await loadAllClientSnapshots(admin)
+    const snapshots = await loadAllClientSnapshots(admin, !!forceRefresh)
     if (snapshots.length === 0) {
       return NextResponse.json({ portfolio: computePortfolioOverview([]), segment: filter ? null : null, snapshotCount: 0, profiles: [], filterOptions: { sectors: [], countries: [], programmeIds: [] } })
     }

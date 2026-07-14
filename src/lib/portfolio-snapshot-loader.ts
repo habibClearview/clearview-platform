@@ -184,9 +184,9 @@ const SNAPSHOT_CACHE_TTL_MS = 60_000
 // Loads and builds a ClientSnapshot for every financial client on the
 // platform. The only DB-touching step -- both callers pass in their own
 // admin (service-role) Supabase client.
-export async function loadAllClientSnapshots(admin: SupabaseClient): Promise<ClientSnapshot[]> {
+export async function loadAllClientSnapshots(admin: SupabaseClient, forceRefresh = false): Promise<ClientSnapshot[]> {
   const now = Date.now()
-  if (snapshotCache && snapshotCache.expiresAt > now) return snapshotCache.data
+  if (!forceRefresh && snapshotCache && snapshotCache.expiresAt > now) return snapshotCache.data
 
   const { data: clients } = await admin.from('engagement_clients').select('*').eq('engagement_mode', 'financial')
   const financialClients = clients || []
