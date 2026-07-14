@@ -269,7 +269,8 @@ export default function TeamPayments({coImplementers=[],setCoImplementers,client
   const outstandingTotal=outstandingInvoices.reduce((s,i)=>s+num(i.net_amount),0)
   // Invoiced this period = net of every non-draft invoice dated to it.
   const invoicedThisPeriod=invoices.filter(i=>i.period===period&&i.status!=='draft').reduce((s,i)=>s+num(i.net_amount),0)
-  // Uncleared advances = every advance not yet reconciled (not period-scoped).
+  // Advances still to retire = every advance not yet reconciled (not
+  // period-scoped -- an open advance stays open across months).
   const openAdvancesAll=advances.filter(a=>!a.reconciled)
   const unclearedAdvTotal=openAdvancesAll.reduce((s,a)=>s+num(a.amount),0)
   const sumCur=curOf(coImplementers[0])
@@ -301,7 +302,7 @@ export default function TeamPayments({coImplementers=[],setCoImplementers,client
         <KPI label="Team" value={activeCount} sub={`active co-implementer${activeCount===1?'':'s'}`}/>
         <KPI label="Outstanding invoices" value={outstandingTotal?fmtMoney(outstandingTotal,sumCur):'—'} sub={outstandingInvoices.length?`${outstandingInvoices.length} issued, not yet paid`:'none outstanding'} color={outstandingInvoices.length?C.amber:C.green}/>
         <KPI label="Invoiced this period" value={invoicedThisPeriod?fmtMoney(invoicedThisPeriod,sumCur):'—'} sub={periodLabel(period)} color={C.teal}/>
-        <KPI label="Uncleared advances" value={unclearedAdvTotal?fmtMoney(unclearedAdvTotal,sumCur):'—'} sub={openAdvancesAll.length?`${openAdvancesAll.length} outstanding`:'none outstanding'} color={openAdvancesAll.length?C.red:C.green}/>
+        <KPI label="Advances to retire" value={unclearedAdvTotal?fmtMoney(unclearedAdvTotal,sumCur):'—'} sub={openAdvancesAll.length?`${openAdvancesAll.length} still open`:'none open'} color={openAdvancesAll.length?C.red:C.green}/>
       </div>}
 
       {canApprove&&<CostOfDeliveryChart coImplementers={coImplementers} entries={entries} expenses={expenses}/>}
@@ -591,14 +592,16 @@ function AdvanceSection({ci,advances,setAdvances,setMsg,canApprove}){
     if(error)return setMsg('Could not add advance: '+error.message)
     setAdvances(prev=>[data,...prev]);setF(x=>({...x,amount:'',reason:'',receipt_url:''}));setMsg(null)
   }
-  // Reconciling (marking an advance settled against actual spend) is a
-  // financial control -- the coach's call, not something a co-implementer
-  // can declare about their own advance.
+  // Retiring an advance (marking it settled against actual spend, with
+  // proof) is a financial control -- the coach's call, not something a
+  // co-implementer can declare about their own advance. Note: the stored
+  // column is still `reconciled` (schema unchanged); only the wording the
+  // coach sees is "retire", the finance term Habib uses.
   async function reconcile(id){
     const patch={reconciled:true,reconciled_at:new Date().toISOString()}
     const {error}=await supabase.from('coach_advances').update(patch).eq('id',id)
-    if(error)return setMsg('Could not reconcile advance: '+error.message)
-    setAdvances(prev=>prev.map(a=>a.id!==id?a:{...a,...patch}));setMsg('Advance reconciled.')
+    if(error)return setMsg('Could not retire advance: '+error.message)
+    setAdvances(prev=>prev.map(a=>a.id!==id?a:{...a,...patch}));setMsg('Advance retired.')
   }
   async function attachReceipt(id,objectPath){
     const {error}=await supabase.from('coach_advances').update({receipt_url:objectPath}).eq('id',id)
@@ -607,7 +610,7 @@ function AdvanceSection({ci,advances,setAdvances,setMsg,canApprove}){
   }
   return(
     <div>
-      <p style={{...hint,marginBottom:'0.6rem'}}>Advances are reconciled against actual spend by their due date. While an advance is unreconciled it is netted off the next invoice, and it blocks that invoice from issuing if it exceeds the period's earnings.</p>
+      <p style={{...hint,marginBottom:'0.6rem'}}>An advance is retired against actual spend by its due date, with proof attached. While it's still open it is netted off the next invoice, and it blocks that invoice from issuing if it exceeds the period's earnings.</p>
       <div style={{overflowX:'auto',marginBottom:'0.75rem'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
           <thead><tr style={{background:C.lightBg}}>{['Date','Amount','Reason','Proof','Due','Status',canApprove?'':null].filter(h=>h!==null).map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
@@ -621,8 +624,8 @@ function AdvanceSection({ci,advances,setAdvances,setMsg,canApprove}){
                 <td style={{...td,maxWidth:200}}>{a.reason||'—'}</td>
                 <td style={td}><ReceiptUpload coImplementerId={ci.id} path={a.receipt_url} onUploaded={p=>attachReceipt(a.id,p)}/></td>
                 <td style={{...td,color:overdue?C.red:C.navy}}>{a.due_date||'—'}{overdue?' ⚠':''}</td>
-                <td style={td}>{a.reconciled?<Badge text="reconciled" color={C.green}/>:<Badge text={overdue?'overdue':'open'} color={overdue?C.red:C.amber}/>}</td>
-                {canApprove&&<td style={td}>{!a.reconciled&&<button style={solidBtn(C.teal,true)} onClick={()=>reconcile(a.id)}>Reconcile</button>}{a.reconciled&&a.applied_invoice_id&&<span style={hint}>netted on invoice</span>}</td>}
+                <td style={td}>{a.reconciled?<Badge text="retired" color={C.green}/>:<Badge text={overdue?'overdue':'open'} color={overdue?C.red:C.amber}/>}</td>
+                {canApprove&&<td style={td}>{!a.reconciled&&<button style={solidBtn(C.teal,true)} onClick={()=>reconcile(a.id)}>Retire advance</button>}{a.reconciled&&a.applied_invoice_id&&<span style={hint}>netted on invoice</span>}</td>}
               </tr>)
             })}
           </tbody>
@@ -724,8 +727,8 @@ td,th{padding:.5rem .6rem;border-bottom:1px solid #ddd} .tot{font-weight:700;fon
                 <tr><td style={{...td,fontWeight:700,borderTop:`2px solid ${C.border}`}}>Net payable</td><td style={{...td,textAlign:'right',fontWeight:700,color:C.teal,borderTop:`2px solid ${C.border}`}}>{fmtMoney(d.net,cur)}</td></tr>
               </tbody>
             </table>
-            {d.blocked&&<div style={{marginTop:'0.7rem',padding:'0.6rem 0.8rem',borderRadius:6,background:'var(--cv-tint-amber)',border:`1px solid ${C.red}`,color:C.red,fontSize:'1.01rem'}}>⛔ Blocked: an unreconciled advance of {fmtMoney(d.openAdvanceTotal,cur)} exceeds this period's earnings. Reconcile the advance before issuing.</div>}
-            {!d.blocked&&d.advanceApplied>0&&<div style={{marginTop:'0.7rem',fontSize:'1.01rem',color:C.slate}}>Issuing will net off and reconcile the open advance of {fmtMoney(d.advanceApplied,cur)}.</div>}
+            {d.blocked&&<div style={{marginTop:'0.7rem',padding:'0.6rem 0.8rem',borderRadius:6,background:'var(--cv-tint-amber)',border:`1px solid ${C.red}`,color:C.red,fontSize:'1.01rem'}}>⛔ Blocked: an open advance of {fmtMoney(d.openAdvanceTotal,cur)} exceeds this period's earnings. Retire the advance before issuing.</div>}
+            {!d.blocked&&d.advanceApplied>0&&<div style={{marginTop:'0.7rem',fontSize:'1.01rem',color:C.slate}}>Issuing will net off and retire the open advance of {fmtMoney(d.advanceApplied,cur)}.</div>}
             {!canApprove&&<div style={{marginTop:'0.7rem',fontSize:'1.01rem',color:C.slate}}>This updates automatically as your timesheets and expenses are approved. Your coach issues the final invoice.</div>}
             <div style={{display:'flex',gap:'0.5rem',marginTop:'0.85rem'}}>
               {canApprove&&<button style={{...solidBtn(),opacity:(nothingToBill||d.blocked||busy)?0.5:1,cursor:(nothingToBill||d.blocked||busy)?'not-allowed':'pointer'}} disabled={nothingToBill||d.blocked||busy} onClick={issue}>{busy?'Issuing…':'Issue invoice'}</button>}
