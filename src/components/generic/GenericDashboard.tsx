@@ -3481,12 +3481,37 @@ function SettingsTab({config,P,onSave,theme,setThemeMode}) {
               <input type="number" style={inp} value={Math.round(((form.settings.capital_structure?.annual_interest_rate||0.18)*100))}
                 onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),annual_interest_rate:Number(e.target.value)/100}}}))}/>
             </div>
+            <div><label style={lbl}>Loan Tenor (years)</label>
+              <input type="number" min={1} style={inp} value={form.settings.capital_structure?.loan_tenor_years||2}
+                onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),loan_tenor_years:Number(e.target.value)}}}))}/>
+            </div>
+            <div><label style={lbl}>Loan Grace Period (months)</label>
+              <input type="number" min={0} style={inp} value={form.settings.capital_structure?.grace_period_months||0}
+                onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),grace_period_months:Number(e.target.value)}}}))}/>
+              <div style={hint}>Months before the bank loan's first repayment falls due.</div>
+            </div>
             <div><label style={lbl}>Fixed Asset Useful Life (years)</label>
               <input type="number" min={1} style={inp} value={form.settings.capital_structure?.fixed_asset_useful_life_years||5}
                 onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),fixed_asset_useful_life_years:Number(e.target.value)}}}))}/>
               <div style={hint}>Depreciated straight-line over this many years -- affects EBIT, tax, and the Fixed Assets balance shown on the Balance Sheet.</div>
             </div>
           </div>
+          {(form.settings.capital_structure?.grant_recoverable||0)>0&&(
+            <div style={{marginTop:'1rem',paddingTop:'1rem',borderTop:`1px solid ${C.border}`}}>
+              <div style={{...secH,fontSize:'1.0rem'}}>Recoverable Grant Repayment Terms</div>
+              <p style={{fontSize:'0.92rem',color:C.slate,marginBottom:'0.7rem'}}>A recoverable grant is real debt -- principal owed back to the donor -- so it gets its own repayment schedule, just like the bank loan. Treated as interest-free by default (the conventional term for a donor-recoverable grant).</p>
+              <div style={fGrid}>
+                <div><label style={lbl}>Repayment Term (years)</label>
+                  <input type="number" min={1} style={inp} value={form.settings.capital_structure?.grant_recoverable_tenor_years||3}
+                    onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),grant_recoverable_tenor_years:Number(e.target.value)}}}))}/>
+                </div>
+                <div><label style={lbl}>Grace Period (months)</label>
+                  <input type="number" min={0} style={inp} value={form.settings.capital_structure?.grant_recoverable_grace_period_months||0}
+                    onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),grant_recoverable_grace_period_months:Number(e.target.value)}}}))}/>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -3752,22 +3777,43 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,clo
   // returns and made null-safe internally instead.
   const assess = config.settings.coach_assessment || defaultCoachAssessment()
   const months_n = months.length
-  // Single source of truth for the bank loan's shape as a DebtObligation
-  // -- previously constructed twice (once for debtSched, once for the
-  // score time series below), byte-for-byte identical but at real risk
-  // of silently drifting apart if one were ever edited without the other.
+  // Single source of truth for the FULL debt obligation list as this
+  // page's own historical trend scoring (computeScoresTimeSeries /
+  // computeLRSTimeSeries below) needs it -- mirrors generic-engine.ts's
+  // construction exactly (manual settings.debts if present, else the
+  // single bank_loan field; the recoverable grant always added on top,
+  // since it's a real repayable obligation, not equity, with its own
+  // schedule) so this tab's scores never diverge from the Overview tab's
+  // canonical result.scores. Previously only ever derived from bank_loan
+  // -- ignored settings.debts entirely, ignored the loan's grace period
+  // (hardcoded to 0), and never included the recoverable grant at all.
   // Memoized on the primitive capital-structure fields it actually reads
   // (not on config.settings.capital_structure itself, which is a fresh
   // object reference every render) so debtSched and the big score/LRS
   // memo below don't invalidate on every keystroke elsewhere on the page.
-  const bankLoanObligation = useMemo(() => config.settings.capital_structure?.bank_loan > 0 ? [{
-    drawdownMonth:1, annualRate:config.settings.capital_structure?.annual_interest_rate||0.18,
-    tenorMonths:(config.settings.capital_structure?.loan_tenor_years||2)*12,
-    gracePeriodMonths:0, principal:config.settings.capital_structure?.bank_loan, repaymentType:'amortising',
-  }] : [], [
+  const bankLoanObligation = useMemo(() => {
+    const cap = config.settings.capital_structure
+    const manualDebts = config.settings.debts
+    const primaryDebts = (manualDebts && manualDebts.length > 0) ? manualDebts : (cap?.bank_loan > 0 ? [{
+      drawdownMonth:1, annualRate:cap?.annual_interest_rate??0.18,
+      tenorMonths:(cap?.loan_tenor_years??2)*12,
+      gracePeriodMonths:cap?.grace_period_months??0, principal:cap?.bank_loan, repaymentType:'amortising',
+    }] : [])
+    const grantRecoverableDebt = cap?.grant_recoverable > 0 ? [{
+      drawdownMonth:1, annualRate:0,
+      tenorMonths:(cap?.grant_recoverable_tenor_years??3)*12,
+      gracePeriodMonths:cap?.grant_recoverable_grace_period_months??0, principal:cap?.grant_recoverable, repaymentType:'amortising',
+    }] : []
+    return [...primaryDebts, ...grantRecoverableDebt]
+  }, [
+    config.settings.debts,
     config.settings.capital_structure?.bank_loan,
     config.settings.capital_structure?.annual_interest_rate,
     config.settings.capital_structure?.loan_tenor_years,
+    config.settings.capital_structure?.grace_period_months,
+    config.settings.capital_structure?.grant_recoverable,
+    config.settings.capital_structure?.grant_recoverable_tenor_years,
+    config.settings.capital_structure?.grant_recoverable_grace_period_months,
   ])
   const debtSched = useMemo(() => buildDebtSchedule(bankLoanObligation, months_n), [bankLoanObligation, months_n])
 
@@ -3903,8 +3949,15 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,clo
   const annualEbitda = sumOver(result.con.ebitda, lastYearGroup.monthIndices)
   const annualInterest = sumOver(debtSched.totalInterest, lastYearGroup.monthIndices)
   const loanLiab = result.bs.loan_liability?.[lastIdx] || 0
+  // Capital employed for ROCE includes the recoverable grant liability --
+  // it funds real assets employed in the business the same way the bank
+  // loan does, even though (unlike loanLiab, used below for Debt/EBITDA
+  // and Gearing) it's deliberately excluded from those two: both are
+  // conventionally about interest-bearing commercial leverage, which a
+  // 0%-interest donor-recoverable grant isn't.
+  const grantLiab = result.bs.grant_liability?.[lastIdx] || 0
   const totalEquityLast = result.bs.total_equity?.[lastIdx] || 0
-  const capitalEmployed = totalEquityLast + loanLiab
+  const capitalEmployed = totalEquityLast + loanLiab + grantLiab
   const ebitdaMargin = m.total_revenue>0 ? m.total_ebitda/m.total_revenue : null
   const roce = capitalEmployed>0 ? annualEbit/capitalEmployed : null
   const debtToEbitda = (s.hasDebt && annualEbitda>0) ? loanLiab/annualEbitda : null

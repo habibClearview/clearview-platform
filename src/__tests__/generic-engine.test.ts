@@ -547,6 +547,76 @@ describe('Generic Engine — Combined balance sheet integrity', () => {
     // Total liability outstanding right after both drawdowns should reflect both loans
     expect(twoLoanResult.bs.loan_liability[3]).toBeGreaterThan(oneLoanResult.bs.loan_liability[3])
   })
+
+  it('REG: a recoverable grant amortises down as its own liability, not a flat balance forever', () => {
+    const cfg = makeConfig()
+    cfg.settings.capital_structure.grant_recoverable = 6_000_000
+    cfg.settings.capital_structure.grant_recoverable_tenor_years = 1
+    const result = runGenericModel(cfg)
+    expectBalanceSheetBalances(result)
+    expect(result.bs.grant_liability[0]).toBeGreaterThan(0)
+    expect(result.bs.grant_liability[11]).toBeLessThan(result.bs.grant_liability[0])
+    expect(result.bs.grant_liability[11]).toBe(0)
+  })
+
+  it('REG: the recoverable grant draws down cash once, not twice, and is interest-free', () => {
+    const cfgNoGrant = makeConfig()
+    const noGrantResult = runGenericModel(cfgNoGrant)
+
+    const cfgWithGrant = makeConfig()
+    cfgWithGrant.settings.capital_structure.grant_recoverable = 6_000_000
+    cfgWithGrant.settings.capital_structure.grant_recoverable_tenor_years = 1
+    // Grace period isolates the pure drawdown amount below -- with none, an
+    // amortising obligation's first repayment lands in its drawdown month
+    // itself (same convention the two-loan test above documents), which
+    // would otherwise net against the inflow being checked here.
+    cfgWithGrant.settings.capital_structure.grant_recoverable_grace_period_months = 1
+    const withGrantResult = runGenericModel(cfgWithGrant)
+
+    // Month 0 financing cash should differ by exactly the grant principal --
+    // if it were being added both via the flat capital-structure sum AND via
+    // the debt obligation drawdown, this delta would be 12,000,000, not 6,000,000.
+    const delta = withGrantResult.cf.fin_cash[0] - noGrantResult.cf.fin_cash[0]
+    expect(delta).toBeCloseTo(6_000_000, 0)
+    // Interest-free: P&L interest expense must be unaffected by the grant
+    expect(withGrantResult.con.interest[5]).toBeCloseTo(noGrantResult.con.interest[5], 0)
+  })
+
+  it('REG: a recoverable grant and a bank loan both amortise independently, each visible in its own balance sheet line', () => {
+    const cfg = makeConfig()
+    cfg.settings.capital_structure.bank_loan = 8_000_000
+    cfg.settings.capital_structure.grant_recoverable = 6_000_000
+    cfg.settings.capital_structure.grant_recoverable_tenor_years = 1
+    const result = runGenericModel(cfg)
+    expectBalanceSheetBalances(result)
+    expect(result.bs.loan_liability[0]).toBeGreaterThan(0)
+    expect(result.bs.grant_liability[0]).toBeGreaterThan(0)
+    expect(result.bs.loan_liability[11]).toBeLessThan(result.bs.loan_liability[0])
+    expect(result.bs.grant_liability[11]).toBeLessThan(result.bs.grant_liability[0])
+    // Both obligations' repayments reduce financing cash flow over the plan
+    expect(result.debtSchedule.totalPrincipal.some((v: number) => v > 0)).toBe(true)
+  })
+
+  it('REG: the bank loan\'s grace period delays its first repayment, not just accepted and ignored', () => {
+    const cfgNoGrace = makeConfig()
+    cfgNoGrace.settings.capital_structure.bank_loan = 12_000_000
+    cfgNoGrace.settings.capital_structure.loan_tenor_years = 1
+    cfgNoGrace.settings.capital_structure.grace_period_months = 0
+    const noGraceResult = runGenericModel(cfgNoGrace)
+
+    const cfgWithGrace = makeConfig()
+    cfgWithGrace.settings.capital_structure.bank_loan = 12_000_000
+    cfgWithGrace.settings.capital_structure.loan_tenor_years = 1
+    cfgWithGrace.settings.capital_structure.grace_period_months = 3
+    const withGraceResult = runGenericModel(cfgWithGrace)
+
+    // With no grace period, principal repayment starts immediately (month 0/index 0)
+    expect(noGraceResult.bs.loan_liability[0]).toBeLessThan(12_000_000)
+    // With a 3-month grace period, the full principal is still outstanding
+    // after month 1 -- previously this field was hardcoded to 0 regardless
+    // of what the coach or client actually entered.
+    expect(withGraceResult.bs.loan_liability[0]).toBeCloseTo(12_000_000, 0)
+  })
 })
 
 describe('Generic Engine — Actuals (calendar-based actual/plan rule)', () => {

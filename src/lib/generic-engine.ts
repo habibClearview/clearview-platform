@@ -279,12 +279,25 @@ export interface GenericCapital {
   bank_loan: number
   annual_interest_rate: number
   loan_tenor_years: number
+  // Months before the bank loan's first repayment falls due. Captured at
+  // intake (Business Details §C) but was never actually read by the
+  // engine, which hardcoded 0 regardless -- see the debt obligation
+  // construction below.
+  grace_period_months?: number
   fixed_assets: number
   // Straight-line depreciation life for fixed_assets. Defaults to 5 years
   // (60 months) when absent -- a generic SME equipment/vehicle life --
   // rather than defaulting to "no depreciation," which would silently
   // reintroduce the exact non-compliance this field exists to fix.
   fixed_asset_useful_life_years?: number
+  // A recoverable grant is real debt -- principal repayable to the donor
+  // -- not captured anywhere at intake with its own repayment terms
+  // (unlike the bank loan). Defaults to a 3-year term, interest-free
+  // (donor-recoverable grants are conventionally interest-free; nothing
+  // in intake captures a rate for one), adjustable per client in Capital
+  // Structure settings.
+  grant_recoverable_tenor_years?: number
+  grant_recoverable_grace_period_months?: number
 }
 
 // ── Default empty config ────────────────────────────────────
@@ -821,17 +834,44 @@ export function runGenericModel(
   // existing schedule into the actual P&L and cash flow instead of only
   // the scoring metric.
   const cap = settings.capital_structure || { shareholder_contribution: 0, grant_non_repayable: 0, grant_recoverable: 0, bank_loan: 0, annual_interest_rate: 0.18, loan_tenor_years: 2, fixed_assets: 0 }
-  const debtObligations: DebtObligation[] = (settings.debts && settings.debts.length > 0)
+  const primaryDebts: DebtObligation[] = (settings.debts && settings.debts.length > 0)
     ? settings.debts
     : (cap.bank_loan > 0 ? [{
         drawdownMonth: 1,
         annualRate: cap.annual_interest_rate ?? 0.18,
         tenorMonths: (cap.loan_tenor_years ?? 2) * 12,
-        gracePeriodMonths: 0,
+        gracePeriodMonths: cap.grace_period_months ?? 0,
         principal: cap.bank_loan,
         repaymentType: 'amortising',
       }] : [])
+  // A recoverable grant is real debt (principal repayable to the donor),
+  // not equity -- previously it only ever appeared as a one-off cash
+  // inflow and a flat, permanently-unchanging balance sheet liability
+  // that was never actually paid down, and never entered the debt
+  // schedule at all (so it was invisible in the repayment schedule, in
+  // Debt Obligations settings, and in DSCR). Modelled here as its own
+  // zero-interest obligation with its own repayment schedule, additive
+  // to primaryDebts regardless of whether the coach also uses the manual
+  // "Additional Debt Obligations" list for the bank loan(s) -- the grant
+  // is a separate, always-present obligation, not an alternative to it.
+  const grantRecoverableDebt: DebtObligation[] = cap.grant_recoverable > 0 ? [{
+    drawdownMonth: 1,
+    annualRate: 0,
+    tenorMonths: (cap.grant_recoverable_tenor_years ?? 3) * 12,
+    gracePeriodMonths: cap.grant_recoverable_grace_period_months ?? 0,
+    principal: cap.grant_recoverable,
+    repaymentType: 'amortising',
+  }] : []
+  const debtObligations: DebtObligation[] = [...primaryDebts, ...grantRecoverableDebt]
+  // Combined schedule -- interest expense, cash flow deduction, and DSCR
+  // all correctly reflect the FULL debt-service burden the business
+  // carries, loan and recoverable grant together. Two further schedules
+  // below exist only to split the balance sheet's loan_liability from
+  // grant_liability, since buildDebtSchedule returns combined totals for
+  // whatever list it's given, not a per-obligation breakdown.
   const debtSchedule = buildDebtSchedule(debtObligations, months)
+  const primaryDebtSchedule = buildDebtSchedule(primaryDebts, months)
+  const grantDebtSchedule = buildDebtSchedule(grantRecoverableDebt, months)
 
   // ── Depreciation ───────────────────────────────────────────
   // Built the same way the debt schedule is: once, ahead of the P&L
@@ -999,7 +1039,10 @@ export function runGenericModel(
     // (future) under the single calendar rule used throughout the model.
     act_mask: Array(months).fill(false) as boolean[],
   }
-  cf.fin_cash[0] = cap.shareholder_contribution + cap.grant_non_repayable + cap.grant_recoverable
+  // grant_recoverable is NOT added here -- it's now part of debtObligations
+  // (drawn down via the loop just below, same as any other debt facility),
+  // so adding it here too would double-count its cash inflow.
+  cf.fin_cash[0] = cap.shareholder_contribution + cap.grant_non_repayable
   // Fixed assets purchased with cash are an investing outflow in month 0 --
   // without this, fixed assets appear on the balance sheet with no cash
   // consequence, breaking the fundamental accounting identity (Assets = Equity + Liabilities).
@@ -1049,8 +1092,10 @@ export function runGenericModel(
     grant_equity: Array(months).fill(cap.grant_non_repayable) as number[],
     retained_earnings: zero(),
     total_equity: zero(),
-    grant_liability: Array(months).fill(cap.grant_recoverable) as number[],
-    loan_liability: debtSchedule.totalOutstanding,
+    // Was a flat fill of the original grant amount for every month,
+    // forever -- now amortises down via its own schedule, same as a loan.
+    grant_liability: grantDebtSchedule.totalOutstanding,
+    loan_liability: primaryDebtSchedule.totalOutstanding,
     accounts_payable: tradeCredit.totalPayableOutstanding,
     total_liabilities: zero(),
     total_equity_and_liabilities: zero(),
