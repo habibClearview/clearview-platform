@@ -10,7 +10,7 @@
 // Bump BUILD_STAMP on every change you want to be able to verify
 // landed. Keep it short and unmistakable.
 // ============================================================
-export const BUILD_STAMP = 'BUILD 2026-07-14 · CODE R81'
+export const BUILD_STAMP = 'BUILD 2026-07-14 · CODE R82'
 
 export default function BuildStamp() {
   return (

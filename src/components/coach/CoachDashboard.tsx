@@ -624,6 +624,18 @@ function MyBusinessGlance({clients,setClients,programmes,coImplementers,onSelect
     setSubDateBusy(null)
     if(!error)setClients&&setClients(prev=>prev.map(c=>c.id!==clientId?c:{...c,subscription_start_date:value||null}))
   }
+  // Reassign programme right where a coach is actually looking when a
+  // client shows up under the wrong group (Independent/Subscriber instead
+  // of a programme) -- the Edit forms elsewhere already did this, but a
+  // coach staring at "why is this client under Subscribers" shouldn't have
+  // to go hunting for yet another screen to fix it.
+  const [progMoveBusy,setProgMoveBusy]=useState(null)
+  async function moveToProgramme(clientId,programmeId){
+    setProgMoveBusy(clientId)
+    const {error}=await supabase.from('engagement_clients').update({programme_id:programmeId||null}).eq('id',clientId)
+    setProgMoveBusy(null)
+    if(!error)setClients&&setClients(prev=>prev.map(c=>c.id!==clientId?c:{...c,programme_id:programmeId||null}))
+  }
   const feeCur=clients.find(c=>c.fee_currency)?.fee_currency||'USD'
   const outstanding=outstandingInvoiced(clients)
   const dso=averageDaysToCollect(clients)
@@ -701,7 +713,15 @@ function MyBusinessGlance({clients,setClients,programmes,coImplementers,onSelect
             return(
               <div key={p.id} style={{padding:'0.5rem 0',borderTop:`1px solid ${C.border}`}}>
                 <div style={{fontWeight:600,color:C.navy}}>{p.name}</div>
-                <div style={{fontSize:'0.93rem',color:C.slate}}>{progClients.length} beneficiar{progClients.length===1?'y':'ies'} served{progClients.length>0&&`: ${progClients.map(c=>c.name).join(', ')}`}</div>
+                {progClients.length===0?<div style={{fontSize:'0.93rem',color:C.slate}}>No beneficiaries yet.</div>:progClients.map(c=>(
+                  <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.4rem',marginTop:'0.25rem'}}>
+                    <span style={{fontSize:'0.93rem',color:onSelectClient?C.teal:C.slate,cursor:onSelectClient?'pointer':'default'}} onClick={()=>onSelectClient&&onSelectClient(c.id)}>{c.name}</span>
+                    {setClients&&<select disabled={progMoveBusy===c.id} value={p.id} onChange={e=>moveToProgramme(c.id,e.target.value)} style={{fontSize:'0.82rem',padding:'0.05rem 0.25rem',border:`1px solid ${C.border}`,borderRadius:4,color:C.navy,maxWidth:120}}>
+                      <option value="">Make independent</option>
+                      {programmes.map(pp=><option key={pp.id} value={pp.id}>{pp.name}</option>)}
+                    </select>}
+                  </div>
+                ))}
               </div>
             )
           })}
@@ -710,9 +730,18 @@ function MyBusinessGlance({clients,setClients,programmes,coImplementers,onSelect
           <div style={{fontFamily:'Georgia,serif',fontSize:'1.13rem',fontWeight:700,color:C.navy,marginBottom:'0.15rem'}}>Independent Clients</div>
           <div style={{fontSize:'0.93rem',color:C.slate,marginBottom:'0.6rem'}}>self-funded GtCV -- paying for their own canvas engagement, no programme behind them</div>
           {independentCanvasClients.length===0?<div style={{color:C.slate,fontSize:'0.96rem'}}>None yet.</div>:independentCanvasClients.map(c=>(
-            <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.4rem 0',borderTop:`1px solid ${C.border}`,cursor:onSelectClient?'pointer':'default'}} onClick={()=>onSelectClient&&onSelectClient(c.id)}>
-              <span style={{fontWeight:600,color:C.navy}}>{c.name}</span>
-              <span style={{fontSize:'0.93rem',color:C.slate}}>{c.engagement_fee?fmtGlance(c.engagement_fee,c.fee_currency||'USD'):'no fee set'}</span>
+            <div key={c.id} style={{padding:'0.4rem 0',borderTop:`1px solid ${C.border}`}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
+                <span style={{fontWeight:600,color:C.navy,cursor:onSelectClient?'pointer':'default'}} onClick={()=>onSelectClient&&onSelectClient(c.id)}>{c.name}</span>
+                <span style={{fontSize:'0.93rem',color:C.slate}}>{c.engagement_fee?fmtGlance(c.engagement_fee,c.fee_currency||'USD'):'no fee set'}</span>
+              </div>
+              {setClients&&<div style={{display:'flex',alignItems:'center',gap:'0.4rem',marginTop:'0.2rem'}}>
+                <label style={{fontSize:'0.86rem',color:C.slate}}>Programme:</label>
+                <select disabled={progMoveBusy===c.id} value="" onChange={e=>moveToProgramme(c.id,e.target.value)} style={{fontSize:'0.86rem',padding:'0.1rem 0.3rem',border:`1px solid ${C.border}`,borderRadius:4,color:C.navy}}>
+                  <option value="">-- independent (self-paying) --</option>
+                  {programmes.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>}
             </div>
           ))}
         </div>
@@ -725,6 +754,13 @@ function MyBusinessGlance({clients,setClients,programmes,coImplementers,onSelect
                 <span style={{fontWeight:600,color:C.navy,cursor:onSelectClient?'pointer':'default'}} onClick={()=>onSelectClient&&onSelectClient(c.id)}>{c.name}</span>
                 <span style={{fontSize:'0.93rem',color:C.slate}}>{c.engagement_fee?fmtGlance(c.engagement_fee,c.fee_currency||'USD'):'no fee set'}</span>
               </div>
+              {setClients&&<div style={{display:'flex',alignItems:'center',gap:'0.4rem',marginTop:'0.2rem'}}>
+                <label style={{fontSize:'0.86rem',color:C.slate}}>Programme:</label>
+                <select disabled={progMoveBusy===c.id} value="" onChange={e=>moveToProgramme(c.id,e.target.value)} style={{fontSize:'0.86rem',padding:'0.1rem 0.3rem',border:`1px solid ${C.border}`,borderRadius:4,color:C.navy}}>
+                  <option value="">-- independent (self-paying) --</option>
+                  {programmes.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>}
               <div style={{display:'flex',alignItems:'center',gap:'0.4rem',marginTop:'0.2rem'}}>
                 <label style={{fontSize:'0.86rem',color:C.slate}}>Subscribed since:</label>
                 <input type="date" disabled={subDateBusy===c.id} value={c.subscription_start_date||''} onChange={e=>saveSubscriptionDate(c.id,e.target.value)} style={{fontSize:'0.86rem',padding:'0.1rem 0.3rem',border:`1px solid ${C.border}`,borderRadius:4,color:C.navy}}/>
