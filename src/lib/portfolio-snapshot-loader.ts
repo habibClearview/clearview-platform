@@ -17,8 +17,8 @@ import { assessConfidence } from './confidence'
 import { buildPeriodSignals } from './verification-display'
 import { computeSeasonalCashProjection } from './seasonal-cash-projection'
 import { computeFundAbsorptionCapacity } from './fund-absorption-capacity'
-import { revenueGrowthPctFromSeries, grossMarginPct, ebitdaMarginPct, netMarginPct, ruleOf40 } from './business-performance-metrics'
-import { computePortfolioOverview, computeSegmentReport, buildAnonymisedProfile, matchesFilter, rankedDimensionFailures, computePerformanceSummary, type ClientSnapshot, type SegmentFilter, type PortfolioOverview, type SegmentReport, type AnonymisedProfile, type DimensionFailure, type PerformanceSummary } from './portfolio-intelligence'
+import { revenueGrowthPctFromSeries, grossMarginPct, ebitdaMarginPct, netMarginPct, ruleOf40, burnMultiple, roiPct } from './business-performance-metrics'
+import { computePortfolioOverview, computeSegmentReport, buildAnonymisedProfile, matchesFilter, rankedDimensionFailures, computePerformanceSummary, computePerformanceBySector, type ClientSnapshot, type SegmentFilter, type PortfolioOverview, type SegmentReport, type AnonymisedProfile, type DimensionFailure, type PerformanceSummary, type SectorPerformance } from './portfolio-intelligence'
 
 async function buildClientSnapshot(admin: SupabaseClient, client: any, configRow: any): Promise<ClientSnapshot | null> {
   if (!configRow) return null
@@ -148,6 +148,11 @@ async function buildClientSnapshot(admin: SupabaseClient, client: any, configRow
   // total operating costs / revenue = 1 - EBITDA margin. Nulls left as null.
   const ebitdaM = ebitdaMarginPct(m.total_ebitda, m.total_revenue)
   const growthPct = revenueGrowthPctFromSeries(result.con.rev)
+  const revSeries: number[] = result.con.rev || []
+  const cashSeries: number[] = result.cf.close || []
+  const y1Rev = revSeries.slice(0, 12).reduce((a: number, b: number) => a + (b || 0), 0)
+  const y2Rev = revSeries.slice(12, 24).reduce((a: number, b: number) => a + (b || 0), 0)
+  const cashBurned = (cashSeries[0] || 0) - (cashSeries.length ? Math.min(...cashSeries.slice(0, 12)) : 0)
   const performance = {
     revenueGrowthPct: growthPct,
     costRatioPct: ebitdaM === null ? null : Math.round(100 - ebitdaM),
@@ -156,6 +161,8 @@ async function buildClientSnapshot(admin: SupabaseClient, client: any, configRow
     netMarginPct: netMarginPct(m.total_npat, m.total_revenue),
     dscrMin: s.hasDebt ? (s.dscrMin ?? null) : null,
     ruleOf40: ruleOf40(growthPct, ebitdaM),
+    burnMultiple: revSeries.length >= 24 ? burnMultiple(cashBurned, y2Rev - y1Rev) : null,
+    roiPct: roiPct(m.total_npat, capitalAtRisk),
   }
 
   return {
@@ -230,6 +237,7 @@ export interface PortfolioViewData {
   segmentDimensionFailures: DimensionFailure[] | null
   performanceSummary: PerformanceSummary
   segmentPerformanceSummary: PerformanceSummary | null
+  performanceBySector: SectorPerformance[]
 }
 
 // Assembles the full response shape both /api/portfolio-intelligence (coach,
@@ -258,5 +266,6 @@ export function buildPortfolioViewData(snapshots: ClientSnapshot[], filter: Segm
     segmentDimensionFailures: filter ? rankedDimensionFailures(profileSnapshots) : null,
     performanceSummary: computePerformanceSummary(snapshots),
     segmentPerformanceSummary: filter ? computePerformanceSummary(profileSnapshots) : null,
+    performanceBySector: computePerformanceBySector(profileSnapshots),
   }
 }

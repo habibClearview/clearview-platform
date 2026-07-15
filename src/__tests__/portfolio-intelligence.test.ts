@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   computePortfolioOverview, computeSegmentReport, readinessStage, matchesFilter,
   anonymizedRefCode, revenueSizeBracket, buildAnonymisedProfile, rankedDimensionFailures,
-  median, computePerformanceSummary,
+  median, computePerformanceSummary, computePerformanceBySector,
   type ClientSnapshot, type SnapshotPerformance,
 } from '../lib/portfolio-intelligence'
 import type { LRSResult } from '../lib/liquidity-readiness'
@@ -54,7 +54,7 @@ describe('median', () => {
 describe('computePerformanceSummary', () => {
   const perf = (p: Partial<SnapshotPerformance>): SnapshotPerformance => ({
     revenueGrowthPct: null, costRatioPct: null, grossMarginPct: null, ebitdaMarginPct: null,
-    netMarginPct: null, dscrMin: null, ruleOf40: null, ...p,
+    netMarginPct: null, dscrMin: null, ruleOf40: null, burnMultiple: null, roiPct: null, ...p,
   })
   it('medians and counts use only present values; nulls and missing performance are ignored', () => {
     const snaps = [
@@ -77,6 +77,26 @@ describe('computePerformanceSummary', () => {
     expect(ps.total).toBe(0)
     expect(ps.revenueGrowth.median).toBeNull()
     expect(ps.bankableCount).toBe(0)
+  })
+})
+
+describe('computePerformanceBySector', () => {
+  const perf = (p: Partial<SnapshotPerformance>): SnapshotPerformance => ({
+    revenueGrowthPct: null, costRatioPct: null, grossMarginPct: null, ebitdaMarginPct: null,
+    netMarginPct: null, dscrMin: null, ruleOf40: null, burnMultiple: null, roiPct: null, ...p,
+  })
+  it('groups by sector and ranks strongest Rule of 40 first; missing sector -> Unspecified', () => {
+    const snaps = [
+      makeSnapshot({ sector: 'agri', performance: perf({ ruleOf40: 52 }) }),
+      makeSnapshot({ sector: 'agri', performance: perf({ ruleOf40: 40 }) }),
+      makeSnapshot({ sector: 'digital', performance: perf({ ruleOf40: 58 }) }),
+      makeSnapshot({ sector: null, performance: perf({ ruleOf40: 10 }) }),
+    ]
+    const rows = computePerformanceBySector(snaps)
+    expect(rows.map(r => r.sector)).toEqual(['digital', 'agri', 'Unspecified'])
+    expect(rows[0].count).toBe(1)
+    expect(rows[1].count).toBe(2)
+    expect(rows[1].summary.ruleOf40.median).toBe(46) // median of [40,52]
   })
 })
 

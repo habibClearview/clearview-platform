@@ -846,7 +846,17 @@ function fmtPortfolioMoney(n,cc){
 // A single performance metric shown the way the research says a decision-maker
 // reads it: the median over the SPREAD across businesses (a small histogram),
 // not a bare number. The bin containing the median is highlighted.
-function PerfDist({label,summary,unit,decimals=0,note}:{label:string;summary:any;unit?:string;decimals?:number;note?:string}){
+function PerfDist({label,summary,unit,decimals=0,note,roadmap,roadmapNote}:{label:string;summary?:any;unit?:string;decimals?:number;note?:string;roadmap?:boolean;roadmapNote?:string}){
+  if(roadmap) return (
+    <div style={{background:'var(--cv-card)',border:'1px solid var(--cv-border-soft)',borderRadius:12,padding:'0.9rem 1rem'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.4rem'}}>
+        <span style={{fontFamily:'monospace',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.04em',color:C.slate,fontWeight:600}}>{label}</span>
+        <span style={{fontFamily:'monospace',fontSize:'0.66rem',fontWeight:700,padding:'0.1rem 0.4rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>roadmap</span>
+      </div>
+      <div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:C.slate,lineHeight:1.1}}>—</div>
+      <div style={{fontSize:'0.76rem',color:C.slate,marginTop:6}}>{roadmapNote||'Needs a short per-period customer input from each business.'}</div>
+    </div>
+  )
   const s=summary
   const has=!!(s&&s.count>0&&s.median!==null)
   const vals:number[]=has?s.values:[]
@@ -944,6 +954,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
   const perfSum=(hasFilter?(data.segmentPerformanceSummary||data.performanceSummary):data.performanceSummary)||null
   const readyCount=view.readinessPipeline.investment_ready
   const weakDimLabel=view.mostCommonWeakDimension?LRS_DIM_LABELS[view.mostCommonWeakDimension]:null
+  const med=(ms:any,unit='',dec=0)=> ms&&ms.median!==null?`${ms.median.toFixed(dec)}${unit}`:'—'
 
   return(
     <div>
@@ -1035,6 +1046,75 @@ function PortfolioIntelligenceHub({clients,programmes}){
             <PerfDist label="Rule of 40" summary={perfSum.ruleOf40} note={`${perfSum.ruleOf40StrongCount} score 40+`}/>
             <PerfDist label="Net margin" summary={perfSum.netMargin} unit="%"/>
           </div>
+        </div>
+      )}
+
+      {perfSum&&(
+        <div style={card}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Business quality &amp; durability</div>
+          <p style={{fontSize:'0.9rem',color:C.slate,margin:'0 0 0.9rem',maxWidth:'74ch'}}>
+            The efficiency and durability ratios — the numbers that tell a funder whether growth is economically
+            real and whether revenue will still be there to repay. Distributions across the {hasFilter?'segment':'portfolio'}; cut by sector below.
+          </p>
+          <div className="cv-grid-4" style={{marginBottom:'0.7rem'}}>
+            <PerfDist label="Rule of 40" summary={perfSum.ruleOf40} note={`${perfSum.ruleOf40StrongCount} score 40+ · from the model`}/>
+            <PerfDist label="Burn multiple" summary={perfSum.burnMultiple} unit="×" decimals={1} note="under 1× is efficient"/>
+            <PerfDist label="Gross margin" summary={perfSum.grossMargin} unit="%" note="pricing &amp; cost control"/>
+            <PerfDist label="Return on investment" summary={perfSum.roi} unit="%" note="net profit ÷ capital at risk"/>
+          </div>
+          <div className="cv-grid-4">
+            <PerfDist label="LTV : CAC" roadmap roadmapNote="Is growth economically real? Healthy above 3×. Needs customer data."/>
+            <PerfDist label="Churn" roadmap roadmapNote="Will revenue still be there to repay? Needs customer data."/>
+            <PerfDist label="Net revenue retention" roadmap roadmapNote="Do existing customers grow or leak? Over 100% grows without new customers. Needs customer data."/>
+            <PerfDist label="Net margin" summary={perfSum.netMargin} unit="%" note="after everything"/>
+          </div>
+
+          {data.performanceBySector&&data.performanceBySector.length>0&&(
+            <div style={{marginTop:'1.1rem'}}>
+              <div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Quality ratios by sector</div>
+              <p style={{fontSize:'0.84rem',color:C.slate,margin:'0 0 0.6rem'}}>Ranked by Rule of 40. Margins, Rule of 40 and burn compute now; the customer ratios fill in as each business reports.</p>
+              <div style={{overflowX:'auto',border:'1px solid var(--cv-border-soft)',borderRadius:10}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.84rem',minWidth:680}}>
+                  <thead>
+                    <tr>{['Sector','Biz','Rule of 40','Gross','EBITDA','Net','Burn','LTV:CAC','Churn','NRR'].map((h,i)=>(
+                      <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily:'monospace',fontSize:'0.68rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
+                    ))}</tr>
+                  </thead>
+                  <tbody>
+                    {data.performanceBySector.map((row:any)=>(
+                      <tr key={row.sector} style={{borderTop:'1px solid var(--cv-border-soft)'}}>
+                        <td style={{padding:'7px 10px',textAlign:'left',color:C.navy}}>{row.sector}</td>
+                        <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{row.count}</td>
+                        <td style={{padding:'7px 10px',textAlign:'right',fontWeight:700,color:C.navy}}>{med(row.summary.ruleOf40)}</td>
+                        <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.grossMargin,'%')}</td>
+                        <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.ebitdaMargin,'%')}</td>
+                        <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.netMargin,'%')}</td>
+                        <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.burnMultiple,'×',1)}</td>
+                        <td style={{padding:'7px 10px',textAlign:'right',color:'var(--cv-slate)'}}>—</td>
+                        <td style={{padding:'7px 10px',textAlign:'right',color:'var(--cv-slate)'}}>—</td>
+                        <td style={{padding:'7px 10px',textAlign:'right',color:'var(--cv-slate)'}}>—</td>
+                      </tr>
+                    ))}
+                    <tr style={{borderTop:`2px solid ${C.cyan}`,background:'var(--cv-tint-cyan)',fontWeight:700}}>
+                      <td style={{padding:'7px 10px',textAlign:'left',color:C.navy}}>Portfolio median</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{perfSum.total}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.ruleOf40)}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.grossMargin,'%')}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.ebitdaMargin,'%')}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.netMargin,'%')}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{med(perfSum.burnMultiple,'×',1)}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>—</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>—</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>—</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div style={{fontSize:'0.8rem',color:C.slate,marginTop:'0.6rem',background:'var(--cv-tint-amber)',borderLeft:`3px solid ${C.amber}`,borderRadius:6,padding:'0.6rem 0.8rem'}}>
+                <b>Available now vs roadmap:</b> Rule of 40, margins and burn compute from the financial model we already run. LTV:CAC, churn and NRR need a short per-period customer input from each business — they populate as businesses start reporting and stay blank until then.
+              </div>
+            </div>
+          )}
         </div>
       )}
 

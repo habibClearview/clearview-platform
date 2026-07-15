@@ -1004,6 +1004,17 @@ function PerformanceTab({config,result,months,cc}) {
   if (recs.length===0) recs.push({sev:'good',title:'The fundamentals look healthy',text:'Growing, profitable, and cash stays positive across the plan. Keep watching the monthly trend and protect your margins as you scale.'})
   const sevColor=(s:string)=> s==='bad'?C.red : s==='warn'?C.amber : s==='good'?C.green : C.teal
 
+  // Per-metric status so the entrepreneur sees good/watch/concern at a glance.
+  const band=(v:number|null,good:number,watch:number,goodLabel='Healthy',watchLabel='Watch',badLabel='Concern')=>
+    v===null?null:(v>=good?{tag:goodLabel,tone:'good' as const}:v>=watch?{tag:watchLabel,tone:'warn' as const}:{tag:badLabel,tone:'bad' as const})
+  const sGrowth = growth===null?null:(growth<0?{tag:'Falling',tone:'bad' as const}:growth>=15?{tag:'Healthy',tone:'good' as const}:{tag:'Watch',tone:'warn' as const})
+  const sGross  = band(gm,40,20)
+  const sEbitda = em===null?null:(em<0?{tag:'Loss',tone:'bad' as const}:em>=15?{tag:'Healthy',tone:'good' as const}:em>=5?{tag:'Watch',tone:'warn' as const}:{tag:'Thin',tone:'bad' as const})
+  const sOp     = opM===null?null:(opM<0?{tag:'Loss',tone:'bad' as const}:opM>=12?{tag:'Healthy',tone:'good' as const}:opM>=4?{tag:'Watch',tone:'warn' as const}:{tag:'Thin',tone:'bad' as const})
+  const sNet    = nm===null?null:(nm<0?{tag:'Loss',tone:'bad' as const}:nm>=8?{tag:'Healthy',tone:'good' as const}:{tag:'Watch',tone:'warn' as const})
+  const sR40    = r40===null?null:(r40<0?{tag:'Concern',tone:'bad' as const}:r40>=40?{tag:'Strong',tone:'good' as const}:r40>=20?{tag:'Watch',tone:'warn' as const}:{tag:'Weak',tone:'bad' as const})
+  const sBurn   = burn===null?{tag:'Cash-generative',tone:'good' as const}:(burn<1?{tag:'Efficient',tone:'good' as const}:burn<=2?{tag:'Watch',tone:'warn' as const}:{tag:'High',tone:'bad' as const})
+
   const gridStyle: React.CSSProperties = {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(215px,1fr))',gap:'0.85rem'}
   const secLabel: React.CSSProperties = {fontFamily:'monospace',fontSize:'0.82rem',letterSpacing:'0.14em',textTransform:'uppercase',color:C.teal,margin:'0 0 0.7rem'}
 
@@ -1032,9 +1043,9 @@ function PerformanceTab({config,result,months,cc}) {
         <div style={secLabel}>At a glance · {sel.label}</div>
         <div style={gridStyle}>
           <PerfMetric label="Revenue" value={fmt(wRev,cc)} formula="Total sales in the selected period." bad={wRev<0}/>
-          <PerfMetric label="Rule of 40" value={r40Str} tag={r40!==null?(isRuleOf40Strong(r40)?'strong':'below 40'):undefined} tagTone={r40!==null&&isRuleOf40Strong(r40)?'good':'warn'} bad={r40!==null&&r40<0} formula="Growth% + profit margin%. Over 40 is strong." travelsTo="intelligence"/>
-          <PerfMetric label="Gross margin" value={pctStr(gm)} bad={gm!==null&&gm<0} formula="(Revenue − cost of goods) ÷ revenue." travelsTo="intelligence"/>
-          <PerfMetric label="EBITDA margin" value={pctStr(em)} bad={em!==null&&em<0} tag={em!==null&&em<0?'loss':undefined} tagTone="bad" formula="Operating profit ÷ revenue (before interest, tax, depreciation)." travelsTo="intelligence"/>
+          <PerfMetric label="Rule of 40" value={r40Str} tag={sR40?.tag} tagTone={sR40?.tone} bad={r40!==null&&r40<0} formula="Growth% + profit margin%. Over 40 is strong — grow faster or lift margins." travelsTo="intelligence"/>
+          <PerfMetric label="Gross margin" value={pctStr(gm)} tag={sGross?.tag} tagTone={sGross?.tone} bad={gm!==null&&gm<0} formula="(Revenue − cost of goods) ÷ revenue. Low? Review supplier prices and your selling price." travelsTo="intelligence"/>
+          <PerfMetric label="EBITDA margin" value={pctStr(em)} tag={sEbitda?.tag} tagTone={sEbitda?.tone} bad={em!==null&&em<0} formula="Operating profit ÷ revenue. Thin? Cut overheads or raise prices." travelsTo="intelligence"/>
         </div>
       </div>
 
@@ -1042,10 +1053,10 @@ function PerformanceTab({config,result,months,cc}) {
       <div style={{marginBottom:'1.3rem'}}>
         <div style={secLabel}>Growth &amp; efficiency</div>
         <div style={gridStyle}>
-          <PerfMetric label="Revenue growth" value={growthStr} bad={growth!==null&&growth<0} tag={growth!==null&&growth<0?'falling':undefined} tagTone="bad" formula="This period's revenue vs the one before, as a %." travelsTo="intelligence"/>
-          <PerfMetric label="Operating margin" value={pctStr(opM)} bad={opM!==null&&opM<0} formula="(EBITDA − depreciation) ÷ revenue." travelsTo="intelligence"/>
-          <PerfMetric label="Net margin" value={pctStr(nm)} bad={nm!==null&&nm<0} tag={nm!==null&&nm<0?'loss':undefined} tagTone="bad" formula="Net profit after tax ÷ revenue." travelsTo="intelligence"/>
-          <PerfMetric label="Burn multiple" value={burn===null?'Cash-generative':`${burn}×`} tag={burn!==null&&burn<1?'efficient':(burn!==null?'high':undefined)} tagTone={burn!==null&&burn<1?'good':'warn'} formula="Cash burned ÷ net new revenue. Under 1× is efficient." travelsTo="intelligence"/>
+          <PerfMetric label="Revenue growth" value={growthStr} tag={sGrowth?.tag} tagTone={sGrowth?.tone} bad={growth!==null&&growth<0} formula="This period's revenue vs the one before. Falling? Keep existing customers, win back lapsed ones." travelsTo="intelligence"/>
+          <PerfMetric label="Operating margin" value={pctStr(opM)} tag={sOp?.tag} tagTone={sOp?.tone} bad={opM!==null&&opM<0} formula="(EBITDA − depreciation) ÷ revenue. Real operating profitability." travelsTo="intelligence"/>
+          <PerfMetric label="Net margin" value={pctStr(nm)} tag={sNet?.tag} tagTone={sNet?.tone} bad={nm!==null&&nm<0} formula="Net profit after tax ÷ revenue. Below zero means loss-making." travelsTo="intelligence"/>
+          <PerfMetric label="Burn multiple" value={burn===null?'Cash-generative':`${burn}×`} tag={sBurn?.tag} tagTone={sBurn?.tone} formula="Cash burned ÷ net new revenue. Under 1× is efficient." travelsTo="intelligence"/>
         </div>
       </div>
 

@@ -82,6 +82,8 @@ export interface SnapshotPerformance {
   netMarginPct: number | null
   dscrMin: number | null            // lowest debt-service coverage; null if no debt
   ruleOf40: number | null           // growth% + ebitda margin%
+  burnMultiple: number | null       // cash burned ÷ net new revenue; null if cash-generative
+  roiPct: number | null             // net profit ÷ capital at risk, %; null if no capital figure
 }
 
 export interface ClientSnapshot {
@@ -139,10 +141,13 @@ export interface MetricSummary {
 export interface PerformanceSummary {
   revenueGrowth: MetricSummary
   costRatio: MetricSummary
+  grossMargin: MetricSummary
   ebitdaMargin: MetricSummary
   netMargin: MetricSummary
   ruleOf40: MetricSummary
   dscr: MetricSummary
+  burnMultiple: MetricSummary
+  roi: MetricSummary
   bankableCount: number        // DSCR >= 1.5 (the usual lender comfort line)
   ruleOf40StrongCount: number  // Rule of 40 >= 40
   total: number
@@ -165,14 +170,42 @@ export function computePerformanceSummary(snapshots: ClientSnapshot[]): Performa
   return {
     revenueGrowth: summariseMetric(perfs.map(p => p.revenueGrowthPct)),
     costRatio: summariseMetric(perfs.map(p => p.costRatioPct)),
+    grossMargin: summariseMetric(perfs.map(p => p.grossMarginPct)),
     ebitdaMargin: summariseMetric(perfs.map(p => p.ebitdaMarginPct)),
     netMargin: summariseMetric(perfs.map(p => p.netMarginPct)),
     ruleOf40: summariseMetric(perfs.map(p => p.ruleOf40)),
     dscr: summariseMetric(perfs.map(p => p.dscrMin)),
+    burnMultiple: summariseMetric(perfs.map(p => p.burnMultiple)),
+    roi: summariseMetric(perfs.map(p => p.roiPct)),
     bankableCount: dscrVals.filter(v => v >= 1.5).length,
     ruleOf40StrongCount: r40Vals.filter(v => v >= 40).length,
     total: snapshots.length,
   }
+}
+
+export interface SectorPerformance {
+  sector: string
+  count: number
+  summary: PerformanceSummary
+}
+
+/**
+ * Performance summary per sector, for the "quality ratios by sector" table.
+ * Businesses with no sector are grouped under "Unspecified". Sorted by median
+ * Rule of 40 (strongest first); sectors where Rule of 40 can't be computed sink
+ * to the bottom.
+ */
+export function computePerformanceBySector(snapshots: ClientSnapshot[]): SectorPerformance[] {
+  const bySector = new Map<string, ClientSnapshot[]>()
+  for (const s of snapshots) {
+    const key = s.sector || 'Unspecified'
+    if (!bySector.has(key)) bySector.set(key, [])
+    bySector.get(key)!.push(s)
+  }
+  const rows: SectorPerformance[] = Array.from(bySector.entries()).map(([sector, snaps]) => ({
+    sector, count: snaps.length, summary: computePerformanceSummary(snaps),
+  }))
+  return rows.sort((a, b) => (b.summary.ruleOf40.median ?? -Infinity) - (a.summary.ruleOf40.median ?? -Infinity))
 }
 
 export function readinessStage(irTier: string): ReadinessStage {
