@@ -124,6 +124,27 @@ async function serveGrantContent(admin: ReturnType<typeof getAdminClient>, grant
   })
 }
 
+// The interactive online view: same authorization as the download, but returns
+// the scoped PortfolioViewData as JSON so the public page can render a live,
+// read-only Market Intelligence dashboard instead of only a Word download.
+// A 'client'-scope grant (a single business's Investment Brief) has no portfolio
+// view -- the page falls back to the Word download for those.
+async function serveGrantView(admin: ReturnType<typeof getAdminClient>, grant: any) {
+  if (grant.scope_type === 'client') {
+    return NextResponse.json({ scopeType: 'client', viewAvailable: false })
+  }
+  const snapshots = await loadAllClientSnapshots(admin)
+  const filter: SegmentFilter | null = grant.scope_type === 'segment' ? (grant.segment_filter || null) : null
+  const data = buildPortfolioViewData(snapshots, filter)
+  let scopeDescription = 'Whole portfolio'
+  if (grant.scope_type === 'segment' && grant.segment_filter) {
+    const f: GrantSegmentFilter = grant.segment_filter
+    const parts = [f.sector, f.country, f.readinessStage].filter(Boolean)
+    if (parts.length > 0) scopeDescription = `Segment: ${parts.join(' · ')}`
+  }
+  return NextResponse.json({ scopeType: grant.scope_type, viewAvailable: true, scopeDescription, data })
+}
+
 export async function GET(req: NextRequest, { params }: { params: { token: string } }) {
   try {
     const { token } = params
@@ -155,7 +176,8 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   try {
     const { token } = params
     if (!token) return NextResponse.json({ error: 'Missing token' }, { status: 400 })
-    const { step, email, code } = await req.json().catch(() => ({})) as { step?: 'request' | 'verify'; email?: string; code?: string }
+    const { step, email, code, format } = await req.json().catch(() => ({})) as { step?: 'request' | 'verify'; email?: string; code?: string; format?: 'view' | 'download' }
+    const serve = (admin: ReturnType<typeof getAdminClient>, grant: any) => format === 'view' ? serveGrantView(admin, grant) : serveGrantContent(admin, grant)
 
     const admin = getAdminClient()
     const grant = await loadGrantOrThrow(admin, token)
@@ -176,7 +198,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
         last_accessed_at: now,
         ...(grant.email_confirmed_at ? {} : { email_confirmed_at: now }),
       }).eq('id', grant.id)
-      return serveGrantContent(admin, grant)
+      return serve(admin, grant)
     }
 
     if (step === 'request') {
@@ -210,7 +232,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
         last_accessed_at: now,
         ...(grant.email_confirmed_at ? {} : { email_confirmed_at: now }),
       }).eq('id', grant.id)
-      return serveGrantContent(admin, grant)
+      return serve(admin, grant)
     }
 
     return NextResponse.json({ error: 'Invalid request.' }, { status: 400 })

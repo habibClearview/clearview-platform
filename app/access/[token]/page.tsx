@@ -14,6 +14,7 @@
 // behaviour rather than breaking access.
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import MarketIntelligenceReport from '@/components/market-intelligence/MarketIntelligenceReport'
 
 const C = {
   cream: 'var(--cv-cream)', card: 'var(--cv-card)',
@@ -41,8 +42,9 @@ export default function AccessGrantPage() {
   const [error, setError] = useState('')
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
-  const [phase, setPhase] = useState<'start' | 'code' | 'done'>('start')
+  const [phase, setPhase] = useState<'start' | 'code' | 'done' | 'view'>('start')
   const [submitting, setSubmitting] = useState(false)
+  const [report, setReport] = useState<any>(null)
 
   useEffect(() => {
     if (!token) return
@@ -62,7 +64,7 @@ export default function AccessGrantPage() {
     try {
       const response = await fetch(`/api/access-grant/${token}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email || undefined }),
+        body: JSON.stringify({ email: email || undefined, format: 'view' }),
       })
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}))
@@ -70,10 +72,25 @@ export default function AccessGrantPage() {
         setSubmitting(false)
         return
       }
-      triggerDownload(await response.blob(), response.headers.get('Content-Disposition') || '')
-      setPhase('done')
+      const json = await response.json().catch(() => ({}))
+      if (json.viewAvailable && json.data) { setReport(json); setPhase('view') }
+      else { await downloadNow() }
     } catch { setError('Could not open this link.') }
     setSubmitting(false)
+  }
+
+  // Download the Word version (a single business Investment Brief, or the
+  // portfolio/segment brief). Used for client-scope grants (no online view)
+  // and from the "Download Word" button on the online view.
+  async function downloadNow() {
+    try {
+      const response = await fetch(`/api/access-grant/${token}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step: info?.otpAvailable ? 'verify' : undefined, email: email || undefined, code: code || undefined, format: 'download' }),
+      })
+      if (!response.ok) { const e = await response.json().catch(() => ({})); setError(e.error || 'Could not download the document.'); return }
+      triggerDownload(await response.blob(), response.headers.get('Content-Disposition') || '')
+    } catch { setError('Could not download the document.') }
   }
 
   async function requestCode(e?: React.FormEvent) {
@@ -99,7 +116,7 @@ export default function AccessGrantPage() {
     try {
       const response = await fetch(`/api/access-grant/${token}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ step: 'verify', email, code }),
+        body: JSON.stringify({ step: 'verify', email, code, format: 'view' }),
       })
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}))
@@ -108,8 +125,9 @@ export default function AccessGrantPage() {
         setSubmitting(false)
         return
       }
-      triggerDownload(await response.blob(), response.headers.get('Content-Disposition') || '')
-      setPhase('done')
+      const json = await response.json().catch(() => ({}))
+      if (json.viewAvailable && json.data) { setReport(json); setPhase('view') }
+      else { await downloadNow(); setPhase('done') }
     } catch { setError('Could not verify that code.') }
     setSubmitting(false)
   }
@@ -131,7 +149,32 @@ export default function AccessGrantPage() {
     </div></div>
   )
 
-  const downloadLabel = info.scopeType === 'client' ? 'Download Investment Brief' : 'Download Portfolio Intelligence'
+  // The interactive online view -- a live, read-only Market Intelligence
+  // dashboard scoped to this grant, with Word download and print-to-PDF.
+  if (phase === 'view' && report) {
+    return (
+      <div style={{ minHeight: '100vh', background: C.cream, fontFamily: "'Segoe UI',system-ui,sans-serif" }}>
+        <style>{`@media print{ .mi-noprint{display:none!important} body{background:#fff} .mi-access-report{-webkit-print-color-adjust:exact;print-color-adjust:exact} }`}</style>
+        <div className="mi-noprint" style={{ background: C.header, borderBottom: '3px solid var(--cv-cyan)' }}>
+          <div style={{ maxWidth: 1080, margin: '0 auto', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.7rem' }}>
+            <div style={{ color: '#fff' }}>
+              <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.15rem', fontWeight: 700 }}>Canvas Coach ClearView</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--cv-wa-85)' }}>{info.granteeName} · {report.scopeDescription}</div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button onClick={() => window.print()} style={{ background: 'transparent', border: '1px solid var(--cv-wa-45)', color: '#fff', borderRadius: 8, padding: '0.5rem 1rem', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' }}>⬇ Print / Save as PDF</button>
+              <button onClick={() => downloadNow()} style={{ background: '#fff', border: 'none', color: C.header, borderRadius: 8, padding: '0.5rem 1rem', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' }}>⬇ Word version</button>
+            </div>
+          </div>
+        </div>
+        <div className="mi-access-report" style={{ maxWidth: 1080, margin: '0 auto', padding: '1.5rem' }}>
+          <MarketIntelligenceReport data={report.data} scopeDescription={report.scopeDescription} />
+        </div>
+      </div>
+    )
+  }
+
+  const downloadLabel = info.scopeType === 'client' ? 'Download Investment Brief' : 'Open Market Intelligence'
 
   return (
     <div style={page}>
