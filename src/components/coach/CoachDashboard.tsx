@@ -958,7 +958,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
 
   return(
     <div>
-      <Kicker>Portfolio Intelligence · {snapshotCount} financial client{snapshotCount===1?'':'s'}</Kicker>
+      <Kicker>Market Intelligence · {snapshotCount} financial client{snapshotCount===1?'':'s'}</Kicker>
 
       <div style={{...card,display:'flex',flexWrap:'wrap',gap:'0.6rem',alignItems:'center'}}>
         <select value={filter.programmeId||''} onChange={e=>applyFilter({programmeId:e.target.value})} style={{padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}>
@@ -1031,7 +1031,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
       {perfSum&&(
         <div style={card}>
           <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Performance — the numbers that decide bankability</div>
-          <p style={{fontSize:'0.9rem',color:C.slate,margin:'0 0 0.9rem',maxWidth:'74ch'}}>
+          <p style={{fontSize:'0.9rem',color:C.slate,margin:'0 0 0.9rem'}}>
             Each figure is the <b>median</b> shown over the <b>spread across businesses</b> — the distribution, not a single
             average, is what a lender reads. The highlighted bar is where the median sits. These ratios are currency-neutral,
             so they compare across the whole {hasFilter?'segment':'portfolio'}.
@@ -1052,7 +1052,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
       {perfSum&&(
         <div style={card}>
           <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Business quality &amp; durability</div>
-          <p style={{fontSize:'0.9rem',color:C.slate,margin:'0 0 0.9rem',maxWidth:'74ch'}}>
+          <p style={{fontSize:'0.9rem',color:C.slate,margin:'0 0 0.9rem'}}>
             The efficiency and durability ratios — the numbers that tell a funder whether growth is economically
             real and whether revenue will still be there to repay. Distributions across the {hasFilter?'segment':'portfolio'}; cut by sector below.
           </p>
@@ -1121,7 +1121,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
       {data.performanceBySector&&data.performanceBySector.length>0&&(
         <div style={card}>
           <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Benchmarked by segment</div>
-          <p style={{fontSize:'0.88rem',color:C.slate,margin:'0 0 0.7rem',maxWidth:'74ch'}}>Every factor cut by sector, ranked strongest-first. The portfolio row is the baseline. Peer comparisons within this portfolio, not external industry norms.</p>
+          <p style={{fontSize:'0.88rem',color:C.slate,margin:'0 0 0.7rem'}}>Every factor cut by sector, ranked strongest-first. The portfolio row is the baseline. Peer comparisons within this portfolio, not external industry norms.</p>
           <div style={{overflowX:'auto',border:'1px solid var(--cv-border-soft)',borderRadius:10}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.84rem',minWidth:640}}>
               <thead>
@@ -1253,19 +1253,40 @@ function PortfolioIntelligenceHub({clients,programmes}){
       <LevelMarker n={3} label="Individual businesses" sub="click one to drill in"/>
       <div style={card}>
         <div style={{fontSize:'0.85rem',color:C.slate,marginBottom:'0.8rem'}}>Anonymised by default -- a business only shows its real name here once its owner has explicitly consented (toggled from the Client Health tab).</div>
-        <div className="cv-grid-3">
-          {(data.profiles||[]).map(p=>(
-            <div key={p.refCode} onClick={()=>setOpenProfile(p)} style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.7rem 0.85rem',cursor:'pointer'}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'0.5rem'}}>
-                <div style={{fontWeight:700,fontSize:'0.95rem',color:C.navy,fontFamily:p.isNamed?'inherit':'monospace'}}>{p.displayName}</div>
-                {p.isNamed&&<Badge text="Verified" color={C.green}/>}
-              </div>
-              <div style={{fontSize:'0.82rem',color:C.slate,marginTop:'0.2rem'}}>{p.sector||'Sector n/a'} · {p.country||'Country n/a'} · {p.sizeBracket}</div>
-              <div style={{fontSize:'0.82rem',color:C.slate,marginTop:'0.2rem'}}>{p.irTier} · IR {Math.round(p.irScore)}/30 · Confidence {Math.round(p.confidenceScore)}/100</div>
-            </div>
-          ))}
-          {(data.profiles||[]).length===0&&<div style={{color:C.slate,fontSize:'0.9rem'}}>No businesses match the current filter.</div>}
-        </div>
+        {(data.profiles||[]).length===0
+          ? <div style={{color:C.slate,fontSize:'0.9rem'}}>No businesses match the current filter.</div>
+          : (()=>{
+              const tierPill=(t:string)=>{const map:any={'Investment Ready':['Ready',C.green],'Near Ready':['Near',C.cyan],'Development Stage':['Dev',C.amber],'Pre-Investment':['Pre',C.red]};const [lbl,col]=map[t]||[t,C.slate];return <span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,padding:'0.05rem 0.4rem',borderRadius:5,color:col,background:'var(--cv-wa-10)',border:`1px solid ${col}`}}>{lbl}</span>}
+              const pv=(v:any,unit='',dec=0,sign=false)=> v===null||v===undefined?'—':`${sign&&v>0?'+':''}${(typeof v==='number'?v.toFixed(dec):v)}${unit}`
+              const rows=[...(data.profiles||[])].sort((a:any,b:any)=>b.irScore-a.irScore)
+              return (
+                <div style={{overflowX:'auto',border:'1px solid var(--cv-border-soft)',borderRadius:10}}>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.84rem',minWidth:720}}>
+                    <thead>
+                      <tr>{['Business','Sector','Size','Ready','LRS','Growth','Cost','Cover','EBITDA','Conf.'].map((h,i)=>(
+                        <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily:'monospace',fontSize:'0.66rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 9px',textAlign:i<=2?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
+                      ))}</tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((p:any)=>{const perf=p.performance||{}; return(
+                        <tr key={p.refCode} onClick={()=>setOpenProfile(p)} style={{borderTop:'1px solid var(--cv-border-soft)',cursor:'pointer'}}>
+                          <td style={{padding:'7px 9px',textAlign:'left',fontWeight:700,color:C.navy,fontFamily:p.isNamed?'inherit':'monospace',whiteSpace:'nowrap'}}>{p.displayName}{p.isNamed&&<span style={{marginLeft:6}}><Badge text="Named" color={C.green}/></span>}</td>
+                          <td style={{padding:'7px 9px',textAlign:'left',color:C.slate}}>{p.sector||'n/a'}</td>
+                          <td style={{padding:'7px 9px',textAlign:'left',color:C.slate}}>{p.sizeBracket}</td>
+                          <td style={{padding:'7px 9px',textAlign:'right'}}>{tierPill(p.irTier)}</td>
+                          <td style={{padding:'7px 9px',textAlign:'right',fontWeight:700,color:C.navy}}>{Math.round(p.lrs.score)}</td>
+                          <td style={{padding:'7px 9px',textAlign:'right',color:perf.revenueGrowthPct!=null&&perf.revenueGrowthPct<0?C.red:C.slate}}>{pv(perf.revenueGrowthPct,'%',0,true)}</td>
+                          <td style={{padding:'7px 9px',textAlign:'right',color:C.slate}}>{pv(perf.costRatioPct,'%')}</td>
+                          <td style={{padding:'7px 9px',textAlign:'right',color:perf.dscrMin!=null&&perf.dscrMin<1?C.red:C.slate}}>{pv(perf.dscrMin,'×',1)}</td>
+                          <td style={{padding:'7px 9px',textAlign:'right',color:perf.ebitdaMarginPct!=null&&perf.ebitdaMarginPct<0?C.red:C.slate}}>{pv(perf.ebitdaMarginPct,'%')}</td>
+                          <td style={{padding:'7px 9px',textAlign:'right',color:C.slate}}>{Math.round(p.confidenceScore)}</td>
+                        </tr>
+                      )})}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })()}
       </div>
 
       {/* DFI risk layer — roadmap */}
@@ -1284,7 +1305,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
           <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>Impact &amp; inclusion</div>
           <span style={{fontFamily:'monospace',fontSize:'0.7rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>roadmap · to collect</span>
         </div>
-        <p style={{fontSize:'0.92rem',color:C.slate,lineHeight:1.55,margin:'0 0 0.7rem',maxWidth:'76ch'}}>
+        <p style={{fontSize:'0.92rem',color:C.slate,lineHeight:1.55,margin:'0 0 0.7rem'}}>
           The reach a donor or impact investor weighs — smallholder farmers and farmer groups reached, and the share of
           <b> women</b> and <b>youth</b> spelled out by where it sits: <b>supply chain</b>, <b>customers</b>, or <b>workforce</b>.
           Captured per enterprise via a short per-period return, then rolled up and cut by sector, geography and size.
@@ -2189,7 +2210,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // to just what they're allowed to see (their assigned clients, or the
   // clients under their programme).
   const mainNavTabs=isSuperCoach
-    ?[['overview','My Business'],['clients','Clients'],['programmes','Pipeline'],['team','Team'],['portfolio','Portfolio Intelligence']]
+    ?[['overview','My Business'],['clients','Clients'],['programmes','Pipeline'],['team','Team'],['portfolio','Market Intelligence']]
     :isCoImplementer
     ?[['clients','Clients'],['mypayments','My Timesheet & Expenses']]
     :[['clients','Clients']]

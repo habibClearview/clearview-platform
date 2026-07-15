@@ -492,6 +492,7 @@ export interface AnonymisedProfile {
   fac: FACResult
   currency: string
   businessUnits: BusinessUnitContribution[]
+  performance?: SnapshotPerformance | null  // currency-neutral ratios for the business-by-business table
 }
 
 export function buildAnonymisedProfile(snapshot: ClientSnapshot, allSnapshots: ClientSnapshot[]): AnonymisedProfile {
@@ -511,5 +512,6 @@ export function buildAnonymisedProfile(snapshot: ClientSnapshot, allSnapshots: C
     fac: snapshot.fac,
     currency: snapshot.currency,
     businessUnits: snapshot.businessUnits,
+    performance: snapshot.performance ?? null,
   }
 }
