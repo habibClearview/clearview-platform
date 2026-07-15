@@ -187,6 +187,7 @@ export interface SectorPerformance {
   sector: string
   count: number
   summary: PerformanceSummary
+  overview: PortfolioOverview  // readiness/LRS/weakest-dimension for this sector, for the segment table
 }
 
 /**
@@ -203,7 +204,7 @@ export function computePerformanceBySector(snapshots: ClientSnapshot[]): SectorP
     bySector.get(key)!.push(s)
   }
   const rows: SectorPerformance[] = Array.from(bySector.entries()).map(([sector, snaps]) => ({
-    sector, count: snaps.length, summary: computePerformanceSummary(snaps),
+    sector, count: snaps.length, summary: computePerformanceSummary(snaps), overview: computePortfolioOverview(snaps),
   }))
   return rows.sort((a, b) => (b.summary.ruleOf40.median ?? -Infinity) - (a.summary.ruleOf40.median ?? -Infinity))
 }
