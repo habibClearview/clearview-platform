@@ -21,7 +21,7 @@ import { yearStartPeriod, canCloseCalendarYear, computeYearEndBalanceSheet } fro
 import BuildStamp from '@/components/BuildStamp'
 import VerificationRecognition from '@/components/generic/VerificationRecognition'
 import PaymentReviewQueue from '@/components/generic/PaymentReviewQueue'
-import { computeFreePerformance, operatingMarginPct } from '@/lib/business-performance-metrics'
+import { computeFreePerformance, operatingMarginPct, grossMarginPct, ebitdaMarginPct, netMarginPct, revenueGrowthPct, ruleOf40, isRuleOf40Strong, burnMultiple } from '@/lib/business-performance-metrics'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
@@ -777,7 +777,7 @@ export default function GenericDashboard({
         {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} pendingApprovalCount={pendingApprovalCount} onGoToApprovals={()=>setView('approvals')} onGoToIntelligence={()=>setView('intelligence')}/>}
         {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P}/>}
         {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods} onNavigate={setView}/>}
-        {view==='performance' && <PerformanceTab config={config} result={result} cc={cc}/>}
+        {view==='performance' && <PerformanceTab config={config} result={result} months={months} cc={cc}/>}
         {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
         {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods}/>}
         {view==='cashflow'    && <CashFlowTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
@@ -863,82 +863,178 @@ const ovLabel: React.CSSProperties = {fontFamily:'monospace',fontSize:'0.96rem',
 
 // ── PERFORMANCE & GROWTH TAB ─────────────────────────────────
 // The enterprise's management view of how the business is performing:
-// growth, efficiency and (roadmap) customer economics. The currency-
-// neutral ratios here also roll up, anonymised, into the coach's Market
-// Intelligence product. Everything is drawn from the financial model we
-// already run; nothing is guessed. Metrics that need a per-period customer
-// input the business hasn't supplied yet are shown as "Needs input", not faked.
-function PerfMetric({label,value,formula,tone,tag,needsInput,travelsTo,showTrend,cc}:{
-  label:string; value?:string; formula:string; tone?:'good'|'warn'|'bad'|'info';
-  tag?:string; needsInput?:boolean; travelsTo?:'intelligence'|'coach'; showTrend?:boolean; cc?:string
+// growth, efficiency and (roadmap) customer economics. Figures come from
+// the financial model's real monthly series -- including the future
+// projection -- so a period can be picked (whole plan / a year / a single
+// month) and the trend is shown month by month. Negative / loss figures are
+// coloured red so bad news reads as bad news, and a plain-English "what to
+// do about it" section turns the numbers into actions. The currency-neutral
+// ratios also roll up, anonymised, into the coach's Market Intelligence
+// product; nothing is guessed.
+function PerfMetric({label,value,formula,tag,tagTone,bad,needsInput,travelsTo}:{
+  label:string; value?:string; formula:string; tag?:string; tagTone?:'good'|'warn'|'bad'|'info';
+  bad?:boolean; needsInput?:boolean; travelsTo?:'intelligence'|'coach'
 }) {
-  const toneColor = tone==='good'?C.green:tone==='warn'?C.amber:tone==='bad'?C.red:C.teal
+  const tagColor = tagTone==='good'?C.green:tagTone==='warn'?C.amber:tagTone==='bad'?C.red:C.teal
   return (
-    <div style={{background:C.white,border:'1px solid var(--cv-border-soft)',borderRadius:12,padding:'0.95rem 1.05rem',display:'flex',flexDirection:'column',gap:'0.4rem'}}>
+    <div style={{background:C.white,border:`1px solid ${bad?C.red:'var(--cv-border-soft)'}`,borderRadius:12,padding:'0.95rem 1.05rem',display:'flex',flexDirection:'column',gap:'0.4rem'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
         <span style={{fontFamily:'monospace',fontSize:'0.82rem',letterSpacing:'0.04em',color:C.slate,textTransform:'uppercase',fontWeight:600}}>{label}</span>
         {travelsTo&&<span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,padding:'0.1rem 0.4rem',borderRadius:5,background:'var(--cv-tint-cyan)',color:C.teal,border:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>{travelsTo==='intelligence'?'→ Intelligence':'coach tab'}</span>}
       </div>
       {needsInput
         ? <span style={{fontFamily:'Georgia,serif',fontSize:'1.35rem',fontWeight:700,color:C.slate}}>—</span>
-        : <span style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,color:C.navy,lineHeight:1.05}}>{value}
-            {tag&&<span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,marginLeft:'0.45rem',padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-wa-10)',color:toneColor,border:`1px solid ${toneColor}`}}>{tag}</span>}
+        : <span style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,color:bad?C.red:C.navy,lineHeight:1.05}}>{value}
+            {tag&&<span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,marginLeft:'0.45rem',padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-wa-10)',color:tagColor,border:`1px solid ${tagColor}`}}>{tag}</span>}
           </span>}
       <span style={{fontSize:'0.82rem',color:C.slate,borderTop:`1px dashed ${C.border}`,paddingTop:'0.4rem'}}>{formula}</span>
       {needsInput&&<span style={{fontFamily:'monospace',fontSize:'0.74rem',color:C.amber,fontWeight:700}}>Needs customer input</span>}
-      {showTrend&&(
-        <div style={{height:28,borderRadius:6,border:`1px dashed ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'monospace',fontSize:'0.68rem',color:C.slate,background:'var(--cv-alt)'}}>trend builds as each period is logged</div>
-      )}
     </div>
   )
 }
 
-function PerformanceTab({config,result,cc}) {
+// Monthly trend chart from the model's real figures. Revenue as a filled
+// area, EBITDA as a line, with red markers on any month the business makes a
+// loss (EBITDA below zero), a dashed zero line, and the selected period shaded.
+function MonthlyTrendChart({months,rev,ebitda,selStart,selEnd,cc}:{
+  months:string[]; rev:number[]; ebitda:number[]; selStart:number; selEnd:number; cc:string
+}) {
+  const n = rev.length
+  if (n < 2) return (
+    <div style={{height:150,borderRadius:10,border:`1px dashed ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',textAlign:'center',fontFamily:'monospace',fontSize:'0.86rem',color:C.slate,background:'var(--cv-alt)',padding:'0 1.5rem'}}>
+      A monthly trend needs at least two months in the plan.
+    </div>
+  )
+  const W=800,H=210,padL=6,padR=6,padT=12,padB=26
+  const vMax=Math.max(...rev,...ebitda,0), vMin=Math.min(...rev,...ebitda,0)
+  const span=(vMax-vMin)||1
+  const x=(i:number)=>padL+(i/(n-1))*(W-padL-padR)
+  const y=(v:number)=>padT+(1-(v-vMin)/span)*(H-padT-padB)
+  const y0=y(0)
+  const revLine=rev.map((v,i)=>`${i===0?'M':'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')
+  const revArea=`${revLine} L${x(n-1).toFixed(1)},${y0.toFixed(1)} L${x(0).toFixed(1)},${y0.toFixed(1)} Z`
+  const ebLine=ebitda.map((v,i)=>`${i===0?'M':'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')
+  const step=Math.max(1,Math.ceil(n/6))
+  const labelIdx=Array.from({length:n},(_,i)=>i).filter(i=>i%step===0||i===n-1)
+  return (
+    <div style={{overflowX:'auto'}}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{width:'100%',minWidth:520,height:220,display:'block'}}>
+        {/* selected-period shading */}
+        <rect x={x(selStart)} y={padT} width={Math.max(2,x(selEnd)-x(selStart))} height={H-padT-padB} fill="var(--cv-tint-cyan)" opacity={0.5}/>
+        {/* zero line */}
+        <line x1={padL} x2={W-padR} y1={y0} y2={y0} stroke={C.slate} strokeDasharray="4 4" strokeWidth="1" opacity={0.5}/>
+        {/* revenue area + line */}
+        <path d={revArea} fill={C.cyan} opacity={0.12}/>
+        <path d={revLine} fill="none" stroke={C.cyan} strokeWidth="2.5"/>
+        {/* ebitda line */}
+        <path d={ebLine} fill="none" stroke={C.navy} strokeWidth="2"/>
+        {/* loss markers */}
+        {ebitda.map((v,i)=> v<0 ? <circle key={i} cx={x(i)} cy={y(v)} r="3.5" fill={C.red}/> : null)}
+        {/* x labels */}
+        {labelIdx.map(i=>(
+          <text key={i} x={x(i)} y={H-8} fontSize="10" fill={C.slate} textAnchor="middle" fontFamily="monospace">{(months&&months[i])||`M${i+1}`}</text>
+        ))}
+      </svg>
+      <div style={{display:'flex',gap:'1.1rem',flexWrap:'wrap',marginTop:'0.4rem',fontSize:'0.8rem',color:C.slate}}>
+        <span><span style={{display:'inline-block',width:14,height:3,background:C.cyan,verticalAlign:'middle',marginRight:5}}/>Revenue</span>
+        <span><span style={{display:'inline-block',width:14,height:3,background:C.navy,verticalAlign:'middle',marginRight:5}}/>EBITDA (profit before interest, tax, depreciation)</span>
+        <span><span style={{display:'inline-block',width:9,height:9,borderRadius:9,background:C.red,verticalAlign:'middle',marginRight:5}}/>Loss month</span>
+      </div>
+    </div>
+  )
+}
+
+function PerformanceTab({config,result,months,cc}) {
+  const [win,setWin] = useState('plan')
   if (!result || !result.metrics) return (
     <div style={card}>
       <div style={{...secH,marginBottom:'0.5rem'}}>Performance &amp; Growth</div>
       <p style={{color:C.slate,fontSize:'1.06rem',lineHeight:1.6}}>
         Once your business units and plan are set up, this page shows how {config.business_name||'your business'}
-        is performing — growth, margins and efficiency — and tracks them over time.
+        is performing — growth, margins and efficiency — month by month.
       </p>
     </div>
   )
-  const m = result.metrics
-  const perf = computeFreePerformance({
-    metrics: m,
-    monthlyRevenue: (result.con && result.con.rev) || [],
-    monthlyCashClose: (result.cf && result.cf.close) || [],
-  })
-  const growthStr = perf.revenueGrowthPct===null ? null
-    : `${perf.revenueGrowthPct>0?'+':''}${perf.revenueGrowthPct}%`
-  const r40Str = perf.ruleOf40===null ? null : String(perf.ruleOf40)
-  const opMargin = operatingMarginPct(m.total_ebitda, (result.con && result.con.depreciation ? result.con.depreciation.reduce((a,b)=>a+(b||0),0) : 0), m.total_revenue)
+  const rev = (result.con && result.con.rev) || []
+  const gp  = (result.con && result.con.gp) || []
+  const ebitda = (result.con && result.con.ebitda) || []
+  const npat = (result.con && result.con.npat) || []
+  const dep  = (result.con && result.con.depreciation) || []
+  const cash = (result.cf && result.cf.close) || []
+  const N = rev.length
+  const sum=(a:number[],s:number,e:number)=>a.slice(s,e+1).reduce((x:number,v:number)=>x+(v||0),0)
+
+  // ── Period selector: whole plan / each year / each month ──
+  const yearCount=Math.max(1,Math.ceil(N/12))
+  const options:{key:string;label:string;start:number;end:number}[]=[{key:'plan',label:'Whole plan',start:0,end:Math.max(0,N-1)}]
+  for(let yi=0;yi<yearCount;yi++){const s=yi*12; if(s<N) options.push({key:`y${yi}`,label:`Year ${yi+1}`,start:s,end:Math.min(N-1,s+11)})}
+  for(let i=0;i<N;i++) options.push({key:`m${i}`,label:(months&&months[i])||`Month ${i+1}`,start:i,end:i})
+  const sel = options.find(o=>o.key===win) || options[0]
+  const len = sel.end-sel.start+1
+
+  // ── Window figures ──
+  const wRev=sum(rev,sel.start,sel.end), wGp=sum(gp,sel.start,sel.end)
+  const wEb=sum(ebitda,sel.start,sel.end), wNp=sum(npat,sel.start,sel.end), wDep=sum(dep,sel.start,sel.end)
+  const gm=grossMarginPct(wGp,wRev), em=ebitdaMarginPct(wEb,wRev), nm=netMarginPct(wNp,wRev)
+  const opM=operatingMarginPct(wEb,wDep,wRev)
+  const pS=sel.start-len, pE=sel.start-1
+  const prevRev = pS>=0 ? sum(rev,pS,pE) : null
+  const growth = prevRev!==null ? revenueGrowthPct(prevRev,wRev) : null
+  const r40 = ruleOf40(growth, em)
+  const opening = sel.start>0 ? (cash[sel.start-1]||0) : (cash[0]||0)
+  const trough = cash.length ? Math.min(...cash.slice(sel.start,sel.end+1)) : 0
+  const burn = prevRev!==null ? burnMultiple(opening-trough, wRev-prevRev) : null
+
+  const growthStr = growth===null ? 'First period' : `${growth>0?'+':''}${growth}%`
+  const r40Str = r40===null ? '—' : String(r40)
+  const pctStr=(v:number|null)=> v===null ? '—' : `${v}%`
+
+  // ── Guidance: turn the numbers into plain-English actions ──
+  const negEbMonths = ebitda.filter(v=>v<0).length
+  const negCashMonths = cash.filter(v=>v<0).length
+  const worstCashIdx = cash.length ? cash.indexOf(Math.min(...cash)) : -1
+  const worstCashLabel = worstCashIdx>=0 ? ((months&&months[worstCashIdx])||`month ${worstCashIdx+1}`) : ''
+  const recs:{sev:'bad'|'warn'|'info'|'good';title:string;text:string}[]=[]
+  if (nm!==null && nm<0) recs.push({sev:'bad',title:'The business is loss-making',text:`Net margin is ${nm}% for the selected period — costs are higher than income. This is the priority: compare weak pricing (gross margin ${gm===null?'n/a':gm+'%'}) against heavy overheads and tackle whichever is bigger.`})
+  if (gm!==null && gm>=0 && gm<30) recs.push({sev:'warn',title:'Cost of goods is eating your margin',text:`Only ${gm}% of revenue is left after the direct cost of what you sell. Look at supplier prices, waste, and whether your selling price is high enough.`})
+  if (negCashMonths>0) recs.push({sev:'bad',title:'Cash runs out in some months',text:`Cash goes negative in ${negCashMonths} month${negCashMonths>1?'s':''}${worstCashLabel?`, worst around ${worstCashLabel}`:''}. Line up an overdraft or working capital before then, or delay large payments so you don't run dry.`})
+  if (negEbMonths>0) recs.push({sev:'warn',title:'Some months spend more than they earn',text:`In ${negEbMonths} month${negEbMonths>1?'s':''} the business makes a loss before financing (red points on the chart). Trim discretionary spend in those months, or bring revenue forward.`})
+  if (growth!==null && growth<0) recs.push({sev:'warn',title:'Revenue is shrinking',text:`Revenue fell ${Math.abs(growth)}% versus the previous period. Focus on keeping existing customers and winning back lapsed ones before chasing new ones.`})
+  if (r40!==null && r40>=0 && r40<40) recs.push({sev:'info',title:'Growth and profit together are below the healthy line',text:`Rule of 40 is ${r40} (growth% + margin%). Healthy is 40+. Either grow faster or lift margins — small moves in both add up.`})
+  if (recs.length===0) recs.push({sev:'good',title:'The fundamentals look healthy',text:'Growing, profitable, and cash stays positive across the plan. Keep watching the monthly trend and protect your margins as you scale.'})
+  const sevColor=(s:string)=> s==='bad'?C.red : s==='warn'?C.amber : s==='good'?C.green : C.teal
+
   const gridStyle: React.CSSProperties = {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(215px,1fr))',gap:'0.85rem'}
   const secLabel: React.CSSProperties = {fontFamily:'monospace',fontSize:'0.82rem',letterSpacing:'0.14em',textTransform:'uppercase',color:C.teal,margin:'0 0 0.7rem'}
 
   return (
     <div>
-      {/* Intro */}
+      {/* Intro + period selector */}
       <div style={{...card,marginBottom:'1.1rem'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:'0.5rem'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.7rem'}}>
           <div style={secH}>Performance &amp; Growth</div>
-          <span style={{fontFamily:'monospace',fontSize:'0.82rem',color:C.slate}}>Modelled · full year</span>
+          <label style={{display:'flex',alignItems:'center',gap:'0.5rem',fontSize:'0.9rem',color:C.slate}}>
+            <span style={{fontFamily:'monospace',fontSize:'0.8rem',textTransform:'uppercase',letterSpacing:'0.06em'}}>Period</span>
+            <select value={win} onChange={e=>setWin(e.target.value)} style={{...inp,width:'auto',padding:'0.35rem 0.6rem',fontSize:'0.94rem'}}>
+              {options.map(o=><option key={o.key} value={o.key}>{o.label}</option>)}
+            </select>
+          </label>
         </div>
-        <p style={{color:C.slate,fontSize:'1.0rem',lineHeight:1.55,margin:0}}>
-          How the business is performing. The ratios marked <span style={{fontFamily:'monospace',fontSize:'0.78rem',color:C.teal}}>→ Intelligence</span> also
-          feed the anonymised Market Intelligence product. Customer metrics need a short per-period input — they
-          stay blank until you log it.
+        <p style={{color:C.slate,fontSize:'1.0rem',lineHeight:1.55,margin:'0.4rem 0 0'}}>
+          How the business is performing over <strong>{sel.label.toLowerCase()}</strong>. Pick any month, year, or
+          the whole plan above. Figures come from your financial model — including its future months. Ratios marked
+          <span style={{fontFamily:'monospace',fontSize:'0.78rem',color:C.teal}}> → Intelligence</span> also feed the anonymised Market Intelligence product.
         </p>
       </div>
 
       {/* At a glance */}
       <div style={{marginBottom:'1.3rem'}}>
-        <div style={secLabel}>At a glance</div>
+        <div style={secLabel}>At a glance · {sel.label}</div>
         <div style={gridStyle}>
-          <PerfMetric label="Revenue" value={fmt(perf.revenue,cc)} formula="Total sales this period." tone="info" showTrend/>
-          <PerfMetric label="Rule of 40" value={r40Str||'—'} tag={r40Str?(perf.ruleOf40Strong?'strong':'below 40'):undefined} tone={perf.ruleOf40Strong?'good':'warn'} formula="Growth% + profit margin%. Over 40 is strong." travelsTo="intelligence" showTrend/>
-          <PerfMetric label="Gross margin" value={perf.grossMarginPct===null?'—':`${perf.grossMarginPct}%`} formula="(Revenue − cost of goods) ÷ revenue." tone="info" travelsTo="intelligence" showTrend/>
-          <PerfMetric label="EBITDA margin" value={perf.ebitdaMarginPct===null?'—':`${perf.ebitdaMarginPct}%`} formula="Operating profit ÷ revenue (before interest, tax, depreciation)." tone="info" travelsTo="intelligence" showTrend/>
+          <PerfMetric label="Revenue" value={fmt(wRev,cc)} formula="Total sales in the selected period." bad={wRev<0}/>
+          <PerfMetric label="Rule of 40" value={r40Str} tag={r40!==null?(isRuleOf40Strong(r40)?'strong':'below 40'):undefined} tagTone={r40!==null&&isRuleOf40Strong(r40)?'good':'warn'} bad={r40!==null&&r40<0} formula="Growth% + profit margin%. Over 40 is strong." travelsTo="intelligence"/>
+          <PerfMetric label="Gross margin" value={pctStr(gm)} bad={gm!==null&&gm<0} formula="(Revenue − cost of goods) ÷ revenue." travelsTo="intelligence"/>
+          <PerfMetric label="EBITDA margin" value={pctStr(em)} bad={em!==null&&em<0} tag={em!==null&&em<0?'loss':undefined} tagTone="bad" formula="Operating profit ÷ revenue (before interest, tax, depreciation)." travelsTo="intelligence"/>
         </div>
       </div>
 
@@ -946,15 +1042,41 @@ function PerformanceTab({config,result,cc}) {
       <div style={{marginBottom:'1.3rem'}}>
         <div style={secLabel}>Growth &amp; efficiency</div>
         <div style={gridStyle}>
-          <PerfMetric label="Revenue growth" value={growthStr||'Needs 2nd year'} formula="This period's revenue vs last, as a %." tone={growthStr&&perf.revenueGrowthPct!==null&&perf.revenueGrowthPct>=0?'good':'warn'} travelsTo="intelligence" showTrend/>
-          <PerfMetric label="Operating margin" value={opMargin===null?'—':`${opMargin}%`} formula="(EBITDA − depreciation) ÷ revenue." tone="info" travelsTo="intelligence" showTrend/>
-          <PerfMetric label="Net margin" value={perf.netMarginPct===null?'—':`${perf.netMarginPct}%`} formula="Net profit after tax ÷ revenue." tone="info" travelsTo="intelligence" showTrend/>
-          <PerfMetric label="Burn multiple" value={perf.burnMultiple===null?'Cash-generative':`${perf.burnMultiple}×`} tag={perf.burnMultiple!==null&&perf.burnMultiple<1?'efficient':undefined} tone="good" formula="Cash burned ÷ net new revenue. Under 1× is efficient." travelsTo="intelligence" showTrend/>
+          <PerfMetric label="Revenue growth" value={growthStr} bad={growth!==null&&growth<0} tag={growth!==null&&growth<0?'falling':undefined} tagTone="bad" formula="This period's revenue vs the one before, as a %." travelsTo="intelligence"/>
+          <PerfMetric label="Operating margin" value={pctStr(opM)} bad={opM!==null&&opM<0} formula="(EBITDA − depreciation) ÷ revenue." travelsTo="intelligence"/>
+          <PerfMetric label="Net margin" value={pctStr(nm)} bad={nm!==null&&nm<0} tag={nm!==null&&nm<0?'loss':undefined} tagTone="bad" formula="Net profit after tax ÷ revenue." travelsTo="intelligence"/>
+          <PerfMetric label="Burn multiple" value={burn===null?'Cash-generative':`${burn}×`} tag={burn!==null&&burn<1?'efficient':(burn!==null?'high':undefined)} tagTone={burn!==null&&burn<1?'good':'warn'} formula="Cash burned ÷ net new revenue. Under 1× is efficient." travelsTo="intelligence"/>
+        </div>
+      </div>
+
+      {/* Monthly trend chart — real figures from the model */}
+      <div style={{...card,marginBottom:'1.3rem'}}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Revenue &amp; EBITDA, month by month</div>
+        <p style={{color:C.slate,fontSize:'0.92rem',lineHeight:1.5,margin:'0 0 0.9rem'}}>
+          Straight from your model, including future months. Red points mark months where the business makes a loss.
+          The shaded band is the period selected above.
+        </p>
+        <MonthlyTrendChart months={months} rev={rev} ebitda={ebitda} selStart={sel.start} selEnd={sel.end} cc={cc}/>
+      </div>
+
+      {/* What to do about it */}
+      <div style={{...card,marginBottom:'1.3rem'}}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>What this means — and what to do</div>
+        <p style={{color:C.slate,fontSize:'0.92rem',lineHeight:1.5,margin:'0 0 0.9rem'}}>
+          Plain-English actions based on the figures above. Work down the list — the red items first.
+        </p>
+        <div style={{display:'flex',flexDirection:'column',gap:'0.7rem'}}>
+          {recs.map((r,i)=>(
+            <div key={i} style={{borderLeft:`4px solid ${sevColor(r.sev)}`,background:'var(--cv-alt)',borderRadius:'0 8px 8px 0',padding:'0.7rem 0.95rem'}}>
+              <div style={{fontWeight:700,color:sevColor(r.sev),fontSize:'0.98rem',marginBottom:'0.2rem'}}>{r.title}</div>
+              <div style={{color:C.navy,fontSize:'0.92rem',lineHeight:1.5}}>{r.text}</div>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* Customer economics — roadmap */}
-      <div style={{marginBottom:'1.3rem'}}>
+      <div style={{marginBottom:'0.4rem'}}>
         <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'0.7rem'}}>
           <span style={secLabel}>Customer economics</span>
           <span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>needs customer data</span>
@@ -972,18 +1094,6 @@ function PerformanceTab({config,result,cc}) {
           <PerfMetric label="Net revenue retention" formula="Revenue from existing customers, this period ÷ last. Over 100% grows without new customers." needsInput travelsTo="intelligence"/>
           <PerfMetric label="MRR" formula="Active subscribers × avg revenue per user. Recurring lines only." needsInput travelsTo="coach"/>
           <PerfMetric label="ARR" formula="MRR × 12. Annual recurring revenue." needsInput travelsTo="coach"/>
-        </div>
-      </div>
-
-      {/* Trends */}
-      <div style={card}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',fontWeight:700,color:C.navy,marginBottom:'0.3rem'}}>Your performance, period over period</div>
-        <p style={{color:C.slate,fontSize:'0.94rem',lineHeight:1.5,margin:'0 0 0.9rem'}}>
-          Every metric above is stored each period. The charts draw themselves once there are two or more
-          periods — we never invent history.
-        </p>
-        <div style={{height:150,borderRadius:10,border:`1px dashed ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',textAlign:'center',fontFamily:'monospace',fontSize:'0.86rem',color:C.slate,background:'var(--cv-alt)',padding:'0 1.5rem'}}>
-          Line and bars render automatically once 2+ periods are logged. No history is invented.
         </div>
       </div>
     </div>
