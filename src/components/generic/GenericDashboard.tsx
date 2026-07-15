@@ -21,6 +21,7 @@ import { yearStartPeriod, canCloseCalendarYear, computeYearEndBalanceSheet } fro
 import BuildStamp from '@/components/BuildStamp'
 import VerificationRecognition from '@/components/generic/VerificationRecognition'
 import PaymentReviewQueue from '@/components/generic/PaymentReviewQueue'
+import { computeFreePerformance, operatingMarginPct } from '@/lib/business-performance-metrics'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
@@ -723,6 +724,7 @@ export default function GenericDashboard({
   ] : [
     ['overview','Overview'],
     ['intelligence','Clearview Intelligence'],
+    ['performance','Performance'],
     ['planning','Planning'],
     ['actuals_wc','Actuals & Working Capital'],
     ['pl','P&L'],
@@ -775,6 +777,7 @@ export default function GenericDashboard({
         {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} pendingApprovalCount={pendingApprovalCount} onGoToApprovals={()=>setView('approvals')} onGoToIntelligence={()=>setView('intelligence')}/>}
         {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P}/>}
         {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods} onNavigate={setView}/>}
+        {view==='performance' && <PerformanceTab config={config} result={result} cc={cc}/>}
         {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
         {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods}/>}
         {view==='cashflow'    && <CashFlowTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
@@ -857,6 +860,135 @@ function TrendChart({months,revenue,cost,ebitda,cc}:{months:string[];revenue:num
 }
 
 const ovLabel: React.CSSProperties = {fontFamily:'monospace',fontSize:'0.96rem',letterSpacing:'0.14em',color:C.slate,textTransform:'uppercase',margin:'0.25rem 0 0.7rem'}
+
+// ── PERFORMANCE & GROWTH TAB ─────────────────────────────────
+// The enterprise's management view of how the business is performing:
+// growth, efficiency and (roadmap) customer economics. The currency-
+// neutral ratios here also roll up, anonymised, into the coach's Market
+// Intelligence product. Everything is drawn from the financial model we
+// already run; nothing is guessed. Metrics that need a per-period customer
+// input the business hasn't supplied yet are shown as "Needs input", not faked.
+function PerfMetric({label,value,formula,tone,tag,needsInput,travelsTo,showTrend,cc}:{
+  label:string; value?:string; formula:string; tone?:'good'|'warn'|'bad'|'info';
+  tag?:string; needsInput?:boolean; travelsTo?:'intelligence'|'coach'; showTrend?:boolean; cc?:string
+}) {
+  const toneColor = tone==='good'?C.green:tone==='warn'?C.amber:tone==='bad'?C.red:C.teal
+  return (
+    <div style={{background:C.white,border:'1px solid var(--cv-border-soft)',borderRadius:12,padding:'0.95rem 1.05rem',display:'flex',flexDirection:'column',gap:'0.4rem'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
+        <span style={{fontFamily:'monospace',fontSize:'0.82rem',letterSpacing:'0.04em',color:C.slate,textTransform:'uppercase',fontWeight:600}}>{label}</span>
+        {travelsTo&&<span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,padding:'0.1rem 0.4rem',borderRadius:5,background:'var(--cv-tint-cyan)',color:C.teal,border:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>{travelsTo==='intelligence'?'→ Intelligence':'coach tab'}</span>}
+      </div>
+      {needsInput
+        ? <span style={{fontFamily:'Georgia,serif',fontSize:'1.35rem',fontWeight:700,color:C.slate}}>—</span>
+        : <span style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,color:C.navy,lineHeight:1.05}}>{value}
+            {tag&&<span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,marginLeft:'0.45rem',padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-wa-10)',color:toneColor,border:`1px solid ${toneColor}`}}>{tag}</span>}
+          </span>}
+      <span style={{fontSize:'0.82rem',color:C.slate,borderTop:`1px dashed ${C.border}`,paddingTop:'0.4rem'}}>{formula}</span>
+      {needsInput&&<span style={{fontFamily:'monospace',fontSize:'0.74rem',color:C.amber,fontWeight:700}}>Needs customer input</span>}
+      {showTrend&&(
+        <div style={{height:28,borderRadius:6,border:`1px dashed ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'monospace',fontSize:'0.68rem',color:C.slate,background:'var(--cv-alt)'}}>trend builds as each period is logged</div>
+      )}
+    </div>
+  )
+}
+
+function PerformanceTab({config,result,cc}) {
+  if (!result || !result.metrics) return (
+    <div style={card}>
+      <div style={{...secH,marginBottom:'0.5rem'}}>Performance &amp; Growth</div>
+      <p style={{color:C.slate,fontSize:'1.06rem',lineHeight:1.6}}>
+        Once your business units and plan are set up, this page shows how {config.business_name||'your business'}
+        is performing — growth, margins and efficiency — and tracks them over time.
+      </p>
+    </div>
+  )
+  const m = result.metrics
+  const perf = computeFreePerformance({
+    metrics: m,
+    monthlyRevenue: (result.con && result.con.rev) || [],
+    monthlyCashClose: (result.cf && result.cf.close) || [],
+  })
+  const growthStr = perf.revenueGrowthPct===null ? null
+    : `${perf.revenueGrowthPct>0?'+':''}${perf.revenueGrowthPct}%`
+  const r40Str = perf.ruleOf40===null ? null : String(perf.ruleOf40)
+  const opMargin = operatingMarginPct(m.total_ebitda, (result.con && result.con.depreciation ? result.con.depreciation.reduce((a,b)=>a+(b||0),0) : 0), m.total_revenue)
+  const gridStyle: React.CSSProperties = {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(215px,1fr))',gap:'0.85rem'}
+  const secLabel: React.CSSProperties = {fontFamily:'monospace',fontSize:'0.82rem',letterSpacing:'0.14em',textTransform:'uppercase',color:C.teal,margin:'0 0 0.7rem'}
+
+  return (
+    <div>
+      {/* Intro */}
+      <div style={{...card,marginBottom:'1.1rem'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:'0.5rem'}}>
+          <div style={secH}>Performance &amp; Growth</div>
+          <span style={{fontFamily:'monospace',fontSize:'0.82rem',color:C.slate}}>Modelled · full year</span>
+        </div>
+        <p style={{color:C.slate,fontSize:'1.0rem',lineHeight:1.55,margin:0}}>
+          How the business is performing. The ratios marked <span style={{fontFamily:'monospace',fontSize:'0.78rem',color:C.teal}}>→ Intelligence</span> also
+          feed the anonymised Market Intelligence product. Customer metrics need a short per-period input — they
+          stay blank until you log it.
+        </p>
+      </div>
+
+      {/* At a glance */}
+      <div style={{marginBottom:'1.3rem'}}>
+        <div style={secLabel}>At a glance</div>
+        <div style={gridStyle}>
+          <PerfMetric label="Revenue" value={fmt(perf.revenue,cc)} formula="Total sales this period." tone="info" showTrend/>
+          <PerfMetric label="Rule of 40" value={r40Str||'—'} tag={r40Str?(perf.ruleOf40Strong?'strong':'below 40'):undefined} tone={perf.ruleOf40Strong?'good':'warn'} formula="Growth% + profit margin%. Over 40 is strong." travelsTo="intelligence" showTrend/>
+          <PerfMetric label="Gross margin" value={perf.grossMarginPct===null?'—':`${perf.grossMarginPct}%`} formula="(Revenue − cost of goods) ÷ revenue." tone="info" travelsTo="intelligence" showTrend/>
+          <PerfMetric label="EBITDA margin" value={perf.ebitdaMarginPct===null?'—':`${perf.ebitdaMarginPct}%`} formula="Operating profit ÷ revenue (before interest, tax, depreciation)." tone="info" travelsTo="intelligence" showTrend/>
+        </div>
+      </div>
+
+      {/* Growth & efficiency */}
+      <div style={{marginBottom:'1.3rem'}}>
+        <div style={secLabel}>Growth &amp; efficiency</div>
+        <div style={gridStyle}>
+          <PerfMetric label="Revenue growth" value={growthStr||'Needs 2nd year'} formula="This period's revenue vs last, as a %." tone={growthStr&&perf.revenueGrowthPct!==null&&perf.revenueGrowthPct>=0?'good':'warn'} travelsTo="intelligence" showTrend/>
+          <PerfMetric label="Operating margin" value={opMargin===null?'—':`${opMargin}%`} formula="(EBITDA − depreciation) ÷ revenue." tone="info" travelsTo="intelligence" showTrend/>
+          <PerfMetric label="Net margin" value={perf.netMarginPct===null?'—':`${perf.netMarginPct}%`} formula="Net profit after tax ÷ revenue." tone="info" travelsTo="intelligence" showTrend/>
+          <PerfMetric label="Burn multiple" value={perf.burnMultiple===null?'Cash-generative':`${perf.burnMultiple}×`} tag={perf.burnMultiple!==null&&perf.burnMultiple<1?'efficient':undefined} tone="good" formula="Cash burned ÷ net new revenue. Under 1× is efficient." travelsTo="intelligence" showTrend/>
+        </div>
+      </div>
+
+      {/* Customer economics — roadmap */}
+      <div style={{marginBottom:'1.3rem'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'0.7rem'}}>
+          <span style={secLabel}>Customer economics</span>
+          <span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>needs customer data</span>
+        </div>
+        <p style={{color:C.slate,fontSize:'0.94rem',lineHeight:1.5,margin:'0 0 0.8rem',maxWidth:'70ch'}}>
+          These need a small input each period — customers won, customers lost, and sales &amp; marketing spend.
+          That input is exactly the discipline that helps a business grow.
+        </p>
+        <div style={gridStyle}>
+          <PerfMetric label="CAC" formula="Sales &amp; marketing spend ÷ new customers won." needsInput/>
+          <PerfMetric label="Customer lifetime value" formula="Avg purchase × yearly frequency × avg lifespan." needsInput/>
+          <PerfMetric label="LTV : CAC" formula="Lifetime value ÷ acquisition cost. Over 3× is healthy." needsInput travelsTo="intelligence"/>
+          <PerfMetric label="CAC payback" formula="CAC ÷ monthly gross profit per customer, in months." needsInput travelsTo="intelligence"/>
+          <PerfMetric label="Churn" formula="Customers lost ÷ customers at the start. Lower is better." needsInput travelsTo="intelligence"/>
+          <PerfMetric label="Net revenue retention" formula="Revenue from existing customers, this period ÷ last. Over 100% grows without new customers." needsInput travelsTo="intelligence"/>
+          <PerfMetric label="MRR" formula="Active subscribers × avg revenue per user. Recurring lines only." needsInput travelsTo="coach"/>
+          <PerfMetric label="ARR" formula="MRR × 12. Annual recurring revenue." needsInput travelsTo="coach"/>
+        </div>
+      </div>
+
+      {/* Trends */}
+      <div style={card}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',fontWeight:700,color:C.navy,marginBottom:'0.3rem'}}>Your performance, period over period</div>
+        <p style={{color:C.slate,fontSize:'0.94rem',lineHeight:1.5,margin:'0 0 0.9rem'}}>
+          Every metric above is stored each period. The charts draw themselves once there are two or more
+          periods — we never invent history.
+        </p>
+        <div style={{height:150,borderRadius:10,border:`1px dashed ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',textAlign:'center',fontFamily:'monospace',fontSize:'0.86rem',color:C.slate,background:'var(--cv-alt)',padding:'0 1.5rem'}}>
+          Line and bars render automatically once 2+ periods are logged. No history is invented.
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ── OVERVIEW TAB ─────────────────────────────────────────────
 function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGoToApprovals,onGoToIntelligence}) {
