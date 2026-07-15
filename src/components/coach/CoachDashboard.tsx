@@ -1118,6 +1118,50 @@ function PortfolioIntelligenceHub({clients,programmes}){
         </div>
       )}
 
+      {data.performanceBySector&&data.performanceBySector.length>0&&(
+        <div style={card}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Benchmarked by segment</div>
+          <p style={{fontSize:'0.88rem',color:C.slate,margin:'0 0 0.7rem',maxWidth:'74ch'}}>Every factor cut by sector, ranked strongest-first. The portfolio row is the baseline. Peer comparisons within this portfolio, not external industry norms.</p>
+          <div style={{overflowX:'auto',border:'1px solid var(--cv-border-soft)',borderRadius:10}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.84rem',minWidth:640}}>
+              <thead>
+                <tr>{['Sector','Biz','Ready','LRS','Growth','Cost','Cover','EBITDA','Weakest'].map((h,i)=>(
+                  <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily:'monospace',fontSize:'0.68rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0||i===8?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody>
+                {[...data.performanceBySector].sort((a:any,b:any)=>(b.overview.avgLRSScore||0)-(a.overview.avgLRSScore||0)).map((row:any)=>{
+                  const g=row.summary.revenueGrowth
+                  return(
+                  <tr key={row.sector} style={{borderTop:'1px solid var(--cv-border-soft)'}}>
+                    <td style={{padding:'7px 10px',textAlign:'left',color:C.navy}}>{row.sector}</td>
+                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{row.count}</td>
+                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{row.overview.readinessPipeline.investment_ready}</td>
+                    <td style={{padding:'7px 10px',textAlign:'right',fontWeight:700,color:C.navy}}>{Math.round(row.overview.avgLRSScore)}</td>
+                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{g&&g.median!==null?`${g.median>0?'+':''}${g.median}%`:'—'}</td>
+                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.costRatio,'%')}</td>
+                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.dscr,'×',1)}</td>
+                    <td style={{padding:'7px 10px',textAlign:'right',color:C.slate}}>{med(row.summary.ebitdaMargin,'%')}</td>
+                    <td style={{padding:'7px 10px',textAlign:'left',color:C.slate}}>{row.overview.mostCommonWeakDimension?LRS_DIM_LABELS[row.overview.mostCommonWeakDimension]:'—'}</td>
+                  </tr>
+                )})}
+                <tr style={{borderTop:`2px solid ${C.cyan}`,background:'var(--cv-tint-cyan)',fontWeight:700}}>
+                  <td style={{padding:'7px 10px',textAlign:'left',color:C.navy}}>Portfolio</td>
+                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{portfolio.totalBusinesses}</td>
+                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{portfolio.readinessPipeline.investment_ready}</td>
+                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{Math.round(portfolio.avgLRSScore)}</td>
+                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{perfSum&&perfSum.revenueGrowth.median!==null?`${perfSum.revenueGrowth.median>0?'+':''}${perfSum.revenueGrowth.median}%`:'—'}</td>
+                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{perfSum?med(perfSum.costRatio,'%'):'—'}</td>
+                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{perfSum?med(perfSum.dscr,'×',1):'—'}</td>
+                  <td style={{padding:'7px 10px',textAlign:'right',color:C.navy}}>{perfSum?med(perfSum.ebitdaMargin,'%'):'—'}</td>
+                  <td style={{padding:'7px 10px',textAlign:'left',color:C.navy}}>{portfolio.mostCommonWeakDimension?LRS_DIM_LABELS[portfolio.mostCommonWeakDimension]:'—'}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <div style={card}>
         <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.8rem'}}>Readiness pipeline</div>
         <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
@@ -1221,6 +1265,53 @@ function PortfolioIntelligenceHub({clients,programmes}){
             </div>
           ))}
           {(data.profiles||[]).length===0&&<div style={{color:C.slate,fontSize:'0.9rem'}}>No businesses match the current filter.</div>}
+        </div>
+      </div>
+
+      {/* DFI risk layer — roadmap */}
+      <div style={{...card,background:'var(--cv-tint-amber)',borderLeft:`4px solid ${C.amber}`}}>
+        <div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.12em',textTransform:'uppercase',color:C.amber,fontWeight:700,marginBottom:'0.3rem'}}>Roadmap · DFI risk layer</div>
+        <div style={{fontSize:'0.94rem',color:C.navy,lineHeight:1.55}}>
+          To let a credit committee price risk directly, per-enterprise <b>collateral coverage</b>, <b>working-capital cycle</b>
+          (largely derivable from the model), <b>FX exposure</b>, and sector <b>default / recovery proxies</b> — benchmarked to
+          the GEMs consortium data DFIs already use — can be added. This is the granular detail that today exists only at pooled-portfolio level.
+        </div>
+      </div>
+
+      {/* Impact & inclusion — roadmap (not yet collected; no fabricated figures) */}
+      <div style={card}>
+        <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'0.3rem',flexWrap:'wrap'}}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>Impact &amp; inclusion</div>
+          <span style={{fontFamily:'monospace',fontSize:'0.7rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>roadmap · to collect</span>
+        </div>
+        <p style={{fontSize:'0.92rem',color:C.slate,lineHeight:1.55,margin:'0 0 0.7rem',maxWidth:'76ch'}}>
+          The reach a donor or impact investor weighs — smallholder farmers and farmer groups reached, and the share of
+          <b> women</b> and <b>youth</b> spelled out by where it sits: <b>supply chain</b>, <b>customers</b>, or <b>workforce</b>.
+          Captured per enterprise via a short per-period return, then rolled up and cut by sector, geography and size.
+          Not yet collected — shown here so the structure is ready.
+        </p>
+        <div style={{fontSize:'0.84rem',color:C.slate,background:'var(--cv-tint-cyan)',borderRadius:8,padding:'0.7rem 0.9rem'}}>
+          Maps to <b>IRIS+</b> (supply-chain &amp; client counts by gender/age), the <b>2X Criteria</b> (gender), and <b>SDGs 1 / 5 / 8</b>.
+        </div>
+      </div>
+
+      {/* Methodology */}
+      <div style={card}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.6rem'}}>Methodology — every factor, defined</div>
+        <div style={{display:'grid',gridTemplateColumns:'minmax(150px,190px) 1fr',gap:'0.5rem 1.2rem',fontSize:'0.88rem'}}>
+          <div style={{fontFamily:'monospace',fontWeight:700,color:C.teal}}>Growth / cost / DSCR / EBITDA</div>
+          <div style={{color:C.navy}}>Year-on-year revenue change; total costs ÷ revenue; operating cash ÷ debt due (1.5× = lender comfort line); operating profit ÷ revenue. Medians over the full distribution.</div>
+          <div style={{fontFamily:'monospace',fontWeight:700,color:C.teal}}>Readiness &amp; LRS</div>
+          <div style={{color:C.navy}}>A 0–30 readiness stage and a 0–100 Liquidity Readiness score from seven weighted dimensions.</div>
+          <div style={{fontFamily:'monospace',fontWeight:700,color:C.teal}}>Data confidence</div>
+          <div style={{color:C.navy}}>How much of each model is verified vs estimated. Feeds OPIM Principle 9 (disclosure &amp; independent verification).</div>
+          <div style={{fontFamily:'monospace',fontWeight:700,color:C.teal}}>Benchmarks</div>
+          <div style={{color:C.navy}}>Computed from businesses in this portfolio; peer comparisons, not industry norms. Medians so one outlier can't distort.</div>
+          <div style={{fontFamily:'monospace',fontWeight:700,color:C.teal}}>Impact &amp; inclusion</div>
+          <div style={{color:C.navy}}>Farmers &amp; groups reached; women/youth share of chain, customers, workforce. Maps to IRIS+, HIPSO/JII and 2X. Not yet collected.</div>
+        </div>
+        <div style={{fontSize:'0.82rem',color:C.slate,marginTop:'0.8rem',background:'var(--cv-tint-amber)',borderLeft:`3px solid ${C.amber}`,borderRadius:6,padding:'0.6rem 0.8rem'}}>
+          <b>Honest limitations.</b> (1) Everything is as at the latest model — tracking factors over time needs historical snapshots we don't yet store. (2) A cohort of this size demonstrates the engine; sector cells become statistically robust as the dataset grows. We show what's possible now and the trajectory — we don't overclaim significance.
         </div>
       </div>
 
