@@ -957,10 +957,19 @@ function PortfolioIntelligenceHub({clients,programmes}){
   const med=(ms:any,unit='',dec=0)=> ms&&ms.median!==null?`${ms.median.toFixed(dec)}${unit}`:'—'
 
   return(
-    <div>
+    <div className="mi-report">
+      {/* Print / Save-as-PDF: hide the app chrome and the on-screen controls, keep the
+          report, and force colours to print so the PDF matches the on-screen design. */}
+      <style>{`@media print{
+        body *{visibility:hidden}
+        .mi-report,.mi-report *{visibility:visible}
+        .mi-report{position:absolute;left:0;top:0;width:100%;padding:0!important}
+        .mi-report .no-print{display:none!important}
+        .mi-report{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      }`}</style>
       <Kicker>Market Intelligence · {snapshotCount} financial client{snapshotCount===1?'':'s'}</Kicker>
 
-      <div style={{...card,display:'flex',flexWrap:'wrap',gap:'0.6rem',alignItems:'center'}}>
+      <div className="no-print" style={{...card,display:'flex',flexWrap:'wrap',gap:'0.6rem',alignItems:'center'}}>
         <select value={filter.programmeId||''} onChange={e=>applyFilter({programmeId:e.target.value})} style={{padding:'0.4rem 0.5rem',borderRadius:6,border:'1px solid var(--cv-border-soft)'}}>
           <option value="">All programmes</option>
           {filterOptions.programmeIds.map(id=><option key={id} value={id}>{programmesById[id]?.name||'Unknown programme'}</option>)}
@@ -979,8 +988,10 @@ function PortfolioIntelligenceHub({clients,programmes}){
         </select>
         {hasFilter&&<button onClick={()=>{setFilter({});load({})}} style={{fontSize:'0.85rem',color:C.slate,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>Clear filters</button>}
         <button title="Numbers are cached for up to 60 seconds so filtering stays fast -- click to force a fresh recompute" onClick={()=>load(filter,true)} style={{marginLeft:'auto',fontSize:'0.85rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>↻ Refresh now</button>
+        <button onClick={()=>window.print()} title="Opens your browser's print dialog -- choose 'Save as PDF' to download a styled PDF of exactly this view" style={{fontSize:'0.85rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>⬇ PDF</button>
         <button disabled={downloading} onClick={()=>downloadBrief(filter)} style={{fontSize:'0.85rem',fontWeight:600,color:C.teal,background:'none',border:`1px solid ${C.teal}`,borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>{downloading?'Generating…':'⬇ Word Summary'}</button>
         <button onClick={()=>setShowAccess(true)} style={{fontSize:'0.85rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>🔗 External Access</button>
+        <div style={{width:'100%',fontSize:'0.78rem',color:C.slate}}>To send a subscribed client (e.g. a donor programme like CSJ) an analysis of just <b>their own beneficiaries</b>: pick their <b>programme</b> above, then <b>External Access → Create Link</b> — the link is pre-scoped to exactly that client's businesses.</div>
         {downloadError&&<div style={{width:'100%',fontSize:'0.78rem',color:C.red}}>{downloadError}</div>}
       </div>
       {showAccess&&<ExternalAccessPanel portfolioFilter={hasFilter?filter:undefined} clients={clients} programmes={programmes} onClose={()=>setShowAccess(false)}/>}
