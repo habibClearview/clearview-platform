@@ -69,6 +69,21 @@ export interface BusinessUnitContribution {
   revenuePct: number  // 0-100, share of this client's total revenue
 }
 
+// Per-business financial performance ratios, carried onto the snapshot so the
+// portfolio layer can benchmark them. All are currency-neutral (percentages /
+// multiples) and therefore safe to average/median ACROSS currencies, unlike the
+// monetary FAC figures. Any value that cannot be computed for a business
+// (e.g. growth without a second year, DSCR without debt) is null, never guessed.
+export interface SnapshotPerformance {
+  revenueGrowthPct: number | null   // year-on-year, whole-number %
+  costRatioPct: number | null       // total operating costs ÷ revenue, %
+  grossMarginPct: number | null
+  ebitdaMarginPct: number | null
+  netMarginPct: number | null
+  dscrMin: number | null            // lowest debt-service coverage; null if no debt
+  ruleOf40: number | null           // growth% + ebitda margin%
+}
+
 export interface ClientSnapshot {
   clientId: string
   name: string
@@ -88,6 +103,7 @@ export interface ClientSnapshot {
   annualRevenue: number  // raw revenue, for size-bracketing only -- never shown as an exact figure
   businessUnits: BusinessUnitContribution[]  // active units with real revenue, by contribution share
   consentToBeNamed: boolean
+  performance?: SnapshotPerformance | null  // currency-neutral ratios for portfolio benchmarking (optional: older snapshots/fixtures may omit it)
 }
 
 export interface SegmentFilter {
@@ -105,6 +121,58 @@ const LRS_DIMENSION_KEYS: (keyof LRSResult['dimensions'])[] = [
 
 function average(values: number[]): number {
   return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0
+}
+
+/** Median of a numeric list (ignores non-finite); null if the list is empty. */
+export function median(values: number[]): number | null {
+  const v = values.filter(x => Number.isFinite(x)).sort((a, b) => a - b)
+  if (!v.length) return null
+  const mid = Math.floor(v.length / 2)
+  return v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2
+}
+
+export interface MetricSummary {
+  median: number | null
+  count: number      // how many businesses had a value for this metric
+  values: number[]   // the raw present values, for a distribution
+}
+export interface PerformanceSummary {
+  revenueGrowth: MetricSummary
+  costRatio: MetricSummary
+  ebitdaMargin: MetricSummary
+  netMargin: MetricSummary
+  ruleOf40: MetricSummary
+  dscr: MetricSummary
+  bankableCount: number        // DSCR >= 1.5 (the usual lender comfort line)
+  ruleOf40StrongCount: number  // Rule of 40 >= 40
+  total: number
+}
+
+function summariseMetric(values: (number | null)[]): MetricSummary {
+  const present = values.filter((v): v is number => v !== null && Number.isFinite(v))
+  return { median: median(present), count: present.length, values: present }
+}
+
+/**
+ * Portfolio-level medians and counts for the currency-neutral performance
+ * ratios. Medians (not means) so one outlier can't distort the picture, and
+ * only businesses that actually have a value for a metric are counted.
+ */
+export function computePerformanceSummary(snapshots: ClientSnapshot[]): PerformanceSummary {
+  const perfs = snapshots.map(s => s.performance).filter((p): p is SnapshotPerformance => !!p)
+  const dscrVals = perfs.map(p => p.dscrMin).filter((v): v is number => v !== null && Number.isFinite(v))
+  const r40Vals = perfs.map(p => p.ruleOf40).filter((v): v is number => v !== null && Number.isFinite(v))
+  return {
+    revenueGrowth: summariseMetric(perfs.map(p => p.revenueGrowthPct)),
+    costRatio: summariseMetric(perfs.map(p => p.costRatioPct)),
+    ebitdaMargin: summariseMetric(perfs.map(p => p.ebitdaMarginPct)),
+    netMargin: summariseMetric(perfs.map(p => p.netMarginPct)),
+    ruleOf40: summariseMetric(perfs.map(p => p.ruleOf40)),
+    dscr: summariseMetric(perfs.map(p => p.dscrMin)),
+    bankableCount: dscrVals.filter(v => v >= 1.5).length,
+    ruleOf40StrongCount: r40Vals.filter(v => v >= 40).length,
+    total: snapshots.length,
+  }
 }
 
 export function readinessStage(irTier: string): ReadinessStage {

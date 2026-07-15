@@ -1056,7 +1056,18 @@ function PerformanceTab({config,result,months,cc}) {
           Straight from your model, including future months. Red points mark months where the business makes a loss.
           The shaded band is the period selected above.
         </p>
-        <MonthlyTrendChart months={months} rev={rev} ebitda={ebitda} selStart={sel.start} selEnd={sel.end} cc={cc}/>
+        {(() => {
+          // Zoom the chart to the chosen period: a year shows that year, the
+          // whole plan shows everything, and a single month shows the year it
+          // sits in with that month shaded (a one-month "trend" is meaningless).
+          const cStart = sel.end===sel.start ? Math.floor(sel.start/12)*12 : sel.start
+          const cEnd   = sel.end===sel.start ? Math.min(N-1, cStart+11) : sel.end
+          return <MonthlyTrendChart
+            months={(months||[]).slice(cStart,cEnd+1)}
+            rev={rev.slice(cStart,cEnd+1)}
+            ebitda={ebitda.slice(cStart,cEnd+1)}
+            selStart={sel.start-cStart} selEnd={sel.end-cStart} cc={cc}/>
+        })()}
       </div>
 
       {/* What to do about it */}

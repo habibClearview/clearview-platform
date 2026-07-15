@@ -17,7 +17,8 @@ import { assessConfidence } from './confidence'
 import { buildPeriodSignals } from './verification-display'
 import { computeSeasonalCashProjection } from './seasonal-cash-projection'
 import { computeFundAbsorptionCapacity } from './fund-absorption-capacity'
-import { computePortfolioOverview, computeSegmentReport, buildAnonymisedProfile, matchesFilter, rankedDimensionFailures, type ClientSnapshot, type SegmentFilter, type PortfolioOverview, type SegmentReport, type AnonymisedProfile, type DimensionFailure } from './portfolio-intelligence'
+import { revenueGrowthPctFromSeries, grossMarginPct, ebitdaMarginPct, netMarginPct, ruleOf40 } from './business-performance-metrics'
+import { computePortfolioOverview, computeSegmentReport, buildAnonymisedProfile, matchesFilter, rankedDimensionFailures, computePerformanceSummary, type ClientSnapshot, type SegmentFilter, type PortfolioOverview, type SegmentReport, type AnonymisedProfile, type DimensionFailure, type PerformanceSummary } from './portfolio-intelligence'
 
 async function buildClientSnapshot(admin: SupabaseClient, client: any, configRow: any): Promise<ClientSnapshot | null> {
   if (!configRow) return null
@@ -142,6 +143,21 @@ async function buildClientSnapshot(admin: SupabaseClient, client: any, configRow
     .map((u: any) => ({ name: u.name, revenuePct: totalUnitRevenue > 0 ? (u.ann_rev / totalUnitRevenue) * 100 : 0 }))
     .sort((a: any, b: any) => b.revenuePct - a.revenuePct)
 
+  // Currency-neutral performance ratios, from the same engine run, so the
+  // portfolio layer can benchmark them (see SnapshotPerformance). Cost ratio is
+  // total operating costs / revenue = 1 - EBITDA margin. Nulls left as null.
+  const ebitdaM = ebitdaMarginPct(m.total_ebitda, m.total_revenue)
+  const growthPct = revenueGrowthPctFromSeries(result.con.rev)
+  const performance = {
+    revenueGrowthPct: growthPct,
+    costRatioPct: ebitdaM === null ? null : Math.round(100 - ebitdaM),
+    grossMarginPct: grossMarginPct(m.total_gp, m.total_revenue),
+    ebitdaMarginPct: ebitdaM,
+    netMarginPct: netMarginPct(m.total_npat, m.total_revenue),
+    dscrMin: s.hasDebt ? (s.dscrMin ?? null) : null,
+    ruleOf40: ruleOf40(growthPct, ebitdaM),
+  }
+
   return {
     clientId: client.id,
     name: config.business_name,
@@ -158,6 +174,7 @@ async function buildClientSnapshot(admin: SupabaseClient, client: any, configRow
     annualRevenue: m.total_revenue,
     businessUnits,
     consentToBeNamed: !!client.portfolio_consent_named,
+    performance,
   }
 }
 
@@ -211,6 +228,8 @@ export interface PortfolioViewData {
   filterOptions: { sectors: string[]; countries: string[]; programmeIds: string[] }
   portfolioDimensionFailures: DimensionFailure[]
   segmentDimensionFailures: DimensionFailure[] | null
+  performanceSummary: PerformanceSummary
+  segmentPerformanceSummary: PerformanceSummary | null
 }
 
 // Assembles the full response shape both /api/portfolio-intelligence (coach,
@@ -237,5 +256,7 @@ export function buildPortfolioViewData(snapshots: ClientSnapshot[], filter: Segm
     },
     portfolioDimensionFailures: rankedDimensionFailures(snapshots),
     segmentDimensionFailures: filter ? rankedDimensionFailures(profileSnapshots) : null,
+    performanceSummary: computePerformanceSummary(snapshots),
+    segmentPerformanceSummary: filter ? computePerformanceSummary(profileSnapshots) : null,
   }
 }

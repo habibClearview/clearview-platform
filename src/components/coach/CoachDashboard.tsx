@@ -843,6 +843,35 @@ function fmtPortfolioMoney(n,cc){
 // app/api/portfolio-intelligence/route.ts); this component doesn't
 // re-check the role, it relies on the route's own check plus the fact
 // only super_coach ever sees this tab in mainNavTabs.
+// A single performance metric shown the way the research says a decision-maker
+// reads it: the median over the SPREAD across businesses (a small histogram),
+// not a bare number. The bin containing the median is highlighted.
+function PerfDist({label,summary,unit,decimals=0,note}:{label:string;summary:any;unit?:string;decimals?:number;note?:string}){
+  const s=summary
+  const has=!!(s&&s.count>0&&s.median!==null)
+  const vals:number[]=has?s.values:[]
+  const min=has?Math.min(...vals):0, max=has?Math.max(...vals):1
+  const bins=7
+  const counts=Array(bins).fill(0)
+  vals.forEach(v=>{const idx=max===min?Math.floor(bins/2):Math.min(bins-1,Math.floor((v-min)/(max-min)*bins));counts[idx]++})
+  const cMax=Math.max(1,...counts)
+  const medBin=has?(max===min?Math.floor(bins/2):Math.min(bins-1,Math.floor((s.median-min)/(max-min)*bins))):-1
+  const fmtV=(v:number)=>`${v.toFixed(decimals)}${unit||''}`
+  return(
+    <div style={{background:'var(--cv-card)',border:'1px solid var(--cv-border-soft)',borderRadius:12,padding:'0.9rem 1rem'}}>
+      <div style={{fontFamily:'monospace',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.04em',color:C.slate,fontWeight:600}}>{label}</div>
+      <div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:C.navy,lineHeight:1.1}}>{has?fmtV(s.median):'—'}<span style={{fontSize:'0.8rem',color:C.slate,fontWeight:400}}> median</span></div>
+      <div style={{display:'flex',alignItems:'flex-end',gap:2,height:32,marginTop:6}}>
+        {counts.map((c,i)=><div key={i} style={{flex:1,height:`${Math.max(6,(c/cMax)*100)}%`,background:i===medBin?C.teal:'var(--cv-tint-cyan)',borderRadius:'2px 2px 0 0'}}/>)}
+      </div>
+      <div style={{display:'flex',justifyContent:'space-between',fontFamily:'monospace',fontSize:'0.66rem',color:C.slate,marginTop:2}}>
+        <span>{has?fmtV(min):''}</span><span>{has?fmtV(max):''}</span>
+      </div>
+      <div style={{fontSize:'0.76rem',color:C.slate,marginTop:4}}>{has?`${s.count} business${s.count===1?'':'es'}`:'no data yet'}{note?` · ${note}`:''}</div>
+    </div>
+  )
+}
+
 function PortfolioIntelligenceHub({clients,programmes}){
   const [data,setData]=useState(null)
   const [loading,setLoading]=useState(true)
@@ -909,6 +938,12 @@ function PortfolioIntelligenceHub({clients,programmes}){
   const currencies=Object.keys(portfolio.currentFundAbsorption)
   const programmesById=Object.fromEntries((programmes||[]).map(p=>[p.id,p]))
   const pipelineEntries=[['investment_ready',C.green],['near_ready',C.cyan],['development_stage',C.amber],['pre_investment',C.red]]
+  // Performance summary for the current view (segment when filtered, else whole
+  // portfolio). Guarded because an older cached API response, or the empty-
+  // portfolio branch, may not carry it.
+  const perfSum=(hasFilter?(data.segmentPerformanceSummary||data.performanceSummary):data.performanceSummary)||null
+  const readyCount=view.readinessPipeline.investment_ready
+  const weakDimLabel=view.mostCommonWeakDimension?LRS_DIM_LABELS[view.mostCommonWeakDimension]:null
 
   return(
     <div>
@@ -944,12 +979,64 @@ function PortfolioIntelligenceHub({clients,programmes}){
       )}
       <LevelMarker n={hasFilter?2:1} label={hasFilter?'Segment view':'Portfolio overview'} sub={hasFilter?`${view.totalBusinesses} of ${portfolio.totalBusinesses} businesses portfolio-wide`:'every financial business on the platform'}/>
 
+      {/* Executive finding — lead with the headline, then drill down */}
+      <div style={{...card,borderLeft:`4px solid ${C.cyan}`}}>
+        <div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.14em',textTransform:'uppercase',color:C.teal,marginBottom:'0.4rem'}}>The finding</div>
+        <div style={{fontSize:'1.05rem',lineHeight:1.6,color:C.navy}}>
+          Across <b>{view.totalBusinesses}</b> business{view.totalBusinesses===1?'':'es'}, <b>{readyCount}</b> {readyCount===1?'is':'are'} investment-ready today
+          {perfSum&&perfSum.revenueGrowth.median!==null?<> — median revenue growth is <b style={{color:C.teal}}>{perfSum.revenueGrowth.median>0?'+':''}{perfSum.revenueGrowth.median}%</b></>:null}
+          {perfSum&&perfSum.dscr.count>0?<>, and <b>{perfSum.bankableCount}</b> can service new debt at a comfortable 1.5×</>:null}
+          {weakDimLabel?<>. The weakest readiness dimension is <b style={{color:C.red}}>{weakDimLabel}</b> — the clearest place to intervene.</>:'.'}
+        </div>
+      </div>
+
+      {/* Trust & coverage — why the numbers can be trusted */}
+      <div className="cv-grid-4" style={{marginBottom:'1.25rem',gap:'0.6rem'}}>
+        <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>{snapshotCount} model{snapshotCount===1?'':'s'}</div>
+          <div style={{fontSize:'0.76rem',color:C.slate}}>Full standardised financial models, not survey estimates.</div>
+        </div>
+        <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>90%+</div>
+          <div style={{fontSize:'0.76rem',color:C.slate}}>have no credit-agency rating — the coverage gap we fill.</div>
+        </div>
+        <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>Independent</div>
+          <div style={{fontSize:'0.76rem',color:C.slate}}>Model-derived; no payment relationship with the business rated.</div>
+        </div>
+        <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>Median-based</div>
+          <div style={{fontSize:'0.76rem',color:C.slate}}>One outlier can't distort a benchmark; only present values are counted.</div>
+        </div>
+      </div>
+
       <div className="cv-grid-4" style={{marginBottom:'1.25rem'}}>
         <GlanceKPI label="Businesses" value={String(view.totalBusinesses)} sub={hasFilter?`of ${portfolio.totalBusinesses} portfolio-wide`:'on platform'} color={C.navy}/>
         <GlanceKPI label="Avg Investment Readiness" value={`${Math.round(view.avgIRScore)}/30`} sub="current scores" color={C.teal}/>
         <GlanceKPI label="Avg Verification Confidence" value={`${Math.round(view.avgConfidenceScore)}/100`} sub="current period" color={C.cyan}/>
         <GlanceKPI label="Avg Liquidity Readiness" value={`${Math.round(view.avgLRSScore)}/100`} sub="seven dimensions" color={C.purple}/>
       </div>
+
+      {perfSum&&(
+        <div style={card}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Performance — the numbers that decide bankability</div>
+          <p style={{fontSize:'0.9rem',color:C.slate,margin:'0 0 0.9rem',maxWidth:'74ch'}}>
+            Each figure is the <b>median</b> shown over the <b>spread across businesses</b> — the distribution, not a single
+            average, is what a lender reads. The highlighted bar is where the median sits. These ratios are currency-neutral,
+            so they compare across the whole {hasFilter?'segment':'portfolio'}.
+          </p>
+          <div className="cv-grid-4" style={{marginBottom:'0.7rem'}}>
+            <PerfDist label="Revenue growth" summary={perfSum.revenueGrowth} unit="%"/>
+            <PerfDist label="Cost ratio" summary={perfSum.costRatio} unit="%"/>
+            <PerfDist label="EBITDA margin" summary={perfSum.ebitdaMargin} unit="%"/>
+            <PerfDist label="Debt coverage (DSCR)" summary={perfSum.dscr} unit="×" decimals={1} note={`${perfSum.bankableCount} bankable (1.5×+)`}/>
+          </div>
+          <div className="cv-grid-4">
+            <PerfDist label="Rule of 40" summary={perfSum.ruleOf40} note={`${perfSum.ruleOf40StrongCount} score 40+`}/>
+            <PerfDist label="Net margin" summary={perfSum.netMargin} unit="%"/>
+          </div>
+        </div>
+      )}
 
       <div style={card}>
         <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.8rem'}}>Readiness pipeline</div>
