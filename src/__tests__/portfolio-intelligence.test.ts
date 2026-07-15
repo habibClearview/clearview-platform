@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   computePortfolioOverview, computeSegmentReport, readinessStage, matchesFilter,
   anonymizedRefCode, revenueSizeBracket, buildAnonymisedProfile, rankedDimensionFailures,
-  type ClientSnapshot,
+  median, computePerformanceSummary,
+  type ClientSnapshot, type SnapshotPerformance,
 } from '../lib/portfolio-intelligence'
 import type { LRSResult } from '../lib/liquidity-readiness'
 import type { FACTypeResult, FACResult } from '../lib/fund-absorption-capacity'
@@ -39,6 +40,45 @@ function makeSnapshot(overrides: Partial<ClientSnapshot> = {}): ClientSnapshot {
     ...overrides,
   }
 }
+
+describe('median', () => {
+  it('odd length returns the middle, even length the mean of the two middles', () => {
+    expect(median([3, 1, 2])).toBe(2)
+    expect(median([1, 2, 3, 4])).toBe(2.5)
+  })
+  it('empty list is null, not NaN', () => {
+    expect(median([])).toBeNull()
+  })
+})
+
+describe('computePerformanceSummary', () => {
+  const perf = (p: Partial<SnapshotPerformance>): SnapshotPerformance => ({
+    revenueGrowthPct: null, costRatioPct: null, grossMarginPct: null, ebitdaMarginPct: null,
+    netMarginPct: null, dscrMin: null, ruleOf40: null, ...p,
+  })
+  it('medians and counts use only present values; nulls and missing performance are ignored', () => {
+    const snaps = [
+      makeSnapshot({ performance: perf({ revenueGrowthPct: 10, ebitdaMarginPct: 20, dscrMin: 1.6, ruleOf40: 30 }) }),
+      makeSnapshot({ performance: perf({ revenueGrowthPct: 30, ebitdaMarginPct: 10, dscrMin: 1.2, ruleOf40: 40 }) }),
+      makeSnapshot({ performance: perf({ revenueGrowthPct: null, ebitdaMarginPct: 30, dscrMin: null, ruleOf40: 50 }) }),
+      makeSnapshot({}), // no performance at all
+    ]
+    const ps = computePerformanceSummary(snaps)
+    expect(ps.total).toBe(4)
+    expect(ps.revenueGrowth.count).toBe(2)
+    expect(ps.revenueGrowth.median).toBe(20)       // median of [10, 30]
+    expect(ps.ebitdaMargin.median).toBe(20)        // median of [10, 20, 30]
+    expect(ps.dscr.count).toBe(2)
+    expect(ps.bankableCount).toBe(1)               // only DSCR 1.6 clears 1.5
+    expect(ps.ruleOf40StrongCount).toBe(2)         // 40 and 50 clear 40
+  })
+  it('is safe on an empty portfolio', () => {
+    const ps = computePerformanceSummary([])
+    expect(ps.total).toBe(0)
+    expect(ps.revenueGrowth.median).toBeNull()
+    expect(ps.bankableCount).toBe(0)
+  })
+})
 
 describe('readinessStage', () => {
   it('REG: maps every known IR tier to its stage, and an unknown tier falls back to pre_investment (not crashing)', () => {
