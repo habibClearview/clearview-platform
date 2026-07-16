@@ -48,14 +48,21 @@ function getAdminClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
+// Trimmed so a key pasted with a stray trailing newline/space (which makes an
+// invalid HTTP header value) still works -- a very easy mistake to make when
+// copying a secret into a hosting dashboard.
+function resendApiKey() {
+  return (process.env.RESEND_API_KEY || '').trim()
+}
+
 function otpAvailable() {
-  return !!process.env.RESEND_API_KEY
+  return !!resendApiKey()
 }
 
 async function sendOtpEmail(toEmail: string, code: string, granteeName: string) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    headers: { 'Authorization': `Bearer ${resendApiKey()}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       from: 'Canvas Coach <notifications@habibonifade.com>',
       to: [toEmail],
