@@ -19,6 +19,7 @@ import { combinedActual, computeActualsTotals, applyPeriodActual, buildHybridCon
 import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
 import { yearStartPeriod, canCloseCalendarYear, computeYearEndBalanceSheet } from '@/lib/annual-close'
 import BuildStamp from '@/components/BuildStamp'
+import ErrorBoundary from '@/components/ErrorBoundary'
 import VerificationRecognition from '@/components/generic/VerificationRecognition'
 import PaymentReviewQueue from '@/components/generic/PaymentReviewQueue'
 import { computeFreePerformance, operatingMarginPct, grossMarginPct, ebitdaMarginPct, netMarginPct, revenueGrowthPct, ruleOf40, isRuleOf40Strong, burnMultiple } from '@/lib/business-performance-metrics'
@@ -772,8 +773,12 @@ export default function GenericDashboard({
         </div>
       </nav>
 
-      {/* Main */}
+      {/* Main. Each tab renders inside an ErrorBoundary keyed by the active
+          view, so if one section throws it shows a contained "couldn't load"
+          message (and the nav/other tabs still work) instead of white-screening
+          the whole dashboard. Keying by view resets the boundary on tab switch. */}
       <main style={{maxWidth:1600,margin:'0 auto',padding:'1.5rem'}}>
+        <ErrorBoundary key={view} label={String(view)}>
         {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} pendingApprovalCount={pendingApprovalCount} onGoToApprovals={()=>setView('approvals')} onGoToIntelligence={()=>setView('intelligence')}/>}
         {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P}/>}
         {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods} onNavigate={setView}/>}
@@ -784,6 +789,7 @@ export default function GenericDashboard({
         {view==='balancesheet'&& <BalanceSheetTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods} onCloseStatusChanged={loadClosedPeriods}/>}
         {view==='actuals_wc'  && <ActualsAndWorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} onCloseStatusChanged={loadClosedPeriods}/>}
         {view==='settings'    && <SettingsAndAdminTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={saveConfig} theme={theme} setThemeMode={setThemeMode}/>}
+        </ErrorBoundary>
       </main>
 
       <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.88rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>
