@@ -765,8 +765,8 @@ export default function GenericDashboard({
       </header>
 
       {/* Nav */}
-      <nav style={{background:'var(--cv-nav)',borderBottom:`1px solid var(--cv-cyan-dim)`,overflowX:'auto'}}>
-        <div style={{maxWidth:1600,margin:'0 auto',padding:'0 1.5rem',display:'flex'}}>
+      <nav style={{background:'var(--cv-nav)',borderBottom:`1px solid var(--cv-cyan-dim)`}}>
+        <div style={{maxWidth:1600,margin:'0 auto',padding:'0 1.5rem',display:'flex',flexWrap:'wrap'}}>
           {mainNav.map(([id,label])=>(
             <button key={id} style={navBtn(view===id)} onClick={()=>setView(id)}>{label}</button>
           ))}
