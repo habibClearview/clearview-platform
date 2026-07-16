@@ -2244,8 +2244,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           </div>
         </div>
       </header>
-      <nav style={{background:'var(--cv-nav)',borderBottom:`1px solid var(--cv-cyan-dim)`,overflowX:'auto'}}>
-        <div style={{maxWidth:1600,margin:'0 auto',padding:'0 1.5rem',display:'flex'}}>
+      <nav style={{background:'var(--cv-nav)',borderBottom:`1px solid var(--cv-cyan-dim)`}}>
+        <div style={{maxWidth:1600,margin:'0 auto',padding:'0 1.5rem',display:'flex',flexWrap:'wrap'}}>
           {mainNavTabs.map(([id,label])=><button key={id} style={navBtn(view===id||(view==='client'&&id==='clients'))} onClick={()=>{if(id!=='client')setSelClientId(null);setView(id)}}>{label}</button>)}
         </div>
       </nav>
