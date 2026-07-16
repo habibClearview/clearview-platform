@@ -11,6 +11,31 @@
 
 ---
 
+## Support Playbook Entry — required for every feature PR
+
+<!--
+Clair (our support agent) is built from these answers. Fill this in from the
+USER's point of view, in plain language — not the code's. If this PR adds no
+user-facing behaviour at all (pure refactor, docs, or infra), write:
+"N/A — no user-facing behaviour" and skip the rest.
+-->
+
+- **What can go wrong for a user?**
+  <!-- The realistic failure(s) a user could actually hit with this feature. -->
+
+- **How would a user describe it?**
+  <!-- In their words, not ours — the phrase they'd type to Clair or tell support. -->
+
+- **Is there a safe fix?**
+  <!-- The safe, reversible resolution — or "None: always escalate to a person". -->
+
+- **Which tier does it belong to?**
+  - [ ] Tier 1 — clearly fixable automatically and safely
+  - [ ] Tier 2 — needs a person to look, but not urgent
+  - [ ] Tier 3 — needs Habib or the assigned co-implementer immediately
+
+---
+
 ## Pre-merge checklist — must all be checked before merge
 
 ### Code quality
