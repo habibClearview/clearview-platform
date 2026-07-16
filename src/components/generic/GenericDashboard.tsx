@@ -4133,12 +4133,12 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,clo
   // the "if (!result) return" below rather than after it.
   const {
     yearGroups, monthLabelsFull, scoreSeries, monthsByYearLabel,
-    periodIsActual, capitalAtRisk, lrsCashFlows, lrsAnnualIrr,
+    periodIsActual, monthsClosedFlags, monthsWithFieldAppFlags, capitalAtRisk, lrsCashFlows, lrsAnnualIrr,
     lrsSeries, lrsMonthsByYearLabel, lrsCurrent, lrsDimensionHistory, pathwayOpportunities,
   } = useMemo(() => {
     if (!result) return {
       yearGroups: [], monthLabelsFull: [], scoreSeries: null, monthsByYearLabel: {},
-      periodIsActual: [], capitalAtRisk: 0, lrsCashFlows: [], lrsAnnualIrr: null,
+      periodIsActual: [], monthsClosedFlags: [], monthsWithFieldAppFlags: [], capitalAtRisk: 0, lrsCashFlows: [], lrsAnnualIrr: null,
       lrsSeries: null, lrsMonthsByYearLabel: {}, lrsCurrent: null, lrsDimensionHistory: {}, pathwayOpportunities: null,
     }
     const s = result.scores
@@ -4213,7 +4213,7 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,clo
 
     return {
       yearGroups, monthLabelsFull, scoreSeries, monthsByYearLabel,
-      periodIsActual, capitalAtRisk, lrsCashFlows, lrsAnnualIrr,
+      periodIsActual, monthsClosedFlags, monthsWithFieldAppFlags, capitalAtRisk, lrsCashFlows, lrsAnnualIrr,
       lrsSeries, lrsMonthsByYearLabel, lrsCurrent, lrsDimensionHistory, pathwayOpportunities,
     }
   }, [config, result, months, closedPeriods, fieldAppPeriods, events, bankLoanObligation, assess])
