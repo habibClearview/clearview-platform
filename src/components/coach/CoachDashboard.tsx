@@ -10,6 +10,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import SpreadsheetUpload from '@/components/intake/SpreadsheetUpload'
 import BuildStamp from '@/components/BuildStamp'
+import ErrorBoundary from '@/components/ErrorBoundary'
 import TeamPayments from '@/components/coach/TeamPayments'
 import DealsAndFees from '@/components/coach/DealsAndFees'
 import {
@@ -2249,6 +2250,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         </div>
       </nav>
       <main style={{maxWidth:1600,margin:'0 auto',padding:'1.5rem'}}>
+        <ErrorBoundary key={view} label={String(view)}>
         {view==='overview'&&<OverviewTab/>}
         {view==='clients'&&<ClientsHub/>}
         {view==='client'&&<ClientDetailView/>}
@@ -2256,6 +2258,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         {view==='team'&&<TeamHub/>}
         {view==='mypayments'&&<TeamPayments coImplementers={coImplementers} setCoImplementers={setCoImplementers} clients={clients} userName={userName} canApprove={false}/>}
         {view==='portfolio'&&<PortfolioIntelligenceHub clients={clients} programmes={programmes}/>}
+        </ErrorBoundary>
       </main>
       <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.93rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach \u00b7 Coach Dashboard \u00b7 habibonifade.com \u00b7 Confidential</footer>
     </div>
