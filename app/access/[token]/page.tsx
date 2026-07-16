@@ -222,9 +222,10 @@ export default function AccessGrantPage() {
               </div>
               {error && <div style={{ color: C.red, fontSize: '0.9rem', marginBottom: '0.8rem' }}>⚠ {error}</div>}
               <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <button type="submit" disabled={submitting} style={btnStyle}>{submitting ? 'Verifying…' : downloadLabel}</button>
+                <button type="submit" disabled={submitting} style={btnStyle}>{submitting ? 'Loading your report…' : downloadLabel}</button>
                 <button type="button" onClick={() => requestCode()} disabled={submitting} style={{ background: 'none', border: 'none', color: C.slate, fontSize: '0.85rem', cursor: 'pointer', textDecoration: 'underline' }}>Resend code</button>
               </div>
+              {submitting && <div style={{ marginTop: '0.9rem', fontSize: '0.88rem', color: C.slate }}>Building your Market Intelligence report from the latest figures — this can take a few seconds. Please don't close the page.</div>}
             </form>
           )}
         </div>
