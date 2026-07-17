@@ -68,11 +68,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const { data: profile } = await admin
+    const { data: profile, error: profileErr } = await admin
       .from('user_profiles')
       .select('role')
       .eq('id', user.id)
       .single()
+
+    // Distinguish a failed lookup (server problem) from a genuine "not allowed":
+    // treating a DB error as a 403 would hide the real cause.
+    if (profileErr && profileErr.code !== 'PGRST116') {
+      console.error('[sync-playbook] profile lookup failed:', profileErr.message)
+      return NextResponse.json({ error: 'Could not verify permissions' }, { status: 500 })
+    }
 
     // Only the super coach may trigger a manual sync — it rewrites Clair's
     // knowledge for everyone.

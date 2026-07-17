@@ -48,9 +48,22 @@ function requireString(v: unknown, field: string, file: string, index: number): 
   return v
 }
 
-function requireStringArray(v: unknown, field: string, file: string, index: number): string[] {
-  if (!Array.isArray(v) || v.some(x => typeof x !== 'string')) {
+// Validates an array of strings. Every element must be a non-blank string (a
+// blank tag or question is useless and almost always a typo). Pass minLength to
+// require the array itself be non-empty — used for the fields Clair depends on
+// (symptom_tags to match, applies_to_roles to scope); left 0 for fields that may
+// legitimately be empty (a trivial entry can have no diagnostic questions).
+function requireStringArray(
+  v: unknown, field: string, file: string, index: number, minLength = 0,
+): string[] {
+  if (!Array.isArray(v)) {
     throw new Error(`Playbook ${file} entry #${index + 1}: "${field}" must be an array of strings.`)
+  }
+  if (v.length < minLength) {
+    throw new Error(`Playbook ${file} entry #${index + 1}: "${field}" must have at least ${minLength} item(s).`)
+  }
+  if (v.some(x => typeof x !== 'string' || x.trim() === '')) {
+    throw new Error(`Playbook ${file} entry #${index + 1}: "${field}" must contain only non-empty strings.`)
   }
   return v as string[]
 }
@@ -92,23 +105,29 @@ export function parsePlaybookMarkdown(raw: string, sourceFile: string): Playbook
     if (tier !== 1 && tier !== 2 && tier !== 3) {
       throw new Error(`Playbook ${sourceFile} entry #${i + 1}: "tier" must be 1, 2, or 3.`)
     }
-    const roles = requireStringArray(e?.applies_to_roles, 'applies_to_roles', sourceFile, i) as SupportRole[]
+    const roles = requireStringArray(e?.applies_to_roles, 'applies_to_roles', sourceFile, i, 1) as SupportRole[]
     const badRole = roles.find(r => !VALID_ROLES.includes(r))
     if (badRole) {
       throw new Error(`Playbook ${sourceFile} entry #${i + 1}: unknown role "${badRole}". Valid roles: ${VALID_ROLES.join(', ')}.`)
     }
-    const safeFix = e?.safe_fix
-    if (safeFix !== null && safeFix !== undefined && typeof safeFix !== 'string') {
-      throw new Error(`Playbook ${sourceFile} entry #${i + 1}: "safe_fix" must be a string or null.`)
+    // safe_fix must be stated explicitly: a string (the fix) or null (there is no
+    // safe fix — always escalate). Omitting the key is rejected so "no safe fix"
+    // is always a deliberate authoring choice, never an accidental gap.
+    if (!('safe_fix' in (e ?? {}))) {
+      throw new Error(`Playbook ${sourceFile} entry #${i + 1}: "safe_fix" must be present — use null to mean "no safe fix, always escalate".`)
+    }
+    const safeFix = e.safe_fix
+    if (safeFix !== null && (typeof safeFix !== 'string' || safeFix.trim() === '')) {
+      throw new Error(`Playbook ${sourceFile} entry #${i + 1}: "safe_fix" must be a non-empty string or null.`)
     }
     return {
       feature_area: requireString(e?.feature_area, 'feature_area', sourceFile, i),
-      symptom_tags: requireStringArray(e?.symptom_tags, 'symptom_tags', sourceFile, i),
+      symptom_tags: requireStringArray(e?.symptom_tags, 'symptom_tags', sourceFile, i, 1),
       tier,
       applies_to_roles: roles,
       user_facing_description: requireString(e?.user_facing_description, 'user_facing_description', sourceFile, i),
       diagnostic_questions: requireStringArray(e?.diagnostic_questions, 'diagnostic_questions', sourceFile, i),
-      safe_fix: safeFix == null ? null : safeFix,
+      safe_fix: safeFix === null ? null : safeFix,
       escalation_criteria: requireString(e?.escalation_criteria, 'escalation_criteria', sourceFile, i),
       source_file: sourceFile,
     }

@@ -67,39 +67,66 @@ export function getPlaybookAdminClient(): SupabaseClient {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
+// Serialises syncs within a single serverless instance so the daily cron and a
+// manual "sync now" cannot interleave their insert/delete steps. (Two separate
+// instances could still overlap, but the refresh self-heals on the next run, and
+// the insert-then-delete order below means an overlap never empties the table.)
+let inFlight: Promise<SyncResult> | null = null
+
 /**
  * Mirror the markdown files into support_playbook_entries as a full refresh.
  *
- * Order matters for safety: we parse everything first (throws before any write
- * if a file is bad), then clear the table, then insert. `entries` is injectable
- * so the sync can be tested without the filesystem; in production it defaults to
- * whatever is on disk.
+ * Safety comes from ordering. We (1) parse everything first, so a bad file
+ * throws before we touch the database; (2) note the rows that exist now;
+ * (3) insert the fresh rows so they coexist with the old ones; (4) only then
+ * delete the previously-noted rows. If the insert fails, the old rows are still
+ * there — the table is never left empty. If the delete fails, a few stale rows
+ * linger and are cleaned up by the next sync. `entries` is injectable so the
+ * sync can be tested without the filesystem; in production it reads from disk.
  */
 export async function syncPlaybook(
   admin: SupabaseClient,
   entries: PlaybookEntry[] = readAllPlaybookEntries(),
 ): Promise<SyncResult> {
+  if (inFlight) return inFlight
+  inFlight = doSync(admin, entries).finally(() => { inFlight = null })
+  return inFlight
+}
+
+async function doSync(admin: SupabaseClient, entries: PlaybookEntry[]): Promise<SyncResult> {
   if (entries.length === 0) {
     // A repo with no playbook entries almost certainly means a broken read or a
     // bad deploy, not a deliberate empty state. Refuse rather than wipe the table.
     throw new Error('Playbook sync: no entries found on disk — refusing to clear the table.')
   }
 
-  // Clear existing rows. Supabase requires a filter on delete; this one matches
-  // every real row (no row uses the all-zero UUID).
-  const { error: delErr } = await admin
+  // 1. Snapshot the ids that exist right now — these are the rows to remove once
+  //    the new set is safely in place.
+  const { data: existing, error: readErr } = await admin
     .from('support_playbook_entries')
-    .delete()
-    .neq('id', '00000000-0000-0000-0000-000000000000')
-  if (delErr) {
-    throw new Error(`Playbook sync: failed to clear old entries — ${delErr.message}`)
+    .select('id')
+  if (readErr) {
+    throw new Error(`Playbook sync: failed to read existing entries — ${readErr.message}`)
   }
+  const oldIds = (existing || []).map((r: { id: string }) => r.id)
 
-  // PlaybookEntry columns are already snake_case and match the table exactly;
-  // updated_at defaults to now() in the database.
+  // 2. Insert the fresh rows first. They get new ids and coexist with the old
+  //    rows, so a failure here leaves the previous knowledge intact.
   const { error: insErr } = await admin.from('support_playbook_entries').insert(entries)
   if (insErr) {
     throw new Error(`Playbook sync: failed to insert ${entries.length} entries — ${insErr.message}`)
+  }
+
+  // 3. Now that the new rows are committed, remove the old ones. A failure here
+  //    only leaves duplicates behind, which the next sync clears.
+  if (oldIds.length > 0) {
+    const { error: delErr } = await admin
+      .from('support_playbook_entries')
+      .delete()
+      .in('id', oldIds)
+    if (delErr) {
+      throw new Error(`Playbook sync: inserted new entries but failed to remove ${oldIds.length} old ones — ${delErr.message}`)
+    }
   }
 
   const sourceFiles = Array.from(new Set(entries.map(e => e.source_file))).sort()

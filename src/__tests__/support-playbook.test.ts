@@ -109,8 +109,33 @@ describe('parsePlaybookMarkdown — invalid input throws (no silent skip)', () =
   })
 
   it('REG: an empty required string throws', () => {
-    const raw = '---\n{"entries":[{"feature_area":"","symptom_tags":[],"tier":1,"applies_to_roles":["super_coach"],"user_facing_description":"d","diagnostic_questions":[],"safe_fix":null,"escalation_criteria":"e"}]}\n---\n'
+    const raw = '---\n{"entries":[{"feature_area":"","symptom_tags":["x"],"tier":1,"applies_to_roles":["super_coach"],"user_facing_description":"d","diagnostic_questions":[],"safe_fix":null,"escalation_criteria":"e"}]}\n---\n'
     expect(() => parsePlaybookMarkdown(raw, 'empty.md')).toThrow(/feature_area/)
+  })
+
+  it('REG: an omitted safe_fix throws — it must be stated explicitly (string or null)', () => {
+    const raw = '---\n{"entries":[{"feature_area":"x","symptom_tags":["x"],"tier":1,"applies_to_roles":["super_coach"],"user_facing_description":"d","diagnostic_questions":[],"escalation_criteria":"e"}]}\n---\n'
+    expect(() => parsePlaybookMarkdown(raw, 'nosafefix.md')).toThrow(/safe_fix/)
+  })
+
+  it('REG: an empty symptom_tags array throws — Clair needs at least one word to match', () => {
+    const raw = '---\n{"entries":[{"feature_area":"x","symptom_tags":[],"tier":1,"applies_to_roles":["super_coach"],"user_facing_description":"d","diagnostic_questions":[],"safe_fix":null,"escalation_criteria":"e"}]}\n---\n'
+    expect(() => parsePlaybookMarkdown(raw, 'notags.md')).toThrow(/symptom_tags/)
+  })
+
+  it('REG: an empty applies_to_roles array throws — every entry must scope to someone', () => {
+    const raw = '---\n{"entries":[{"feature_area":"x","symptom_tags":["x"],"tier":1,"applies_to_roles":[],"user_facing_description":"d","diagnostic_questions":[],"safe_fix":null,"escalation_criteria":"e"}]}\n---\n'
+    expect(() => parsePlaybookMarkdown(raw, 'noroles.md')).toThrow(/applies_to_roles/)
+  })
+
+  it('REG: a blank tag element (whitespace only) throws', () => {
+    const raw = '---\n{"entries":[{"feature_area":"x","symptom_tags":["  "],"tier":1,"applies_to_roles":["super_coach"],"user_facing_description":"d","diagnostic_questions":[],"safe_fix":null,"escalation_criteria":"e"}]}\n---\n'
+    expect(() => parsePlaybookMarkdown(raw, 'blanktag.md')).toThrow(/symptom_tags/)
+  })
+
+  it('REG: a blank-string safe_fix throws — use null, not empty text', () => {
+    const raw = '---\n{"entries":[{"feature_area":"x","symptom_tags":["x"],"tier":1,"applies_to_roles":["super_coach"],"user_facing_description":"d","diagnostic_questions":[],"safe_fix":"   ","escalation_criteria":"e"}]}\n---\n'
+    expect(() => parsePlaybookMarkdown(raw, 'blanksafefix.md')).toThrow(/safe_fix/)
   })
 })
 
@@ -149,19 +174,32 @@ describe('login-and-auth.md (the real playbook file)', () => {
 // ------------------------------------------------------------
 // syncPlaybook — full-refresh behaviour against a mocked admin client
 // ------------------------------------------------------------
-function makeAdminMock() {
-  const calls = { delete: 0, insert: 0, insertedRows: null as PlaybookEntry[] | null }
+function makeAdminMock(existingIds: string[] = ['old-1']) {
+  const calls = {
+    select: 0, insert: 0, delete: 0,
+    insertedRows: null as PlaybookEntry[] | null,
+    deletedIds: null as string[] | null,
+  }
   const admin: any = {
     from(_table: string) {
       return {
-        delete() {
-          calls.delete++
-          return { neq: () => Promise.resolve({ error: null }) }
+        select() {
+          calls.select++
+          return Promise.resolve({ data: existingIds.map(id => ({ id })), error: null })
         },
         insert(rows: PlaybookEntry[]) {
           calls.insert++
           calls.insertedRows = rows
           return Promise.resolve({ error: null })
+        },
+        delete() {
+          calls.delete++
+          return {
+            in(_col: string, ids: string[]) {
+              calls.deletedIds = ids
+              return Promise.resolve({ error: null })
+            },
+          }
         },
       }
     },
@@ -184,57 +222,82 @@ const SAMPLE_ENTRIES: PlaybookEntry[] = [
 ]
 
 describe('syncPlaybook', () => {
-  it('REG: clears the table then inserts the current entries', async () => {
-    const { admin, calls } = makeAdminMock()
+  it('REG: inserts the current entries, then deletes the previously-existing rows', async () => {
+    const { admin, calls } = makeAdminMock(['old-1', 'old-2'])
     const result = await syncPlaybook(admin, SAMPLE_ENTRIES)
 
-    expect(calls.delete).toBe(1)
     expect(calls.insert).toBe(1)
     expect(calls.insertedRows).toEqual(SAMPLE_ENTRIES)
+    // Old rows are removed only after the new ones are safely in place.
+    expect(calls.delete).toBe(1)
+    expect(calls.deletedIds).toEqual(['old-1', 'old-2'])
     expect(result.synced).toBe(1)
     expect(result.sourceFiles).toEqual(['login-and-auth.md'])
   })
 
-  it('REG: refuses to run (and never clears) when there are no entries', async () => {
+  it('REG: with an empty table it inserts and skips the delete step entirely', async () => {
+    const { admin, calls } = makeAdminMock([])
+    await syncPlaybook(admin, SAMPLE_ENTRIES)
+    expect(calls.insert).toBe(1)
+    expect(calls.delete).toBe(0)
+  })
+
+  it('REG: refuses to run (touches nothing) when there are no entries', async () => {
     const { admin, calls } = makeAdminMock()
     await expect(syncPlaybook(admin, [])).rejects.toThrow(/no entries/i)
-    expect(calls.delete).toBe(0)
+    expect(calls.select).toBe(0)
     expect(calls.insert).toBe(0)
+    expect(calls.delete).toBe(0)
   })
 
-  it('REG: a delete error is thrown loudly and insert is not attempted', async () => {
-    const calls = { delete: 0, insert: 0 }
+  it('REG: an insert error is thrown loudly and the old rows are NOT deleted', async () => {
+    const calls = { insert: 0, delete: 0 }
     const admin: any = {
       from() {
         return {
-          delete() {
-            calls.delete++
-            return { neq: () => Promise.resolve({ error: { message: 'db down' } }) }
-          },
+          select: () => Promise.resolve({ data: [{ id: 'old-1' }], error: null }),
           insert() {
             calls.insert++
-            return Promise.resolve({ error: null })
-          },
-        }
-      },
-    }
-    await expect(syncPlaybook(admin, SAMPLE_ENTRIES)).rejects.toThrow(/db down/)
-    expect(calls.insert).toBe(0)
-  })
-
-  it('REG: an insert error is thrown loudly with the entry count', async () => {
-    const admin: any = {
-      from() {
-        return {
-          delete() {
-            return { neq: () => Promise.resolve({ error: null }) }
-          },
-          insert() {
             return Promise.resolve({ error: { message: 'constraint violated' } })
+          },
+          delete() {
+            calls.delete++
+            return { in: () => Promise.resolve({ error: null }) }
           },
         }
       },
     }
     await expect(syncPlaybook(admin, SAMPLE_ENTRIES)).rejects.toThrow(/constraint violated/)
+    // Table still holds the old rows — never emptied by a failed insert.
+    expect(calls.delete).toBe(0)
+  })
+
+  it('REG: a delete error after a successful insert is thrown loudly', async () => {
+    const admin: any = {
+      from() {
+        return {
+          select: () => Promise.resolve({ data: [{ id: 'old-1' }], error: null }),
+          insert: () => Promise.resolve({ error: null }),
+          delete: () => ({ in: () => Promise.resolve({ error: { message: 'delete failed' } }) }),
+        }
+      },
+    }
+    await expect(syncPlaybook(admin, SAMPLE_ENTRIES)).rejects.toThrow(/delete failed/)
+  })
+
+  it('REG: a read error is thrown loudly before anything is written', async () => {
+    const calls = { insert: 0, delete: 0 }
+    const admin: any = {
+      from() {
+        return {
+          select: () => Promise.resolve({ data: null, error: { message: 'read failed' } }),
+          insert() { calls.insert++; return Promise.resolve({ error: null }) },
+          delete() { calls.delete++; return { in: () => Promise.resolve({ error: null }) } },
+        }
+      },
+    }
+    await expect(syncPlaybook(admin, SAMPLE_ENTRIES)).rejects.toThrow(/read failed/)
+    expect(calls.insert).toBe(0)
+    expect(calls.delete).toBe(0)
   })
 })
