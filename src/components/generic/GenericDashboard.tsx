@@ -2686,24 +2686,30 @@ function ApprovalsTab({clientId,config,cc,P}) {
     setPendingActuals(data||[])
   }
 
+  // Use the affected-row COUNT, not a returned representation, to decide the
+  // outcome. Chaining .select() here would make PostgREST re-filter the returned
+  // row against the update's own filters (submitted/approved) AFTER the update
+  // has changed them — so a perfectly good update returns zero rows and looks
+  // like a conflict. count:'exact' reports how many rows the guard actually
+  // updated: >0 = done, 0 = a genuine concurrent change.
   async function approveActual(id:string) {
-    const {data,error} = await supabase.from('generic_actuals').update({
+    const {error,count} = await supabase.from('generic_actuals').update({
       approved:true, approved_at:new Date().toISOString(), approved_by:P.fullName,
       review_note:null, updated_at:new Date().toISOString(),
-    }).eq('id',id).eq('submitted',true).eq('approved',false).select().maybeSingle()
+    },{count:'exact'}).eq('id',id).eq('submitted',true).eq('approved',false)
     if (error) { alert('Could not approve — '+error.message); return }
-    if (!data) { alert('These figures were just changed or handled by someone else — refreshing the list.'); refreshPendingActuals(); return }
+    if (!count) { alert('These figures were just changed or handled by someone else — refreshing the list.'); refreshPendingActuals(); return }
     setPendingActuals(a=>a.filter(x=>x.id!==id))
   }
 
   async function sendBackActual(id:string) {
     const note = (actualNotes[id]||'').trim()
     if (!note) { alert('Please add a short note so they know what to correct.'); return }
-    const {data,error} = await supabase.from('generic_actuals').update({
+    const {error,count} = await supabase.from('generic_actuals').update({
       submitted:false, approved:false, review_note:note, updated_at:new Date().toISOString(),
-    }).eq('id',id).eq('submitted',true).eq('approved',false).select().maybeSingle()
+    },{count:'exact'}).eq('id',id).eq('submitted',true).eq('approved',false)
     if (error) { alert('Could not send back — '+error.message); return }
-    if (!data) { alert('These figures were just changed or handled by someone else — refreshing the list.'); refreshPendingActuals(); return }
+    if (!count) { alert('These figures were just changed or handled by someone else — refreshing the list.'); refreshPendingActuals(); return }
     setPendingActuals(a=>a.filter(x=>x.id!==id))
   }
 
