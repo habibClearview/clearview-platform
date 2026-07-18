@@ -1757,7 +1757,7 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
           ))}
         </div>
       )}
-      <DriversSection config={config} cc={cc} P={P} onSave={onSave}/>
+      <DriversSection key={clientId} config={config} cc={cc} P={P} onSave={onSave}/>
       <MarketActivitiesSection clientId={clientId} config={config} cc={cc} P={P} events={marketEvents} loadError={marketEventsError} onChanged={onMarketEventsChanged}/>
     </div>
   )
@@ -1771,33 +1771,51 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
 // config.settings.channels / .drivers (inheriting this config's client-scoped
 // RLS) and flows into the model via syntheticPlanLinesFromDrivers.
 function DriversSection({config,cc,P,onSave}) {
-  const channels: Channel[] = config.settings?.channels||[]
-  const drivers: Driver[] = config.settings?.drivers||[]
   const units = config.business_units.filter((u:any)=>u.active)
   const firstUnit = units[0]?.id || ''
   const canEdit = !!P.canEditPlan
 
-  function persist(nextChannels:Channel[], nextDrivers:Driver[]) {
+  // Local optimistic draft. The channel/driver inputs render from THIS, not from
+  // config, so typing is instant and never snaps back to a stale value while the
+  // async whole-config save is in flight. Every edit updates the draft AND
+  // persists, and the save payload is always built from the just-updated draft —
+  // so rapid edits across different fields accumulate instead of overlapping
+  // upserts clobbering one another. Seeded per client: the parent keys this
+  // section by clientId, so a client switch remounts it with fresh data.
+  const [draft,setDraft] = useState<{channels:Channel[],drivers:Driver[]}>(
+    ()=>({channels: config.settings?.channels||[], drivers: config.settings?.drivers||[]})
+  )
+  const channels = draft.channels
+  const drivers = draft.drivers
+
+  function commit(nextChannels:Channel[], nextDrivers:Driver[]) {
+    setDraft({channels:nextChannels, drivers:nextDrivers})
     onSave({...config, settings:{...config.settings, channels:nextChannels, drivers:nextDrivers}})
   }
   const mkId = (p:string)=>`${p}_${Date.now()}_${Math.random().toString(36).slice(2,6)}`
 
-  function addChannel(){ persist([...channels, {id:mkId('ch'), name:'New channel', unit_id:null, active:true}], drivers) }
-  function updChannel(id:string, patch:Partial<Channel>){ persist(channels.map(c=>c.id===id?{...c,...patch}:c), drivers) }
-  function delChannel(id:string){ persist(channels.filter(c=>c.id!==id), drivers.map(d=>d.channel_id===id?{...d,channel_id:null}:d)) }
+  function addChannel(){ commit([...channels, {id:mkId('ch'), name:'New channel', unit_id:null, active:true}], drivers) }
+  function updChannel(id:string, patch:Partial<Channel>){ commit(channels.map(c=>c.id===id?{...c,...patch}:c), drivers) }
+  function delChannel(id:string){ commit(channels.filter(c=>c.id!==id), drivers.map(d=>d.channel_id===id?{...d,channel_id:null}:d)) }
 
   function addDriver(kind:'sales'|'cost'){
     const base:Driver = {
       id:mkId('drv'), name: kind==='sales'?'New sales driver':'New cost driver', kind,
-      unit_id: firstUnit||null, channel_id: kind==='sales'?(channels[0]?.id||null):null,
+      // A sales driver leaves unit_id null so it INHERITS its channel's unit (the
+      // driver engine resolves driver.unit_id ?? channel.unit_id ?? fallback).
+      // Pinning it to firstUnit here would silently forecast a driver assigned to
+      // a channel in another unit into the wrong unit. Cost drivers have no
+      // channel, so they default to the first unit.
+      unit_id: kind==='sales' ? null : (firstUnit||null),
+      channel_id: kind==='sales'?(channels[0]?.id||null):null,
       unit_label: kind==='sales'?'units':'', mode:'smart',
       quantity: Array(config.planning_months).fill(0), rate:0,
       unit_cost: kind==='sales'?0:null, cost_category: kind==='cost'?'direct_opex':undefined, active:true,
     }
-    persist(channels, [...drivers, base])
+    commit(channels, [...drivers, base])
   }
-  function updDriver(id:string, patch:Partial<Driver>){ persist(channels, drivers.map(d=>d.id===id?{...d,...patch}:d)) }
-  function delDriver(id:string){ persist(channels, drivers.filter(d=>d.id!==id)) }
+  function updDriver(id:string, patch:Partial<Driver>){ commit(channels, drivers.map(d=>d.id===id?{...d,...patch}:d)) }
+  function delDriver(id:string){ commit(channels, drivers.filter(d=>d.id!==id)) }
   // Drivers store a per-month quantity array; the UI edits a single "per month"
   // figure that fills every month (same convention as shared costs). Advanced
   // month-by-month variation can be layered on later.
