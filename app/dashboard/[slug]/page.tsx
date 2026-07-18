@@ -61,8 +61,15 @@ export default function GenericClientPage() {
   const [funderDetailLevel, setFunderDetailLevel] = useState<'summary'|'full'>('summary')
   const [checking, setChecking] = useState(true)
   const [authError, setAuthError] = useState(false)
+  const [initError, setInitError] = useState<string|null>(null)
 
   useEffect(()=>{
+    let cancelled = false
+    // Watchdog: never leave the user stuck on "Loading Clearview..." forever. If
+    // init hasn't resolved in 20s (a hung query / RLS timeout / network stall),
+    // stop checking so the login or error screen renders instead of an infinite
+    // spinner.
+    const watchdog = setTimeout(()=>{ if(!cancelled){ setInitError('This took too long to load. Check your connection and reload.'); setChecking(false) } }, 20000)
     async function init() {
       const {data:{session}} = await supabase.auth.getSession()
       if (!session) { setChecking(false); return }
@@ -104,9 +111,14 @@ export default function GenericClientPage() {
           .select('funder_detail_level').eq('id',profile.funder_programme_id).single()
         if (programme?.funder_detail_level === 'full') setFunderDetailLevel('full')
       }
-      setChecking(false)
     }
+    // Wrap the whole init so a thrown query (e.g. an RLS/id error) can never
+    // leave the page hanging on "Loading Clearview..." — it surfaces the real
+    // reason on screen instead, and `finally` always clears the loading state.
     init()
+      .catch((e:any)=>{ if(!cancelled){ console.error('Dashboard init failed:', e); setInitError(e?.message||'Something went wrong loading this dashboard.') } })
+      .finally(()=>{ if(!cancelled){ clearTimeout(watchdog); setChecking(false) } })
+    return ()=>{ cancelled = true; clearTimeout(watchdog) }
   },[slug])
 
   async function handleLogin(email:string, password:string) {
@@ -118,6 +130,15 @@ export default function GenericClientPage() {
   }
 
   if (checking) return <Loading/>
+  if (initError) return (
+    <div style={{minHeight:'100vh',background:'#F8F4EE',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Segoe UI',system-ui,sans-serif",padding:'2rem'}}>
+      <div style={{maxWidth:460,textAlign:'center'}}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:'#1B2A4A',marginBottom:'0.6rem'}}>Couldn't load this dashboard</div>
+        <div style={{color:'#C0392B',fontSize:'0.95rem',marginBottom:'1.2rem',padding:'0.7rem',background:'#FDF0EE',borderRadius:6,wordBreak:'break-word'}}>{initError}</div>
+        <button onClick={()=>window.location.reload()} style={{padding:'0.6rem 1.2rem',border:'none',borderRadius:6,background:'#1B2A4A',color:'#fff',fontSize:'0.9rem',fontWeight:600,cursor:'pointer'}}>Reload</button>
+      </div>
+    </div>
+  )
   if (!user) return <LoginPrompt onLogin={handleLogin}/>
   if (authError) return <div style={{padding:'2rem',fontFamily:'Georgia,serif',color:'#C0392B'}}>You don't have access to this client's dashboard. Contact your administrator if you believe this is a mistake.</div>
   if (!clientId) return <div style={{padding:'2rem',fontFamily:'Georgia,serif',color:'#C0392B'}}>Client not found.</div>
