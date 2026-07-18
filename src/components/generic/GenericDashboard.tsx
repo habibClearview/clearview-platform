@@ -1540,9 +1540,20 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
   }
 
   function addLine(category:LineCategory) {
-    const id = `${selUnit}_${category}_${Date.now()}`
-    const newLine = blankLine(id, selUnit, 'New line', category, config.planning_months)
-    onSave({...config, plan_lines:[...config.plan_lines, newLine]})
+    // TEMPORARY DIAGNOSTIC (R141): report exactly what happens on click so a
+    // "nothing happens" report can be pinned to a real cause. Remove once the
+    // add-line failure is understood.
+    try {
+      if (!selUnit) { alert('Add line: no unit is selected (selUnit is empty). Pick a unit tab first — that is why nothing is being added.'); return }
+      const id = `${selUnit}_${category}_${Date.now()}`
+      const newLine = blankLine(id, selUnit, 'New line', category, config.planning_months)
+      const next = {...config, plan_lines:[...config.plan_lines, newLine]}
+      onSave(next)
+      const shownAfter = next.plan_lines.filter(l=>l.unit_id===selUnit&&l.category===category&&l.active).length
+      alert(`Add line OK · unit=${selUnit} · section=${category} · rows in this section now = ${shownAfter}. If this number went UP but you see no new "New line" row, it's a display/scroll issue — scroll to the very bottom of the section.`)
+    } catch(e:any) {
+      alert('Add line ERROR: ' + (e?.message || String(e)))
+    }
   }
 
   function updateLineName(lineId:string, name:string) {
