@@ -752,8 +752,8 @@ export default function GenericDashboard({
     // P&L / cash flow / balance sheet.
     const firstUnit = config.business_units.find((u:any)=>u.active)?.id || config.business_units[0]?.id || null
     const driverLines = syntheticPlanLinesFromDrivers(
-      (config.settings?.channels||[]) as Channel[],
-      (config.settings?.drivers||[]) as Driver[],
+      config.settings?.channels||[],
+      config.settings?.drivers||[],
       config.planning_months, firstUnit,
     )
     const eventLines = syntheticPlanLinesFromEvents(marketEvents, config.start_date, config.planning_months)
@@ -1771,8 +1771,8 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
 // config.settings.channels / .drivers (inheriting this config's client-scoped
 // RLS) and flows into the model via syntheticPlanLinesFromDrivers.
 function DriversSection({config,cc,P,onSave}) {
-  const channels: Channel[] = (config.settings?.channels||[]) as Channel[]
-  const drivers: Driver[] = (config.settings?.drivers||[]) as Driver[]
+  const channels: Channel[] = config.settings?.channels||[]
+  const drivers: Driver[] = config.settings?.drivers||[]
   const units = config.business_units.filter((u:any)=>u.active)
   const firstUnit = units[0]?.id || ''
   const canEdit = !!P.canEditPlan
@@ -1811,14 +1811,14 @@ function DriversSection({config,cc,P,onSave}) {
 
   const driverRow = (d:Driver)=> (
     <div key={d.id} style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:'0.5rem',alignItems:'end',padding:'0.5rem 0',borderBottom:'1px solid var(--cv-border-soft)'}}>
-      <div><label style={lbl}>Name</label><input style={inp} value={d.name} disabled={!canEdit} onChange={e=>updDriver(d.id,{name:e.target.value})}/></div>
-      {d.kind==='sales'&&<div><label style={lbl}>Channel</label><select style={inp} value={d.channel_id||''} disabled={!canEdit} onChange={e=>updDriver(d.id,{channel_id:e.target.value||null})}><option value="">— none —</option>{channels.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>}
-      <div><label style={lbl}>Unit</label><select style={inp} value={d.unit_id||''} disabled={!canEdit} onChange={e=>updDriver(d.id,{unit_id:e.target.value||null})}><option value="">Whole business</option>{units.map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
-      <div><label style={lbl}>How</label><select style={inp} value={d.mode} disabled={!canEdit} onChange={e=>updDriver(d.id,{mode:e.target.value as any})}><option value="smart">Qty × rate</option><option value="flat">Flat figure</option></select></div>
-      <div><label style={lbl}>{d.mode==='smart'?`Qty/month${d.unit_label?` (${d.unit_label})`:''}`:'Amount/month'}</label><input type="number" style={inp} value={perMonth(d)||''} disabled={!canEdit} onChange={e=>setPerMonth(d,Number(e.target.value))}/></div>
-      {d.mode==='smart'&&<div><label style={lbl}>{d.kind==='sales'?'Sell price':'Rate'}</label><input type="number" style={inp} value={d.rate||''} disabled={!canEdit} onChange={e=>updDriver(d.id,{rate:Number(e.target.value)})}/></div>}
-      {d.kind==='sales'&&d.mode==='smart'&&<div><label style={lbl}>Buy price</label><input type="number" style={inp} value={d.unit_cost??''} placeholder="optional" disabled={!canEdit} onChange={e=>updDriver(d.id,{unit_cost:e.target.value===''?null:Number(e.target.value)})}/></div>}
-      {d.kind==='cost'&&<div><label style={lbl}>Cost type</label><select style={inp} value={d.cost_category||'direct_opex'} disabled={!canEdit} onChange={e=>updDriver(d.id,{cost_category:e.target.value as any})}><option value="direct_opex">Overhead</option><option value="cost_of_sales">Cost of sales</option><option value="staff">Staff</option></select></div>}
+      <div><label style={lbl} htmlFor={`drv-${d.id}-name`}>Name</label><input id={`drv-${d.id}-name`} style={inp} value={d.name} disabled={!canEdit} onChange={e=>updDriver(d.id,{name:e.target.value})}/></div>
+      {d.kind==='sales'&&<div><label style={lbl} htmlFor={`drv-${d.id}-channel`}>Channel</label><select id={`drv-${d.id}-channel`} style={inp} value={d.channel_id||''} disabled={!canEdit} onChange={e=>updDriver(d.id,{channel_id:e.target.value||null})}><option value="">— none —</option>{channels.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>}
+      <div><label style={lbl} htmlFor={`drv-${d.id}-unit`}>Unit</label><select id={`drv-${d.id}-unit`} style={inp} value={d.unit_id||''} disabled={!canEdit} onChange={e=>updDriver(d.id,{unit_id:e.target.value||null})}><option value="">Whole business</option>{units.map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+      <div><label style={lbl} htmlFor={`drv-${d.id}-mode`}>How</label><select id={`drv-${d.id}-mode`} style={inp} value={d.mode} disabled={!canEdit} onChange={e=>updDriver(d.id,{mode:e.target.value as any})}><option value="smart">Qty × rate</option><option value="flat">Flat figure</option></select></div>
+      <div><label style={lbl} htmlFor={`drv-${d.id}-qty`}>{d.mode==='smart'?`Qty/month${d.unit_label?` (${d.unit_label})`:''}`:'Amount/month'}</label><input id={`drv-${d.id}-qty`} type="number" style={inp} value={perMonth(d)||''} disabled={!canEdit} onChange={e=>setPerMonth(d,Number(e.target.value))}/></div>
+      {d.mode==='smart'&&<div><label style={lbl} htmlFor={`drv-${d.id}-rate`}>{d.kind==='sales'?'Sell price':'Rate'}</label><input id={`drv-${d.id}-rate`} type="number" style={inp} value={d.rate||''} disabled={!canEdit} onChange={e=>updDriver(d.id,{rate:Number(e.target.value)})}/></div>}
+      {d.kind==='sales'&&d.mode==='smart'&&<div><label style={lbl} htmlFor={`drv-${d.id}-buy`}>Buy price</label><input id={`drv-${d.id}-buy`} type="number" style={inp} value={d.unit_cost??''} placeholder="optional" disabled={!canEdit} onChange={e=>updDriver(d.id,{unit_cost:e.target.value===''?null:Number(e.target.value)})}/></div>}
+      {d.kind==='cost'&&<div><label style={lbl} htmlFor={`drv-${d.id}-cat`}>Cost type</label><select id={`drv-${d.id}-cat`} style={inp} value={d.cost_category||'direct_opex'} disabled={!canEdit} onChange={e=>updDriver(d.id,{cost_category:e.target.value as any})}><option value="direct_opex">Overhead</option><option value="cost_of_sales">Cost of sales</option><option value="staff">Staff</option></select></div>}
       {canEdit&&<div><button style={delBtn} aria-label="Delete driver" title="Delete driver" onClick={()=>delDriver(d.id)}>×</button></div>}
     </div>
   )
@@ -1891,7 +1891,6 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
   const [msg,setMsg]=useState<{ok:boolean,text:string}|null>(null)
   const firstUnit=config.business_units.find((u:any)=>u.active)?.id||''
   const nowPeriod=(()=>{const d=new Date();d.setDate(1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`})()
-  const [form,setForm]=useState({name:'',unit_id:firstUnit,cost:'',start_period:nowPeriod,months_count:'1',cost_category:'direct_opex',expected_uplift_pct:'',description:''})
 
   const monthOpts = Array.from({length:config.planning_months},(_,i)=>{
     const p=periodForMonthIndex(config.start_date,i)
@@ -1901,6 +1900,11 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
     // timezones.
     return {value:p,label:d.toLocaleString('en-GB',{month:'short',year:'numeric',timeZone:'UTC'})}
   })
+  // Default to the current month only if it's actually inside the planning window;
+  // otherwise fall back to the first month, so an activity is never saved with a
+  // start period outside the window (which would silently drop it from the plan).
+  const defaultPeriod = monthOpts.some(m=>m.value===nowPeriod) ? nowPeriod : (monthOpts[0]?.value||'')
+  const [form,setForm]=useState({name:'',unit_id:firstUnit,cost:'',start_period:defaultPeriod,months_count:'1',cost_category:'direct_opex',expected_uplift_pct:'',description:''})
   const unitName=(id:string)=>config.business_units.find((u:any)=>u.id===id)?.name||id
   const statusColor=(s:string)=>s==='approved'?C.green:s==='rejected'?C.red:C.amber
   const statusText=(s:string)=>s==='approved'?'Approved':s==='rejected'?'Sent back':'Awaiting approval'
@@ -1926,7 +1930,11 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
   }
   async function remove(id:string){
     if(!confirm('Delete this market activity? If it was approved, its cost will stop flowing into the plan.'))return
-    const {error}=await supabase.from('generic_market_events').delete().eq('id',id)
+    // Scope the delete to this client (defence in depth on top of RLS). The
+    // database's delete policy is the real guard: a non-approver can only delete
+    // their own still-proposed activity, so deleting an approved one is refused
+    // there for anyone who isn't an approver.
+    const {error}=await supabase.from('generic_market_events').delete().eq('id',id).eq('client_id',clientId)
     if(error){alert('Could not delete — '+error.message);return}
     onChanged&&onChanged()
   }
@@ -3195,7 +3203,7 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
           })}
         </div>
       )}
-      {pendingFM.length===0&&pendingCEO.length===0&&pendingActuals.length===0&&pendingEvents.length===0&&(
+      {pendingFM.length===0&&pendingCEO.length===0&&pendingActuals.length===0&&(!canApproveEvents||pendingEvents.length===0)&&(
         <div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No pending approvals.</div>
       )}
     </div>

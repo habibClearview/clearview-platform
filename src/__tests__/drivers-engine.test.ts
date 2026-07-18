@@ -133,6 +133,17 @@ describe('summariseByChannel', () => {
     const s = summariseByChannel([chan({})], [drv({ id: 'c', kind: 'cost', channel_id: 'ch1', quantity: new Array(M).fill(1), rate: 100 })], M)
     expect(s).toHaveLength(0)
   })
+
+  it('REG: a zero-revenue sales driver with positive unit_cost still contributes COGS to its channel', () => {
+    // Consistency with the plan-line side: a rate:0 + unit_cost:60 driver must
+    // still show its COGS (and negative margin) in the channel summary.
+    const s = summariseByChannel([chan({ id: 'ch1', name: 'Walk-in' })], [drv({ id: 'z', channel_id: 'ch1', quantity: new Array(M).fill(10), rate: 0, unit_cost: 60 })], M)
+    expect(s).toHaveLength(1)
+    expect(s[0].revenue).toBe(0)
+    expect(s[0].cogs).toBe(600 * M)
+    expect(s[0].margin).toBe(-600 * M)
+    expect(s[0].marginPct).toBeNull()
+  })
 })
 
 describe('isDriverLineId', () => {
