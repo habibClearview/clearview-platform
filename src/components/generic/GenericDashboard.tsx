@@ -713,60 +713,62 @@ export default function GenericDashboard({
   }, [clientId])
 
   // Save config to Supabase
-  // Persist the whole config, OPTIMISTIC + SERIALIZED, so concurrent edits from
-  // different editing surfaces can't lose one another:
-  //  - Optimistic: setConfig(newConfig) happens IMMEDIATELY, before the write.
-  //    Every editing surface builds its next config from `config`, so applying
-  //    it to local state at once means a fast follow-up edit is always built on
-  //    top of the latest change — never on a stale snapshot that would silently
-  //    revert an in-flight save's unrelated field.
-  //  - Serialized + coalesced: at most one upsert is in flight; while it runs the
-  //    LATEST config is queued (older queued configs dropped) and written when the
-  //    current one finishes, so writes land in order and the DB ends on the last
-  //    edit.
-  const saveInFlightRef = useRef(false)
-  const savePendingRef = useRef<GenericModelConfig | null>(null)
-  const saveConfig = useCallback(async (newConfig: GenericModelConfig) => {
-    setConfig(newConfig) // optimistic: local state is the source of truth at once
-    if (saveInFlightRef.current) { savePendingRef.current = newConfig; return }
-    saveInFlightRef.current = true
+  // Persist the whole config with a single-writer design keyed to one
+  // synchronously-maintained "latest desired config" ref. This is the source of
+  // truth for what SHOULD be in the database:
+  //  - Optimistic: setConfig(newConfig) runs immediately, so a fast follow-up edit
+  //    from any surface is built on top of the latest change, and the newest config
+  //    is recorded in latestConfigRef synchronously (independent of React timing).
+  //  - One writer at a time: if a write is already running, we just update the ref
+  //    and return; the running writer always persists the LATEST desired config,
+  //    never a stale queued snapshot — so writes are ordered and coalesced and can
+  //    never drain an old snapshot over a newer one.
+  //  - On failure: the latest desired config is KEPT in the ref (not discarded), so
+  //    the next edit re-persists it; local state already shows it. The only residual
+  //    is a transient failure with no further edit before a reload — no worse than a
+  //    plain single save, and the change stays visible meanwhile.
+  const latestConfigRef = useRef<GenericModelConfig | null>(null)
+  const writingRef = useRef(false)
+  const saveConfig = useCallback((newConfig: GenericModelConfig) => {
+    setConfig(newConfig)                 // optimistic: local state is truth at once
+    latestConfigRef.current = newConfig  // synchronous latest DESIRED config
+    if (writingRef.current) return       // the active writer will pick this up
+    writingRef.current = true
     setSaving(true)
-    let cfg: GenericModelConfig | null = newConfig
-    try {
-      // Drain loop: a config queued while we were awaiting still gets written next,
-      // preserving order, until nothing newer is pending.
-      while (cfg) {
-        const { error: err } = await supabase
-          .from('generic_model_config')
-          .upsert({
-            client_id: cfg.client_id,
-            business_name: cfg.business_name,
-            currency: cfg.currency,
-            start_date: cfg.start_date,
-            planning_months: cfg.planning_months,
-            business_units: cfg.business_units,
-            plan_lines: cfg.plan_lines,
-            shared_lines: cfg.shared_lines,
-            settings: cfg.settings,
-            updated_at: new Date().toISOString(),
-            updated_by: P.userId,
-          }, { onConflict: 'client_id' })
-        if (err) throw err
-        const queued = savePendingRef.current
-        savePendingRef.current = null
-        cfg = queued
+    void (async () => {
+      let lastWritten: GenericModelConfig | null = null
+      try {
+        // Always persist the latest desired config. If more edits arrive mid-write,
+        // latestConfigRef advances and we loop again to write the newer one.
+        while (latestConfigRef.current !== lastWritten) {
+          const cfg = latestConfigRef.current as GenericModelConfig
+          const { error: err } = await supabase
+            .from('generic_model_config')
+            .upsert({
+              client_id: cfg.client_id,
+              business_name: cfg.business_name,
+              currency: cfg.currency,
+              start_date: cfg.start_date,
+              planning_months: cfg.planning_months,
+              business_units: cfg.business_units,
+              plan_lines: cfg.plan_lines,
+              shared_lines: cfg.shared_lines,
+              settings: cfg.settings,
+              updated_at: new Date().toISOString(),
+              updated_by: P.userId,
+            }, { onConflict: 'client_id' })
+          if (err) throw err
+          lastWritten = cfg
+        }
+      } catch(e: any) {
+        // Keep latestConfigRef as-is (the newest desired config) so the next edit
+        // re-persists it — nothing is dropped, and no stale snapshot is written.
+        alert('Save failed: ' + e.message)
+      } finally {
+        writingRef.current = false
+        setSaving(false)
       }
-    } catch(e: any) {
-      // Drop any snapshot queued during the failed write. If we kept it, a later
-      // successful save would drain this now-stale snapshot afterwards and revert
-      // itself. Nothing is lost: optimistic setConfig already applied the queued
-      // edit to local state, so the next successful save re-persists it.
-      savePendingRef.current = null
-      alert('Save failed: ' + e.message)
-    } finally {
-      saveInFlightRef.current = false
-      setSaving(false)
-    }
+    })()
   }, [P.userId])
 
   const months = useMemo(() => config ? buildMonthLabels(config.start_date, config.planning_months) : [], [config])
