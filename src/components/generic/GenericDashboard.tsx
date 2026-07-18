@@ -1558,7 +1558,10 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
 
   function addLine(category:LineCategory) {
     if (!selUnit) return
-    const id = `${selUnit}_${category}_${Date.now()}`
+    // Collision-safe id: Date.now() alone can repeat on rapid clicks, which would
+    // duplicate the React key AND the planrow-<id> DOM id the scroll/focus/
+    // highlight below target — so add a random suffix.
+    const id = `${selUnit}_${category}_${Date.now()}_${Math.random().toString(36).slice(2,9)}`
     const newLine = blankLine(id, selUnit, 'New line', category, config.planning_months)
     onSave({...config, plan_lines:[...config.plan_lines, newLine]})
     // The new line is appended to the BOTTOM of what can be a long list, so on a
