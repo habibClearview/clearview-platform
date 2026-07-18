@@ -1,4 +1,5 @@
 import { computeScores, buildDebtSchedule, computeTradeCredit, defaultCoachAssessment, type CoachAssessment, type ScoringResult, type DebtObligation, type TradeCreditLine } from './scoring-engine'
+import type { Channel, Driver } from './drivers-engine'
 
 // ============================================================
 // CLEARVIEW GENERIC ENGINE v1
@@ -264,9 +265,9 @@ export interface GenericModelConfig {
     // Driver-based planning: sales/cost drivers grouped into channels (routes to
     // market). Stored here (inheriting this config's client-scoped RLS) and
     // turned into synthetic plan lines at model time — see src/lib/drivers-engine.ts.
-    // Typed as any[] to avoid a circular import; the real shapes are Channel/Driver.
-    channels?: any[]
-    drivers?: any[]
+    // Type-only imports, so there is no runtime circular dependency.
+    channels?: Channel[]
+    drivers?: Driver[]
   }
 }
 
