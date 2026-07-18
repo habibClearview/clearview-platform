@@ -682,19 +682,24 @@ function InviteLoginButton({email,fullName,role,coImplementerId,funderProgrammeI
 function ClientTeamInvite({client}){
   const [members,setMembers]=useState<any[]>([])
   const [loading,setLoading]=useState(true)
+  const [loadErr,setLoadErr]=useState<string|null>(null)
   const [form,setForm]=useState({email:client.contact_email||'',full_name:client.contact_name||'',role:'ceo'})
   const [busy,setBusy]=useState(false)
   const [msg,setMsg]=useState<{ok:boolean,text:string}|null>(null)
 
   async function load(){
-    setLoading(true)
+    setLoading(true); setLoadErr(null)
     try{
       const {data:{session}}=await supabase.auth.getSession()
       const res=await fetch('/api/list-users',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({clientId:client.id,requesterToken:session?.access_token})})
       const data=await res.json()
-      setMembers(res.ok?(data.users||[]):[])
-    }catch{ setMembers([]) }
+      // Only a genuinely successful, empty response means "no logins yet". A
+      // failed request keeps an error (with retry) so it is never misread as
+      // "nobody has been invited".
+      if(res.ok){ setMembers(data.users||[]) }
+      else { setMembers([]); setLoadErr(data.error||'Could not load the team list.') }
+    }catch(e){ setMembers([]); setLoadErr('Could not load the team list: '+(e as any).message) }
     setLoading(false)
   }
   useEffect(()=>{load()},[client.id])
@@ -724,7 +729,12 @@ function ClientTeamInvite({client}){
       </p>
       {loading?<Spinner/>:(
         <>
-          {members.length>0?(
+          {loadErr?(
+            <div style={{fontSize:'1.0rem',color:C.red,marginBottom:'0.9rem',display:'flex',gap:'0.6rem',alignItems:'center',flexWrap:'wrap'}}>
+              <span>{loadErr}</span>
+              <button style={addBtn(true,C.slate)} onClick={load}>Try again</button>
+            </div>
+          ):members.length>0?(
             <div style={{marginBottom:'0.9rem'}}>
               {members.map(m=>(
                 <div key={m.id} style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',padding:'0.4rem 0',borderBottom:'1px solid var(--cv-border-soft)'}}>
@@ -741,7 +751,7 @@ function ClientTeamInvite({client}){
           <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
             <input style={{...inp,maxWidth:200}} placeholder="Full name" value={form.full_name} onChange={e=>setForm(f=>({...f,full_name:e.target.value}))}/>
             <input style={{...inp,maxWidth:220}} placeholder="Email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))}/>
-            <select style={{...inp,maxWidth:240}} value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))}>
+            <select aria-label="Invitee role" style={{...inp,maxWidth:240}} value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))}>
               {ROLE_OPTS.map(([v,l])=><option key={v} value={v}>{l}</option>)}
             </select>
             <button style={addBtn(true,C.teal)} disabled={busy} onClick={invite}>{busy?'Sending…':'Send invite'}</button>
@@ -1974,6 +1984,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             onCancel={()=>setShowEditClient(false)}
           />
         )}
+        {isSuperCoach&&<ClientTeamInvite client={selClient}/>}
 
         {/* Two-column layout: sidebar + content */}
         <div style={{display:'grid',gridTemplateColumns:'220px 1fr',gap:'1.5rem',alignItems:'start'}}>
