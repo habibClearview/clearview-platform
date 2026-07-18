@@ -1578,6 +1578,10 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
   function removeEmptyNewLines() {
     const isEmptyNew = (l:GenericPlanLine) => l.unit_id===selUnit && l.category===selSection && l.active
       && ((l.name||'').trim()==='New line' || !(l.name||'').trim())
+      // Only the default 'standard' line type counts as untouched: switching a
+      // line to spread/service_fee is a deliberate setup step that leaves the
+      // numeric arrays at zero, so those must NOT be treated as blank junk.
+      && (!l.line_type || l.line_type==='standard')
       && (l.monthly_plan||[]).every(v=>!v)
       && (l.buy_price||[]).every(v=>!v) && (l.sell_price||[]).every(v=>!v) && (l.volume||[]).every(v=>!v)
       && (l.fee_per_engagement||[]).every(v=>!v) && (l.cost_per_engagement||[]).every(v=>!v) && (l.engagements||[]).every(v=>!v)
