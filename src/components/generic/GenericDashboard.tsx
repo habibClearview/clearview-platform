@@ -546,6 +546,14 @@ export default function GenericDashboard({
   // Guards the save STATUS against out-of-order responses: a slow earlier write
   // must not overwrite the status of a newer one the user has since triggered.
   const saveSeqRef = useRef(0)
+  // Write serialization. Each save writes a FULL config snapshot, so two writes
+  // in flight at once could land out of order and an older one could clobber a
+  // newer edit. Instead we keep at most one upsert in flight and always persist
+  // the LATEST snapshot: newer edits while a write is running are coalesced into
+  // pendingConfigRef and flushed when the current write finishes. This makes the
+  // final stored row always equal the most recent edit.
+  const inFlightRef = useRef(false)
+  const pendingConfigRef = useRef<GenericModelConfig|null>(null)
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0)
   const [pendingActualsCount, setPendingActualsCount] = useState(0)
   // unit_id -> period -> line_id -> combined (manual + field) value.
@@ -736,44 +744,64 @@ export default function GenericDashboard({
   // different way: the numeric/text editors (BufferedInput below) hold what you
   // type in local state and only commit — i.e. only call this — on blur/Enter,
   // so this fires roughly once per field, not once per character.
-  const saveConfig = useCallback(async (newConfig: GenericModelConfig) => {
-    setConfig(newConfig)            // optimistic: reflect the edit on screen at once
-    const seq = ++saveSeqRef.current
-    setSaving(true)
-    setSaveError(null)
+  // Drains pendingConfigRef, writing one snapshot at a time. Only ever one
+  // instance runs (guarded by inFlightRef), so writes can never overlap or land
+  // out of order. Each write is the newest snapshot available at the time it
+  // starts, so intermediate edits made while a write was in flight are
+  // coalesced away rather than written stale.
+  const flushSave = useCallback(async () => {
+    if (inFlightRef.current) return
+    inFlightRef.current = true
     try {
-      const result: any = await Promise.race([
-        supabase
-          .from('generic_model_config')
-          .upsert({
-            client_id: newConfig.client_id,
-            business_name: newConfig.business_name,
-            currency: newConfig.currency,
-            start_date: newConfig.start_date,
-            planning_months: newConfig.planning_months,
-            business_units: newConfig.business_units,
-            plan_lines: newConfig.plan_lines,
-            shared_lines: newConfig.shared_lines,
-            settings: newConfig.settings,
-            updated_at: new Date().toISOString(),
-            updated_by: P.userId,
-          }, { onConflict: 'client_id' }),
-        // A true network stall must not leave "Saving…" up forever with no
-        // outcome — turn it into a visible, actionable message.
-        new Promise((_, reject) => setTimeout(() => reject(new Error(
-          'The server took too long to respond. Your change is shown here but may not be saved yet — check your connection.'
-        )), 15000)),
-      ])
-      if (result?.error) throw result.error
-      if (saveSeqRef.current === seq) { setSaving(false); setSaveError(null) }
-    } catch(e: any) {
-      // Only the most recent save may set the visible status.
-      if (saveSeqRef.current === seq) {
-        setSaving(false)
-        setSaveError(e?.message || 'Could not save your change to the server.')
+      while (pendingConfigRef.current) {
+        const cfg = pendingConfigRef.current
+        pendingConfigRef.current = null
+        const seq = ++saveSeqRef.current
+        setSaving(true)
+        setSaveError(null)
+        // Abort a stalled request so it cannot complete later and overwrite a
+        // newer save — the timeout both surfaces the stall AND cancels the call.
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 15000)
+        try {
+          const { error: err } = await supabase
+            .from('generic_model_config')
+            .upsert({
+              client_id: cfg.client_id,
+              business_name: cfg.business_name,
+              currency: cfg.currency,
+              start_date: cfg.start_date,
+              planning_months: cfg.planning_months,
+              business_units: cfg.business_units,
+              plan_lines: cfg.plan_lines,
+              shared_lines: cfg.shared_lines,
+              settings: cfg.settings,
+              updated_at: new Date().toISOString(),
+              updated_by: P.userId,
+            }, { onConflict: 'client_id' })
+            .abortSignal(controller.signal)
+          if (err) throw err
+          if (saveSeqRef.current === seq) setSaveError(null)
+        } catch(e: any) {
+          const msg = controller.signal.aborted
+            ? 'The server took too long, so the save was cancelled. Your change is shown here but is NOT saved — check your connection and re-enter it.'
+            : (e?.message || 'Could not save your change to the server.')
+          if (saveSeqRef.current === seq) setSaveError(msg)
+        } finally {
+          clearTimeout(timer)
+        }
       }
+    } finally {
+      inFlightRef.current = false
+      setSaving(false)
     }
   }, [P.userId])
+
+  const saveConfig = useCallback((newConfig: GenericModelConfig) => {
+    setConfig(newConfig)                     // optimistic: reflect the edit at once
+    pendingConfigRef.current = newConfig     // newest snapshot wins
+    void flushSave()                         // no-op if a write is already draining
+  }, [flushSave])
 
   const months = useMemo(() => config ? buildMonthLabels(config.start_date, config.planning_months) : [], [config])
   const result = useMemo(() => {
@@ -890,12 +918,28 @@ export default function GenericDashboard({
           message (and the nav/other tabs still work) instead of white-screening
           the whole dashboard. Keying by view resets the boundary on tab switch. */}
       <main style={{maxWidth:1600,margin:'0 auto',padding:'1.5rem'}}>
+        {/* Dashboard-wide save status. saveConfig is used by every editing tab
+            (Planning, Overview, Intelligence, Actuals, Settings, drivers), so
+            the status lives here — a failed or stalled save is visible no matter
+            which tab triggered it, never silently "optimistic and lost". */}
+        {(saveError || saving) && (
+          <div style={{
+            display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'1rem',padding:'0.6rem 0.9rem',borderRadius:8,
+            background: saveError ? '#FDF0EE' : '#EEF3F8',
+            border: `1px solid ${saveError ? '#C0392B' : '#D8E0E8'}`,
+            borderLeft: `4px solid ${saveError ? '#C0392B' : '#E0A800'}`,
+            fontSize:'0.95rem', color: saveError ? '#C0392B' : '#1B2A4A',
+          }}>
+            <span style={{fontWeight:700}}>{saveError ? 'Not saved' : 'Saving…'}</span>
+            <span>{saveError ? saveError : 'Your change is being saved.'}</span>
+          </div>
+        )}
         <ErrorBoundary key={view} label={String(view)}>
         {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} pendingApprovalCount={pendingApprovalCount} pendingActualsCount={pendingActualsCount} onGoToApprovals={()=>setView('approvals')} onGoToIntelligence={()=>setView('intelligence')}/>}
         {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P} marketEvents={marketEvents} onMarketEventsChanged={reloadMarketEvents} onApprovalActioned={reloadPendingActualsCount}/>}
         {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods} onNavigate={setView}/>}
         {view==='performance' && <PerformanceTab config={config} result={result} months={months} cc={cc}/>}
-        {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} saving={saving} saveError={saveError} clientId={clientId} marketEvents={marketEvents} marketEventsError={marketEventsError} onMarketEventsChanged={reloadMarketEvents}/>}
+        {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} clientId={clientId} marketEvents={marketEvents} marketEventsError={marketEventsError} onMarketEventsChanged={reloadMarketEvents}/>}
         {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods}/>}
         {view==='cashflow'    && <CashFlowTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
         {view==='balancesheet'&& <BalanceSheetTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods} onCloseStatusChanged={loadClosedPeriods}/>}
@@ -1474,7 +1518,7 @@ const SERVICE_FEE_SUBROWS: [string,string,boolean][] = [
   ['Engagements','engagements',false],
 ]
 
-function PlanningTab({config,result,months,cc,P,onSave,saving,saveError,clientId,marketEvents,marketEventsError,onMarketEventsChanged}) {
+function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,marketEventsError,onMarketEventsChanged}) {
   const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active)?.id||'')
   const [selSection, setSelSection] = useState<LineCategory>('revenue')
   // Cost of Sales product scope: '__whole__' = whole unit / shared, otherwise a
@@ -1601,23 +1645,6 @@ function PlanningTab({config,result,months,cc,P,onSave,saving,saveError,clientId
 
   return (
     <div>
-      {/* Save status — always-visible truth about whether edits are reaching the
-          server. Green tick when saved, amber while saving, red with the reason
-          if a write failed or stalled. This is what makes a failed/slow save
-          impossible to mistake for "nothing happened". */}
-      {P.canEditPlan && (saveError || saving) && (
-        <div style={{
-          display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'1rem',padding:'0.6rem 0.9rem',borderRadius:8,
-          background: saveError ? '#FDF0EE' : C.lightBg,
-          border: `1px solid ${saveError ? C.red : C.border}`,
-          borderLeft: `4px solid ${saveError ? C.red : C.amber}`,
-          fontSize:'0.98rem', color: saveError ? C.red : C.navy,
-        }}>
-          <span style={{fontWeight:700}}>{saveError ? 'Not saved' : 'Saving…'}</span>
-          <span>{saveError ? saveError : 'Your change is being saved.'}</span>
-        </div>
-      )}
-
       {/* Unit selector */}
       <div style={{display:'flex',gap:'0.45rem',marginBottom:'1.25rem',flexWrap:'wrap',alignItems:'center'}}>
         {config.business_units.filter(u=>u.active).map(u=>(
