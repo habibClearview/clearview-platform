@@ -1,6 +1,6 @@
 // @ts-nocheck
 'use client'
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import QRCode from 'qrcode'
 import { mostRecentTokenUse } from '@/lib/field-auth'
 import { supabase } from '@/lib/supabase'
@@ -614,16 +614,26 @@ export default function GenericDashboard({
   // silently drop out of the P&L. We flag it so the Planning section can warn
   // that the numbers may be understated until it reloads.
   const [marketEventsError, setMarketEventsError] = useState(false)
+  // Guards against a stale response landing after the user has switched clients:
+  // we stamp each request with the client it was for and drop any response whose
+  // client no longer matches — so Client A's activities can never be injected
+  // into Client B's model.
+  const marketEventsClientRef = useRef<string | null>(clientId)
+  marketEventsClientRef.current = clientId
   const reloadMarketEvents = useCallback(() => {
-    if (!clientId) return
-    supabase.from('generic_market_events').select('*').eq('client_id', clientId).order('created_at', {ascending:false})
+    if (!clientId) { setMarketEvents([]); return }
+    const forClient = clientId
+    supabase.from('generic_market_events').select('*').eq('client_id', forClient).order('created_at', {ascending:false})
       .then(({data, error}) => {
+        if (marketEventsClientRef.current !== forClient) return // superseded by a client switch
         if (error) { console.error('Failed to load market activities:', error.message); setMarketEventsError(true); return }
         setMarketEventsError(false)
         setMarketEvents((data as MarketEvent[]) || [])
       })
   }, [clientId])
-  useEffect(() => { reloadMarketEvents() }, [reloadMarketEvents])
+  // Clear immediately on a client change so the previous client's activities are
+  // never briefly applied to the new client, then load the new client's set.
+  useEffect(() => { setMarketEvents([]); setMarketEventsError(false); reloadMarketEvents() }, [clientId, reloadMarketEvents])
 
   // Fetch actuals for the P&L's hybrid mode: real data for months that
   // have it, plan for months ahead. Combines line_values (manual) and
@@ -1767,11 +1777,15 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
   const statusText=(s:string)=>s==='approved'?'Approved':s==='rejected'?'Sent back':'Awaiting approval'
 
   async function propose(){
+    const monthsCount=Number(form.months_count)
     if(!form.name.trim()||!form.unit_id||!(Number(form.cost)>0)){setMsg({ok:false,text:'Enter a name, a unit and a cost above zero.'});return}
+    // Match the DB constraint (whole number, 1–24) here so a bad duration is
+    // caught with a friendly message instead of a rejected insert.
+    if(!Number.isInteger(monthsCount)||monthsCount<1||monthsCount>24){setMsg({ok:false,text:'"Runs for" must be a whole number of months from 1 to 24.'});return}
     setBusy(true);setMsg(null)
     const {error}=await supabase.from('generic_market_events').insert({
       client_id:clientId, unit_id:form.unit_id, name:form.name.trim(), description:form.description||null,
-      cost:Number(form.cost), start_period:form.start_period, months_count:Math.max(1,Number(form.months_count)||1),
+      cost:Number(form.cost), start_period:form.start_period, months_count:monthsCount,
       cost_category:form.cost_category, expected_uplift_pct:form.expected_uplift_pct?Number(form.expected_uplift_pct):null,
       status:'proposed', created_by:P.fullName,
     })
