@@ -36,11 +36,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    // Get all profiles for this client
+    // Get all profiles for this client. Scope by engagement_client_id (the TEXT
+    // engagement_clients id the coach dashboard passes) — NOT the legacy client_id
+    // UUID column, which throws "invalid input syntax for type uuid" when given an
+    // engagement id like "client_1784012872580_46doj".
     const { data: profiles, error: profilesErr } = await admin
       .from('user_profiles')
-      .select('id, role, full_name, assigned_unit_ids, client_id')
-      .eq('client_id', clientId)
+      .select('id, role, full_name, assigned_unit_ids, engagement_client_id')
+      .eq('engagement_client_id', clientId)
       .order('role')
 
     if (profilesErr) return NextResponse.json({ error: profilesErr.message }, { status: 500 })
