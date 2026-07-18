@@ -3277,22 +3277,47 @@ function TeamTab({clientId,config,P}) {
   },[clientId])
 
   async function invite() {
-    if (!inviteForm.email||!inviteForm.full_name) return
+    if (!inviteForm.email||!inviteForm.full_name) { alert('Enter a full name and email first.'); return }
+    // A Unit Head / Accounts Assistant with no unit would see nothing — require one.
+    if (['unit_head','accounts_assistant'].includes(inviteForm.role) && inviteForm.unit_ids.length===0) {
+      alert('Select at least one unit for a Unit Head or Accounts Assistant.'); return
+    }
     setSaving(true)
-    // Insert pending profile -- actual auth invite handled separately.
-    // Uses engagement_client_id, not client_id: client_id has a foreign
-    // key to the legacy `clients` table (UUID ids), but clientId here is
-    // the text engagement_clients id -- inserting it into client_id would
-    // fail the FK constraint outright for every client. See
-    // supabase/migrations/2026_07_04_user_profiles_engagement_client_bridge.sql.
-    const {data,error} = await supabase.from('user_profiles').insert([{
-      engagement_client_id:clientId, email:inviteForm.email, full_name:inviteForm.full_name,
-      role:inviteForm.role, assigned_unit_ids:inviteForm.unit_ids,
-      status:'invited', invited_at:new Date().toISOString(), invited_by:P.userId,
-    }]).select().single()
-    if (!error&&data) { setMembers(m=>[...m,data]); setShowInvite(false) }
-    else if (error) alert('Could not invite this person. Please try again.')
-    setSaving(false)
+    // Go through /api/invite-user (server, service-role): it creates the real
+    // auth login, SENDS the invitation email, and links the profile to this
+    // client via engagement_client_id. A plain browser insert here never created
+    // a login or sent an email, and failed outright (no id) — so it silently
+    // did nothing useful. Surface the API's real error instead of a generic one.
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/invite-user', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: inviteForm.email.trim(), fullName: inviteForm.full_name.trim(), role: inviteForm.role,
+          clientId, assignedUnitIds: inviteForm.unit_ids, coImplementerId: null, funderProgrammeId: null,
+          inviterToken: session?.access_token,
+        }),
+      })
+      const data = await res.json().catch(()=>({} as any))
+      if (res.ok) {
+        setShowInvite(false)
+        setInviteForm({email:'',full_name:'',role:'unit_head',unit_ids:[]})
+        // Reload the team from the source of truth so the new invitee appears.
+        // Only replace the roster if the refresh actually succeeded — a transient
+        // read failure must not blank out the existing list.
+        const { data: rows, error: refreshErr } = await supabase.from('user_profiles')
+          .select('id,role,full_name,email,assigned_unit_ids,status,can_manage_catalogue')
+          .eq('engagement_client_id', clientId)
+        if (!refreshErr) setMembers(rows||[])
+        alert(data.message || `Invitation sent to ${inviteForm.email.trim()}. They'll get an email to set their password.`)
+      } else {
+        alert(data.error || 'Could not invite this person. Please try again.')
+      }
+    } catch(e:any) {
+      alert('Could not invite this person — ' + (e?.message || 'network error. Please check your connection and try again.'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const roles = [['ceo','CEO'],['finance_manager','Finance Manager'],['unit_head','Unit Head'],['accounts_assistant','Accounts Assistant']]
