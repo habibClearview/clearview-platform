@@ -713,25 +713,29 @@ export default function GenericDashboard({
   }, [clientId])
 
   // Save config to Supabase
-  // Serialize + coalesce writes to generic_model_config. Every editing surface
-  // calls saveConfig with the WHOLE config, so two rapid edits that overlap could
-  // otherwise finish out of order and persist an older snapshot over a newer one
-  // (e.g. fast driver tuning). We keep at most one upsert in flight; while it runs
-  // the LATEST config is queued (older queued configs are dropped — only the last
-  // matters), and it is written when the current upsert finishes. So the database
-  // always ends on the last edit, in order.
+  // Persist the whole config, OPTIMISTIC + SERIALIZED, so concurrent edits from
+  // different editing surfaces can't lose one another:
+  //  - Optimistic: setConfig(newConfig) happens IMMEDIATELY, before the write.
+  //    Every editing surface builds its next config from `config`, so applying
+  //    it to local state at once means a fast follow-up edit is always built on
+  //    top of the latest change — never on a stale snapshot that would silently
+  //    revert an in-flight save's unrelated field.
+  //  - Serialized + coalesced: at most one upsert is in flight; while it runs the
+  //    LATEST config is queued (older queued configs dropped) and written when the
+  //    current one finishes, so writes land in order and the DB ends on the last
+  //    edit.
   const saveInFlightRef = useRef(false)
   const savePendingRef = useRef<GenericModelConfig | null>(null)
   const saveConfig = useCallback(async (newConfig: GenericModelConfig) => {
+    setConfig(newConfig) // optimistic: local state is the source of truth at once
     if (saveInFlightRef.current) { savePendingRef.current = newConfig; return }
     saveInFlightRef.current = true
     setSaving(true)
-    let cfg = newConfig
+    let cfg: GenericModelConfig | null = newConfig
     try {
       // Drain loop: a config queued while we were awaiting still gets written next,
       // preserving order, until nothing newer is pending.
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
+      while (cfg) {
         const { error: err } = await supabase
           .from('generic_model_config')
           .upsert({
@@ -748,9 +752,7 @@ export default function GenericDashboard({
             updated_by: P.userId,
           }, { onConflict: 'client_id' })
         if (err) throw err
-        setConfig(cfg)
         const queued = savePendingRef.current
-        if (!queued) break
         savePendingRef.current = null
         cfg = queued
       }

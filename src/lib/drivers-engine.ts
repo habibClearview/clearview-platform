@@ -68,18 +68,19 @@ export function driverMonthlyValue(d: Driver, planningMonths: number): number[] 
 }
 
 // Resolve which business unit(s) a driver's lines attach to:
-//   - its own unit if set, else its channel's unit → a single, precise unit;
-//   - otherwise it is a WHOLE-BUSINESS driver, spread EVENLY across every active
-//     unit. Splitting (rather than dumping the whole amount on the first unit)
-//     keeps the consolidated total correct AND avoids overstating one unit's P&L
-//     while understating the others — the per-unit statements stay honest.
-// Returns the list of units to attach to (one for a unit/channel-scoped driver,
-// all of them for a whole-business driver); empty means nowhere to attach.
-function resolveUnitIds(d: Driver, channelById: Map<string, Channel>, allUnitIds: string[]): string[] {
-  if (d.unit_id) return [d.unit_id]
+//   - its own unit if set, else its channel's unit → a single, precise unit
+//     (wholeBusiness = false);
+//   - otherwise it is a WHOLE-BUSINESS driver (wholeBusiness = true), spread
+//     EVENLY across every active unit. Splitting (rather than dumping the whole
+//     amount on the first unit) keeps the consolidated total correct AND avoids
+//     overstating one unit's P&L while understating the others.
+// Returns the units to attach to and whether this is a whole-business driver;
+// empty units means nowhere to attach.
+function resolveUnits(d: Driver, channelById: Map<string, Channel>, allUnitIds: string[]): { units: string[]; wholeBusiness: boolean } {
+  if (d.unit_id) return { units: [d.unit_id], wholeBusiness: false }
   const chan = d.channel_id ? channelById.get(d.channel_id) : undefined
-  if (chan?.unit_id) return [chan.unit_id]
-  return allUnitIds
+  if (chan?.unit_id) return { units: [chan.unit_id], wholeBusiness: false }
+  return { units: allUnitIds, wholeBusiness: true }
 }
 
 /**
@@ -111,14 +112,19 @@ export function syntheticPlanLinesFromDrivers(
 
   for (const d of drivers) {
     if (!d || d.active === false) continue
-    const targetUnits = resolveUnitIds(d, channelById, allUnits)
+    const { units: targetUnits, wholeBusiness } = resolveUnits(d, channelById, allUnits)
     if (targetUnits.length === 0) continue
     const n = targetUnits.length
-    // Split whole-business drivers evenly; a single-unit driver keeps its full
-    // value and its plain (unsuffixed) id, so unit/channel-scoped lines are
-    // unchanged. Whole-business lines get a per-unit id suffix to stay unique.
-    const split = (series: number[]) => n === 1 ? series : series.map(v => v / n)
-    const suffix = (unitId: string) => n === 1 ? '' : `__${unitId}`
+    // Split whole-business drivers evenly across the active units; a
+    // unit/channel-scoped driver keeps its full value on its one unit.
+    const split = (series: number[]) => wholeBusiness && n > 1 ? series.map(v => v / n) : series
+    // Suffix the line id by unit for whole-business drivers ONLY — and ALWAYS,
+    // even when there is currently one unit. The id must depend on the driver's
+    // SCOPE, not the current unit count: actuals are keyed by line id, so if a
+    // whole-business line were unsuffixed with one unit and then suffixed after a
+    // second unit is added, its stored actuals would be orphaned. A scoped
+    // driver's id stays plain (its unit never changes underneath it).
+    const suffix = (unitId: string) => wholeBusiness ? `__${unitId}` : ''
 
     if (d.kind === 'sales') {
       // Evaluate revenue AND (spread) COGS independently, and emit each line only

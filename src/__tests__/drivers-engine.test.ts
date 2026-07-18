@@ -92,12 +92,25 @@ describe('syntheticPlanLinesFromDrivers — unit resolution & skipping', () => {
     const lines = syntheticPlanLinesFromDrivers([chan({ id: 'ch1', unit_id: 'unitX' })], [drv({ unit_id: null, channel_id: 'ch1' })], M, [])
     expect(lines[0].unit_id).toBe('unitX')
   })
-  it('REG: a single-unit whole-business driver lands wholly on that unit with a plain id', () => {
+  it('REG: a single-unit whole-business driver lands wholly on that unit with a STABLE unit-suffixed id (actuals stay attached when more units are added later)', () => {
     const lines = syntheticPlanLinesFromDrivers([], [drv({ unit_id: null, channel_id: null, quantity: new Array(M).fill(1), rate: 10 })], M, ['fallbackU'])
     expect(lines).toHaveLength(1)
     expect(lines[0].unit_id).toBe('fallbackU')
-    expect(lines[0].id).toBe(`${DRIVER_REV_PREFIX}d1`)
+    // Whole-business lines are ALWAYS unit-suffixed, so the id doesn't change
+    // (and orphan its actuals) when the business later gains a second unit.
+    expect(lines[0].id).toBe(`${DRIVER_REV_PREFIX}d1__fallbackU`)
     expect(lines[0].monthly_plan[0]).toBe(10)
+  })
+  it('REG: a whole-business line id for a given unit is unchanged when a second unit is added (actuals stay attached)', () => {
+    const d = drv({ unit_id: null, channel_id: null, quantity: new Array(M).fill(4), rate: 10 })
+    const oneUnit = syntheticPlanLinesFromDrivers([], [d], M, ['u1'])
+    const twoUnits = syntheticPlanLinesFromDrivers([], [d], M, ['u1', 'u2'])
+    const u1a = oneUnit.find(l => l.unit_id === 'u1')!
+    const u1b = twoUnits.find(l => l.unit_id === 'u1')!
+    expect(u1a.id).toBe(`${DRIVER_REV_PREFIX}d1__u1`)
+    expect(u1b.id).toBe(u1a.id)              // same id → actuals stay connected
+    expect(u1a.monthly_plan[0]).toBe(40)     // all of it on u1 when it's the only unit
+    expect(u1b.monthly_plan[0]).toBe(20)     // now shared evenly across the two units
   })
   it('REG: a whole-business spread driver is split EVENLY across all active units (consolidated exact, no unit overstated)', () => {
     // qty 10 × sell 100 = 1000/mo revenue, × buy 60 = 600/mo COGS, whole business
