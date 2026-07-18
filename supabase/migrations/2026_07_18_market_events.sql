@@ -46,13 +46,34 @@ create index if not exists idx_market_events_client on generic_market_events(cli
 
 alter table generic_market_events enable row level security;
 
--- Internal users read all; anyone who can already view the client reads theirs.
--- Fail-closed: a super_coach sees everything; others only clients they can view.
+-- Operation-specific policies so the DB itself — not just the app — enforces who
+-- can do what. A super_coach can do anything; otherwise everything is scoped to
+-- clients the user can already view (can_view_client covers the client's own
+-- users, their assigned coach, and their funder). Crucially, only an APPROVER
+-- role may move an activity out of 'proposed' (approve or send back); everyone
+-- else can propose and edit their own proposals but can never self-approve,
+-- because approving an activity changes the financial plan.
 drop policy if exists market_events_read on generic_market_events;
-create policy market_events_read on generic_market_events for select using (my_role() in ('super_coach', 'co_implementer') or can_view_client(client_id));
+drop policy if exists market_events_write on generic_market_events;   -- replaced by the split policies below
+drop policy if exists market_events_insert on generic_market_events;
+drop policy if exists market_events_update on generic_market_events;
+drop policy if exists market_events_delete on generic_market_events;
 
--- Writes come from authenticated internal users (coach proposes, approver
--- decides) through the browser client, mirroring how generic_spend_requests and
--- generic_actuals are written. Scoped to clients the user can view.
-drop policy if exists market_events_write on generic_market_events;
-create policy market_events_write on generic_market_events for all using (my_role() in ('super_coach', 'co_implementer') or can_view_client(client_id)) with check (my_role() in ('super_coach', 'co_implementer') or can_view_client(client_id));
+create policy market_events_read on generic_market_events for select using (my_role() = 'super_coach' or can_view_client(client_id));
+
+-- Anyone who can view the client may create an activity, but only as a proposal.
+create policy market_events_insert on generic_market_events for insert
+  with check ((my_role() = 'super_coach' or can_view_client(client_id)) and status = 'proposed');
+
+-- Edits are allowed, but a row can only be left in / returned to 'proposed'
+-- unless the editor holds an approver role — that is what blocks a non-approver
+-- from flipping their own activity to 'approved' via a direct API call.
+create policy market_events_update on generic_market_events for update
+  using (my_role() = 'super_coach' or can_view_client(client_id))
+  with check (
+    (my_role() = 'super_coach' or can_view_client(client_id))
+    and (status = 'proposed' or my_role() in ('super_coach', 'coach', 'ceo', 'finance_manager'))
+  );
+
+create policy market_events_delete on generic_market_events for delete
+  using (my_role() = 'super_coach' or can_view_client(client_id));

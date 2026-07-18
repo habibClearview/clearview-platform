@@ -607,10 +607,18 @@ export default function GenericDashboard({
   // Reload is shared with the Planning and Approvals sections so proposing or
   // approving an event immediately reflows the P&L.
   const [marketEvents, setMarketEvents] = useState<MarketEvent[]>([])
+  // Surfaced (not swallowed): if this load fails, approved activities would
+  // silently drop out of the P&L. We flag it so the Planning section can warn
+  // that the numbers may be understated until it reloads.
+  const [marketEventsError, setMarketEventsError] = useState(false)
   const reloadMarketEvents = useCallback(() => {
     if (!clientId) return
     supabase.from('generic_market_events').select('*').eq('client_id', clientId).order('created_at', {ascending:false})
-      .then(({data, error}) => { if (!error) setMarketEvents((data as MarketEvent[]) || []) })
+      .then(({data, error}) => {
+        if (error) { console.error('Failed to load market activities:', error.message); setMarketEventsError(true); return }
+        setMarketEventsError(false)
+        setMarketEvents((data as MarketEvent[]) || [])
+      })
   }, [clientId])
   useEffect(() => { reloadMarketEvents() }, [reloadMarketEvents])
 
@@ -764,7 +772,14 @@ export default function GenericDashboard({
     ['pl','P&L'],
     ['cashflow','Cash Flow'],
     ['balancesheet','Balance Sheet'],
-    ['approvals',(()=>{const n=pendingApprovalCount+pendingActualsCount+marketEvents.filter(e=>e.status==='proposed').length;return `Approvals${n>0?` (${n})`:''}`})()],
+    ['approvals',(()=>{
+      // Only count pending market activities for users who can actually approve
+      // them, so a non-approver never sees a badge that leads to an empty queue.
+      const canApproveEvents = ['finance_manager','ceo','super_coach','coach'].includes(P.role)
+      const eventsPending = canApproveEvents ? marketEvents.filter(e=>e.status==='proposed').length : 0
+      const n=pendingApprovalCount+pendingActualsCount+eventsPending
+      return `Approvals${n>0?` (${n})`:''}`
+    })()],
     ['settings','Settings'],
   ]
 
@@ -816,7 +831,7 @@ export default function GenericDashboard({
         {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P} marketEvents={marketEvents} onMarketEventsChanged={reloadMarketEvents}/>}
         {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods} onNavigate={setView}/>}
         {view==='performance' && <PerformanceTab config={config} result={result} months={months} cc={cc}/>}
-        {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} clientId={clientId} marketEvents={marketEvents} onMarketEventsChanged={reloadMarketEvents}/>}
+        {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} clientId={clientId} marketEvents={marketEvents} marketEventsError={marketEventsError} onMarketEventsChanged={reloadMarketEvents}/>}
         {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods}/>}
         {view==='cashflow'    && <CashFlowTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
         {view==='balancesheet'&& <BalanceSheetTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods} onCloseStatusChanged={loadClosedPeriods}/>}
@@ -1357,7 +1372,7 @@ const SERVICE_FEE_SUBROWS: [string,string,boolean][] = [
   ['Engagements','engagements',false],
 ]
 
-function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,onMarketEventsChanged}) {
+function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,marketEventsError,onMarketEventsChanged}) {
   const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active)?.id||'')
   const [selSection, setSelSection] = useState<LineCategory>('revenue')
   const [saving, setSaving] = useState(false)
@@ -1717,7 +1732,7 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,onM
           ))}
         </div>
       )}
-      <MarketActivitiesSection clientId={clientId} config={config} cc={cc} P={P} events={marketEvents} onChanged={onMarketEventsChanged}/>
+      <MarketActivitiesSection clientId={clientId} config={config} cc={cc} P={P} events={marketEvents} loadError={marketEventsError} onChanged={onMarketEventsChanged}/>
     </div>
   )
 }
@@ -1728,7 +1743,7 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,onM
 // for approval (Approvals tab). Once approved, its cost is injected into the
 // plan by the engine (see syntheticPlanLinesFromEvents + the result memo), so it
 // flows into P&L, cash flow and balance sheet for the months it covers.
-function MarketActivitiesSection({clientId,config,cc,P,events,onChanged}) {
+function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChanged}) {
   const [showAdd,setShowAdd]=useState(false)
   const [busy,setBusy]=useState(false)
   const [msg,setMsg]=useState<{ok:boolean,text:string}|null>(null)
@@ -1739,7 +1754,10 @@ function MarketActivitiesSection({clientId,config,cc,P,events,onChanged}) {
   const monthOpts = Array.from({length:config.planning_months},(_,i)=>{
     const p=periodForMonthIndex(config.start_date,i)
     const d=new Date(p)
-    return {value:p,label:d.toLocaleString('en-GB',{month:'short',year:'numeric'})}
+    // timeZone:'UTC' so a date-only period (YYYY-MM-01, parsed as UTC midnight)
+    // always shows its true month, never slipping back a month in negative-offset
+    // timezones.
+    return {value:p,label:d.toLocaleString('en-GB',{month:'short',year:'numeric',timeZone:'UTC'})}
   })
   const unitName=(id:string)=>config.business_units.find((u:any)=>u.id===id)?.name||id
   const statusColor=(s:string)=>s==='approved'?C.green:s==='rejected'?C.red:C.amber
@@ -1766,11 +1784,24 @@ function MarketActivitiesSection({clientId,config,cc,P,events,onChanged}) {
     if(error){alert('Could not delete — '+error.message);return}
     onChanged&&onChanged()
   }
+  // "Sent back" is not the end of the road: the proposer can adjust and put the
+  // activity back into the approval queue. (Edit the details by deleting and
+  // re-adding; re-propose keeps the same activity and clears the reviewer note.)
+  async function rePropose(id:string){
+    const {error}=await supabase.from('generic_market_events').update({status:'proposed', review_note:null, updated_at:new Date().toISOString()}).eq('id',id)
+    if(error){alert('Could not re-propose — '+error.message);return}
+    onChanged&&onChanged()
+  }
 
   return (
     <div style={card}>
       <SectionHeader title="Market Activities" action={P.canEditPlan?<button style={addBtn(true,C.teal)} onClick={()=>setShowAdd(s=>!s)}>{showAdd?'Close':'+ Propose activity'}</button>:null}/>
       <p style={{fontSize:'1.06rem',color:C.slate,marginBottom:'0.75rem'}}>Plan a marketing or sales push — its cost, the unit it's for, the month(s) it runs, and the sales lift you expect. Once <strong>approved</strong>, the cost automatically flows into the plan (P&amp;L, cash flow) for those months. Clearview Intelligence then tracks expected vs actual impact.</p>
+      {loadError&&(
+        <div style={{padding:'0.7rem 0.9rem',borderRadius:8,background:'var(--cv-tint-warn)',border:`1px solid ${C.amber}`,color:C.amber,fontSize:'1.0rem',marginBottom:'0.75rem'}}>
+          Couldn't load market activities just now, so any approved activity's cost may be missing from the figures. Reload the page to try again.
+        </div>
+      )}
       {showAdd&&P.canEditPlan&&(
         <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'1rem',marginBottom:'1rem',background:C.cream}}>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'0.6rem'}}>
@@ -1807,7 +1838,12 @@ function MarketActivitiesSection({clientId,config,cc,P,events,onChanged}) {
                   <td style={{padding:'6px 8px',color:C.slate}}>{startLabel}{e.months_count>1?` · ${e.months_count} mo`:''}</td>
                   <td style={{padding:'6px 8px',color:C.slate}}>{e.expected_uplift_pct!=null?`+${e.expected_uplift_pct}%`:'—'}</td>
                   <td style={{padding:'6px 8px'}}><Badge text={statusText(e.status)} color={statusColor(e.status)}/></td>
-                  <td style={{padding:'6px 8px'}}>{P.canEditPlan&&<button style={delBtn} onClick={()=>remove(e.id)}>×</button>}</td>
+                  <td style={{padding:'6px 8px'}}>
+                    <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}>
+                      {P.canEditPlan&&e.status==='rejected'&&<button style={addBtn(true,C.teal)} onClick={()=>rePropose(e.id)}>Re-propose</button>}
+                      {P.canEditPlan&&<button style={delBtn} onClick={()=>remove(e.id)}>×</button>}
+                    </div>
+                  </td>
                 </tr>
               )
             })}</tbody>
@@ -2987,7 +3023,7 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged})
         <div style={{...card,borderLeft:`4px solid ${C.teal}`}}>
           <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.teal,marginBottom:'0.9rem'}}>Market activities awaiting approval ({pendingEvents.length})</div>
           {pendingEvents.map((e:any)=>{
-            const startLabel=(()=>{const d=new Date(e.start_period);return d.toLocaleString('en-GB',{month:'short',year:'numeric'})})()
+            const startLabel=(()=>{const d=new Date(e.start_period);return d.toLocaleString('en-GB',{month:'short',year:'numeric',timeZone:'UTC'})})()
             return (
               <div key={e.id} style={{border:'1px solid var(--cv-border-soft)',borderRadius:12,padding:'1rem 1.1rem',marginBottom:'0.85rem',background:C.lightBg}}>
                 <div style={{display:'flex',alignItems:'flex-start',gap:'1rem',flexWrap:'wrap',justifyContent:'space-between'}}>
