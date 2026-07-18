@@ -3303,10 +3303,12 @@ function TeamTab({clientId,config,P}) {
         setShowInvite(false)
         setInviteForm({email:'',full_name:'',role:'unit_head',unit_ids:[]})
         // Reload the team from the source of truth so the new invitee appears.
-        const { data: rows } = await supabase.from('user_profiles')
+        // Only replace the roster if the refresh actually succeeded — a transient
+        // read failure must not blank out the existing list.
+        const { data: rows, error: refreshErr } = await supabase.from('user_profiles')
           .select('id,role,full_name,email,assigned_unit_ids,status,can_manage_catalogue')
           .eq('engagement_client_id', clientId)
-        setMembers(rows||[])
+        if (!refreshErr) setMembers(rows||[])
         alert(data.message || `Invitation sent to ${inviteForm.email.trim()}. They'll get an email to set their password.`)
       } else {
         alert(data.error || 'Could not invite this person. Please try again.')

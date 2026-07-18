@@ -155,13 +155,21 @@ export async function POST(req: NextRequest) {
       // The auth user was just created but couldn't be linked to the client.
       // Leaving it would brick this email: a retry would hit the "already
       // registered" 409 path and could never link the profile. Roll the auth
-      // user back so the invite can simply be retried cleanly.
+      // user back so the invite can simply be retried cleanly. deleteUser
+      // returns { error } (it doesn't throw), so check that result — if the
+      // rollback ALSO fails, say so honestly rather than claim nothing was
+      // saved. Detailed DB errors are logged server-side only, never returned
+      // to the browser.
       console.error('Profile creation error:', profileErr)
-      await admin.auth.admin.deleteUser(inviteData.user.id).catch((delErr) => {
-        console.error('Rollback (deleteUser) failed:', delErr)
-      })
+      const { error: rollbackErr } = await admin.auth.admin.deleteUser(inviteData.user.id)
+      if (rollbackErr) {
+        console.error('Rollback (deleteUser) failed after profile link error:', rollbackErr)
+        return NextResponse.json({
+          error: 'Could not finish setting up this login, and the automatic cleanup did not complete. Please tell your coach before retrying this email address.',
+        }, { status: 500 })
+      }
       return NextResponse.json({
-        error: `Could not link the new login to the organisation (${profileErr.message}). Nothing was saved — please try again.`,
+        error: 'Could not link the new login to the organisation. Nothing was saved — please try again.',
       }, { status: 500 })
     }
 
