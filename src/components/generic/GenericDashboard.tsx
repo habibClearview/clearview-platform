@@ -593,13 +593,16 @@ export default function GenericDashboard({
 
   // Monthly actuals that have been submitted but not yet approved. Feeds the
   // same Approvals nav badge so approvers are nudged to the figures queue, not
-  // only the spend-request queue.
-  useEffect(() => {
+  // only the spend-request queue. Exposed as a callback so the Approvals tab can
+  // refresh the badge the instant a figure is approved or sent back, rather than
+  // the count going stale until the next view change.
+  const reloadPendingActualsCount = useCallback(() => {
     if (!clientId) return
     supabase.from('generic_actuals').select('id',{count:'exact',head:true})
       .eq('client_id',clientId).eq('submitted',true).eq('approved',false)
       .then(({count}) => setPendingActualsCount(count||0))
-  }, [clientId, view])
+  }, [clientId])
+  useEffect(() => { reloadPendingActualsCount() }, [reloadPendingActualsCount, view])
 
   // Fetch actuals for the P&L's hybrid mode: real data for months that
   // have it, plan for months ahead. Combines line_values (manual) and
@@ -791,7 +794,7 @@ export default function GenericDashboard({
       <main style={{maxWidth:1600,margin:'0 auto',padding:'1.5rem'}}>
         <ErrorBoundary key={view} label={String(view)}>
         {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} pendingApprovalCount={pendingApprovalCount} pendingActualsCount={pendingActualsCount} onGoToApprovals={()=>setView('approvals')} onGoToIntelligence={()=>setView('intelligence')}/>}
-        {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P}/>}
+        {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P} onApprovalActioned={reloadPendingActualsCount}/>}
         {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods} onNavigate={setView}/>}
         {view==='performance' && <PerformanceTab config={config} result={result} months={months} cc={cc}/>}
         {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
@@ -2636,7 +2639,7 @@ function SpendRequestsTab({clientId,config,cc,P}) {
 }
 
 // ── APPROVALS TAB ─────────────────────────────────────────────
-function ApprovalsTab({clientId,config,cc,P}) {
+function ApprovalsTab({clientId,config,cc,P,onApprovalActioned}) {
   const [requests, setRequests] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [notes, setNotes] = useState<Record<string,string>>({})
@@ -2698,8 +2701,9 @@ function ApprovalsTab({clientId,config,cc,P}) {
       review_note:null, updated_at:new Date().toISOString(),
     },{count:'exact'}).eq('id',id).eq('submitted',true).eq('approved',false)
     if (error) { alert('Could not approve — '+error.message); return }
-    if (!count) { alert('These figures were just changed or handled by someone else — refreshing the list.'); refreshPendingActuals(); return }
+    if (!count) { alert('These figures were just changed or handled by someone else — refreshing the list.'); refreshPendingActuals(); onApprovalActioned&&onApprovalActioned(); return }
     setPendingActuals(a=>a.filter(x=>x.id!==id))
+    onApprovalActioned&&onApprovalActioned()
   }
 
   async function sendBackActual(id:string) {
@@ -2709,8 +2713,9 @@ function ApprovalsTab({clientId,config,cc,P}) {
       submitted:false, approved:false, review_note:note, updated_at:new Date().toISOString(),
     },{count:'exact'}).eq('id',id).eq('submitted',true).eq('approved',false)
     if (error) { alert('Could not send back — '+error.message); return }
-    if (!count) { alert('These figures were just changed or handled by someone else — refreshing the list.'); refreshPendingActuals(); return }
+    if (!count) { alert('These figures were just changed or handled by someone else — refreshing the list.'); refreshPendingActuals(); onApprovalActioned&&onApprovalActioned(); return }
     setPendingActuals(a=>a.filter(x=>x.id!==id))
+    onApprovalActioned&&onApprovalActioned()
   }
 
   async function fmAction(id:string, forward:boolean) {
@@ -6250,7 +6255,7 @@ function ActualsAndWorkingCapitalTab({config,result,months,cc,P,onSave,onCloseSt
   )
 }
 // ── APPROVALS & SPEND REQUESTS TAB (toggle, reuses existing components) ──
-function ApprovalsAndSpendTab({clientId,config,cc,P}) {
+function ApprovalsAndSpendTab({clientId,config,cc,P,onApprovalActioned}) {
   const [mode, setMode] = useState<'approvals'|'requests'>('approvals')
   return (
     <div>
@@ -6258,7 +6263,7 @@ function ApprovalsAndSpendTab({clientId,config,cc,P}) {
         <button style={subtabPill(mode==='approvals')} onClick={()=>setMode('approvals')}>Approvals</button>
         <button style={subtabPill(mode==='requests')} onClick={()=>setMode('requests')}>My Spend Requests</button>
       </div>
-      {mode==='approvals' && <ApprovalsTab clientId={clientId} config={config} cc={cc} P={P}/>}
+      {mode==='approvals' && <ApprovalsTab clientId={clientId} config={config} cc={cc} P={P} onApprovalActioned={onApprovalActioned}/>}
       {mode==='requests' && <SpendRequestsTab clientId={clientId} config={config} cc={cc} P={P}/>}
     </div>
   )
