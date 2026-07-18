@@ -1,1 +1,6 @@
-{"framework": "nextjs"}
+{
+  "framework": "nextjs",
+  "crons": [
+    { "path": "/api/support/sync-playbook", "schedule": "0 6 * * *" }
+  ]
+}
