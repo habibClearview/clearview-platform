@@ -1912,15 +1912,20 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
       line_values:lineValues, catalogue_quantities:catalogueQuantities, submitted:submit||(submitted&&!canSeeAll),
       submitted_at:submit?new Date().toISOString():undefined,
       submitted_by:submit?P.fullName:undefined,
-      // Any (re)submission re-enters the approval queue: clear a prior approval
-      // and any "sent back" note so approvers always see the current figures fresh.
-      ...(submit?{approved:false, approved_at:null, approved_by:null, review_note:null}:{}),
+      // Editing the figures always clears a prior approval: an "Approved" stamp
+      // must never sit on numbers that changed after it was given. A submit
+      // re-enters the approval queue; a draft-save drops it back to unapproved.
+      // The "sent back" note is cleared only on submit, so it stays visible
+      // while the person is still correcting the figures.
+      approved:false, approved_at:null, approved_by:null,
+      ...(submit?{review_note:null}:{}),
       entered_by:P.fullName, entered_at:new Date().toISOString(),
       updated_at:new Date().toISOString(),
     },{onConflict:'client_id,unit_id,period'})
     setSaving(false)
     if (error) { setSaveMsg({ok:false, text:'Could not save — '+error.message+'. Nothing was lost; please try again.'}); return }
-    if (submit) { setSubmitted(true); setApproved(false); setReviewNote(null) }
+    setApproved(false)
+    if (submit) { setSubmitted(true); setReviewNote(null) }
     setSaveMsg({ok:true, text: submit
       ? 'Submitted for approval ✓ — your coach, CEO or accountant can now approve it.'
       : 'Saved ✓ '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) })
@@ -2438,6 +2443,9 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll}) {
       return {
         client_id:config.client_id, unit_id:selUnit, period,
         line_values:base, submitted:!!submittedByPeriod[period],
+        // Editing figures here clears any prior approval too — same integrity
+        // rule as the guided form: "Approved" must never stay on changed numbers.
+        approved:false, approved_at:null, approved_by:null,
         entered_by:P.fullName, entered_at:now, updated_at:now,
       }
     })
@@ -2668,21 +2676,35 @@ function ApprovalsTab({clientId,config,cc,P}) {
     return {rev,cost}
   }
 
+  // Both actions only match a row that is STILL submitted-and-unapproved
+  // (.eq('submitted',true).eq('approved',false)). If someone else already
+  // approved it, edited it, or sent it back, no row matches — we tell the user
+  // and refresh the queue instead of silently overwriting a newer decision.
+  async function refreshPendingActuals() {
+    const {data} = await supabase.from('generic_actuals').select('*').eq('client_id',clientId)
+      .eq('submitted',true).eq('approved',false).order('submitted_at',{ascending:false})
+    setPendingActuals(data||[])
+  }
+
   async function approveActual(id:string) {
-    const {data} = await supabase.from('generic_actuals').update({
+    const {data,error} = await supabase.from('generic_actuals').update({
       approved:true, approved_at:new Date().toISOString(), approved_by:P.fullName,
       review_note:null, updated_at:new Date().toISOString(),
-    }).eq('id',id).select().single()
-    if (data) setPendingActuals(a=>a.filter(x=>x.id!==id))
+    }).eq('id',id).eq('submitted',true).eq('approved',false).select().maybeSingle()
+    if (error) { alert('Could not approve — '+error.message); return }
+    if (!data) { alert('These figures were just changed or handled by someone else — refreshing the list.'); refreshPendingActuals(); return }
+    setPendingActuals(a=>a.filter(x=>x.id!==id))
   }
 
   async function sendBackActual(id:string) {
     const note = (actualNotes[id]||'').trim()
     if (!note) { alert('Please add a short note so they know what to correct.'); return }
-    const {data} = await supabase.from('generic_actuals').update({
+    const {data,error} = await supabase.from('generic_actuals').update({
       submitted:false, approved:false, review_note:note, updated_at:new Date().toISOString(),
-    }).eq('id',id).select().single()
-    if (data) setPendingActuals(a=>a.filter(x=>x.id!==id))
+    }).eq('id',id).eq('submitted',true).eq('approved',false).select().maybeSingle()
+    if (error) { alert('Could not send back — '+error.message); return }
+    if (!data) { alert('These figures were just changed or handled by someone else — refreshing the list.'); refreshPendingActuals(); return }
+    setPendingActuals(a=>a.filter(x=>x.id!==id))
   }
 
   async function fmAction(id:string, forward:boolean) {
