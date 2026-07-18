@@ -1,11 +1,11 @@
 -- ============================================================
--- PRODUCT CATALOGUE — product dimensions + optional pricing
+-- PRODUCT CATALOGUE — product dimensions + optional pricing   [step 2 of 3]
 --
 -- Extends the existing field_catalogue (one row = one sellable SKU)
 -- so a product carries its category / type / size / supplier, and
--- stamps those same dimensions onto every field_transactions row so
--- sales and COGS can be drilled down by them — WITHOUT changing how
--- the P&L works (the engine still groups only by plan_line_id).
+-- mirrors those dimensions onto field_transactions so sales and COGS
+-- can be drilled down by them — WITHOUT changing how the P&L works
+-- (the engine still groups only by plan_line_id).
 --
 -- Design notes:
 --   * Each field_catalogue row stays one SKU = product x size. The new
@@ -20,10 +20,21 @@
 --     a specific revenue line. Revenue still lands in the P&L via a
 --     single default "Product Sales" revenue line per unit (assigned in
 --     app code), keeping category/type/size/supplier as pure drill-down.
+--   * The four dimension columns are plain uuid (NOT database foreign
+--     keys) — deliberately matching how field_catalogue.plan_line_id
+--     already works (a bare text id, no FK). A hard uuid FK could not
+--     express the two rules that actually matter here — the id must be
+--     a value list of the RIGHT KIND and belong to the SAME client+unit
+--     — and would give false confidence while also locking the table on
+--     apply. Those rules are enforced where the ids are set: the
+--     catalogue admin + import routes only ever write an id looked up
+--     from catalogue_value_lists for that client, unit and kind.
 --   * dimension ids on field_transactions are denormalised copies
 --     written at sync time (same as plan_line_id / unit_label already
---     are), so re-categorising a product later never rewrites history
---     and drill-down is a plain GROUP BY.
+--     are), so re-categorising a product later never rewrites history.
+--
+-- RUN ORDER: run …_catalogue_1_value_lists BEFORE this file, and
+-- …_catalogue_3_ft_dims_index AFTER it.
 --
 -- SAFE TO APPLY: every statement is additive or constraint-RELAXING
 -- (ADD COLUMN IF NOT EXISTS / DROP NOT NULL / DROP DEFAULT). No data is
@@ -31,11 +42,12 @@
 -- Paste into the Supabase SQL editor and Run.
 -- ============================================================
 
--- 1) field_catalogue: product dimensions + size grouping label.
-alter table field_catalogue add column if not exists category_id uuid references catalogue_value_lists(id);
-alter table field_catalogue add column if not exists type_id     uuid references catalogue_value_lists(id);
-alter table field_catalogue add column if not exists size_id     uuid references catalogue_value_lists(id);
-alter table field_catalogue add column if not exists supplier_id uuid references catalogue_value_lists(id);
+-- 1) field_catalogue: product dimensions (plain uuid; see note above) +
+--    size-grouping label.
+alter table field_catalogue add column if not exists category_id uuid;
+alter table field_catalogue add column if not exists type_id     uuid;
+alter table field_catalogue add column if not exists size_id     uuid;
+alter table field_catalogue add column if not exists supplier_id uuid;
 alter table field_catalogue add column if not exists product_name text;
 
 -- 2) field_catalogue: make price optional (upload without prices at setup).
@@ -47,10 +59,9 @@ alter table field_catalogue alter column price drop default;
 alter table field_catalogue alter column plan_line_id drop not null;
 
 -- 4) field_transactions: carry the dimensions so sales & COGS drill down.
+--    (The supporting index is created concurrently in step 3, so it does
+--     not lock this live table.)
 alter table field_transactions add column if not exists category_id uuid;
 alter table field_transactions add column if not exists type_id     uuid;
 alter table field_transactions add column if not exists size_id     uuid;
 alter table field_transactions add column if not exists supplier_id uuid;
-
-create index if not exists idx_ft_dims
-  on field_transactions (client_id, business_unit_id, category_id, type_id, size_id, supplier_id);

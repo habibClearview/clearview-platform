@@ -1,5 +1,5 @@
 -- ============================================================
--- PRODUCT CATALOGUE — value lists (dropdown definitions)
+-- PRODUCT CATALOGUE — value lists (dropdown definitions)   [step 1 of 3]
 --
 -- Defines the pre-set dropdown values a product is built from:
 -- category, type, size, and supplier/brand. One row = one choice in
@@ -16,6 +16,9 @@
 --   * reads are client-scoped via can_view_client() — the same
 --     helper field_catalogue reads are granted through
 --     (2026_07_13_funder_coimplementer_access.sql).
+--
+-- RUN ORDER: this file (…_catalogue_1_…) must run BEFORE
+-- …_catalogue_2_product_dimensions and …_catalogue_3_ft_dims_index.
 --
 -- SAFE TO APPLY: purely additive (new table, IF NOT EXISTS). Nothing
 -- existing is altered. Paste into the Supabase SQL editor and Run.
@@ -36,6 +39,7 @@ create table if not exists catalogue_value_lists (
   unique (client_id, business_unit_id, kind, name)
 );
 
+-- New, empty table — this index builds instantly, no lock concern.
 create index if not exists idx_cvl_client_unit_kind
   on catalogue_value_lists (client_id, business_unit_id, kind)
   where active = true;
