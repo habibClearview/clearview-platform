@@ -37,22 +37,34 @@ create table if not exists generic_market_events (
   approved_by text,
   approved_at timestamptz,
   review_note text,                                -- set when sent back / rejected, so the proposer sees why
-  created_by text,
+  created_by text,                                 -- display name only (who proposed it)
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- The IMMUTABLE, server-set identity of the proposer. It defaults to the
+-- authenticated user (auth.uid()) and the insert policy forces it to equal
+-- auth.uid(), so it can never be spoofed by the browser. This is what the
+-- proposer-scoped edit/delete rules below rely on — not the free-text
+-- created_by. Nullable so the column can be added to a table that may already
+-- hold rows; every new row gets the real authenticated id.
+alter table generic_market_events add column if not exists created_by_uid uuid references auth.users(id) default auth.uid();
 
 create index if not exists idx_market_events_client on generic_market_events(client_id);
 
 alter table generic_market_events enable row level security;
 
--- Operation-specific policies so the DB itself — not just the app — enforces who
--- can do what. A super_coach can do anything; otherwise everything is scoped to
--- clients the user can already view (can_view_client covers the client's own
--- users, their assigned coach, and their funder). Crucially, only an APPROVER
--- role may move an activity out of 'proposed' (approve or send back); everyone
--- else can propose and edit their own proposals but can never self-approve,
--- because approving an activity changes the financial plan.
+-- Operation-specific policies so the DATABASE — not just the app — enforces who
+-- can do what, keyed to the authenticated user. Everything is scoped to clients
+-- the user can already view (can_view_client covers the client's own users,
+-- their assigned coach, and their funder). The rules:
+--   * INSERT: only as a 'proposed' row, and created_by_uid must be the caller.
+--   * UPDATE: an APPROVER role (super_coach/coach/ceo/finance_manager) may make
+--     any transition; otherwise only the ORIGINAL PROPOSER may edit, and only
+--     while keeping the row 'proposed' — so a non-approver can never self-approve
+--     or touch someone else's activity.
+--   * DELETE: an approver may delete; otherwise only the proposer, and only while
+--     the row is still 'proposed' (an approved cost line can't be quietly pulled).
 drop policy if exists market_events_read on generic_market_events;
 drop policy if exists market_events_write on generic_market_events;   -- replaced by the split policies below
 drop policy if exists market_events_insert on generic_market_events;
@@ -61,19 +73,24 @@ drop policy if exists market_events_delete on generic_market_events;
 
 create policy market_events_read on generic_market_events for select using (my_role() = 'super_coach' or can_view_client(client_id));
 
--- Anyone who can view the client may create an activity, but only as a proposal.
 create policy market_events_insert on generic_market_events for insert
-  with check ((my_role() = 'super_coach' or can_view_client(client_id)) and status = 'proposed');
+  with check ((my_role() = 'super_coach' or can_view_client(client_id)) and status = 'proposed' and created_by_uid = auth.uid());
 
--- Edits are allowed, but a row can only be left in / returned to 'proposed'
--- unless the editor holds an approver role — that is what blocks a non-approver
--- from flipping their own activity to 'approved' via a direct API call.
 create policy market_events_update on generic_market_events for update
   using (my_role() = 'super_coach' or can_view_client(client_id))
   with check (
     (my_role() = 'super_coach' or can_view_client(client_id))
-    and (status = 'proposed' or my_role() in ('super_coach', 'coach', 'ceo', 'finance_manager'))
+    and (
+      my_role() in ('super_coach', 'coach', 'ceo', 'finance_manager')
+      or (status = 'proposed' and created_by_uid = auth.uid())
+    )
   );
 
 create policy market_events_delete on generic_market_events for delete
-  using (my_role() = 'super_coach' or can_view_client(client_id));
+  using (
+    (my_role() = 'super_coach' or can_view_client(client_id))
+    and (
+      my_role() in ('super_coach', 'coach', 'ceo', 'finance_manager')
+      or (status = 'proposed' and created_by_uid = auth.uid())
+    )
+  );
