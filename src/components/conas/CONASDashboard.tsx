@@ -685,14 +685,22 @@ function TeamTab({role,userId,userName,businessUnit,canSeeAllUnits}:{role:string
     const prevMember = teamMembers.find(m => m.id === id)
     setTeamMembers(prev => prev.map(m => m.id !== id ? m : {...m, ...updates}))
     try {
-      const { error } = await supabase.from('user_profiles').update({...updates, updated_at: new Date().toISOString()}).eq('id', id)
+      // .select() so a save that matched NO row (a stale id, or a row RLS filters
+      // out) can't look successful — that returns no error but changes nothing.
+      const { data, error } = await supabase.from('user_profiles').update({...updates, updated_at: new Date().toISOString()}).eq('id', id).select('id')
       if (error) throw error
+      if (!data || data.length !== 1) throw new Error('That change did not match any record.')
     } catch (e) {
-      // Revert only the fields THIS update changed (not the whole row), so a
-      // concurrent update to a different field of the same member isn't clobbered.
+      // Roll back only the fields THIS update changed, and only where the value
+      // on screen is still the one we optimistically set — so a newer overlapping
+      // update to the same field isn't reverted to a stale value.
       if (prevMember) {
-        const prevFields = Object.fromEntries(Object.keys(updates).map(k => [k, prevMember[k]]))
-        setTeamMembers(prev => prev.map(m => m.id !== id ? m : {...m, ...prevFields}))
+        setTeamMembers(prev => prev.map(m => {
+          if (m.id !== id) return m
+          const restored = {...m}
+          for (const k of Object.keys(updates)) if (m[k] === updates[k]) restored[k] = prevMember[k]
+          return restored
+        }))
       }
       alert('Could not save that change to the server. Please check your connection and try again.')
     }
