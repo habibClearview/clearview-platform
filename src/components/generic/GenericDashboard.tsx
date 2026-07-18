@@ -537,6 +537,7 @@ export default function GenericDashboard({
   const [view, setView] = useState('overview')
   const [saving, setSaving] = useState(false)
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0)
+  const [pendingActualsCount, setPendingActualsCount] = useState(0)
   // unit_id -> period -> line_id -> combined (manual + field) value.
   // Feeds runGenericModel's hybrid mode: months with actuals show actuals,
   // months ahead still show plan. See docs/ACCOUNTING_ARCHITECTURE.md.
@@ -588,6 +589,16 @@ export default function GenericDashboard({
     supabase.from('generic_spend_requests').select('id',{count:'exact',head:true})
       .eq('client_id',clientId).in('status',['pending_fm','pending_ceo'])
       .then(({count}) => setPendingApprovalCount(count||0))
+  }, [clientId, view])
+
+  // Monthly actuals that have been submitted but not yet approved. Feeds the
+  // same Approvals nav badge so approvers are nudged to the figures queue, not
+  // only the spend-request queue.
+  useEffect(() => {
+    if (!clientId) return
+    supabase.from('generic_actuals').select('id',{count:'exact',head:true})
+      .eq('client_id',clientId).eq('submitted',true).eq('approved',false)
+      .then(({count}) => setPendingActualsCount(count||0))
   }, [clientId, view])
 
   // Fetch actuals for the P&L's hybrid mode: real data for months that
@@ -731,7 +742,7 @@ export default function GenericDashboard({
     ['pl','P&L'],
     ['cashflow','Cash Flow'],
     ['balancesheet','Balance Sheet'],
-    ['approvals',`Approvals${pendingApprovalCount>0?` (${pendingApprovalCount})`:''}`],
+    ['approvals',`Approvals${(pendingApprovalCount+pendingActualsCount)>0?` (${pendingApprovalCount+pendingActualsCount})`:''}`],
     ['settings','Settings'],
   ]
 
@@ -779,7 +790,7 @@ export default function GenericDashboard({
           the whole dashboard. Keying by view resets the boundary on tab switch. */}
       <main style={{maxWidth:1600,margin:'0 auto',padding:'1.5rem'}}>
         <ErrorBoundary key={view} label={String(view)}>
-        {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} pendingApprovalCount={pendingApprovalCount} onGoToApprovals={()=>setView('approvals')} onGoToIntelligence={()=>setView('intelligence')}/>}
+        {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} pendingApprovalCount={pendingApprovalCount} pendingActualsCount={pendingActualsCount} onGoToApprovals={()=>setView('approvals')} onGoToIntelligence={()=>setView('intelligence')}/>}
         {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P}/>}
         {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods} onNavigate={setView}/>}
         {view==='performance' && <PerformanceTab config={config} result={result} months={months} cc={cc}/>}
@@ -1129,7 +1140,7 @@ function PerformanceTab({config,result,months,cc}) {
 }
 
 // ── OVERVIEW TAB ─────────────────────────────────────────────
-function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGoToApprovals,onGoToIntelligence}) {
+function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,pendingActualsCount,onGoToApprovals,onGoToIntelligence}) {
   const [story,setStory] = useState<any>(null)
   useEffect(()=>{
     if(!config.client_id) return
@@ -1154,6 +1165,12 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,onGo
         <div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <span style={{fontWeight:600,color:C.amber}}>⏳ {pendingApprovalCount} spend request{pendingApprovalCount>1?'s':''} awaiting approval</span>
           <button style={addBtn(true,C.amber)} onClick={onGoToApprovals}>Review now →</button>
+        </div>
+      )}
+      {pendingActualsCount>0&&(
+        <div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.green}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.75rem',flexWrap:'wrap'}}>
+          <span style={{fontWeight:600,color:C.green}}>📊 {pendingActualsCount} month{pendingActualsCount>1?'s of figures are':' of figures is'} submitted and waiting for approval</span>
+          <button style={addBtn(true,C.green)} onClick={onGoToApprovals}>Review now →</button>
         </div>
       )}
       {/* Headline scores -- the interpreted verdict, alongside the raw
@@ -1775,6 +1792,11 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [approved, setApproved] = useState(false)
+  const [reviewNote, setReviewNote] = useState<string|null>(null)
+  // Inline save feedback: {ok:true} = green confirmation, {ok:false} = red error.
+  // Replaces the old silent save (no toast/checkmark, errors swallowed).
+  const [saveMsg, setSaveMsg] = useState<{ok:boolean,text:string}|null>(null)
   const [allActuals, setAllActuals] = useState<any[]>([])
   const [periodClose, setPeriodClose] = useState<any>(null)
   const [periodCloseVerified, setPeriodCloseVerified] = useState(false)
@@ -1811,6 +1833,9 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
         setFieldLineValues(data?.field_line_values||{})
         setCatalogueQuantities(data?.catalogue_quantities||{})
         setSubmitted(data?.submitted||false)
+        setApproved(data?.approved||false)
+        setReviewNote(data?.review_note||null)
+        setSaveMsg(null)
         setLoading(false)
       })
   },[selUnit,selPeriod])
@@ -1881,17 +1906,52 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
   async function save(submit=false) {
     if (!periodCloseVerified) { alert('Close status is still loading. Please try again in a moment.'); return }
     if (periodClose?.closed) { alert('This period is closed and cannot be edited. Ask your Finance Manager to reopen it first.'); return }
-    setSaving(true)
+    setSaving(true); setSaveMsg(null)
     const {error} = await supabase.from('generic_actuals').upsert({
       client_id:config.client_id, unit_id:selUnit, period:selPeriod,
       line_values:lineValues, catalogue_quantities:catalogueQuantities, submitted:submit||(submitted&&!canSeeAll),
       submitted_at:submit?new Date().toISOString():undefined,
       submitted_by:submit?P.fullName:undefined,
+      // Editing the figures always clears a prior approval: an "Approved" stamp
+      // must never sit on numbers that changed after it was given. A submit
+      // re-enters the approval queue; a draft-save drops it back to unapproved.
+      // The "sent back" note is cleared only on submit, so it stays visible
+      // while the person is still correcting the figures.
+      approved:false, approved_at:null, approved_by:null,
+      ...(submit?{review_note:null}:{}),
       entered_by:P.fullName, entered_at:new Date().toISOString(),
       updated_at:new Date().toISOString(),
     },{onConflict:'client_id,unit_id,period'})
-    if (!error) { if(submit) setSubmitted(true) }
     setSaving(false)
+    if (error) { setSaveMsg({ok:false, text:'Could not save — '+error.message+'. Nothing was lost; please try again.'}); return }
+    setApproved(false)
+    if (submit) { setSubmitted(true); setReviewNote(null) }
+    setSaveMsg({ok:true, text: submit
+      ? 'Submitted for approval ✓ — your coach, CEO or accountant can now approve it.'
+      : 'Saved ✓ '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) })
+  }
+
+  // Clear the manually-entered figures for the selected unit + month, so a user
+  // can wipe wrong numbers and re-enter cleanly. Only touches manual line_values
+  // (and catalogue quantities) — field-app figures are never affected. Guarded
+  // by an explicit confirm; the user pulls the trigger on their own data.
+  async function clearMonth() {
+    if (!periodCloseVerified) { alert('Close status is still loading. Please try again in a moment.'); return }
+    if (periodClose?.closed) { alert('This period is closed and cannot be edited. Ask your Finance Manager to reopen it first.'); return }
+    const unitName = config.business_units.find(u=>u.id===selUnit)?.name || 'this unit'
+    const monthLabel = periodMonths.find(m=>m.value===selPeriod)?.label || 'this month'
+    if (!confirm(`Clear the figures you typed for ${unitName} in ${monthLabel}?\n\nThis blanks the manually-entered numbers for this month only. Figures coming from Clearview Field are not affected. You can re-enter straight away.`)) return
+    setSaving(true); setSaveMsg(null)
+    const {error} = await supabase.from('generic_actuals').upsert({
+      client_id:config.client_id, unit_id:selUnit, period:selPeriod,
+      line_values:{}, catalogue_quantities:{}, submitted:false,
+      approved:false, approved_at:null, approved_by:null, review_note:null,
+      entered_by:P.fullName, entered_at:new Date().toISOString(), updated_at:new Date().toISOString(),
+    },{onConflict:'client_id,unit_id,period'})
+    setSaving(false)
+    if (error) { setSaveMsg({ok:false, text:'Could not clear — '+error.message}); return }
+    setLineValues({}); setCatalogueQuantities({}); setSubmitted(false); setApproved(false); setReviewNote(null)
+    setSaveMsg({ok:true, text:'This month cleared ✓ — enter the correct figures and Save.'})
   }
 
   // Month-end close: computes the exception report from real data --
@@ -2026,7 +2086,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
                 value={selPeriod} onChange={e=>setSelPeriod(e.target.value)}>
                 {periodMonths.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
-              {submitted&&<Badge text="Submitted" color={C.green}/>}
+              {approved?<Badge text="Approved" color={C.teal}/>:submitted&&<Badge text="Submitted" color={C.green}/>}
               {periodClose?.closed&&<Badge text="Closed" color={'var(--cv-header)'}/>}
             </>
           )}
@@ -2117,7 +2177,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
                     <td style={{padding:'8px 10px',color:C.green}}>{fmt(rev,cc)}</td>
                     <td style={{padding:'8px 10px',color:C.red}}>{fmt(cost,cc)}</td>
                     <td style={{padding:'8px 10px',fontWeight:700,color:gp>=0?C.green:C.red}}>{fmt(gp,cc)}</td>
-                    <td style={{padding:'8px 10px'}}><Badge text={a.submitted?'Submitted':'Draft'} color={a.submitted?C.green:C.amber}/></td>
+                    <td style={{padding:'8px 10px'}}><Badge text={a.approved?'Approved':a.submitted?'Submitted':'Draft'} color={a.approved?C.teal:a.submitted?C.green:C.amber}/></td>
                   </tr>
                 )
               })}</tbody>
@@ -2206,10 +2266,23 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
                 </div>
               )
             })}
-            <div style={{display:'flex',gap:'0.75rem',flexWrap:'wrap',marginTop:'1rem'}}>
+            {reviewNote&&!approved&&(
+              <div style={{margin:'0 0 1rem',padding:'0.7rem 0.9rem',borderRadius:8,background:'var(--cv-tint-warn)',border:`1px solid ${C.amber}`,color:C.amber,fontSize:'1.0rem'}}>
+                <strong>Sent back for correction:</strong> {reviewNote}
+              </div>
+            )}
+            <div style={{display:'flex',gap:'0.75rem',flexWrap:'wrap',marginTop:'1rem',alignItems:'center'}}>
               <button style={solidBtn('var(--cv-header)')} disabled={saving} onClick={()=>save(false)}>{saving?'Saving...':'Save Draft'}</button>
               {!submitted&&P.canEnterActuals&&(
                 <button style={solidBtn(C.green)} disabled={saving} onClick={()=>save(true)}>Submit for Approval</button>
+              )}
+              {P.canEnterActuals&&(
+                <button
+                  style={{fontFamily:'monospace',fontSize:'1.0rem',fontWeight:600,padding:'0.55rem 1rem',border:`1px solid ${C.red}`,borderRadius:4,background:'transparent',color:C.red,cursor:saving?'default':'pointer',opacity:saving?0.6:1}}
+                  disabled={saving} onClick={clearMonth}>Clear this month</button>
+              )}
+              {saveMsg&&(
+                <span style={{fontFamily:'monospace',fontSize:'0.98rem',fontWeight:600,color:saveMsg.ok?C.green:C.red}}>{saveMsg.text}</span>
               )}
             </div>
           </>
@@ -2370,6 +2443,9 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll}) {
       return {
         client_id:config.client_id, unit_id:selUnit, period,
         line_values:base, submitted:!!submittedByPeriod[period],
+        // Editing figures here clears any prior approval too — same integrity
+        // rule as the guided form: "Approved" must never stay on changed numbers.
+        approved:false, approved_at:null, approved_by:null,
         entered_by:P.fullName, entered_at:now, updated_at:now,
       }
     })
@@ -2570,11 +2646,66 @@ function ApprovalsTab({clientId,config,cc,P}) {
   // Check delegation
   const delegatedApprover = config.settings?.delegated_approver_id === P.userId
 
+  // Who may approve the monthly FIGURES (generic_actuals). The accountant
+  // (finance_manager) is the primary approver; the CEO and the coach can also
+  // approve, matching how the team actually works on the ground.
+  const canApproveActuals = ['finance_manager','ceo','super_coach','coach'].includes(P.role)
+  const [pendingActuals, setPendingActuals] = useState<any[]>([])
+  const [actualNotes, setActualNotes] = useState<Record<string,string>>({})
+
   useEffect(()=>{
     supabase.from('generic_spend_requests').select('*').eq('client_id',clientId)
       .in('status',['pending_fm','pending_ceo']).order('created_at',{ascending:false})
       .then(({data})=>{ setRequests(data||[]); setLoading(false) })
   },[clientId])
+
+  useEffect(()=>{
+    if (!canApproveActuals) return
+    supabase.from('generic_actuals').select('*').eq('client_id',clientId)
+      .eq('submitted',true).eq('approved',false).order('submitted_at',{ascending:false})
+      .then(({data})=>setPendingActuals(data||[]))
+  },[clientId,canApproveActuals])
+
+  // Revenue / cost totals for a submitted actual, using the same combinedActual
+  // (manual + field) helper the rest of the dashboard uses so figures reconcile.
+  function actualTotals(a:any) {
+    const aLines = config.plan_lines.filter((l:any)=>l.unit_id===a.unit_id&&l.active)
+    const c = (id:string)=>combinedActual(id, a.line_values||{}, a.field_line_values||{})
+    const rev = aLines.filter((l:any)=>l.category==='revenue').reduce((s:number,l:any)=>s+c(l.id),0)
+    const cost = aLines.filter((l:any)=>l.category!=='revenue').reduce((s:number,l:any)=>s+c(l.id),0)
+    return {rev,cost}
+  }
+
+  // Both actions only match a row that is STILL submitted-and-unapproved
+  // (.eq('submitted',true).eq('approved',false)). If someone else already
+  // approved it, edited it, or sent it back, no row matches — we tell the user
+  // and refresh the queue instead of silently overwriting a newer decision.
+  async function refreshPendingActuals() {
+    const {data} = await supabase.from('generic_actuals').select('*').eq('client_id',clientId)
+      .eq('submitted',true).eq('approved',false).order('submitted_at',{ascending:false})
+    setPendingActuals(data||[])
+  }
+
+  async function approveActual(id:string) {
+    const {data,error} = await supabase.from('generic_actuals').update({
+      approved:true, approved_at:new Date().toISOString(), approved_by:P.fullName,
+      review_note:null, updated_at:new Date().toISOString(),
+    }).eq('id',id).eq('submitted',true).eq('approved',false).select().maybeSingle()
+    if (error) { alert('Could not approve — '+error.message); return }
+    if (!data) { alert('These figures were just changed or handled by someone else — refreshing the list.'); refreshPendingActuals(); return }
+    setPendingActuals(a=>a.filter(x=>x.id!==id))
+  }
+
+  async function sendBackActual(id:string) {
+    const note = (actualNotes[id]||'').trim()
+    if (!note) { alert('Please add a short note so they know what to correct.'); return }
+    const {data,error} = await supabase.from('generic_actuals').update({
+      submitted:false, approved:false, review_note:note, updated_at:new Date().toISOString(),
+    }).eq('id',id).eq('submitted',true).eq('approved',false).select().maybeSingle()
+    if (error) { alert('Could not send back — '+error.message); return }
+    if (!data) { alert('These figures were just changed or handled by someone else — refreshing the list.'); refreshPendingActuals(); return }
+    setPendingActuals(a=>a.filter(x=>x.id!==id))
+  }
 
   async function fmAction(id:string, forward:boolean) {
     const note = notes[id]||''
@@ -2634,6 +2765,38 @@ function ApprovalsTab({clientId,config,cc,P}) {
           <KPI label="Value pending" value={fmt(valuePending,cc)} color={C.navy}/>
         </div>
       )}
+      {/* Monthly FIGURES awaiting approval (generic_actuals). Distinct from the
+          spend-request queue below. This is what a client submits from the
+          Actuals screen; approving it here is what was previously impossible. */}
+      {canApproveActuals&&pendingActuals.length>0&&(
+        <div style={{...card,borderLeft:`4px solid ${C.green}`}}>
+          <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.green,marginBottom:'0.9rem'}}>Monthly figures awaiting approval ({pendingActuals.length})</div>
+          {pendingActuals.map(a=>{
+            const {rev,cost}=actualTotals(a)
+            const unitName=config.business_units.find((u:any)=>u.id===a.unit_id)?.name||a.unit_id
+            const monthLabel=new Date(a.period+'T00:00:00').toLocaleString('en-GB',{month:'long',year:'numeric'})
+            return (
+              <div key={a.id} style={{border:'1px solid var(--cv-border-soft)',borderRadius:12,padding:'1rem 1.1rem',marginBottom:'0.85rem',background:C.lightBg}}>
+                <div style={{display:'flex',alignItems:'flex-start',gap:'1rem',flexWrap:'wrap',justifyContent:'space-between'}}>
+                  <div style={{flex:1,minWidth:220}}>
+                    <div style={{fontWeight:700,fontSize:'1.2rem',color:C.navy}}>{unitName} · {monthLabel}</div>
+                    <div style={{fontSize:'1.0rem',color:C.slate,marginTop:'0.15rem'}}>Submitted by {a.submitted_by||a.entered_by||'—'}{a.submitted_at?` · ${new Date(a.submitted_at).toLocaleDateString('en-GB')}`:''}</div>
+                  </div>
+                  <div style={{display:'flex',gap:'1.2rem',flexWrap:'wrap'}}>
+                    <div><div style={{fontSize:'0.8rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.08em'}}>Revenue</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.green}}>{fmt(rev,cc)}</div></div>
+                    <div><div style={{fontSize:'0.8rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.08em'}}>Total costs</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.red}}>{fmt(cost,cc)}</div></div>
+                  </div>
+                </div>
+                <textarea style={{...inp,minHeight:50,resize:'vertical',margin:'0.75rem 0 0.5rem'}} placeholder="If sending back, add a note on what to correct" value={actualNotes[a.id]||''} onChange={e=>setActualNotes(n=>({...n,[a.id]:e.target.value}))}/>
+                <div style={{display:'flex',gap:'0.5rem'}}>
+                  <button style={solidBtn(C.green,true)} onClick={()=>approveActual(a.id)}>Approve</button>
+                  <button style={solidBtn(C.amber,true)} onClick={()=>sendBackActual(a.id)}>Send back</button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
       {isFM&&pendingFM.length>0&&(
         <div style={{...card,borderLeft:`4px solid ${C.amber}`}}>
           <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.amber,marginBottom:'0.9rem'}}>Pending FM Review ({pendingFM.length})</div>
@@ -2664,7 +2827,7 @@ function ApprovalsTab({clientId,config,cc,P}) {
           ))}
         </div>
       )}
-      {pendingFM.length===0&&pendingCEO.length===0&&(
+      {pendingFM.length===0&&pendingCEO.length===0&&pendingActuals.length===0&&(
         <div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No pending approvals.</div>
       )}
     </div>
