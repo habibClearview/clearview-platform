@@ -25,6 +25,7 @@ import PaymentReviewQueue from '@/components/generic/PaymentReviewQueue'
 import { computeFreePerformance, operatingMarginPct, grossMarginPct, ebitdaMarginPct, netMarginPct, revenueGrowthPct, ruleOf40, isRuleOf40Strong, burnMultiple } from '@/lib/business-performance-metrics'
 import { syntheticPlanLinesFromDrivers, summariseByChannel, type Channel, type Driver } from '@/lib/drivers-engine'
 import { syntheticPlanLinesFromEvents, type MarketEvent } from '@/lib/market-events'
+import { applyActivityDriverEffects, type DriverEffect, type TargetingEvent } from '@/lib/activity-driver-impact'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
@@ -745,15 +746,25 @@ export default function GenericDashboard({
     if (!config || config.business_units.length === 0) return null
     // Inject two families of synthetic plan lines before running the engine:
     //  1. driver-derived lines (sales/cost drivers → revenue/cost, with the
-    //     buy/sell spread), and
+    //     buy/sell spread) — first LIFTED by any approved activity that targets
+    //     a driver, so a campaign's expected volume flows through the spread to
+    //     margin, and
     //  2. APPROVED market activities (their cost for the months they cover).
     // Each is a no-op when empty, so a model with neither is completely
     // unaffected. The engine sums plan lines by category, so both just flow into
     // P&L / cash flow / balance sheet.
     const firstUnit = config.business_units.find((u:any)=>u.active)?.id || config.business_units[0]?.id || null
+    // Approved driver-targeting activities raise their target drivers' volume
+    // over the activity window. Applied to a copy — the base drivers are never
+    // mutated — so the lift is purely the activity's contribution.
+    const liftedDrivers = applyActivityDriverEffects(
+      config.settings?.drivers||[],
+      marketEvents as TargetingEvent[],
+      config.start_date, config.planning_months,
+    )
     const driverLines = syntheticPlanLinesFromDrivers(
       config.settings?.channels||[],
-      config.settings?.drivers||[],
+      liftedDrivers,
       config.planning_months, firstUnit,
     )
     const eventLines = syntheticPlanLinesFromEvents(marketEvents, config.start_date, config.planning_months)
@@ -1909,23 +1920,40 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
   const statusColor=(s:string)=>s==='approved'?C.green:s==='rejected'?C.red:C.amber
   const statusText=(s:string)=>s==='approved'?'Approved':s==='rejected'?'Sent back':'Awaiting approval'
 
+  // Which drivers this activity is expected to MOVE, and by how much. Because
+  // margin is the buy/sell spread, extra volume on a driver automatically adds
+  // both revenue and cost of sales — so the plan shows the true margin impact,
+  // not a flat % on revenue. Keyed by driver id; only entries with a value > 0
+  // become driver_effects when proposed.
+  const salesDrivers:Driver[] = (config.settings?.drivers||[]).filter((d:Driver)=>d.kind==='sales'&&d.active!==false)
+  const driverName=(id:string)=>salesDrivers.find(d=>d.id===id)?.name||id
+  const [effects,setEffects]=useState<Record<string,{mode:'absolute'|'percent',value:string}>>({})
+  const setEffect=(driverId:string, patch:Partial<{mode:'absolute'|'percent',value:string}>)=>
+    setEffects(e=>({...e,[driverId]:{mode:e[driverId]?.mode||'absolute', value:e[driverId]?.value||'', ...patch}}))
+  const buildEffects=():DriverEffect[]=>Object.entries(effects)
+    .map(([driver_id,e])=>({driver_id, mode:e.mode, value:Number(e.value)}))
+    .filter(e=>Number.isFinite(e.value)&&e.value>0)
+  const effectLabel=(e:DriverEffect)=>`${driverName(e.driver_id)} ${e.mode==='percent'?`+${e.value}%`:`+${e.value}/mo`}`
+
   async function propose(){
     const monthsCount=Number(form.months_count)
     if(!form.name.trim()||!form.unit_id||!(Number(form.cost)>0)){setMsg({ok:false,text:'Enter a name, a unit and a cost above zero.'});return}
     // Match the DB constraint (whole number, 1–24) here so a bad duration is
     // caught with a friendly message instead of a rejected insert.
     if(!Number.isInteger(monthsCount)||monthsCount<1||monthsCount>24){setMsg({ok:false,text:'"Runs for" must be a whole number of months from 1 to 24.'});return}
+    const driver_effects=buildEffects()
     setBusy(true);setMsg(null)
     const {error}=await supabase.from('generic_market_events').insert({
       client_id:clientId, unit_id:form.unit_id, name:form.name.trim(), description:form.description||null,
       cost:Number(form.cost), start_period:form.start_period, months_count:monthsCount,
       cost_category:form.cost_category, expected_uplift_pct:form.expected_uplift_pct?Number(form.expected_uplift_pct):null,
+      driver_effects:driver_effects.length?driver_effects:null,
       status:'proposed', created_by:P.fullName,
     })
     setBusy(false)
     if(error){setMsg({ok:false,text:'Could not save — '+error.message});return}
-    setForm(f=>({...f,name:'',cost:'',expected_uplift_pct:'',description:''}));setShowAdd(false)
-    setMsg({ok:true,text:'Proposed ✓ — sent for approval. Once approved, its cost flows into the plan.'})
+    setForm(f=>({...f,name:'',cost:'',expected_uplift_pct:'',description:''}));setEffects({});setShowAdd(false)
+    setMsg({ok:true,text:'Proposed ✓ — sent for approval. Once approved, its cost'+(driver_effects.length?' and its expected sales lift':'')+' flows into the plan.'})
     onChanged&&onChanged()
   }
   async function remove(id:string){
@@ -1971,6 +1999,29 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
             <div><label style={lbl} htmlFor="mkt-lift">Expected sales lift %</label><input id="mkt-lift" type="number" style={inp} value={form.expected_uplift_pct} onChange={e=>setForm(f=>({...f,expected_uplift_pct:e.target.value}))} placeholder="optional"/></div>
             <div style={{gridColumn:'1/-1'}}><label style={lbl} htmlFor="mkt-notes">Notes (optional)</label><input id="mkt-notes" style={inp} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></div>
           </div>
+
+          {/* Which drivers this activity is expected to move. Once approved, the
+              lift raises that driver's volume for the months the activity runs,
+              and — because margin is the buy/sell spread — the plan shows the real
+              revenue AND cost-of-sales impact, not a flat % on revenue. */}
+          {salesDrivers.length>0&&(
+            <div style={{marginTop:'1rem',borderTop:`1px solid ${C.border}`,paddingTop:'0.85rem'}}>
+              <div style={{fontWeight:700,color:C.navy,fontSize:'1.06rem',marginBottom:'0.2rem'}}>What sales does this drive? <span style={{fontWeight:400,color:C.slate}}>(optional)</span></div>
+              <p style={{fontSize:'0.98rem',color:C.slate,marginBottom:'0.6rem'}}>Say how much extra volume you expect on each driver. Because your margin is the spread, the plan automatically adds both the extra revenue and its cost of sales — so you see the true margin impact.</p>
+              {salesDrivers.map(d=>{
+                const e=effects[d.id]||{mode:'absolute',value:''}
+                const on=Number(e.value)>0
+                return (
+                  <div key={d.id} style={{display:'grid',gridTemplateColumns:'minmax(140px,1.4fr) minmax(120px,1fr) minmax(110px,1fr)',gap:'0.5rem',alignItems:'end',padding:'0.35rem 0'}}>
+                    <div style={{fontSize:'1.0rem',color:on?C.navy:C.slate,fontWeight:on?600:400,alignSelf:'center'}}>{d.name}{d.unit_label?<span style={{color:C.slate,fontWeight:400}}> ({d.unit_label})</span>:null}</div>
+                    <div><label style={lbl} htmlFor={`eff-${d.id}-mode`}>How</label><select id={`eff-${d.id}-mode`} style={inp} value={e.mode} onChange={ev=>setEffect(d.id,{mode:ev.target.value as any})}><option value="absolute">Add units/mo</option><option value="percent">Increase by %</option></select></div>
+                    <div><label style={lbl} htmlFor={`eff-${d.id}-val`}>{e.mode==='percent'?'% increase':'Extra/month'}</label><input id={`eff-${d.id}-val`} type="number" min={0} style={inp} value={e.value} onChange={ev=>setEffect(d.id,{value:ev.target.value})} placeholder="0"/></div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
           <div style={{display:'flex',gap:'0.5rem',marginTop:'0.75rem',alignItems:'center',flexWrap:'wrap'}}>
             <button style={solidBtn(C.teal)} disabled={busy} onClick={propose}>{busy?'Saving…':'Propose for approval'}</button>
             {msg&&<span style={{fontFamily:'monospace',fontSize:'0.95rem',color:msg.ok?C.green:C.red}}>{msg.text}</span>}
@@ -1989,7 +2040,9 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
               const startLabel=monthOpts.find(m=>m.value===e.start_period)?.label||e.start_period
               return (
                 <tr key={e.id} style={{borderBottom:`1px solid ${C.border}`}}>
-                  <td style={{padding:'6px 8px',fontWeight:600,color:C.navy}}>{e.name}{e.review_note&&e.status==='rejected'?<div style={{fontSize:'0.9rem',color:C.red,fontWeight:400}}>Sent back: {e.review_note}</div>:null}</td>
+                  <td style={{padding:'6px 8px',fontWeight:600,color:C.navy}}>{e.name}
+                    {Array.isArray(e.driver_effects)&&e.driver_effects.length>0?<div style={{fontSize:'0.9rem',color:C.teal,fontWeight:400}}>Drives: {e.driver_effects.map((ef:DriverEffect)=>effectLabel(ef)).join(' · ')}</div>:null}
+                    {e.review_note&&e.status==='rejected'?<div style={{fontSize:'0.9rem',color:C.red,fontWeight:400}}>Sent back: {e.review_note}</div>:null}</td>
                   <td style={{padding:'6px 8px',color:C.slate}}>{unitName(e.unit_id)}</td>
                   <td style={{padding:'6px 8px',fontFamily:'monospace'}}>{fmt(e.cost,cc)}</td>
                   <td style={{padding:'6px 8px',color:C.slate}}>{startLabel}{e.months_count>1?` · ${e.months_count} mo`:''}</td>
@@ -3189,6 +3242,12 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
                   <div style={{flex:1,minWidth:220}}>
                     <div style={{fontWeight:700,fontSize:'1.2rem',color:C.navy}}>{e.name}</div>
                     <div style={{fontSize:'1.0rem',color:C.slate,marginTop:'0.15rem'}}>{unitNameFor(e.unit_id)} · {startLabel}{e.months_count>1?` · ${e.months_count} months`:''}{e.expected_uplift_pct!=null?` · expected +${e.expected_uplift_pct}% sales`:''}{e.created_by?` · proposed by ${e.created_by}`:''}</div>
+                    {Array.isArray(e.driver_effects)&&e.driver_effects.length>0&&(
+                      <div style={{fontSize:'1.0rem',color:C.teal,marginTop:'0.25rem'}}>Expected to drive: {e.driver_effects.map((ef:any)=>{
+                        const dn=(config.settings?.drivers||[]).find((d:any)=>d.id===ef.driver_id)?.name||'a driver'
+                        return `${dn} ${ef.mode==='percent'?`+${ef.value}%`:`+${ef.value}/mo`}`
+                      }).join(' · ')} <span style={{color:C.slate}}>— approving this lifts these drivers in the plan (revenue and cost of sales move together on the spread).</span></div>
+                    )}
                     {e.description&&<div style={{fontSize:'1.0rem',color:C.slate,fontStyle:'italic',marginTop:'0.25rem'}}>{e.description}</div>}
                   </div>
                   <div><div style={{fontSize:'0.8rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.08em'}}>Cost</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.red}}>{fmt(e.cost,cc)}</div></div>
