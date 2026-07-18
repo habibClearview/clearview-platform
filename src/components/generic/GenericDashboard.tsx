@@ -23,6 +23,7 @@ import ErrorBoundary from '@/components/ErrorBoundary'
 import VerificationRecognition from '@/components/generic/VerificationRecognition'
 import PaymentReviewQueue from '@/components/generic/PaymentReviewQueue'
 import { computeFreePerformance, operatingMarginPct, grossMarginPct, ebitdaMarginPct, netMarginPct, revenueGrowthPct, ruleOf40, isRuleOf40Strong, burnMultiple } from '@/lib/business-performance-metrics'
+import { syntheticPlanLinesFromDrivers, summariseByChannel, type Channel, type Driver } from '@/lib/drivers-engine'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
@@ -708,7 +709,20 @@ export default function GenericDashboard({
   }, [P.userId])
 
   const months = useMemo(() => config ? buildMonthLabels(config.start_date, config.planning_months) : [], [config])
-  const result = useMemo(() => config && config.business_units.length > 0 ? runGenericModel(config, modelActuals) : null, [config, modelActuals])
+  const result = useMemo(() => {
+    if (!config || config.business_units.length === 0) return null
+    // Inject driver-derived plan lines (sales/cost drivers → revenue/cost lines,
+    // with the buy/sell spread) so the model reflects the drivers. With no
+    // drivers this is a no-op, so existing models are unaffected.
+    const firstUnit = config.business_units.find((u:any)=>u.active)?.id || config.business_units[0]?.id || null
+    const driverLines = syntheticPlanLinesFromDrivers(
+      (config.settings?.channels||[]) as Channel[],
+      (config.settings?.drivers||[]) as Driver[],
+      config.planning_months, firstUnit,
+    )
+    const cfg = driverLines.length ? { ...config, plan_lines: [...config.plan_lines, ...driverLines] } : config
+    return runGenericModel(cfg, modelActuals)
+  }, [config, modelActuals])
   const cc = config?.currency || 'UGX'
 
   if (loading) return <Spinner/>
@@ -1696,6 +1710,123 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
               {P.canEditPlan&&<button style={delBtn} onClick={()=>onSave({...config,shared_lines:config.shared_lines.filter(sl=>sl.id!==l.id)})}>×</button>}
             </div>
           ))}
+        </div>
+      )}
+      <DriversSection config={config} cc={cc} P={P} onSave={onSave}/>
+    </div>
+  )
+}
+
+// ── DRIVERS & CHANNELS (planning) ────────────────────────────
+// The levers the business plans around. SALES drivers are grouped into CHANNELS
+// (routes to market). A smart driver's value = quantity × rate; if a per-unit
+// buy cost is set, the buy/sell spread flows to margin automatically. COST
+// drivers land in their chosen bucket. Everything persists in
+// config.settings.channels / .drivers (inheriting this config's client-scoped
+// RLS) and flows into the model via syntheticPlanLinesFromDrivers.
+function DriversSection({config,cc,P,onSave}) {
+  const channels: Channel[] = (config.settings?.channels||[]) as Channel[]
+  const drivers: Driver[] = (config.settings?.drivers||[]) as Driver[]
+  const units = config.business_units.filter((u:any)=>u.active)
+  const firstUnit = units[0]?.id || ''
+  const canEdit = !!P.canEditPlan
+
+  function persist(nextChannels:Channel[], nextDrivers:Driver[]) {
+    onSave({...config, settings:{...config.settings, channels:nextChannels, drivers:nextDrivers}})
+  }
+  const mkId = (p:string)=>`${p}_${Date.now()}_${Math.random().toString(36).slice(2,6)}`
+
+  function addChannel(){ persist([...channels, {id:mkId('ch'), name:'New channel', unit_id:null, active:true}], drivers) }
+  function updChannel(id:string, patch:Partial<Channel>){ persist(channels.map(c=>c.id===id?{...c,...patch}:c), drivers) }
+  function delChannel(id:string){ persist(channels.filter(c=>c.id!==id), drivers.map(d=>d.channel_id===id?{...d,channel_id:null}:d)) }
+
+  function addDriver(kind:'sales'|'cost'){
+    const base:Driver = {
+      id:mkId('drv'), name: kind==='sales'?'New sales driver':'New cost driver', kind,
+      unit_id: firstUnit||null, channel_id: kind==='sales'?(channels[0]?.id||null):null,
+      unit_label: kind==='sales'?'units':'', mode:'smart',
+      quantity: Array(config.planning_months).fill(0), rate:0,
+      unit_cost: kind==='sales'?0:null, cost_category: kind==='cost'?'direct_opex':undefined, active:true,
+    }
+    persist(channels, [...drivers, base])
+  }
+  function updDriver(id:string, patch:Partial<Driver>){ persist(channels, drivers.map(d=>d.id===id?{...d,...patch}:d)) }
+  function delDriver(id:string){ persist(channels, drivers.filter(d=>d.id!==id)) }
+  // Drivers store a per-month quantity array; the UI edits a single "per month"
+  // figure that fills every month (same convention as shared costs). Advanced
+  // month-by-month variation can be layered on later.
+  const perMonth = (d:Driver)=> (Array.isArray(d.quantity)&&d.quantity.length? d.quantity[0] : 0)
+  const setPerMonth = (d:Driver, v:number)=> updDriver(d.id, {quantity: Array(config.planning_months).fill(v)})
+
+  const salesDrivers = drivers.filter(d=>d.kind==='sales')
+  const costDrivers = drivers.filter(d=>d.kind==='cost')
+  const channelSummary = summariseByChannel(channels, drivers, config.planning_months)
+  const unitName = (id:string|null)=> id? (config.business_units.find((u:any)=>u.id===id)?.name||id) : 'Whole business'
+
+  const driverRow = (d:Driver)=> (
+    <div key={d.id} style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:'0.5rem',alignItems:'end',padding:'0.5rem 0',borderBottom:'1px solid var(--cv-border-soft)'}}>
+      <div><label style={lbl}>Name</label><input style={inp} value={d.name} disabled={!canEdit} onChange={e=>updDriver(d.id,{name:e.target.value})}/></div>
+      {d.kind==='sales'&&<div><label style={lbl}>Channel</label><select style={inp} value={d.channel_id||''} disabled={!canEdit} onChange={e=>updDriver(d.id,{channel_id:e.target.value||null})}><option value="">— none —</option>{channels.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>}
+      <div><label style={lbl}>Unit</label><select style={inp} value={d.unit_id||''} disabled={!canEdit} onChange={e=>updDriver(d.id,{unit_id:e.target.value||null})}><option value="">Whole business</option>{units.map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+      <div><label style={lbl}>How</label><select style={inp} value={d.mode} disabled={!canEdit} onChange={e=>updDriver(d.id,{mode:e.target.value as any})}><option value="smart">Qty × rate</option><option value="flat">Flat figure</option></select></div>
+      <div><label style={lbl}>{d.mode==='smart'?`Qty/month${d.unit_label?` (${d.unit_label})`:''}`:'Amount/month'}</label><input type="number" style={inp} value={perMonth(d)||''} disabled={!canEdit} onChange={e=>setPerMonth(d,Number(e.target.value))}/></div>
+      {d.mode==='smart'&&<div><label style={lbl}>{d.kind==='sales'?'Sell price':'Rate'}</label><input type="number" style={inp} value={d.rate||''} disabled={!canEdit} onChange={e=>updDriver(d.id,{rate:Number(e.target.value)})}/></div>}
+      {d.kind==='sales'&&d.mode==='smart'&&<div><label style={lbl}>Buy price</label><input type="number" style={inp} value={d.unit_cost??''} placeholder="optional" disabled={!canEdit} onChange={e=>updDriver(d.id,{unit_cost:e.target.value===''?null:Number(e.target.value)})}/></div>}
+      {d.kind==='cost'&&<div><label style={lbl}>Cost type</label><select style={inp} value={d.cost_category||'direct_opex'} disabled={!canEdit} onChange={e=>updDriver(d.id,{cost_category:e.target.value as any})}><option value="direct_opex">Overhead</option><option value="cost_of_sales">Cost of sales</option><option value="staff">Staff</option></select></div>}
+      {canEdit&&<div><button style={delBtn} aria-label="Delete driver" title="Delete driver" onClick={()=>delDriver(d.id)}>×</button></div>}
+    </div>
+  )
+
+  return (
+    <div style={card}>
+      <SectionHeader title="Drivers & Channels"/>
+      <p style={{fontSize:'1.06rem',color:C.slate,marginBottom:'0.75rem'}}>The levers your business runs on. Group sales into <strong>channels</strong> (walk-in, retailers, large farms, export). Each driver is <strong>quantity × rate</strong> — set a buy price on a sales driver and the buy/sell <strong>spread</strong> flows to margin automatically. Change a driver and the whole plan (P&amp;L, cash flow) moves.</p>
+
+      {/* Channels */}
+      <div style={{marginBottom:'1.25rem'}}>
+        <SectionHeader title="Channels" action={canEdit?<button style={addBtn(true,C.teal)} onClick={addChannel}>+ Add channel</button>:null}/>
+        {channels.length===0? <div style={{fontSize:'1.0rem',color:C.slate}}>No channels yet.</div> :
+          channels.map(c=>(
+            <div key={c.id} style={{display:'flex',gap:'0.5rem',alignItems:'center',padding:'0.35rem 0',borderBottom:'1px solid var(--cv-border-soft)',flexWrap:'wrap'}}>
+              <input style={{...inp,maxWidth:220}} value={c.name} disabled={!canEdit} onChange={e=>updChannel(c.id,{name:e.target.value})}/>
+              <select style={{...inp,maxWidth:220}} value={c.unit_id||''} disabled={!canEdit} onChange={e=>updChannel(c.id,{unit_id:e.target.value||null})}>
+                <option value="">Whole business</option>{units.map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+              {canEdit&&<button style={delBtn} aria-label="Delete channel" title="Delete channel" onClick={()=>delChannel(c.id)}>×</button>}
+            </div>
+          ))}
+      </div>
+
+      {/* Sales drivers */}
+      <div style={{marginBottom:'1.25rem'}}>
+        <SectionHeader title="Sales drivers" action={canEdit?<button style={addBtn(true,C.green)} onClick={()=>addDriver('sales')}>+ Add sales driver</button>:null}/>
+        {salesDrivers.length===0? <div style={{fontSize:'1.0rem',color:C.slate}}>No sales drivers yet.</div> : salesDrivers.map(driverRow)}
+      </div>
+
+      {/* Cost drivers */}
+      <div style={{marginBottom:'1.25rem'}}>
+        <SectionHeader title="Cost drivers" action={canEdit?<button style={addBtn(true,C.red)} onClick={()=>addDriver('cost')}>+ Add cost driver</button>:null}/>
+        {costDrivers.length===0? <div style={{fontSize:'1.0rem',color:C.slate}}>No cost drivers yet.</div> : costDrivers.map(driverRow)}
+      </div>
+
+      {/* Channel margin summary (live impact) */}
+      {channelSummary.length>0&&(
+        <div>
+          <div style={{fontWeight:700,color:C.navy,marginBottom:'0.5rem',fontSize:'1.06rem'}}>By channel — annual (from your drivers)</div>
+          <div style={{overflowX:'auto'}}>
+            <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily:'monospace'}}>
+              <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Channel','Revenue','Cost of sales','Margin','Margin %'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600}}>{h}</th>)}</tr></thead>
+              <tbody>{channelSummary.map((s,i)=>(
+                <tr key={s.channel_id||'unassigned'} style={{background:i%2===0?C.cream:C.white}}>
+                  <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{s.channel_name}</td>
+                  <td style={{padding:'8px 10px',color:C.green}}>{fmt(s.revenue,cc)}</td>
+                  <td style={{padding:'8px 10px',color:C.red}}>{fmt(s.cogs,cc)}</td>
+                  <td style={{padding:'8px 10px',fontWeight:700,color:s.margin>=0?C.green:C.red}}>{fmt(s.margin,cc)}</td>
+                  <td style={{padding:'8px 10px',color:C.slate}}>{s.marginPct!=null?`${Math.round(s.marginPct)}%`:'—'}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

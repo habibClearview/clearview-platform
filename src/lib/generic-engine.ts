@@ -261,6 +261,12 @@ export interface GenericModelConfig {
     // Trade credit: supplier credit received (payable) and customer/partner
     // credit given (receivable), tracked monthly per line.
     trade_credit_lines?: TradeCreditLine[]
+    // Driver-based planning: sales/cost drivers grouped into channels (routes to
+    // market). Stored here (inheriting this config's client-scoped RLS) and
+    // turned into synthetic plan lines at model time — see src/lib/drivers-engine.ts.
+    // Typed as any[] to avoid a circular import; the real shapes are Channel/Driver.
+    channels?: any[]
+    drivers?: any[]
   }
 }
 
