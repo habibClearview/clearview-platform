@@ -671,6 +671,98 @@ function InviteLoginButton({email,fullName,role,coImplementerId,funderProgrammeI
   )
 }
 
+// Coach-side team management for a specific client. Lets the coach (super_coach)
+// create the client's own logins -- CEO(s), Finance Manager, Unit Heads,
+// Accounts Assistants -- and see who already has one. This fills the gap where a
+// spreadsheet upload created the client but never created a CEO account or sent
+// an invite, so the CEO could never log in (or approve). Posts to the existing
+// /api/invite-user, which sends a real Supabase Auth invite email and permits a
+// super_coach to invite any role into any client. Two CEOs (co-owners) are
+// allowed -- there is no one-CEO limit -- so the button stays available.
+function ClientTeamInvite({client}){
+  const [members,setMembers]=useState<any[]>([])
+  const [loading,setLoading]=useState(true)
+  const [loadErr,setLoadErr]=useState<string|null>(null)
+  const [form,setForm]=useState({email:client.contact_email||'',full_name:client.contact_name||'',role:'ceo'})
+  const [busy,setBusy]=useState(false)
+  const [msg,setMsg]=useState<{ok:boolean,text:string}|null>(null)
+
+  async function load(){
+    setLoading(true); setLoadErr(null)
+    try{
+      const {data:{session}}=await supabase.auth.getSession()
+      const res=await fetch('/api/list-users',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({clientId:client.id,requesterToken:session?.access_token})})
+      const data=await res.json()
+      // Only a genuinely successful, empty response means "no logins yet". A
+      // failed request keeps an error (with retry) so it is never misread as
+      // "nobody has been invited".
+      if(res.ok){ setMembers(data.users||[]) }
+      else { setMembers([]); setLoadErr(data.error||'Could not load the team list.') }
+    }catch(e){ setMembers([]); setLoadErr('Could not load the team list: '+(e as any).message) }
+    setLoading(false)
+  }
+  useEffect(()=>{load()},[client.id])
+
+  async function invite(){
+    if(!form.email||!form.full_name){setMsg({ok:false,text:'Enter a name and email first.'});return}
+    setBusy(true);setMsg(null)
+    try{
+      const {data:{session}}=await supabase.auth.getSession()
+      const res=await fetch('/api/invite-user',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:form.email,fullName:form.full_name,role:form.role,clientId:client.id,assignedUnitIds:[],coImplementerId:null,funderProgrammeId:null,inviterToken:session?.access_token})})
+      const data=await res.json()
+      if(res.ok){ setMsg({ok:true,text:`Invitation emailed to ${form.email} ✓`}); setForm(f=>({...f,email:'',full_name:''})); load() }
+      else setMsg({ok:false,text:data.error||'Invite failed.'})
+    }catch(e){setMsg({ok:false,text:'Invite failed: '+(e as any).message})}
+    setBusy(false)
+  }
+
+  const ROLE_OPTS:[string,string][]=[['ceo','CEO / Owner'],['finance_manager','Finance Manager / Accountant'],['unit_head','Unit Head'],['accounts_assistant','Accounts Assistant']]
+  const roleLabel=(r:string)=>ROLE_OPTS.find(o=>o[0]===r)?.[1]||r
+
+  return(
+    <div style={{...card,marginBottom:'1.25rem'}}>
+      <div style={{fontFamily:'Georgia,serif',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Client team &amp; logins</div>
+      <p style={{fontSize:'1.02rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem'}}>
+        Invite this client's own people so they can log in. The CEO / owner approves figures; the Finance Manager (accountant) can also approve and enter actuals. You can invite two CEOs if the business has co-owners.
+      </p>
+      {loading?<Spinner/>:(
+        <>
+          {loadErr?(
+            <div style={{fontSize:'1.0rem',color:C.red,marginBottom:'0.9rem',display:'flex',gap:'0.6rem',alignItems:'center',flexWrap:'wrap'}}>
+              <span>{loadErr}</span>
+              <button style={addBtn(true,C.slate)} onClick={load}>Try again</button>
+            </div>
+          ):members.length>0?(
+            <div style={{marginBottom:'0.9rem'}}>
+              {members.map(m=>(
+                <div key={m.id} style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',padding:'0.4rem 0',borderBottom:'1px solid var(--cv-border-soft)'}}>
+                  <span style={{fontWeight:600,color:C.navy}}>{m.full_name||'—'}</span>
+                  <Badge text={roleLabel(m.role)} color={C.teal}/>
+                  <span style={{fontSize:'0.95rem',color:C.slate}}>{m.email}</span>
+                  <Badge text={m.confirmed?'Active':'Invite pending'} color={m.confirmed?C.green:C.amber}/>
+                </div>
+              ))}
+            </div>
+          ):(
+            <div style={{fontSize:'1.0rem',color:C.amber,marginBottom:'0.9rem'}}>No logins yet — this client can't sign in until you invite someone. The spreadsheet upload creates the client, but not a login.</div>
+          )}
+          <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
+            <input style={{...inp,maxWidth:200}} placeholder="Full name" value={form.full_name} onChange={e=>setForm(f=>({...f,full_name:e.target.value}))}/>
+            <input style={{...inp,maxWidth:220}} placeholder="Email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))}/>
+            <select aria-label="Invitee role" style={{...inp,maxWidth:240}} value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))}>
+              {ROLE_OPTS.map(([v,l])=><option key={v} value={v}>{l}</option>)}
+            </select>
+            <button style={addBtn(true,C.teal)} disabled={busy} onClick={invite}>{busy?'Sending…':'Send invite'}</button>
+          </div>
+          {msg&&<div style={{marginTop:'0.6rem',fontSize:'0.98rem',fontWeight:600,color:msg.ok?C.green:C.red}}>{msg.text}</div>}
+        </>
+      )}
+    </div>
+  )
+}
+
 function DeleteClientConfirm({client,onCancel,onDeleted}){
   const [text,setText]=useState('')
   const [deleting,setDeleting]=useState(false)
@@ -1854,6 +1946,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 2 — Define Business Units</div><p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.7,margin:0}}>In Settings, add business units. Set each unit type: product, service, or aggregator.</p></div>
           <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 3 — Enter the Plan</div><p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.7,margin:0}}>Go to Planning to add revenue and cost lines. Enter monthly figures for the full planning period.</p></div>
         </div>
+        {isSuperCoach&&<ClientTeamInvite client={selClient}/>}
         <div style={card}><TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/></div>
         {!selClient.programme_id&&<ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>}
       </div>
@@ -1891,6 +1984,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             onCancel={()=>setShowEditClient(false)}
           />
         )}
+        {isSuperCoach&&<ClientTeamInvite client={selClient}/>}
 
         {/* Two-column layout: sidebar + content */}
         <div style={{display:'grid',gridTemplateColumns:'220px 1fr',gap:'1.5rem',alignItems:'start'}}>
