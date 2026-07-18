@@ -1526,9 +1526,26 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
   // (GenericPlanLine has no revenue_line_id), so this is a presentation-only
   // grouping for now -- selecting a product does not filter or persist a link.
   const [costProduct, setCostProduct] = useState<string>('__whole__')
+  // Id of the line just added via "+ Add line" — used to scroll it into view and
+  // briefly highlight it so a new row is never added invisibly off-screen again.
+  const [newLineId, setNewLineId] = useState<string|null>(null)
 
   const unit = config.business_units.find(u=>u.id===selUnit)
   const lines = config.plan_lines.filter(l=>l.unit_id===selUnit&&l.category===selSection&&l.active)
+
+  // When a line is added, wait for it to render, then scroll it into view and
+  // focus its name field, and clear the highlight after a moment.
+  useEffect(() => {
+    if (!newLineId) return
+    const el = typeof document!=='undefined' ? document.getElementById(`planrow-${newLineId}`) : null
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      const input = el.querySelector('input') as HTMLInputElement | null
+      if (input) { input.focus(); input.select?.() }
+    }
+    const t = setTimeout(() => setNewLineId(null), 2500)
+    return () => clearTimeout(t)
+  }, [newLineId, lines.length]) // eslint-disable-line react-hooks/exhaustive-deps
   // Revenue lines of the selected unit -- feed the Cost of Sales product selector.
   const revLines = config.plan_lines.filter(l=>l.unit_id===selUnit&&l.category==='revenue'&&l.active)
 
@@ -1540,20 +1557,38 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
   }
 
   function addLine(category:LineCategory) {
-    // TEMPORARY DIAGNOSTIC (R141): report exactly what happens on click so a
-    // "nothing happens" report can be pinned to a real cause. Remove once the
-    // add-line failure is understood.
-    try {
-      if (!selUnit) { alert('Add line: no unit is selected (selUnit is empty). Pick a unit tab first — that is why nothing is being added.'); return }
-      const id = `${selUnit}_${category}_${Date.now()}`
-      const newLine = blankLine(id, selUnit, 'New line', category, config.planning_months)
-      const next = {...config, plan_lines:[...config.plan_lines, newLine]}
-      onSave(next)
-      const shownAfter = next.plan_lines.filter(l=>l.unit_id===selUnit&&l.category===category&&l.active).length
-      alert(`Add line OK · unit=${selUnit} · section=${category} · rows in this section now = ${shownAfter}. If this number went UP but you see no new "New line" row, it's a display/scroll issue — scroll to the very bottom of the section.`)
-    } catch(e:any) {
-      alert('Add line ERROR: ' + (e?.message || String(e)))
-    }
+    if (!selUnit) return
+    // Collision-safe id: Date.now() alone can repeat on rapid clicks, which would
+    // duplicate the React key AND the planrow-<id> DOM id the scroll/focus/
+    // highlight below target — so add a random suffix.
+    const id = `${selUnit}_${category}_${Date.now()}_${Math.random().toString(36).slice(2,9)}`
+    const newLine = blankLine(id, selUnit, 'New line', category, config.planning_months)
+    onSave({...config, plan_lines:[...config.plan_lines, newLine]})
+    // The new line is appended to the BOTTOM of what can be a long list, so on a
+    // section with many rows it lands off-screen and looks like nothing happened.
+    // Remember it so the effect below scrolls it into view and highlights it once
+    // it has rendered — the click now visibly produces a row.
+    setNewLineId(id)
+  }
+
+  // Bulk-remove the untouched default "New line" rows in this unit+section. These
+  // accumulate when a new line was added off-screen and the user, seeing nothing,
+  // clicked again. Only rows STILL named "New line" (or blank) with no numbers
+  // anywhere are removed — anything named or filled in is left alone.
+  function removeEmptyNewLines() {
+    const isEmptyNew = (l:GenericPlanLine) => l.unit_id===selUnit && l.category===selSection && l.active
+      && ((l.name||'').trim()==='New line' || !(l.name||'').trim())
+      // Only the default 'standard' line type counts as untouched: switching a
+      // line to spread/service_fee is a deliberate setup step that leaves the
+      // numeric arrays at zero, so those must NOT be treated as blank junk.
+      && (!l.line_type || l.line_type==='standard')
+      && (l.monthly_plan||[]).every(v=>!v)
+      && (l.buy_price||[]).every(v=>!v) && (l.sell_price||[]).every(v=>!v) && (l.volume||[]).every(v=>!v)
+      && (l.fee_per_engagement||[]).every(v=>!v) && (l.cost_per_engagement||[]).every(v=>!v) && (l.engagements||[]).every(v=>!v)
+    const count = config.plan_lines.filter(isEmptyNew).length
+    if (count===0) { alert('No empty “New line” rows to remove in this section.'); return }
+    if (typeof window!=='undefined' && !window.confirm(`Remove ${count} empty “New line” row${count===1?'':'s'} from ${unit?.name} — ${selSection}?\n\nAny line you have named or entered figures into is kept.`)) return
+    onSave({...config, plan_lines: config.plan_lines.map(l => isEmptyNew(l) ? {...l, active:false} : l)})
   }
 
   function updateLineName(lineId:string, name:string) {
@@ -1720,9 +1755,12 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
       )}
 
       {/* Section header + add */}
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>{unit?.name} — {sections.find(s=>s[0]===selSection)?.[1]}</div>
-        {P.canEditPlan&&<button style={addBtn(true,accent)} onClick={()=>addLine(selSection)}>+ Add {selSection==='cost_of_sales'?'a cost':'line'}</button>}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem',gap:'0.6rem',flexWrap:'wrap'}}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>{unit?.name} — {sections.find(s=>s[0]===selSection)?.[1]} <span style={{fontFamily:'monospace',fontSize:'0.85rem',fontWeight:400,color:C.slate}}>({lines.length})</span></div>
+        <div style={{display:'flex',gap:'0.5rem',alignItems:'center',flexWrap:'wrap'}}>
+          {P.canEditPlan&&<button style={addBtn(true,C.red)} onClick={removeEmptyNewLines} title="Remove blank &quot;New line&quot; rows that were added by accident">Clean up empty rows</button>}
+          {P.canEditPlan&&<button style={addBtn(true,accent)} onClick={()=>addLine(selSection)}>+ Add {selSection==='cost_of_sales'?'a cost':'line'}</button>}
+        </div>
       </div>
 
       {/* Line cards */}
@@ -1751,7 +1789,8 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
         const canFill = !(isSpread||isServiceFee)
         const [badgeLabel,badgeColor] = typeBadge(l.line_type)
         return (
-          <div key={l.id} style={{...card,padding:0,overflow:'hidden'}}>
+          <div key={l.id} id={`planrow-${l.id}`} style={{...card,padding:0,overflow:'hidden',
+            ...(l.id===newLineId ? {outline:`3px solid ${C.cyan}`, boxShadow:`0 0 0 4px var(--cv-cyan-20, rgba(0,180,216,0.25))`, transition:'outline 0.2s'} : {})}}>
             {/* Header with coloured accent bar */}
             <div style={{display:'flex',alignItems:'center',gap:'0.85rem',padding:'0.8rem 1.1rem',borderLeft:`5px solid ${accent}`,background:C.lightBg,borderBottom:'1px solid var(--cv-border-soft)',flexWrap:'wrap'}}>
               <div style={{flex:'1 1 220px',minWidth:180}}>
