@@ -58,6 +58,14 @@ describe('syntheticPlanLinesFromDrivers — sales drivers', () => {
     expect(cogs.id).toBe(`${DRIVER_COST_PREFIX}d1`)
   })
 
+  it('REG: a smart sales driver with zero sell price but a positive buy price still emits its COGS line', () => {
+    // volume 10, rate 0 (no revenue), unit_cost 60 → COGS 600/month, no revenue line
+    const lines = syntheticPlanLinesFromDrivers([chan({})], [drv({ quantity: new Array(M).fill(10), rate: 0, unit_cost: 60 })], M, 'u1')
+    expect(lines).toHaveLength(1)
+    expect(lines[0].category).toBe('cost_of_sales')
+    expect(lines[0].monthly_plan[0]).toBe(600)
+  })
+
   it('REG: a flat sales driver does NOT emit a COGS line even if unit_cost is set', () => {
     const lines = syntheticPlanLinesFromDrivers([chan({})], [drv({ mode: 'flat', quantity: new Array(M).fill(500), unit_cost: 60 })], M, 'u1')
     expect(lines).toHaveLength(1)

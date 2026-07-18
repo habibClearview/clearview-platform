@@ -102,23 +102,31 @@ export function syntheticPlanLinesFromDrivers(
     if (!d || d.active === false) continue
     const unitId = effectiveUnitId(d, channelById, fallbackUnitId)
     if (!unitId) continue
-    const monthly = driverMonthlyValue(d, planningMonths)
-    if (!monthly.some(v => v !== 0)) continue
 
     if (d.kind === 'sales') {
-      lines.push({
-        id: `${DRIVER_REV_PREFIX}${d.id}`, unit_id: unitId, name: `Driver: ${d.name}`,
-        category: 'revenue', line_type: 'standard', monthly_plan: monthly, active: true,
-      } as GenericPlanLine)
-      if (d.mode === 'smart' && d.unit_cost != null && Number(d.unit_cost) > 0) {
-        const q = ensureLen(d.quantity, planningMonths)
-        const cogs = q.map(v => v * Number(d.unit_cost))
+      // Evaluate revenue AND (spread) COGS independently, and emit each line only
+      // when it is non-zero. A sales driver with zero sell price but a positive
+      // buy price still produces a COGS line — dropping it (as a revenue-only
+      // zero check would) would silently lose that cost.
+      const rev = driverMonthlyValue(d, planningMonths)
+      if (rev.some(v => v !== 0)) {
         lines.push({
-          id: `${DRIVER_COST_PREFIX}${d.id}`, unit_id: unitId, name: `Driver COGS: ${d.name}`,
-          category: 'cost_of_sales', line_type: 'standard', monthly_plan: cogs, active: true,
+          id: `${DRIVER_REV_PREFIX}${d.id}`, unit_id: unitId, name: `Driver: ${d.name}`,
+          category: 'revenue', line_type: 'standard', monthly_plan: rev, active: true,
         } as GenericPlanLine)
       }
+      if (d.mode === 'smart' && d.unit_cost != null && Number(d.unit_cost) > 0) {
+        const cogs = ensureLen(d.quantity, planningMonths).map(v => v * Number(d.unit_cost))
+        if (cogs.some(v => v !== 0)) {
+          lines.push({
+            id: `${DRIVER_COST_PREFIX}${d.id}`, unit_id: unitId, name: `Driver COGS: ${d.name}`,
+            category: 'cost_of_sales', line_type: 'standard', monthly_plan: cogs, active: true,
+          } as GenericPlanLine)
+        }
+      }
     } else {
+      const monthly = driverMonthlyValue(d, planningMonths)
+      if (!monthly.some(v => v !== 0)) continue
       const cat: DriverCostCategory = d.cost_category || 'direct_opex'
       lines.push({
         id: `${DRIVER_COST_PREFIX}${d.id}`, unit_id: unitId, name: `Driver: ${d.name}`,
@@ -145,11 +153,14 @@ export interface ChannelSummary {
  */
 export function summariseByChannel(channels: Channel[], drivers: Driver[], planningMonths: number): ChannelSummary[] {
   const nameById = new Map<string, string>((channels || []).map(c => [c.id, c.name]))
-  const acc = new Map<string, { revenue: number; cogs: number }>()
+  // Key by the real channel id (or null for unassigned) — a Map handles a null
+  // key natively, so there is no sentinel string that could collide with an
+  // actual channel whose id happened to be "__unassigned__".
+  const acc = new Map<string | null, { revenue: number; cogs: number }>()
 
   for (const d of drivers || []) {
     if (!d || d.active === false || d.kind !== 'sales') continue
-    const key = d.channel_id || '__unassigned__'
+    const key: string | null = d.channel_id || null
     const bucket = acc.get(key) || { revenue: 0, cogs: 0 }
     const rev = driverMonthlyValue(d, planningMonths).reduce((a, b) => a + b, 0)
     bucket.revenue += rev
@@ -163,8 +174,8 @@ export function summariseByChannel(channels: Channel[], drivers: Driver[], plann
   return Array.from(acc.entries()).map(([key, v]) => {
     const margin = v.revenue - v.cogs
     return {
-      channel_id: key === '__unassigned__' ? null : key,
-      channel_name: key === '__unassigned__' ? 'Unassigned' : (nameById.get(key) || key),
+      channel_id: key,
+      channel_name: key === null ? 'Unassigned' : (nameById.get(key) || key),
       revenue: v.revenue,
       cogs: v.cogs,
       margin,
