@@ -3278,6 +3278,10 @@ function TeamTab({clientId,config,P}) {
 
   async function invite() {
     if (!inviteForm.email||!inviteForm.full_name) { alert('Enter a full name and email first.'); return }
+    // A Unit Head / Accounts Assistant with no unit would see nothing — require one.
+    if (['unit_head','accounts_assistant'].includes(inviteForm.role) && inviteForm.unit_ids.length===0) {
+      alert('Select at least one unit for a Unit Head or Accounts Assistant.'); return
+    }
     setSaving(true)
     // Go through /api/invite-user (server, service-role): it creates the real
     // auth login, SENDS the invitation email, and links the profile to this
