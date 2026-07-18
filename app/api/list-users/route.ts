@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await admin
       .from('user_profiles')
-      .select('role, client_id')
+      .select('role, engagement_client_id')
       .eq('id', user.id)
       .single()
 
@@ -33,6 +33,15 @@ export async function POST(req: NextRequest) {
 
     // Only CEO, Finance Manager, and super_coach can list users
     if (!['ceo', 'finance_manager', 'super_coach'].includes(profile.role)) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    }
+
+    // Tenant scope: a ceo/finance_manager may only list THEIR OWN client's team.
+    // Without this, the role check alone let any ceo/finance_manager read another
+    // client's full roster (names, emails, sign-in status) just by passing that
+    // client's engagement id. super_coach is the deliberate cross-client
+    // exception (their engagement_client_id is null).
+    if (profile.role !== 'super_coach' && profile.engagement_client_id !== clientId) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
@@ -46,7 +55,9 @@ export async function POST(req: NextRequest) {
       .eq('engagement_client_id', clientId)
       .order('role')
 
-    if (profilesErr) return NextResponse.json({ error: profilesErr.message }, { status: 500 })
+    // Log the real DB error server-side; return a generic message so raw
+    // PostgREST/schema detail is never leaked to the browser.
+    if (profilesErr) { console.error('List users profiles query error:', profilesErr); return NextResponse.json({ error: 'Could not load the team.' }, { status: 500 }) }
 
     // Get emails from auth.users for each profile
     const userIds = (profiles || []).map(p => p.id)

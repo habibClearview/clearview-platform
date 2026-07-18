@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     let upd = admin.from('user_profiles').update(updateData).eq('id', targetUserId)
     if (rp.role !== 'super_coach') upd = upd.eq('engagement_client_id', rp.engagement_client_id)
     const { error: ue } = await upd
-    if (ue) return NextResponse.json({ error: ue.message }, { status: 500 })
+    if (ue) { console.error('Update user error:', ue); return NextResponse.json({ error: 'Could not update this user.' }, { status: 500 }) }
     if (updates.active === false && canRole) await admin.auth.admin.updateUserById(targetUserId, { ban_duration: '876000h' })
     if (updates.active === true && canRole) await admin.auth.admin.updateUserById(targetUserId, { ban_duration: 'none' })
     return NextResponse.json({ success: true })
