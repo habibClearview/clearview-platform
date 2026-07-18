@@ -538,6 +538,14 @@ export default function GenericDashboard({
   const [error, setError] = useState<string|null>(null)
   const [view, setView] = useState('overview')
   const [saving, setSaving] = useState(false)
+  // Surfaced, never-silent save status. If a background write fails or stalls,
+  // this holds the reason so the editing surfaces can show a clear banner
+  // instead of leaving the user staring at a change that looks like it did
+  // nothing. Cleared on the next successful save.
+  const [saveError, setSaveError] = useState<string|null>(null)
+  // Guards the save STATUS against out-of-order responses: a slow earlier write
+  // must not overwrite the status of a newer one the user has since triggered.
+  const saveSeqRef = useRef(0)
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0)
   const [pendingActualsCount, setPendingActualsCount] = useState(0)
   // unit_id -> period -> line_id -> combined (manual + field) value.
@@ -712,36 +720,58 @@ export default function GenericDashboard({
     if (clientId) load()
   }, [clientId])
 
-  // Save config to Supabase
-  // Persist the whole config. This is the long-proven, simple flow: write to the
-  // database, then update local state on success. setConfig runs AFTER the write
-  // completes (not optimistically) — which also means the heavy `result` model
-  // recompute is naturally throttled to once per save round-trip rather than
-  // firing on every keystroke, so a large multi-unit model stays responsive.
+  // Save config to Supabase.
+  //
+  // OPTIMISTIC: the local state (and therefore every input on screen) updates
+  // IMMEDIATELY, then the write happens in the background. The previous flow
+  // wrote first and only called setConfig on success — which meant a controlled
+  // input's displayed value did not change until the database round-trip
+  // completed. On a slow or stalling connection that made typing, clearing and
+  // adding lines look like they did nothing (the value snapped back / the new
+  // line never appeared) with no error, because the request simply hadn't
+  // returned yet. Now the change shows instantly and the save is confirmed (or
+  // flagged) afterwards.
+  //
+  // The per-keystroke recompute that once froze large models is avoided a
+  // different way: the numeric/text editors (BufferedInput below) hold what you
+  // type in local state and only commit — i.e. only call this — on blur/Enter,
+  // so this fires roughly once per field, not once per character.
   const saveConfig = useCallback(async (newConfig: GenericModelConfig) => {
+    setConfig(newConfig)            // optimistic: reflect the edit on screen at once
+    const seq = ++saveSeqRef.current
     setSaving(true)
+    setSaveError(null)
     try {
-      const { error: err } = await supabase
-        .from('generic_model_config')
-        .upsert({
-          client_id: newConfig.client_id,
-          business_name: newConfig.business_name,
-          currency: newConfig.currency,
-          start_date: newConfig.start_date,
-          planning_months: newConfig.planning_months,
-          business_units: newConfig.business_units,
-          plan_lines: newConfig.plan_lines,
-          shared_lines: newConfig.shared_lines,
-          settings: newConfig.settings,
-          updated_at: new Date().toISOString(),
-          updated_by: P.userId,
-        }, { onConflict: 'client_id' })
-      if (err) throw err
-      setConfig(newConfig)
+      const result: any = await Promise.race([
+        supabase
+          .from('generic_model_config')
+          .upsert({
+            client_id: newConfig.client_id,
+            business_name: newConfig.business_name,
+            currency: newConfig.currency,
+            start_date: newConfig.start_date,
+            planning_months: newConfig.planning_months,
+            business_units: newConfig.business_units,
+            plan_lines: newConfig.plan_lines,
+            shared_lines: newConfig.shared_lines,
+            settings: newConfig.settings,
+            updated_at: new Date().toISOString(),
+            updated_by: P.userId,
+          }, { onConflict: 'client_id' }),
+        // A true network stall must not leave "Saving…" up forever with no
+        // outcome — turn it into a visible, actionable message.
+        new Promise((_, reject) => setTimeout(() => reject(new Error(
+          'The server took too long to respond. Your change is shown here but may not be saved yet — check your connection.'
+        )), 15000)),
+      ])
+      if (result?.error) throw result.error
+      if (saveSeqRef.current === seq) { setSaving(false); setSaveError(null) }
     } catch(e: any) {
-      alert('Save failed: ' + e.message)
-    } finally {
-      setSaving(false)
+      // Only the most recent save may set the visible status.
+      if (saveSeqRef.current === seq) {
+        setSaving(false)
+        setSaveError(e?.message || 'Could not save your change to the server.')
+      }
     }
   }, [P.userId])
 
@@ -865,7 +895,7 @@ export default function GenericDashboard({
         {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P} marketEvents={marketEvents} onMarketEventsChanged={reloadMarketEvents} onApprovalActioned={reloadPendingActualsCount}/>}
         {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods} onNavigate={setView}/>}
         {view==='performance' && <PerformanceTab config={config} result={result} months={months} cc={cc}/>}
-        {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} clientId={clientId} marketEvents={marketEvents} marketEventsError={marketEventsError} onMarketEventsChanged={reloadMarketEvents}/>}
+        {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} saving={saving} saveError={saveError} clientId={clientId} marketEvents={marketEvents} marketEventsError={marketEventsError} onMarketEventsChanged={reloadMarketEvents}/>}
         {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods}/>}
         {view==='cashflow'    && <CashFlowTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
         {view==='balancesheet'&& <BalanceSheetTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods} onCloseStatusChanged={loadClosedPeriods}/>}
@@ -1363,6 +1393,44 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,pend
 // fields/labels apply and which field gets a summed total (the quantity
 // field: volume or engagements; price/fee/cost fields show no total since
 // summing a price across months isn't meaningful).
+// A text/number input that keeps what you are typing in LOCAL state and only
+// reports it upward on blur or Enter. This does two things at once:
+//   1. Every keystroke is instant and never waits on (or is reverted by) the
+//      background save — the value you type is always the value you see.
+//   2. The heavy whole-model recompute (and the DB write) fire once per field
+//      when you leave it, not once per character, so large models never freeze
+//      while typing (the reason the fully-controlled + save-per-keystroke
+//      version was reverted before).
+// While focused it shows exactly what you type; when not focused it mirrors the
+// saved value, so a quick-fill / clear / external change is reflected as soon as
+// you are not actively editing that box.
+function BufferedInput({ value, onCommit, type='text', style, placeholder, ariaLabel, disabled }:{
+  value: string|number, onCommit:(v:string|number)=>void, type?:'text'|'number',
+  style?:any, placeholder?:string, ariaLabel?:string, disabled?:boolean
+}) {
+  const toStr = (v:string|number) => (v===null||v===undefined||v==='') ? '' : String(v)
+  const [local, setLocal] = useState<string>(toStr(value))
+  const [editing, setEditing] = useState(false)
+  useEffect(() => { if (!editing) setLocal(toStr(value)) }, [value, editing]) // eslint-disable-line react-hooks/exhaustive-deps
+  function commit() {
+    setEditing(false)
+    if (type === 'number') {
+      const n = Number(local)
+      onCommit(Number.isFinite(n) ? n : 0)
+    } else {
+      onCommit(local)
+    }
+  }
+  return (
+    <input type={type} value={local} placeholder={placeholder} aria-label={ariaLabel} disabled={disabled}
+      onFocus={()=>setEditing(true)}
+      onChange={e=>{ setEditing(true); setLocal(e.target.value) }}
+      onBlur={commit}
+      onKeyDown={e=>{ if(e.key==='Enter'){ (e.target as HTMLInputElement).blur() } }}
+      style={style}/>
+  )
+}
+
 function LineFieldSubRows({l,months,cc,canEdit,rowBg,colSpanBefore,rows,totalField,onUpdate}:{
   l:GenericPlanLine, months:string[], cc:string, canEdit:boolean, rowBg:string,
   colSpanBefore:number,
@@ -1380,9 +1448,9 @@ function LineFieldSubRows({l,months,cc,canEdit,rowBg,colSpanBefore,rows,totalFie
           {arr.map((v,m)=>(
             <td key={m} style={{padding:'2px 4px'}}>
               {canEdit
-                ? <input type="number" style={{width:74,padding:'2px 4px',border:`1px solid ${C.border}`,borderRadius:3,fontSize:'0.88rem',fontFamily:'monospace',textAlign:'right',background:C.lightBg,color:C.slate}}
-                    value={v??''} placeholder="0"
-                    onChange={e=>onUpdate(field,m,Number(e.target.value))}/>
+                ? <BufferedInput type="number" value={v??''} placeholder="0"
+                    onCommit={(val)=>onUpdate(field,m,Number(val))}
+                    style={{width:74,padding:'2px 4px',border:`1px solid ${C.border}`,borderRadius:3,fontSize:'0.88rem',fontFamily:'monospace',textAlign:'right',background:C.lightBg,color:C.slate}}/>
                 : <span style={{display:'block',textAlign:'right',padding:'2px 4px',fontSize:'0.88rem',color:C.slate}}>{isCurrency?fmt(v,cc):v.toLocaleString()}</span>
               }
             </td>
@@ -1406,10 +1474,9 @@ const SERVICE_FEE_SUBROWS: [string,string,boolean][] = [
   ['Engagements','engagements',false],
 ]
 
-function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,marketEventsError,onMarketEventsChanged}) {
+function PlanningTab({config,result,months,cc,P,onSave,saving,saveError,clientId,marketEvents,marketEventsError,onMarketEventsChanged}) {
   const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active)?.id||'')
   const [selSection, setSelSection] = useState<LineCategory>('revenue')
-  const [saving, setSaving] = useState(false)
   // Cost of Sales product scope: '__whole__' = whole unit / shared, otherwise a
   // revenue line id. NOTE: no persisted cost->revenue link exists in the model
   // (GenericPlanLine has no revenue_line_id), so this is a presentation-only
@@ -1534,6 +1601,23 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
 
   return (
     <div>
+      {/* Save status — always-visible truth about whether edits are reaching the
+          server. Green tick when saved, amber while saving, red with the reason
+          if a write failed or stalled. This is what makes a failed/slow save
+          impossible to mistake for "nothing happened". */}
+      {P.canEditPlan && (saveError || saving) && (
+        <div style={{
+          display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'1rem',padding:'0.6rem 0.9rem',borderRadius:8,
+          background: saveError ? '#FDF0EE' : C.lightBg,
+          border: `1px solid ${saveError ? C.red : C.border}`,
+          borderLeft: `4px solid ${saveError ? C.red : C.amber}`,
+          fontSize:'0.98rem', color: saveError ? C.red : C.navy,
+        }}>
+          <span style={{fontWeight:700}}>{saveError ? 'Not saved' : 'Saving…'}</span>
+          <span>{saveError ? saveError : 'Your change is being saved.'}</span>
+        </div>
+      )}
+
       {/* Unit selector */}
       <div style={{display:'flex',gap:'0.45rem',marginBottom:'1.25rem',flexWrap:'wrap',alignItems:'center'}}>
         {config.business_units.filter(u=>u.active).map(u=>(
@@ -1634,8 +1718,8 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
             <div style={{display:'flex',alignItems:'center',gap:'0.85rem',padding:'0.8rem 1.1rem',borderLeft:`5px solid ${accent}`,background:C.lightBg,borderBottom:'1px solid var(--cv-border-soft)',flexWrap:'wrap'}}>
               <div style={{flex:'1 1 220px',minWidth:180}}>
                 {P.canEditPlan
-                  ? <input style={{...inp,background:'transparent',border:'none',padding:0,fontSize:'1.09rem',fontWeight:700,fontFamily:'Georgia,serif',color:C.navy}}
-                      value={l.name} onChange={e=>updateLineName(l.id,e.target.value)} aria-label="Line name"/>
+                  ? <BufferedInput value={l.name} onCommit={(val)=>updateLineName(l.id,String(val))} ariaLabel="Line name"
+                      style={{...inp,background:'transparent',border:'none',padding:0,fontSize:'1.09rem',fontWeight:700,fontFamily:'Georgia,serif',color:C.navy}}/>
                   : <span style={{fontSize:'1.09rem',fontWeight:700,fontFamily:'Georgia,serif',color:C.navy}}>{l.name}</span>
                 }
               </div>
@@ -1689,9 +1773,9 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
                       : l.monthly_plan.map((v,m)=>(
                           <td key={m} style={{padding:'2px 4px'}}>
                             {P.canEditPlan
-                              ? <input type="number" style={{width:80,padding:'3px 5px',border:`1px solid ${C.border}`,borderRadius:3,fontSize:'0.96rem',fontFamily:'monospace',textAlign:'right',background:C.white,color:C.navy}}
-                                  value={v??''} placeholder="0"
-                                  onChange={e=>updateLine(l.id,m,Number(e.target.value))}/>
+                              ? <BufferedInput type="number" value={v??''} placeholder="0"
+                                  onCommit={(val)=>updateLine(l.id,m,Number(val))}
+                                  style={{width:80,padding:'3px 5px',border:`1px solid ${C.border}`,borderRadius:3,fontSize:'0.96rem',fontFamily:'monospace',textAlign:'right',background:C.white,color:C.navy}}/>
                               : <span style={{display:'block',textAlign:'right',padding:'3px 5px',fontSize:'0.96rem'}}>{fmt(v,cc)}</span>
                             }
                           </td>
@@ -1747,16 +1831,16 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
             <div key={l.id} style={{display:'flex',gap:'0.75rem',alignItems:'center',marginBottom:'0.5rem',padding:'0.4rem 0.6rem',background:ri%2===0?C.cream:C.white,borderRadius:4}}>
               <div style={{flex:1}}>
                 {P.canEditPlan
-                  ? <input style={{...inp,background:'transparent',border:'none',padding:0,fontSize:'1.06rem'}}
-                      value={l.name} onChange={e=>onSave({...config,shared_lines:config.shared_lines.map(sl=>sl.id===l.id?{...sl,name:e.target.value}:sl)})}/>
+                  ? <BufferedInput value={l.name} onCommit={(val)=>onSave({...config,shared_lines:config.shared_lines.map(sl=>sl.id===l.id?{...sl,name:String(val)}:sl)})}
+                      style={{...inp,background:'transparent',border:'none',padding:0,fontSize:'1.06rem'}}/>
                   : <span style={{fontSize:'1.06rem',color:C.navy}}>{l.name}</span>
                 }
               </div>
               <div style={{width:140}}>
                 {P.canEditPlan
-                  ? <input type="number" style={{...inp,textAlign:'right',fontFamily:'monospace',fontSize:'1.06rem'}}
-                      value={l.monthly_plan[0]??''} placeholder="Monthly amount"
-                      onChange={e=>onSave({...config,shared_lines:config.shared_lines.map(sl=>sl.id===l.id?{...sl,monthly_plan:Array(config.planning_months).fill(Number(e.target.value))}:sl)})}/>
+                  ? <BufferedInput type="number" value={l.monthly_plan[0]??''} placeholder="Monthly amount"
+                      onCommit={(val)=>onSave({...config,shared_lines:config.shared_lines.map(sl=>sl.id===l.id?{...sl,monthly_plan:Array(config.planning_months).fill(Number(val))}:sl)})}
+                      style={{...inp,textAlign:'right',fontFamily:'monospace',fontSize:'1.06rem'}}/>
                   : <span style={{fontFamily:'monospace',fontSize:'1.06rem',color:C.navy,display:'block',textAlign:'right'}}>{fmt(l.monthly_plan[0],cc)}/mo</span>
                 }
               </div>
