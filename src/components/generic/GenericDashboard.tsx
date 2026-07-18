@@ -757,6 +757,11 @@ export default function GenericDashboard({
         cfg = queued
       }
     } catch(e: any) {
+      // Drop any snapshot queued during the failed write. If we kept it, a later
+      // successful save would drain this now-stale snapshot afterwards and revert
+      // itself. Nothing is lost: optimistic setConfig already applied the queued
+      // edit to local state, so the next successful save re-persists it.
+      savePendingRef.current = null
       alert('Save failed: ' + e.message)
     } finally {
       saveInFlightRef.current = false
