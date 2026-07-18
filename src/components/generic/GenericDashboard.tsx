@@ -614,18 +614,19 @@ export default function GenericDashboard({
   // silently drop out of the P&L. We flag it so the Planning section can warn
   // that the numbers may be understated until it reloads.
   const [marketEventsError, setMarketEventsError] = useState(false)
-  // Guards against a stale response landing after the user has switched clients:
-  // we stamp each request with the client it was for and drop any response whose
-  // client no longer matches — so Client A's activities can never be injected
-  // into Client B's model.
-  const marketEventsClientRef = useRef<string | null>(clientId)
-  marketEventsClientRef.current = clientId
+  // Each load gets a monotonically increasing token; only the newest token's
+  // response is applied. This drops BOTH a stale response after a client switch
+  // AND an earlier slow response for the same client that a later reload
+  // superseded — so one client's activities can never leak into another's model,
+  // and an out-of-order reload can't resurrect stale rows. The token is bumped
+  // inside the callback (an event/effect), never during render.
+  const marketEventsReqRef = useRef(0)
   const reloadMarketEvents = useCallback(() => {
     if (!clientId) { setMarketEvents([]); return }
-    const forClient = clientId
-    supabase.from('generic_market_events').select('*').eq('client_id', forClient).order('created_at', {ascending:false})
+    const reqId = ++marketEventsReqRef.current
+    supabase.from('generic_market_events').select('*').eq('client_id', clientId).order('created_at', {ascending:false})
       .then(({data, error}) => {
-        if (marketEventsClientRef.current !== forClient) return // superseded by a client switch
+        if (marketEventsReqRef.current !== reqId) return // superseded by a newer load
         if (error) { console.error('Failed to load market activities:', error.message); setMarketEventsError(true); return }
         setMarketEventsError(false)
         setMarketEvents((data as MarketEvent[]) || [])
@@ -1805,8 +1806,11 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
   // activity back into the approval queue. (Edit the details by deleting and
   // re-adding; re-propose keeps the same activity and clears the reviewer note.)
   async function rePropose(id:string){
-    const {error}=await supabase.from('generic_market_events').update({status:'proposed', review_note:null, updated_at:new Date().toISOString()}).eq('id',id)
+    // Guard on status='rejected' (count:'exact') so a stale click can't overwrite
+    // a row that has since moved on — e.g. silently withdrawing an approved cost.
+    const {error,count}=await supabase.from('generic_market_events').update({status:'proposed', review_note:null, updated_at:new Date().toISOString()},{count:'exact'}).eq('id',id).eq('status','rejected')
     if(error){alert('Could not re-propose — '+error.message);return}
+    if(!count){alert('This activity was already changed — refreshing.')}
     onChanged&&onChanged()
   }
 
@@ -1822,14 +1826,14 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
       {showAdd&&P.canEditPlan&&(
         <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'1rem',marginBottom:'1rem',background:C.cream}}>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'0.6rem'}}>
-            <div><label style={lbl}>Activity name</label><input style={inp} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Radio campaign"/></div>
-            <div><label style={lbl}>Business unit</label><select style={inp} value={form.unit_id} onChange={e=>setForm(f=>({...f,unit_id:e.target.value}))}>{config.business_units.filter((u:any)=>u.active).map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
-            <div><label style={lbl}>Total cost</label><input type="number" style={inp} value={form.cost} onChange={e=>setForm(f=>({...f,cost:e.target.value}))} placeholder="0"/></div>
-            <div><label style={lbl}>Start month</label><select style={inp} value={form.start_period} onChange={e=>setForm(f=>({...f,start_period:e.target.value}))}>{monthOpts.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}</select></div>
-            <div><label style={lbl}>Runs for (months)</label><input type="number" min={1} style={inp} value={form.months_count} onChange={e=>setForm(f=>({...f,months_count:e.target.value}))}/></div>
-            <div><label style={lbl}>Cost type</label><select style={inp} value={form.cost_category} onChange={e=>setForm(f=>({...f,cost_category:e.target.value}))}><option value="direct_opex">Overhead (marketing)</option><option value="cost_of_sales">Cost of sales</option></select></div>
-            <div><label style={lbl}>Expected sales lift %</label><input type="number" style={inp} value={form.expected_uplift_pct} onChange={e=>setForm(f=>({...f,expected_uplift_pct:e.target.value}))} placeholder="optional"/></div>
-            <div style={{gridColumn:'1/-1'}}><label style={lbl}>Notes (optional)</label><input style={inp} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></div>
+            <div><label style={lbl} htmlFor="mkt-name">Activity name</label><input id="mkt-name" style={inp} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Radio campaign"/></div>
+            <div><label style={lbl} htmlFor="mkt-unit">Business unit</label><select id="mkt-unit" style={inp} value={form.unit_id} onChange={e=>setForm(f=>({...f,unit_id:e.target.value}))}>{config.business_units.filter((u:any)=>u.active).map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+            <div><label style={lbl} htmlFor="mkt-cost">Total cost</label><input id="mkt-cost" type="number" style={inp} value={form.cost} onChange={e=>setForm(f=>({...f,cost:e.target.value}))} placeholder="0"/></div>
+            <div><label style={lbl} htmlFor="mkt-start">Start month</label><select id="mkt-start" style={inp} value={form.start_period} onChange={e=>setForm(f=>({...f,start_period:e.target.value}))}>{monthOpts.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}</select></div>
+            <div><label style={lbl} htmlFor="mkt-months">Runs for (months)</label><input id="mkt-months" type="number" min={1} max={24} style={inp} value={form.months_count} onChange={e=>setForm(f=>({...f,months_count:e.target.value}))}/></div>
+            <div><label style={lbl} htmlFor="mkt-cat">Cost type</label><select id="mkt-cat" style={inp} value={form.cost_category} onChange={e=>setForm(f=>({...f,cost_category:e.target.value}))}><option value="direct_opex">Overhead (marketing)</option><option value="cost_of_sales">Cost of sales</option></select></div>
+            <div><label style={lbl} htmlFor="mkt-lift">Expected sales lift %</label><input id="mkt-lift" type="number" style={inp} value={form.expected_uplift_pct} onChange={e=>setForm(f=>({...f,expected_uplift_pct:e.target.value}))} placeholder="optional"/></div>
+            <div style={{gridColumn:'1/-1'}}><label style={lbl} htmlFor="mkt-notes">Notes (optional)</label><input id="mkt-notes" style={inp} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></div>
           </div>
           <div style={{display:'flex',gap:'0.5rem',marginTop:'0.75rem',alignItems:'center',flexWrap:'wrap'}}>
             <button style={solidBtn(C.teal)} disabled={busy} onClick={propose}>{busy?'Saving…':'Propose for approval'}</button>
@@ -1858,7 +1862,7 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
                   <td style={{padding:'6px 8px'}}>
                     <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}>
                       {P.canEditPlan&&e.status==='rejected'&&<button style={addBtn(true,C.teal)} onClick={()=>rePropose(e.id)}>Re-propose</button>}
-                      {P.canEditPlan&&<button style={delBtn} onClick={()=>remove(e.id)}>×</button>}
+                      {P.canEditPlan&&<button style={delBtn} aria-label="Delete market activity" title="Delete market activity" onClick={()=>remove(e.id)}>×</button>}
                     </div>
                   </td>
                 </tr>
