@@ -67,14 +67,19 @@ export function driverMonthlyValue(d: Driver, planningMonths: number): number[] 
   return q.map(v => v * rate)
 }
 
-// Resolve which business unit a driver's line attaches to: its own unit, else its
-// channel's unit, else the caller-provided fallback (usually the first unit) so a
-// whole-business driver still lands in the consolidated P&L.
-function effectiveUnitId(d: Driver, channelById: Map<string, Channel>, fallbackUnitId: string | null): string | null {
-  if (d.unit_id) return d.unit_id
+// Resolve which business unit(s) a driver's lines attach to:
+//   - its own unit if set, else its channel's unit → a single, precise unit;
+//   - otherwise it is a WHOLE-BUSINESS driver, spread EVENLY across every active
+//     unit. Splitting (rather than dumping the whole amount on the first unit)
+//     keeps the consolidated total correct AND avoids overstating one unit's P&L
+//     while understating the others — the per-unit statements stay honest.
+// Returns the list of units to attach to (one for a unit/channel-scoped driver,
+// all of them for a whole-business driver); empty means nowhere to attach.
+function resolveUnitIds(d: Driver, channelById: Map<string, Channel>, allUnitIds: string[]): string[] {
+  if (d.unit_id) return [d.unit_id]
   const chan = d.channel_id ? channelById.get(d.channel_id) : undefined
-  if (chan?.unit_id) return chan.unit_id
-  return fallbackUnitId
+  if (chan?.unit_id) return [chan.unit_id]
+  return allUnitIds
 }
 
 /**
@@ -85,23 +90,35 @@ function effectiveUnitId(d: Driver, channelById: Map<string, Channel>, fallbackU
  *    matching 'cost_of_sales' line, so gross margin = quantity × (rate − unit_cost)
  *    — the spread. Move the quantity and both revenue and COGS move together.
  *  - A cost driver → a cost line in its chosen bucket (default direct_opex).
- * Inactive drivers, all-zero drivers, and drivers with nowhere to attach are
- * skipped. Every line's monthly_plan is exactly planningMonths long.
+ *  - A WHOLE-BUSINESS driver (no unit and no channel unit) is split evenly across
+ *    all `unitIds`, one line per unit carrying an equal share, so consolidated is
+ *    exact and no single unit is over/under-stated. A unit/channel-scoped driver
+ *    produces one line on that unit.
+ * Inactive drivers, all-zero drivers, and drivers with nowhere to attach (whole
+ * business but no units) are skipped. Every line's monthly_plan is exactly
+ * planningMonths long.
  */
 export function syntheticPlanLinesFromDrivers(
   channels: Channel[],
   drivers: Driver[],
   planningMonths: number,
-  fallbackUnitId: string | null,
+  unitIds: string[],
 ): GenericPlanLine[] {
   const lines: GenericPlanLine[] = []
   if (!Array.isArray(drivers) || planningMonths <= 0) return lines
   const channelById = new Map<string, Channel>((channels || []).map(c => [c.id, c]))
+  const allUnits = (Array.isArray(unitIds) ? unitIds : []).filter(Boolean)
 
   for (const d of drivers) {
     if (!d || d.active === false) continue
-    const unitId = effectiveUnitId(d, channelById, fallbackUnitId)
-    if (!unitId) continue
+    const targetUnits = resolveUnitIds(d, channelById, allUnits)
+    if (targetUnits.length === 0) continue
+    const n = targetUnits.length
+    // Split whole-business drivers evenly; a single-unit driver keeps its full
+    // value and its plain (unsuffixed) id, so unit/channel-scoped lines are
+    // unchanged. Whole-business lines get a per-unit id suffix to stay unique.
+    const split = (series: number[]) => n === 1 ? series : series.map(v => v / n)
+    const suffix = (unitId: string) => n === 1 ? '' : `__${unitId}`
 
     if (d.kind === 'sales') {
       // Evaluate revenue AND (spread) COGS independently, and emit each line only
@@ -109,18 +126,22 @@ export function syntheticPlanLinesFromDrivers(
       // buy price still produces a COGS line — dropping it (as a revenue-only
       // zero check would) would silently lose that cost.
       const rev = driverMonthlyValue(d, planningMonths)
-      if (rev.some(v => v !== 0)) {
-        lines.push({
-          id: `${DRIVER_REV_PREFIX}${d.id}`, unit_id: unitId, name: `Driver: ${d.name}`,
-          category: 'revenue', line_type: 'standard', monthly_plan: rev, active: true,
-        } as GenericPlanLine)
-      }
-      if (d.mode === 'smart' && d.unit_cost != null && Number(d.unit_cost) > 0) {
-        const cogs = ensureLen(d.quantity, planningMonths).map(v => v * Number(d.unit_cost))
-        if (cogs.some(v => v !== 0)) {
+      const hasRev = rev.some(v => v !== 0)
+      const cogsFull = (d.mode === 'smart' && d.unit_cost != null && Number(d.unit_cost) > 0)
+        ? ensureLen(d.quantity, planningMonths).map(v => v * Number(d.unit_cost))
+        : null
+      const hasCogs = !!cogsFull && cogsFull.some(v => v !== 0)
+      for (const unitId of targetUnits) {
+        if (hasRev) {
           lines.push({
-            id: `${DRIVER_COST_PREFIX}${d.id}`, unit_id: unitId, name: `Driver COGS: ${d.name}`,
-            category: 'cost_of_sales', line_type: 'standard', monthly_plan: cogs, active: true,
+            id: `${DRIVER_REV_PREFIX}${d.id}${suffix(unitId)}`, unit_id: unitId, name: `Driver: ${d.name}`,
+            category: 'revenue', line_type: 'standard', monthly_plan: split(rev), active: true,
+          } as GenericPlanLine)
+        }
+        if (hasCogs && cogsFull) {
+          lines.push({
+            id: `${DRIVER_COST_PREFIX}${d.id}${suffix(unitId)}`, unit_id: unitId, name: `Driver COGS: ${d.name}`,
+            category: 'cost_of_sales', line_type: 'standard', monthly_plan: split(cogsFull), active: true,
           } as GenericPlanLine)
         }
       }
@@ -128,10 +149,12 @@ export function syntheticPlanLinesFromDrivers(
       const monthly = driverMonthlyValue(d, planningMonths)
       if (!monthly.some(v => v !== 0)) continue
       const cat: DriverCostCategory = d.cost_category || 'direct_opex'
-      lines.push({
-        id: `${DRIVER_COST_PREFIX}${d.id}`, unit_id: unitId, name: `Driver: ${d.name}`,
-        category: cat, line_type: 'standard', monthly_plan: monthly, active: true,
-      } as GenericPlanLine)
+      for (const unitId of targetUnits) {
+        lines.push({
+          id: `${DRIVER_COST_PREFIX}${d.id}${suffix(unitId)}`, unit_id: unitId, name: `Driver: ${d.name}`,
+          category: cat, line_type: 'standard', monthly_plan: split(monthly), active: true,
+        } as GenericPlanLine)
+      }
     }
   }
   return lines

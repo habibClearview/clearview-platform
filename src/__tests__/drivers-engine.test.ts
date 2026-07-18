@@ -37,7 +37,7 @@ describe('driverMonthlyValue', () => {
 
 describe('syntheticPlanLinesFromDrivers — sales drivers', () => {
   it('REG: a smart sales driver makes one revenue line = quantity × rate', () => {
-    const lines = syntheticPlanLinesFromDrivers([chan({})], [drv({ quantity: new Array(M).fill(10), rate: 100 })], M, 'u1')
+    const lines = syntheticPlanLinesFromDrivers([chan({})], [drv({ quantity: new Array(M).fill(10), rate: 100 })], M, ['u1'])
     expect(lines).toHaveLength(1)
     expect(lines[0].category).toBe('revenue')
     expect(lines[0].id).toBe(`${DRIVER_REV_PREFIX}d1`)
@@ -47,7 +47,7 @@ describe('syntheticPlanLinesFromDrivers — sales drivers', () => {
   })
 
   it('REG: a spread driver (unit_cost set) also emits a matching COGS line → margin = qty × (rate − cost)', () => {
-    const lines = syntheticPlanLinesFromDrivers([chan({})], [drv({ quantity: new Array(M).fill(10), rate: 100, unit_cost: 60 })], M, 'u1')
+    const lines = syntheticPlanLinesFromDrivers([chan({})], [drv({ quantity: new Array(M).fill(10), rate: 100, unit_cost: 60 })], M, ['u1'])
     expect(lines).toHaveLength(2)
     const rev = lines.find(l => l.category === 'revenue')!
     const cogs = lines.find(l => l.category === 'cost_of_sales')!
@@ -60,14 +60,14 @@ describe('syntheticPlanLinesFromDrivers — sales drivers', () => {
 
   it('REG: a smart sales driver with zero sell price but a positive buy price still emits its COGS line', () => {
     // volume 10, rate 0 (no revenue), unit_cost 60 → COGS 600/month, no revenue line
-    const lines = syntheticPlanLinesFromDrivers([chan({})], [drv({ quantity: new Array(M).fill(10), rate: 0, unit_cost: 60 })], M, 'u1')
+    const lines = syntheticPlanLinesFromDrivers([chan({})], [drv({ quantity: new Array(M).fill(10), rate: 0, unit_cost: 60 })], M, ['u1'])
     expect(lines).toHaveLength(1)
     expect(lines[0].category).toBe('cost_of_sales')
     expect(lines[0].monthly_plan[0]).toBe(600)
   })
 
   it('REG: a flat sales driver does NOT emit a COGS line even if unit_cost is set', () => {
-    const lines = syntheticPlanLinesFromDrivers([chan({})], [drv({ mode: 'flat', quantity: new Array(M).fill(500), unit_cost: 60 })], M, 'u1')
+    const lines = syntheticPlanLinesFromDrivers([chan({})], [drv({ mode: 'flat', quantity: new Array(M).fill(500), unit_cost: 60 })], M, ['u1'])
     expect(lines).toHaveLength(1)
     expect(lines[0].category).toBe('revenue')
     expect(lines[0].monthly_plan[0]).toBe(500)
@@ -76,33 +76,59 @@ describe('syntheticPlanLinesFromDrivers — sales drivers', () => {
 
 describe('syntheticPlanLinesFromDrivers — cost drivers', () => {
   it('REG: a cost driver lands in its chosen bucket (default direct_opex)', () => {
-    const lines = syntheticPlanLinesFromDrivers([], [drv({ id: 'c1', kind: 'cost', channel_id: null, quantity: new Array(M).fill(3), rate: 2000 })], M, 'u1')
+    const lines = syntheticPlanLinesFromDrivers([], [drv({ id: 'c1', kind: 'cost', channel_id: null, quantity: new Array(M).fill(3), rate: 2000 })], M, ['u1'])
     expect(lines).toHaveLength(1)
     expect(lines[0].category).toBe('direct_opex')
     expect(lines[0].monthly_plan[0]).toBe(6000) // 3 × 2000
   })
   it('REG: a cost driver can target cost_of_sales', () => {
-    const lines = syntheticPlanLinesFromDrivers([], [drv({ id: 'c1', kind: 'cost', channel_id: null, cost_category: 'cost_of_sales', quantity: new Array(M).fill(1), rate: 50 })], M, 'u1')
+    const lines = syntheticPlanLinesFromDrivers([], [drv({ id: 'c1', kind: 'cost', channel_id: null, cost_category: 'cost_of_sales', quantity: new Array(M).fill(1), rate: 50 })], M, ['u1'])
     expect(lines[0].category).toBe('cost_of_sales')
   })
 })
 
 describe('syntheticPlanLinesFromDrivers — unit resolution & skipping', () => {
   it('REG: a driver with no unit inherits its channel unit', () => {
-    const lines = syntheticPlanLinesFromDrivers([chan({ id: 'ch1', unit_id: 'unitX' })], [drv({ unit_id: null, channel_id: 'ch1' })], M, null)
+    const lines = syntheticPlanLinesFromDrivers([chan({ id: 'ch1', unit_id: 'unitX' })], [drv({ unit_id: null, channel_id: 'ch1' })], M, [])
     expect(lines[0].unit_id).toBe('unitX')
   })
-  it('REG: with no driver unit and no channel unit, it uses the fallback unit', () => {
-    const lines = syntheticPlanLinesFromDrivers([], [drv({ unit_id: null, channel_id: null })], M, 'fallbackU')
+  it('REG: a single-unit whole-business driver lands wholly on that unit with a plain id', () => {
+    const lines = syntheticPlanLinesFromDrivers([], [drv({ unit_id: null, channel_id: null, quantity: new Array(M).fill(1), rate: 10 })], M, ['fallbackU'])
+    expect(lines).toHaveLength(1)
     expect(lines[0].unit_id).toBe('fallbackU')
+    expect(lines[0].id).toBe(`${DRIVER_REV_PREFIX}d1`)
+    expect(lines[0].monthly_plan[0]).toBe(10)
   })
-  it('REG: with nowhere to attach (no unit anywhere), the driver is skipped', () => {
-    const lines = syntheticPlanLinesFromDrivers([], [drv({ unit_id: null, channel_id: null })], M, null)
+  it('REG: a whole-business spread driver is split EVENLY across all active units (consolidated exact, no unit overstated)', () => {
+    // qty 10 × sell 100 = 1000/mo revenue, × buy 60 = 600/mo COGS, whole business
+    // across two units → each unit gets half of each, ids suffixed per unit.
+    const lines = syntheticPlanLinesFromDrivers([], [drv({ id: 'wb', unit_id: null, channel_id: null, quantity: new Array(M).fill(10), rate: 100, unit_cost: 60 })], M, ['u1', 'u2'])
+    expect(lines).toHaveLength(4) // rev+cogs per unit
+    const u1rev = lines.find(l => l.unit_id === 'u1' && l.category === 'revenue')!
+    const u2rev = lines.find(l => l.unit_id === 'u2' && l.category === 'revenue')!
+    const u1cogs = lines.find(l => l.unit_id === 'u1' && l.category === 'cost_of_sales')!
+    expect(u1rev.monthly_plan[0]).toBe(500)   // 1000 / 2
+    expect(u2rev.monthly_plan[0]).toBe(500)
+    expect(u1cogs.monthly_plan[0]).toBe(300)  // 600 / 2
+    expect(u1rev.id).toBe(`${DRIVER_REV_PREFIX}wb__u1`)
+    expect(u2rev.id).toBe(`${DRIVER_REV_PREFIX}wb__u2`)
+    // consolidated revenue over the horizon = full amount (no leakage)
+    const totalRev = lines.filter(l => l.category === 'revenue').reduce((s, l) => s + l.monthly_plan.reduce((a, b) => a + b, 0), 0)
+    expect(totalRev).toBe(1000 * M)
+  })
+  it('REG: a whole-business cost driver is split evenly across all active units', () => {
+    const lines = syntheticPlanLinesFromDrivers([], [drv({ id: 'oc', kind: 'cost', unit_id: null, channel_id: null, quantity: new Array(M).fill(1), rate: 900 })], M, ['u1', 'u2', 'u3'])
+    expect(lines).toHaveLength(3)
+    expect(lines.every(l => l.category === 'direct_opex')).toBe(true)
+    expect(lines.every(l => l.monthly_plan[0] === 300)).toBe(true) // 900 / 3
+  })
+  it('REG: with nowhere to attach (whole business but no units), the driver is skipped', () => {
+    const lines = syntheticPlanLinesFromDrivers([], [drv({ unit_id: null, channel_id: null })], M, [])
     expect(lines).toHaveLength(0)
   })
   it('REG: inactive and all-zero drivers produce nothing', () => {
-    expect(syntheticPlanLinesFromDrivers([chan({})], [drv({ active: false })], M, 'u1')).toHaveLength(0)
-    expect(syntheticPlanLinesFromDrivers([chan({})], [drv({ quantity: new Array(M).fill(0) })], M, 'u1')).toHaveLength(0)
+    expect(syntheticPlanLinesFromDrivers([chan({})], [drv({ active: false })], M, ['u1'])).toHaveLength(0)
+    expect(syntheticPlanLinesFromDrivers([chan({})], [drv({ quantity: new Array(M).fill(0) })], M, ['u1'])).toHaveLength(0)
   })
 })
 

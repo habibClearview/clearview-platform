@@ -713,29 +713,51 @@ export default function GenericDashboard({
   }, [clientId])
 
   // Save config to Supabase
+  // Serialize + coalesce writes to generic_model_config. Every editing surface
+  // calls saveConfig with the WHOLE config, so two rapid edits that overlap could
+  // otherwise finish out of order and persist an older snapshot over a newer one
+  // (e.g. fast driver tuning). We keep at most one upsert in flight; while it runs
+  // the LATEST config is queued (older queued configs are dropped — only the last
+  // matters), and it is written when the current upsert finishes. So the database
+  // always ends on the last edit, in order.
+  const saveInFlightRef = useRef(false)
+  const savePendingRef = useRef<GenericModelConfig | null>(null)
   const saveConfig = useCallback(async (newConfig: GenericModelConfig) => {
+    if (saveInFlightRef.current) { savePendingRef.current = newConfig; return }
+    saveInFlightRef.current = true
     setSaving(true)
+    let cfg = newConfig
     try {
-      const { error: err } = await supabase
-        .from('generic_model_config')
-        .upsert({
-          client_id: newConfig.client_id,
-          business_name: newConfig.business_name,
-          currency: newConfig.currency,
-          start_date: newConfig.start_date,
-          planning_months: newConfig.planning_months,
-          business_units: newConfig.business_units,
-          plan_lines: newConfig.plan_lines,
-          shared_lines: newConfig.shared_lines,
-          settings: newConfig.settings,
-          updated_at: new Date().toISOString(),
-          updated_by: P.userId,
-        }, { onConflict: 'client_id' })
-      if (err) throw err
-      setConfig(newConfig)
+      // Drain loop: a config queued while we were awaiting still gets written next,
+      // preserving order, until nothing newer is pending.
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { error: err } = await supabase
+          .from('generic_model_config')
+          .upsert({
+            client_id: cfg.client_id,
+            business_name: cfg.business_name,
+            currency: cfg.currency,
+            start_date: cfg.start_date,
+            planning_months: cfg.planning_months,
+            business_units: cfg.business_units,
+            plan_lines: cfg.plan_lines,
+            shared_lines: cfg.shared_lines,
+            settings: cfg.settings,
+            updated_at: new Date().toISOString(),
+            updated_by: P.userId,
+          }, { onConflict: 'client_id' })
+        if (err) throw err
+        setConfig(cfg)
+        const queued = savePendingRef.current
+        if (!queued) break
+        savePendingRef.current = null
+        cfg = queued
+      }
     } catch(e: any) {
       alert('Save failed: ' + e.message)
     } finally {
+      saveInFlightRef.current = false
       setSaving(false)
     }
   }, [P.userId])
@@ -750,11 +772,15 @@ export default function GenericDashboard({
     // Each is a no-op when empty, so a model with neither is completely
     // unaffected. The engine sums plan lines by category, so both just flow into
     // P&L / cash flow / balance sheet.
-    const firstUnit = config.business_units.find((u:any)=>u.active)?.id || config.business_units[0]?.id || null
+    // Whole-business drivers (no unit, no channel unit) are split evenly across
+    // the active units, so consolidated is exact and no single unit is
+    // over/under-stated. Fall back to all units if none are marked active.
+    const activeUnitIds = config.business_units.filter((u:any)=>u.active).map((u:any)=>u.id)
+    const unitIds = activeUnitIds.length ? activeUnitIds : config.business_units.map((u:any)=>u.id)
     const driverLines = syntheticPlanLinesFromDrivers(
       config.settings?.channels||[],
       config.settings?.drivers||[],
-      config.planning_months, firstUnit,
+      config.planning_months, unitIds,
     )
     const eventLines = syntheticPlanLinesFromEvents(marketEvents, config.start_date, config.planning_months)
     const extra = [...driverLines, ...eventLines]
@@ -1852,8 +1878,8 @@ function DriversSection({config,cc,P,onSave}) {
         {channels.length===0? <div style={{fontSize:'1.0rem',color:C.slate}}>No channels yet.</div> :
           channels.map(c=>(
             <div key={c.id} style={{display:'flex',gap:'0.5rem',alignItems:'center',padding:'0.35rem 0',borderBottom:'1px solid var(--cv-border-soft)',flexWrap:'wrap'}}>
-              <input style={{...inp,maxWidth:220}} value={c.name} disabled={!canEdit} onChange={e=>updChannel(c.id,{name:e.target.value})}/>
-              <select style={{...inp,maxWidth:220}} value={c.unit_id||''} disabled={!canEdit} onChange={e=>updChannel(c.id,{unit_id:e.target.value||null})}>
+              <input aria-label="Channel name" style={{...inp,maxWidth:220}} value={c.name} disabled={!canEdit} onChange={e=>updChannel(c.id,{name:e.target.value})}/>
+              <select aria-label={`Business unit for ${c.name||'channel'}`} style={{...inp,maxWidth:220}} value={c.unit_id||''} disabled={!canEdit} onChange={e=>updChannel(c.id,{unit_id:e.target.value||null})}>
                 <option value="">Whole business</option>{units.map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
               {canEdit&&<button style={delBtn} aria-label="Delete channel" title="Delete channel" onClick={()=>delChannel(c.id)}>×</button>}
@@ -1881,7 +1907,7 @@ function DriversSection({config,cc,P,onSave}) {
             <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily:'monospace'}}>
               <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Channel','Revenue','Cost of sales','Margin','Margin %'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600}}>{h}</th>)}</tr></thead>
               <tbody>{channelSummary.map((s,i)=>(
-                <tr key={s.channel_id||'unassigned'} style={{background:i%2===0?C.cream:C.white}}>
+                <tr key={s.channel_id===null?'unassigned':`channel:${s.channel_id}`} style={{background:i%2===0?C.cream:C.white}}>
                   <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{s.channel_name}</td>
                   <td style={{padding:'8px 10px',color:C.green}}>{fmt(s.revenue,cc)}</td>
                   <td style={{padding:'8px 10px',color:C.red}}>{fmt(s.cogs,cc)}</td>
