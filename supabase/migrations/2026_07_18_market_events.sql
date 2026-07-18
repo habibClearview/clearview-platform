@@ -76,8 +76,19 @@ create policy market_events_read on generic_market_events for select using (my_r
 create policy market_events_insert on generic_market_events for insert
   with check ((my_role() = 'super_coach' or can_view_client(client_id)) and status = 'proposed' and created_by_uid = auth.uid());
 
+-- The ownership + status test must be in USING as well as WITH CHECK. USING
+-- decides which EXISTING rows a non-approver may target; without it, a
+-- non-approver could target someone else's proposed row and set created_by_uid
+-- to themselves (passing WITH CHECK) — taking over ownership. With it, a
+-- non-approver can only ever touch their OWN still-proposed activity.
 create policy market_events_update on generic_market_events for update
-  using (my_role() = 'super_coach' or can_view_client(client_id))
+  using (
+    (my_role() = 'super_coach' or can_view_client(client_id))
+    and (
+      my_role() in ('super_coach', 'coach', 'ceo', 'finance_manager')
+      or (status = 'proposed' and created_by_uid = auth.uid())
+    )
+  )
   with check (
     (my_role() = 'super_coach' or can_view_client(client_id))
     and (
