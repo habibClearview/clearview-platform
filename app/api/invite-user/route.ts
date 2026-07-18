@@ -120,22 +120,36 @@ export async function POST(req: NextRequest) {
     }
 
     // Create the user_profile record immediately
-    // (the user can log in once they accept the invite)
+    // (the user can log in once they accept the invite).
+    // Client-scoped roles link to the client via engagement_client_id — the
+    // TEXT engagement_clients id the whole app and RLS (my_engagement_client_id)
+    // read. The legacy client_id column references the old clients table (UUID),
+    // so it must stay null for engagement-id clients or the write fails. coach/
+    // funder logins aren't "of" any one client — they're scoped by their own
+    // co_implementer_id / funder_programme_id columns.
+    const isClientRole = ['ceo', 'finance_manager', 'unit_head', 'accounts_assistant'].includes(role)
     const { error: profileErr } = await admin
       .from('user_profiles')
       .upsert({
         id: inviteData.user.id,
-        client_id: clientId || null,
+        engagement_client_id: isClientRole ? (clientId || null) : null,
         role,
         full_name: fullName,
+        email,
+        status: 'invited',
         assigned_unit_ids: assignedUnitIds || [],
         co_implementer_id: role === 'coach' ? coImplementerId : null,
         funder_programme_id: role === 'funder' ? funderProgrammeId : null,
       })
 
     if (profileErr) {
+      // The invite email was already sent; a failed profile write means the new
+      // login won't be linked to the client yet. Surface it so it isn't a silent
+      // half-success (the invitee would get an email but see no client on login).
       console.error('Profile creation error:', profileErr)
-      // Don't fail — the invite was sent, profile can be fixed manually
+      return NextResponse.json({
+        error: `Invite email sent, but linking the account to the organisation failed (${profileErr.message}). Please tell your coach so they can finish setting up this login.`,
+      }, { status: 500 })
     }
 
     return NextResponse.json({
