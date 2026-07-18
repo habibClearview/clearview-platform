@@ -688,7 +688,12 @@ function TeamTab({role,userId,userName,businessUnit,canSeeAllUnits}:{role:string
       const { error } = await supabase.from('user_profiles').update({...updates, updated_at: new Date().toISOString()}).eq('id', id)
       if (error) throw error
     } catch (e) {
-      if (prevMember) setTeamMembers(prev => prev.map(m => m.id !== id ? m : prevMember))
+      // Revert only the fields THIS update changed (not the whole row), so a
+      // concurrent update to a different field of the same member isn't clobbered.
+      if (prevMember) {
+        const prevFields = Object.fromEntries(Object.keys(updates).map(k => [k, prevMember[k]]))
+        setTeamMembers(prev => prev.map(m => m.id !== id ? m : {...m, ...prevFields}))
+      }
       alert('Could not save that change to the server. Please check your connection and try again.')
     }
   }
