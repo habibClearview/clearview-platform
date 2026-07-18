@@ -23,6 +23,7 @@ import ErrorBoundary from '@/components/ErrorBoundary'
 import VerificationRecognition from '@/components/generic/VerificationRecognition'
 import PaymentReviewQueue from '@/components/generic/PaymentReviewQueue'
 import { computeFreePerformance, operatingMarginPct, grossMarginPct, ebitdaMarginPct, netMarginPct, revenueGrowthPct, ruleOf40, isRuleOf40Strong, burnMultiple } from '@/lib/business-performance-metrics'
+import { syntheticPlanLinesFromDrivers, summariseByChannel, type Channel, type Driver } from '@/lib/drivers-engine'
 import { syntheticPlanLinesFromEvents, type MarketEvent } from '@/lib/market-events'
 
 // ── Design tokens ────────────────────────────────────────────
@@ -712,42 +713,87 @@ export default function GenericDashboard({
   }, [clientId])
 
   // Save config to Supabase
-  const saveConfig = useCallback(async (newConfig: GenericModelConfig) => {
+  // Persist the whole config with a single-writer design keyed to one
+  // synchronously-maintained "latest desired config" ref. This is the source of
+  // truth for what SHOULD be in the database:
+  //  - Optimistic: setConfig(newConfig) runs immediately, so a fast follow-up edit
+  //    from any surface is built on top of the latest change, and the newest config
+  //    is recorded in latestConfigRef synchronously (independent of React timing).
+  //  - One writer at a time: if a write is already running, we just update the ref
+  //    and return; the running writer always persists the LATEST desired config,
+  //    never a stale queued snapshot — so writes are ordered and coalesced and can
+  //    never drain an old snapshot over a newer one.
+  //  - On failure: the latest desired config is KEPT in the ref (not discarded), so
+  //    the next edit re-persists it; local state already shows it. The only residual
+  //    is a transient failure with no further edit before a reload — no worse than a
+  //    plain single save, and the change stays visible meanwhile.
+  const latestConfigRef = useRef<GenericModelConfig | null>(null)
+  const writingRef = useRef(false)
+  const saveConfig = useCallback((newConfig: GenericModelConfig) => {
+    setConfig(newConfig)                 // optimistic: local state is truth at once
+    latestConfigRef.current = newConfig  // synchronous latest DESIRED config
+    if (writingRef.current) return       // the active writer will pick this up
+    writingRef.current = true
     setSaving(true)
-    try {
-      const { error: err } = await supabase
-        .from('generic_model_config')
-        .upsert({
-          client_id: newConfig.client_id,
-          business_name: newConfig.business_name,
-          currency: newConfig.currency,
-          start_date: newConfig.start_date,
-          planning_months: newConfig.planning_months,
-          business_units: newConfig.business_units,
-          plan_lines: newConfig.plan_lines,
-          shared_lines: newConfig.shared_lines,
-          settings: newConfig.settings,
-          updated_at: new Date().toISOString(),
-          updated_by: P.userId,
-        }, { onConflict: 'client_id' })
-      if (err) throw err
-      setConfig(newConfig)
-    } catch(e: any) {
-      alert('Save failed: ' + e.message)
-    } finally {
-      setSaving(false)
-    }
+    void (async () => {
+      let lastWritten: GenericModelConfig | null = null
+      try {
+        // Always persist the latest desired config. If more edits arrive mid-write,
+        // latestConfigRef advances and we loop again to write the newer one.
+        while (latestConfigRef.current !== lastWritten) {
+          const cfg = latestConfigRef.current as GenericModelConfig
+          const { error: err } = await supabase
+            .from('generic_model_config')
+            .upsert({
+              client_id: cfg.client_id,
+              business_name: cfg.business_name,
+              currency: cfg.currency,
+              start_date: cfg.start_date,
+              planning_months: cfg.planning_months,
+              business_units: cfg.business_units,
+              plan_lines: cfg.plan_lines,
+              shared_lines: cfg.shared_lines,
+              settings: cfg.settings,
+              updated_at: new Date().toISOString(),
+              updated_by: P.userId,
+            }, { onConflict: 'client_id' })
+          if (err) throw err
+          lastWritten = cfg
+        }
+      } catch(e: any) {
+        // Keep latestConfigRef as-is (the newest desired config) so the next edit
+        // re-persists it — nothing is dropped, and no stale snapshot is written.
+        alert('Save failed: ' + e.message)
+      } finally {
+        writingRef.current = false
+        setSaving(false)
+      }
+    })()
   }, [P.userId])
 
   const months = useMemo(() => config ? buildMonthLabels(config.start_date, config.planning_months) : [], [config])
   const result = useMemo(() => {
     if (!config || config.business_units.length === 0) return null
-    // Inject APPROVED market activities as synthetic cost plan lines so their
-    // cost flows into P&L / cash flow / balance sheet for the months they cover.
-    // With no approved events this is a no-op (cfg === config), so existing
-    // models are completely unaffected.
+    // Inject two families of synthetic plan lines before running the engine:
+    //  1. driver-derived lines (sales/cost drivers → revenue/cost, with the
+    //     buy/sell spread), and
+    //  2. APPROVED market activities (their cost for the months they cover).
+    // Each is a no-op when empty, so a model with neither is completely
+    // unaffected. The engine sums plan lines by category, so both just flow into
+    // P&L / cash flow / balance sheet.
+    // Whole-business drivers (no unit, no channel unit) are split evenly across
+    // the active units, so consolidated is exact and no single unit is
+    // over/under-stated. Fall back to all units if none are marked active.
+    const activeUnitIds = config.business_units.filter((u:any)=>u.active).map((u:any)=>u.id)
+    const unitIds = activeUnitIds.length ? activeUnitIds : config.business_units.map((u:any)=>u.id)
+    const driverLines = syntheticPlanLinesFromDrivers(
+      config.settings?.channels||[],
+      config.settings?.drivers||[],
+      config.planning_months, unitIds,
+    )
     const eventLines = syntheticPlanLinesFromEvents(marketEvents, config.start_date, config.planning_months)
-    const cfg = eventLines.length ? { ...config, plan_lines: [...config.plan_lines, ...eventLines] } : config
+    const extra = [...driverLines, ...eventLines]
+    const cfg = extra.length ? { ...config, plan_lines: [...config.plan_lines, ...extra] } : config
     return runGenericModel(cfg, modelActuals)
   }, [config, modelActuals, marketEvents])
   const cc = config?.currency || 'UGX'
@@ -1746,7 +1792,142 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
           ))}
         </div>
       )}
+      <DriversSection key={clientId} config={config} cc={cc} P={P} onSave={onSave}/>
       <MarketActivitiesSection clientId={clientId} config={config} cc={cc} P={P} events={marketEvents} loadError={marketEventsError} onChanged={onMarketEventsChanged}/>
+    </div>
+  )
+}
+
+// ── DRIVERS & CHANNELS (planning) ────────────────────────────
+// The levers the business plans around. SALES drivers are grouped into CHANNELS
+// (routes to market). A smart driver's value = quantity × rate; if a per-unit
+// buy cost is set, the buy/sell spread flows to margin automatically. COST
+// drivers land in their chosen bucket. Everything persists in
+// config.settings.channels / .drivers (inheriting this config's client-scoped
+// RLS) and flows into the model via syntheticPlanLinesFromDrivers.
+function DriversSection({config,cc,P,onSave}) {
+  const units = config.business_units.filter((u:any)=>u.active)
+  const firstUnit = units[0]?.id || ''
+  const canEdit = !!P.canEditPlan
+
+  // Local optimistic draft. The channel/driver inputs render from THIS, not from
+  // config, so typing is instant and never snaps back to a stale value while the
+  // async whole-config save is in flight. Every edit updates the draft AND
+  // persists, and the save payload is always built from the just-updated draft —
+  // so rapid edits across different fields accumulate instead of overlapping
+  // upserts clobbering one another. Seeded per client: the parent keys this
+  // section by clientId, so a client switch remounts it with fresh data.
+  const [draft,setDraft] = useState<{channels:Channel[],drivers:Driver[]}>(
+    ()=>({channels: config.settings?.channels||[], drivers: config.settings?.drivers||[]})
+  )
+  const channels = draft.channels
+  const drivers = draft.drivers
+
+  function commit(nextChannels:Channel[], nextDrivers:Driver[]) {
+    setDraft({channels:nextChannels, drivers:nextDrivers})
+    onSave({...config, settings:{...config.settings, channels:nextChannels, drivers:nextDrivers}})
+  }
+  const mkId = (p:string)=>`${p}_${Date.now()}_${Math.random().toString(36).slice(2,6)}`
+
+  function addChannel(){ commit([...channels, {id:mkId('ch'), name:'New channel', unit_id:null, active:true}], drivers) }
+  function updChannel(id:string, patch:Partial<Channel>){ commit(channels.map(c=>c.id===id?{...c,...patch}:c), drivers) }
+  function delChannel(id:string){ commit(channels.filter(c=>c.id!==id), drivers.map(d=>d.channel_id===id?{...d,channel_id:null}:d)) }
+
+  function addDriver(kind:'sales'|'cost'){
+    const base:Driver = {
+      id:mkId('drv'), name: kind==='sales'?'New sales driver':'New cost driver', kind,
+      // A sales driver leaves unit_id null so it INHERITS its channel's unit (the
+      // driver engine resolves driver.unit_id ?? channel.unit_id ?? fallback).
+      // Pinning it to firstUnit here would silently forecast a driver assigned to
+      // a channel in another unit into the wrong unit. Cost drivers have no
+      // channel, so they default to the first unit.
+      unit_id: kind==='sales' ? null : (firstUnit||null),
+      channel_id: kind==='sales'?(channels[0]?.id||null):null,
+      unit_label: kind==='sales'?'units':'', mode:'smart',
+      quantity: Array(config.planning_months).fill(0), rate:0,
+      unit_cost: kind==='sales'?0:null, cost_category: kind==='cost'?'direct_opex':undefined, active:true,
+    }
+    commit(channels, [...drivers, base])
+  }
+  function updDriver(id:string, patch:Partial<Driver>){ commit(channels, drivers.map(d=>d.id===id?{...d,...patch}:d)) }
+  function delDriver(id:string){ commit(channels, drivers.filter(d=>d.id!==id)) }
+  // Drivers store a per-month quantity array; the UI edits a single "per month"
+  // figure that fills every month (same convention as shared costs). Advanced
+  // month-by-month variation can be layered on later.
+  const perMonth = (d:Driver)=> (Array.isArray(d.quantity)&&d.quantity.length? d.quantity[0] : 0)
+  const setPerMonth = (d:Driver, v:number)=> updDriver(d.id, {quantity: Array(config.planning_months).fill(v)})
+
+  const salesDrivers = drivers.filter(d=>d.kind==='sales')
+  const costDrivers = drivers.filter(d=>d.kind==='cost')
+  const channelSummary = summariseByChannel(channels, drivers, config.planning_months)
+  const unitName = (id:string|null)=> id? (config.business_units.find((u:any)=>u.id===id)?.name||id) : 'Whole business'
+
+  const driverRow = (d:Driver)=> (
+    <div key={d.id} style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:'0.5rem',alignItems:'end',padding:'0.5rem 0',borderBottom:'1px solid var(--cv-border-soft)'}}>
+      <div><label style={lbl} htmlFor={`drv-${d.id}-name`}>Name</label><input id={`drv-${d.id}-name`} style={inp} value={d.name} disabled={!canEdit} onChange={e=>updDriver(d.id,{name:e.target.value})}/></div>
+      {d.kind==='sales'&&<div><label style={lbl} htmlFor={`drv-${d.id}-channel`}>Channel</label><select id={`drv-${d.id}-channel`} style={inp} value={d.channel_id||''} disabled={!canEdit} onChange={e=>updDriver(d.id,{channel_id:e.target.value||null})}><option value="">— none —</option>{channels.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>}
+      <div><label style={lbl} htmlFor={`drv-${d.id}-unit`}>Unit</label><select id={`drv-${d.id}-unit`} style={inp} value={d.unit_id||''} disabled={!canEdit} onChange={e=>updDriver(d.id,{unit_id:e.target.value||null})}><option value="">Whole business</option>{units.map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+      <div><label style={lbl} htmlFor={`drv-${d.id}-mode`}>How</label><select id={`drv-${d.id}-mode`} style={inp} value={d.mode} disabled={!canEdit} onChange={e=>updDriver(d.id,{mode:e.target.value as any})}><option value="smart">Qty × rate</option><option value="flat">Flat figure</option></select></div>
+      <div><label style={lbl} htmlFor={`drv-${d.id}-qty`}>{d.mode==='smart'?`Qty/month${d.unit_label?` (${d.unit_label})`:''}`:'Amount/month'}</label><input id={`drv-${d.id}-qty`} type="number" style={inp} value={perMonth(d)||''} disabled={!canEdit} onChange={e=>setPerMonth(d,Number(e.target.value))}/></div>
+      {d.mode==='smart'&&<div><label style={lbl} htmlFor={`drv-${d.id}-rate`}>{d.kind==='sales'?'Sell price':'Rate'}</label><input id={`drv-${d.id}-rate`} type="number" style={inp} value={d.rate||''} disabled={!canEdit} onChange={e=>updDriver(d.id,{rate:Number(e.target.value)})}/></div>}
+      {d.kind==='sales'&&d.mode==='smart'&&<div><label style={lbl} htmlFor={`drv-${d.id}-buy`}>Buy price</label><input id={`drv-${d.id}-buy`} type="number" style={inp} value={d.unit_cost??''} placeholder="optional" disabled={!canEdit} onChange={e=>updDriver(d.id,{unit_cost:e.target.value===''?null:Number(e.target.value)})}/></div>}
+      {d.kind==='cost'&&<div><label style={lbl} htmlFor={`drv-${d.id}-cat`}>Cost type</label><select id={`drv-${d.id}-cat`} style={inp} value={d.cost_category||'direct_opex'} disabled={!canEdit} onChange={e=>updDriver(d.id,{cost_category:e.target.value as any})}><option value="direct_opex">Overhead</option><option value="cost_of_sales">Cost of sales</option><option value="staff">Staff</option></select></div>}
+      {canEdit&&<div><button style={delBtn} aria-label="Delete driver" title="Delete driver" onClick={()=>delDriver(d.id)}>×</button></div>}
+    </div>
+  )
+
+  return (
+    <div style={card}>
+      <SectionHeader title="Drivers & Channels"/>
+      <p style={{fontSize:'1.06rem',color:C.slate,marginBottom:'0.75rem'}}>The levers your business runs on. Group sales into <strong>channels</strong> (walk-in, retailers, large farms, export). Each driver is <strong>quantity × rate</strong> — set a buy price on a sales driver and the buy/sell <strong>spread</strong> flows to margin automatically. Change a driver and the whole plan (P&amp;L, cash flow) moves.</p>
+
+      {/* Channels */}
+      <div style={{marginBottom:'1.25rem'}}>
+        <SectionHeader title="Channels" action={canEdit?<button style={addBtn(true,C.teal)} onClick={addChannel}>+ Add channel</button>:null}/>
+        {channels.length===0? <div style={{fontSize:'1.0rem',color:C.slate}}>No channels yet.</div> :
+          channels.map(c=>(
+            <div key={c.id} style={{display:'flex',gap:'0.5rem',alignItems:'center',padding:'0.35rem 0',borderBottom:'1px solid var(--cv-border-soft)',flexWrap:'wrap'}}>
+              <input aria-label="Channel name" style={{...inp,maxWidth:220}} value={c.name} disabled={!canEdit} onChange={e=>updChannel(c.id,{name:e.target.value})}/>
+              <select aria-label={`Business unit for ${c.name||'channel'}`} style={{...inp,maxWidth:220}} value={c.unit_id||''} disabled={!canEdit} onChange={e=>updChannel(c.id,{unit_id:e.target.value||null})}>
+                <option value="">Whole business</option>{units.map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+              {canEdit&&<button style={delBtn} aria-label="Delete channel" title="Delete channel" onClick={()=>delChannel(c.id)}>×</button>}
+            </div>
+          ))}
+      </div>
+
+      {/* Sales drivers */}
+      <div style={{marginBottom:'1.25rem'}}>
+        <SectionHeader title="Sales drivers" action={canEdit?<button style={addBtn(true,C.green)} onClick={()=>addDriver('sales')}>+ Add sales driver</button>:null}/>
+        {salesDrivers.length===0? <div style={{fontSize:'1.0rem',color:C.slate}}>No sales drivers yet.</div> : salesDrivers.map(driverRow)}
+      </div>
+
+      {/* Cost drivers */}
+      <div style={{marginBottom:'1.25rem'}}>
+        <SectionHeader title="Cost drivers" action={canEdit?<button style={addBtn(true,C.red)} onClick={()=>addDriver('cost')}>+ Add cost driver</button>:null}/>
+        {costDrivers.length===0? <div style={{fontSize:'1.0rem',color:C.slate}}>No cost drivers yet.</div> : costDrivers.map(driverRow)}
+      </div>
+
+      {/* Channel margin summary (live impact) */}
+      {channelSummary.length>0&&(
+        <div>
+          <div style={{fontWeight:700,color:C.navy,marginBottom:'0.5rem',fontSize:'1.06rem'}}>By channel — annual (from your drivers)</div>
+          <div style={{overflowX:'auto'}}>
+            <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily:'monospace'}}>
+              <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Channel','Revenue','Cost of sales','Margin','Margin %'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600}}>{h}</th>)}</tr></thead>
+              <tbody>{channelSummary.map((s,i)=>(
+                <tr key={s.channel_id===null?'unassigned':`channel:${s.channel_id}`} style={{background:i%2===0?C.cream:C.white}}>
+                  <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{s.channel_name}</td>
+                  <td style={{padding:'8px 10px',color:C.green}}>{fmt(s.revenue,cc)}</td>
+                  <td style={{padding:'8px 10px',color:C.red}}>{fmt(s.cogs,cc)}</td>
+                  <td style={{padding:'8px 10px',fontWeight:700,color:s.margin>=0?C.green:C.red}}>{fmt(s.margin,cc)}</td>
+                  <td style={{padding:'8px 10px',color:C.slate}}>{s.marginPct!=null?`${Math.round(s.marginPct)}%`:'—'}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1763,7 +1944,6 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
   const [msg,setMsg]=useState<{ok:boolean,text:string}|null>(null)
   const firstUnit=config.business_units.find((u:any)=>u.active)?.id||''
   const nowPeriod=(()=>{const d=new Date();d.setDate(1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`})()
-  const [form,setForm]=useState({name:'',unit_id:firstUnit,cost:'',start_period:nowPeriod,months_count:'1',cost_category:'direct_opex',expected_uplift_pct:'',description:''})
 
   const monthOpts = Array.from({length:config.planning_months},(_,i)=>{
     const p=periodForMonthIndex(config.start_date,i)
@@ -1773,6 +1953,11 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
     // timezones.
     return {value:p,label:d.toLocaleString('en-GB',{month:'short',year:'numeric',timeZone:'UTC'})}
   })
+  // Default to the current month only if it's actually inside the planning window;
+  // otherwise fall back to the first month, so an activity is never saved with a
+  // start period outside the window (which would silently drop it from the plan).
+  const defaultPeriod = monthOpts.some(m=>m.value===nowPeriod) ? nowPeriod : (monthOpts[0]?.value||'')
+  const [form,setForm]=useState({name:'',unit_id:firstUnit,cost:'',start_period:defaultPeriod,months_count:'1',cost_category:'direct_opex',expected_uplift_pct:'',description:''})
   const unitName=(id:string)=>config.business_units.find((u:any)=>u.id===id)?.name||id
   const statusColor=(s:string)=>s==='approved'?C.green:s==='rejected'?C.red:C.amber
   const statusText=(s:string)=>s==='approved'?'Approved':s==='rejected'?'Sent back':'Awaiting approval'
@@ -1798,7 +1983,11 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
   }
   async function remove(id:string){
     if(!confirm('Delete this market activity? If it was approved, its cost will stop flowing into the plan.'))return
-    const {error}=await supabase.from('generic_market_events').delete().eq('id',id)
+    // Scope the delete to this client (defence in depth on top of RLS). The
+    // database's delete policy is the real guard: a non-approver can only delete
+    // their own still-proposed activity, so deleting an approved one is refused
+    // there for anyone who isn't an approver.
+    const {error}=await supabase.from('generic_market_events').delete().eq('id',id).eq('client_id',clientId)
     if(error){alert('Could not delete — '+error.message);return}
     onChanged&&onChanged()
   }
@@ -3067,7 +3256,7 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
           })}
         </div>
       )}
-      {pendingFM.length===0&&pendingCEO.length===0&&pendingActuals.length===0&&pendingEvents.length===0&&(
+      {pendingFM.length===0&&pendingCEO.length===0&&pendingActuals.length===0&&(!canApproveEvents||pendingEvents.length===0)&&(
         <div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No pending approvals.</div>
       )}
     </div>
