@@ -1618,19 +1618,42 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   const clearviewLive=clients.filter(c=>c.clearview_active)
   const canvasClients=clients.filter(c=>c.engagement_mode==='canvas')
 
-  async function updateClient(id,updates){
-    await supabase.from('engagement_clients').update({...updates,updated_at:new Date().toISOString()}).eq('id',id)
-    setClients(prev=>prev.map(c=>c.id!==id?c:{...c,...updates}))
+  // Surfaced, never-silent save status for the coaching-canvas edits below.
+  const [saveError,setSaveError]=useState<string|null>(null)
+  // Optimistic write: apply the change to local state IMMEDIATELY so the input
+  // reflects what was typed and never sits dead waiting on the database, then
+  // persist in the background and surface (never swallow) a failure. This is the
+  // same fix the Planning tab got — previously these handlers awaited the write
+  // BEFORE updating state, so on a slow/stalling connection the typed value
+  // snapped back and a failed save looked saved. `write` returns the supabase
+  // query promise so its {error} can be inspected.
+  function optimisticWrite(applyLocal:()=>void, write:()=>Promise<any>){
+    applyLocal()
+    const FAIL='Your last change could not be saved — check your connection; it may not have been stored.'
+    Promise.resolve(write())
+      .then(res=>setSaveError(res && res.error ? FAIL : null))
+      .catch(()=>setSaveError(FAIL))
   }
 
-  async function updateDP(clientId,dpId,updates){
-    await supabase.from('canvas_decision_points').update({...updates,updated_at:new Date().toISOString()}).eq('client_id',clientId).eq('dp_id',dpId)
-    setClientData(prev=>({...prev,[clientId]:{...prev[clientId],canvas:(prev[clientId]?.canvas||[]).map(dp=>dp.dp_id!==dpId?dp:{...dp,...updates})}}))
+  function updateClient(id,updates){
+    optimisticWrite(
+      ()=>setClients(prev=>prev.map(c=>c.id!==id?c:{...c,...updates})),
+      ()=>supabase.from('engagement_clients').update({...updates,updated_at:new Date().toISOString()}).eq('id',id),
+    )
   }
 
-  async function updateComponent(clientId,dpId,compNumber,updates){
-    await supabase.from('canvas_components').update({...updates,updated_at:new Date().toISOString()}).eq('client_id',clientId).eq('dp_id',dpId).eq('component_number',compNumber)
-    setClientData(prev=>({...prev,[clientId]:{...prev[clientId],canvas:(prev[clientId]?.canvas||[]).map(dp=>dp.dp_id!==dpId?dp:{...dp,components:dp.components.map(c=>c.component_number!==compNumber?c:{...c,...updates})})}}))
+  function updateDP(clientId,dpId,updates){
+    optimisticWrite(
+      ()=>setClientData(prev=>({...prev,[clientId]:{...prev[clientId],canvas:(prev[clientId]?.canvas||[]).map(dp=>dp.dp_id!==dpId?dp:{...dp,...updates})}})),
+      ()=>supabase.from('canvas_decision_points').update({...updates,updated_at:new Date().toISOString()}).eq('client_id',clientId).eq('dp_id',dpId),
+    )
+  }
+
+  function updateComponent(clientId,dpId,compNumber,updates){
+    optimisticWrite(
+      ()=>setClientData(prev=>({...prev,[clientId]:{...prev[clientId],canvas:(prev[clientId]?.canvas||[]).map(dp=>dp.dp_id!==dpId?dp:{...dp,components:dp.components.map(c=>c.component_number!==compNumber?c:{...c,...updates})})}})),
+      ()=>supabase.from('canvas_components').update({...updates,updated_at:new Date().toISOString()}).eq('client_id',clientId).eq('dp_id',dpId).eq('component_number',compNumber),
+    )
   }
 
   if(loading)return<Spinner/>
@@ -2017,11 +2040,11 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             {activeTab==='coach_ref'&&canViewCoachGuidance(userRole)&&<TabCoachRef/>}
             {activeTab==='ip_framework'&&<TabIPFramework/>}
             {activeTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
-            {activeTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={userRole} userName={userName} onUpdate={async(updates)=>{if(diagnostic?.id){await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('client_id',selClient.id)}else{await supabase.from('engagement_diagnostic').insert({client_id:selClient.id,...updates})}setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,diagnostic:{...diagnostic,...updates}}}))}}/>}
+            {activeTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={userRole} userName={userName} onUpdate={(updates)=>optimisticWrite(()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,diagnostic:{...diagnostic,...updates}}})),()=>diagnostic?.id?supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('client_id',selClient.id):supabase.from('engagement_diagnostic').insert({client_id:selClient.id,...updates}))}/>}
             {activeTab==='tracker'&&<TabTracker client={selClient} canvas={canvas}/>}
-            {activeTab==='decisions'&&<TabDecisions client={selClient} decisions={decisions} userRole={userRole} userName={userName} onAdd={async(d)=>{const {data}=await supabase.from('canvas_decisions').insert([{...d,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:[...decisions,data]}}))}} onUpdate={async(id,updates)=>{await supabase.from('canvas_decisions').update({...updates,updated_at:new Date().toISOString()}).eq('id',id);setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:decisions.map(d=>d.id!==id?d:{...d,...updates})}}))}}/>}
-            {activeTab==='evidence'&&<TabEvidence client={selClient} evidence={evidence} onAdd={async(e)=>{const ref=`E-${String(evidence.length+1).padStart(3,'0')}`;const {data}=await supabase.from('evidence_library').insert([{...e,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:[...evidence,data]}}))}} onUpdate={async(id,updates)=>{await supabase.from('evidence_library').update({...updates,updated_at:new Date().toISOString()}).eq('id',id);setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:evidence.map(e=>e.id!==id?e:{...e,...updates})}}))}}/>}
-            {activeTab==='handover'&&<TabHandover client={selClient} handover={handover} canvas={canvas} userRole={userRole} onUpdate={async(id,updates)=>{await supabase.from('handover_record').update({...updates,updated_at:new Date().toISOString()}).eq('id',id);setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,handover:handover.map(h=>h.id!==id?h:{...h,...updates})}}))}}/>}
+            {activeTab==='decisions'&&<TabDecisions client={selClient} decisions={decisions} userRole={userRole} userName={userName} onAdd={async(d)=>{const {data}=await supabase.from('canvas_decisions').insert([{...d,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:[...decisions,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:decisions.map(d=>d.id!==id?d:{...d,...updates})}})),()=>supabase.from('canvas_decisions').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
+            {activeTab==='evidence'&&<TabEvidence client={selClient} evidence={evidence} onAdd={async(e)=>{const ref=`E-${String(evidence.length+1).padStart(3,'0')}`;const {data}=await supabase.from('evidence_library').insert([{...e,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:[...evidence,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:evidence.map(e=>e.id!==id?e:{...e,...updates})}})),()=>supabase.from('evidence_library').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
+            {activeTab==='handover'&&<TabHandover client={selClient} handover={handover} canvas={canvas} userRole={userRole} onUpdate={(id,updates)=>optimisticWrite(()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,handover:handover.map(h=>h.id!==id?h:{...h,...updates})}})),()=>supabase.from('handover_record').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
             {activeTab==='phase0'&&<TabDP client={selClient} dp={canvas.find(d=>d.dp_id==='phase_0')} userRole={userRole} onUpdateDP={u=>updateDP(selClient.id,'phase_0',u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,'phase_0',cn,u)}/>}
             {['dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09'].map(dpKey=>(
               activeTab===dpKey&&<TabDP key={dpKey} client={selClient} dp={canvas.find(d=>d.dp_id===dpKey)} userRole={userRole} onUpdateDP={u=>updateDP(selClient.id,dpKey,u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,dpKey,cn,u)}/>
@@ -2033,14 +2056,14 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 const {data}=await supabase.from('interviews').insert([{...i,client_id:selClient.id,reference:ref}]).select().single()
                 if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,interviews:[...interviews,data]}}))
               }}
-              onUpdate={async(id,updates)=>{
-                await supabase.from('interviews').update({...updates,updated_at:new Date().toISOString()}).eq('id',id)
-                setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,interviews:interviews.map(i=>i.id!==id?i:{...i,...updates})}}))
-              }}
+              onUpdate={(id,updates)=>optimisticWrite(
+                ()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,interviews:interviews.map(i=>i.id!==id?i:{...i,...updates})}})),
+                ()=>supabase.from('interviews').update({...updates,updated_at:new Date().toISOString()}).eq('id',id),
+              )}
             />}
             {activeTab==='int_report'&&<TabInterviewReporting interviews={interviews}/>}
-            {activeTab==='hypothesis'&&<TabHypothesis client={selClient} hypotheses={hypotheses} onAdd={async(h)=>{const ref=`HYP-${String(hypotheses.length+1).padStart(3,'0')}`;const {data}=await supabase.from('hypotheses').insert([{...h,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,hypotheses:[...hypotheses,data]}}))} } onUpdate={async(id,updates)=>{await supabase.from('hypotheses').update({...updates,updated_at:new Date().toISOString()}).eq('id',id);setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,hypotheses:hypotheses.map(h=>h.id!==id?h:{...h,...updates})}}))}}/>}
-            {activeTab==='pilot_obs'&&<TabPilotObservation client={selClient} pilots={pilots} onAdd={async(p)=>{const {data}=await supabase.from('pilot_observations').insert([{...p,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,pilots:[...pilots,data]}}))} } onUpdate={async(id,updates)=>{await supabase.from('pilot_observations').update({...updates,updated_at:new Date().toISOString()}).eq('id',id);setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,pilots:pilots.map(p=>p.id!==id?p:{...p,...updates})}}))}}/>}
+            {activeTab==='hypothesis'&&<TabHypothesis client={selClient} hypotheses={hypotheses} onAdd={async(h)=>{const ref=`HYP-${String(hypotheses.length+1).padStart(3,'0')}`;const {data}=await supabase.from('hypotheses').insert([{...h,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,hypotheses:[...hypotheses,data]}}))} } onUpdate={(id,updates)=>optimisticWrite(()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,hypotheses:hypotheses.map(h=>h.id!==id?h:{...h,...updates})}})),()=>supabase.from('hypotheses').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
+            {activeTab==='pilot_obs'&&<TabPilotObservation client={selClient} pilots={pilots} onAdd={async(p)=>{const {data}=await supabase.from('pilot_observations').insert([{...p,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,pilots:[...pilots,data]}}))} } onUpdate={(id,updates)=>optimisticWrite(()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,pilots:pilots.map(p=>p.id!==id?p:{...p,...updates})}})),()=>supabase.from('pilot_observations').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
           </div>
         </div>
       </div>
@@ -2324,6 +2347,20 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   return(
     <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif",background:C.cream,color:C.navy,minHeight:'100vh'}}>
       <BuildStamp/>
+      {/* Canvas save status — a failed background save of a client/decision-point/
+          component/diagnostic/etc. edit is shown here instead of being silently
+          lost. Fixed so it is visible on whichever tab is open. */}
+      {saveError&&(
+        <div style={{position:'fixed',top:8,left:'50%',transform:'translateX(-50%)',zIndex:10000,maxWidth:640,
+          display:'flex',alignItems:'center',gap:'0.6rem',padding:'0.6rem 0.95rem',borderRadius:8,
+          background:'#FDF0EE',border:'1px solid #C0392B',borderLeft:'4px solid #C0392B',
+          fontSize:'0.9rem',color:'#C0392B',boxShadow:'0 2px 12px rgba(0,0,0,0.14)'}}>
+          <span style={{fontWeight:700}}>Not saved</span>
+          <span>{saveError}</span>
+          <button onClick={()=>setSaveError(null)} aria-label="Dismiss"
+            style={{marginLeft:'0.4rem',border:'none',background:'transparent',color:'#C0392B',fontWeight:700,cursor:'pointer',fontSize:'1rem'}}>×</button>
+        </div>
+      )}
       <header style={{background:'var(--cv-header)',borderBottom:`3px solid ${C.cyan}`}}>
         <div style={{maxWidth:1600,margin:'0 auto',padding:'1.25rem 1.5rem',display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
           <div>
