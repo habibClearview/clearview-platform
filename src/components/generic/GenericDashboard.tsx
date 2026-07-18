@@ -23,6 +23,7 @@ import ErrorBoundary from '@/components/ErrorBoundary'
 import VerificationRecognition from '@/components/generic/VerificationRecognition'
 import PaymentReviewQueue from '@/components/generic/PaymentReviewQueue'
 import { computeFreePerformance, operatingMarginPct, grossMarginPct, ebitdaMarginPct, netMarginPct, revenueGrowthPct, ruleOf40, isRuleOf40Strong, burnMultiple } from '@/lib/business-performance-metrics'
+import { syntheticPlanLinesFromEvents, type MarketEvent } from '@/lib/market-events'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
@@ -601,6 +602,18 @@ export default function GenericDashboard({
       .then(({count}) => setPendingActualsCount(count||0))
   }, [clientId, view])
 
+  // Market activities (forward-planned marketing events). Loaded here so the
+  // engine can inject APPROVED events' cost into the plan (see the result memo).
+  // Reload is shared with the Planning and Approvals sections so proposing or
+  // approving an event immediately reflows the P&L.
+  const [marketEvents, setMarketEvents] = useState<MarketEvent[]>([])
+  const reloadMarketEvents = useCallback(() => {
+    if (!clientId) return
+    supabase.from('generic_market_events').select('*').eq('client_id', clientId).order('created_at', {ascending:false})
+      .then(({data, error}) => { if (!error) setMarketEvents((data as MarketEvent[]) || []) })
+  }, [clientId])
+  useEffect(() => { reloadMarketEvents() }, [reloadMarketEvents])
+
   // Fetch actuals for the P&L's hybrid mode: real data for months that
   // have it, plan for months ahead. Combines line_values (manual) and
   // field_line_values (from Clearview Field) here -- these must never be
@@ -705,7 +718,16 @@ export default function GenericDashboard({
   }, [P.userId])
 
   const months = useMemo(() => config ? buildMonthLabels(config.start_date, config.planning_months) : [], [config])
-  const result = useMemo(() => config && config.business_units.length > 0 ? runGenericModel(config, modelActuals) : null, [config, modelActuals])
+  const result = useMemo(() => {
+    if (!config || config.business_units.length === 0) return null
+    // Inject APPROVED market activities as synthetic cost plan lines so their
+    // cost flows into P&L / cash flow / balance sheet for the months they cover.
+    // With no approved events this is a no-op (cfg === config), so existing
+    // models are completely unaffected.
+    const eventLines = syntheticPlanLinesFromEvents(marketEvents, config.start_date, config.planning_months)
+    const cfg = eventLines.length ? { ...config, plan_lines: [...config.plan_lines, ...eventLines] } : config
+    return runGenericModel(cfg, modelActuals)
+  }, [config, modelActuals, marketEvents])
   const cc = config?.currency || 'UGX'
 
   if (loading) return <Spinner/>
@@ -742,7 +764,7 @@ export default function GenericDashboard({
     ['pl','P&L'],
     ['cashflow','Cash Flow'],
     ['balancesheet','Balance Sheet'],
-    ['approvals',`Approvals${(pendingApprovalCount+pendingActualsCount)>0?` (${pendingApprovalCount+pendingActualsCount})`:''}`],
+    ['approvals',(()=>{const n=pendingApprovalCount+pendingActualsCount+marketEvents.filter(e=>e.status==='proposed').length;return `Approvals${n>0?` (${n})`:''}`})()],
     ['settings','Settings'],
   ]
 
@@ -791,10 +813,10 @@ export default function GenericDashboard({
       <main style={{maxWidth:1600,margin:'0 auto',padding:'1.5rem'}}>
         <ErrorBoundary key={view} label={String(view)}>
         {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} pendingApprovalCount={pendingApprovalCount} pendingActualsCount={pendingActualsCount} onGoToApprovals={()=>setView('approvals')} onGoToIntelligence={()=>setView('intelligence')}/>}
-        {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P}/>}
+        {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P} marketEvents={marketEvents} onMarketEventsChanged={reloadMarketEvents}/>}
         {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods} onNavigate={setView}/>}
         {view==='performance' && <PerformanceTab config={config} result={result} months={months} cc={cc}/>}
-        {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig}/>}
+        {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} clientId={clientId} marketEvents={marketEvents} onMarketEventsChanged={reloadMarketEvents}/>}
         {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods}/>}
         {view==='cashflow'    && <CashFlowTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
         {view==='balancesheet'&& <BalanceSheetTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods} onCloseStatusChanged={loadClosedPeriods}/>}
@@ -1335,7 +1357,7 @@ const SERVICE_FEE_SUBROWS: [string,string,boolean][] = [
   ['Engagements','engagements',false],
 ]
 
-function PlanningTab({config,result,months,cc,P,onSave}) {
+function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,onMarketEventsChanged}) {
   const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active)?.id||'')
   const [selSection, setSelSection] = useState<LineCategory>('revenue')
   const [saving, setSaving] = useState(false)
@@ -1693,6 +1715,103 @@ function PlanningTab({config,result,months,cc,P,onSave}) {
               {P.canEditPlan&&<button style={delBtn} onClick={()=>onSave({...config,shared_lines:config.shared_lines.filter(sl=>sl.id!==l.id)})}>×</button>}
             </div>
           ))}
+        </div>
+      )}
+      <MarketActivitiesSection clientId={clientId} config={config} cc={cc} P={P} events={marketEvents} onChanged={onMarketEventsChanged}/>
+    </div>
+  )
+}
+
+// ── MARKET ACTIVITIES (planning) ─────────────────────────────
+// Propose forward-planned marketing/sales activities. Each has a cost, a target
+// unit, a start month, a duration and an expected sales lift. Proposing sends it
+// for approval (Approvals tab). Once approved, its cost is injected into the
+// plan by the engine (see syntheticPlanLinesFromEvents + the result memo), so it
+// flows into P&L, cash flow and balance sheet for the months it covers.
+function MarketActivitiesSection({clientId,config,cc,P,events,onChanged}) {
+  const [showAdd,setShowAdd]=useState(false)
+  const [busy,setBusy]=useState(false)
+  const [msg,setMsg]=useState<{ok:boolean,text:string}|null>(null)
+  const firstUnit=config.business_units.find((u:any)=>u.active)?.id||''
+  const nowPeriod=(()=>{const d=new Date();d.setDate(1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`})()
+  const [form,setForm]=useState({name:'',unit_id:firstUnit,cost:'',start_period:nowPeriod,months_count:'1',cost_category:'direct_opex',expected_uplift_pct:'',description:''})
+
+  const monthOpts = Array.from({length:config.planning_months},(_,i)=>{
+    const p=periodForMonthIndex(config.start_date,i)
+    const d=new Date(p)
+    return {value:p,label:d.toLocaleString('en-GB',{month:'short',year:'numeric'})}
+  })
+  const unitName=(id:string)=>config.business_units.find((u:any)=>u.id===id)?.name||id
+  const statusColor=(s:string)=>s==='approved'?C.green:s==='rejected'?C.red:C.amber
+  const statusText=(s:string)=>s==='approved'?'Approved':s==='rejected'?'Sent back':'Awaiting approval'
+
+  async function propose(){
+    if(!form.name.trim()||!form.unit_id||!(Number(form.cost)>0)){setMsg({ok:false,text:'Enter a name, a unit and a cost above zero.'});return}
+    setBusy(true);setMsg(null)
+    const {error}=await supabase.from('generic_market_events').insert({
+      client_id:clientId, unit_id:form.unit_id, name:form.name.trim(), description:form.description||null,
+      cost:Number(form.cost), start_period:form.start_period, months_count:Math.max(1,Number(form.months_count)||1),
+      cost_category:form.cost_category, expected_uplift_pct:form.expected_uplift_pct?Number(form.expected_uplift_pct):null,
+      status:'proposed', created_by:P.fullName,
+    })
+    setBusy(false)
+    if(error){setMsg({ok:false,text:'Could not save — '+error.message});return}
+    setForm(f=>({...f,name:'',cost:'',expected_uplift_pct:'',description:''}));setShowAdd(false)
+    setMsg({ok:true,text:'Proposed ✓ — sent for approval. Once approved, its cost flows into the plan.'})
+    onChanged&&onChanged()
+  }
+  async function remove(id:string){
+    if(!confirm('Delete this market activity? If it was approved, its cost will stop flowing into the plan.'))return
+    const {error}=await supabase.from('generic_market_events').delete().eq('id',id)
+    if(error){alert('Could not delete — '+error.message);return}
+    onChanged&&onChanged()
+  }
+
+  return (
+    <div style={card}>
+      <SectionHeader title="Market Activities" action={P.canEditPlan?<button style={addBtn(true,C.teal)} onClick={()=>setShowAdd(s=>!s)}>{showAdd?'Close':'+ Propose activity'}</button>:null}/>
+      <p style={{fontSize:'1.06rem',color:C.slate,marginBottom:'0.75rem'}}>Plan a marketing or sales push — its cost, the unit it's for, the month(s) it runs, and the sales lift you expect. Once <strong>approved</strong>, the cost automatically flows into the plan (P&amp;L, cash flow) for those months. Clearview Intelligence then tracks expected vs actual impact.</p>
+      {showAdd&&P.canEditPlan&&(
+        <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'1rem',marginBottom:'1rem',background:C.cream}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'0.6rem'}}>
+            <div><label style={lbl}>Activity name</label><input style={inp} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Radio campaign"/></div>
+            <div><label style={lbl}>Business unit</label><select style={inp} value={form.unit_id} onChange={e=>setForm(f=>({...f,unit_id:e.target.value}))}>{config.business_units.filter((u:any)=>u.active).map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+            <div><label style={lbl}>Total cost</label><input type="number" style={inp} value={form.cost} onChange={e=>setForm(f=>({...f,cost:e.target.value}))} placeholder="0"/></div>
+            <div><label style={lbl}>Start month</label><select style={inp} value={form.start_period} onChange={e=>setForm(f=>({...f,start_period:e.target.value}))}>{monthOpts.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}</select></div>
+            <div><label style={lbl}>Runs for (months)</label><input type="number" min={1} style={inp} value={form.months_count} onChange={e=>setForm(f=>({...f,months_count:e.target.value}))}/></div>
+            <div><label style={lbl}>Cost type</label><select style={inp} value={form.cost_category} onChange={e=>setForm(f=>({...f,cost_category:e.target.value}))}><option value="direct_opex">Overhead (marketing)</option><option value="cost_of_sales">Cost of sales</option></select></div>
+            <div><label style={lbl}>Expected sales lift %</label><input type="number" style={inp} value={form.expected_uplift_pct} onChange={e=>setForm(f=>({...f,expected_uplift_pct:e.target.value}))} placeholder="optional"/></div>
+            <div style={{gridColumn:'1/-1'}}><label style={lbl}>Notes (optional)</label><input style={inp} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></div>
+          </div>
+          <div style={{display:'flex',gap:'0.5rem',marginTop:'0.75rem',alignItems:'center',flexWrap:'wrap'}}>
+            <button style={solidBtn(C.teal)} disabled={busy} onClick={propose}>{busy?'Saving…':'Propose for approval'}</button>
+            {msg&&<span style={{fontFamily:'monospace',fontSize:'0.95rem',color:msg.ok?C.green:C.red}}>{msg.text}</span>}
+          </div>
+        </div>
+      )}
+      {(!events||events.length===0)?(
+        <div style={{fontSize:'1.0rem',color:C.slate}}>No market activities yet.</div>
+      ):(
+        <div style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem'}}>
+            <thead><tr style={{borderBottom:`2px solid ${C.border}`}}>
+              {['Activity','Unit','Cost','When','Expected lift','Status',''].map(h=><th key={h} style={{textAlign:'left',padding:'6px 8px',color:C.slate,fontWeight:600}}>{h}</th>)}
+            </tr></thead>
+            <tbody>{events.map((e:any)=>{
+              const startLabel=monthOpts.find(m=>m.value===e.start_period)?.label||e.start_period
+              return (
+                <tr key={e.id} style={{borderBottom:`1px solid ${C.border}`}}>
+                  <td style={{padding:'6px 8px',fontWeight:600,color:C.navy}}>{e.name}{e.review_note&&e.status==='rejected'?<div style={{fontSize:'0.9rem',color:C.red,fontWeight:400}}>Sent back: {e.review_note}</div>:null}</td>
+                  <td style={{padding:'6px 8px',color:C.slate}}>{unitName(e.unit_id)}</td>
+                  <td style={{padding:'6px 8px',fontFamily:'monospace'}}>{fmt(e.cost,cc)}</td>
+                  <td style={{padding:'6px 8px',color:C.slate}}>{startLabel}{e.months_count>1?` · ${e.months_count} mo`:''}</td>
+                  <td style={{padding:'6px 8px',color:C.slate}}>{e.expected_uplift_pct!=null?`+${e.expected_uplift_pct}%`:'—'}</td>
+                  <td style={{padding:'6px 8px'}}><Badge text={statusText(e.status)} color={statusColor(e.status)}/></td>
+                  <td style={{padding:'6px 8px'}}>{P.canEditPlan&&<button style={delBtn} onClick={()=>remove(e.id)}>×</button>}</td>
+                </tr>
+              )
+            })}</tbody>
+          </table>
         </div>
       )}
     </div>
@@ -2636,7 +2755,7 @@ function SpendRequestsTab({clientId,config,cc,P}) {
 }
 
 // ── APPROVALS TAB ─────────────────────────────────────────────
-function ApprovalsTab({clientId,config,cc,P}) {
+function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged}) {
   const [requests, setRequests] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [notes, setNotes] = useState<Record<string,string>>({})
@@ -2665,6 +2784,35 @@ function ApprovalsTab({clientId,config,cc,P}) {
       .eq('submitted',true).eq('approved',false).order('submitted_at',{ascending:false})
       .then(({data})=>setPendingActuals(data||[]))
   },[clientId,canApproveActuals])
+
+  // Market activities awaiting approval. Same approver set as figures. The list
+  // comes from the parent (marketEvents) so approving one immediately reflows
+  // the plan; we filter to the still-proposed ones here.
+  const canApproveEvents = ['finance_manager','ceo','super_coach','coach'].includes(P.role)
+  const [eventNotes, setEventNotes] = useState<Record<string,string>>({})
+  const pendingEvents = (marketEvents||[]).filter((e:any)=>e.status==='proposed')
+  const unitNameFor = (id:string)=>config.business_units.find((u:any)=>u.id===id)?.name||id
+
+  async function approveEvent(id:string){
+    // count:'exact' + status guard: the same stale-write-safe pattern as actuals.
+    const {error,count} = await supabase.from('generic_market_events').update({
+      status:'approved', approved_by:P.fullName, approved_at:new Date().toISOString(),
+      review_note:null, updated_at:new Date().toISOString(),
+    },{count:'exact'}).eq('id',id).eq('status','proposed')
+    if (error) { alert('Could not approve — '+error.message); return }
+    if (!count) alert('This activity was just changed or handled by someone else — refreshing.')
+    onMarketEventsChanged&&onMarketEventsChanged()
+  }
+  async function sendBackEvent(id:string){
+    const note=(eventNotes[id]||'').trim()
+    if(!note){ alert('Please add a short note so they know what to change.'); return }
+    const {error,count} = await supabase.from('generic_market_events').update({
+      status:'rejected', review_note:note, updated_at:new Date().toISOString(),
+    },{count:'exact'}).eq('id',id).eq('status','proposed')
+    if (error) { alert('Could not send back — '+error.message); return }
+    if (!count) alert('This activity was just changed or handled by someone else — refreshing.')
+    onMarketEventsChanged&&onMarketEventsChanged()
+  }
 
   // Revenue / cost totals for a submitted actual, using the same combinedActual
   // (manual + field) helper the rest of the dashboard uses so figures reconcile.
@@ -2833,7 +2981,34 @@ function ApprovalsTab({clientId,config,cc,P}) {
           ))}
         </div>
       )}
-      {pendingFM.length===0&&pendingCEO.length===0&&pendingActuals.length===0&&(
+      {/* Market activities awaiting approval. Approving one injects its cost
+          into the plan for the months it covers. */}
+      {canApproveEvents&&pendingEvents.length>0&&(
+        <div style={{...card,borderLeft:`4px solid ${C.teal}`}}>
+          <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.teal,marginBottom:'0.9rem'}}>Market activities awaiting approval ({pendingEvents.length})</div>
+          {pendingEvents.map((e:any)=>{
+            const startLabel=(()=>{const d=new Date(e.start_period);return d.toLocaleString('en-GB',{month:'short',year:'numeric'})})()
+            return (
+              <div key={e.id} style={{border:'1px solid var(--cv-border-soft)',borderRadius:12,padding:'1rem 1.1rem',marginBottom:'0.85rem',background:C.lightBg}}>
+                <div style={{display:'flex',alignItems:'flex-start',gap:'1rem',flexWrap:'wrap',justifyContent:'space-between'}}>
+                  <div style={{flex:1,minWidth:220}}>
+                    <div style={{fontWeight:700,fontSize:'1.2rem',color:C.navy}}>{e.name}</div>
+                    <div style={{fontSize:'1.0rem',color:C.slate,marginTop:'0.15rem'}}>{unitNameFor(e.unit_id)} · {startLabel}{e.months_count>1?` · ${e.months_count} months`:''}{e.expected_uplift_pct!=null?` · expected +${e.expected_uplift_pct}% sales`:''}{e.created_by?` · proposed by ${e.created_by}`:''}</div>
+                    {e.description&&<div style={{fontSize:'1.0rem',color:C.slate,fontStyle:'italic',marginTop:'0.25rem'}}>{e.description}</div>}
+                  </div>
+                  <div><div style={{fontSize:'0.8rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.08em'}}>Cost</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.red}}>{fmt(e.cost,cc)}</div></div>
+                </div>
+                <textarea style={{...inp,minHeight:50,resize:'vertical',margin:'0.75rem 0 0.5rem'}} placeholder="If sending back, add a note on what to change" value={eventNotes[e.id]||''} onChange={ev=>setEventNotes(n=>({...n,[e.id]:ev.target.value}))}/>
+                <div style={{display:'flex',gap:'0.5rem'}}>
+                  <button style={solidBtn(C.green,true)} onClick={()=>approveEvent(e.id)}>Approve</button>
+                  <button style={solidBtn(C.amber,true)} onClick={()=>sendBackEvent(e.id)}>Send back</button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      {pendingFM.length===0&&pendingCEO.length===0&&pendingActuals.length===0&&pendingEvents.length===0&&(
         <div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No pending approvals.</div>
       )}
     </div>
@@ -6250,7 +6425,7 @@ function ActualsAndWorkingCapitalTab({config,result,months,cc,P,onSave,onCloseSt
   )
 }
 // ── APPROVALS & SPEND REQUESTS TAB (toggle, reuses existing components) ──
-function ApprovalsAndSpendTab({clientId,config,cc,P}) {
+function ApprovalsAndSpendTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged}) {
   const [mode, setMode] = useState<'approvals'|'requests'>('approvals')
   return (
     <div>
@@ -6258,7 +6433,7 @@ function ApprovalsAndSpendTab({clientId,config,cc,P}) {
         <button style={subtabPill(mode==='approvals')} onClick={()=>setMode('approvals')}>Approvals</button>
         <button style={subtabPill(mode==='requests')} onClick={()=>setMode('requests')}>My Spend Requests</button>
       </div>
-      {mode==='approvals' && <ApprovalsTab clientId={clientId} config={config} cc={cc} P={P}/>}
+      {mode==='approvals' && <ApprovalsTab clientId={clientId} config={config} cc={cc} P={P} marketEvents={marketEvents} onMarketEventsChanged={onMarketEventsChanged}/>}
       {mode==='requests' && <SpendRequestsTab clientId={clientId} config={config} cc={cc} P={P}/>}
     </div>
   )
