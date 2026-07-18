@@ -679,12 +679,16 @@ function TeamTab({role,userId,userName,businessUnit,canSeeAllUnits}:{role:string
   async function updateMember(id, updates) {
     // Optimistic: reflect the change at once (the role dropdown must not sit on
     // the old value waiting for the DB, then snap back on a slow link), then
-    // persist and surface — never swallow — a failure.
+    // persist and surface — never swallow — a failure. On failure roll the local
+    // state back to the previous value so the UI never shows a change the
+    // database rejected (which would contradict the "could not save" alert).
+    const prevMember = teamMembers.find(m => m.id === id)
     setTeamMembers(prev => prev.map(m => m.id !== id ? m : {...m, ...updates}))
     try {
       const { error } = await supabase.from('user_profiles').update({...updates, updated_at: new Date().toISOString()}).eq('id', id)
       if (error) throw error
     } catch (e) {
+      if (prevMember) setTeamMembers(prev => prev.map(m => m.id !== id ? m : prevMember))
       alert('Could not save that change to the server. Please check your connection and try again.')
     }
   }

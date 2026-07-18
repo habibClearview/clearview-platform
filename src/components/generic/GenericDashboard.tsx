@@ -3468,7 +3468,7 @@ function TeamTab({clientId,config,P}) {
                     const next=e.target.checked
                     setMembers(ms=>ms.map(x=>x.id!==m.id?x:{...x,can_manage_catalogue:next}))
                     try {
-                      const {error}=await supabase.from('user_profiles').update({can_manage_catalogue:next}).eq('id',m.id)
+                      const {error}=await supabase.from('user_profiles').update({can_manage_catalogue:next,updated_at:new Date().toISOString()}).eq('id',m.id)
                       if (error) throw error
                     } catch(err) {
                       setMembers(ms=>ms.map(x=>x.id!==m.id?x:{...x,can_manage_catalogue:!next}))
