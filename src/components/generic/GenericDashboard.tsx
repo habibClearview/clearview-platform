@@ -3461,8 +3461,19 @@ function TeamTab({clientId,config,P}) {
               <label style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'1.0rem',color:C.slate,marginTop:'0.35rem',cursor:'pointer'}}>
                 <input type="checkbox" checked={!!m.can_manage_catalogue}
                   onChange={async e=>{
-                    await supabase.from('user_profiles').update({can_manage_catalogue:e.target.checked}).eq('id',m.id)
-                    setMembers(ms=>ms.map(x=>x.id!==m.id?x:{...x,can_manage_catalogue:e.target.checked}))
+                    // Optimistic: flip the toggle at once (it must not wait on the
+                    // DB then snap back on a slow link), then persist and surface
+                    // — never swallow — a failure so a lost permission change is
+                    // visible.
+                    const next=e.target.checked
+                    setMembers(ms=>ms.map(x=>x.id!==m.id?x:{...x,can_manage_catalogue:next}))
+                    try {
+                      const {error}=await supabase.from('user_profiles').update({can_manage_catalogue:next}).eq('id',m.id)
+                      if (error) throw error
+                    } catch(err) {
+                      setMembers(ms=>ms.map(x=>x.id!==m.id?x:{...x,can_manage_catalogue:!next}))
+                      alert('Could not save that permission change. Please check your connection and try again.')
+                    }
                   }}/>
                 Can manage Field Catalogue (prices & products)
               </label>

@@ -677,8 +677,16 @@ function TeamTab({role,userId,userName,businessUnit,canSeeAllUnits}:{role:string
   }
 
   async function updateMember(id, updates) {
-        await supabase.from('user_profiles').update({...updates, updated_at: new Date().toISOString()}).eq('id', id)
+    // Optimistic: reflect the change at once (the role dropdown must not sit on
+    // the old value waiting for the DB, then snap back on a slow link), then
+    // persist and surface — never swallow — a failure.
     setTeamMembers(prev => prev.map(m => m.id !== id ? m : {...m, ...updates}))
+    try {
+      const { error } = await supabase.from('user_profiles').update({...updates, updated_at: new Date().toISOString()}).eq('id', id)
+      if (error) throw error
+    } catch (e) {
+      alert('Could not save that change to the server. Please check your connection and try again.')
+    }
   }
 
   const roleLabel = (r) => TEAM_ROLES.find(x => x.value === r)?.label || r
