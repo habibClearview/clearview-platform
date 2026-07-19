@@ -6,6 +6,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { writeAuditLog, auditIp } from '@/lib/audit-log'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 // This route runs on Vercel's server — the service key is safe here
 function getAdminClient() {
@@ -64,6 +65,16 @@ export async function POST(req: NextRequest) {
     const { data: { user: inviter }, error: authErr } = await admin.auth.getUser(inviterToken)
     if (authErr || !inviter) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    // Each invite sends an email; cap how many one inviter can trigger per hour
+    // so the endpoint can't be used to spray invitations.
+    const rl = await checkRateLimit(admin, `invite-user:${inviter.id}`, 15, 3600)
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Too many invitations sent. Please wait a while before inviting more people.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } },
+      )
     }
 
     // Get inviter's profile to check their role. Use engagement_client_id (the

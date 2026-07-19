@@ -40,6 +40,7 @@ import {
   GRANT_TYPE_LABELS, GRANT_SCOPE_LABELS, type GrantSegmentFilter,
 } from '@/lib/access-grants'
 import type { SegmentFilter } from '@/lib/portfolio-intelligence'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -212,6 +213,16 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
       if (!email) return NextResponse.json({ error: 'Enter your email address.' }, { status: 400 })
       if (requiresEmailConfirmation(grant) && !emailSatisfiesGrant(grant, email)) {
         return NextResponse.json({ error: "That email doesn't match the one this link was sent to." }, { status: 401 })
+      }
+      // Each request sends a code email — cap how many can be triggered for a
+      // given grant so the link can't be used to spam the recipient's inbox.
+      // (Wrong-code guessing is separately capped by otpAttemptsExceeded below.)
+      const rl = await checkRateLimit(admin, `otp-request:${grant.id}`, 5, 600)
+      if (!rl.allowed) {
+        return NextResponse.json(
+          { error: 'Too many code requests. Please wait a few minutes and try again.' },
+          { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } },
+        )
       }
       const now = new Date()
       const otpCode = generateOtpCode()
