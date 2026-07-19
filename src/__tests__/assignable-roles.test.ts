@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canAssignRole } from '../lib/auth/assignable-roles'
+import { canAssignRole, canModifyUserRole } from '../lib/auth/assignable-roles'
 
 describe('canAssignRole', () => {
   it('super_coach may assign any real role', () => {
@@ -40,5 +40,34 @@ describe('canAssignRole', () => {
     expect(canAssignRole('ceo', 'wizard')).toBe(false)
     expect(canAssignRole('auditor', 'unit_head')).toBe(false)
     expect(canAssignRole('', '')).toBe(false)
+  })
+})
+
+describe('canModifyUserRole (target-role hierarchy)', () => {
+  it('a finance_manager may NOT demote a CEO (target outranks them)', () => {
+    // destination role (unit_head) is assignable, but the target's CURRENT role (ceo) is not.
+    expect(canModifyUserRole('finance_manager', 'ceo', 'unit_head')).toBe(false)
+  })
+
+  it('a finance_manager may retune a unit_head <-> accounts_assistant', () => {
+    expect(canModifyUserRole('finance_manager', 'unit_head', 'accounts_assistant')).toBe(true)
+    expect(canModifyUserRole('finance_manager', 'accounts_assistant', 'unit_head')).toBe(true)
+  })
+
+  it('a CEO may change staff they administer but NOT another CEO or a super_coach target', () => {
+    expect(canModifyUserRole('ceo', 'finance_manager', 'unit_head')).toBe(true)
+    expect(canModifyUserRole('ceo', 'ceo', 'finance_manager')).toBe(false)
+    expect(canModifyUserRole('ceo', 'super_coach', 'finance_manager')).toBe(false)
+  })
+
+  it('super_coach may change ceo/coach/funder targets but not a super_coach target (DB-only)', () => {
+    expect(canModifyUserRole('super_coach', 'ceo', 'finance_manager')).toBe(true)
+    expect(canModifyUserRole('super_coach', 'coach', 'funder')).toBe(true)
+    expect(canModifyUserRole('super_coach', 'super_coach', 'ceo')).toBe(false)
+  })
+
+  it('a unit_head/accounts_assistant may never change anyone', () => {
+    expect(canModifyUserRole('unit_head', 'accounts_assistant', 'unit_head')).toBe(false)
+    expect(canModifyUserRole('accounts_assistant', 'unit_head', 'accounts_assistant')).toBe(false)
   })
 })

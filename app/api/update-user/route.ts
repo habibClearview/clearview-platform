@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { canAssignRole } from '@/lib/auth/assignable-roles'
+import { canModifyUserRole } from '@/lib/auth/assignable-roles'
 
 function getAdminClient() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } })
@@ -20,38 +20,60 @@ export async function POST(req: NextRequest) {
     // their own organisation. (Previously the profile UPDATE was scoped but the
     // deactivate/ban action below was not, so a CEO could ban a user in another
     // organisation by passing their id.)
-    const { data: tp, error: tpErr } = await admin.from('user_profiles').select('engagement_client_id').eq('id', targetUserId).single()
+    const { data: tp, error: tpErr } = await admin.from('user_profiles').select('role, engagement_client_id').eq('id', targetUserId).single()
     if (tpErr || !tp) { if (tpErr) console.error('Update user target lookup error:', tpErr); return NextResponse.json({ error: 'User not found' }, { status: 404 }) }
     const sameTenant = rp.role === 'super_coach' || (!!rp.engagement_client_id && rp.engagement_client_id === tp.engagement_client_id)
     if (!sameTenant) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const canUnits = ['ceo', 'super_coach', 'finance_manager'].includes(rp.role)
     const canDeactivate = ['ceo', 'super_coach'].includes(rp.role)
+
+    // Reject a deactivate/reactivate request from an actor who isn't allowed to
+    // do it, rather than silently ignoring it and returning success.
+    if (updates.active !== undefined && !canDeactivate) {
+      return NextResponse.json({ error: 'You are not permitted to change this user’s active status.' }, { status: 403 })
+    }
+
     const updateData: Record<string, unknown> = {}
     if (updates.full_name) updateData.full_name = updates.full_name
     if (updates.assigned_unit_ids !== undefined && canUnits) updateData.assigned_unit_ids = updates.assigned_unit_ids
-    // Role changes are the privilege-escalation surface: validate the TARGET
-    // role against what this actor is actually allowed to assign (a CEO can
-    // staff their org but never mint a peer CEO or a super_coach), and never
-    // let anyone change their own role. Previously any role string was accepted
-    // for a ceo/super_coach actor, so a CEO could set someone — or themselves —
-    // to super_coach and gain cross-tenant platform admin.
+    // Role changes are the privilege-escalation surface. Validate BOTH the
+    // target's current role and the requested new role against what this actor
+    // may administer (a CEO can staff their org but never touch a peer CEO or a
+    // super_coach, and never mint one), and never let anyone change their own
+    // role. Previously any role string was accepted for a ceo/super_coach actor,
+    // and the target's current role wasn't checked — so a CEO could make someone
+    // super_coach, or a finance_manager could demote a CEO.
     if (updates.role) {
       if (targetUserId === user.id) {
         return NextResponse.json({ error: 'You cannot change your own role.' }, { status: 403 })
       }
-      if (!canAssignRole(rp.role, updates.role)) {
-        return NextResponse.json({ error: 'You are not permitted to assign this role.' }, { status: 403 })
+      if (!canModifyUserRole(rp.role, tp.role, updates.role)) {
+        return NextResponse.json({ error: 'You are not permitted to change this user’s role.' }, { status: 403 })
       }
       updateData.role = updates.role
     }
-    // Scope by engagement_client_id (TEXT), not the legacy client_id UUID.
-    let upd = admin.from('user_profiles').update(updateData).eq('id', targetUserId)
-    if (rp.role !== 'super_coach') upd = upd.eq('engagement_client_id', rp.engagement_client_id)
-    const { error: ue } = await upd
-    if (ue) { console.error('Update user error:', ue); return NextResponse.json({ error: 'Could not update this user.' }, { status: 500 }) }
-    if (updates.active === false && canDeactivate) await admin.auth.admin.updateUserById(targetUserId, { ban_duration: '876000h' })
-    if (updates.active === true && canDeactivate) await admin.auth.admin.updateUserById(targetUserId, { ban_duration: 'none' })
+
+    // Only write the profile when there is actually something to change — an
+    // empty .update({}) is rejected by PostgREST. Scope by engagement_client_id
+    // (TEXT), not the legacy client_id UUID.
+    if (Object.keys(updateData).length > 0) {
+      let upd = admin.from('user_profiles').update(updateData).eq('id', targetUserId)
+      if (rp.role !== 'super_coach') upd = upd.eq('engagement_client_id', rp.engagement_client_id)
+      const { error: ue } = await upd
+      if (ue) { console.error('Update user error:', ue); return NextResponse.json({ error: 'Could not update this user.' }, { status: 500 }) }
+    }
+
+    // Deactivate / reactivate via a ban window. Surface a failure instead of
+    // returning a false success if the Auth admin call errors.
+    if (updates.active === false) {
+      const { error: be } = await admin.auth.admin.updateUserById(targetUserId, { ban_duration: '876000h' })
+      if (be) { console.error('Deactivate (ban) error:', be); return NextResponse.json({ error: 'Could not deactivate this user.' }, { status: 500 }) }
+    }
+    if (updates.active === true) {
+      const { error: be } = await admin.auth.admin.updateUserById(targetUserId, { ban_duration: 'none' })
+      if (be) { console.error('Reactivate (unban) error:', be); return NextResponse.json({ error: 'Could not reactivate this user.' }, { status: 500 }) }
+    }
     return NextResponse.json({ success: true })
   } catch (err) { console.error(err); return NextResponse.json({ error: 'Unexpected error' }, { status: 500 }) }
 }

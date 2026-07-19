@@ -24,3 +24,16 @@ export const ASSIGNABLE_ROLES: Record<string, string[]> = {
 export function canAssignRole(actorRole: string, targetRole: string): boolean {
   return (ASSIGNABLE_ROLES[actorRole] || []).includes(targetRole)
 }
+
+/**
+ * True when `actorRole` may change a user whose CURRENT role is
+ * `targetCurrentRole` to `targetNewRole`.
+ *
+ * Enforces the hierarchy in BOTH directions: the actor must be allowed to
+ * administer the target's current role AND to assign the new one. Without the
+ * current-role check, a finance_manager (who may assign unit_head) could demote
+ * a CEO to unit_head — the destination is allowed, but the target outranks them.
+ */
+export function canModifyUserRole(actorRole: string, targetCurrentRole: string, targetNewRole: string): boolean {
+  return canAssignRole(actorRole, targetCurrentRole) && canAssignRole(actorRole, targetNewRole)
+}
