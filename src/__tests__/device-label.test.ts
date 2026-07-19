@@ -32,6 +32,18 @@ describe('describeDevice', () => {
       .toBe('Firefox on Linux')
   })
 
+  it('recognises iOS browsers by their brand token, not the Safari fallback', () => {
+    // Chrome on iOS (CriOS) — carries a Safari token but is NOT Safari.
+    expect(describeDevice('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0.0.0 Mobile/15E148 Safari/604.1'))
+      .toBe('Chrome on iPhone/iPad')
+    // Firefox on iOS (FxiOS)
+    expect(describeDevice('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/121.0 Mobile/15E148 Safari/605.1.15'))
+      .toBe('Firefox on iPhone/iPad')
+    // Edge on iOS (EdgiOS)
+    expect(describeDevice('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 EdgiOS/120.0 Mobile/15E148 Safari/604.1'))
+      .toBe('Edge on iPhone/iPad')
+  })
+
   it('falls back gracefully for empty / unknown agents', () => {
     expect(describeDevice('')).toBe('Unknown device')
     expect(describeDevice(null)).toBe('Unknown device')

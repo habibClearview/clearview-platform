@@ -8,7 +8,7 @@
 // 2026_07_19_self_service_sessions migration) that only ever touch the
 // caller's OWN sessions — so this component needs no server route.
 // ============================================================
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { describeDevice } from '@/lib/auth/device-label'
 
@@ -50,6 +50,21 @@ export default function ActiveSessionsButton({ fontSize = '0.88rem' }: { fontSiz
 
   useEffect(() => { if (open) void load() }, [open, load])
 
+  // Drive a native <dialog> so we get focus-trapping, Escape-to-close, and the
+  // backdrop for free (an accessible modal, rather than a plain div overlay
+  // that keyboard users can tab out of).
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const d = dialogRef.current
+    if (!d) return
+    if (open && !d.open) d.showModal()
+    else if (!open && d.open) d.close()
+  }, [open])
+  function onBackdropClick(e: React.MouseEvent<HTMLDialogElement>) {
+    // A click landing on the <dialog> element itself (not its content) is the backdrop.
+    if (e.target === dialogRef.current) setOpen(false)
+  }
+
   const current = sessions.find(s => s.is_current)
   const otherCount = sessions.filter(s => !s.is_current).length
 
@@ -83,16 +98,17 @@ export default function ActiveSessionsButton({ fontSize = '0.88rem' }: { fontSiz
         Devices
       </button>
 
-      {open && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Your signed-in devices"
-          onClick={() => setOpen(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(11,31,51,0.55)', zIndex: 10000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '4vh 1rem', overflowY: 'auto' }}>
+      <dialog
+        ref={dialogRef}
+        aria-label="Your signed-in devices"
+        onClose={() => setOpen(false)}
+        onCancel={() => setOpen(false)}
+        onClick={onBackdropClick}
+        style={{ border: 'none', padding: 0, maxWidth: 560, width: '92vw', background: 'transparent', color: '#1B2A4A' }}>
+        <style>{`dialog::backdrop{background:rgba(11,31,51,0.55);} dialog[open]{margin:6vh auto;}`}</style>
+        {open && (
           <div
-            onClick={e => e.stopPropagation()}
-            style={{ background: '#FFFFFF', color: '#1B2A4A', borderRadius: 10, maxWidth: 560, width: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.3)', padding: '1.25rem 1.35rem' }}>
+            style={{ background: '#FFFFFF', color: '#1B2A4A', borderRadius: 10, width: '100%', maxHeight: '84vh', overflowY: 'auto', boxShadow: '0 12px 40px rgba(0,0,0,0.3)', padding: '1.25rem 1.35rem', boxSizing: 'border-box' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 700 }}>Your signed-in devices</div>
               <button type="button" onClick={() => setOpen(false)} aria-label="Close" style={{ background: 'none', border: 'none', fontSize: '1.4rem', lineHeight: 1, color: '#4A5A6A', cursor: 'pointer' }}>×</button>
@@ -148,8 +164,8 @@ export default function ActiveSessionsButton({ fontSize = '0.88rem' }: { fontSiz
               A device already open may keep working for up to about an hour until its access expires, then it is fully locked out.
             </p>
           </div>
-        </div>
-      )}
+        )}
+      </dialog>
     </>
   )
 }

@@ -17,11 +17,16 @@ export function describeDevice(ua: string | null | undefined): string {
   else if (/Linux/i.test(ua)) os = 'Linux'
 
   // Browser. Order matters: Edge/Opera/Chrome all carry the "Safari" token,
-  // and Chrome carries an "Edg"/"OPR" token only for those forks — so the
-  // most specific brands must be tested first.
+  // and Chrome carries an "Edg"/"OPR" token only for those forks. On iOS,
+  // every browser is WebKit under the hood and reports a Safari token, so the
+  // iOS-specific brand tokens (Edg[iA], CriOS, FxiOS) MUST be matched before
+  // the plain Chrome/Firefox/Safari fallbacks or e.g. Chrome-on-iPhone shows
+  // as Safari.
   let browser = ''
-  if (/Edg\//i.test(ua)) browser = 'Edge'
-  else if (/OPR\/|Opera/i.test(ua)) browser = 'Opera'
+  if (/Edg\/|EdgiOS\/|EdgA\//i.test(ua)) browser = 'Edge'
+  else if (/OPR\/|OPT\/|Opera/i.test(ua)) browser = 'Opera'
+  else if (/CriOS\//i.test(ua)) browser = 'Chrome'   // Chrome on iOS
+  else if (/FxiOS\//i.test(ua)) browser = 'Firefox'  // Firefox on iOS
   else if (/Chrome\//i.test(ua)) browser = 'Chrome'
   else if (/Firefox\//i.test(ua)) browser = 'Firefox'
   else if (/Version\/.*Safari/i.test(ua)) browser = 'Safari'
