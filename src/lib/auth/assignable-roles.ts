@@ -8,6 +8,18 @@
 // platform admin.
 // ============================================================
 
+// Roles permitted to manage another user's unit assignments.
+export const UNIT_MANAGER_ROLES = ['ceo', 'super_coach', 'finance_manager']
+// Roles permitted to deactivate / reactivate another user.
+export const DEACTIVATOR_ROLES = ['ceo', 'super_coach']
+
+export function canManageUnits(role: string): boolean {
+  return UNIT_MANAGER_ROLES.includes(role)
+}
+export function canDeactivateUsers(role: string): boolean {
+  return DEACTIVATOR_ROLES.includes(role)
+}
+
 export const ASSIGNABLE_ROLES: Record<string, string[]> = {
   // Platform admin may assign any real role.
   super_coach: ['ceo', 'finance_manager', 'unit_head', 'accounts_assistant', 'coach', 'funder'],

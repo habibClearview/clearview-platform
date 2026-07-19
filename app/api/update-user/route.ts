@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { canModifyUserRole } from '@/lib/auth/assignable-roles'
+import { canModifyUserRole, canManageUnits, canDeactivateUsers } from '@/lib/auth/assignable-roles'
 
 function getAdminClient() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } })
@@ -25,18 +25,22 @@ export async function POST(req: NextRequest) {
     const sameTenant = rp.role === 'super_coach' || (!!rp.engagement_client_id && rp.engagement_client_id === tp.engagement_client_id)
     if (!sameTenant) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const canUnits = ['ceo', 'super_coach', 'finance_manager'].includes(rp.role)
-    const canDeactivate = ['ceo', 'super_coach'].includes(rp.role)
+    const canUnits = canManageUnits(rp.role)
+    const canDeactivate = canDeactivateUsers(rp.role)
 
-    // Reject a deactivate/reactivate request from an actor who isn't allowed to
-    // do it, rather than silently ignoring it and returning success.
+    // Reject unauthorized requests explicitly rather than silently ignoring the
+    // field and returning success (which would mislead the caller into thinking
+    // the change applied).
     if (updates.active !== undefined && !canDeactivate) {
       return NextResponse.json({ error: 'You are not permitted to change this user’s active status.' }, { status: 403 })
+    }
+    if (updates.assigned_unit_ids !== undefined && !canUnits) {
+      return NextResponse.json({ error: 'You are not permitted to change this user’s unit assignments.' }, { status: 403 })
     }
 
     const updateData: Record<string, unknown> = {}
     if (updates.full_name) updateData.full_name = updates.full_name
-    if (updates.assigned_unit_ids !== undefined && canUnits) updateData.assigned_unit_ids = updates.assigned_unit_ids
+    if (updates.assigned_unit_ids !== undefined) updateData.assigned_unit_ids = updates.assigned_unit_ids
     // Role changes are the privilege-escalation surface. Validate BOTH the
     // target's current role and the requested new role against what this actor
     // may administer (a CEO can staff their org but never touch a peer CEO or a
