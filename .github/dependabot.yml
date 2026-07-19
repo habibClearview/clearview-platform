@@ -1,0 +1,21 @@
+# Dependabot — automatically opens PRs to update dependencies with known
+# vulnerabilities (the gap that let the vulnerable xlsx / next versions sit
+# unnoticed). Also keeps the GitHub Actions used by our workflows patched.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    # Group minor/patch bumps so we get one PR instead of many.
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "ci"]

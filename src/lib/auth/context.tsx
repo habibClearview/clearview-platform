@@ -45,14 +45,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch { /* fall through */ }
 
-    // Fallback: derive role from email
-    // Habib is always super_coach regardless of profile read failure
-    const role: UserRole = email === 'habib@habibonifade.com' ? 'super_coach' : 'accounts_assistant'
+    // Fallback when the profile row can't be read: fail CLOSED.
+    // A user's role and privileges come only from user_profiles (which is
+    // itself protected server-side). We must never grant elevated access from
+    // a hard-coded email string — if the read fails we hand back the
+    // lowest-privilege role, which sees no client data on its own.
+    const role: UserRole = 'accounts_assistant'
     return {
       id: userId,
       email,
       role,
-      full_name: email === 'habib@habibonifade.com' ? 'Habib Onifade' : '',
+      full_name: '',
       client_id: null,
       assigned_unit_ids: [],
       engagement_client_id: null,
