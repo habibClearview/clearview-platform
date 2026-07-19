@@ -15,11 +15,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { canForceSignout } from '@/lib/auth/force-signout-authz'
 
 function getAdminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) throw new Error('Supabase admin credentials not configured')
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
 export async function POST(req: NextRequest) {
@@ -36,19 +35,27 @@ export async function POST(req: NextRequest) {
     if (authErr || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
     // 2) Resolve requester and target profiles server-side.
-    const { data: actor } = await admin
+    const { data: actor, error: actorErr } = await admin
       .from('user_profiles')
       .select('role, engagement_client_id')
       .eq('id', user.id)
       .single()
-    if (!actor) return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
+    if (actorErr || !actor) {
+      // A real DB error is logged for diagnosis; the browser only ever sees the
+      // generic message so schema/PostgREST detail is never leaked.
+      if (actorErr) console.error('Force signout — actor profile lookup error:', actorErr)
+      return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
+    }
 
-    const { data: target } = await admin
+    const { data: target, error: targetErr } = await admin
       .from('user_profiles')
       .select('role, engagement_client_id')
       .eq('id', targetUserId)
       .single()
-    if (!target) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    if (targetErr || !target) {
+      if (targetErr) console.error('Force signout — target profile lookup error:', targetErr)
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
 
     // 3) Authorise (super_coach anywhere; ceo/finance_manager within their own
     //    organisation only — see canForceSignout for the exact rule).
