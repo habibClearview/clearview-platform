@@ -1,0 +1,68 @@
+name: Dependency audit
+
+# Runs `npm audit` on every PR and weekly. ADVISORIES are report-only for now
+# (there are known high-severity advisories — xlsx, next — being remediated
+# separately, and we don't want to block every PR until those land). But a
+# CRASH of the audit tool itself must NOT look the same as "no advisories":
+# the step below distinguishes the two and fails only when the tool genuinely
+# could not run. Flip to a hard gate on advisories once the outstanding ones
+# are cleared.
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dep-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: npm audit (high+, advisories report-only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "20"
+      - name: npm audit (high+)
+        run: |
+          # `npm audit` exits non-zero BOTH when advisories exist (expected,
+          # report-only here) AND when it fails to run. Tell them apart by the
+          # output: valid JSON = it ran (report and pass); no JSON = the tool
+          # failed (fail the job) — never swallow a real failure silently.
+          # The report is written to a FILE (not a pipe) so the Python program,
+          # which is itself read from stdin via the heredoc, doesn't consume it.
+          npm audit --audit-level=high --json > audit.json 2>audit.err || true
+          if python3 - <<'PY'
+          import json, sys
+          try:
+              with open("audit.json") as fh:
+                  d = json.load(fh)
+          except Exception:
+              sys.exit(1)
+          # `npm audit --json` can emit a valid JSON error payload
+          # ({"error": {...}}, no "metadata") when the tool itself fails
+          # (registry/network/auth issue, missing lockfile). That parses fine
+          # but is NOT a real report — require a genuine report shape so a
+          # failed audit can't masquerade as "no advisories".
+          if not isinstance(d, dict) or "error" in d or "metadata" not in d:
+              sys.exit(1)
+          v = d.get("metadata", {}).get("vulnerabilities", {})
+          print("Advisory counts (report-only):", v)
+          sys.exit(0)
+          PY
+          then
+            echo "npm audit ran successfully; advisories above are report-only."
+          else
+            echo "::error::npm audit did not produce a valid report — the audit tool failed to run."
+            cat audit.err || true
+            exit 1
+          fi

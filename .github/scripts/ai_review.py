@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""Ask Claude to review a PR diff for CRITICAL issues — and FAIL CLOSED.
+
+Why this exists as a script instead of inline shell:
+
+The previous shell version pasted the raw diff straight into a JSON string
+(`... '"$DIFF"' ...`). Any newline or double-quote in the diff — i.e. every
+real diff — produced invalid JSON, the API rejected it, and the script then
+printed "APPROVED - Review unavailable". The security gate therefore passed
+WITHOUT any review ever happening. That is a fail-OPEN gate.
+
+This version:
+  * builds the request body with json.dumps, so the diff is always encoded
+    safely no matter what it contains;
+  * treats every failure — no API key, network error, HTTP error, malformed
+    response, empty answer — as BLOCKED, never APPROVED;
+  * passes the gate ONLY when the model explicitly starts its answer with
+    APPROVED. Anything else fails the gate.
+
+Reads:  /tmp/pr_truncated.diff, env ANTHROPIC_API_KEY
+Writes: review.txt (the comment body) and conclusion=success|failure to
+        $GITHUB_OUTPUT.
+"""
+import json
+import os
+import re
+import sys
+import urllib.error
+import urllib.request
+
+MODEL = "claude-sonnet-5"
+
+PROMPT = (
+    "You are reviewing a PR for the Clearview financial platform (Next.js 14, "
+    "Supabase, TypeScript). Review this diff for CRITICAL issues only (auth "
+    "gaps, data loss, financial calculation errors, SQL injection, falsy-zero "
+    "bugs with || instead of ??, React state timing bugs, duplicate client "
+    "creation, type mismatches between UUID and TEXT). Ignore style. Rate each "
+    "issue as CRITICAL (blocks merge) or WARNING (informational). Be concise. "
+    "Start your response with either APPROVED or BLOCKED.\n\nDiff:\n"
+)
+
+
+def set_output(key: str, value: str) -> None:
+    path = os.environ.get("GITHUB_OUTPUT")
+    if path:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(f"{key}={value}\n")
+
+
+def write_review(text: str) -> None:
+    with open("review.txt", "w", encoding="utf-8") as f:
+        f.write(text)
+
+
+def fail_closed(reason: str) -> None:
+    """Any failure to obtain a real review blocks the merge (never approves)."""
+    print(f"::error::AI review could not complete — failing closed. {reason}")
+    write_review(
+        f"BLOCKED - The automated AI review could not run ({reason}). "
+        "Failing closed so nothing merges unreviewed. A maintainer must fix the "
+        "cause (for example add the ANTHROPIC_API_KEY repository secret) and "
+        "re-run this check, or review the change manually before merging."
+    )
+    set_output("conclusion", "failure")
+    # Exit 0 so the later comment step still posts; the status-check step reads
+    # conclusion=failure and fails the job.
+    sys.exit(0)
+
+
+def main() -> None:
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        fail_closed("ANTHROPIC_API_KEY repository secret is not set")
+
+    try:
+        with open("/tmp/pr_truncated.diff", encoding="utf-8", errors="replace") as f:
+            diff = f.read()
+    except OSError as e:
+        fail_closed(f"could not read the diff: {e}")
+
+    if not diff.strip():
+        write_review("APPROVED - No reviewable code changes in this diff.")
+        set_output("conclusion", "success")
+        return
+
+    body = json.dumps(
+        {
+            "model": MODEL,
+            "max_tokens": 2000,
+            "messages": [{"role": "user", "content": PROMPT + diff}],
+        }
+    ).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=body,
+        headers={
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            payload = json.load(resp)
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "replace")[:500]
+        fail_closed(f"API returned HTTP {e.code}: {detail}")
+    except Exception as e:  # network / JSON / timeout — all fail closed
+        fail_closed(f"request to the model failed: {e}")
+
+    # The response's content is a list of blocks; with extended thinking the
+    # first block can be a "thinking" block, so find the first "text" block
+    # rather than assuming index 0.
+    review = ""
+    blocks = payload.get("content") if isinstance(payload, dict) else None
+    if isinstance(blocks, list):
+        for b in blocks:
+            if isinstance(b, dict) and b.get("type") == "text":
+                review = (b.get("text") or "").strip()
+                if review:
+                    break
+
+    if not review:
+        fail_closed(f"no text block in the API response: {json.dumps(payload)[:400]}")
+
+    write_review(review)
+    # Read the verdict robustly. The model may wrap it in markdown (e.g.
+    # "**APPROVED**") or add a heading, so strip non-letters from the start
+    # before matching rather than requiring the bare word first — otherwise a
+    # genuinely-approved review that happens to be bolded would be treated as a
+    # failure and block the PR.
+    head = re.sub(r"[^A-Za-z]", "", review[:40]).upper()
+    if head.startswith("APPROVED"):
+        conclusion = "success"
+    elif head.startswith("BLOCKED"):
+        conclusion = "failure"
+    else:
+        # Genuinely can't tell what the model decided — fail closed.
+        fail_closed(f"could not read an APPROVED/BLOCKED verdict from the review: {review[:120]!r}")
+    set_output("conclusion", conclusion)
+    print(f"AI review conclusion: {conclusion}")
+
+
+if __name__ == "__main__":
+    main()
