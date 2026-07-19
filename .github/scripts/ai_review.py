@@ -87,7 +87,13 @@ def main() -> None:
     body = json.dumps(
         {
             "model": MODEL,
-            "max_tokens": 2000,
+            # Generous budget: this model can spend output tokens on internal
+            # reasoning before the visible verdict, and on a large diff a small
+            # budget got fully consumed by reasoning — the response then carried
+            # only a (redacted) thinking block and NO text, so the gate failed
+            # closed and blocked a clean PR. 8000 leaves ample room for the
+            # reasoning plus the short APPROVED/BLOCKED review.
+            "max_tokens": 8000,
             "messages": [{"role": "user", "content": PROMPT + diff}],
         }
     ).encode("utf-8")
