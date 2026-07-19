@@ -22,6 +22,7 @@
 // ============================================================
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { getBearerToken, requesterCanViewClient } from '@/lib/auth/api-authz'
 import { listProviders, getProvider } from '@/lib/providers/registry'
 import type { LinkStatus } from '@/lib/providers/types'
 
@@ -62,6 +63,11 @@ export async function POST(req: NextRequest) {
     if (!clientId || !providerId) {
       return NextResponse.json({ error: 'Missing clientId or providerId' }, { status: 400 })
     }
+    // Only a caller who may view this client can create/alter its provider link.
+    // Previously there was no auth — anyone could write provider_links for any client.
+    if (!(await requesterCanViewClient(getBearerToken(req), clientId))) {
+      return NextResponse.json({ error: 'Not authorised' }, { status: 403 })
+    }
     const adapter = getProvider(providerId)
     if (!adapter) {
       return NextResponse.json({ error: `Unknown provider "${providerId}"` }, { status: 400 })
@@ -80,11 +86,13 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     }, { onConflict: 'client_id,provider_id' })
     if (error) {
-      return NextResponse.json({ error: 'Could not save the link: ' + error.message }, { status: 500 })
+      console.error('connect-provider upsert error:', error)
+      return NextResponse.json({ error: 'Could not save the link.' }, { status: 500 })
     }
 
     return NextResponse.json({ status, instructions: link.instructions })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'An unexpected error occurred' }, { status: 500 })
+    console.error('connect-provider error:', err)
+    return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 })
   }
 }

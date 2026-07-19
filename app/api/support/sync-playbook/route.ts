@@ -31,11 +31,12 @@ function getAdminClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
-// Vercel Cron sends "Authorization: Bearer <CRON_SECRET>" when CRON_SECRET is
-// set. If we haven't configured one, we don't block the cron (see header note).
+// Vercel Cron sends "Authorization: Bearer <CRON_SECRET>". Fail CLOSED if no
+// secret is configured — an unset CRON_SECRET in production is a
+// misconfiguration, not a reason to let anyone trigger the resync.
 function cronAuthorised(req: NextRequest): boolean {
   const secret = (process.env.CRON_SECRET || '').trim()
-  if (!secret) return true
+  if (!secret) return false
   return req.headers.get('authorization') === `Bearer ${secret}`
 }
 

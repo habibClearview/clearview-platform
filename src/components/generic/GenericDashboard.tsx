@@ -5085,7 +5085,7 @@ Financial summary:
 - Staff cost as % of revenue: ${(m.staff_cost_pct*100).toFixed(1)}%
 
 Write a short health check for the CEO in plain continuous prose. Begin with the overall status, one of Green, Amber or Red, and the one reason for it, in a single sentence. Then a sentence or two on what is going well, then the main concerns, then the most important actions this month. Plain sentences only. No lists, no numbered points, no headings, no bold, no dashes, no symbols. Under 150 words.`
-      const response = await fetch('/api/ai-generate',{
+      const response = await authedFetch('/api/ai-generate',{
         method:'POST', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({prompt,max_tokens:500})
       })
@@ -5115,7 +5115,7 @@ Credit Risk: ${s.score}/100 (${s.classification}); Going Concern: ${s.gcScore}/2
 Business units: ${config.business_units.filter(u=>u.active).map(u=>u.name).join(', ')}
 
 Write a status report, not a letter. Do not address the reader. Do not open with any preamble or greeting. Start with the single most important fact. State what is going well, then what is getting worse (revenue direction, whether cash covers outflow, cost pressure), then the one action that matters most this month. At most 5 short factual sentences, under 80 words. No repetition, no filler.`
-      const response = await fetch('/api/ai-generate',{
+      const response = await authedFetch('/api/ai-generate',{
         method:'POST', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({prompt,max_tokens:350})
       })
