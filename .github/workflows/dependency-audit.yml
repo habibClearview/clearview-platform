@@ -38,11 +38,14 @@ jobs:
           # report-only here) AND when it fails to run. Tell them apart by the
           # output: valid JSON = it ran (report and pass); no JSON = the tool
           # failed (fail the job) — never swallow a real failure silently.
-          out=$(npm audit --audit-level=high --json 2>audit.err) || true
-          if printf '%s' "$out" | python3 - <<'PY'
+          # The report is written to a FILE (not a pipe) so the Python program,
+          # which is itself read from stdin via the heredoc, doesn't consume it.
+          npm audit --audit-level=high --json > audit.json 2>audit.err || true
+          if python3 - <<'PY'
           import json, sys
           try:
-              d = json.load(sys.stdin)
+              with open("audit.json") as fh:
+                  d = json.load(fh)
           except Exception:
               sys.exit(1)
           v = d.get("metadata", {}).get("vulnerabilities", {})

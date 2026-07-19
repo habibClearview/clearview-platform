@@ -111,13 +111,20 @@ def main() -> None:
     except Exception as e:  # network / JSON / timeout — all fail closed
         fail_closed(f"request to the model failed: {e}")
 
-    try:
-        review = payload["content"][0]["text"].strip()
-    except (KeyError, IndexError, TypeError):
-        fail_closed(f"unexpected API response shape: {json.dumps(payload)[:400]}")
+    # The response's content is a list of blocks; with extended thinking the
+    # first block can be a "thinking" block, so find the first "text" block
+    # rather than assuming index 0.
+    review = ""
+    blocks = payload.get("content") if isinstance(payload, dict) else None
+    if isinstance(blocks, list):
+        for b in blocks:
+            if isinstance(b, dict) and b.get("type") == "text":
+                review = (b.get("text") or "").strip()
+                if review:
+                    break
 
     if not review:
-        fail_closed("the model returned an empty review")
+        fail_closed(f"no text block in the API response: {json.dumps(payload)[:400]}")
 
     write_review(review)
     # Only an explicit APPROVED passes. BLOCKED — or any unrecognised opening —
