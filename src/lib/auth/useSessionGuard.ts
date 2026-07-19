@@ -21,6 +21,10 @@ export function useSessionGuard(active: boolean) {
     let idleTimer: ReturnType<typeof setTimeout> | null = null
     let heartbeat: ReturnType<typeof setInterval> | null = null
     let ended = false
+    // Set true once a heartbeat has seen a live session, so an ambiguous
+    // "no user / no error" result can't sign the user out before the session
+    // has settled right after login.
+    let hasBeenLive = false
 
     async function endSession() {
       if (ended) return
@@ -48,7 +52,9 @@ export function useSessionGuard(active: boolean) {
       if (ended) return
       try {
         const { data, error } = await supabase.auth.getUser()
-        if (shouldEndOnHeartbeat(data?.user ?? null, error)) endSession()
+        const user = data?.user ?? null
+        if (user && !error) hasBeenLive = true
+        if (shouldEndOnHeartbeat(user, error, hasBeenLive)) endSession()
       } catch {
         /* network throw — ignore, try again next tick */
       }

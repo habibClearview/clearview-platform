@@ -40,12 +40,23 @@ export const ACTIVITY_EVENTS = [
  * A transient/network error (no status, or a 5xx) must NOT sign the user out —
  * otherwise a momentary connection blip would kick them out mid-work. Those are
  * ignored so the next heartbeat can try again.
+ *
+ * `hasBeenLive` guards the ambiguous "no user AND no error" result: we only
+ * treat it as a genuinely-ended session once at least one earlier heartbeat has
+ * seen a live user. That avoids a false sign-out if the very first check right
+ * after login briefly resolves before the session has fully propagated.
  */
 export function shouldEndOnHeartbeat(
   user: unknown,
   error: { status?: number } | null | undefined,
+  hasBeenLive: boolean = true,
 ): boolean {
-  if (!error) return !user // no error → end only if there is genuinely no user
-  const status = error.status
-  return status === 401 || status === 403
+  // A revoked/expired token (401/403) always ends the session, immediately.
+  if (error) {
+    const status = error.status
+    return status === 401 || status === 403
+  }
+  // No error: end only if there is genuinely no user, and only once we've
+  // previously confirmed a live session.
+  return !user && hasBeenLive
 }

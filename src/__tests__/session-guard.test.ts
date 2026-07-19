@@ -7,6 +7,15 @@ describe('shouldEndOnHeartbeat', () => {
     expect(shouldEndOnHeartbeat(undefined, undefined)).toBe(true)
   })
 
+  it('does NOT end on "no user / no error" until a live session has been seen', () => {
+    // First tick right after login: hasBeenLive=false → must not sign out.
+    expect(shouldEndOnHeartbeat(null, null, false)).toBe(false)
+    // After a live session was confirmed once, a later "no user" ends it.
+    expect(shouldEndOnHeartbeat(null, null, true)).toBe(true)
+    // A revoked token still ends immediately, even before any live tick.
+    expect(shouldEndOnHeartbeat(null, { status: 401 }, false)).toBe(true)
+  })
+
   it('keeps the session when a valid user is returned', () => {
     expect(shouldEndOnHeartbeat({ id: 'u1' }, null)).toBe(false)
   })
