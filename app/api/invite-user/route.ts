@@ -5,6 +5,7 @@
 // ============================================================
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { writeAuditLog, auditIp } from '@/lib/audit-log'
 
 // This route runs on Vercel's server — the service key is safe here
 function getAdminClient() {
@@ -172,6 +173,14 @@ export async function POST(req: NextRequest) {
         error: 'Could not link the new login to the organisation. Nothing was saved — please try again.',
       }, { status: 500 })
     }
+
+    await writeAuditLog(admin, {
+      actorId: inviter.id, actorEmail: inviter.email, actorRole: inviterRole,
+      action: 'user.invited',
+      targetId: inviteData.user.id, targetEmail: email,
+      detail: { role, engagement_client_id: clientId ?? null },
+      ip: auditIp(req.headers),
+    })
 
     return NextResponse.json({
       success: true,
