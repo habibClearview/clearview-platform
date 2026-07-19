@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { getBearerToken } from '@/lib/auth/api-authz'
 import { escapeHtml } from '@/lib/escape-html'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   const RESEND_API_KEY = process.env.RESEND_API_KEY
@@ -20,6 +21,15 @@ export async function POST(req: NextRequest) {
   if (authErr || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   const { data: rp } = await admin.from('user_profiles').select('role').eq('id', user.id).single()
   if (!rp || rp.role !== 'super_coach') return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
+  // Sends email from the company domain — cap the send rate even for the admin.
+  const rl = await checkRateLimit(admin, `send-notification:${user.id}`, 30, 3600)
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Too many notifications sent. Please wait a while and try again.' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } },
+    )
+  }
 
   let body: any
   try {
