@@ -900,6 +900,17 @@ export default function GenericDashboard({
             <span style={{fontFamily:'monospace',fontSize:'0.88rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem',textTransform:'uppercase'}}>{P.role.replace('_',' ')}</span>
             <button onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle light/dark theme" style={{fontFamily:'monospace',fontSize:'0.88rem',background:'transparent',border:`1px solid var(--cv-wa-45)`,borderRadius:4,color:'var(--cv-wa-85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>{theme==='dark'?'☀':'☾'} Theme</button>
             <button onClick={P.onSignOut} style={{fontFamily:'monospace',fontSize:'0.88rem',background:'transparent',border:`1px solid var(--cv-wa-45)`,borderRadius:4,color:'var(--cv-wa-85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
+            {/* Global sign-out: revokes EVERY session for this login (all devices),
+                so a session left open on another computer is ended — not just this
+                tab. Uses Supabase scope:'global' which invalidates all refresh
+                tokens for the user. */}
+            <button type="button" onClick={async()=>{
+              if(!window.confirm('Sign out of ALL devices?\n\nThis logs you out everywhere — including any other computer where you are still signed in — as well as here.\n\nNote: a page already open on another device can keep working for up to about an hour until its access expires; after that it can no longer stay signed in. You will need to sign in again.')) return
+              let signOutError:any = null
+              try { const { error } = await supabase.auth.signOut({ scope: 'global' }); signOutError = error } catch(e) { signOutError = e }
+              if(signOutError){ window.alert('We could not confirm sign-out on all devices — other sessions may still be active. Please check your connection and try again.'); return }
+              window.location.href='/'
+            }} title="Log out of every device where you are signed in" style={{fontFamily:'monospace',fontSize:'0.88rem',background:'transparent',border:`1px solid var(--cv-red-45, rgba(192,57,43,0.45))`,borderRadius:4,color:'var(--cv-wa-85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out — all devices</button>
           </div>
         </div>
       </header>
