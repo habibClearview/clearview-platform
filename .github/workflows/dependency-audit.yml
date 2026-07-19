@@ -48,6 +48,13 @@ jobs:
                   d = json.load(fh)
           except Exception:
               sys.exit(1)
+          # `npm audit --json` can emit a valid JSON error payload
+          # ({"error": {...}}, no "metadata") when the tool itself fails
+          # (registry/network/auth issue, missing lockfile). That parses fine
+          # but is NOT a real report — require a genuine report shape so a
+          # failed audit can't masquerade as "no advisories".
+          if not isinstance(d, dict) or "error" in d or "metadata" not in d:
+              sys.exit(1)
           v = d.get("metadata", {}).get("vulnerabilities", {})
           print("Advisory counts (report-only):", v)
           sys.exit(0)

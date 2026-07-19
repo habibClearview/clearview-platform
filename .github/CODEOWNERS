@@ -16,3 +16,6 @@
 
 # CodeRabbit review configuration.
 /.coderabbit.yaml     @habibClearview
+
+# PR template — carries the security/auth definition-of-done checklist.
+/.github/PULL_REQUEST_TEMPLATE.md   @habibClearview

@@ -104,8 +104,10 @@ reviews:
         - AUTHORIZE: check the caller's role AND tenant scope. Never trust a
           role, client_id, or engagement_client_id taken from the request body
           or query — always re-derive them server-side from the caller's
-          profile, or reuse can_view_client (see src/lib/auth/api-authz.ts,
-          field-admin-authz.ts, assignable-roles.ts).
+          profile, or reuse the tenant-scope check (can_view_client is the
+          Postgres RLS policy; requesterCanViewClient in src/lib/auth/api-authz.ts
+          is the TypeScript wrapper that reuses it — see also field-admin-authz.ts,
+          assignable-roles.ts).
         - It is CORRECT for a route to use the anon key with the caller's JWT to
           run an RLS-scoped check (requesterCanViewClient) — do NOT flag anon-key
           usage as wrong; flag MISSING auth instead. But requesterCanViewClient
