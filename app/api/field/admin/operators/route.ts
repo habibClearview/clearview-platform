@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { randomBytes } from 'crypto'
+import { resolveFieldAdminActor, actorMayAccessClient } from '@/lib/auth/field-admin-authz'
 
 // Lazy init -- must never call createClient() at module level on Vercel.
 function getSupabase() {
@@ -21,6 +22,14 @@ export async function GET(req: NextRequest) {
     if (!clientId) return NextResponse.json({ error: 'client_id required' }, { status: 400 })
 
     const supabase = getSupabase()
+    const actor = await resolveFieldAdminActor(supabase, req)
+    if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    if (!actorMayAccessClient(actor, clientId)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
+    // Tokens ARE returned here (the dashboard needs them to show each operator's
+    // field link), but only now that the caller is authenticated AND confined to
+    // their own business — so this is a business admin seeing their own
+    // operators' links, not the previous open, cross-tenant credential dump.
     const { data: operators, error } = await supabase
       .from('field_operators')
       .select('*, tokens:field_operator_tokens(id, token, expires_at, last_used_at, created_at)')
@@ -46,6 +55,10 @@ export async function POST(req: NextRequest) {
     if (!display_name) return NextResponse.json({ error: 'display_name required' }, { status: 400 })
 
     const supabase = getSupabase()
+    const actor = await resolveFieldAdminActor(supabase, req)
+    if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    if (!actorMayAccessClient(actor, client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
     const { data: operator, error: opErr } = await supabase
       .from('field_operators')
       .insert({
@@ -94,6 +107,18 @@ export async function PATCH(req: NextRequest) {
     if (!operator_id) return NextResponse.json({ error: 'operator_id required' }, { status: 400 })
 
     const supabase = getSupabase()
+    const actor = await resolveFieldAdminActor(supabase, req)
+    if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+
+    // Resolve the operator's business up front and authorize against it before
+    // any change (this PATCH takes only operator_id, no client_id).
+    const { data: opRow, error: opLookupErr } = await supabase
+      .from('field_operators')
+      .select('client_id, business_unit_id')
+      .eq('id', operator_id)
+      .single()
+    if (opLookupErr || !opRow) return NextResponse.json({ error: 'Operator not found' }, { status: 404 })
+    if (!actorMayAccessClient(actor, opRow.client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     if (active !== undefined) {
       const { error } = await supabase
@@ -105,13 +130,6 @@ export async function PATCH(req: NextRequest) {
 
     let newToken = null
     if (issue_new_token) {
-      const { data: op, error: opErr } = await supabase
-        .from('field_operators')
-        .select('client_id, business_unit_id')
-        .eq('id', operator_id)
-        .single()
-      if (opErr || !op) return NextResponse.json({ error: 'Operator not found' }, { status: 404 })
-
       const expiresAt = expires_in_days
         ? new Date(Date.now() + Number(expires_in_days) * 24 * 60 * 60 * 1000).toISOString()
         : null
@@ -121,8 +139,8 @@ export async function PATCH(req: NextRequest) {
         .insert({
           token: generateToken(),
           operator_id,
-          client_id: op.client_id,
-          business_unit_id: op.business_unit_id,
+          client_id: opRow.client_id,
+          business_unit_id: opRow.business_unit_id,
           expires_at: expiresAt,
         })
         .select()

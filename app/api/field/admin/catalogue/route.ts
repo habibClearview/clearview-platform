@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isPlanLineValidForUnit } from '@/lib/catalogue-validation'
 import { getFieldSupabase as getSupabase } from '@/lib/field-auth'
+import { resolveFieldAdminActor, actorMayAccessClient } from '@/lib/auth/field-admin-authz'
 
 // ── GET: list catalogue items for a client (optionally one unit) ──
 export async function GET(req: NextRequest) {
@@ -10,6 +11,10 @@ export async function GET(req: NextRequest) {
     if (!clientId) return NextResponse.json({ error: 'client_id required' }, { status: 400 })
 
     const supabase = getSupabase()
+    const actor = await resolveFieldAdminActor(supabase, req)
+    if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    if (!actorMayAccessClient(actor, clientId)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
     let query = supabase.from('field_catalogue').select('*').eq('client_id', clientId).order('name')
     if (businessUnitId) query = query.eq('business_unit_id', businessUnitId)
 
@@ -46,6 +51,10 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = getSupabase()
+    const actor = await resolveFieldAdminActor(supabase, req)
+    if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    if (!actorMayAccessClient(actor, client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
     const { data: item, error } = await supabase
       .from('field_catalogue')
       .insert({
@@ -79,6 +88,8 @@ export async function PATCH(req: NextRequest) {
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
     const supabase = getSupabase()
+    const actor = await resolveFieldAdminActor(supabase, req)
+    if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
     // Fetch current state first: cost_price and cogs_plan_line_id must
     // stay atomic (a costed item always has a COGS category, never one
@@ -89,6 +100,8 @@ export async function PATCH(req: NextRequest) {
     const { data: existing, error: fetchErr } = await supabase
       .from('field_catalogue').select('cost_price, cogs_plan_line_id, client_id, business_unit_id, plan_line_id').eq('id', id).single()
     if (fetchErr) return NextResponse.json({ error: 'Catalogue item not found' }, { status: 404 })
+    // Authorize against the item's OWN business (this PATCH takes only the item id).
+    if (!actorMayAccessClient(actor, existing.client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const updates: Record<string, any> = { updated_at: new Date().toISOString() }
     if (name !== undefined) updates.name = String(name).trim()
