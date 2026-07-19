@@ -35,5 +35,11 @@ create policy audit_log_super_coach_read
   for select
   using (public.my_role() = 'super_coach');
 
--- Belt-and-braces: no direct table privileges for client roles.
-revoke all on public.audit_log from anon, authenticated;
+-- RLS filters ROWS, but the table-level privilege check still runs first, and
+-- PostgREST connects every logged-in user (including super_coach) as the
+-- `authenticated` Postgres role. So we MUST grant SELECT to authenticated for
+-- the policy to be reachable at all — the policy above then limits the visible
+-- rows to super_coach. We deliberately grant ONLY select: inserts/updates/
+-- deletes come from the service role (which bypasses RLS), never from clients.
+grant select on public.audit_log to authenticated;
+revoke all on public.audit_log from anon;

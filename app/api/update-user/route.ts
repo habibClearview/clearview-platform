@@ -74,8 +74,11 @@ export async function POST(req: NextRequest) {
         action: updates.role ? 'user.role_changed' : 'user.updated',
         targetId: targetUserId,
         detail: {
+          // role is only ever applied when truthy (see the guard above), so the
+          // detail mirrors that; full_name/units use !== undefined so clearing a
+          // value ('' or []) is still recorded.
           ...(updates.role ? { role_from: tp.role, role_to: updates.role } : {}),
-          ...(updates.full_name ? { full_name_changed: true } : {}),
+          ...(updates.full_name !== undefined ? { full_name_changed: true } : {}),
           ...(updates.assigned_unit_ids !== undefined ? { assigned_unit_ids: updates.assigned_unit_ids } : {}),
         },
         ip: auditIp(req.headers),
