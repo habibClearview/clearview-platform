@@ -44,7 +44,9 @@ export default function LoginPage() {
       password,
     })
     if (authError) {
-      setError(authError.message)
+      // Don't echo the provider's raw message — it can reveal whether an email
+      // exists. One generic message for every sign-in failure.
+      setError('The email or password you entered is incorrect.')
       setLoading(false)
     } else {
       window.location.href = '/coach'
