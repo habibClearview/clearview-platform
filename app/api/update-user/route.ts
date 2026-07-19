@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { canModifyUserRole, canManageUnits, canDeactivateUsers } from '@/lib/auth/assignable-roles'
+import { writeAuditLog, auditIp } from '@/lib/audit-log'
 
 function getAdminClient() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } })
@@ -66,6 +67,22 @@ export async function POST(req: NextRequest) {
       if (rp.role !== 'super_coach') upd = upd.eq('engagement_client_id', rp.engagement_client_id)
       const { error: ue } = await upd
       if (ue) { console.error('Update user error:', ue); return NextResponse.json({ error: 'Could not update this user.' }, { status: 500 }) }
+      // Record the change. A role change is the privilege-sensitive one, so
+      // capture the before/after explicitly.
+      await writeAuditLog(admin, {
+        actorId: user.id, actorEmail: user.email, actorRole: rp.role,
+        action: updates.role ? 'user.role_changed' : 'user.updated',
+        targetId: targetUserId,
+        detail: {
+          // role is only ever applied when truthy (see the guard above), so the
+          // detail mirrors that; full_name/units use !== undefined so clearing a
+          // value ('' or []) is still recorded.
+          ...(updates.role ? { role_from: tp.role, role_to: updates.role } : {}),
+          ...(updates.full_name !== undefined ? { full_name_changed: true } : {}),
+          ...(updates.assigned_unit_ids !== undefined ? { assigned_unit_ids: updates.assigned_unit_ids } : {}),
+        },
+        ip: auditIp(req.headers),
+      })
     }
 
     // Deactivate / reactivate via a ban window. Surface a failure instead of
@@ -73,10 +90,18 @@ export async function POST(req: NextRequest) {
     if (updates.active === false) {
       const { error: be } = await admin.auth.admin.updateUserById(targetUserId, { ban_duration: '876000h' })
       if (be) { console.error('Deactivate (ban) error:', be); return NextResponse.json({ error: 'Could not deactivate this user.' }, { status: 500 }) }
+      await writeAuditLog(admin, {
+        actorId: user.id, actorEmail: user.email, actorRole: rp.role,
+        action: 'user.deactivated', targetId: targetUserId, ip: auditIp(req.headers),
+      })
     }
     if (updates.active === true) {
       const { error: be } = await admin.auth.admin.updateUserById(targetUserId, { ban_duration: 'none' })
       if (be) { console.error('Reactivate (unban) error:', be); return NextResponse.json({ error: 'Could not reactivate this user.' }, { status: 500 }) }
+      await writeAuditLog(admin, {
+        actorId: user.id, actorEmail: user.email, actorRole: rp.role,
+        action: 'user.reactivated', targetId: targetUserId, ip: auditIp(req.headers),
+      })
     }
     return NextResponse.json({ success: true })
   } catch (err) { console.error(err); return NextResponse.json({ error: 'Unexpected error' }, { status: 500 }) }
