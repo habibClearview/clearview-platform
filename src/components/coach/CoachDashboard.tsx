@@ -2395,6 +2395,14 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             <span style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem'}}>{roleBadgeLabel}</span>
             <button onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle light/dark theme" style={{fontFamily:'monospace',fontSize:'0.93rem',background:'transparent',border:`1px solid var(--cv-wa-25)`,borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>{theme==='dark'?'☀':'☾'} Theme</button>
             <button onClick={onSignOut} style={{fontFamily:'monospace',fontSize:'0.93rem',background:'transparent',border:`1px solid var(--cv-wa-25)`,borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
+            {/* Global sign-out: revokes EVERY session for this login (all devices),
+                so a session left open on another computer is ended. Supabase
+                scope:'global' invalidates all refresh tokens for the user. */}
+            <button onClick={async()=>{
+              if(!window.confirm('Sign out of ALL devices?\n\nThis logs you out everywhere — including any other computer where you are still signed in — as well as here. You will need to sign in again.')) return
+              try { await supabase.auth.signOut({ scope: 'global' }) } catch(e) { /* redirect regardless */ }
+              window.location.href='/'
+            }} title="Log out of every device where you are signed in" style={{fontFamily:'monospace',fontSize:'0.93rem',background:'transparent',border:'1px solid rgba(192,57,43,0.45)',borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out — all devices</button>
           </div>
         </div>
       </header>
