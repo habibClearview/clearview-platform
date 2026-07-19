@@ -23,6 +23,7 @@ Writes: review.txt (the comment body) and conclusion=success|failure to
 """
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -127,9 +128,19 @@ def main() -> None:
         fail_closed(f"no text block in the API response: {json.dumps(payload)[:400]}")
 
     write_review(review)
-    # Only an explicit APPROVED passes. BLOCKED — or any unrecognised opening —
-    # fails the gate.
-    conclusion = "success" if review.upper().startswith("APPROVED") else "failure"
+    # Read the verdict robustly. The model may wrap it in markdown (e.g.
+    # "**APPROVED**") or add a heading, so strip non-letters from the start
+    # before matching rather than requiring the bare word first — otherwise a
+    # genuinely-approved review that happens to be bolded would be treated as a
+    # failure and block the PR.
+    head = re.sub(r"[^A-Za-z]", "", review[:40]).upper()
+    if head.startswith("APPROVED"):
+        conclusion = "success"
+    elif head.startswith("BLOCKED"):
+        conclusion = "failure"
+    else:
+        # Genuinely can't tell what the model decided — fail closed.
+        fail_closed(f"could not read an APPROVED/BLOCKED verdict from the review: {review[:120]!r}")
     set_output("conclusion", conclusion)
     print(f"AI review conclusion: {conclusion}")
 
