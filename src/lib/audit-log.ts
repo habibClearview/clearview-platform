@@ -21,7 +21,7 @@ export interface AuditEntry {
 
 export async function writeAuditLog(admin: SupabaseClient, entry: AuditEntry): Promise<void> {
   try {
-    const { error } = await admin.from('audit_log').insert({
+    const { error } = await admin.from('admin_audit_log').insert({
       actor_id: entry.actorId ?? null,
       actor_email: entry.actorEmail ?? null,
       actor_role: entry.actorRole ?? null,
