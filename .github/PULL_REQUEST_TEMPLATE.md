@@ -60,7 +60,8 @@ user-facing behaviour at all (pure refactor, docs, or infra), write:
 
 ### If this touches an API route  (the trust boundary — service-role bypasses RLS)
 - [ ] **Authenticates the caller** before any data access (verify a token via `getUser`, a field-operator token, or an RLS-scoped read) — no route reads/writes with the service-role key and no caller check
-- [ ] **Authorizes**: checks the caller's role AND tenant scope; `role`/`client_id`/`engagement_client_id` are re-derived server-side (or via `requesterCanViewClient`), never trusted from the request body
+- [ ] **Authorizes the operation**: checks the caller's ROLE/capability is allowed to perform *this* action (read vs write vs admin); `role`/`client_id`/`engagement_client_id` are re-derived server-side, never trusted from the request body
+- [ ] **Scopes to the tenant**: confirms the caller may touch *this* client's data. `requesterCanViewClient` runs an RLS read with the **caller's own validated token** and is a visibility/scope check ONLY — it does not replace the authentication or the role check above
 - [ ] **Generic errors** returned to the browser — real DB/provider errors are `console.error`-logged only, never returned
 - [ ] Supabase client created inside the request handler, not at module level
 - [ ] Returns correct HTTP status codes (400 bad input, 401 unauthenticated, 403 forbidden, 500 server error)

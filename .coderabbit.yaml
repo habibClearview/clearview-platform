@@ -108,7 +108,12 @@ reviews:
           field-admin-authz.ts, assignable-roles.ts).
         - It is CORRECT for a route to use the anon key with the caller's JWT to
           run an RLS-scoped check (requesterCanViewClient) — do NOT flag anon-key
-          usage as wrong; flag MISSING auth instead.
+          usage as wrong; flag MISSING auth instead. But requesterCanViewClient
+          is a TENANT/OBJECT-SCOPE (visibility) check ONLY: it confirms the
+          caller may SEE this client, not that they were authenticated for this
+          request nor that their role is allowed to perform THIS operation
+          (e.g. a write or an admin action). Flag any route that leans on it as
+          if it replaced caller authentication or operation-level role checks.
         - Do NOT leak internals: log the real error server-side and return a
           generic message (never raw PostgREST/DB/provider error text).
         - Return NextResponse.json with appropriate status codes; create the

@@ -5,10 +5,11 @@ name: Semgrep SAST
 # dangerous sinks, secrets, Next.js/React footguns. Uses free, open rulesets;
 # no account or GitHub Advanced Security licence required.
 #
-# Report-only for now (findings print to the Action log) so introducing SAST
-# doesn't block every PR on pre-existing findings. Once triaged, add
-# `--error` to make it a hard gate, or upload SARIF to the Security tab if
-# GitHub Advanced Security is enabled on the repo.
+# FINDINGS are report-only for now (they print to the Action log) so introducing
+# SAST doesn't block every PR on pre-existing findings. But a Semgrep ERROR
+# (bad config, crash) is NOT a finding and must not be swallowed — the step
+# below suppresses only Semgrep's documented "findings" exit code and lets real
+# errors fail the job. Once triaged, add `--error` to make findings a hard gate.
 
 on:
   pull_request:
@@ -16,19 +17,38 @@ on:
   schedule:
     - cron: "0 6 * * 1"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: semgrep-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   semgrep:
+    name: Semgrep scan (report-only)
     runs-on: ubuntu-latest
     container:
-      image: semgrep/semgrep
+      # Pinned to an immutable digest (semgrep/semgrep 1.170.0).
+      image: semgrep/semgrep:1.170.0@sha256:f42392ee2c00f0de06702135e0e20415f481935900790fbe37aa778591be3999
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - name: Semgrep scan (report-only)
         run: |
+          set +e
           semgrep scan \
             --config p/security-audit \
             --config p/typescript \
             --config p/nextjs \
             --config p/secrets \
-            --metrics off \
-            || true
+            --metrics off
+          code=$?
+          # Exit 0 = no findings. Exit 1 = findings (report-only — don't fail).
+          # Exit >= 2 = Semgrep itself errored — surface it, don't hide it.
+          if [ "$code" -ge 2 ]; then
+            echo "::error::Semgrep failed to run (exit $code)."
+            exit "$code"
+          fi
+          echo "Semgrep completed (exit $code); any findings above are report-only."

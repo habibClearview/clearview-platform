@@ -1,0 +1,18 @@
+# Code owners for security-critical paths.
+#
+# NOTE: this file only enforces required review once branch protection on `main`
+# has "Require review from Code Owners" enabled in GitHub → Settings → Branches.
+# Until then it documents intent. The point is that changes to the CI security
+# gates and their scripts cannot be weakened in the same PR without an owner's
+# review.
+
+# CI workflows and their helper scripts (the security gates themselves).
+/.github/workflows/   @habibClearview
+/.github/scripts/     @habibClearview
+/.github/CODEOWNERS   @habibClearview
+
+# Server-side authentication & authorization helpers.
+/src/lib/auth/        @habibClearview
+
+# CodeRabbit review configuration.
+/.coderabbit.yaml     @habibClearview
