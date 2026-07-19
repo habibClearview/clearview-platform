@@ -54,9 +54,17 @@ export default function ResetPasswordPage() {
       setError('Could not set your new password — the link may have expired. Request a fresh reset link and try again.')
       return
     }
-    // Sign out everywhere so the new password is what gets used next, and any
-    // old sessions (including the recovery one) are cleared.
-    try { await supabase.auth.signOut({ scope: 'global' }) } catch { /* fall through */ }
+    // The password is now changed. Sign out everywhere so the new password is
+    // what gets used next and any old sessions (including the recovery one) are
+    // cleared. If the global sign-out itself fails we still show success — the
+    // password DID change and can't be un-set — but we log it, since it means
+    // other devices may stay signed in until their tokens expire.
+    try {
+      const { error: signOutErr } = await supabase.auth.signOut({ scope: 'global' })
+      if (signOutErr) console.error('Global sign-out after password reset failed:', signOutErr.message)
+    } catch (e) {
+      console.error('Global sign-out after password reset threw:', e)
+    }
     setSaving(false)
     setDone(true)
   }
@@ -89,14 +97,14 @@ export default function ResetPasswordPage() {
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 700, color: C.navy, marginBottom: '1.25rem', textAlign: 'center' }}>Set a new password</h2>
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: C.navy, marginBottom: '0.3rem' }}>New password</label>
-                <input type="password" required autoFocus value={password} onChange={e => setPassword(e.target.value)}
+                <label htmlFor="new-password" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: C.navy, marginBottom: '0.3rem' }}>New password</label>
+                <input id="new-password" name="new-password" type="password" required autoFocus autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)}
                   style={{ width: '100%', padding: '0.65rem 0.8rem', border: `1px solid ${C.border}`, borderRadius: 5, fontSize: '0.9rem', fontFamily: 'inherit', boxSizing: 'border-box', background: '#F4F8FC', color: C.navy }}
                   placeholder={`At least ${MIN_LEN} characters`} />
               </div>
               <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: C.navy, marginBottom: '0.3rem' }}>Confirm new password</label>
-                <input type="password" required value={confirm} onChange={e => setConfirm(e.target.value)}
+                <label htmlFor="confirm-password" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: C.navy, marginBottom: '0.3rem' }}>Confirm new password</label>
+                <input id="confirm-password" name="confirm-password" type="password" required autoComplete="new-password" value={confirm} onChange={e => setConfirm(e.target.value)}
                   style={{ width: '100%', padding: '0.65rem 0.8rem', border: `1px solid ${C.border}`, borderRadius: 5, fontSize: '0.9rem', fontFamily: 'inherit', boxSizing: 'border-box', background: '#F4F8FC', color: C.navy }}
                   placeholder="Re-enter it" />
               </div>
