@@ -1,0 +1,37 @@
+name: Route auth gate
+
+# The exact class of bug the security audit found: an API route that obtains a
+# service-role Supabase client (which BYPASSES row-level security) but never
+# checks who is calling — a cross-tenant hole. This gate fails the PR if any such
+# route lacks an authentication marker, turning a "system-level judgement" into a
+# mechanical check on every change.
+#
+# The detection logic lives in .github/scripts/route_auth_check.py. Unlike a
+# plain grep it (a) also catches routes that reach the service client through a
+# helper (getFieldSupabase), and (b) ignores comments and string literals, so a
+# marker in a comment can't satisfy the gate. It is still a heuristic — presence
+# of a check, not proof it is used correctly — so CodeRabbit and human review
+# remain the judge of correctness; but it makes the zero-auth case impossible to
+# merge.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: route-auth-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  route-auth:
+    name: Every service-role API route must authenticate the caller
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Check service-role routes authenticate the caller
+        run: python3 .github/scripts/route_auth_check.py

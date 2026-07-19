@@ -135,7 +135,9 @@ export default function GenericClientPage() {
 
   async function handleLogin(email:string, password:string) {
     const {error} = await supabase.auth.signInWithPassword({email,password})
-    if (error) return error.message
+    // One generic message for every sign-in failure — never echo the raw
+    // provider error, which can reveal whether an email exists.
+    if (error) return 'The email or password you entered is incorrect.'
     // Reload
     window.location.reload()
     return null

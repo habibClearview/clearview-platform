@@ -1,8 +1,6 @@
 # CodeRabbit Configuration for Clearview Platform
 # Focus: architecture, business logic, security -- not style
 
-version: "2"
-
 reviews:
   # Run on every PR automatically
   auto_review:
@@ -96,11 +94,32 @@ reviews:
         
     - path: "app/api/**"
       instructions: |
-        All API routes. Critical areas:
-        - Must use SUPABASE_SERVICE_ROLE_KEY not anon key
-        - Must return NextResponse.json with appropriate status codes
-        - Must handle missing env vars gracefully without crashing
-        - ANTHROPIC_API_KEY absence should degrade gracefully, not throw
+        All API routes. TREAT AS CRITICAL (these are the trust boundary — a
+        route that uses the service-role key BYPASSES row-level security, so it
+        must do the auth itself):
+        - AUTHENTICATE the caller before ANY data access — verify a token via
+          admin.auth.getUser(token), a field operator token, or a signed-in
+          RLS-scoped read. A route that reads/writes data with the service-role
+          key and NO caller check is a CRITICAL cross-tenant hole — flag it.
+        - AUTHORIZE: check the caller's role AND tenant scope. Never trust a
+          role, client_id, or engagement_client_id taken from the request body
+          or query — always re-derive them server-side from the caller's
+          profile, or reuse the tenant-scope check (can_view_client is the
+          Postgres RLS policy; requesterCanViewClient in src/lib/auth/api-authz.ts
+          is the TypeScript wrapper that reuses it — see also field-admin-authz.ts,
+          assignable-roles.ts).
+        - It is CORRECT for a route to use the anon key with the caller's JWT to
+          run an RLS-scoped check (requesterCanViewClient) — do NOT flag anon-key
+          usage as wrong; flag MISSING auth instead. But requesterCanViewClient
+          is a TENANT/OBJECT-SCOPE (visibility) check ONLY: it confirms the
+          caller may SEE this client, not that they were authenticated for this
+          request nor that their role is allowed to perform THIS operation
+          (e.g. a write or an admin action). Flag any route that leans on it as
+          if it replaced caller authentication or operation-level role checks.
+        - Do NOT leak internals: log the real error server-side and return a
+          generic message (never raw PostgREST/DB/provider error text).
+        - Return NextResponse.json with appropriate status codes; create the
+          Supabase client inside the handler; handle missing env vars gracefully.
 
   # Tools to enable
   tools:
