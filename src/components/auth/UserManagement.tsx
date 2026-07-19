@@ -158,6 +158,30 @@ export default function UserManagement({ currentUserId, currentRole, clientId, c
     setEditingId(null)
   }
 
+  async function forceSignoutUser(userId: string, name: string) {
+    if (!window.confirm(`Sign ${name} out of every device?\n\nThis ends all their active sessions — useful if they lost a device or forgot to log out somewhere. They can sign in again normally afterwards; the account is not deactivated.\n\nNote: a page they already have open can keep working for up to about an hour until it expires, then it is fully locked out.`)) return
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+    if (!token) return
+    try {
+      const res = await fetch('/api/force-signout-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId: userId, requesterToken: token }),
+      })
+      const data = await res.json() as { success?: boolean; sessionsRevoked?: number; error?: string }
+      if (data.success) {
+        const n = data.sessionsRevoked
+        window.alert(`${name} has been signed out of all devices${typeof n === 'number' ? ` (${n} session${n === 1 ? '' : 's'} ended)` : ''}.`)
+        void loadMembers()
+      } else {
+        window.alert(data.error || 'Could not sign this user out. Please try again.')
+      }
+    } catch {
+      window.alert('Network error. Please try again.')
+    }
+  }
+
   async function deactivateUser(userId: string, name: string) {
     if (!window.confirm(`Deactivate ${name}? They will no longer be able to log in. This can be reversed.`)) return
     const { data: { session } } = await supabase.auth.getSession()
@@ -314,11 +338,20 @@ export default function UserManagement({ currentUserId, currentRole, clientId, c
                 {member.id !== currentUserId && (currentRole === 'ceo' || currentRole === 'super_coach' || (currentRole === 'finance_manager' && ['unit_head', 'accounts_assistant'].includes(member.role))) && (
                   <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
                     <button
+                      type="button"
                       onClick={() => setEditingId(editingId === member.id ? null : member.id)}
                       style={{ fontFamily: 'monospace', fontSize: '0.68rem', padding: '0.28rem 0.6rem', border: `1px solid ${C.border}`, borderRadius: 4, background: 'transparent', color: C.slate, cursor: 'pointer' }}>
                       Edit units
                     </button>
                     <button
+                      type="button"
+                      onClick={() => forceSignoutUser(member.id, member.full_name)}
+                      title="End all of this user's active sessions on every device (they can sign in again)"
+                      style={{ fontFamily: 'monospace', fontSize: '0.68rem', padding: '0.28rem 0.6rem', border: `1px solid ${C.amber}`, borderRadius: 4, background: 'transparent', color: C.amber, cursor: 'pointer' }}>
+                      Sign out everywhere
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => deactivateUser(member.id, member.full_name)}
                       style={{ fontFamily: 'monospace', fontSize: '0.68rem', padding: '0.28rem 0.6rem', border: `1px solid ${C.red}`, borderRadius: 4, background: 'transparent', color: C.red, cursor: 'pointer' }}>
                       Deactivate
