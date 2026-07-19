@@ -45,6 +45,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(data)
   } catch (err: any) {
     console.error('Portfolio intelligence error:', err)
-    return NextResponse.json({ error: err.message || 'An unexpected error occurred' }, { status: err.status || 500 })
+    // Only surface the message for controlled client errors (4xx, thrown with a
+    // safe message). For unexpected/server errors return a generic message so
+    // raw DB/PostgREST detail never reaches the browser.
+    const status = err?.status || 500
+    if (status >= 500) return NextResponse.json({ error: 'An unexpected error occurred.' }, { status: 500 })
+    return NextResponse.json({ error: err.message || 'Request could not be completed.' }, { status })
   }
 }
