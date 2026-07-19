@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { AppUser, UserRole } from './types'
+import { useSessionGuard } from './useSessionGuard'
 
 interface AuthContextValue {
   user: AppUser | null
@@ -81,6 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  // Idle-timeout + heartbeat: only active once someone is actually signed in.
+  // Auto signs-out an unattended screen and drops a revoked session promptly.
+  useSessionGuard(!!user)
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
