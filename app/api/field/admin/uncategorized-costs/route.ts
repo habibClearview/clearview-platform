@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getFieldSupabase } from '@/lib/field-auth'
 import { isPlanLineValidForUnit } from '@/lib/catalogue-validation'
+import { resolveFieldAdminActor, actorMayAccessClient } from '@/lib/auth/field-admin-authz'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,6 +12,10 @@ export async function GET(req: NextRequest) {
     if (!clientId) return NextResponse.json({ error: 'client_id required' }, { status: 400 })
 
     const supabase = getFieldSupabase()
+    const actor = await resolveFieldAdminActor(supabase, req)
+    if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    if (!actorMayAccessClient(actor, clientId)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
     const { data, error } = await supabase
       .from('field_uncategorized_costs')
       .select('*')
@@ -41,6 +46,9 @@ export async function POST(req: NextRequest) {
     if (!category) return NextResponse.json({ error: 'category required' }, { status: 400 })
 
     const supabase = getFieldSupabase()
+    const actor = await resolveFieldAdminActor(supabase, req)
+    if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+
     const { data: pending, error: fetchErr } = await supabase
       .from('field_uncategorized_costs')
       .select('*')
@@ -48,6 +56,8 @@ export async function POST(req: NextRequest) {
       .eq('categorized', false)
       .single()
     if (fetchErr || !pending) return NextResponse.json({ error: 'Pending cost not found, or already categorized' }, { status: 404 })
+    // Authorize against the cost's OWN business (this POST takes only the record id).
+    if (!actorMayAccessClient(actor, pending.client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     // Confirm the chosen plan line genuinely belongs to this cost's own
     // unit and is a real cost category -- the same validation principle

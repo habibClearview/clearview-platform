@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import QRCode from 'qrcode'
 import { mostRecentTokenUse } from '@/lib/field-auth'
 import { supabase } from '@/lib/supabase'
+import { authedFetch } from '@/lib/authed-fetch'
 import {
   fmt, fmtFull, pct, buildMonthLabels, buildYearGroups, collapseYear, defaultExpandedYears, extendPlanningHorizon, type YearAggregation, type YearGroup,
   runGenericModel, defaultGenericConfig,
@@ -2519,7 +2520,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
   // to now() without changing the actual price. No separate endpoint needed.
   async function confirmCostPriceStillAccurate(itemId: string, currentCostPrice: number) {
     try {
-      const res = await fetch('/api/field/admin/catalogue', {
+      const res = await authedFetch('/api/field/admin/catalogue', {
         method: 'PATCH', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ id: itemId, cost_price: currentCostPrice }),
       })
@@ -3560,7 +3561,7 @@ function FieldOperatorManager({clientId,config,P}) {
   async function load() {
     setLoading(true)
     try {
-      const res = await fetch(`/api/field/admin/operators?client_id=${encodeURIComponent(clientId)}`)
+      const res = await authedFetch(`/api/field/admin/operators?client_id=${encodeURIComponent(clientId)}`)
       const data = await res.json()
       setOperators(data.operators||[])
     } catch { /* handled by empty state below */ }
@@ -3572,7 +3573,7 @@ function FieldOperatorManager({clientId,config,P}) {
     if (!form.display_name || !form.business_unit_id) return
     setSaving(true)
     try {
-      await fetch('/api/field/admin/operators', {
+      await authedFetch('/api/field/admin/operators', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           client_id:clientId, business_unit_id:form.business_unit_id,
@@ -3589,7 +3590,7 @@ function FieldOperatorManager({clientId,config,P}) {
   }
 
   async function toggleActive(operatorId:string, active:boolean) {
-    await fetch('/api/field/admin/operators', {
+    await authedFetch('/api/field/admin/operators', {
       method:'PATCH', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({operator_id:operatorId, active}),
     })
@@ -3598,7 +3599,7 @@ function FieldOperatorManager({clientId,config,P}) {
 
   async function issueNewToken(operatorId:string) {
     if (!window.confirm('Issue a new token for this operator? Their old token(s) will still work until they expire -- this adds a new one, it does not revoke existing tokens.')) return
-    await fetch('/api/field/admin/operators', {
+    await authedFetch('/api/field/admin/operators', {
       method:'PATCH', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({operator_id:operatorId, issue_new_token:true}),
     })
@@ -3715,7 +3716,7 @@ function CatalogueManager({clientId,config,P}) {
   async function load() {
     setLoading(true)
     try {
-      const res = await fetch(`/api/field/admin/catalogue?client_id=${encodeURIComponent(clientId)}`)
+      const res = await authedFetch(`/api/field/admin/catalogue?client_id=${encodeURIComponent(clientId)}`)
       const data = await res.json()
       setItems(data.items||[])
     } catch { /* handled by empty state below */ }
@@ -3733,7 +3734,7 @@ function CatalogueManager({clientId,config,P}) {
     if (form.cost_price!=='' && !form.cogs_plan_line_id) { alert('Select a COGS category to go with the cost price.'); return }
     setSaving(true)
     try {
-      await fetch('/api/field/admin/catalogue', {
+      await authedFetch('/api/field/admin/catalogue', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           client_id: clientId, business_unit_id: form.business_unit_id, plan_line_id: form.plan_line_id,
@@ -3752,7 +3753,7 @@ function CatalogueManager({clientId,config,P}) {
 
   async function savePrice(id:string) {
     if (editPrice==='' || Number(editPrice)<0) return
-    await fetch('/api/field/admin/catalogue', {
+    await authedFetch('/api/field/admin/catalogue', {
       method:'PATCH', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ id, price: Number(editPrice) }),
     })
@@ -3770,7 +3771,7 @@ function CatalogueManager({clientId,config,P}) {
     if (!editFull.business_unit_id || !editFull.plan_line_id) { alert('Business unit and category are required.'); return }
     setSavingFull(true)
     try {
-      const res = await fetch('/api/field/admin/catalogue', {
+      const res = await authedFetch('/api/field/admin/catalogue', {
         method:'PATCH', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           id, name: editFull.name.trim(), item_type: editFull.item_type,
@@ -3793,7 +3794,7 @@ function CatalogueManager({clientId,config,P}) {
     if (editCostPrice!=='' && Number(editCostPrice)<0) { alert('Cost price cannot be negative.'); return }
     if (editCostPrice!=='' && !editCostLine) { alert('Select a COGS category to go with the cost price.'); return }
     try {
-      const res = await fetch('/api/field/admin/catalogue', {
+      const res = await authedFetch('/api/field/admin/catalogue', {
         method:'PATCH', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           id,
@@ -3812,7 +3813,7 @@ function CatalogueManager({clientId,config,P}) {
   }
 
   async function toggleActive(id:string, active:boolean) {
-    await fetch('/api/field/admin/catalogue', {
+    await authedFetch('/api/field/admin/catalogue', {
       method:'PATCH', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ id, active }),
     })
@@ -4064,7 +4065,7 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
   async function load() {
     setLoading(true)
     try {
-      const res = await fetch(`/api/field/admin/operators?client_id=${encodeURIComponent(clientId)}`)
+      const res = await authedFetch(`/api/field/admin/operators?client_id=${encodeURIComponent(clientId)}`)
       const data = await res.json()
       if (res.ok) setOperators(data.operators||[])
       else alert(data.error || 'Could not load field operators.')
@@ -4083,7 +4084,7 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
     if (!form.display_name || !form.business_unit_id) { alert('Name and business unit are required.'); return }
     setCreating(true)
     try {
-      const res = await fetch('/api/field/admin/operators', {
+      const res = await authedFetch('/api/field/admin/operators', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({client_id: clientId, ...form}),
       })
@@ -4109,7 +4110,7 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
   async function toggleActive(operatorId: string, active: boolean) {
     setBusyId(operatorId)
     try {
-      const res = await fetch('/api/field/admin/operators', {
+      const res = await authedFetch('/api/field/admin/operators', {
         method: 'PATCH', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({operator_id: operatorId, active}),
       })
@@ -4124,7 +4125,7 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
   async function issueNewToken(operatorId: string, operatorName: string) {
     setBusyId(operatorId)
     try {
-      const res = await fetch('/api/field/admin/operators', {
+      const res = await authedFetch('/api/field/admin/operators', {
         method: 'PATCH', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({operator_id: operatorId, issue_new_token: true}),
       })
@@ -4261,7 +4262,7 @@ function StockAndTransfersSection({clientId,businessUnits}:{clientId:string;busi
     setLoading(true)
     try {
       const [levelsRes, catalogueRes] = await Promise.all([
-        fetch(`/api/field/admin/stock?client_id=${encodeURIComponent(clientId)}`),
+        authedFetch(`/api/field/admin/stock?client_id=${encodeURIComponent(clientId)}`),
         supabase.from('field_catalogue').select('id,name,unit_label,business_unit_id').eq('client_id',clientId).eq('active',true),
       ])
       const levelsData = await levelsRes.json()
@@ -4281,7 +4282,7 @@ function StockAndTransfersSection({clientId,businessUnits}:{clientId:string;busi
 
   async function saveThreshold(levelId: string) {
     try {
-      const res = await fetch('/api/field/admin/stock', {
+      const res = await authedFetch('/api/field/admin/stock', {
         method: 'PATCH', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ stock_level_id: levelId, reorder_threshold: thresholdValue===''?null:Number(thresholdValue) }),
       })
@@ -4299,7 +4300,7 @@ function StockAndTransfersSection({clientId,businessUnits}:{clientId:string;busi
     }
     setTransferring(true)
     try {
-      const res = await fetch('/api/field/admin/stock', {
+      const res = await authedFetch('/api/field/admin/stock', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ client_id: clientId, ...f, quantity: Number(f.quantity) }),
       })
@@ -6741,7 +6742,7 @@ function UncategorizedCostsSection({config,P}:{config:GenericModelConfig;P:any})
   async function load() {
     setLoading(true)
     try {
-      const res = await fetch(`/api/field/admin/uncategorized-costs?client_id=${encodeURIComponent(config.client_id)}`)
+      const res = await authedFetch(`/api/field/admin/uncategorized-costs?client_id=${encodeURIComponent(config.client_id)}`)
       const data = await res.json()
       if (res.ok) setPending(data.pendingCosts||[])
     } catch { /* leave list as-is; shows empty rather than a broken page */ }
@@ -6758,7 +6759,7 @@ function UncategorizedCostsSection({config,P}:{config:GenericModelConfig;P:any})
     if (!line) return
     setSaving(true)
     try {
-      const res = await fetch('/api/field/admin/uncategorized-costs', {
+      const res = await authedFetch('/api/field/admin/uncategorized-costs', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ uncategorized_cost_id: cost.id, plan_line_id: line.id, plan_line_name: line.name, category: line.category, categorized_by: P.fullName }),
       })
@@ -6832,7 +6833,7 @@ function ActualsAndWorkingCapitalTab({config,result,months,cc,P,onSave,onCloseSt
   const [uncatCount, setUncatCount] = useState(0)
   useEffect(()=>{
     let active = true
-    fetch(`/api/field/admin/uncategorized-costs?client_id=${encodeURIComponent(config.client_id)}`)
+    authedFetch(`/api/field/admin/uncategorized-costs?client_id=${encodeURIComponent(config.client_id)}`)
       .then(r=>r.ok?r.json():{pendingCosts:[]})
       .then(d=>{ if(active) setUncatCount((d.pendingCosts||[]).length) })
       .catch(()=>{})

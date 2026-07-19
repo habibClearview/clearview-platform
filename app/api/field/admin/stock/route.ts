@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getFieldSupabase } from '@/lib/field-auth'
 import { applyStockMovement } from '@/lib/field-stock'
 import { randomUUID } from 'crypto'
+import { resolveFieldAdminActor, actorMayAccessClient } from '@/lib/auth/field-admin-authz'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,10 @@ export async function GET(req: NextRequest) {
     if (!clientId) return NextResponse.json({ error: 'client_id required' }, { status: 400 })
 
     const supabase = getFieldSupabase()
+    const actor = await resolveFieldAdminActor(supabase, req)
+    if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    if (!actorMayAccessClient(actor, clientId)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
     const { data, error } = await supabase
       .from('field_stock_levels')
       .select('id, business_unit_id, catalogue_item_id, quantity_on_hand, reorder_threshold, catalogue:field_catalogue(name, unit_label)')
@@ -35,6 +40,13 @@ export async function PATCH(req: NextRequest) {
     if (!stock_level_id) return NextResponse.json({ error: 'stock_level_id required' }, { status: 400 })
 
     const supabase = getFieldSupabase()
+    const actor = await resolveFieldAdminActor(supabase, req)
+    if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    const { data: level, error: lvlErr } = await supabase
+      .from('field_stock_levels').select('client_id').eq('id', stock_level_id).single()
+    if (lvlErr || !level) return NextResponse.json({ error: 'Stock level not found' }, { status: 404 })
+    if (!actorMayAccessClient(actor, level.client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
     const { error } = await supabase
       .from('field_stock_levels')
       .update({ reorder_threshold, updated_at: new Date().toISOString() })
@@ -66,6 +78,10 @@ export async function POST(req: NextRequest) {
     if (quantity === undefined || quantity === null || Number(quantity) <= 0) return NextResponse.json({ error: 'A positive quantity is required' }, { status: 400 })
 
     const supabase = getFieldSupabase()
+    const actor = await resolveFieldAdminActor(supabase, req)
+    if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    if (!actorMayAccessClient(actor, client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
     const qty = Number(quantity)
     const transferPairId = randomUUID()
 
