@@ -1,0 +1,24 @@
+name: Dependency audit
+
+# Runs `npm audit` on every PR and weekly. Report-only for now (there are known
+# high-severity advisories — xlsx, next — being remediated separately, and we
+# don't want to block every PR until those land). Flip `continue-on-error` to
+# false once the outstanding advisories are cleared to make it a hard gate.
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: npm audit (high+)
+        continue-on-error: true
+        run: npm audit --audit-level=high

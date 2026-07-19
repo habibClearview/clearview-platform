@@ -42,7 +42,14 @@ jobs:
         id: diff
         run: |
           git diff origin/main...HEAD > /tmp/pr.diff
-          head -c 8000 /tmp/pr.diff > /tmp/pr_truncated.diff
+          # Previously truncated to 8 KB — anything past the first ~150 lines of a
+          # PR was never reviewed, so auth changes in large PRs sailed through.
+          # Raised to 120 KB (well within the model's context); note when a PR
+          # still exceeds it rather than silently dropping the rest.
+          head -c 120000 /tmp/pr.diff > /tmp/pr_truncated.diff
+          if [ "$(wc -c < /tmp/pr.diff)" -gt 120000 ]; then
+            printf '\n\n[NOTE: diff exceeded 120KB and was truncated for this AI pass — rely on CodeRabbit for the full review.]\n' >> /tmp/pr_truncated.diff
+          fi
 
       - name: AI Review
         id: review

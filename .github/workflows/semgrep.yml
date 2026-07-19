@@ -1,0 +1,34 @@
+name: Semgrep SAST
+
+# Static application security testing — the "systematic" layer that scans the
+# WHOLE tree (not just a diff) for insecure patterns: injection, missing auth,
+# dangerous sinks, secrets, Next.js/React footguns. Uses free, open rulesets;
+# no account or GitHub Advanced Security licence required.
+#
+# Report-only for now (findings print to the Action log) so introducing SAST
+# doesn't block every PR on pre-existing findings. Once triaged, add
+# `--error` to make it a hard gate, or upload SARIF to the Security tab if
+# GitHub Advanced Security is enabled on the repo.
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep scan (report-only)
+        run: |
+          semgrep scan \
+            --config p/security-audit \
+            --config p/typescript \
+            --config p/nextjs \
+            --config p/secrets \
+            --metrics off \
+            || true

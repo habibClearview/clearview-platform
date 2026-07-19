@@ -1,0 +1,40 @@
+name: Route auth gate
+
+# The exact class of bug the security audit found: an API route that uses the
+# service-role key (which BYPASSES row-level security) but never checks who is
+# calling — a cross-tenant hole. This gate fails the PR if any such route lacks
+# an authentication marker, turning a "system-level judgement" into a mechanical
+# check on every change. It is a heuristic (presence of a check, not proof it's
+# used correctly) — CodeRabbit + the review still judge correctness — but it
+# makes the zero-auth case impossible to merge.
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  route-auth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Every service-role API route must authenticate the caller
+        run: |
+          set -euo pipefail
+          # Recognised ways a route authenticates the caller:
+          #  getUser (Supabase JWT) · requesterCanViewClient / resolveFieldAdminActor
+          #  (role+tenant helpers) · validateFieldToken (field operator token) ·
+          #  isGrantActive (external access-grant token + OTP) · cronAuthorised (cron secret).
+          AUTH='getUser|requesterCanViewClient|resolveFieldAdminActor|validateFieldToken|isGrantActive|cronAuthorised'
+          fails=""
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            if ! grep -Eq "$AUTH" "$f"; then fails="$fails $f"; fi
+          done < <(grep -rl "SUPABASE_SERVICE_ROLE_KEY" app/api --include=route.ts 2>/dev/null || true)
+          if [ -n "$fails" ]; then
+            echo "::error::Service-role API route(s) with NO authentication marker found."
+            echo "A route that uses SUPABASE_SERVICE_ROLE_KEY bypasses RLS and MUST authenticate + authorize the caller."
+            echo "Use a helper from src/lib/auth/ (e.g. requesterCanViewClient / resolveFieldAdminActor / getUser)."
+            for f in $fails; do echo "  - $f"; done
+            exit 1
+          fi
+          echo "OK — every service-role route references an authentication check."
