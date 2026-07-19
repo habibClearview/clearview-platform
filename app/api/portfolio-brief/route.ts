@@ -49,6 +49,9 @@ export async function POST(req: NextRequest) {
     })
   } catch (err: any) {
     console.error('Portfolio brief error:', err)
-    return NextResponse.json({ error: err.message || 'An unexpected error occurred' }, { status: err.status || 500 })
+    // 4xx: safe thrown message; 5xx/unexpected: generic, never leak raw detail.
+    const status = err?.status || 500
+    if (status >= 500) return NextResponse.json({ error: 'An unexpected error occurred.' }, { status: 500 })
+    return NextResponse.json({ error: err.message || 'Request could not be completed.' }, { status })
   }
 }

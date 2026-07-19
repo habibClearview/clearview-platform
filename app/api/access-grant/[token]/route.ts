@@ -176,7 +176,12 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
       otpAvailable: otpAvailable(),
     })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'An unexpected error occurred' }, { status: err.status || 500 })
+    // 4xx errors here are thrown deliberately with visitor-safe messages
+    // (e.g. "This link has expired"). Anything else is unexpected — log it and
+    // return a generic message rather than leaking raw detail to the public page.
+    const status = err?.status || 500
+    if (status >= 500) { console.error('Access grant GET error:', err); return NextResponse.json({ error: 'An unexpected error occurred.' }, { status: 500 }) }
+    return NextResponse.json({ error: err.message || 'Request could not be completed.' }, { status })
   }
 }
 
@@ -256,6 +261,9 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     return NextResponse.json({ error: 'Invalid request.' }, { status: 400 })
   } catch (err: any) {
     console.error('Access grant redemption error:', err)
-    return NextResponse.json({ error: err.message || 'An unexpected error occurred' }, { status: err.status || 500 })
+    // Keep visitor-safe 4xx messages; genericise unexpected 5xx errors.
+    const status = err?.status || 500
+    if (status >= 500) return NextResponse.json({ error: 'An unexpected error occurred.' }, { status: 500 })
+    return NextResponse.json({ error: err.message || 'Request could not be completed.' }, { status })
   }
 }
