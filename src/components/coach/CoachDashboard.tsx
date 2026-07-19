@@ -8,6 +8,7 @@ import {
   READINESS_QUESTIONS, buildEmptyCanvas,
 } from '@/lib/coach-types'
 import { supabase } from '@/lib/supabase'
+import ActiveSessionsButton from '@/components/auth/ActiveSessionsButton'
 import SpreadsheetUpload from '@/components/intake/SpreadsheetUpload'
 import BuildStamp from '@/components/BuildStamp'
 import ErrorBoundary from '@/components/ErrorBoundary'
@@ -2394,6 +2395,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}>
             <span style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem'}}>{roleBadgeLabel}</span>
             <button onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle light/dark theme" style={{fontFamily:'monospace',fontSize:'0.93rem',background:'transparent',border:`1px solid var(--cv-wa-25)`,borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>{theme==='dark'?'☀':'☾'} Theme</button>
+            <ActiveSessionsButton fontSize="0.93rem" />
             <button onClick={onSignOut} style={{fontFamily:'monospace',fontSize:'0.93rem',background:'transparent',border:`1px solid var(--cv-wa-25)`,borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
             {/* Global sign-out: revokes EVERY session for this login (all devices),
                 so a session left open on another computer is ended. Supabase

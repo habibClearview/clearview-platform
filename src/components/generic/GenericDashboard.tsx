@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import QRCode from 'qrcode'
 import { mostRecentTokenUse } from '@/lib/field-auth'
 import { supabase } from '@/lib/supabase'
+import ActiveSessionsButton from '@/components/auth/ActiveSessionsButton'
 import { authedFetch } from '@/lib/authed-fetch'
 import {
   fmt, fmtFull, pct, buildMonthLabels, buildYearGroups, collapseYear, defaultExpandedYears, extendPlanningHorizon, type YearAggregation, type YearGroup,
@@ -900,6 +901,7 @@ export default function GenericDashboard({
           <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}>
             <span style={{fontFamily:'monospace',fontSize:'0.88rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem',textTransform:'uppercase'}}>{P.role.replace('_',' ')}</span>
             <button onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle light/dark theme" style={{fontFamily:'monospace',fontSize:'0.88rem',background:'transparent',border:`1px solid var(--cv-wa-45)`,borderRadius:4,color:'var(--cv-wa-85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>{theme==='dark'?'☀':'☾'} Theme</button>
+            <ActiveSessionsButton fontSize="0.88rem" />
             <button onClick={P.onSignOut} style={{fontFamily:'monospace',fontSize:'0.88rem',background:'transparent',border:`1px solid var(--cv-wa-45)`,borderRadius:4,color:'var(--cv-wa-85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
             {/* Global sign-out: revokes EVERY session for this login (all devices),
                 so a session left open on another computer is ended — not just this

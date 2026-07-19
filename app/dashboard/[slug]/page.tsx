@@ -121,6 +121,18 @@ export default function GenericClientPage() {
     return ()=>{ cancelled = true; clearTimeout(watchdog) }
   },[slug])
 
+  // Lock this window the instant the session ends — even when the sign-out
+  // happens in ANOTHER window on the same computer (the browser broadcasts
+  // SIGNED_OUT across tabs), or when a revoked session's access token finally
+  // expires on a different device. Without this the page only re-checked auth
+  // on a full reload, so an already-open window stayed usable until refreshed.
+  useEffect(()=>{
+    const { data:{ subscription } } = supabase.auth.onAuthStateChange((event)=>{
+      if (event === 'SIGNED_OUT') { window.location.href = '/' }
+    })
+    return ()=> subscription.unsubscribe()
+  },[])
+
   async function handleLogin(email:string, password:string) {
     const {error} = await supabase.auth.signInWithPassword({email,password})
     if (error) return error.message
