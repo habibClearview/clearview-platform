@@ -4,6 +4,7 @@
 // ============================================================
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 function getAdminClient() {
   return createClient(
@@ -34,6 +35,16 @@ export async function POST(req: NextRequest) {
     // Only CEO, Finance Manager, and super_coach can list users
     if (!['ceo', 'finance_manager', 'super_coach'].includes(profile.role)) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    }
+
+    // This route fans out to auth.admin.getUserById per member, so it's
+    // relatively expensive — cap how often one requester can call it.
+    const rl = await checkRateLimit(admin, `list-users:${user.id}`, 60, 60)
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait a moment and try again.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } },
+      )
     }
 
     // Tenant scope: a ceo/finance_manager may only list THEIR OWN client's team.

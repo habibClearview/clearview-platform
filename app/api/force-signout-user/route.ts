@@ -13,6 +13,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { canForceSignout } from '@/lib/auth/force-signout-authz'
+import { writeAuditLog, auditIp } from '@/lib/audit-log'
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -70,6 +71,14 @@ export async function POST(req: NextRequest) {
       console.error('Force signout RPC error:', rpcErr)
       return NextResponse.json({ error: 'Could not sign this user out.' }, { status: 500 })
     }
+
+    await writeAuditLog(admin, {
+      actorId: user.id, actorEmail: user.email, actorRole: actor.role,
+      action: 'user.force_signed_out',
+      targetId: targetUserId,
+      detail: { sessions_revoked: typeof revoked === 'number' ? revoked : 0 },
+      ip: auditIp(req.headers),
+    })
 
     return NextResponse.json({ success: true, sessionsRevoked: typeof revoked === 'number' ? revoked : 0 })
   } catch (err) {
