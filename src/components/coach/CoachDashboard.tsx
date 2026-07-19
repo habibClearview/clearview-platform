@@ -2398,9 +2398,11 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             {/* Global sign-out: revokes EVERY session for this login (all devices),
                 so a session left open on another computer is ended. Supabase
                 scope:'global' invalidates all refresh tokens for the user. */}
-            <button onClick={async()=>{
-              if(!window.confirm('Sign out of ALL devices?\n\nThis logs you out everywhere — including any other computer where you are still signed in — as well as here. You will need to sign in again.')) return
-              try { await supabase.auth.signOut({ scope: 'global' }) } catch(e) { /* redirect regardless */ }
+            <button type="button" onClick={async()=>{
+              if(!window.confirm('Sign out of ALL devices?\n\nThis logs you out everywhere — including any other computer where you are still signed in — as well as here.\n\nNote: a page already open on another device can keep working for up to about an hour until its access expires; after that it can no longer stay signed in. You will need to sign in again.')) return
+              let signOutError:any = null
+              try { const { error } = await supabase.auth.signOut({ scope: 'global' }); signOutError = error } catch(e) { signOutError = e }
+              if(signOutError){ window.alert('We could not confirm sign-out on all devices — other sessions may still be active. Please check your connection and try again.'); return }
               window.location.href='/'
             }} title="Log out of every device where you are signed in" style={{fontFamily:'monospace',fontSize:'0.93rem',background:'transparent',border:'1px solid rgba(192,57,43,0.45)',borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out — all devices</button>
           </div>
