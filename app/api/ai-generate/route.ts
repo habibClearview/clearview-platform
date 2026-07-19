@@ -5,15 +5,30 @@
 // client-side and POST it here; the ANTHROPIC_API_KEY lives only on
 // the server, never in the browser. Returns { text }.
 // ============================================================
+import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { CLEARVIEW_STYLE } from '@/lib/ai-style'
+import { getBearerToken } from '@/lib/auth/api-authz'
 
 export async function POST(req: NextRequest) {
   try {
+    // Require a signed-in caller: this route spends the server's Anthropic key,
+    // so leaving it open is a billing-DoS / free-proxy hole. (No client scoping
+    // needed — it generates narrative text, not another client's data.)
+    const token = getBearerToken(req)
+    if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } })
+    const { data: { user }, error: authErr } = await admin.auth.getUser(token)
+    if (authErr || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+
     const { prompt, max_tokens } = await req.json() as { prompt?: string; max_tokens?: number }
 
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json({ error: 'Missing prompt' }, { status: 400 })
+    }
+    // Bound the input so a caller can't submit an enormous prompt.
+    if (prompt.length > 24000) {
+      return NextResponse.json({ error: 'Prompt too long' }, { status: 400 })
     }
 
     const key = process.env.ANTHROPIC_API_KEY

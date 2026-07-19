@@ -19,6 +19,7 @@ import {
   CONFIDENCE_DISPLAY, BADGE_DISPLAY, READINESS_DISPLAY,
   buildPeriodSignals, partitionBadges, type ReadinessStatus,
 } from '@/lib/verification-display'
+import { authedFetch } from '@/lib/authed-fetch'
 
 const C = {
   navy: 'var(--cv-navy)', card: 'var(--cv-card)', border: 'var(--cv-border-soft)',
@@ -76,7 +77,7 @@ export default function VerificationRecognition({
   async function connectProvider(providerId: string) {
     setConnecting(providerId); setConnectMsg(null)
     try {
-      const res = await fetch('/api/verification/connect-provider', {
+      const res = await authedFetch('/api/verification/connect-provider', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId, providerId }),
       })

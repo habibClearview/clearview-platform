@@ -9,6 +9,7 @@ import {
 } from '@/lib/coach-types'
 import { supabase } from '@/lib/supabase'
 import ActiveSessionsButton from '@/components/auth/ActiveSessionsButton'
+import { authedFetch } from '@/lib/authed-fetch'
 import SpreadsheetUpload from '@/components/intake/SpreadsheetUpload'
 import BuildStamp from '@/components/BuildStamp'
 import ErrorBoundary from '@/components/ErrorBoundary'
@@ -166,7 +167,7 @@ function ClientDocumentActions({clientId,clientName,clients,programmes}){
   async function download(){
     setDownloading(true); setError('')
     try{
-      const response=await fetch('/api/investment-pitch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId})})
+      const response=await authedFetch('/api/investment-pitch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId})})
       if(!response.ok){const errData=await response.json().catch(()=>({}));throw new Error(errData.error||'Could not generate the document')}
       const blob=await response.blob()
       const disposition=response.headers.get('Content-Disposition')||''

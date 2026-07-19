@@ -4,6 +4,7 @@
 // ============================================================
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { getBearerToken, requesterCanViewClient } from '@/lib/auth/api-authz'
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   HeadingLevel, BorderStyle, WidthType, AlignmentType, ShadingType,
@@ -98,6 +99,12 @@ async function callClaude(prompt:string):Promise<string>{
 
 export async function POST(req:NextRequest){
   try{
+    // Confidential CONAS financials — only a caller who may view CONAS
+    // (super_coach / CONAS staff / assigned coach·funder) may download it.
+    // Previously there was no auth at all.
+    if (!(await requesterCanViewClient(getBearerToken(req), CONAS_CLIENT_ID))) {
+      return NextResponse.json({ error: 'Not authorised' }, { status: 403 })
+    }
     const admin=getAdminClient()
     const [{data:client},{data:configRow},{data:coachBriefing},{data:events}]=await Promise.all([
       admin.from('engagement_clients').select('*').eq('id',CONAS_CLIENT_ID).single(),
@@ -288,6 +295,6 @@ Capital: Shareholder ${fmt(inputs.capitalStructure?.shareholderContribution||0,c
     }})
   }catch(err:any){
     console.error('CONAS pitch error:',err)
-    return NextResponse.json({error:err.message||'An unexpected error occurred'},{status:500})
+    return NextResponse.json({error:'Could not generate the brief.'},{status:500})
   }
 }
