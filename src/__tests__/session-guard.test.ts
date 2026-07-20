@@ -1,38 +1,31 @@
 import { describe, it, expect } from 'vitest'
-import { shouldEndOnHeartbeat, IDLE_MS, HEARTBEAT_MS } from '@/lib/auth/session-guard'
+import { isIdle, IDLE_MS, HEARTBEAT_MS } from '@/lib/auth/session-guard'
 
-describe('shouldEndOnHeartbeat', () => {
-  it('ends the session when there is no user and no error (session genuinely gone)', () => {
-    expect(shouldEndOnHeartbeat(null, null)).toBe(true)
-    expect(shouldEndOnHeartbeat(undefined, undefined)).toBe(true)
+describe('isIdle', () => {
+  const now = 1_000_000_000_000
+
+  it('is NOT idle right after activity', () => {
+    expect(isIdle(now, now, IDLE_MS)).toBe(false)
+    expect(isIdle(now, now - 1000, IDLE_MS)).toBe(false)
   })
 
-  it('does NOT end on "no user / no error" until a live session has been seen', () => {
-    // First tick right after login: hasBeenLive=false → must not sign out.
-    expect(shouldEndOnHeartbeat(null, null, false)).toBe(false)
-    // After a live session was confirmed once, a later "no user" ends it.
-    expect(shouldEndOnHeartbeat(null, null, true)).toBe(true)
-    // A revoked token still ends immediately, even before any live tick.
-    expect(shouldEndOnHeartbeat(null, { status: 401 }, false)).toBe(true)
+  it('is idle once the gap reaches the timeout', () => {
+    expect(isIdle(now, now - IDLE_MS, IDLE_MS)).toBe(true)
+    expect(isIdle(now, now - (IDLE_MS + 1), IDLE_MS)).toBe(true)
   })
 
-  it('keeps the session when a valid user is returned', () => {
-    expect(shouldEndOnHeartbeat({ id: 'u1' }, null)).toBe(false)
+  it('is NOT idle just before the timeout', () => {
+    expect(isIdle(now, now - (IDLE_MS - 1), IDLE_MS)).toBe(false)
   })
 
-  it('ends the session on an auth error (401/403 — revoked or expired)', () => {
-    expect(shouldEndOnHeartbeat(null, { status: 401 })).toBe(true)
-    expect(shouldEndOnHeartbeat({ id: 'u1' }, { status: 403 })).toBe(true)
+  it('treats a missing/blank last-activity as active (never signs out on bad data)', () => {
+    expect(isIdle(now, null, IDLE_MS)).toBe(false)
+    expect(isIdle(now, undefined, IDLE_MS)).toBe(false)
+    expect(isIdle(now, NaN, IDLE_MS)).toBe(false)
+    expect(isIdle(now, 0, IDLE_MS)).toBe(false)
   })
 
-  it('does NOT end the session on a transient/network error (no auth status)', () => {
-    expect(shouldEndOnHeartbeat(null, {})).toBe(false)
-    expect(shouldEndOnHeartbeat(null, { status: 500 })).toBe(false)
-    expect(shouldEndOnHeartbeat(null, { status: 0 })).toBe(false)
-    expect(shouldEndOnHeartbeat({ id: 'u1' }, { status: 503 })).toBe(false)
-  })
-
-  it('uses a short idle window and a frequent heartbeat', () => {
+  it('uses a short idle window and a frequent check interval', () => {
     expect(IDLE_MS).toBeLessThanOrEqual(5 * 60 * 1000)
     expect(HEARTBEAT_MS).toBeLessThanOrEqual(30 * 1000)
   })
