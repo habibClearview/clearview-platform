@@ -1,21 +1,20 @@
 // ============================================================
-// Session guard — the pure, testable decision logic behind the
-// idle-timeout + heartbeat that useSessionGuard() wires to the DOM.
+// Session guard — the pure, testable pieces behind the idle-timeout + safe
+// revocation re-check that useSessionGuard() wires to the browser.
 //
 // Two protections for a signed-in user:
-//   1. IDLE TIMEOUT — after IDLE_MS with no interaction, sign out. Protects an
-//      unattended screen (someone walks away from an open financials view).
-//   2. HEARTBEAT — every HEARTBEAT_MS, re-validate the session against the
-//      server. If it was revoked (e.g. an admin forced sign-out, or the person
-//      signed out on another device), drop this session promptly instead of
-//      waiting for the access token to expire on its own.
+//   1. IDLE TIMEOUT — after IDLE_MS with no interaction ACROSS ANY TAB, sign out
+//      (local scope). Protects an unattended screen without touching the user's
+//      other devices.
+//   2. REVOCATION RE-CHECK — periodically confirm the session still exists; if
+//      it's genuinely gone (signed out elsewhere, admin force-signout), drop it.
 // ============================================================
 
 // Idle timeout. Kept deliberately short for a platform showing real financial
 // data. Change this one number to make it shorter/longer.
 export const IDLE_MS = 5 * 60 * 1000 // 5 minutes
 
-// How often the heartbeat re-checks the session server-side.
+// How often the guard re-checks idle + session state.
 export const HEARTBEAT_MS = 15 * 1000 // 15 seconds
 
 // The browser events that count as "the user is still here" and reset the idle
@@ -30,33 +29,11 @@ export const ACTIVITY_EVENTS = [
 ] as const
 
 /**
- * Decide whether a heartbeat result means the session should be ended.
- *
- * Only two things end a session here:
- *   - the server says there is no user AND returned no error (the session is
- *     genuinely gone), or
- *   - the server returned an auth error (401/403 — token revoked or expired).
- *
- * A transient/network error (no status, or a 5xx) must NOT sign the user out —
- * otherwise a momentary connection blip would kick them out mid-work. Those are
- * ignored so the next heartbeat can try again.
- *
- * `hasBeenLive` guards the ambiguous "no user AND no error" result: we only
- * treat it as a genuinely-ended session once at least one earlier heartbeat has
- * seen a live user. That avoids a false sign-out if the very first check right
- * after login briefly resolves before the session has fully propagated.
+ * Pure idle decision: has it been at least `idleMs` since the last activity?
+ * `lastActivityMs` is the newest activity timestamp seen across all tabs.
+ * Defensive against a missing/blank timestamp (treated as "active now").
  */
-export function shouldEndOnHeartbeat(
-  user: unknown,
-  error: { status?: number } | null | undefined,
-  hasBeenLive: boolean = true,
-): boolean {
-  // A revoked/expired token (401/403) always ends the session, immediately.
-  if (error) {
-    const status = error.status
-    return status === 401 || status === 403
-  }
-  // No error: end only if there is genuinely no user, and only once we've
-  // previously confirmed a live session.
-  return !user && hasBeenLive
+export function isIdle(nowMs: number, lastActivityMs: number | null | undefined, idleMs: number): boolean {
+  if (!lastActivityMs || !Number.isFinite(lastActivityMs)) return false
+  return nowMs - lastActivityMs >= idleMs
 }
