@@ -343,6 +343,53 @@ export function defaultGenericConfig(overrides: Partial<GenericModelConfig> = {}
   }
 }
 
+// ── Clear all figures (keep the business shell) ──────────────
+// Returns a NEW config with every FIGURE that feeds the P&L, Balance Sheet and
+// Cash Flow removed, while KEEPING the structure the client set up: business
+// units, currency, start date, planning horizon, scenarios, tax rate and cost-
+// allocation split. This is the "give me a clean slate without rebuilding the
+// business" reset, and it is deliberately exhaustive because figures live in
+// SIX different places, several of which are NOT on the Actuals or Planning
+// tabs — which is exactly why clearing only what's visible leaves numbers on
+// the statements:
+//   1. plan_lines            — every unit's revenue/cost planning lines
+//   2. shared_lines          — central/shared cost lines
+//   3. opening_cash_balance  — Settings › General (seeds Balance Sheet cash)
+//   4. capital_structure     — Settings › Capital Structure (equity/debt/assets)
+//   5. trade_credit_lines    — Working Capital (receivables/payables)
+//      + debts               — Settings › Debt Obligations
+//   6. drivers / channels    — driver-based planning (become synthetic P&L lines)
+//
+// NOTE: this does NOT touch the generic_actuals table (posted monthly figures)
+// or generic_market_events — those are separate rows, cleared alongside this in
+// the UI. Pure: never mutates the input.
+export function clearedBusinessFigures(config: GenericModelConfig): GenericModelConfig {
+  const cap = config.settings.capital_structure
+  return {
+    ...config,
+    plan_lines: [],
+    shared_lines: [],
+    settings: {
+      ...config.settings,
+      opening_cash_balance: 0,
+      trade_credit_lines: [],
+      debts: [],
+      drivers: [],
+      channels: [],
+      // Zero the capital AMOUNTS but keep the rate/tenor/useful-life settings —
+      // they are harmless with no principal and save re-entry of preferences.
+      capital_structure: cap ? {
+        ...cap,
+        shareholder_contribution: 0,
+        grant_non_repayable: 0,
+        grant_recoverable: 0,
+        bank_loan: 0,
+        fixed_assets: 0,
+      } : cap,
+    },
+  }
+}
+
 // Extends every month-sized array in the config by additionalMonths,
 // all together, in one operation -- this is what makes "add another
 // year" safe. There are five distinct places a monthly array lives in

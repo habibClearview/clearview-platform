@@ -8,7 +8,7 @@ import ActiveSessionsButton from '@/components/auth/ActiveSessionsButton'
 import { authedFetch } from '@/lib/authed-fetch'
 import {
   fmt, fmtFull, pct, buildMonthLabels, buildYearGroups, collapseYear, defaultExpandedYears, extendPlanningHorizon, type YearAggregation, type YearGroup,
-  runGenericModel, defaultGenericConfig,
+  runGenericModel, defaultGenericConfig, clearedBusinessFigures,
   blankLine, spreadLine, serviceFeeLine,
   type GenericModelConfig, type GenericBusinessUnit,
   type GenericPlanLine, type LineCategory, type LineType, type UnitType,
@@ -3339,9 +3339,19 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
                   </div>
                 </div>
                 <textarea style={{...inp,minHeight:50,resize:'vertical',margin:'0.75rem 0 0.5rem'}} placeholder="If sending back, add a note on what to correct" value={actualNotes[a.id]||''} onChange={e=>setActualNotes(n=>({...n,[a.id]:e.target.value}))}/>
-                <div style={{display:'flex',gap:'0.5rem'}}>
+                <div style={{display:'flex',gap:'0.5rem',alignItems:'center',flexWrap:'wrap'}}>
                   <button style={solidBtn(C.green,true)} onClick={()=>approveActual(a.id)}>Approve</button>
-                  <button style={solidBtn(C.amber,true)} onClick={()=>sendBackActual(a.id)}>Send back</button>
+                  {(() => {
+                    const hasNote = !!(actualNotes[a.id]||'').trim()
+                    return (
+                      <button
+                        style={{...solidBtn(C.amber,true),opacity:hasNote?1:0.5,cursor:hasNote?'pointer':'not-allowed'}}
+                        disabled={!hasNote}
+                        title={hasNote?'Send these figures back for correction':'Add a note above first, so they know what to correct'}
+                        onClick={()=>sendBackActual(a.id)}>Send back</button>
+                    )
+                  })()}
+                  {!(actualNotes[a.id]||'').trim() && <span style={{fontSize:'0.85rem',color:C.slate}}>Add a note above to send back</span>}
                 </div>
               </div>
             )
@@ -3396,9 +3406,19 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
                   <div><div style={{fontSize:'0.8rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.08em'}}>Cost</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.red}}>{fmt(e.cost,cc)}</div></div>
                 </div>
                 <textarea style={{...inp,minHeight:50,resize:'vertical',margin:'0.75rem 0 0.5rem'}} placeholder="If sending back, add a note on what to change" value={eventNotes[e.id]||''} onChange={ev=>setEventNotes(n=>({...n,[e.id]:ev.target.value}))}/>
-                <div style={{display:'flex',gap:'0.5rem'}}>
+                <div style={{display:'flex',gap:'0.5rem',alignItems:'center',flexWrap:'wrap'}}>
                   <button style={solidBtn(C.green,true)} onClick={()=>approveEvent(e.id)}>Approve</button>
-                  <button style={solidBtn(C.amber,true)} onClick={()=>sendBackEvent(e.id)}>Send back</button>
+                  {(() => {
+                    const hasNote = !!(eventNotes[e.id]||'').trim()
+                    return (
+                      <button
+                        style={{...solidBtn(C.amber,true),opacity:hasNote?1:0.5,cursor:hasNote?'pointer':'not-allowed'}}
+                        disabled={!hasNote}
+                        title={hasNote?'Send this activity back for changes':'Add a note above first, so they know what to change'}
+                        onClick={()=>sendBackEvent(e.id)}>Send back</button>
+                    )
+                  })()}
+                  {!(eventNotes[e.id]||'').trim() && <span style={{fontSize:'0.85rem',color:C.slate}}>Add a note above to send back</span>}
                 </div>
               </div>
             )
@@ -4421,10 +4441,64 @@ function SettingsTab({config,P,onSave,theme,setThemeMode}) {
   const [saving, setSaving] = useState(false)
   const [activeSection, setActiveSection] = useState('general')
 
+  // "Clear all figures" — a deliberate, name-confirmed reset that wipes every
+  // number feeding the statements while keeping the business shell. Only the
+  // coach or the business CEO can reach it; a read-only role never sees it.
+  const canClearFigures = P.role === 'super_coach' || P.role === 'coach' || P.role === 'ceo'
+  const [showClearModal, setShowClearModal] = useState(false)
+  const [clearConfirmText, setClearConfirmText] = useState('')
+  const [clearing, setClearing] = useState(false)
+  const [clearError, setClearError] = useState<string|null>(null)
+  const [clearDone, setClearDone] = useState(false)
+
   async function save() {
     setSaving(true)
     await onSave(form)
     setSaving(false)
+  }
+
+  // Wipe every figure:
+  //  1. Config-resident figures (plan lines, opening cash, capital, working
+  //     capital, drivers) via clearedBusinessFigures + onSave.
+  //  2. The posted monthly figures in generic_actuals — INCLUDING the Clearview
+  //     Field entries (field_line_values). The per-month "Clear this month"
+  //     button deliberately leaves field_line_values in place, which is exactly
+  //     why costs (negative EBITDA with zero revenue) survive every clear. Here
+  //     we blank EVERY value store on each row — line_values, catalogue_quantities
+  //     AND field_line_values — using the same upsert write path the app already
+  //     uses (so it can't be blocked the way a raw DELETE could), leaving a truly
+  //     empty row.
+  //  3. Market events (delete — the same path deleteMarketEvent already uses).
+  // We surface the first real failure rather than pretending it worked.
+  async function runClearAllFigures() {
+    setClearing(true); setClearError(null)
+    try {
+      const cleared = clearedBusinessFigures(config)
+      setForm({...cleared})            // reflect the wipe in the Settings inputs at once
+      await onSave(cleared)            // persist the cleared config
+
+      // Find every monthly-figures row for this business, then blank each one.
+      const { data: rows, error: readErr } = await supabase
+        .from('generic_actuals').select('unit_id,period').eq('client_id', config.client_id)
+      if (readErr) throw new Error('Reading posted figures: ' + readErr.message)
+      for (const r of (rows || [])) {
+        const { error: upErr } = await supabase.from('generic_actuals').upsert({
+          client_id: config.client_id, unit_id: r.unit_id, period: r.period,
+          line_values: {}, catalogue_quantities: {}, field_line_values: {},
+          submitted: false, approved: false, approved_at: null, approved_by: null,
+          review_note: null, updated_at: new Date().toISOString(),
+        }, { onConflict: 'client_id,unit_id,period' })
+        if (upErr) throw new Error('Clearing posted figures: ' + upErr.message)
+      }
+
+      const del = await supabase.from('generic_market_events').delete().eq('client_id', config.client_id)
+      if (del.error) throw new Error('Market events: ' + del.error.message)
+      setClearDone(true)
+    } catch (e:any) {
+      setClearError(e?.message || 'Could not finish clearing. Some figures may remain.')
+    } finally {
+      setClearing(false)
+    }
   }
 
   function addUnit() {
@@ -4501,6 +4575,21 @@ function SettingsTab({config,P,onSave,theme,setThemeMode}) {
               <div style={hint}>Light and dark are saved on this device. Auto matches your device setting now.</div>
             </div>
           </div>
+          {canClearFigures && (
+            <div style={{marginTop:'1.5rem',paddingTop:'1.25rem',borderTop:`1px solid ${C.border}`}}>
+              <label style={{...lbl,color:C.red}}>Clear all figures</label>
+              <p style={{fontSize:'0.98rem',color:C.slate,lineHeight:1.6,margin:'0.35rem 0 0.8rem',maxWidth:640}}>
+                Removes <strong>every figure</strong> for this business in one step — all posted monthly figures (every unit, every month),
+                the whole plan, opening cash balance, capital structure, working capital and drivers — so the Profit &amp; Loss, Balance Sheet
+                and Cash Flow all read zero. Your business units and their names are <strong>kept</strong>, ready to re-enter figures.
+                This cannot be undone.
+              </p>
+              <button type="button" onClick={()=>{setClearConfirmText('');setClearError(null);setClearDone(false);setShowClearModal(true)}}
+                style={{background:'transparent',border:`1px solid ${C.red}`,color:C.red,borderRadius:8,padding:'0.55rem 1.1rem',fontWeight:700,cursor:'pointer',fontSize:'1rem'}}>
+                Clear all figures for this business…
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -4665,6 +4754,52 @@ function SettingsTab({config,P,onSave,theme,setThemeMode}) {
       <div style={{marginTop:'1.25rem',display:'flex',gap:'0.75rem'}}>
         <button style={solidBtn('var(--cv-header)')} disabled={saving} onClick={save}>{saving?'Saving...':'Save All Settings'}</button>
       </div>
+
+      {showClearModal && (
+        <div style={{position:'fixed',inset:0,background:'rgba(11,31,51,0.55)',zIndex:10000,display:'flex',alignItems:'center',justifyContent:'center',padding:'1.25rem'}}
+          onClick={()=>{ if(!clearing) setShowClearModal(false) }}>
+          <div style={{background:C.white,borderRadius:14,maxWidth:520,width:'100%',padding:'1.6rem 1.7rem',boxShadow:'0 12px 48px rgba(0,0,0,0.25)'}}
+            onClick={e=>e.stopPropagation()}>
+            {clearDone ? (
+              <>
+                <div style={{fontFamily:'Georgia,serif',fontSize:'1.35rem',fontWeight:700,color:C.green,marginBottom:'0.6rem'}}>All figures cleared</div>
+                <p style={{fontSize:'1.0rem',color:C.slate,lineHeight:1.6,marginBottom:'1.2rem'}}>
+                  Every figure for <strong>{config.business_name}</strong> has been removed. The Profit &amp; Loss, Balance Sheet and Cash Flow now read zero.
+                  Your business units are still here — go to <strong>Planning</strong> to enter figures again whenever you're ready.
+                </p>
+                <button type="button" onClick={()=>setShowClearModal(false)}
+                  style={solidBtn(C.green,true)}>Done</button>
+              </>
+            ) : (
+              <>
+                <div style={{fontFamily:'Georgia,serif',fontSize:'1.35rem',fontWeight:700,color:C.red,marginBottom:'0.6rem'}}>Clear all figures?</div>
+                <p style={{fontSize:'1.0rem',color:C.slate,lineHeight:1.6,marginBottom:'0.9rem'}}>
+                  This permanently removes <strong>all posted monthly figures, the whole plan, opening cash, capital structure,
+                  working capital and drivers</strong> for <strong>{config.business_name}</strong>. Business units are kept.
+                  <strong> This cannot be undone.</strong>
+                </p>
+                <label style={{...lbl}}>To confirm, type the business name below:</label>
+                <div style={{fontFamily:'monospace',fontSize:'0.95rem',color:C.navy,margin:'0.2rem 0 0.4rem'}}>{config.business_name}</div>
+                <input style={inp} value={clearConfirmText} disabled={clearing} autoFocus
+                  onChange={e=>setClearConfirmText(e.target.value)} placeholder="Type the exact business name"/>
+                {clearError && <div style={{color:C.red,fontSize:'0.9rem',marginTop:'0.6rem',padding:'0.55rem',background:'var(--cv-tint-red)',borderRadius:6}}>{clearError}</div>}
+                <div style={{display:'flex',gap:'0.6rem',marginTop:'1.1rem'}}>
+                  <button type="button" disabled={clearing} onClick={()=>setShowClearModal(false)}
+                    style={{background:'transparent',border:`1px solid ${C.border}`,color:C.slate,borderRadius:8,padding:'0.55rem 1.1rem',fontWeight:600,cursor:'pointer'}}>Cancel</button>
+                  <button type="button"
+                    disabled={clearing || clearConfirmText.trim() !== (config.business_name||'').trim()}
+                    onClick={runClearAllFigures}
+                    style={{background:C.red,border:'none',color:'#fff',borderRadius:8,padding:'0.55rem 1.1rem',fontWeight:700,
+                      cursor:(clearing||clearConfirmText.trim()!==(config.business_name||'').trim())?'not-allowed':'pointer',
+                      opacity:(clearing||clearConfirmText.trim()!==(config.business_name||'').trim())?0.5:1}}>
+                    {clearing?'Clearing…':'Yes, clear all figures'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
