@@ -29,6 +29,9 @@ export async function POST(req: NextRequest) {
     const technicalErrors: string[] = []
     let txSynced = 0
     let creditSynced = 0
+    // Set if the field_transactions insert failed, so the actuals roll-up below
+    // is skipped (the just-synced rows never landed, nothing new to aggregate).
+    let fieldTxInsertFailed = false
     const priceAlerts: string[] = []
     // Every original transaction's local_id that passed validation and was
     // added to `rows` -- used to tell the client exactly which queued
@@ -232,6 +235,7 @@ export async function POST(req: NextRequest) {
           .upsert(rows, { onConflict: 'client_id,local_id', ignoreDuplicates: true })
           .select('id')
         if (txErr) {
+          fieldTxInsertFailed = true
           technicalErrors.push(`Transaction insert error: ${txErr.message}`); errors.push(friendlyDbError(txErr.message))
           // The rows that passed validation never actually got written --
           // don't tell the client to clear entries that failed at the
@@ -378,54 +382,70 @@ export async function POST(req: NextRequest) {
     // sync that contains only credit_transactions with no regular
     // transactions -- must run after every sync, not just when standard
     // transactions happen to be present.
-    if (transactions.length > 0 || credit_transactions.length > 0) {
-      // Roll field_transactions up into generic_actuals.field_line_values IN
-      // THIS ROUTE, rather than depending on the aggregate_field_transactions
-      // DB function. That function has a history of being absent/failing on a
-      // live database (see its migration header) -- when it doesn't run, synced
-      // entries sit in field_transactions and never reach the Actuals month
-      // numbers or the P&L, with only a soft "will catch up" notice. Here we
-      // recompute the full per-(unit, month, plan_line) sums from
-      // field_transactions and write them directly, using the same
-      // (client_id, unit_id, period) upsert the dashboard's own actuals writes
-      // use. field_line_values is entirely derived from field_transactions, so
-      // recomputing and overwriting it is correct; line_values (manual entries)
-      // is never included here, so it is never touched.
-      const { data: txRows, error: txReadErr } = await supabase
-        .from('field_transactions')
-        .select('business_unit_id, transaction_date, plan_line_id, amount')
-        .eq('client_id', operator.client_id)
-        .not('plan_line_id', 'is', null)
-      if (txReadErr) {
-        technicalErrors.push(`Aggregation read error: ${txReadErr.message}`)
-        errors.push('Your entries were saved, but the month figures haven\'t updated yet. They\'ll catch up on the next sync.')
-      } else {
-        // key = unit_id | first-of-month period; value = { plan_line_id: sum }
-        const byUnitPeriod = new Map<string, { unit_id: string; period: string; fields: Record<string, number> }>()
-        for (const tx of (txRows || [])) {
-          if (!tx.plan_line_id) continue
-          const period = String(tx.transaction_date).slice(0, 7) + '-01' // month bucket
-          const key = `${tx.business_unit_id}|${period}`
-          let g = byUnitPeriod.get(key)
-          if (!g) { g = { unit_id: tx.business_unit_id, period, fields: {} }; byUnitPeriod.set(key, g) }
-          g.fields[tx.plan_line_id] = (g.fields[tx.plan_line_id] || 0) + Number(tx.amount || 0)
-        }
-        for (const g of Array.from(byUnitPeriod.values())) {
-          const { error: aggErr } = await supabase.from('generic_actuals').upsert({
-            client_id: operator.client_id, unit_id: g.unit_id, period: g.period,
-            field_line_values: g.fields, entered_by: 'Clearview Field (aggregated)',
-            entered_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-          }, { onConflict: 'client_id,unit_id,period' })
-          if (aggErr) {
-            technicalErrors.push(`Aggregation write error: ${aggErr.message}`)
-            // A closed period rejects the write by design (month-end-close
-            // trigger) -- that never "catches up", so say so plainly.
-            errors.push(
-              aggErr.message.includes('is closed and cannot be edited')
-                ? 'Your entries were saved, but the period they belong to has already been closed by your Finance Manager. Ask them to reopen it if these figures need to be included.'
-                : 'Your entries were saved, but the month figures haven\'t updated yet. They\'ll catch up on the next sync.'
-            )
+    // Roll field_transactions up into generic_actuals.field_line_values IN THIS
+    // ROUTE, rather than depending on the aggregate_field_transactions DB
+    // function, which has a history of being absent/failing on a live database
+    // (see its migration header) -- when it doesn't run, synced entries sit in
+    // field_transactions and never reach the Actuals month numbers or the P&L.
+    //
+    // SCOPED, not a full-history rescan: we only recompute the (unit, month)
+    // buckets this sync actually wrote to (derived from `rows`), and each read
+    // is filtered to that one unit + month window and PAGINATED past the 1000-row
+    // PostgREST cap -- so sums are never silently truncated, and periods this
+    // sync didn't touch keep their existing figures and audit stamp untouched.
+    const unitId = operator.business_unit_id
+    const touchedPeriods = new Set<string>()
+    for (const t of transactions) {
+      const dateStr = t.transaction_date || new Date().toISOString().split('T')[0]
+      touchedPeriods.add(String(dateStr).slice(0, 7) + '-01') // month bucket
+    }
+    if (!fieldTxInsertFailed && touchedPeriods.size > 0) {
+      const nextMonthStart = (period: string) => {
+        const d = new Date(period + 'T00:00:00Z')
+        return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)).toISOString().slice(0, 10)
+      }
+      for (const period of Array.from(touchedPeriods)) {
+        const end = nextMonthStart(period)
+        // Sum this unit+month's field transactions by plan_line_id, paginating.
+        const fields: Record<string, number> = {}
+        let from = 0
+        const PAGE = 1000
+        let readFailed = false
+        for (;;) {
+          const { data: page, error: pErr } = await supabase
+            .from('field_transactions')
+            .select('plan_line_id, amount')
+            .eq('client_id', operator.client_id)
+            .eq('business_unit_id', unitId)
+            .not('plan_line_id', 'is', null)
+            .gte('transaction_date', period)
+            .lt('transaction_date', end)
+            .range(from, from + PAGE - 1)
+          if (pErr) { technicalErrors.push(`Aggregation read error: ${pErr.message}`); readFailed = true; break }
+          for (const tx of (page || [])) {
+            if (!tx.plan_line_id) continue
+            fields[tx.plan_line_id] = (fields[tx.plan_line_id] || 0) + Number(tx.amount || 0)
           }
+          if (!page || page.length < PAGE) break
+          from += PAGE
+        }
+        if (readFailed) {
+          errors.push('Your entries were saved, but the month figures haven\'t updated yet. They\'ll catch up on the next sync.')
+          continue
+        }
+        const { error: aggErr } = await supabase.from('generic_actuals').upsert({
+          client_id: operator.client_id, unit_id: unitId, period,
+          field_line_values: fields, entered_by: 'Clearview Field (aggregated)',
+          entered_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        }, { onConflict: 'client_id,unit_id,period' })
+        if (aggErr) {
+          technicalErrors.push(`Aggregation write error: ${aggErr.message}`)
+          // A closed period rejects the write by design (month-end-close trigger).
+          errors.push(
+            aggErr.message.includes('is closed and cannot be edited')
+              ? 'Your entries were saved, but the period they belong to has already been closed by your Finance Manager. Ask them to reopen it if these figures need to be included.'
+              : 'Your entries were saved, but the month figures haven\'t updated yet. They\'ll catch up on the next sync.'
+          )
         }
       }
     }
