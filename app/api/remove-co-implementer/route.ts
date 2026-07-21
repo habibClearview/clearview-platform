@@ -60,24 +60,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4) Safe to proceed. Remove any login issued to them FIRST (auth user, then
-    //    profile row), because user_profiles.co_implementer_id references the
-    //    record we delete last. If an auth deletion fails, we abort BEFORE
-    //    deleting the record, leaving a consistent state (nothing removed).
-    const { data: linked } = await admin
-      .from('user_profiles').select('id').eq('co_implementer_id', coImplementerId)
-    for (const p of (linked || [])) {
-      const { error: authDelErr } = await admin.auth.admin.deleteUser(p.id)
-      if (authDelErr && !/not found/i.test(authDelErr.message || '')) {
-        console.error('remove-co-implementer: auth delete failed', authDelErr.message)
-        return NextResponse.json({ error: 'Could not remove this team member’s login. Nothing was deleted — please try again.' }, { status: 500 })
-      }
-      // Remove the profile row too (a no-op if deleting the auth user already
-      // cascaded it away).
-      await admin.from('user_profiles').delete().eq('id', p.id)
+    // 4) Revoke access by deleting the linked profile row(s) in ONE statement.
+    //    Removing the profile strips their role, so any auth login that remains
+    //    can do nothing in the app — we deliberately do NOT call the irreversible
+    //    auth.admin.deleteUser (which can't participate in an all-or-nothing
+    //    flow and would risk partial, unrecoverable loss). This is a single,
+    //    error-checked delete, done before the record because
+    //    user_profiles.co_implementer_id references it.
+    const { error: profErr } = await admin
+      .from('user_profiles').delete().eq('co_implementer_id', coImplementerId)
+    if (profErr) {
+      console.error('remove-co-implementer: profile delete failed', profErr.message)
+      return NextResponse.json({ error: 'Could not remove this team member’s access. Nothing was deleted — please try again.' }, { status: 500 })
     }
 
-    // 5) Finally delete the record. Its blocking references are now gone.
+    // 5) Delete the record itself. Its blocking references (financial rows ruled
+    //    out in step 3, profile rows removed in step 4) are now gone.
     const { error: delErr } = await admin.from('co_implementers').delete().eq('id', coImplementerId)
     if (delErr) {
       console.error('remove-co-implementer: delete failed', delErr.message)
