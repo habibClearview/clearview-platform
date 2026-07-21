@@ -134,17 +134,25 @@ def main() -> None:
         fail_closed(f"no text block in the API response: {json.dumps(payload)[:400]}")
 
     write_review(review)
-    # Read the verdict robustly. The model may wrap it in markdown (e.g.
-    # "**APPROVED**") or add a heading, so strip non-letters from the start
-    # before matching rather than requiring the bare word first — otherwise a
-    # genuinely-approved review that happens to be bolded would be treated as a
-    # failure and block the PR.
-    head = re.sub(r"[^A-Za-z]", "", review[:40]).upper()
-    if head.startswith("APPROVED"):
-        conclusion = "success"
-    elif head.startswith("BLOCKED"):
-        conclusion = "failure"
-    else:
+    # Read the verdict robustly. The model is asked to lead with APPROVED/BLOCKED
+    # but sometimes prefixes a markdown heading (e.g. "# Review: ...") or bolds
+    # the verdict ("**APPROVED**"). Scan the first several non-empty lines and
+    # take the FIRST whose letters-only form begins with the verdict word, rather
+    # than only inspecting the first 40 characters — otherwise a genuinely
+    # APPROVED review that happens to sit under a heading is misread as a failure
+    # and needlessly blocks the PR. BLOCKED still wins if it appears first.
+    conclusion = None
+    for line in review.splitlines()[:20]:
+        letters = re.sub(r"[^A-Za-z]", "", line).upper()
+        if not letters:
+            continue
+        if letters.startswith("APPROVED"):
+            conclusion = "success"
+            break
+        if letters.startswith("BLOCKED"):
+            conclusion = "failure"
+            break
+    if conclusion is None:
         # Genuinely can't tell what the model decided — fail closed.
         fail_closed(f"could not read an APPROVED/BLOCKED verdict from the review: {review[:120]!r}")
     set_output("conclusion", conclusion)

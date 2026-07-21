@@ -240,6 +240,26 @@ export default function TeamPayments({coImplementers=[],setCoImplementers,client
   const [accessMsg,setAccessMsg]=useState(null)
   const clientName=useCallback((id)=>clients.find(c=>c.id===id)?.name||(id?String(id):'—'),[clients])
 
+  // Permanently remove a co-implementer (and any login issued to them) via the
+  // authenticated server route. Owner-only; the button is already gated by
+  // canManage (super_coach), and the route re-checks it server-side.
+  const removeCI=useCallback(async(ci)=>{
+    if(typeof window!=='undefined' && !window.confirm(`Remove ${ci.name||'this team member'} from your team permanently?\n\nThis also removes any login they were given. It cannot be undone. (If they have timesheets or invoices on record, set them Inactive instead.)`)) return {error:{message:'cancelled'}}
+    try{
+      const {data:{session}}=await supabase.auth.getSession()
+      const res=await fetch('/api/remove-co-implementer',{
+        method:'POST',headers:{'Content-Type':'application/json',...(session?.access_token?{Authorization:`Bearer ${session.access_token}`}:{})},
+        body:JSON.stringify({coImplementerId:ci.id}),
+      })
+      const data=await res.json().catch(()=>({}))
+      if(!res.ok) return {error:{message:data?.error||'Could not remove this team member.'}}
+      setCoImplementers&&setCoImplementers(prev=>prev.filter(x=>x.id!==ci.id))
+      return {}
+    }catch(e){
+      return {error:{message:'No connection — could not remove this team member. Please try again.'}}
+    }
+  },[setCoImplementers])
+
   useEffect(()=>{
     let alive=true
     async function load(){
@@ -313,7 +333,7 @@ export default function TeamPayments({coImplementers=[],setCoImplementers,client
         : coImplementers.map(ci=>(
             <CoImplementerPayments
               key={ci.id} ci={ci} period={period} userName={userName} clientName={clientName} clients={clients} canApprove={canApprove}
-              canManage={canManage} updateCI={updateCI} renderInvite={renderInvite}
+              canManage={canManage} updateCI={updateCI} removeCI={removeCI} renderInvite={renderInvite}
               entries={entries} setEntries={setEntries}
               expenses={expenses} setExpenses={setExpenses}
               advances={advances} setAdvances={setAdvances}
@@ -345,7 +365,7 @@ function computeDraft(ci,period,entries,expenses,advances){
   return {approvedHours,days,rate,timeAmount,expApproved,openAdvances,openAdvanceTotal,gross,advanceApplied,net,blocked}
 }
 
-function CoImplementerPayments({ci,period,userName,clientName,clients,entries,setEntries,expenses,setExpenses,advances,setAdvances,invoices,setInvoices,canApprove,canManage,updateCI,renderInvite}){
+function CoImplementerPayments({ci,period,userName,clientName,clients,entries,setEntries,expenses,setExpenses,advances,setAdvances,invoices,setInvoices,canApprove,canManage,updateCI,removeCI,renderInvite}){
   const [tab,setTab]=useState('timesheets')
   const [busy,setBusy]=useState(false)
   const [msg,setMsg]=useState(null)
@@ -411,6 +431,8 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
           <span style={{fontFamily:'monospace',fontSize:'0.85rem',background:d.rate>0?'var(--cv-tint-cyan)':'var(--cv-tint-amber)',color:d.rate>0?C.cyan:C.amber,borderRadius:999,padding:'0.25rem 0.7rem'}}>{d.rate>0?`${fmtMoney(d.rate,curOf(ci))} / day`:'no day rate set'}</span>
           {canManage&&<button style={addBtn(true)} onClick={()=>editingProfile?setEditingProfile(false):startEditProfile()}>{editingProfile?'Cancel':'Edit profile'}</button>}
           {renderInvite&&renderInvite(ci)}
+          {canManage&&removeCI&&<button style={addBtn(true,C.red)} disabled={busy} title="Remove this team member from the system"
+            onClick={async()=>{setBusy(true);setMsg(null);const {error}=await removeCI(ci);if(error&&error.message!=='cancelled')setMsg('Could not remove: '+error.message);setBusy(false)}}>{busy?'Removing…':'Remove'}</button>}
         </div>
       </div>
 
