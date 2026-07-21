@@ -44,27 +44,44 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    // 3) Delete the co-implementer record FIRST. If financial records reference
-    //    it (timesheets/invoices via a foreign key), the delete is refused and we
-    //    stop here having changed NOTHING — the login is only removed in step 4,
-    //    after this succeeds, so a blocked delete can never orphan a login.
-    const { error: delErr } = await admin.from('co_implementers').delete().eq('id', coImplementerId)
-    if (delErr) {
-      console.error('remove-co-implementer: delete failed', delErr.message)
-      return NextResponse.json({
-        error: 'Could not remove this team member — they may have timesheets, expenses or invoices on record. Set them to Inactive instead.',
-      }, { status: 409 })
+    // 3) PRE-FLIGHT (no mutations yet): refuse up front if any financial record
+    //    references this person. Doing this first means we never start deleting
+    //    only to hit a foreign-key wall halfway — either the whole removal is
+    //    safe to proceed, or nothing is touched at all.
+    const financialTables = ['coach_timesheet_entries', 'coach_expenses', 'coach_advances', 'coach_invoices']
+    for (const table of financialTables) {
+      const { count, error: countErr } = await admin
+        .from(table).select('id', { count: 'exact', head: true }).eq('co_implementer_id', coImplementerId)
+      if (countErr) { console.error(`remove-co-implementer: ${table} check failed`, countErr.message); return NextResponse.json({ error: 'Could not verify this team member’s records — please try again.' }, { status: 500 }) }
+      if ((count || 0) > 0) {
+        return NextResponse.json({
+          error: 'This team member has timesheets, expenses, advances or invoices on record, so they can’t be permanently removed. Set them to Inactive instead.',
+        }, { status: 409 })
+      }
     }
 
-    // 4) The record is gone — now remove any login issued to this person (their
-    //    auth user + profile). Best-effort: the team removal has already
-    //    succeeded, so a hiccup here is logged, not surfaced as a failure.
+    // 4) Safe to proceed. Remove any login issued to them FIRST (auth user, then
+    //    profile row), because user_profiles.co_implementer_id references the
+    //    record we delete last. If an auth deletion fails, we abort BEFORE
+    //    deleting the record, leaving a consistent state (nothing removed).
     const { data: linked } = await admin
       .from('user_profiles').select('id').eq('co_implementer_id', coImplementerId)
     for (const p of (linked || [])) {
-      const { error: profErr } = await admin.from('user_profiles').delete().eq('id', p.id)
-      if (profErr) { console.error('remove-co-implementer: profile delete failed', profErr.message); continue }
-      await admin.auth.admin.deleteUser(p.id).catch((e: any) => console.error('remove-co-implementer: auth delete failed', e?.message))
+      const { error: authDelErr } = await admin.auth.admin.deleteUser(p.id)
+      if (authDelErr && !/not found/i.test(authDelErr.message || '')) {
+        console.error('remove-co-implementer: auth delete failed', authDelErr.message)
+        return NextResponse.json({ error: 'Could not remove this team member’s login. Nothing was deleted — please try again.' }, { status: 500 })
+      }
+      // Remove the profile row too (a no-op if deleting the auth user already
+      // cascaded it away).
+      await admin.from('user_profiles').delete().eq('id', p.id)
+    }
+
+    // 5) Finally delete the record. Its blocking references are now gone.
+    const { error: delErr } = await admin.from('co_implementers').delete().eq('id', coImplementerId)
+    if (delErr) {
+      console.error('remove-co-implementer: delete failed', delErr.message)
+      return NextResponse.json({ error: 'Could not remove this team member. Please try again.' }, { status: 500 })
     }
 
     return NextResponse.json({ ok: true })
