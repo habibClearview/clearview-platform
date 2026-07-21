@@ -3285,14 +3285,22 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
   // has changed them — so a perfectly good update returns zero rows and looks
   // like a conflict. count:'exact' reports how many rows the guard actually
   // updated: >0 = done, 0 = a genuine concurrent change.
+  // Both actions ALWAYS reconcile the on-screen queue against the database
+  // after the write (refreshPendingActuals), instead of trusting an optimistic
+  // filter or the returned count. So whatever the outcome — the row was
+  // approved/sent-back (it drops out), the write was blocked (it stays, with a
+  // clear reason), or a concurrent change happened — the list on screen always
+  // matches the database truth. Any real DB error (e.g. a closed-period trigger
+  // rejection) is surfaced verbatim rather than swallowed.
   async function approveActual(id:string) {
     const {error,count} = await supabase.from('generic_actuals').update({
       approved:true, approved_at:new Date().toISOString(), approved_by:P.fullName,
       review_note:null, updated_at:new Date().toISOString(),
     },{count:'exact'}).eq('id',id).eq('submitted',true).eq('approved',false)
-    if (error) { notify('Could not approve — '+error.message); return }
-    if (!count) { notify('These figures were just changed or handled by someone else — refreshing the list.'); refreshPendingActuals(); onApprovalActioned&&onApprovalActioned(); return }
-    setPendingActuals(a=>a.filter(x=>x.id!==id))
+    if (error) { notify('Could not approve — '+error.message, 'error'); return }
+    if (count === 0) notify('These figures were just changed or handled by someone else.', 'info')
+    else notify('Approved ✓', 'success')
+    await refreshPendingActuals()
     onApprovalActioned&&onApprovalActioned()
   }
 
@@ -3302,9 +3310,10 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
     const {error,count} = await supabase.from('generic_actuals').update({
       submitted:false, approved:false, review_note:note, updated_at:new Date().toISOString(),
     },{count:'exact'}).eq('id',id).eq('submitted',true).eq('approved',false)
-    if (error) { notify('Could not send back — '+error.message); return }
-    if (!count) { notify('These figures were just changed or handled by someone else — refreshing the list.'); refreshPendingActuals(); onApprovalActioned&&onApprovalActioned(); return }
-    setPendingActuals(a=>a.filter(x=>x.id!==id))
+    if (error) { notify('Could not send back — '+error.message, 'error'); return }
+    if (count === 0) notify('These figures were just changed or handled by someone else.', 'info')
+    else { notify('Sent back for correction ✓', 'success'); setActualNotes(n=>{const m={...n};delete m[id];return m}) }
+    await refreshPendingActuals()
     onApprovalActioned&&onApprovalActioned()
   }
 
