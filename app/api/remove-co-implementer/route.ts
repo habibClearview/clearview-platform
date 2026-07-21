@@ -34,30 +34,37 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error: authErr } = await admin.auth.getUser(token)
     if (authErr || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
-    // 2) Re-derive role server-side; only the owning coach (super_coach) may remove team members.
+    // 2) Re-derive role server-side. The co_implementers table is a single
+    //    super_coach-scoped team (its RLS is `using (my_role() = 'super_coach')`,
+    //    with no per-coach owner column), so the super_coach role IS the boundary
+    //    here, consistent with every other co_implementers operation in the app.
     const { data: actor, error: actorErr } = await admin
       .from('user_profiles').select('role').eq('id', user.id).single()
     if (actorErr || !actor || actor.role !== 'super_coach') {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    // 3) Remove any login issued to this co-implementer (their auth user + profile).
-    const { data: linked } = await admin
-      .from('user_profiles').select('id').eq('co_implementer_id', coImplementerId)
-    for (const p of (linked || [])) {
-      await admin.auth.admin.deleteUser(p.id).catch((e: any) => console.error('remove-co-implementer: auth delete failed', e?.message))
-      await admin.from('user_profiles').delete().eq('id', p.id)
-    }
-
-    // 4) Remove the co-implementer record itself. If financial records reference
-    //    it (timesheets/invoices with a foreign key), the delete is refused —
-    //    surface that plainly rather than silently orphaning money records.
+    // 3) Delete the co-implementer record FIRST. If financial records reference
+    //    it (timesheets/invoices via a foreign key), the delete is refused and we
+    //    stop here having changed NOTHING — the login is only removed in step 4,
+    //    after this succeeds, so a blocked delete can never orphan a login.
     const { error: delErr } = await admin.from('co_implementers').delete().eq('id', coImplementerId)
     if (delErr) {
       console.error('remove-co-implementer: delete failed', delErr.message)
       return NextResponse.json({
         error: 'Could not remove this team member — they may have timesheets, expenses or invoices on record. Set them to Inactive instead.',
       }, { status: 409 })
+    }
+
+    // 4) The record is gone — now remove any login issued to this person (their
+    //    auth user + profile). Best-effort: the team removal has already
+    //    succeeded, so a hiccup here is logged, not surfaced as a failure.
+    const { data: linked } = await admin
+      .from('user_profiles').select('id').eq('co_implementer_id', coImplementerId)
+    for (const p of (linked || [])) {
+      const { error: profErr } = await admin.from('user_profiles').delete().eq('id', p.id)
+      if (profErr) { console.error('remove-co-implementer: profile delete failed', profErr.message); continue }
+      await admin.auth.admin.deleteUser(p.id).catch((e: any) => console.error('remove-co-implementer: auth delete failed', e?.message))
     }
 
     return NextResponse.json({ ok: true })

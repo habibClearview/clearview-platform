@@ -1181,7 +1181,7 @@ function PerformanceTab({config,result,months,cc,clientId,onGoToIntelligence}) {
     if(!clientId) return
     let active = true
     supabase.from('management_events').select('cost,customers_acquired,revenue_before,revenue_after').eq('client_id',clientId)
-      .then(({data})=>{ if(active) setCustGrowth(computeCustomerGrowthSummary(data||[])) })
+      .then(({data,error})=>{ if(active) setCustGrowth(error ? null : computeCustomerGrowthSummary(data||[])) })
     return ()=>{ active = false }
   },[clientId])
   if (!result || !result.metrics) return (
