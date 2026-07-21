@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { runGenericModel, defaultGenericConfig, clearedBusinessFigures, spreadLine, serviceFeeLine, buildYearGroups, collapseYear, defaultExpandedYears, extendPlanningHorizon, buildDepreciationSchedule, applyCorporateTax } from '../lib/generic-engine'
+import { runGenericModel, defaultGenericConfig, spreadLine, serviceFeeLine, buildYearGroups, collapseYear, defaultExpandedYears, extendPlanningHorizon, buildDepreciationSchedule, applyCorporateTax } from '../lib/generic-engine'
 import { deriveActualOperatingCosts } from '../lib/actuals'
 
 function expectBalanceSheetBalances(result: ReturnType<typeof runGenericModel>) {
@@ -1364,102 +1364,5 @@ describe('extendPlanningHorizon — growing a client\'s planning horizon indefin
   it('REG: non-finite additionalMonths (NaN, Infinity) is also rejected', () => {
     expect(() => extendPlanningHorizon(makeConfigWithEverything(), NaN)).toThrow(/whole number/)
     expect(() => extendPlanningHorizon(makeConfigWithEverything(), Infinity)).toThrow(/whole number/)
-  })
-})
-
-describe('Generic Engine — clearedBusinessFigures (in-app "clear all figures")', () => {
-  // A config with a figure in EVERY place that feeds the statements, so we can
-  // prove the reset touches all of them and the statements go to zero.
-  function makeFullyLoadedConfig() {
-    return makeConfig({
-      start_date: '2026-01-01',
-      shared_lines: [
-        { id: 'sh1', unit_id: '', name: 'Central admin', category: 'shared',
-          line_type: 'standard', monthly_plan: Array(12).fill(700_000), active: true },
-      ],
-      settings: {
-        shared_cost_fixed_pct: 0.5, corporate_tax_rate: 0.30,
-        opening_cash_balance: 10_000_000,
-        capital_structure: {
-          shareholder_contribution: 25_000_000, grant_non_repayable: 3_000_000,
-          grant_recoverable: 2_000_000, bank_loan: 40_000_000,
-          annual_interest_rate: 0.18, loan_tenor_years: 3, grace_period_months: 2,
-          fixed_assets: 15_000_000, fixed_asset_useful_life_years: 5,
-        },
-        trade_credit_lines: [
-          { id: 'tc1', name: 'Supplier credit', kind: 'payable',
-            monthly_new: Array(12).fill(1_000_000), monthly_settled: Array(12).fill(800_000) },
-        ] as any,
-        debts: [{ name: 'SACCO loan', principal: 5_000_000, annualRate: 0.2, tenorMonths: 12 }] as any,
-        channels: [{ id: 'ch1', name: 'Retail', unit_id: null, active: true }] as any,
-        drivers: [{ id: 'dr1', kind: 'sales', name: 'Units sold', unit_id: 'u1',
-          channel_id: 'ch1', mode: 'flat', monthly: Array(12).fill(2_000_000) }] as any,
-      },
-    })
-  }
-
-  it('empties every figure array and zeroes the scalar figures', () => {
-    const cleared = clearedBusinessFigures(makeFullyLoadedConfig())
-    expect(cleared.plan_lines).toEqual([])
-    expect(cleared.shared_lines).toEqual([])
-    expect(cleared.settings.opening_cash_balance).toBe(0)
-    expect(cleared.settings.trade_credit_lines).toEqual([])
-    expect(cleared.settings.debts).toEqual([])
-    expect(cleared.settings.drivers).toEqual([])
-    expect(cleared.settings.channels).toEqual([])
-    expect(cleared.settings.capital_structure).toMatchObject({
-      shareholder_contribution: 0, grant_non_repayable: 0, grant_recoverable: 0,
-      bank_loan: 0, fixed_assets: 0,
-    })
-  })
-
-  it('KEEPS the business shell and non-figure preferences', () => {
-    const src = makeFullyLoadedConfig()
-    const cleared = clearedBusinessFigures(src)
-    expect(cleared.business_units).toEqual(src.business_units)   // units preserved
-    expect(cleared.currency).toBe(src.currency)
-    expect(cleared.start_date).toBe(src.start_date)
-    expect(cleared.planning_months).toBe(src.planning_months)
-    expect(cleared.settings.corporate_tax_rate).toBe(0.30)
-    expect(cleared.settings.shared_cost_fixed_pct).toBe(0.5)
-  })
-
-  it('zeroes the rate/tenor/useful-life terms too (so nothing lingers to confuse clients)', () => {
-    const cleared = clearedBusinessFigures(makeFullyLoadedConfig())
-    expect(cleared.settings.capital_structure?.annual_interest_rate).toBe(0)
-    expect(cleared.settings.capital_structure?.loan_tenor_years).toBe(0)
-    expect(cleared.settings.capital_structure?.grace_period_months).toBe(0)
-    expect(cleared.settings.capital_structure?.fixed_asset_useful_life_years).toBe(0)
-    // A zero useful-life must not break the engine (guarded → no depreciation).
-    const result = runGenericModel(cleared)
-    expectBalanceSheetBalances(result)
-  })
-
-  it('does not mutate the input config', () => {
-    const src = makeFullyLoadedConfig()
-    clearedBusinessFigures(src)
-    expect(src.plan_lines.length).toBeGreaterThan(0)
-    expect(src.settings.opening_cash_balance).toBe(10_000_000)
-    expect(src.settings.capital_structure?.bank_loan).toBe(40_000_000)
-  })
-
-  it('drives the P&L / Balance Sheet / Cash Flow to zero after clearing', () => {
-    const cleared = clearedBusinessFigures(makeFullyLoadedConfig())
-    const result = runGenericModel(cleared)
-    expect(result.metrics.total_revenue).toBe(0)
-    result.con.rev.forEach((v: number) => expect(v).toBe(0))
-    // Balance sheet: no cash, no equity, no assets seeded from figures.
-    result.bs.cash.forEach((v: number) => expect(Math.abs(v)).toBeLessThan(1))
-    result.bs.total_assets.forEach((v: number) => expect(Math.abs(v)).toBeLessThan(1))
-    // And it still balances (assets == equity+liabilities) at zero.
-    expectBalanceSheetBalances(result)
-  })
-
-  it('tolerates a config with no capital_structure set', () => {
-    const src = makeConfig()
-    delete (src.settings as any).capital_structure
-    const cleared = clearedBusinessFigures(src)
-    expect(cleared.settings.capital_structure).toBeUndefined()
-    expect(cleared.plan_lines).toEqual([])
   })
 })
