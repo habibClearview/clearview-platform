@@ -68,6 +68,55 @@ const addBtn = (sm=false, col=C.cyan): React.CSSProperties => ({fontFamily:'mono
 const solidBtn = (col=C.cyan, sm=false): React.CSSProperties => ({fontFamily:'monospace',fontSize:sm?'0.88rem':'0.94rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:4,background:col,color:col===C.white?'var(--cv-navy)':'var(--cv-on-accent)',cursor:'pointer'})
 const delBtn: React.CSSProperties = {fontSize:'0.96rem',color:C.red,background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,cursor:'pointer',padding:'0.18rem 0.42rem'}
 
+// ── In-app toast notifications ───────────────────────────────
+// A single, gentle, branded notifier that replaces jarring native alert()
+// popups (the "clearview.habibonifade.com says…" OS dialogs that read as
+// errors and make the platform feel unstable to a client). Any component in
+// this file calls notify(message[, kind]); the dashboard root renders
+// <ToastHost/> once and registers the sink. Toasts auto-dismiss and can be
+// closed. Before the host mounts (should never happen in practice) it falls
+// back to a native alert so a message is never silently lost.
+type ToastKind = 'info' | 'error' | 'success'
+type ToastItem = { id: number; message: string; kind: ToastKind }
+let _toastSink: ((t: ToastItem) => void) | null = null
+let _toastSeq = 0
+function notify(message: string, kind: ToastKind = 'info') {
+  const item: ToastItem = { id: ++_toastSeq, message: String(message ?? ''), kind }
+  if (_toastSink) _toastSink(item)
+  else if (typeof window !== 'undefined') window.alert(item.message)
+}
+function ToastHost() {
+  const [items, setItems] = useState<ToastItem[]>([])
+  useEffect(() => {
+    _toastSink = (t: ToastItem) => {
+      setItems(prev => [...prev, t])
+      const ttl = t.kind === 'error' ? 8000 : 4500
+      setTimeout(() => setItems(prev => prev.filter(x => x.id !== t.id)), ttl)
+    }
+    return () => { _toastSink = null }
+  }, [])
+  if (items.length === 0) return null
+  const palette: Record<ToastKind, { bg: string; bar: string }> = {
+    info:    { bg: C.navy,  bar: C.cyan },
+    success: { bg: C.navy,  bar: C.green },
+    error:   { bg: C.navy,  bar: C.red },
+  }
+  return (
+    <div style={{position:'fixed',top:16,left:'50%',transform:'translateX(-50%)',zIndex:11000,display:'flex',flexDirection:'column',gap:8,width:460,maxWidth:'92vw',pointerEvents:'none'}}>
+      {items.map(t => {
+        const p = palette[t.kind]
+        return (
+          <div key={t.id} role="status" style={{pointerEvents:'auto',display:'flex',alignItems:'flex-start',gap:'0.7rem',background:p.bg,color:'#fff',borderLeft:`4px solid ${p.bar}`,borderRadius:10,padding:'0.75rem 0.9rem',boxShadow:'0 8px 30px rgba(0,0,0,0.28)',fontSize:'1.0rem',lineHeight:1.45}}>
+            <span style={{flex:1}}>{t.message}</span>
+            <button type="button" aria-label="Dismiss" onClick={()=>setItems(prev=>prev.filter(x=>x.id!==t.id))}
+              style={{background:'transparent',border:'none',color:'#fff',opacity:0.7,cursor:'pointer',fontSize:'1.1rem',lineHeight:1,padding:0}}>×</button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function navBtn(active: boolean): React.CSSProperties {
   return {fontFamily:'monospace',fontSize:'0.96rem',padding:'0.65rem 1rem',border:'none',background:'transparent',
     color:active?C.cyan:'var(--cv-wa-60)',cursor:'pointer',
@@ -880,6 +929,7 @@ export default function GenericDashboard({
   return (
     <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif",background:C.cream,color:C.navy,minHeight:'100vh'}}>
       <BuildStamp/>
+      <ToastHost/>
       {/* Header */}
       <header style={{background:'var(--cv-header)',borderBottom:`3px solid ${C.cyan}`}}>
         <div style={{maxWidth:1600,margin:'0 auto',padding:'1.25rem 1.5rem',display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
@@ -911,7 +961,7 @@ export default function GenericDashboard({
               if(!window.confirm('Sign out of ALL devices?\n\nThis logs you out everywhere — including any other computer where you are still signed in — as well as here.\n\nNote: a page already open on another device can keep working for up to about an hour until its access expires; after that it can no longer stay signed in. You will need to sign in again.')) return
               let signOutError:any = null
               try { const { error } = await supabase.auth.signOut({ scope: 'global' }); signOutError = error } catch(e) { signOutError = e }
-              if(signOutError){ window.alert('We could not confirm sign-out on all devices — other sessions may still be active. Please check your connection and try again.'); return }
+              if(signOutError){ notify('We could not confirm sign-out on all devices — other sessions may still be active. Please check your connection and try again.'); return }
               window.location.href='/'
             }} title="Log out of every device where you are signed in" style={{fontFamily:'monospace',fontSize:'0.88rem',background:'transparent',border:`1px solid var(--cv-red-45, rgba(192,57,43,0.45))`,borderRadius:4,color:'var(--cv-wa-85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out — all devices</button>
           </div>
@@ -1600,7 +1650,7 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
       && (l.buy_price||[]).every(v=>!v) && (l.sell_price||[]).every(v=>!v) && (l.volume||[]).every(v=>!v)
       && (l.fee_per_engagement||[]).every(v=>!v) && (l.cost_per_engagement||[]).every(v=>!v) && (l.engagements||[]).every(v=>!v)
     const count = config.plan_lines.filter(isEmptyNew).length
-    if (count===0) { alert('No empty “New line” rows to remove in this section.'); return }
+    if (count===0) { notify('No empty “New line” rows to remove in this section.'); return }
     if (typeof window!=='undefined' && !window.confirm(`Remove ${count} empty “New line” row${count===1?'':'s'} from ${unit?.name} — ${selSection}?\n\nAny line you have named or entered figures into is kept.`)) return
     onSave({...config, plan_lines: config.plan_lines.map(l => isEmptyNew(l) ? {...l, active:false} : l)})
   }
@@ -2137,7 +2187,7 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
     // their own still-proposed activity, so deleting an approved one is refused
     // there for anyone who isn't an approver.
     const {error}=await supabase.from('generic_market_events').delete().eq('id',id).eq('client_id',clientId)
-    if(error){alert('Could not delete — '+error.message);return}
+    if(error){notify('Could not delete — '+error.message);return}
     onChanged&&onChanged()
   }
   // "Sent back" is not the end of the road: the proposer can adjust and put the
@@ -2147,8 +2197,8 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
     // Guard on status='rejected' (count:'exact') so a stale click can't overwrite
     // a row that has since moved on — e.g. silently withdrawing an approved cost.
     const {error,count}=await supabase.from('generic_market_events').update({status:'proposed', review_note:null, updated_at:new Date().toISOString()},{count:'exact'}).eq('id',id).eq('status','rejected')
-    if(error){alert('Could not re-propose — '+error.message);return}
-    if(!count){alert('This activity was already changed — refreshing.')}
+    if(error){notify('Could not re-propose — '+error.message);return}
+    if(!count){notify('This activity was already changed — refreshing.')}
     onChanged&&onChanged()
   }
 
@@ -2399,7 +2449,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
       .then(({data,error})=>{
         if (!active) return // a newer selPeriod/client_id change already superseded this request
         if (error) {
-          alert('Could not verify whether this period is closed. Editing is disabled until it can be verified.')
+          notify('Could not verify whether this period is closed. Editing is disabled until it can be verified.')
           return
         }
         setPeriodClose(data)
@@ -2418,8 +2468,8 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
   },[selPeriod,canSeeAll,config.client_id])
 
   async function save(submit=false) {
-    if (!periodCloseVerified) { alert('Close status is still loading. Please try again in a moment.'); return }
-    if (periodClose?.closed) { alert('This period is closed and cannot be edited. Ask your Finance Manager to reopen it first.'); return }
+    if (!periodCloseVerified) { notify('Close status is still loading. Please try again in a moment.'); return }
+    if (periodClose?.closed) { notify('This period is closed and cannot be edited. Ask your Finance Manager to reopen it first.'); return }
     setSaving(true); setSaveMsg(null)
     const {error} = await supabase.from('generic_actuals').upsert({
       client_id:config.client_id, unit_id:selUnit, period:selPeriod,
@@ -2450,8 +2500,8 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
   // (and catalogue quantities) — field-app figures are never affected. Guarded
   // by an explicit confirm; the user pulls the trigger on their own data.
   async function clearMonth() {
-    if (!periodCloseVerified) { alert('Close status is still loading. Please try again in a moment.'); return }
-    if (periodClose?.closed) { alert('This period is closed and cannot be edited. Ask your Finance Manager to reopen it first.'); return }
+    if (!periodCloseVerified) { notify('Close status is still loading. Please try again in a moment.'); return }
+    if (periodClose?.closed) { notify('This period is closed and cannot be edited. Ask your Finance Manager to reopen it first.'); return }
     const unitName = config.business_units.find(u=>u.id===selUnit)?.name || 'this unit'
     const monthLabel = periodMonths.find(m=>m.value===selPeriod)?.label || 'this month'
     if (!confirm(`Clear the figures you typed for ${unitName} in ${monthLabel}?\n\nThis blanks the manually-entered numbers for this month only. Figures coming from Clearview Field are not affected. You can re-enter straight away.`)) return
@@ -2493,7 +2543,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
   const canClose = canClosePeriod(exceptionReport)
 
   async function closePeriod() {
-    if (!periodCloseVerified) { alert('Close status is still loading. Please try again in a moment.'); return }
+    if (!periodCloseVerified) { notify('Close status is still loading. Please try again in a moment.'); return }
     if (!canClose) return
     setClosing(true)
     const {error} = await supabase.from('generic_period_close').upsert({
@@ -2502,18 +2552,18 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
       exception_report: exceptionReport,
     }, {onConflict:'client_id,period'})
     if (!error) { setPeriodClose({ closed: true, closed_at: new Date().toISOString(), closed_by: P.fullName }); onCloseStatusChanged?.() }
-    else alert('Could not close this period. Please try again.')
+    else notify('Could not close this period. Please try again.')
     setClosing(false)
   }
 
   async function reopenPeriod() {
-    if (!periodCloseVerified) { alert('Close status is still loading. Please try again in a moment.'); return }
+    if (!periodCloseVerified) { notify('Close status is still loading. Please try again in a moment.'); return }
     if (!confirm('Reopen this period for editing? This should only be done to correct a genuine mistake.')) return
     setClosing(true)
     const {error} = await supabase.from('generic_period_close')
       .update({ closed: false }).eq('client_id', config.client_id).eq('period', selPeriod)
     if (!error) { setPeriodClose((prev:any) => ({ ...prev, closed: false })); onCloseStatusChanged?.() }
-    else alert('Could not reopen this period. Please try again.')
+    else notify('Could not reopen this period. Please try again.')
     setClosing(false)
   }
 
@@ -2532,7 +2582,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
       if (error) throw error
       setStaleCatalogue(data||[])
     } catch {
-      alert('Could not confirm this cost price. Please try again.')
+      notify('Could not confirm this cost price. Please try again.')
     }
   }
 
@@ -2887,7 +2937,7 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll}) {
       .eq('client_id',config.client_id).in('period',pv)
       .then(({data,error})=>{
         if (!active) return
-        if (error) { alert('Could not verify which months are closed. Editing is disabled until it can be verified.'); return }
+        if (error) { notify('Could not verify which months are closed. Editing is disabled until it can be verified.'); return }
         const s=new Set<string>(); (data||[]).forEach((r:any)=>{ if (r.closed) s.add(r.period) })
         setClosedSet(s); setCloseVerified(true)
       })
@@ -2938,9 +2988,9 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll}) {
   }
 
   async function save() {
-    if (!closeVerified) { alert('Close status is still loading. Please try again in a moment.'); return }
+    if (!closeVerified) { notify('Close status is still loading. Please try again in a moment.'); return }
     const toWrite=[...dirty].filter(p=>!closedSet.has(p))
-    if (toWrite.length===0) { alert('No changes to save.'); return }
+    if (toWrite.length===0) { notify('No changes to save.'); return }
     setSaving(true)
     const now=new Date().toISOString()
     const rows=toWrite.map(period=>{
@@ -2966,7 +3016,7 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll}) {
     const {error}=await supabase.from('generic_actuals').upsert(rows,{onConflict:'client_id,unit_id,period'})
     if (!error) {
       const nl={...loadedManual}; rows.forEach(r=>{ nl[r.period]=r.line_values }); setLoadedManual(nl); setDirty(new Set())
-    } else alert('Could not save. Please try again.')
+    } else notify('Could not save. Please try again.')
     setSaving(false)
   }
 
@@ -3194,18 +3244,18 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
       status:'approved', approved_by:P.fullName, approved_at:new Date().toISOString(),
       review_note:null, updated_at:new Date().toISOString(),
     },{count:'exact'}).eq('id',id).eq('status','proposed')
-    if (error) { alert('Could not approve — '+error.message); return }
-    if (!count) alert('This activity was just changed or handled by someone else — refreshing.')
+    if (error) { notify('Could not approve — '+error.message); return }
+    if (!count) notify('This activity was just changed or handled by someone else — refreshing.')
     onMarketEventsChanged&&onMarketEventsChanged()
   }
   async function sendBackEvent(id:string){
     const note=(eventNotes[id]||'').trim()
-    if(!note){ alert('Please add a short note so they know what to change.'); return }
+    if(!note){ notify('Please add a short note so they know what to change.'); return }
     const {error,count} = await supabase.from('generic_market_events').update({
       status:'rejected', review_note:note, updated_at:new Date().toISOString(),
     },{count:'exact'}).eq('id',id).eq('status','proposed')
-    if (error) { alert('Could not send back — '+error.message); return }
-    if (!count) alert('This activity was just changed or handled by someone else — refreshing.')
+    if (error) { notify('Could not send back — '+error.message); return }
+    if (!count) notify('This activity was just changed or handled by someone else — refreshing.')
     onMarketEventsChanged&&onMarketEventsChanged()
   }
 
@@ -3235,26 +3285,35 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
   // has changed them — so a perfectly good update returns zero rows and looks
   // like a conflict. count:'exact' reports how many rows the guard actually
   // updated: >0 = done, 0 = a genuine concurrent change.
+  // Both actions ALWAYS reconcile the on-screen queue against the database
+  // after the write (refreshPendingActuals), instead of trusting an optimistic
+  // filter or the returned count. So whatever the outcome — the row was
+  // approved/sent-back (it drops out), the write was blocked (it stays, with a
+  // clear reason), or a concurrent change happened — the list on screen always
+  // matches the database truth. Any real DB error (e.g. a closed-period trigger
+  // rejection) is surfaced verbatim rather than swallowed.
   async function approveActual(id:string) {
     const {error,count} = await supabase.from('generic_actuals').update({
       approved:true, approved_at:new Date().toISOString(), approved_by:P.fullName,
       review_note:null, updated_at:new Date().toISOString(),
     },{count:'exact'}).eq('id',id).eq('submitted',true).eq('approved',false)
-    if (error) { alert('Could not approve — '+error.message); return }
-    if (!count) { alert('These figures were just changed or handled by someone else — refreshing the list.'); refreshPendingActuals(); onApprovalActioned&&onApprovalActioned(); return }
-    setPendingActuals(a=>a.filter(x=>x.id!==id))
+    if (error) { notify('Could not approve — '+error.message, 'error'); return }
+    if (count === 0) notify('These figures were just changed or handled by someone else.', 'info')
+    else notify('Approved ✓', 'success')
+    await refreshPendingActuals()
     onApprovalActioned&&onApprovalActioned()
   }
 
   async function sendBackActual(id:string) {
     const note = (actualNotes[id]||'').trim()
-    if (!note) { alert('Please add a short note so they know what to correct.'); return }
+    if (!note) { notify('Please add a short note so they know what to correct.'); return }
     const {error,count} = await supabase.from('generic_actuals').update({
       submitted:false, approved:false, review_note:note, updated_at:new Date().toISOString(),
     },{count:'exact'}).eq('id',id).eq('submitted',true).eq('approved',false)
-    if (error) { alert('Could not send back — '+error.message); return }
-    if (!count) { alert('These figures were just changed or handled by someone else — refreshing the list.'); refreshPendingActuals(); onApprovalActioned&&onApprovalActioned(); return }
-    setPendingActuals(a=>a.filter(x=>x.id!==id))
+    if (error) { notify('Could not send back — '+error.message, 'error'); return }
+    if (count === 0) notify('These figures were just changed or handled by someone else.', 'info')
+    else { notify('Sent back for correction ✓', 'success'); setActualNotes(n=>{const m={...n};delete m[id];return m}) }
+    await refreshPendingActuals()
     onApprovalActioned&&onApprovalActioned()
   }
 
@@ -3339,9 +3398,19 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
                   </div>
                 </div>
                 <textarea style={{...inp,minHeight:50,resize:'vertical',margin:'0.75rem 0 0.5rem'}} placeholder="If sending back, add a note on what to correct" value={actualNotes[a.id]||''} onChange={e=>setActualNotes(n=>({...n,[a.id]:e.target.value}))}/>
-                <div style={{display:'flex',gap:'0.5rem'}}>
+                <div style={{display:'flex',gap:'0.5rem',alignItems:'center',flexWrap:'wrap'}}>
                   <button style={solidBtn(C.green,true)} onClick={()=>approveActual(a.id)}>Approve</button>
-                  <button style={solidBtn(C.amber,true)} onClick={()=>sendBackActual(a.id)}>Send back</button>
+                  {(() => {
+                    const hasNote = !!(actualNotes[a.id]||'').trim()
+                    return (
+                      <button
+                        style={{...solidBtn(C.amber,true),opacity:hasNote?1:0.5,cursor:hasNote?'pointer':'not-allowed'}}
+                        disabled={!hasNote}
+                        title={hasNote?'Send these figures back for correction':'Add a note above first, so they know what to correct'}
+                        onClick={()=>sendBackActual(a.id)}>Send back</button>
+                    )
+                  })()}
+                  {!(actualNotes[a.id]||'').trim() && <span style={{fontSize:'0.85rem',color:C.slate}}>Add a note above to send back</span>}
                 </div>
               </div>
             )
@@ -3396,9 +3465,19 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
                   <div><div style={{fontSize:'0.8rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.08em'}}>Cost</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.red}}>{fmt(e.cost,cc)}</div></div>
                 </div>
                 <textarea style={{...inp,minHeight:50,resize:'vertical',margin:'0.75rem 0 0.5rem'}} placeholder="If sending back, add a note on what to change" value={eventNotes[e.id]||''} onChange={ev=>setEventNotes(n=>({...n,[e.id]:ev.target.value}))}/>
-                <div style={{display:'flex',gap:'0.5rem'}}>
+                <div style={{display:'flex',gap:'0.5rem',alignItems:'center',flexWrap:'wrap'}}>
                   <button style={solidBtn(C.green,true)} onClick={()=>approveEvent(e.id)}>Approve</button>
-                  <button style={solidBtn(C.amber,true)} onClick={()=>sendBackEvent(e.id)}>Send back</button>
+                  {(() => {
+                    const hasNote = !!(eventNotes[e.id]||'').trim()
+                    return (
+                      <button
+                        style={{...solidBtn(C.amber,true),opacity:hasNote?1:0.5,cursor:hasNote?'pointer':'not-allowed'}}
+                        disabled={!hasNote}
+                        title={hasNote?'Send this activity back for changes':'Add a note above first, so they know what to change'}
+                        onClick={()=>sendBackEvent(e.id)}>Send back</button>
+                    )
+                  })()}
+                  {!(eventNotes[e.id]||'').trim() && <span style={{fontSize:'0.85rem',color:C.slate}}>Add a note above to send back</span>}
                 </div>
               </div>
             )
@@ -3426,10 +3505,10 @@ function TeamTab({clientId,config,P}) {
   },[clientId])
 
   async function invite() {
-    if (!inviteForm.email||!inviteForm.full_name) { alert('Enter a full name and email first.'); return }
+    if (!inviteForm.email||!inviteForm.full_name) { notify('Enter a full name and email first.'); return }
     // A Unit Head / Accounts Assistant with no unit would see nothing — require one.
     if (['unit_head','accounts_assistant'].includes(inviteForm.role) && inviteForm.unit_ids.length===0) {
-      alert('Select at least one unit for a Unit Head or Accounts Assistant.'); return
+      notify('Select at least one unit for a Unit Head or Accounts Assistant.'); return
     }
     setSaving(true)
     // Go through /api/invite-user (server, service-role): it creates the real
@@ -3458,12 +3537,12 @@ function TeamTab({clientId,config,P}) {
           .select('id,role,full_name,email,assigned_unit_ids,status,can_manage_catalogue')
           .eq('engagement_client_id', clientId)
         if (!refreshErr) setMembers(rows||[])
-        alert(data.message || `Invitation sent to ${inviteForm.email.trim()}. They'll get an email to set their password.`)
+        notify(data.message || `Invitation sent to ${inviteForm.email.trim()}. They'll get an email to set their password.`)
       } else {
-        alert(data.error || 'Could not invite this person. Please try again.')
+        notify(data.error || 'Could not invite this person. Please try again.')
       }
     } catch(e:any) {
-      alert('Could not invite this person — ' + (e?.message || 'network error. Please check your connection and try again.'))
+      notify('Could not invite this person — ' + (e?.message || 'network error. Please check your connection and try again.'))
     } finally {
       setSaving(false)
     }
@@ -3536,7 +3615,7 @@ function TeamTab({clientId,config,P}) {
                       if (error) throw error
                     } catch(err) {
                       setMembers(ms=>ms.map(x=>x.id!==m.id?x:{...x,can_manage_catalogue:!next}))
-                      alert('Could not save that permission change. Please check your connection and try again.')
+                      notify('Could not save that permission change. Please check your connection and try again.')
                     }
                   }}/>
                 Can manage Field Catalogue (prices & products)
@@ -3587,7 +3666,7 @@ function FieldOperatorManager({clientId,config,P}) {
       setForm({display_name:'',phone:'',business_unit_id:'',sync_frequency:'end_of_day',expires_in_days:''})
       setShowAdd(false)
       await load()
-    } catch { alert('Could not create operator. Please try again.') }
+    } catch { notify('Could not create operator. Please try again.') }
     setSaving(false)
   }
 
@@ -3733,7 +3812,7 @@ function CatalogueManager({clientId,config,P}) {
 
   async function addItem() {
     if (!form.name || !form.business_unit_id || !form.plan_line_id || form.price==='') return
-    if (form.cost_price!=='' && !form.cogs_plan_line_id) { alert('Select a COGS category to go with the cost price.'); return }
+    if (form.cost_price!=='' && !form.cogs_plan_line_id) { notify('Select a COGS category to go with the cost price.'); return }
     setSaving(true)
     try {
       await authedFetch('/api/field/admin/catalogue', {
@@ -3749,7 +3828,7 @@ function CatalogueManager({clientId,config,P}) {
       setForm({name:'',item_type:'product',price:'',unit_label:'',business_unit_id:'',plan_line_id:'',cost_price:'',cogs_plan_line_id:''})
       setShowAdd(false)
       await load()
-    } catch { alert('Could not save this catalogue item. Please try again.') }
+    } catch { notify('Could not save this catalogue item. Please try again.') }
     setSaving(false)
   }
 
@@ -3769,8 +3848,8 @@ function CatalogueManager({clientId,config,P}) {
   }
 
   async function saveFullEdit(id:string) {
-    if (!editFull.name.trim()) { alert('Item name is required.'); return }
-    if (!editFull.business_unit_id || !editFull.plan_line_id) { alert('Business unit and category are required.'); return }
+    if (!editFull.name.trim()) { notify('Item name is required.'); return }
+    if (!editFull.business_unit_id || !editFull.plan_line_id) { notify('Business unit and category are required.'); return }
     setSavingFull(true)
     try {
       const res = await authedFetch('/api/field/admin/catalogue', {
@@ -3783,18 +3862,18 @@ function CatalogueManager({clientId,config,P}) {
       })
       if (!res.ok) {
         const data = await res.json().catch(()=>({}))
-        alert(data.error || 'Could not save these changes. Please try again.')
+        notify(data.error || 'Could not save these changes. Please try again.')
         return
       }
       setEditingFullId(null)
       await load()
-    } catch { alert('Could not save these changes. Please try again.') }
+    } catch { notify('Could not save these changes. Please try again.') }
     finally { setSavingFull(false) }
   }
 
   async function saveCostPrice(id:string) {
-    if (editCostPrice!=='' && Number(editCostPrice)<0) { alert('Cost price cannot be negative.'); return }
-    if (editCostPrice!=='' && !editCostLine) { alert('Select a COGS category to go with the cost price.'); return }
+    if (editCostPrice!=='' && Number(editCostPrice)<0) { notify('Cost price cannot be negative.'); return }
+    if (editCostPrice!=='' && !editCostLine) { notify('Select a COGS category to go with the cost price.'); return }
     try {
       const res = await authedFetch('/api/field/admin/catalogue', {
         method:'PATCH', headers:{'Content-Type':'application/json'},
@@ -3806,12 +3885,12 @@ function CatalogueManager({clientId,config,P}) {
       })
       if (!res.ok) {
         const data = await res.json().catch(()=>({}))
-        alert(data.error || 'Could not save the cost price. Please try again.')
+        notify(data.error || 'Could not save the cost price. Please try again.')
         return
       }
       setEditingCostId(null)
       await load()
-    } catch { alert('Could not save the cost price. Please try again.') }
+    } catch { notify('Could not save the cost price. Please try again.') }
   }
 
   async function toggleActive(id:string, active:boolean) {
@@ -4008,7 +4087,7 @@ function ExtendHorizonControl({form,setForm}:{form:GenericModelConfig;setForm:(n
     try {
       next = extendPlanningHorizon(form, addMonths)
     } catch (e: any) {
-      alert(e?.message || 'Could not extend the planning horizon -- some of this client\'s data may be inconsistent. Please contact support.')
+      notify(e?.message || 'Could not extend the planning horizon -- some of this client\'s data may be inconsistent. Please contact support.')
       return
     }
     setForm(next)
@@ -4070,7 +4149,7 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
       const res = await authedFetch(`/api/field/admin/operators?client_id=${encodeURIComponent(clientId)}`)
       const data = await res.json()
       if (res.ok) setOperators(data.operators||[])
-      else alert(data.error || 'Could not load field operators.')
+      else notify(data.error || 'Could not load field operators.')
     } catch { /* leave operators as-is; the list below shows empty rather than a broken page */ }
     setLoading(false)
   }
@@ -4083,7 +4162,7 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
   }
 
   async function createOperator() {
-    if (!form.display_name || !form.business_unit_id) { alert('Name and business unit are required.'); return }
+    if (!form.display_name || !form.business_unit_id) { notify('Name and business unit are required.'); return }
     setCreating(true)
     try {
       const res = await authedFetch('/api/field/admin/operators', {
@@ -4091,7 +4170,7 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
         body: JSON.stringify({client_id: clientId, ...form}),
       })
       const data = await res.json()
-      if (!res.ok) { alert(data.error || 'Could not create operator.'); setCreating(false); return }
+      if (!res.ok) { notify(data.error || 'Could not create operator.'); setCreating(false); return }
       setForm({display_name:'', phone:'', business_unit_id:'', sync_frequency:'realtime'})
       setShowForm(false)
       await load()
@@ -4101,10 +4180,10 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
       // create operator", which would wrongly invite a duplicate retry.
       if (data.token?.token) {
         try { await buildShareLink(form.display_name, data.token.token) }
-        catch { alert('Operator created, but the share link/QR code could not be generated. Use "New Link" to retry.') }
+        catch { notify('Operator created, but the share link/QR code could not be generated. Use "New Link" to retry.') }
       }
     } catch {
-      alert('No connection -- could not create operator. Please try again.')
+      notify('No connection -- could not create operator. Please try again.')
     }
     setCreating(false)
   }
@@ -4117,9 +4196,9 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
         body: JSON.stringify({operator_id: operatorId, active}),
       })
       if (res.ok) await load()
-      else { const d = await res.json(); alert(d.error || 'Could not update operator.') }
+      else { const d = await res.json(); notify(d.error || 'Could not update operator.') }
     } catch {
-      alert('No connection -- could not update operator. Please try again.')
+      notify('No connection -- could not update operator. Please try again.')
     }
     setBusyId(null)
   }
@@ -4135,11 +4214,11 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
       if (res.ok && data.token?.token) {
         await load()
         try { await buildShareLink(operatorName, data.token.token) }
-        catch { alert('New token issued, but the share link/QR code could not be generated. Use "New Link" again to retry.') }
+        catch { notify('New token issued, but the share link/QR code could not be generated. Use "New Link" again to retry.') }
       }
-      else alert(data.error || 'Could not issue a new token.')
+      else notify(data.error || 'Could not issue a new token.')
     } catch {
-      alert('No connection -- could not issue a new token. Please try again.')
+      notify('No connection -- could not issue a new token. Please try again.')
     }
     setBusyId(null)
   }
@@ -4289,16 +4368,16 @@ function StockAndTransfersSection({clientId,businessUnits}:{clientId:string;busi
         body: JSON.stringify({ stock_level_id: levelId, reorder_threshold: thresholdValue===''?null:Number(thresholdValue) }),
       })
       if (res.ok) { setEditingThresholdId(null); await load() }
-      else { const d = await res.json(); alert(d.error || 'Could not update the reorder threshold.') }
+      else { const d = await res.json(); notify(d.error || 'Could not update the reorder threshold.') }
     } catch {
-      alert('No connection -- could not update the reorder threshold. Please try again.')
+      notify('No connection -- could not update the reorder threshold. Please try again.')
     }
   }
 
   async function submitTransfer() {
     const f = transferForm
     if (!f.from_business_unit_id || !f.from_catalogue_item_id || !f.to_business_unit_id || !f.to_catalogue_item_id || !f.quantity) {
-      alert('Every field is required for a transfer.'); return
+      notify('Every field is required for a transfer.'); return
     }
     setTransferring(true)
     try {
@@ -4312,10 +4391,10 @@ function StockAndTransfersSection({clientId,businessUnits}:{clientId:string;busi
         setTransferForm({from_business_unit_id:'',from_catalogue_item_id:'',to_business_unit_id:'',to_catalogue_item_id:'',quantity:'',notes:''})
         await load()
       } else {
-        alert(data.error || 'Could not record the transfer.')
+        notify(data.error || 'Could not record the transfer.')
       }
     } catch {
-      alert('No connection -- could not record the transfer. Please try again.')
+      notify('No connection -- could not record the transfer. Please try again.')
     }
     setTransferring(false)
   }
@@ -4563,20 +4642,20 @@ function SettingsTab({config,P,onSave,theme,setThemeMode}) {
               </div>
             ))}
             <div><label style={lbl}>Annual Interest Rate (%)</label>
-              <input type="number" style={inp} value={Math.round(((form.settings.capital_structure?.annual_interest_rate||0.18)*100))}
+              <input type="number" min={0} style={inp} value={Math.round(((form.settings.capital_structure?.annual_interest_rate??0.18)*100))}
                 onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),annual_interest_rate:Number(e.target.value)/100}}}))}/>
             </div>
             <div><label style={lbl}>Loan Tenor (years)</label>
-              <input type="number" min={1} style={inp} value={form.settings.capital_structure?.loan_tenor_years||2}
+              <input type="number" min={1} style={inp} value={form.settings.capital_structure?.loan_tenor_years??2}
                 onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),loan_tenor_years:Number(e.target.value)}}}))}/>
             </div>
             <div><label style={lbl}>Loan Grace Period (months)</label>
-              <input type="number" min={0} style={inp} value={form.settings.capital_structure?.grace_period_months||0}
+              <input type="number" min={0} style={inp} value={form.settings.capital_structure?.grace_period_months??0}
                 onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),grace_period_months:Number(e.target.value)}}}))}/>
               <div style={hint}>Months before the bank loan's first repayment falls due.</div>
             </div>
             <div><label style={lbl}>Fixed Asset Useful Life (years)</label>
-              <input type="number" min={1} style={inp} value={form.settings.capital_structure?.fixed_asset_useful_life_years||5}
+              <input type="number" min={1} style={inp} value={form.settings.capital_structure?.fixed_asset_useful_life_years??5}
                 onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),fixed_asset_useful_life_years:Number(e.target.value)}}}))}/>
               <div style={hint}>Depreciated straight-line over this many years -- affects EBIT, tax, and the Fixed Assets balance shown on the Balance Sheet.</div>
             </div>
@@ -4587,11 +4666,11 @@ function SettingsTab({config,P,onSave,theme,setThemeMode}) {
               <p style={{fontSize:'0.92rem',color:C.slate,marginBottom:'0.7rem'}}>A recoverable grant is real debt -- principal owed back to the donor -- so it gets its own repayment schedule, just like the bank loan. Treated as interest-free by default (the conventional term for a donor-recoverable grant).</p>
               <div style={fGrid}>
                 <div><label style={lbl}>Repayment Term (years)</label>
-                  <input type="number" min={1} style={inp} value={form.settings.capital_structure?.grant_recoverable_tenor_years||3}
+                  <input type="number" min={1} style={inp} value={form.settings.capital_structure?.grant_recoverable_tenor_years??3}
                     onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),grant_recoverable_tenor_years:Number(e.target.value)}}}))}/>
                 </div>
                 <div><label style={lbl}>Grace Period (months)</label>
-                  <input type="number" min={0} style={inp} value={form.settings.capital_structure?.grant_recoverable_grace_period_months||0}
+                  <input type="number" min={0} style={inp} value={form.settings.capital_structure?.grant_recoverable_grace_period_months??0}
                     onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),grant_recoverable_grace_period_months:Number(e.target.value)}}}))}/>
                 </div>
               </div>
@@ -5096,7 +5175,7 @@ Write a short health check for the CEO in plain continuous prose. Begin with the
         triggered_by:'manual', generated_at:new Date().toISOString(), visible_to_ceo:true,
       },{onConflict:'client_id,period'}).select().single()
       if (saved) setHealthReports([saved])
-    } catch(e) { alert('Health check generation failed') }
+    } catch(e) { notify('Health check generation failed') }
     setGeneratingHealth(false)
   }
 
@@ -5129,7 +5208,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
       if (saved) {
         setNarrative(prev => { if (prev) setPreviousStories(list => [prev, ...list]); return saved })
       }
-    } catch(e) { alert('Narrative generation failed') }
+    } catch(e) { notify('Narrative generation failed') }
     setGeneratingNarrative(false)
   }
 
@@ -6756,7 +6835,7 @@ function UncategorizedCostsSection({config,P}:{config:GenericModelConfig;P:any})
   const costLinesForUnit = (unitId: string) => config.plan_lines.filter(l=>l.unit_id===unitId&&l.active&&(l.category==='direct_opex'||l.category==='cost_of_sales'))
 
   async function categorize(cost: any) {
-    if (!chosenLineId) { alert('Select a plan line first.'); return }
+    if (!chosenLineId) { notify('Select a plan line first.'); return }
     const line = config.plan_lines.find(l=>l.id===chosenLineId)
     if (!line) return
     setSaving(true)
@@ -6767,9 +6846,9 @@ function UncategorizedCostsSection({config,P}:{config:GenericModelConfig;P:any})
       })
       const data = await res.json()
       if (res.ok) { setCategorizingId(null); setChosenLineId(''); await load() }
-      else alert(data.error || 'Could not categorize this cost.')
+      else notify(data.error || 'Could not categorize this cost.')
     } catch {
-      alert('No connection -- could not categorize this cost. Please try again.')
+      notify('No connection -- could not categorize this cost. Please try again.')
     }
     setSaving(false)
   }
@@ -7256,7 +7335,7 @@ function YearCloseControls({config,result,closedPeriods,P,onCloseStatusChanged}:
     const yc = yearCloses[key]
     if (yc?.closed) return
     if (!canCloseCalendarYear(group, closedPeriods||new Set(), periodForMonthIndex, config.start_date)) {
-      alert('Every month in this year must be individually closed first (Actuals & Working Capital tab).')
+      notify('Every month in this year must be individually closed first (Actuals & Working Capital tab).')
       return
     }
     setClosing(key)
@@ -7268,12 +7347,12 @@ function YearCloseControls({config,result,closedPeriods,P,onCloseStatusChanged}:
         client_id: config.client_id, year_start_period: key, closed: true,
         closed_at: closedAt, closed_by: P.fullName, closing_snapshot: snapshot,
       }, { onConflict: 'client_id,year_start_period' })
-      if (error) { alert('Could not close this year. Please try again.'); return }
+      if (error) { notify('Could not close this year. Please try again.'); return }
       setYearCloses(prev => ({...prev, [key]: { closed:true, closed_at:closedAt, closed_by:P.fullName, closing_snapshot:snapshot }}))
       onCloseStatusChanged?.()
     } catch (e) {
       console.error('Could not close this year:', e)
-      alert('Could not close this year. Please try again.')
+      notify('Could not close this year. Please try again.')
     } finally {
       setClosing(null)
     }

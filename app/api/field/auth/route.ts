@@ -44,9 +44,16 @@ export async function POST(req: NextRequest) {
     // Cost/expense lines: still sourced directly from the plan, unchanged --
     // pricing the cost side of the catalogue is a separate, later piece of
     // work, not part of this change.
+    // Only offer cost lines the field sync will actually accept: this unit's own
+    // active Cost-of-Sales and Overhead (direct_opex) lines. Previously this
+    // offered EVERY non-revenue line (including Staff), but sync only accepts
+    // cost_of_sales/direct_opex — so a Staff line could be selected and then
+    // rejected on sync ("does not belong to this business unit"). Keeping the two
+    // lists in lock-step means the operator is never shown a line that can't save.
     const planLines: any[] = config.plan_lines || []
     const costLines = planLines
-      .filter((l: any) => l.unit_id === operator.business_unit_id && l.active && l.category !== 'revenue')
+      .filter((l: any) => l.unit_id === operator.business_unit_id && l.active
+        && (l.category === 'cost_of_sales' || l.category === 'direct_opex'))
       .map((l: any) => ({ id: l.id, name: l.name, category: l.category }))
 
     const { data: customers } = await supabase
