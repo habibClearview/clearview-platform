@@ -4652,20 +4652,20 @@ function SettingsTab({config,P,onSave,theme,setThemeMode}) {
               </div>
             ))}
             <div><label style={lbl}>Annual Interest Rate (%)</label>
-              <input type="number" style={inp} value={Math.round(((form.settings.capital_structure?.annual_interest_rate||0.18)*100))}
+              <input type="number" min={0} style={inp} value={Math.round(((form.settings.capital_structure?.annual_interest_rate??0.18)*100))}
                 onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),annual_interest_rate:Number(e.target.value)/100}}}))}/>
             </div>
             <div><label style={lbl}>Loan Tenor (years)</label>
-              <input type="number" min={1} style={inp} value={form.settings.capital_structure?.loan_tenor_years||2}
+              <input type="number" min={0} style={inp} value={form.settings.capital_structure?.loan_tenor_years??2}
                 onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),loan_tenor_years:Number(e.target.value)}}}))}/>
             </div>
             <div><label style={lbl}>Loan Grace Period (months)</label>
-              <input type="number" min={0} style={inp} value={form.settings.capital_structure?.grace_period_months||0}
+              <input type="number" min={0} style={inp} value={form.settings.capital_structure?.grace_period_months??0}
                 onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),grace_period_months:Number(e.target.value)}}}))}/>
               <div style={hint}>Months before the bank loan's first repayment falls due.</div>
             </div>
             <div><label style={lbl}>Fixed Asset Useful Life (years)</label>
-              <input type="number" min={1} style={inp} value={form.settings.capital_structure?.fixed_asset_useful_life_years||5}
+              <input type="number" min={0} style={inp} value={form.settings.capital_structure?.fixed_asset_useful_life_years??5}
                 onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),fixed_asset_useful_life_years:Number(e.target.value)}}}))}/>
               <div style={hint}>Depreciated straight-line over this many years -- affects EBIT, tax, and the Fixed Assets balance shown on the Balance Sheet.</div>
             </div>
@@ -4676,11 +4676,11 @@ function SettingsTab({config,P,onSave,theme,setThemeMode}) {
               <p style={{fontSize:'0.92rem',color:C.slate,marginBottom:'0.7rem'}}>A recoverable grant is real debt -- principal owed back to the donor -- so it gets its own repayment schedule, just like the bank loan. Treated as interest-free by default (the conventional term for a donor-recoverable grant).</p>
               <div style={fGrid}>
                 <div><label style={lbl}>Repayment Term (years)</label>
-                  <input type="number" min={1} style={inp} value={form.settings.capital_structure?.grant_recoverable_tenor_years||3}
+                  <input type="number" min={0} style={inp} value={form.settings.capital_structure?.grant_recoverable_tenor_years??3}
                     onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),grant_recoverable_tenor_years:Number(e.target.value)}}}))}/>
                 </div>
                 <div><label style={lbl}>Grace Period (months)</label>
-                  <input type="number" min={0} style={inp} value={form.settings.capital_structure?.grant_recoverable_grace_period_months||0}
+                  <input type="number" min={0} style={inp} value={form.settings.capital_structure?.grant_recoverable_grace_period_months??0}
                     onChange={e=>setForm(f=>({...f,settings:{...f.settings,capital_structure:{...(f.settings.capital_structure||{}),grant_recoverable_grace_period_months:Number(e.target.value)}}}))}/>
                 </div>
               </div>

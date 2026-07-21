@@ -376,8 +376,12 @@ export function clearedBusinessFigures(config: GenericModelConfig): GenericModel
       debts: [],
       drivers: [],
       channels: [],
-      // Zero the capital AMOUNTS but keep the rate/tenor/useful-life settings —
-      // they are harmless with no principal and save re-entry of preferences.
+      // Zero EVERY capital field — amounts AND the rate/tenor/useful-life terms.
+      // Leaving 18% / 2yr / 5yr behind after a reset confuses clients (they read
+      // as live settings when the whole business has supposedly been cleared), so
+      // a true "clear all" leaves them at zero too. Safe: with no principal the
+      // engine never applies interest/repayment, and buildDepreciationSchedule
+      // treats a zero useful-life as "no depreciation" (guarded), never a divide.
       capital_structure: cap ? {
         ...cap,
         shareholder_contribution: 0,
@@ -385,6 +389,12 @@ export function clearedBusinessFigures(config: GenericModelConfig): GenericModel
         grant_recoverable: 0,
         bank_loan: 0,
         fixed_assets: 0,
+        annual_interest_rate: 0,
+        loan_tenor_years: 0,
+        grace_period_months: 0,
+        fixed_asset_useful_life_years: 0,
+        grant_recoverable_tenor_years: 0,
+        grant_recoverable_grace_period_months: 0,
       } : cap,
     },
   }

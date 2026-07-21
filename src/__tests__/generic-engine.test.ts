@@ -1422,10 +1422,17 @@ describe('Generic Engine — clearedBusinessFigures (in-app "clear all figures")
     expect(cleared.planning_months).toBe(src.planning_months)
     expect(cleared.settings.corporate_tax_rate).toBe(0.30)
     expect(cleared.settings.shared_cost_fixed_pct).toBe(0.5)
-    // rate/tenor/useful-life kept (harmless with zero principal)
-    expect(cleared.settings.capital_structure?.annual_interest_rate).toBe(0.18)
-    expect(cleared.settings.capital_structure?.loan_tenor_years).toBe(3)
-    expect(cleared.settings.capital_structure?.fixed_asset_useful_life_years).toBe(5)
+  })
+
+  it('zeroes the rate/tenor/useful-life terms too (so nothing lingers to confuse clients)', () => {
+    const cleared = clearedBusinessFigures(makeFullyLoadedConfig())
+    expect(cleared.settings.capital_structure?.annual_interest_rate).toBe(0)
+    expect(cleared.settings.capital_structure?.loan_tenor_years).toBe(0)
+    expect(cleared.settings.capital_structure?.grace_period_months).toBe(0)
+    expect(cleared.settings.capital_structure?.fixed_asset_useful_life_years).toBe(0)
+    // A zero useful-life must not break the engine (guarded → no depreciation).
+    const result = runGenericModel(cleared)
+    expectBalanceSheetBalances(result)
   })
 
   it('does not mutate the input config', () => {
