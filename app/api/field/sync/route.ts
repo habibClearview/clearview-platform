@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { friendlyDbError } from '@/lib/field-errors'
 import { buildAutoCogsRow } from '@/lib/field-cogs'
-import { isPlanLineValidForUnit, isValidCostCategory } from '@/lib/catalogue-validation'
+import { isValidCostCategory } from '@/lib/catalogue-validation'
 import { getFieldSupabase as getSupabase, validateFieldToken as validateToken } from '@/lib/field-auth'
 import { applyStockMovement } from '@/lib/field-stock'
 
@@ -164,13 +164,21 @@ export async function POST(req: NextRequest) {
         if (!t.plan_line_id) { errors.push('Cost entry missing plan_line_id'); return false }
         if (t.amount === undefined || t.amount === null) { errors.push('Cost entry missing amount'); return false }
         if (!t.transaction_type) { errors.push('Cost entry missing transaction_type'); return false }
-        if (!t.category) { errors.push('Cost entry missing category'); return false }
-        if (!isValidCostCategory(t.category)) {
-          errors.push('Cost entry has an invalid category'); return false
-        }
-        if (!isPlanLineValidForUnit(planLines, t.plan_line_id, operator.business_unit_id, t.category)) {
+        // The field app offers EVERY non-revenue cost line and sends a
+        // hard-coded category ('direct_opex') on every one, so a Cost-of-Sales
+        // line (or a Staff line) was being rejected against that wrong category
+        // and mis-reported as "does not belong to this business unit". Trust the
+        // plan line itself: find it, confirm it is this unit's own active
+        // non-revenue line, and adopt ITS real category for both validation and
+        // storage so the amount is filed under the correct heading.
+        const line = (planLines || []).find((l: any) => l.id === t.plan_line_id)
+        if (!line || !line.active || line.unit_id !== operator.business_unit_id) {
           errors.push(`Cost line "${t.plan_line_name || t.plan_line_id}" does not belong to this business unit`); return false
         }
+        if (!isValidCostCategory(line.category)) {
+          errors.push(`Cost line "${t.plan_line_name || t.plan_line_id}" is not a spending category`); return false
+        }
+        t.category = line.category  // use the line's TRUE category, not the hard-coded one
         return true
       })
       for (const t of validCostEntries) {
