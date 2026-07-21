@@ -8,7 +8,7 @@ import ActiveSessionsButton from '@/components/auth/ActiveSessionsButton'
 import { authedFetch } from '@/lib/authed-fetch'
 import {
   fmt, fmtFull, pct, buildMonthLabels, buildYearGroups, collapseYear, defaultExpandedYears, extendPlanningHorizon, type YearAggregation, type YearGroup,
-  runGenericModel, defaultGenericConfig, clearedBusinessFigures,
+  runGenericModel, defaultGenericConfig,
   blankLine, spreadLine, serviceFeeLine,
   type GenericModelConfig, type GenericBusinessUnit,
   type GenericPlanLine, type LineCategory, type LineType, type UnitType,
@@ -4516,42 +4516,25 @@ function SettingsTab({config,P,onSave,theme,setThemeMode}) {
     setSaving(false)
   }
 
-  // Wipe every figure:
-  //  1. Config-resident figures (plan lines, opening cash, capital, working
-  //     capital, drivers) via clearedBusinessFigures + onSave.
-  //  2. The posted monthly figures in generic_actuals — INCLUDING the Clearview
-  //     Field entries (field_line_values). The per-month "Clear this month"
-  //     button deliberately leaves field_line_values in place, which is exactly
-  //     why costs (negative EBITDA with zero revenue) survive every clear. Here
-  //     we blank EVERY value store on each row — line_values, catalogue_quantities
-  //     AND field_line_values — using the same upsert write path the app already
-  //     uses (so it can't be blocked the way a raw DELETE could), leaving a truly
-  //     empty row.
-  //  3. Market events (delete — the same path deleteMarketEvent already uses).
-  // We surface the first real failure rather than pretending it worked.
+  // The wipe itself runs SERVER-SIDE at /api/clear-figures, which authenticates
+  // the caller, re-checks their role and client scope, and clears the config
+  // figures, every generic_actuals row (including Clearview Field values) and
+  // all market events in bulk. We never issue the destructive writes from the
+  // browser — a UI-only role gate could be bypassed from dev tools. On success
+  // we reload so the whole dashboard reflects the cleared state from the DB.
   async function runClearAllFigures() {
     setClearing(true); setClearError(null)
     try {
-      const cleared = clearedBusinessFigures(config)
-      setForm({...cleared})            // reflect the wipe in the Settings inputs at once
-      await onSave(cleared)            // persist the cleared config
-
-      // Find every monthly-figures row for this business, then blank each one.
-      const { data: rows, error: readErr } = await supabase
-        .from('generic_actuals').select('unit_id,period').eq('client_id', config.client_id)
-      if (readErr) throw new Error('Reading posted figures: ' + readErr.message)
-      for (const r of (rows || [])) {
-        const { error: upErr } = await supabase.from('generic_actuals').upsert({
-          client_id: config.client_id, unit_id: r.unit_id, period: r.period,
-          line_values: {}, catalogue_quantities: {}, field_line_values: {},
-          submitted: false, approved: false, approved_at: null, approved_by: null,
-          review_note: null, updated_at: new Date().toISOString(),
-        }, { onConflict: 'client_id,unit_id,period' })
-        if (upErr) throw new Error('Clearing posted figures: ' + upErr.message)
+      const res = await authedFetch('/api/clear-figures', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId: config.client_id }),
+      })
+      if (!res.ok) {
+        let msg = 'Could not clear figures. Please try again.'
+        try { const j = await res.json(); if (j?.error) msg = j.error } catch { /* keep default */ }
+        throw new Error(msg)
       }
-
-      const del = await supabase.from('generic_market_events').delete().eq('client_id', config.client_id)
-      if (del.error) throw new Error('Market events: ' + del.error.message)
       setClearDone(true)
     } catch (e:any) {
       setClearError(e?.message || 'Could not finish clearing. Some figures may remain.')
@@ -4826,7 +4809,7 @@ function SettingsTab({config,P,onSave,theme,setThemeMode}) {
                   Every figure for <strong>{config.business_name}</strong> has been removed. The Profit &amp; Loss, Balance Sheet and Cash Flow now read zero.
                   Your business units are still here — go to <strong>Planning</strong> to enter figures again whenever you're ready.
                 </p>
-                <button type="button" onClick={()=>setShowClearModal(false)}
+                <button type="button" onClick={()=>{ if(typeof window!=='undefined') window.location.reload(); else setShowClearModal(false) }}
                   style={solidBtn(C.green,true)}>Done</button>
               </>
             ) : (
