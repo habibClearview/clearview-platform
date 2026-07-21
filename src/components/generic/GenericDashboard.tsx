@@ -1002,7 +1002,7 @@ export default function GenericDashboard({
         {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} pendingApprovalCount={pendingApprovalCount} pendingActualsCount={pendingActualsCount} onGoToApprovals={()=>setView('approvals')} onGoToIntelligence={()=>setView('intelligence')}/>}
         {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P} marketEvents={marketEvents} onMarketEventsChanged={reloadMarketEvents} onApprovalActioned={reloadPendingActualsCount}/>}
         {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods} onNavigate={setView}/>}
-        {view==='performance' && <PerformanceTab config={config} result={result} months={months} cc={cc}/>}
+        {view==='performance' && <PerformanceTab config={config} result={result} months={months} cc={cc} clientId={clientId} onGoToIntelligence={()=>setView('intelligence')}/>}
         {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} clientId={clientId} marketEvents={marketEvents} marketEventsError={marketEventsError} onMarketEventsChanged={reloadMarketEvents}/>}
         {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods}/>}
         {view==='cashflow'    && <CashFlowTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
@@ -1097,9 +1097,9 @@ const ovLabel: React.CSSProperties = {fontFamily:'monospace',fontSize:'0.96rem',
 // do about it" section turns the numbers into actions. The currency-neutral
 // ratios also roll up, anonymised, into the coach's Market Intelligence
 // product; nothing is guessed.
-function PerfMetric({label,value,formula,tag,tagTone,bad,needsInput,travelsTo}:{
+function PerfMetric({label,value,formula,tag,tagTone,bad,needsInput,travelsTo,hint}:{
   label:string; value?:string; formula:string; tag?:string; tagTone?:'good'|'warn'|'bad'|'info';
-  bad?:boolean; needsInput?:boolean; travelsTo?:'intelligence'|'coach'
+  bad?:boolean; needsInput?:boolean; travelsTo?:'intelligence'|'coach'; hint?:string
 }) {
   const tagColor = tagTone==='good'?C.green:tagTone==='warn'?C.amber:tagTone==='bad'?C.red:C.teal
   return (
@@ -1114,7 +1114,7 @@ function PerfMetric({label,value,formula,tag,tagTone,bad,needsInput,travelsTo}:{
             {tag&&<span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,marginLeft:'0.45rem',padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-wa-10)',color:tagColor,border:`1px solid ${tagColor}`}}>{tag}</span>}
           </span>}
       <span style={{fontSize:'0.82rem',color:C.slate,borderTop:`1px dashed ${C.border}`,paddingTop:'0.4rem'}}>{formula}</span>
-      {needsInput&&<span style={{fontFamily:'monospace',fontSize:'0.74rem',color:C.amber,fontWeight:700}}>Needs customer input</span>}
+      {needsInput&&<span style={{fontFamily:'monospace',fontSize:'0.74rem',color:C.amber,fontWeight:700,lineHeight:1.35}}>{hint||'Needs customer input'}</span>}
     </div>
   )
 }
@@ -1170,8 +1170,20 @@ function MonthlyTrendChart({months,rev,ebitda,selStart,selEnd,cc}:{
   )
 }
 
-function PerformanceTab({config,result,months,cc}) {
+function PerformanceTab({config,result,months,cc,clientId,onGoToIntelligence}) {
   const [win,setWin] = useState('plan')
+  // Customer-acquisition figures the client already enters under
+  // Intelligence -> Marketing Events (management_events). Loaded here so CAC can
+  // show on the Performance tab alongside the model-derived metrics, rather than
+  // being a dead "needs input" card.
+  const [custGrowth,setCustGrowth] = useState<{totalCustomersAcquired:number;totalAcquisitionCost:number;blendedCAC:number|null;totalRevenueLift:number}|null>(null)
+  useEffect(()=>{
+    if(!clientId) return
+    let active = true
+    supabase.from('management_events').select('cost,customers_acquired,revenue_before,revenue_after').eq('client_id',clientId)
+      .then(({data})=>{ if(active) setCustGrowth(computeCustomerGrowthSummary(data||[])) })
+    return ()=>{ active = false }
+  },[clientId])
   if (!result || !result.metrics) return (
     <div style={card}>
       <div style={{...secH,marginBottom:'0.5rem'}}>Performance &amp; Growth</div>
@@ -1330,14 +1342,17 @@ function PerformanceTab({config,result,months,cc}) {
           <span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>needs customer data</span>
         </div>
         <p style={{color:C.slate,fontSize:'0.94rem',lineHeight:1.5,margin:'0 0 0.8rem',maxWidth:'70ch'}}>
-          These need a small input each period — customers won, customers lost, and sales &amp; marketing spend.
-          That input is exactly the discipline that helps a business grow.
+          <strong>CAC</strong> below is live — it comes from the marketing events you record on the{' '}
+          <span onClick={()=>onGoToIntelligence&&onGoToIntelligence()} style={{color:C.teal,cursor:'pointer',fontWeight:600,textDecoration:'underline'}}>Clearview Intelligence → Marketing Events</span>{' '}
+          tab (each event's cost and customers won). The other three still need a little customer data, explained on each card.
         </p>
         <div style={gridStyle}>
-          <PerfMetric label="CAC" formula="Sales &amp; marketing spend ÷ new customers won." needsInput/>
-          <PerfMetric label="Customer lifetime value" formula="Avg purchase × yearly frequency × avg lifespan." needsInput/>
-          <PerfMetric label="LTV : CAC" formula="Lifetime value ÷ acquisition cost. Over 3× is healthy." needsInput travelsTo="intelligence"/>
-          <PerfMetric label="CAC payback" formula="CAC ÷ monthly gross profit per customer, in months." needsInput travelsTo="intelligence"/>
+          {custGrowth && custGrowth.blendedCAC!==null
+            ? <PerfMetric label="CAC" value={fmt(custGrowth.blendedCAC,cc)} tag={`${custGrowth.totalCustomersAcquired.toLocaleString()} won`} tagTone="info" formula="Sales &amp; marketing spend ÷ new customers won. From your Marketing Events." travelsTo="intelligence"/>
+            : <PerfMetric label="CAC" formula="Sales &amp; marketing spend ÷ new customers won." needsInput travelsTo="intelligence" hint="Add a Marketing Event (its cost + customers won) on the Intelligence tab and CAC appears here."/>}
+          <PerfMetric label="Customer lifetime value" formula="Avg purchase × yearly frequency × avg lifespan." needsInput hint="Needs three figures not collected yet: average sale value, purchases per year, and typical customer lifespan."/>
+          <PerfMetric label="LTV : CAC" formula="Lifetime value ÷ acquisition cost. Over 3× is healthy." needsInput travelsTo="intelligence" hint="Shows automatically once Customer lifetime value (left) is available."/>
+          <PerfMetric label="CAC payback" formula="CAC ÷ monthly gross profit per customer, in months." needsInput travelsTo="intelligence" hint="Shows once customer lifetime value and gross profit per customer are available."/>
           <PerfMetric label="Churn" formula="Customers lost ÷ customers at the start. Lower is better." needsInput travelsTo="intelligence"/>
           <PerfMetric label="Net revenue retention" formula="Revenue from existing customers, this period ÷ last. Over 100% grows without new customers." needsInput travelsTo="intelligence"/>
           <PerfMetric label="MRR" formula="Active subscribers × avg revenue per user. Recurring lines only." needsInput travelsTo="coach"/>
