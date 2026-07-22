@@ -3801,6 +3801,82 @@ function FieldOperatorManager({clientId,config,P}) {
 // permission in Team) the right to edit it. Field operators never see or
 // enter a price -- they pick an item from here and record a volume; the
 // price and revenue amount are always calculated from what's set here.
+function SegmentManager({clientId,config,P}) {
+  const [items,setItems]=useState<any[]>([])
+  const [loading,setLoading]=useState(true)
+  const [newName,setNewName]=useState<Record<string,string>>({})
+  const [busy,setBusy]=useState(false)
+  const canEdit = P.canManageTeam || P.canManageCatalogue
+
+  async function load(){
+    setLoading(true)
+    try{ const res=await authedFetch(`/api/field/admin/segments?client_id=${encodeURIComponent(clientId)}`); const d=await res.json(); setItems(d.items||[]) }catch{ /* empty state below */ }
+    setLoading(false)
+  }
+  useEffect(()=>{ load() },[clientId])
+
+  async function add(unitId:string){
+    const name=(newName[unitId]||'').trim(); if(!name) return
+    setBusy(true)
+    try{
+      const res=await authedFetch('/api/field/admin/segments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({client_id:clientId,business_unit_id:unitId,name,created_by:P.userId})})
+      if(!res.ok){ const d=await res.json().catch(()=>({})); notify(d.error||'Could not add the segment.') }
+      else { setNewName(n=>({...n,[unitId]:''})); await load() }
+    }catch{ notify('Could not add the segment.') }
+    setBusy(false)
+  }
+  async function seed(unitId:string){
+    setBusy(true)
+    try{ await authedFetch('/api/field/admin/segments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({client_id:clientId,business_unit_id:unitId,seedDefaults:true,created_by:P.userId})}); await load() }
+    catch{ notify('Could not add the default segments.') }
+    setBusy(false)
+  }
+  async function toggle(id:string,active:boolean){
+    setBusy(true)
+    try{ await authedFetch('/api/field/admin/segments',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,active})}); await load() }
+    catch{ notify('Could not update the segment.') }
+    setBusy(false)
+  }
+
+  if (loading) return <Spinner/>
+  const units = (config.business_units||[]).filter((u:any)=>u.active)
+  return (
+    <div style={{marginTop:'2.2rem',paddingTop:'1.6rem',borderTop:`1px solid ${C.border}`}}>
+      <div style={secH}>Customer Segments — “who bought this”</div>
+      <p style={{fontSize:'1.06rem',color:C.slate,lineHeight:1.6,marginBottom:'1.1rem'}}>
+        The customer types your team can pick when recording a sale (in the field app or on the platform). They power “revenue by segment” on the Performance and Intelligence tabs. Add your own, or start with the common ones.
+      </p>
+      {!canEdit && <div style={{...card,background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,fontSize:'1.06rem',color:C.navy}}>You can view segments but need “Manage Field Catalogue” access (granted by your CEO or Finance Manager in Team) to change them.</div>}
+      {units.map((u:any)=>{
+        const segs = items.filter(s=>s.business_unit_id===u.id)
+        return (
+          <div key={u.id} style={card}>
+            <div style={{fontWeight:700,color:C.navy,marginBottom:'0.6rem'}}>{u.name}</div>
+            {segs.length===0 && <p style={{fontSize:'0.98rem',color:C.slate,marginBottom:'0.7rem'}}>No segments yet.</p>}
+            {segs.length>0 && (
+              <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem',marginBottom:canEdit?'0.85rem':0}}>
+                {segs.map(s=>(
+                  <span key={s.id} style={{display:'inline-flex',alignItems:'center',gap:'0.45rem',padding:'0.32rem 0.62rem',borderRadius:6,border:`1px solid ${C.border}`,opacity:s.active?1:0.45,fontSize:'0.98rem',color:C.navy}}>
+                    {s.name}
+                    {canEdit && <button title={s.active?'Remove':'Restore'} disabled={busy} onClick={()=>toggle(s.id,!s.active)} style={{background:'none',border:'none',cursor:'pointer',color:s.active?C.red:C.green,fontWeight:700,fontSize:'1.05rem',lineHeight:1}}>{s.active?'×':'+'}</button>}
+                  </span>
+                ))}
+              </div>
+            )}
+            {canEdit && (
+              <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
+                <input style={{...inp,maxWidth:280,marginBottom:0}} placeholder="Add a segment (e.g. Hotels & restaurants)" value={newName[u.id]||''} onChange={e=>setNewName(n=>({...n,[u.id]:e.target.value}))} onKeyDown={e=>{if(e.key==='Enter')add(u.id)}}/>
+                <button style={addBtn()} disabled={busy} onClick={()=>add(u.id)}>+ Add</button>
+                {segs.length===0 && <button style={addBtn(false,C.teal)} disabled={busy} onClick={()=>seed(u.id)}>Add the 5 common segments</button>}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function CatalogueManager({clientId,config,P}) {
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -6987,7 +7063,7 @@ function SettingsAndAdminTab({config,result,months,cc,clientId,P,onSave,theme,se
       {mode==='settings' && <SettingsTab config={config} P={P} onSave={onSave} theme={theme} setThemeMode={setThemeMode}/>}
       {mode==='scenarios' && <ScenariosTab config={config} result={result} months={months} cc={cc} P={P} onSave={onSave}/>}
       {mode==='team' && <TeamTab clientId={clientId} config={config} P={P}/>}
-      {mode==='catalogue' && <CatalogueManager clientId={clientId} config={config} P={P}/>}
+      {mode==='catalogue' && <><CatalogueManager clientId={clientId} config={config} P={P}/><SegmentManager clientId={clientId} config={config} P={P}/></>}
       {mode==='field' && <FieldOperatorManager clientId={clientId} config={config} P={P}/>}
     </div>
   )
