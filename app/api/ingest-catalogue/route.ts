@@ -31,14 +31,38 @@ export async function POST(req: NextRequest) {
     const items = Array.isArray(body.items) ? body.items : []
     if (!clientId) return NextResponse.json({ error: 'clientId required' }, { status: 400 })
     if (items.length === 0) return NextResponse.json({ inserted: 0, unmatched: [] })
-    // A single client's catalogue is small; a huge payload means something is
-    // wrong. Refuse rather than let one request write thousands of rows.
-    if (items.length > 1000) return NextResponse.json({ error: 'Too many catalogue items in one upload' }, { status: 400 })
 
     const supabase = getSupabase()
     const actor = await resolveFieldAdminActor(supabase, req)
     if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     if (!actorMayAccessClient(actor, clientId)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
+    // A single client's catalogue is small; a huge payload means something is
+    // wrong. Checked after auth so an unauthenticated caller learns nothing.
+    if (items.length > 1000) return NextResponse.json({ error: 'Too many catalogue items in one upload' }, { status: 400 })
+
+    // TENANT SCOPING (critical): this is a service-role route (RLS bypassed),
+    // so being allowed to act on `clientId` is not enough — every id in the
+    // payload must ALSO belong to that client's own model. Otherwise a caller
+    // authorized for client A could smuggle client B's business_unit_id /
+    // plan_line_id into A's catalogue (cross-tenant corruption / IDOR). Load
+    // this client's model and reject any item referencing an id it doesn't own.
+    const { data: cfg, error: cfgErr } = await supabase
+      .from('generic_model_config').select('business_units, plan_lines').eq('client_id', clientId).single()
+    if (cfgErr || !cfg) return NextResponse.json({ error: 'This client has no financial model yet — upload the figures before the catalogue.' }, { status: 400 })
+    const validUnitIds = new Set<string>((cfg.business_units || []).map((u: any) => String(u.id)))
+    const validPlanLineIds = new Set<string>((cfg.plan_lines || []).map((l: any) => String(l.id)))
+    for (const it of items) {
+      if (!validUnitIds.has(String(it.business_unit_id || ''))) {
+        return NextResponse.json({ error: 'A catalogue item references a business unit that does not belong to this client.' }, { status: 400 })
+      }
+      if (it.plan_line_id && !validPlanLineIds.has(String(it.plan_line_id))) {
+        return NextResponse.json({ error: 'A catalogue item references a revenue line that does not belong to this client.' }, { status: 400 })
+      }
+      if (it.cogs_plan_line_id && !validPlanLineIds.has(String(it.cogs_plan_line_id))) {
+        return NextResponse.json({ error: 'A catalogue item references a cost line that does not belong to this client.' }, { status: 400 })
+      }
+    }
 
     const norm = (s: string) => s.trim().toLowerCase()
 
