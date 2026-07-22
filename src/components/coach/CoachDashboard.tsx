@@ -910,7 +910,7 @@ function CopyIntakeLink({client}){
     <button onClick={copyToClipboard} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:copied?C.green:'transparent',border:`1px solid ${copied?C.green:'var(--cv-wa-40)'}`,color:'var(--cv-on-accent)',cursor:'pointer'}}>
       {copied?'Copied!':`Copy ${client.name} Data Capture Link`}
     </button>
-    <a href="/Clearview_Data_Capture_Template_v7.xlsx" download="Clearview_Data_Capture_Template_v7.xlsx"
+    <a href="/Clearview_Data_Capture_Template_v8.xlsx" download="Clearview_Data_Capture_Template_v8.xlsx"
       style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,
         background:'transparent',border:'1px solid var(--cv-wa-40)',
         color:'var(--cv-wa-80)',cursor:'pointer',textDecoration:'none',display:'inline-block',marginLeft:'0.5rem'}}>

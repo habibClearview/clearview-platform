@@ -366,7 +366,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
               <div style={{fontWeight:700,color:C.navy,marginBottom:'0.4rem',fontSize:'0.95rem'}}>Prefer to work in Excel?</div>
               <p style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.7,marginBottom:'0.9rem'}}>Download the Clearview data-capture template, fill it in offline, then upload the completed file instead of filling in this form.</p>
               <div style={{display:'flex',gap:'0.75rem',flexWrap:'wrap',alignItems:'center'}}>
-                <a href="/Clearview_Data_Capture_Template_v7.xlsx" download style={{...ghostBtn,textDecoration:'none',display:'inline-block'}}>⬇ Download Template</a>
+                <a href="/Clearview_Data_Capture_Template_v8.xlsx" download style={{...ghostBtn,textDecoration:'none',display:'inline-block'}}>⬇ Download Template</a>
                 <button style={smallBtn(C.teal)} onClick={()=>setUploadMode(m=>!m)}>{uploadMode?'Hide upload':'Upload completed template'}</button>
               </div>
               {uploadMode && (

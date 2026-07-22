@@ -82,16 +82,75 @@ export interface ParsedCommonCost {
   section: 'staff' | 'overheads'
 }
 
+// One product row from the optional "Catalogue" sheet (v8+). This carries the
+// field-app pricing detail (retail/cost price, unit label) and the grouping
+// dimensions (category, type). It links to a revenue product by matching
+// productName (and unitName when the business has units). Absent entirely on a
+// v7 workbook, which simply has no Catalogue sheet.
+export interface ParsedCatalogueItem {
+  unitName: string
+  productName: string
+  category: string
+  productType: string
+  unitLabel: string
+  retailPrice: number
+  costPrice: number
+}
+
 export interface ParsedUpload {
   business: ParsedBusiness
   hasUnits: boolean
   units: { name: string; headcount: number }[]
   products: ParsedProduct[]
   commonCosts: ParsedCommonCost[]
+  catalogue: ParsedCatalogueItem[]
   pastMonths: number
   futureMonths: number
   monthColsCount: number
   unassignedSheets: string[]
+}
+
+// Reads the optional "Catalogue" sheet. Returns [] when the sheet is absent
+// (every v7 workbook) so callers never need to special-case template version.
+// The header row is located by scanning for the row whose first two columns
+// read like "Business Unit" / "Product", rather than a hardcoded row number,
+// so small layout tweaks to the template don't silently misread every row.
+export function parseCatalogueSheet(wb: XLSX.WorkBook): ParsedCatalogueItem[] {
+  const cat = wb.Sheets['Catalogue']
+  if (!cat) return []
+  let headerRow = -1
+  for (let r = 1; r <= 12; r++) {
+    const a = cellStr(cat, `A${r}`).toLowerCase()
+    const b = cellStr(cat, `B${r}`).toLowerCase()
+    if (a.includes('business unit') && b.includes('product')) { headerRow = r; break }
+  }
+  if (headerRow < 0) return []
+
+  const items: ParsedCatalogueItem[] = []
+  for (let r = headerRow + 1; r < headerRow + 500; r++) {
+    const product = cellStr(cat, `B${r}`)
+    const unit = cellStr(cat, `A${r}`)
+    // Stop only after a long run of blank rows; a single gap between entries
+    // must not end the read. Peek ahead: if this row and the next 3 are all
+    // blank in the Product column, we're past the data.
+    if (!product) {
+      const ahead = [1, 2, 3].every(k => !cellStr(cat, `B${r + k}`))
+      if (ahead) break
+      continue
+    }
+    // Skip the greyed sample row shipped in the blank template.
+    if (product.toLowerCase().startsWith('(example)') || unit.toLowerCase().startsWith('(example)')) continue
+    items.push({
+      unitName: unit.replace(/^\(example\)\s*/i, '').trim(),
+      productName: product.trim(),
+      category: cellStr(cat, `C${r}`).trim(),
+      productType: cellStr(cat, `D${r}`).trim(),
+      unitLabel: cellStr(cat, `E${r}`).trim(),
+      retailPrice: cellNum(cat, `F${r}`) || 0,
+      costPrice: cellNum(cat, `G${r}`) || 0,
+    })
+  }
+  return items
 }
 
 export function parseClearviewWorkbook(wb: XLSX.WorkBook): ParsedUpload {
@@ -325,6 +384,7 @@ export function parseClearviewWorkbook(wb: XLSX.WorkBook): ParsedUpload {
 
   return {
     business, hasUnits, units, products: allProducts, commonCosts: allCommonCosts,
+    catalogue: parseCatalogueSheet(wb),
     pastMonths, futureMonths, monthColsCount, unassignedSheets,
   }
 }
