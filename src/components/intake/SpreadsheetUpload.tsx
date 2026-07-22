@@ -83,10 +83,8 @@ export default function SpreadsheetUpload({intakeToken,programmeId,existingClien
 
       const { businessUnits, planLines, totalMonths, actualsRows, catalogueRows } = buildPlanFromParsedUpload(preview, genId)
 
-      // Upsert (not insert) so loading into an existing client replaces its
-      // model rather than failing on the existing config row.
-      const { error: configErr } = await supabase.from('generic_model_config').upsert([{
-        client_id: clientId, business_name: business.business_name, currency: business.currency,
+      const configFields = {
+        business_name: business.business_name, currency: business.currency,
         start_date: new Date(new Date().setMonth(new Date().getMonth()-preview.pastMonths)).toISOString().split('T')[0],
         planning_months: totalMonths, business_units: businessUnits, plan_lines: planLines, shared_lines: [],
         settings: {
@@ -113,8 +111,34 @@ export default function SpreadsheetUpload({intakeToken,programmeId,existingClien
           structure_confirmed: true,
           upload_note: unassignedSheets?.length>0 ? `Some sheets could not be matched to a unit by name (${unassignedSheets.join(', ')}) -- their products were placed under "${units[0]?.name}". Coach should review and reassign.` : '',
         },
-      }])
-      if (configErr) throw configErr
+      }
+
+      if (existingClient) {
+        // Load into an existing client. To avoid ANY chance of wiping a live
+        // model, this is only allowed when the client's model is still empty
+        // (no plan lines). If it already has a model, refuse and tell the coach
+        // to edit it in Settings/Planning instead. This also sidesteps any
+        // ambiguity about the upsert conflict key: we explicitly UPDATE the
+        // existing (empty) config row, or INSERT one if none exists yet.
+        const { data: existingCfg, error: cfgReadErr } = await supabase
+          .from('generic_model_config').select('id, plan_lines').eq('client_id', clientId).maybeSingle()
+        if (cfgReadErr) throw cfgReadErr
+        if (existingCfg && Array.isArray(existingCfg.plan_lines) && existingCfg.plan_lines.length > 0) {
+          setError(`${existingClient.name} already has a financial model, so loading a file would overwrite it. Loading a file into an existing client is only for one whose model is still empty. To change a model that already has figures, edit it in Settings and Planning (or clear it first).`)
+          setSubmitting(false)
+          return
+        }
+        if (existingCfg) {
+          const { error: updErr } = await supabase.from('generic_model_config').update(configFields).eq('client_id', clientId)
+          if (updErr) throw updErr
+        } else {
+          const { error: insErr } = await supabase.from('generic_model_config').insert([{ client_id: clientId, ...configFields }])
+          if (insErr) throw insErr
+        }
+      } else {
+        const { error: configErr } = await supabase.from('generic_model_config').insert([{ client_id: clientId, ...configFields }])
+        if (configErr) throw configErr
+      }
 
       for (const { unit_id, period, values } of actualsRows) {
         await supabase.from('generic_actuals').upsert({
@@ -209,11 +233,11 @@ export default function SpreadsheetUpload({intakeToken,programmeId,existingClien
     <div style={card}>
       <div style={secH}>{existingClient ? `Upload figures into ${existingClient.name}` : 'Upload Completed Spreadsheet'}</div>
       <p style={{fontSize:'0.85rem',color:C.slate,marginBottom:'1rem',lineHeight:1.7}}>{existingClient
-        ? `Upload a completed Clearview Data Capture template (.xlsx). This loads the figures into ${existingClient.name} — it does NOT create a new client. It replaces this client's current financial model with the uploaded figures; the organisation and contact details are left untouched.`
+        ? `Upload a completed Clearview Data Capture template (.xlsx). This loads the figures into ${existingClient.name} — it does NOT create a new client, and it leaves the organisation and contact details untouched.`
         : 'Upload a completed Clearview Data Capture template (.xlsx). This creates the client and loads their figures the same way the web form does.'}</p>
       {existingClient && (
         <div style={{fontSize:'0.82rem',color:C.amber,background:'#FBF3E2',border:`1px solid ${C.amber}`,borderRadius:5,padding:'0.6rem 0.7rem',marginBottom:'1rem'}}>
-          Loading into an existing client replaces its planning &amp; actuals with this file. If you meant to add a brand-new client instead, close this and use “Upload Spreadsheet” at the top of the client list.
+          This only works when {existingClient.name}’s model is still empty (nothing entered in Planning yet), so it can never overwrite figures that are already there. To add a brand-new client instead, close this and use “Upload Spreadsheet” at the top of the client list.
         </div>
       )}
       <input type="file" accept=".xlsx" onChange={e=>e.target.files?.[0] && handleFile(e.target.files[0])} style={{marginBottom:'1rem'}}/>
