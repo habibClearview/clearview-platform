@@ -149,19 +149,24 @@ export async function POST(req: NextRequest) {
     // funder logins aren't "of" any one client — they're scoped by their own
     // co_implementer_id / funder_programme_id columns.
     const isClientRole = ['ceo', 'finance_manager', 'unit_head', 'accounts_assistant'].includes(role)
-    const { error: profileErr } = await admin
-      .from('user_profiles')
-      .upsert({
-        id: inviteData.user.id,
-        engagement_client_id: isClientRole ? (clientId || null) : null,
-        role,
-        full_name: fullName,
-        email,
-        status: 'invited',
-        assigned_unit_ids: assignedUnitIds || [],
-        co_implementer_id: role === 'coach' ? coImplementerId : null,
-        funder_programme_id: role === 'funder' ? funderProgrammeId : null,
-      })
+    // Always set EVERY scope column explicitly — the one this role uses to its
+    // value, and the ones it doesn't to null. This is an upsert: if the same id
+    // already exists under a different role (e.g. someone re-invited from coach
+    // to ceo), omitting a column would leave the OLD role's scope in place
+    // (a stale co_implementer_id / funder_programme_id), which could leak access
+    // from the previous role. Writing null clears it every time.
+    const profileRow: Record<string, any> = {
+      id: inviteData.user.id,
+      engagement_client_id: isClientRole ? (clientId || null) : null,
+      role,
+      full_name: fullName,
+      email,
+      status: 'invited',
+      assigned_unit_ids: assignedUnitIds || [],
+      co_implementer_id: role === 'coach' ? coImplementerId : null,
+      funder_programme_id: role === 'funder' ? funderProgrammeId : null,
+    }
+    const { error: profileErr } = await admin.from('user_profiles').upsert(profileRow)
 
     if (profileErr) {
       // The auth user was just created but couldn't be linked to the client.
@@ -180,8 +185,12 @@ export async function POST(req: NextRequest) {
           error: 'Could not finish setting up this login, and the automatic cleanup did not complete. Please tell your coach before retrying this email address.',
         }, { status: 500 })
       }
+      // Surface the specific database reason — the caller here is an
+      // authenticated coach/CEO (an admin action), so a schema/constraint
+      // message helps them and their coach fix it, and is not sensitive.
+      const detail = [profileErr.code, profileErr.message].filter(Boolean).join(': ')
       return NextResponse.json({
-        error: 'Could not link the new login to the organisation. Nothing was saved — please try again.',
+        error: `Could not link the new login to the organisation. Nothing was saved. Reason: ${detail || 'unknown database error'}`,
       }, { status: 500 })
     }
 
