@@ -60,14 +60,28 @@ export async function POST(req: NextRequest) {
     if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     if (!actorMayAccessClient(actor, client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
+    // Tenant scoping: being allowed to act on client_id is not enough — the
+    // business_unit_id must ALSO be one of THIS client's own (active) units.
+    // Otherwise a caller for client A could tag a segment with a unit id from
+    // client B (cross-tenant). Validate against the client's own model.
+    const { data: cfg, error: cfgErr } = await supabase
+      .from('generic_model_config').select('business_units').eq('client_id', client_id).single()
+    if (cfgErr || !cfg) return NextResponse.json({ error: 'This client has no financial model yet.' }, { status: 400 })
+    const unitOk = (cfg.business_units || []).some((u: any) => String(u.id) === String(business_unit_id) && u.active !== false)
+    if (!unitOk) return NextResponse.json({ error: 'That business unit does not belong to this client.' }, { status: 400 })
+
     const names: string[] = seedDefaults
       ? DEFAULT_SEGMENTS
       : (typeof name === 'string' && name.trim() ? [name.trim()] : [])
     if (names.length === 0) return NextResponse.json({ error: 'A segment name is required' }, { status: 400 })
 
+    // created_by is intentionally NOT taken from the request body (spoofable).
+    // The row's provenance is the authenticated client scope already enforced
+    // above; we don't attribute it to a client-supplied id.
+    void created_by
     const rows = names.map((n, i) => ({
       client_id, business_unit_id, kind: 'segment', name: n, active: true,
-      sort_order: i, created_by: created_by || null,
+      sort_order: i, created_by: null,
     }))
     // Upsert on the table's own unique key so re-seeding or a duplicate name is
     // a no-op rather than an error.
