@@ -29,7 +29,44 @@
 -- editor and Run.
 -- ============================================================
 
--- 1) Allow 'segment' as a value-list kind.
+-- 0) Ensure the value-list table exists (some environments never ran the
+--    original catalogue value-lists migration). Self-contained + idempotent.
+--    This is an EXACT copy of the original catalogue_value_lists definition
+--    (2026_07_18_catalogue_1_value_lists.sql), so it can only match, never
+--    drift. Two deliberate choices the automated reviewer should note:
+--      * client_id / business_unit_id are TEXT, NOT uuid — engagement_clients.id
+--        is TEXT, and field_catalogue / the original value-lists table use TEXT
+--        too. The repo's own migration validator REQUIRES client_id to be TEXT.
+--        can_view_client() takes a text argument (it's what field_catalogue's
+--        RLS already passes).
+--      * Only a SELECT policy is defined ON PURPOSE. Every write to this table
+--        goes through a service-role admin route (/api/field/admin/segments,
+--        /api/ingest-catalogue) which bypasses RLS; there is no client-side
+--        write path, so INSERT/UPDATE/DELETE policies would grant nothing and
+--        are intentionally omitted — identical to the original table's design.
+create table if not exists catalogue_value_lists (
+  id uuid primary key default gen_random_uuid(),
+  client_id text not null,
+  business_unit_id text not null,
+  kind text not null check (kind in ('category','type','size','supplier','segment')),
+  name text not null,
+  active boolean not null default true,
+  sort_order int not null default 0,
+  created_by uuid,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (client_id, business_unit_id, kind, name)
+);
+create index if not exists idx_cvl_client_unit_kind
+  on catalogue_value_lists (client_id, business_unit_id, kind)
+  where active = true;
+alter table catalogue_value_lists enable row level security;
+drop policy if exists catalogue_value_lists_read on catalogue_value_lists;
+create policy catalogue_value_lists_read on catalogue_value_lists
+  for select using (can_view_client(client_id));
+
+-- 1) Allow 'segment' as a value-list kind (for an EXISTING table whose check
+--    predates segments; a no-op for the freshly-created table above).
 alter table catalogue_value_lists drop constraint if exists catalogue_value_lists_kind_check;
 alter table catalogue_value_lists add constraint catalogue_value_lists_kind_check
   check (kind in ('category', 'type', 'size', 'supplier', 'segment'));
