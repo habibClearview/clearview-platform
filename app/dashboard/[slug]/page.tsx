@@ -58,6 +58,7 @@ export default function GenericClientPage() {
   const slug = params?.slug as string
   const [user, setUser] = useState<any>(null)
   const [clientId, setClientId] = useState<string|null>(null)
+  const [clientName, setClientName] = useState<string>('')
   const [funderDetailLevel, setFunderDetailLevel] = useState<'summary'|'full'>('summary')
   const [checking, setChecking] = useState(true)
   const [authError, setAuthError] = useState(false)
@@ -84,7 +85,7 @@ export default function GenericClientPage() {
       // co_implementers.client_ids / programme actually includes this
       // client -- see 2026_07_13_funder_coimplementer_access.sql.
       const {data:client} = await supabase.from('engagement_clients')
-        .select('id').eq('slug',slug).single()
+        .select('id,name').eq('slug',slug).single()
       // Authorization check: does this user actually belong to the client
       // resolved from the URL? Previously there was NONE at all -- any
       // authenticated user could navigate to any client's URL slug and
@@ -100,7 +101,7 @@ export default function GenericClientPage() {
       const isDirectClientUser = !!profile?.engagement_client_id && profile.engagement_client_id === client?.id
       const isMultiClientRoleWithAccess = (profile?.role === 'coach' || profile?.role === 'funder') && !!client
       const isAuthorized = isSuperCoach || isDirectClientUser || isMultiClientRoleWithAccess
-      if (client && isAuthorized) setClientId(client.id)
+      if (client && isAuthorized) { setClientId(client.id); setClientName((client as any).name || '') }
       else if (client && !isAuthorized) setAuthError(true)
       // The coach-configurable level of detail a funder sees, read from
       // their one programme -- irrelevant (default stays 'summary', but
@@ -182,5 +183,5 @@ export default function GenericClientPage() {
     onSignOut: async () => { await supabase.auth.signOut(); window.location.href='/' },
   }
 
-  return <GenericDashboard clientId={clientId} permissions={permissions}/>
+  return <GenericDashboard clientId={clientId} clientName={clientName} permissions={permissions}/>
 }

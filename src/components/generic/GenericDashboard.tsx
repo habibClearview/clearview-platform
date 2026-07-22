@@ -573,9 +573,11 @@ const FULL_PERMISSIONS: GenericPermissions = {
 // ── Main dashboard component ─────────────────────────────────
 export default function GenericDashboard({
   clientId,
+  clientName,
   permissions: permProp,
 }: {
   clientId: string
+  clientName?: string
   permissions?: GenericPermissions
 }) {
   const P = permProp || FULL_PERMISSIONS
@@ -768,7 +770,12 @@ export default function GenericDashboard({
             settings: data.settings || {},
           })
         } else {
-          setConfig(defaultGenericConfig({ client_id: clientId }))
+          // No financial model has been created for this client yet. Seed the
+          // business name from the organisation's name (passed from the client
+          // record) so the header and Settings show the real name instead of
+          // the "New Client" placeholder. This is local only until the coach
+          // actually enters data and a config row is saved.
+          setConfig(defaultGenericConfig({ client_id: clientId, business_name: clientName || '' }))
         }
       } catch(e: any) {
         setError(e.message)
@@ -936,7 +943,7 @@ export default function GenericDashboard({
           <div>
             <div style={{fontFamily:'monospace',fontSize:'0.88rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>CANVAS COACH — CLEARVIEW</div>
             <div style={{display:'flex',alignItems:'center',gap:'0.7rem',flexWrap:'wrap'}}>
-              <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0.1rem 0 0.15rem'}}>{config.business_name || 'New Client'}</h1>
+              <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0.1rem 0 0.15rem'}}>{config.business_name || clientName || 'New Client'}</h1>
               {result?.scores&&(
                 <span style={{fontFamily:'monospace',fontSize:'0.88rem',fontWeight:700,letterSpacing:'0.04em',padding:'0.2rem 0.65rem',borderRadius:20,background:'var(--cv-wa-10)',color:result.scores.classColor,border:`1px solid ${result.scores.classColor}`,display:'inline-flex',alignItems:'center',gap:'0.4rem'}}>
                   <span style={{width:7,height:7,borderRadius:7,background:result.scores.classColor,display:'inline-block'}}/>{result.scores.classification}
