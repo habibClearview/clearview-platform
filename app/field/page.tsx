@@ -807,8 +807,8 @@ export default function FieldCapturePage() {
             </div>
             <div style={{display:'flex',alignItems:'center',gap:'0.8rem',marginBottom:'1.1rem'}}>
               <button aria-label="Less" onClick={()=>setSaleForm(f=>({...f,quantity:String(Math.max(0,(Number(f.quantity||0)||0)-1))}))} style={stepBtnStyle}>−</button>
-              <input type="number" inputMode="numeric" aria-label="Quantity" value={saleForm.quantity}
-                onChange={e=>setSaleForm(f=>({...f,quantity:e.target.value}))} placeholder="0"
+              <input type="number" inputMode="numeric" min={0} aria-label="Quantity" value={saleForm.quantity}
+                onChange={e=>{const raw=e.target.value;const n=Number(raw);setSaleForm(f=>({...f,quantity: raw===''?'':(isNaN(n)||n<0?'0':raw)}))}} placeholder="0"
                 style={{flex:1,minWidth:0,textAlign:'center',fontSize:'2rem',fontWeight:800,padding:'0.6rem',background:D.bg2,border:`1px solid ${D.border}`,borderRadius:14,color:D.text,boxSizing:'border-box'}} autoFocus/>
               <button aria-label="More" onClick={()=>setSaleForm(f=>({...f,quantity:String((Number(f.quantity||0)||0)+1)}))} style={stepBtnStyle}>+</button>
             </div>
@@ -819,9 +819,9 @@ export default function FieldCapturePage() {
             </div>
             <div style={{display:'flex',alignItems:'center',gap:'0.8rem',marginBottom:'0.5rem'}}>
               <button aria-label="Lower price" onClick={()=>setSaleForm(f=>({...f,override:true,override_price:String(Math.max(0,(Number(f.override?f.override_price:selectedItem.price)||0)-100))}))} style={stepBtnStyle}>−</button>
-              <input type="number" inputMode="numeric" aria-label="Price for each unit"
+              <input type="number" inputMode="numeric" min={0} aria-label="Price for each unit"
                 value={saleForm.override?saleForm.override_price:String(selectedItem.price)}
-                onChange={e=>setSaleForm(f=>({...f,override:true,override_price:e.target.value}))}
+                onChange={e=>{const raw=e.target.value;const n=Number(raw);setSaleForm(f=>({...f,override:true,override_price: raw===''?'':(isNaN(n)||n<0?'0':raw)}))}}
                 style={{flex:1,minWidth:0,textAlign:'center',fontSize:'1.6rem',fontWeight:800,padding:'0.6rem',background:D.bg2,border:`1px solid ${D.border}`,borderRadius:14,color:D.text,boxSizing:'border-box'}}/>
               <button aria-label="Raise price" onClick={()=>setSaleForm(f=>({...f,override:true,override_price:String((Number(f.override?f.override_price:selectedItem.price)||0)+100)}))} style={stepBtnStyle}>+</button>
             </div>
