@@ -772,12 +772,23 @@ function DeleteClientConfirm({client,onCancel,onDeleted}){
   async function handleDelete(){
     setDeleting(true)
     try{
-      await supabase.from('generic_actuals').delete().eq('client_id',client.id)
-      await supabase.from('generic_model_config').delete().eq('client_id',client.id)
-      await supabase.from('engagement_clients').delete().eq('id',client.id)
+      // Go through the server route: it removes ALL of the client's dependent
+      // records (market events, Clair chats, logins, field + model data) in a
+      // safe order and then the client, and — crucially — reports whether the
+      // delete actually happened. The old browser-side delete ignored the
+      // result, so a blocked delete looked done but the client reappeared on
+      // the next login.
+      const { data:{ session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/delete-client',{
+        method:'POST',
+        headers:{'Content-Type':'application/json', Authorization:`Bearer ${session?.access_token||''}`},
+        body: JSON.stringify({ clientId: client.id }),
+      })
+      const data = await res.json().catch(()=>({}))
+      if(!res.ok){ alert(data.error||'Delete failed. Please try again.'); setDeleting(false); return }
       onDeleted()
-    }catch(e){
-      alert('Delete failed: '+e.message)
+    }catch(e:any){
+      alert('Delete failed: '+(e?.message||'please try again'))
       setDeleting(false)
     }
   }
