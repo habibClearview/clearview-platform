@@ -147,6 +147,9 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
             <div style={{fontSize:'0.82rem',color:C.slate,marginBottom:'0.3rem'}}>Products: {preview.products.map((p:any)=>p.name).join(', ')}</div>
           )}
           <div style={{fontSize:'0.82rem',color:C.slate,marginTop:'0.4rem'}}>{preview.pastMonths} months past data · {preview.futureMonths} months forward plan</div>
+          {preview.catalogue?.length>0 && (
+            <div style={{fontSize:'0.82rem',color:C.green,marginTop:'0.3rem'}}>Catalogue: {preview.catalogue.length} priced item{preview.catalogue.length===1?'':'s'} for the field app</div>
+          )}
           {preview.unassignedSheets?.length>0 && (
             <p style={{fontSize:'0.78rem',color:C.amber,marginTop:'0.6rem'}}>Note: the sheet(s) "{preview.unassignedSheets.join(', ')}" did not have a "Which Part Is This For?" value matching a named part, so their products were placed under "{preview.units[0]?.name}". You should review and reassign these.</p>
           )}

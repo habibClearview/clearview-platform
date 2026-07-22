@@ -242,3 +242,31 @@ describe('buildPlanFromParsedUpload', () => {
     expect(actualsRows.some(r => r.period > '2026-07-01')).toBe(false)
   })
 })
+
+describe('catalogue sheet (v8)', () => {
+  it('returns [] when there is no Catalogue sheet (v7 workbook)', () => {
+    const parsed = parseClearviewWorkbook(buildTestWorkbook())
+    expect(parsed.catalogue).toEqual([])
+  })
+
+  it('parses catalogue rows, skips the (example) row, and ignores single blank gaps', () => {
+    const wb = buildTestWorkbook()
+    XLSX.utils.book_append_sheet(wb, sheetFromCells({
+      A4: 'Business Unit (match Section F, or blank)', B4: 'Product (match Unit Figures)',
+      C4: 'Category', D4: 'Product Type', E4: 'Unit', F4: 'Retail Price', G4: 'Cost Price',
+      // greyed sample the blank template ships with -- must be skipped
+      A5: '(example) Poultry', B5: 'Eggs', C5: 'Eggs', D5: 'Tray of 30', E5: 'tray', F5: 12000, G5: 9000,
+      A6: 'TEST UNIT A', B6: 'WIDGETS', C6: 'Hardware', D6: 'Small', E6: 'box', F6: 5000, G6: 3000,
+      // a single blank gap row (7) then more data -- must NOT stop the read
+      A8: 'TEST UNIT A', B8: 'GADGETS', C8: 'Hardware', D8: 'Large', E8: 'unit', F8: 15000, G8: 11000,
+    }), 'Catalogue')
+
+    const parsed = parseClearviewWorkbook(wb)
+    expect(parsed.catalogue.length).toBe(2)
+    expect(parsed.catalogue[0]).toEqual({
+      unitName: 'TEST UNIT A', productName: 'WIDGETS', category: 'Hardware',
+      productType: 'Small', unitLabel: 'box', retailPrice: 5000, costPrice: 3000,
+    })
+    expect(parsed.catalogue.map(c => c.productName)).toEqual(['WIDGETS', 'GADGETS'])
+  })
+})
