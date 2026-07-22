@@ -161,19 +161,28 @@ export async function POST(req: NextRequest) {
       role,
       full_name: fullName,
       email,
-      // Use 'active' — the value the user_profiles status check constraint
-      // accepts. ('invited' is NOT in that constraint and was rejected with
-      // 23514, which is why the whole invite failed.) This column does not
-      // gate login: whether the person can actually sign in is controlled by
-      // Supabase Auth (they must accept the invite email and set a password),
-      // and the team list derives "Invited vs Active" from the auth record
-      // (email confirmed / last sign-in), not from this column.
-      status: 'active',
       assigned_unit_ids: assignedUnitIds || [],
       co_implementer_id: role === 'coach' ? coImplementerId : null,
       funder_programme_id: role === 'funder' ? funderProgrammeId : null,
     }
-    const { error: profileErr } = await admin.from('user_profiles').upsert(profileRow)
+
+    // Status: the accurate value for someone who has been invited but has not
+    // yet accepted is 'invited'. Migration
+    // 2026_07_22_user_profiles_allow_invited_status.sql widens the
+    // user_profiles status CHECK constraint to permit it. Older environments
+    // where that migration has not been applied yet still have the original
+    // constraint, which rejects 'invited' with error 23514 and failed the
+    // whole invite. So: try the accurate value first, and ONLY if the
+    // constraint rejects it, fall back to letting the column take its own DB
+    // default — never a made-up stand-in value. Either way login is gated by
+    // Supabase Auth (accept email + set password), not by this column.
+    let { error: profileErr } = await admin
+      .from('user_profiles')
+      .upsert({ ...profileRow, status: 'invited' })
+    if (profileErr && profileErr.code === '23514' && /status/i.test(profileErr.message || '')) {
+      console.warn('invite-user: status check constraint rejected "invited"; falling back to DB default. Apply 2026_07_22_user_profiles_allow_invited_status.sql to store the accurate status.')
+      ;({ error: profileErr } = await admin.from('user_profiles').upsert(profileRow))
+    }
 
     if (profileErr) {
       // The auth user was just created but couldn't be linked to the client.
