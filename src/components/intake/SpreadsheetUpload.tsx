@@ -23,7 +23,7 @@ function genId(prefix:string) { return `${prefix}_${Date.now()}_${Math.random().
 // just the UI: pick a file, show a preview, and write whatever the pure
 // parser produced to the database on confirm.
 
-export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{intakeToken?:string,programmeId?:string,onSuccess?:(clientId:string)=>void}) {
+export default function SpreadsheetUpload({intakeToken,programmeId,existingClient,onSuccess}:{intakeToken?:string,programmeId?:string,existingClient?:{id:string,name:string},onSuccess?:(clientId:string)=>void}) {
   const [file, setFile] = useState<File|null>(null)
   const [parsing, setParsing] = useState(false)
   const [preview, setPreview] = useState<any|null>(null)
@@ -60,20 +60,31 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
       const { business, hasUnits, unassignedSheets, units } = preview
       const slug = business.business_name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')
 
-      const { data: client, error: clientErr } = await supabase.from('engagement_clients').insert([{
-        id: genId('client'), name: business.business_name, slug, type: 'service_lsp',
-        engagement_mode: 'financial', status: 'setup', country: business.country, sector: business.sector,
-        contact_name: business.contact_name, contact_email: business.contact_email, contact_phone: business.contact_phone,
-        clearview_active: true, programme_id: programmeId || null,
-        start_date: new Date().toISOString().split('T')[0],
-        notes: `Self-submitted intake (spreadsheet upload). Structure: ${hasUnits?'Multiple units':'Single business'}.`,
-      }]).select().single()
-      if (clientErr) throw clientErr
+      // Either load into an existing client (chosen from the coach dashboard) or
+      // create a brand-new one. Loading into an existing client does NOT touch
+      // its organisation/Cover record — it only (re)loads the financial model,
+      // actuals and catalogue — so it can't overwrite the client's contact
+      // details or duplicate the client.
+      let clientId: string
+      if (existingClient) {
+        clientId = existingClient.id
+      } else {
+        const { data: client, error: clientErr } = await supabase.from('engagement_clients').insert([{
+          id: genId('client'), name: business.business_name, slug, type: 'service_lsp',
+          engagement_mode: 'financial', status: 'setup', country: business.country, sector: business.sector,
+          contact_name: business.contact_name, contact_email: business.contact_email, contact_phone: business.contact_phone,
+          clearview_active: true, programme_id: programmeId || null,
+          start_date: new Date().toISOString().split('T')[0],
+          notes: `Self-submitted intake (spreadsheet upload). Structure: ${hasUnits?'Multiple units':'Single business'}.`,
+        }]).select().single()
+        if (clientErr) throw clientErr
+        clientId = client.id
+      }
 
       const { businessUnits, planLines, totalMonths, actualsRows, catalogueRows } = buildPlanFromParsedUpload(preview, genId)
 
-      const { error: configErr } = await supabase.from('generic_model_config').insert([{
-        client_id: client.id, business_name: business.business_name, currency: business.currency,
+      const configFields = {
+        business_name: business.business_name, currency: business.currency,
         start_date: new Date(new Date().setMonth(new Date().getMonth()-preview.pastMonths)).toISOString().split('T')[0],
         planning_months: totalMonths, business_units: businessUnits, plan_lines: planLines, shared_lines: [],
         settings: {
@@ -100,12 +111,35 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
           structure_confirmed: true,
           upload_note: unassignedSheets?.length>0 ? `Some sheets could not be matched to a unit by name (${unassignedSheets.join(', ')}) -- their products were placed under "${units[0]?.name}". Coach should review and reassign.` : '',
         },
-      }])
-      if (configErr) throw configErr
+      }
+
+      if (existingClient) {
+        // Load into an existing client with a SINGLE atomic INSERT — never an
+        // overwrite. client_id is the config table's key (that's why the
+        // dashboard's own save upserts on it without a surrogate id), so a
+        // second INSERT for a client that already has a model fails with a
+        // duplicate-key error (23505). We treat that as "already set up" and
+        // change nothing. This is race-free by construction (no read-then-write
+        // window) and can never clobber a model that already has figures — the
+        // only case that proceeds is a client whose model was never started
+        // (e.g. one created by hand, like the empty client we discussed).
+        const { error: insErr } = await supabase.from('generic_model_config').insert([{ client_id: clientId, ...configFields }])
+        if (insErr) {
+          if ((insErr as any).code === '23505') {
+            setError(`${existingClient.name} already has a financial model set up, so nothing was changed. To replace a model that already has figures, edit it in Settings and Planning, or clear it first.`)
+            setSubmitting(false)
+            return
+          }
+          throw insErr
+        }
+      } else {
+        const { error: configErr } = await supabase.from('generic_model_config').insert([{ client_id: clientId, ...configFields }])
+        if (configErr) throw configErr
+      }
 
       for (const { unit_id, period, values } of actualsRows) {
         await supabase.from('generic_actuals').upsert({
-          client_id: client.id, unit_id, period,
+          client_id: clientId, unit_id, period,
           line_values: values, submitted: true, submitted_at: new Date().toISOString(),
           submitted_by: business.contact_name, entered_by: business.contact_name,
         }, { onConflict: 'client_id,unit_id,period' })
@@ -124,7 +158,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
             const catRes = await fetch('/api/ingest-catalogue', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-              body: JSON.stringify({ clientId: client.id, items: catalogueRows }),
+              body: JSON.stringify({ clientId, items: catalogueRows }),
             })
             // Non-fatal (the client + financial model are already saved), but
             // never silent: log so a failing catalogue load is detectable.
@@ -135,9 +169,9 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
         } catch (e) { console.error('Catalogue ingest request errored (non-fatal):', e) }
       }
 
-      setCreated({ id: client.id, email: business.contact_email || '', name: business.contact_name || '' })
+      setCreated({ id: clientId, email: business.contact_email || '', name: business.contact_name || '' })
       setSubmitted(true)
-      if (onSuccess) onSuccess(client.id)
+      if (onSuccess) onSuccess(clientId)
     } catch(e:any) {
       setError(e.message || 'Upload failed.')
     }
@@ -177,7 +211,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
     <div style={{...card,textAlign:'center'}}>
       <div style={{fontSize:'2rem',marginBottom:'1rem'}}>✓</div>
       <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Uploaded successfully</div>
-      <p style={{color:C.slate,fontSize:'0.88rem'}}>The client has been created and their data loaded into Clearview.</p>
+      <p style={{color:C.slate,fontSize:'0.88rem'}}>{existingClient ? `The figures were loaded into ${existingClient.name}.` : 'The client has been created and their data loaded into Clearview.'}</p>
       {created?.email && inviteState !== 'sent' && (
         <div style={{marginTop:'1.25rem'}}>
           <button style={btn(C.teal)} disabled={inviteState==='sending'} onClick={sendCeoInvite}>
@@ -194,8 +228,15 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
 
   return (
     <div style={card}>
-      <div style={secH}>Upload Completed Spreadsheet</div>
-      <p style={{fontSize:'0.85rem',color:C.slate,marginBottom:'1rem',lineHeight:1.7}}>Upload a completed Clearview Data Capture template (.xlsx). This creates the client and loads their figures the same way the web form does.</p>
+      <div style={secH}>{existingClient ? `Upload figures into ${existingClient.name}` : 'Upload Completed Spreadsheet'}</div>
+      <p style={{fontSize:'0.85rem',color:C.slate,marginBottom:'1rem',lineHeight:1.7}}>{existingClient
+        ? `Upload a completed Clearview Data Capture template (.xlsx). This loads the figures into ${existingClient.name} — it does NOT create a new client, and it leaves the organisation and contact details untouched.`
+        : 'Upload a completed Clearview Data Capture template (.xlsx). This creates the client and loads their figures the same way the web form does.'}</p>
+      {existingClient && (
+        <div style={{fontSize:'0.82rem',color:C.amber,background:'#FBF3E2',border:`1px solid ${C.amber}`,borderRadius:5,padding:'0.6rem 0.7rem',marginBottom:'1rem'}}>
+          This only works when {existingClient.name}’s model is still empty (nothing entered in Planning yet), so it can never overwrite figures that are already there. To add a brand-new client instead, close this and use “Upload Spreadsheet” at the top of the client list.
+        </div>
+      )}
       <input type="file" accept=".xlsx" onChange={e=>e.target.files?.[0] && handleFile(e.target.files[0])} style={{marginBottom:'1rem'}}/>
       {parsing && <p style={{color:C.slate,fontSize:'0.85rem'}}>Reading file...</p>}
       {error && <div style={{color:C.red,fontSize:'0.85rem',padding:'0.7rem',background:'#FDF0EE',borderRadius:5,marginBottom:'1rem'}}>{error}</div>}
@@ -226,7 +267,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
         </div>
       )}
       {preview && (
-        <button style={btn(C.green)} disabled={submitting} onClick={confirmUpload}>{submitting?'Creating client...':'Confirm and Create Client'}</button>
+        <button style={btn(C.green)} disabled={submitting} onClick={confirmUpload}>{submitting?(existingClient?'Loading figures...':'Creating client...'):(existingClient?`Confirm and load into ${existingClient.name}`:'Confirm and Create Client')}</button>
       )}
     </div>
   )
