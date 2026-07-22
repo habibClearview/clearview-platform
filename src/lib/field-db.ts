@@ -28,6 +28,7 @@ export interface QueuedSale {
   override_price?: number
   payment_method?: string
   customer_id?: string
+  segment_id?: string
   transaction_date: string
   notes?: string
   queued_at: number

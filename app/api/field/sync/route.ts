@@ -61,6 +61,25 @@ export async function POST(req: NextRequest) {
         if (catErr) errors.push(`Catalogue lookup error: ${catErr.message}`)
         const catalogueById = new Map((catalogueItems || []).map((c: any) => [c.id, c]))
 
+        // Validate any customer-segment ids the same way the catalogue is
+        // validated: a segment must be a 'segment' value list belonging to THIS
+        // operator's client + business unit. A browser-supplied id that isn't is
+        // stored as null (never trusted / cross-tenant), not rejected — the sale
+        // itself is still valid, it just isn't tagged to a segment.
+        const segmentIds = Array.from(new Set(saleEntries.map((t: any) => t.segment_id).filter(Boolean)))
+        let validSegmentIds = new Set<string>()
+        if (segmentIds.length > 0) {
+          const { data: segRows, error: segErr } = await supabase
+            .from('catalogue_value_lists')
+            .select('id')
+            .in('id', segmentIds)
+            .eq('client_id', operator.client_id)
+            .eq('business_unit_id', operator.business_unit_id)
+            .eq('kind', 'segment')
+          if (segErr) errors.push(`Segment lookup error: ${segErr.message}`)
+          validSegmentIds = new Set((segRows || []).map((r: any) => r.id))
+        }
+
         for (const t of saleEntries) {
           const item = catalogueById.get(t.catalogue_item_id)
           if (!item) { errors.push(`Unknown or inactive catalogue item: ${t.catalogue_item_id}`); continue }
@@ -90,6 +109,7 @@ export async function POST(req: NextRequest) {
             unit_price: priceUsed,
             payment_method: t.payment_method || null,
             customer_id: t.customer_id || null,
+            segment_id: (t.segment_id && validSegmentIds.has(t.segment_id)) ? t.segment_id : null,
             transaction_date: t.transaction_date || new Date().toISOString().split('T')[0],
             // Real capture time from the field queue; enables payment
             // reconciliation on a time window. Nullable -- older clients that
@@ -227,10 +247,22 @@ export async function POST(req: NextRequest) {
         // ignoreDuplicates means a repeat local_id is silently skipped and
         // won't appear here. Counting rows.length instead would overstate
         // how many records were really inserted on a retry.
-        const { data: insertedTx, error: txErr } = await supabase
+        let { data: insertedTx, error: txErr } = await supabase
           .from('field_transactions')
           .upsert(rows, { onConflict: 'client_id,local_id', ignoreDuplicates: true })
           .select('id')
+        // Resilience for an environment where the customer-segments migration
+        // (2026_07_22_customer_segments.sql) hasn't been applied yet: the
+        // segment_id column may not exist. Rather than fail every field sale,
+        // strip segment_id and retry once. Sales still sync — they just aren't
+        // segment-tagged until the migration runs.
+        if (txErr && (txErr as any).code === '42703' && /segment_id/i.test(txErr.message || '')) {
+          const stripped = rows.map(({ segment_id, ...rest }: any) => rest)
+          ;({ data: insertedTx, error: txErr } = await supabase
+            .from('field_transactions')
+            .upsert(stripped, { onConflict: 'client_id,local_id', ignoreDuplicates: true })
+            .select('id'))
+        }
         if (txErr) {
           technicalErrors.push(`Transaction insert error: ${txErr.message}`); errors.push(friendlyDbError(txErr.message))
           // The rows that passed validation never actually got written --

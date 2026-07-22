@@ -58,11 +58,22 @@ export async function POST(req: NextRequest) {
 
     const { data: customers } = await supabase
       .from('field_customers')
-      .select('id, name, phone, village')
+      .select('id, name, phone, village, segment_id')
       .eq('client_id', operator.client_id)
       .eq('business_unit_id', operator.business_unit_id)
       .eq('active', true)
       .order('name')
+
+    // Customer segments (who bought this) for this unit — the value list of
+    // kind 'segment', same source the platform admin manages.
+    const { data: segments } = await supabase
+      .from('catalogue_value_lists')
+      .select('id, name')
+      .eq('client_id', operator.client_id)
+      .eq('business_unit_id', operator.business_unit_id)
+      .eq('kind', 'segment')
+      .eq('active', true)
+      .order('sort_order')
 
     return NextResponse.json({
       operator: {
@@ -82,6 +93,7 @@ export async function POST(req: NextRequest) {
       catalogue: catalogueItems || [],
       cost_lines: costLines,
       customers: customers || [],
+      segments: segments || [],
       authenticated_at: new Date().toISOString(),
     })
 
