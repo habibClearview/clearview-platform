@@ -149,19 +149,23 @@ export async function POST(req: NextRequest) {
     // funder logins aren't "of" any one client — they're scoped by their own
     // co_implementer_id / funder_programme_id columns.
     const isClientRole = ['ceo', 'finance_manager', 'unit_head', 'accounts_assistant'].includes(role)
-    const { error: profileErr } = await admin
-      .from('user_profiles')
-      .upsert({
-        id: inviteData.user.id,
-        engagement_client_id: isClientRole ? (clientId || null) : null,
-        role,
-        full_name: fullName,
-        email,
-        status: 'invited',
-        assigned_unit_ids: assignedUnitIds || [],
-        co_implementer_id: role === 'coach' ? coImplementerId : null,
-        funder_programme_id: role === 'funder' ? funderProgrammeId : null,
-      })
+    // Build the row with ONLY the columns this role needs. A CEO/finance_manager
+    // invite must never reference the coach/funder columns — if that column is
+    // ever absent on an environment, including it (even as null) makes the whole
+    // insert fail and the login can't be linked. Only add each scope column for
+    // the role it belongs to.
+    const profileRow: Record<string, any> = {
+      id: inviteData.user.id,
+      engagement_client_id: isClientRole ? (clientId || null) : null,
+      role,
+      full_name: fullName,
+      email,
+      status: 'invited',
+      assigned_unit_ids: assignedUnitIds || [],
+    }
+    if (role === 'coach') profileRow.co_implementer_id = coImplementerId
+    if (role === 'funder') profileRow.funder_programme_id = funderProgrammeId
+    const { error: profileErr } = await admin.from('user_profiles').upsert(profileRow)
 
     if (profileErr) {
       // The auth user was just created but couldn't be linked to the client.
@@ -180,8 +184,12 @@ export async function POST(req: NextRequest) {
           error: 'Could not finish setting up this login, and the automatic cleanup did not complete. Please tell your coach before retrying this email address.',
         }, { status: 500 })
       }
+      // Surface the specific database reason — the caller here is an
+      // authenticated coach/CEO (an admin action), so a schema/constraint
+      // message helps them and their coach fix it, and is not sensitive.
+      const detail = [profileErr.code, profileErr.message].filter(Boolean).join(': ')
       return NextResponse.json({
-        error: 'Could not link the new login to the organisation. Nothing was saved — please try again.',
+        error: `Could not link the new login to the organisation. Nothing was saved. Reason: ${detail || 'unknown database error'}`,
       }, { status: 500 })
     }
 
