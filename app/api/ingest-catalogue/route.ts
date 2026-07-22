@@ -85,6 +85,9 @@ export async function POST(req: NextRequest) {
         const hasCost = it.cost_price != null && Number.isFinite(cost) && cost >= 0 && !!it.cogs_plan_line_id
         const name = String(it.name || '').trim()
         if (name && !it.plan_line_id) unmatched.push(name)
+        // A malformed/missing price is coerced to 0 so the row still loads,
+        // but log it — a "free" product is usually a data-entry slip, not intent.
+        if (name && !(Number.isFinite(price) && price >= 0)) console.warn(`ingest-catalogue: item "${name}" had an invalid price (${JSON.stringify(it.price)}); defaulted to 0`)
         return {
           client_id: clientId,
           business_unit_id: bu,

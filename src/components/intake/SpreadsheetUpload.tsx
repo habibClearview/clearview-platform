@@ -116,13 +116,18 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
         try {
           const { data: { session } } = await supabase.auth.getSession()
           if (session?.access_token) {
-            await fetch('/api/ingest-catalogue', {
+            const catRes = await fetch('/api/ingest-catalogue', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
               body: JSON.stringify({ clientId: client.id, items: catalogueRows }),
             })
+            // Non-fatal (the client + financial model are already saved), but
+            // never silent: log so a failing catalogue load is detectable.
+            if (!catRes.ok) console.error('Catalogue ingest failed:', catRes.status, await catRes.text().catch(()=>''))
+          } else {
+            console.warn('Catalogue not loaded: no session token (anonymous intake upload). The financial model was saved; add the catalogue from the coach dashboard.')
           }
-        } catch { /* non-fatal: the client and financial model are already saved */ }
+        } catch (e) { console.error('Catalogue ingest request errored (non-fatal):', e) }
       }
 
       setSubmitted(true)

@@ -27,6 +27,15 @@ function cellNum(ws: XLSX.WorkSheet, addr: string): number {
   const v = cell ? cell.v : 0
   return typeof v === 'number' ? v : (parseFloat(v) || 0)
 }
+// Like cellNum, but distinguishes a genuinely empty cell (null) from a cell
+// that holds the number 0. Needed for cost price, where "blank = no cost data"
+// and "0 = a real, free-to-produce item" must NOT be conflated.
+function cellNumOrNull(ws: XLSX.WorkSheet, addr: string): number | null {
+  const cell = (ws as any)[addr]
+  if (!cell || cell.v === '' || cell.v == null) return null
+  const n = typeof cell.v === 'number' ? cell.v : parseFloat(cell.v)
+  return Number.isFinite(n) ? n : null
+}
 function colLetter(idx: number): string {
   let s = ''
   idx += 1
@@ -94,7 +103,9 @@ export interface ParsedCatalogueItem {
   productType: string
   unitLabel: string
   retailPrice: number
-  costPrice: number
+  // null when the cost cell is blank (no cost data); a number — including 0 —
+  // when a cost was actually entered.
+  costPrice: number | null
 }
 
 export interface ParsedUpload {
@@ -147,7 +158,7 @@ export function parseCatalogueSheet(wb: XLSX.WorkBook): ParsedCatalogueItem[] {
       productType: cellStr(cat, `D${r}`).trim(),
       unitLabel: cellStr(cat, `E${r}`).trim(),
       retailPrice: cellNum(cat, `F${r}`) || 0,
-      costPrice: cellNum(cat, `G${r}`) || 0,
+      costPrice: cellNumOrNull(cat, `G${r}`),
     })
   }
   return items
@@ -512,9 +523,11 @@ export function buildPlanFromParsedUpload(parsed: ParsedUpload, genId: (prefix: 
     const key = keyFor(unitId, item.productName)
     const planLineId = revLineByKey[key] || null
     const cogsLineId = cogsLineByKey[key] || null
-    // Only carry a cost price when there's a cost-of-sales line to post it
-    // against — the database rejects a costed item with no COGS line.
-    const cost = item.costPrice > 0 && cogsLineId ? item.costPrice : null
+    // Only carry a cost price when a cost was actually entered (including a
+    // genuine 0 — a free-to-produce item) AND there's a cost-of-sales line to
+    // post it against; the database rejects a costed item with no COGS line.
+    // Use != null, not > 0, so a real zero cost isn't dropped as "no data".
+    const cost = item.costPrice != null && cogsLineId ? item.costPrice : null
     return {
       business_unit_id: unitId,
       plan_line_id: planLineId,

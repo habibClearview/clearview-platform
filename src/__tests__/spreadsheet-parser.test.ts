@@ -281,7 +281,12 @@ describe('buildPlanFromParsedUpload — catalogue linking', () => {
     XLSX.utils.book_append_sheet(wb, sheetFromCells({
       A4: 'Business Unit', B4: 'Product', C4: 'Category', D4: 'Product Type', E4: 'Unit', F4: 'Retail Price', G4: 'Cost Price',
       A5: 'TEST UNIT A', B5: 'WIDGETS', C5: 'Hardware', D5: 'Small', E5: 'box', F5: 5000, G5: 3000,
-      A6: 'TEST UNIT A', B6: 'NOPRODUCT', C6: 'Hardware', D6: 'Large', E6: 'unit', F6: 9000, G6: 0,
+      // GADGETS: a genuine ZERO cost (free to produce) with a matching cost line.
+      A6: 'TEST UNIT A', B6: 'GADGETS', C6: 'Hardware', D6: 'Medium', E6: 'unit', F6: 7000, G6: 0,
+      // GIZMOS: cost cell left BLANK (no cost data) — G7 omitted entirely.
+      A7: 'TEST UNIT A', B7: 'GIZMOS', C7: 'Hardware', D7: 'Tiny', E7: 'unit', F7: 3000,
+      // NOPRODUCT: no matching revenue line at all.
+      A8: 'TEST UNIT A', B8: 'NOPRODUCT', C8: 'Hardware', D8: 'Large', E8: 'unit', F8: 9000, G8: 400,
     }), 'Catalogue')
     return wb
   }
@@ -297,6 +302,24 @@ describe('buildPlanFromParsedUpload — catalogue linking', () => {
     expect(widget.cost_price).toBe(3000)
     expect(widget.price).toBe(5000)
     expect(widget.category).toBe('Hardware')
+  })
+
+  it('keeps a genuine zero cost price (does not drop it as "no data")', () => {
+    const parsed = parseClearviewWorkbook(workbookWithCatalogue())
+    const { catalogueRows } = buildPlanFromParsedUpload(parsed, genIdSeq())
+    const gadget = catalogueRows.find(c => c.name === 'GADGETS')!
+    expect(gadget.cost_price).toBe(0)
+    expect(gadget.cogs_plan_line_id).not.toBeNull()
+  })
+
+  it('treats a blank cost cell as no cost data (null)', () => {
+    const parsed = parseClearviewWorkbook(workbookWithCatalogue())
+    const gizmoParsed = parsed.catalogue.find(c => c.productName === 'GIZMOS')!
+    expect(gizmoParsed.costPrice).toBeNull()
+    const { catalogueRows } = buildPlanFromParsedUpload(parsed, genIdSeq())
+    const gizmo = catalogueRows.find(c => c.name === 'GIZMOS')!
+    expect(gizmo.cost_price).toBeNull()
+    expect(gizmo.cogs_plan_line_id).toBeNull()
   })
 
   it('carries no cost price when there is no cost-of-sales line to post against', () => {
