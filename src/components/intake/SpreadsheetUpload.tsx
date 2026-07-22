@@ -30,6 +30,11 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  // The client we just created, kept so we can offer a one-click CEO invite
+  // on the success screen using the email captured in the sheet.
+  const [created, setCreated] = useState<{id:string,email:string,name:string}|null>(null)
+  const [inviteState, setInviteState] = useState<'idle'|'sending'|'sent'|'error'>('idle')
+  const [inviteMsg, setInviteMsg] = useState('')
 
   async function handleFile(f: File) {
     setFile(f)
@@ -130,6 +135,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
         } catch (e) { console.error('Catalogue ingest request errored (non-fatal):', e) }
       }
 
+      setCreated({ id: client.id, email: business.contact_email || '', name: business.contact_name || '' })
       setSubmitted(true)
       if (onSuccess) onSuccess(client.id)
     } catch(e:any) {
@@ -138,11 +144,51 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
     setSubmitting(false)
   }
 
+  // One-click CEO invite: uses the coach's session to send the invitation to
+  // the email captured in the sheet. Only works for a signed-in coach — on the
+  // anonymous intake link there's no session, so we show guidance instead.
+  async function sendCeoInvite() {
+    if (!created?.email) return
+    setInviteState('sending'); setInviteMsg('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        setInviteState('error')
+        setInviteMsg('You need to be signed in as the coach to send the invite. Open this client from your coach dashboard and use “Client team & logins”.')
+        return
+      }
+      const res = await fetch('/api/invite-user', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: created.email, fullName: created.name || created.email, role: 'ceo',
+          clientId: created.id, assignedUnitIds: [], coImplementerId: null, funderProgrammeId: null,
+          inviterToken: session.access_token,
+        }),
+      })
+      const data = await res.json().catch(() => ({} as any))
+      if (!res.ok) { setInviteState('error'); setInviteMsg(data.error || 'Could not send the invitation.'); return }
+      setInviteState('sent'); setInviteMsg(`Invitation sent to ${created.email}. They'll get an email to set their password.`)
+    } catch {
+      setInviteState('error'); setInviteMsg('Could not send the invitation. Please try from the coach dashboard.')
+    }
+  }
+
   if (submitted) return (
     <div style={{...card,textAlign:'center'}}>
       <div style={{fontSize:'2rem',marginBottom:'1rem'}}>✓</div>
       <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Uploaded successfully</div>
       <p style={{color:C.slate,fontSize:'0.88rem'}}>The client has been created and their data loaded into Clearview.</p>
+      {created?.email && inviteState !== 'sent' && (
+        <div style={{marginTop:'1.25rem'}}>
+          <button style={btn(C.teal)} disabled={inviteState==='sending'} onClick={sendCeoInvite}>
+            {inviteState==='sending' ? 'Sending…' : `Send CEO login invite to ${created.email}`}
+          </button>
+          <p style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.5rem'}}>Sends the CEO an email to set their password. You can also do this later from the coach dashboard.</p>
+        </div>
+      )}
+      {inviteState==='sent' && <div style={{marginTop:'1.1rem',color:C.green,fontSize:'0.9rem'}}>✓ {inviteMsg}</div>}
+      {inviteState==='error' && <div style={{marginTop:'1.1rem',color:C.red,fontSize:'0.85rem'}}>{inviteMsg}</div>}
+      {!created?.email && <p style={{fontSize:'0.8rem',color:C.amber,marginTop:'0.9rem'}}>No CEO email was in the sheet, so no invite was sent. Add the CEO from the coach dashboard’s “Client team &amp; logins”.</p>}
     </div>
   )
 
