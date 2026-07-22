@@ -114,26 +114,23 @@ export default function SpreadsheetUpload({intakeToken,programmeId,existingClien
       }
 
       if (existingClient) {
-        // Load into an existing client. To avoid ANY chance of wiping a live
-        // model, this is only allowed when the client's model is still empty
-        // (no plan lines). If it already has a model, refuse and tell the coach
-        // to edit it in Settings/Planning instead. This also sidesteps any
-        // ambiguity about the upsert conflict key: we explicitly UPDATE the
-        // existing (empty) config row, or INSERT one if none exists yet.
-        const { data: existingCfg, error: cfgReadErr } = await supabase
-          .from('generic_model_config').select('id, plan_lines').eq('client_id', clientId).maybeSingle()
-        if (cfgReadErr) throw cfgReadErr
-        if (existingCfg && Array.isArray(existingCfg.plan_lines) && existingCfg.plan_lines.length > 0) {
-          setError(`${existingClient.name} already has a financial model, so loading a file would overwrite it. Loading a file into an existing client is only for one whose model is still empty. To change a model that already has figures, edit it in Settings and Planning (or clear it first).`)
-          setSubmitting(false)
-          return
-        }
-        if (existingCfg) {
-          const { error: updErr } = await supabase.from('generic_model_config').update(configFields).eq('client_id', clientId)
-          if (updErr) throw updErr
-        } else {
-          const { error: insErr } = await supabase.from('generic_model_config').insert([{ client_id: clientId, ...configFields }])
-          if (insErr) throw insErr
+        // Load into an existing client with a SINGLE atomic INSERT — never an
+        // overwrite. client_id is the config table's key (that's why the
+        // dashboard's own save upserts on it without a surrogate id), so a
+        // second INSERT for a client that already has a model fails with a
+        // duplicate-key error (23505). We treat that as "already set up" and
+        // change nothing. This is race-free by construction (no read-then-write
+        // window) and can never clobber a model that already has figures — the
+        // only case that proceeds is a client whose model was never started
+        // (e.g. one created by hand, like the empty client we discussed).
+        const { error: insErr } = await supabase.from('generic_model_config').insert([{ client_id: clientId, ...configFields }])
+        if (insErr) {
+          if ((insErr as any).code === '23505') {
+            setError(`${existingClient.name} already has a financial model set up, so nothing was changed. To replace a model that already has figures, edit it in Settings and Planning, or clear it first.`)
+            setSubmitting(false)
+            return
+          }
+          throw insErr
         }
       } else {
         const { error: configErr } = await supabase.from('generic_model_config').insert([{ client_id: clientId, ...configFields }])
