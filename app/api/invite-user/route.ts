@@ -161,7 +161,14 @@ export async function POST(req: NextRequest) {
       role,
       full_name: fullName,
       email,
-      status: 'invited',
+      // Use 'active' — the value the user_profiles status check constraint
+      // accepts. ('invited' is NOT in that constraint and was rejected with
+      // 23514, which is why the whole invite failed.) This column does not
+      // gate login: whether the person can actually sign in is controlled by
+      // Supabase Auth (they must accept the invite email and set a password),
+      // and the team list derives "Invited vs Active" from the auth record
+      // (email confirmed / last sign-in), not from this column.
+      status: 'active',
       assigned_unit_ids: assignedUnitIds || [],
       co_implementer_id: role === 'coach' ? coImplementerId : null,
       funder_programme_id: role === 'funder' ? funderProgrammeId : null,
