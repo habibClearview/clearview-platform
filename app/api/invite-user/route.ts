@@ -149,11 +149,12 @@ export async function POST(req: NextRequest) {
     // funder logins aren't "of" any one client — they're scoped by their own
     // co_implementer_id / funder_programme_id columns.
     const isClientRole = ['ceo', 'finance_manager', 'unit_head', 'accounts_assistant'].includes(role)
-    // Build the row with ONLY the columns this role needs. A CEO/finance_manager
-    // invite must never reference the coach/funder columns — if that column is
-    // ever absent on an environment, including it (even as null) makes the whole
-    // insert fail and the login can't be linked. Only add each scope column for
-    // the role it belongs to.
+    // Always set EVERY scope column explicitly — the one this role uses to its
+    // value, and the ones it doesn't to null. This is an upsert: if the same id
+    // already exists under a different role (e.g. someone re-invited from coach
+    // to ceo), omitting a column would leave the OLD role's scope in place
+    // (a stale co_implementer_id / funder_programme_id), which could leak access
+    // from the previous role. Writing null clears it every time.
     const profileRow: Record<string, any> = {
       id: inviteData.user.id,
       engagement_client_id: isClientRole ? (clientId || null) : null,
@@ -162,9 +163,9 @@ export async function POST(req: NextRequest) {
       email,
       status: 'invited',
       assigned_unit_ids: assignedUnitIds || [],
+      co_implementer_id: role === 'coach' ? coImplementerId : null,
+      funder_programme_id: role === 'funder' ? funderProgrammeId : null,
     }
-    if (role === 'coach') profileRow.co_implementer_id = coImplementerId
-    if (role === 'funder') profileRow.funder_programme_id = funderProgrammeId
     const { error: profileErr } = await admin.from('user_profiles').upsert(profileRow)
 
     if (profileErr) {
