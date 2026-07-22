@@ -871,6 +871,7 @@ function CopyIntakeLink({client}){
   const [loading,setLoading]=useState(true)
   const [copied,setCopied]=useState(false)
   const [creating,setCreating]=useState(false)
+  const [showUpload,setShowUpload]=useState(false)
 
   useEffect(()=>{
     supabase.from('client_intake_links').select('token').eq('client_id',client.id).order('created_at',{ascending:false}).limit(1).maybeSingle()
@@ -916,6 +917,17 @@ function CopyIntakeLink({client}){
         color:'var(--cv-wa-80)',cursor:'pointer',textDecoration:'none',display:'inline-block',marginLeft:'0.5rem'}}>
       ⬇ Download Template
     </a>
+    <button onClick={()=>setShowUpload(v=>!v)}
+      style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,
+        background:'transparent',border:'1px solid var(--cv-wa-40)',
+        color:'var(--cv-wa-80)',cursor:'pointer',marginLeft:'0.5rem'}}>
+      {showUpload?'Hide upload':'⬆ Upload completed file'}
+    </button>
+    {showUpload&&(
+      <div style={{marginTop:'0.75rem'}}>
+        <SpreadsheetUpload existingClient={{id:client.id,name:client.name}} onSuccess={()=>setShowUpload(false)}/>
+      </div>
+    )}
     </>
   )
 }
