@@ -405,11 +405,31 @@ export interface BuiltActualsRow {
   values: Record<string, number>
 }
 
+// A field-catalogue row ready to be written by the /api/ingest-catalogue
+// server route. category / productType are carried as NAMES; the server
+// resolves them to catalogue_value_lists ids (creating the list entry if it
+// doesn't exist yet). plan_line_id is the revenue line this item's sales roll
+// up into (null if the catalogue product name didn't match any revenue line).
+// cost_price is only carried when there is a cogs_plan_line_id to post the
+// cost against — the database enforces that a costed item always has one.
+export interface BuiltCatalogueRow {
+  business_unit_id: string
+  plan_line_id: string | null
+  cogs_plan_line_id: string | null
+  name: string
+  category: string
+  product_type: string
+  unit_label: string
+  price: number
+  cost_price: number | null
+}
+
 export interface BuiltPlan {
   businessUnits: { id: string; name: string; short: string; type: string; color: string; headcount: number; active: true; sort_order: number }[]
   planLines: BuiltPlanLine[]
   totalMonths: number
   actualsRows: BuiltActualsRow[]
+  catalogueRows: BuiltCatalogueRow[]
 }
 
 // Turns a ParsedUpload into the plan lines, business units, and actuals
@@ -418,7 +438,7 @@ export interface BuiltPlan {
 // the exact period-string math that determines which calendar month
 // each historical actuals row lands on.
 export function buildPlanFromParsedUpload(parsed: ParsedUpload, genId: (prefix: string) => string, now: Date = new Date()): BuiltPlan {
-  const { business, hasUnits, units, products, commonCosts, pastMonths } = parsed
+  const { business, hasUnits, units, products, commonCosts, catalogue, pastMonths } = parsed
   const totalMonths = Math.max(parsed.monthColsCount, 24)
   const planArray = (values: number[]): number[] => Array.from({ length: totalMonths }, (_, i) => values[i] ?? 0)
 
@@ -438,11 +458,21 @@ export function buildPlanFromParsedUpload(parsed: ParsedUpload, genId: (prefix: 
   })
 
   const planLines: BuiltPlanLine[] = []
+  // Remember each product's revenue line id and its first cost-of-sales line
+  // id, keyed by unit+product name, so catalogue rows can be linked to the
+  // exact plan lines this same upload creates.
+  const revLineByKey: Record<string, string> = {}
+  const cogsLineByKey: Record<string, string> = {}
+  const keyFor = (unitId: string, name: string) => `${unitId}|${(name || '').trim().toLowerCase()}`
   products.forEach(p => {
     const unitId = hasUnits ? (unitIdByName[p.unitName] || keys[0].id) : wholeKey
-    planLines.push({ id: genId('rev'), unit_id: unitId, name: p.name, category: 'revenue', line_type: 'standard', monthly_plan: planArray(p.revenue), active: true })
+    const revId = genId('rev')
+    planLines.push({ id: revId, unit_id: unitId, name: p.name, category: 'revenue', line_type: 'standard', monthly_plan: planArray(p.revenue), active: true })
+    revLineByKey[keyFor(unitId, p.name)] = revId
     p.costLines.forEach(c => {
-      planLines.push({ id: genId('cost'), unit_id: unitId, name: `${p.name} — ${c.name}`, category: 'cost_of_sales', line_type: 'standard', monthly_plan: planArray(c.values), active: true })
+      const costId = genId('cost')
+      planLines.push({ id: costId, unit_id: unitId, name: `${p.name} — ${c.name}`, category: 'cost_of_sales', line_type: 'standard', monthly_plan: planArray(c.values), active: true })
+      if (!cogsLineByKey[keyFor(unitId, p.name)]) cogsLineByKey[keyFor(unitId, p.name)] = costId
     })
   })
   commonCosts.forEach(c => {
@@ -475,5 +505,28 @@ export function buildPlanFromParsedUpload(parsed: ParsedUpload, genId: (prefix: 
     }
   }
 
-  return { businessUnits, planLines, totalMonths, actualsRows: Object.values(actualsByUnitPeriod) }
+  // Catalogue rows: link each catalogue item to the revenue line (and, when
+  // it has a cost price, the cost-of-sales line) this upload just created.
+  const catalogueRows: BuiltCatalogueRow[] = (catalogue || []).map(item => {
+    const unitId = hasUnits ? (unitIdByName[item.unitName] || keys[0].id) : wholeKey
+    const key = keyFor(unitId, item.productName)
+    const planLineId = revLineByKey[key] || null
+    const cogsLineId = cogsLineByKey[key] || null
+    // Only carry a cost price when there's a cost-of-sales line to post it
+    // against — the database rejects a costed item with no COGS line.
+    const cost = item.costPrice > 0 && cogsLineId ? item.costPrice : null
+    return {
+      business_unit_id: unitId,
+      plan_line_id: planLineId,
+      cogs_plan_line_id: cost != null ? cogsLineId : null,
+      name: item.productName,
+      category: item.category,
+      product_type: item.productType,
+      unit_label: item.unitLabel,
+      price: item.retailPrice,
+      cost_price: cost,
+    }
+  })
+
+  return { businessUnits, planLines, totalMonths, actualsRows: Object.values(actualsByUnitPeriod), catalogueRows }
 }

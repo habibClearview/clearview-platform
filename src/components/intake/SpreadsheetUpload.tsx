@@ -65,7 +65,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
       }]).select().single()
       if (clientErr) throw clientErr
 
-      const { businessUnits, planLines, totalMonths, actualsRows } = buildPlanFromParsedUpload(preview, genId)
+      const { businessUnits, planLines, totalMonths, actualsRows, catalogueRows } = buildPlanFromParsedUpload(preview, genId)
 
       const { error: configErr } = await supabase.from('generic_model_config').insert([{
         client_id: client.id, business_name: business.business_name, currency: business.currency,
@@ -104,6 +104,25 @@ export default function SpreadsheetUpload({intakeToken,programmeId,onSuccess}:{i
           line_values: values, submitted: true, submitted_at: new Date().toISOString(),
           submitted_by: business.contact_name, entered_by: business.contact_name,
         }, { onConflict: 'client_id,unit_id,period' })
+      }
+
+      // Load the product catalogue (v8 sheet), if any, into the field app.
+      // These tables are service-role only, so this goes through a server
+      // route that needs the caller's session token. On the anonymous intake
+      // link there's no session — we skip it there (the financial model is
+      // already saved; the coach can add the catalogue later). Any failure
+      // here is non-fatal for the same reason.
+      if (catalogueRows && catalogueRows.length > 0) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session?.access_token) {
+            await fetch('/api/ingest-catalogue', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+              body: JSON.stringify({ clientId: client.id, items: catalogueRows }),
+            })
+          }
+        } catch { /* non-fatal: the client and financial model are already saved */ }
       }
 
       setSubmitted(true)

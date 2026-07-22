@@ -270,3 +270,44 @@ describe('catalogue sheet (v8)', () => {
     expect(parsed.catalogue.map(c => c.productName)).toEqual(['WIDGETS', 'GADGETS'])
   })
 })
+
+describe('buildPlanFromParsedUpload — catalogue linking', () => {
+  function genIdSeq() {
+    let n = 0
+    return (prefix: string) => `${prefix}_${n++}`
+  }
+  function workbookWithCatalogue() {
+    const wb = buildTestWorkbook()
+    XLSX.utils.book_append_sheet(wb, sheetFromCells({
+      A4: 'Business Unit', B4: 'Product', C4: 'Category', D4: 'Product Type', E4: 'Unit', F4: 'Retail Price', G4: 'Cost Price',
+      A5: 'TEST UNIT A', B5: 'WIDGETS', C5: 'Hardware', D5: 'Small', E5: 'box', F5: 5000, G5: 3000,
+      A6: 'TEST UNIT A', B6: 'NOPRODUCT', C6: 'Hardware', D6: 'Large', E6: 'unit', F6: 9000, G6: 0,
+    }), 'Catalogue')
+    return wb
+  }
+
+  it('links a catalogue item to its revenue line and cost-of-sales line', () => {
+    const parsed = parseClearviewWorkbook(workbookWithCatalogue())
+    const { planLines, catalogueRows } = buildPlanFromParsedUpload(parsed, genIdSeq())
+    const widget = catalogueRows.find(c => c.name === 'WIDGETS')!
+    const revLine = planLines.find(l => l.name === 'WIDGETS' && l.category === 'revenue')!
+    const cogsLine = planLines.find(l => l.name === 'WIDGETS — Cost of Goods' && l.category === 'cost_of_sales')!
+    expect(widget.plan_line_id).toBe(revLine.id)
+    expect(widget.cogs_plan_line_id).toBe(cogsLine.id)
+    expect(widget.cost_price).toBe(3000)
+    expect(widget.price).toBe(5000)
+    expect(widget.category).toBe('Hardware')
+  })
+
+  it('carries no cost price when there is no cost-of-sales line to post against', () => {
+    // NOPRODUCT has no matching revenue line at all, so no plan_line_id and no
+    // cogs line — cost price must be dropped (the DB rejects a costed item
+    // with no COGS line).
+    const parsed = parseClearviewWorkbook(workbookWithCatalogue())
+    const { catalogueRows } = buildPlanFromParsedUpload(parsed, genIdSeq())
+    const np = catalogueRows.find(c => c.name === 'NOPRODUCT')!
+    expect(np.plan_line_id).toBeNull()
+    expect(np.cogs_plan_line_id).toBeNull()
+    expect(np.cost_price).toBeNull()
+  })
+})
