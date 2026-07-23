@@ -1009,7 +1009,7 @@ export default function GenericDashboard({
         {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} pendingApprovalCount={pendingApprovalCount} pendingActualsCount={pendingActualsCount} onGoToApprovals={()=>setView('approvals')} onGoToIntelligence={()=>setView('intelligence')}/>}
         {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P} marketEvents={marketEvents} onMarketEventsChanged={reloadMarketEvents} onApprovalActioned={reloadPendingActualsCount}/>}
         {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods} onNavigate={setView}/>}
-        {view==='performance' && <PerformanceTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={onSave} onGoToIntelligence={()=>setView('intelligence')}/>}
+        {view==='performance' && <PerformanceTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={saveConfig} onGoToIntelligence={()=>setView('intelligence')}/>}
         {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} clientId={clientId} marketEvents={marketEvents} marketEventsError={marketEventsError} onMarketEventsChanged={reloadMarketEvents}/>}
         {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods}/>}
         {view==='cashflow'    && <CashFlowTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
@@ -1195,9 +1195,16 @@ function PerformanceTab({config,result,months,cc,clientId,P,onSave,onGoToIntelli
   async function saveCE(){
     if(!onSave) return
     setCeSaving(true)
+    // Persist ONLY the fields the user actually filled in. A blank field is
+    // skipped (not stored as 0), so it stays blank on reload and its metric
+    // stays "needs input". This save goes through the same saveConfig path
+    // (RLS-gated on generic_model_config) that every other Settings/Planning
+    // editing tab uses — the canEditCE check mirrors those tabs' own gating.
     const clean: Record<string,number> = {}
     ;['avgPurchaseValue','purchasesPerYear','avgLifespanYears','monthlyGrossProfitPerCustomer','recurringSubscribers','arpu'].forEach(k=>{
-      const n=Number((ceForm as any)[k]); if(Number.isFinite(n)&&n>=0) clean[k]=n
+      const raw=(ceForm as any)[k]
+      if(raw==='' || raw===null || raw===undefined) return
+      const n=Number(raw); if(Number.isFinite(n)&&n>=0) clean[k]=n
     })
     try{ await onSave({ ...config, settings: { ...(config.settings||{}), customer_economics: clean } }) }catch{ notify('Could not save these figures. Please try again.') }
     setCeSaving(false); setCeEditing(false)
