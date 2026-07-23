@@ -69,6 +69,15 @@ const securityHeaders = [
 ]
 
 const nextConfig = {
+  // Surface Vercel's server-only VERCEL_ENV ('production' | 'preview' |
+  // 'development') to the browser bundle as NEXT_PUBLIC_VERCEL_ENV, so the
+  // STAGING safety banner (src/lib/app-env.ts) appears on EVERY preview deploy
+  // automatically — even before NEXT_PUBLIC_APP_ENV is set for that environment.
+  // Empty string when building outside Vercel (local); app-env then treats it as
+  // production, so no false banner locally unless NEXT_PUBLIC_APP_ENV says so.
+  env: {
+    NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV || '',
+  },
   experimental: {
     // The /api/support/sync-playbook route reads docs/support-playbook/*.md at
     // runtime. Next.js only bundles files it can statically see are imported, so
