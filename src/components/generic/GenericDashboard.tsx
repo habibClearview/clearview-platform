@@ -697,7 +697,7 @@ export default function GenericDashboard({
     supabase.from('generic_market_events').select('*').eq('client_id', clientId).order('created_at', {ascending:false})
       .then(({data, error}) => {
         if (marketEventsReqRef.current !== reqId) return // superseded by a newer load
-        if (error) { console.error('Failed to load market activities:', error.message); setMarketEventsError(true); return }
+        if (error) { console.error('Failed to load marketing activities:', error.message); setMarketEventsError(true); return }
         setMarketEventsError(false)
         setMarketEvents((data as MarketEvent[]) || [])
       })
@@ -867,7 +867,7 @@ export default function GenericDashboard({
     // Inject two families of synthetic plan lines before running the engine:
     //  1. driver-derived lines (sales/cost drivers → revenue/cost, with the
     //     buy/sell spread), and
-    //  2. APPROVED market activities (their cost for the months they cover).
+    //  2. APPROVED marketing activities (their cost for the months they cover).
     // Each is a no-op when empty, so a model with neither is completely
     // unaffected. The engine sums plan lines by category, so both just flow into
     // P&L / cash flow / balance sheet.
@@ -923,7 +923,7 @@ export default function GenericDashboard({
     ['cashflow','Cash Flow'],
     ['balancesheet','Balance Sheet'],
     ['approvals',(()=>{
-      // Only count pending market activities for users who can actually approve
+      // Only count pending marketing activities for users who can actually approve
       // them, so a non-approver never sees a badge that leads to an empty queue.
       const canApproveEvents = ['finance_manager','ceo','super_coach','coach'].includes(P.role)
       const eventsPending = canApproveEvents ? marketEvents.filter(e=>e.status==='proposed').length : 0
@@ -2203,7 +2203,7 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
     onChanged&&onChanged()
   }
   async function remove(id:string){
-    if(!confirm('Delete this market activity? If it was approved, its cost will stop flowing into the plan.'))return
+    if(!confirm('Delete this marketing activity? If it was approved, its cost will stop flowing into the plan.'))return
     // Scope the delete to this client (defence in depth on top of RLS). The
     // database's delete policy is the real guard: a non-approver can only delete
     // their own still-proposed activity, so deleting an approved one is refused
@@ -2226,11 +2226,11 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
 
   return (
     <div style={card}>
-      <SectionHeader title="Market Activities" action={P.canEditPlan?<button style={addBtn(true,C.teal)} onClick={()=>setShowAdd(s=>!s)}>{showAdd?'Close':'+ Propose activity'}</button>:null}/>
+      <SectionHeader title="Marketing Activities" action={P.canEditPlan?<button style={addBtn(true,C.teal)} onClick={()=>setShowAdd(s=>!s)}>{showAdd?'Close':'+ Propose activity'}</button>:null}/>
       <p style={{fontSize:'1.06rem',color:C.slate,marginBottom:'0.75rem'}}>Plan a marketing or sales push — its cost, the unit it's for, the month(s) it runs, and the sales lift you expect. Once <strong>approved</strong>, the cost automatically flows into the plan (P&amp;L, cash flow) for those months. Clearview Intelligence then tracks expected vs actual impact.</p>
       {loadError&&(
         <div style={{padding:'0.7rem 0.9rem',borderRadius:8,background:'var(--cv-tint-warn)',border:`1px solid ${C.amber}`,color:C.amber,fontSize:'1.0rem',marginBottom:'0.75rem'}}>
-          Couldn't load market activities just now, so any approved activity's cost may be missing from the figures. Reload the page to try again.
+          Couldn't load marketing activities just now, so any approved activity's cost may be missing from the figures. Reload the page to try again.
         </div>
       )}
       {showAdd&&P.canEditPlan&&(
@@ -2252,7 +2252,7 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
         </div>
       )}
       {(!events||events.length===0)?(
-        <div style={{fontSize:'1.0rem',color:C.slate}}>No market activities yet.</div>
+        <div style={{fontSize:'1.0rem',color:C.slate}}>No marketing activities yet.</div>
       ):(
         <div style={{overflowX:'auto'}}>
           <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem'}}>
@@ -2272,7 +2272,7 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
                   <td style={{padding:'6px 8px'}}>
                     <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}>
                       {P.canEditPlan&&e.status==='rejected'&&<button style={addBtn(true,C.teal)} onClick={()=>rePropose(e.id)}>Re-propose</button>}
-                      {P.canEditPlan&&<button style={delBtn} aria-label="Delete market activity" title="Delete market activity" onClick={()=>remove(e.id)}>×</button>}
+                      {P.canEditPlan&&<button style={delBtn} aria-label="Delete marketing activity" title="Delete marketing activity" onClick={()=>remove(e.id)}>×</button>}
                     </div>
                   </td>
                 </tr>
