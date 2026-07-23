@@ -127,7 +127,9 @@ export async function POST(req: NextRequest) {
         .from('engagement_clients')
         .select('slug')
         .eq('id', clientId)
-        .single()
+        // maybeSingle: a no-match returns { data: null } cleanly instead of an
+        // error, so a bad/stale clientId just drops to the safe login fallback.
+        .maybeSingle()
       // Fall back to the login page (never a bespoke route) if the slug is
       // somehow missing, so a client user is never dropped onto some other
       // client's dashboard.
