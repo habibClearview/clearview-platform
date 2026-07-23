@@ -13,10 +13,14 @@ export default function EnvBanner() {
   const env = appEnv()
   if (env === 'production') return null
 
+  // Deliberately does NOT promise "this can never touch production" — that would
+  // depend on the Supabase URL actually pointing at staging, which this banner
+  // can't verify. Instead it tells people what to DO: treat this as a test area
+  // and don't put real client information in it.
   const label =
     env === 'staging'
-      ? 'STAGING — safe test copy. This is NOT your live data. Anything you enter or delete here does not affect real clients.'
-      : 'LOCAL DEV — development build. Not connected to production.'
+      ? 'STAGING — test copy for trying things out. Do NOT enter real client information here; use made-up data.'
+      : 'LOCAL DEV — development build. Do not enter real client information.'
 
   return (
     <div

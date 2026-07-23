@@ -7,9 +7,12 @@
 //   1. NEXT_PUBLIC_APP_ENV  — the explicit flag we set per Vercel environment.
 //        Set it to 'staging' on the Vercel *Preview* environment (which is
 //        wired to the staging database), and to 'production' on Production.
-//   2. NEXT_PUBLIC_VERCEL_ENV — Vercel's own automatic signal ('preview' /
-//        'production' / 'development'), used only as a fallback if (1) is unset
-//        so a preview deploy still warns even before the flag is configured.
+//   2. NEXT_PUBLIC_VERCEL_ENV — Vercel's automatic signal ('preview' /
+//        'production' / 'development'). Vercel's own variable is VERCEL_ENV
+//        (server-only); next.config.js re-exports it under this NEXT_PUBLIC_
+//        name so it reaches the browser bundle. Used as a fallback when (1) is
+//        unset, so a preview deploy still shows the banner even before the flag
+//        is configured for that environment.
 //
 // If NOTHING is set we deliberately assume 'production' — so we never paint a
 // false "staging" banner on the real site. The banner is a safety net for the

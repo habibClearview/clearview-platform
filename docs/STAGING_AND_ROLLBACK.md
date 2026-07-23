@@ -41,18 +41,31 @@ Cost: **£0/month** (a second free Supabase project).
 This copies the **shape** of your database (all the tables and rules) but
 **none of the data** — staging starts empty and safe.
 
-1. First, get your **live** project's connection string:
-   - Open your **live** project in Supabase → **Project Settings** (gear icon) → **Database**.
-   - Under **Connection string**, copy the **URI** line. It looks like
-     `postgresql://postgres:[YOUR-PASSWORD]@db.abcd1234.supabase.co:5432/postgres`.
-2. In this project's folder, run this one command (it only **reads** the structure, it changes nothing):
+We use Supabase's own login (a browser sign-in) so you **never type your
+database password into a command**. That keeps the password out of your
+terminal history and logs.
+
+> ⚠️ Never paste a command that contains your database password directly (e.g. a
+> `postgresql://postgres:PASSWORD@...` URL) into a terminal, chat, or log — it
+> gets saved in history where others could see it. The steps below avoid that.
+
+1. Sign in to Supabase from your computer (opens your browser once):
+
    ```bash
-   npx supabase db dump \
-     --db-url "postgresql://postgres:[LIVE-PASSWORD]@db.[LIVE-REF].supabase.co:5432/postgres" \
-     --schema public -f schema.sql
+   npx supabase login
    ```
-   Replace the two bits in brackets with the values from the URI you copied.
-   This creates a file called `schema.sql`.
+
+2. Point the tool at your **live** project, then dump only the **structure**
+   (this only **reads** — it changes nothing). Get your live project's *ref*
+   from its dashboard URL (`.../project/<REF>`), then:
+
+   ```bash
+   npx supabase link --project-ref [LIVE-REF]
+   npx supabase db dump --schema public -f schema.sql
+   ```
+
+   This creates a file called `schema.sql`. No password appears anywhere.
+
 3. Now load that structure into **staging**:
    - Open your **`clearview-staging`** project → **SQL Editor** → **New query**.
    - Open `schema.sql`, copy everything, paste it into the editor, and click **Run**.
@@ -93,9 +106,21 @@ staging database instead."
 4. That's it. The next Pull Request's preview link will use the staging
    database and show the yellow **STAGING** banner.
 
+> **Why this is safe — and one honest caveat.** The `SUPABASE_SERVICE_ROLE_KEY`
+> is a powerful key that can read/write past the database's normal row-level
+> protections. The app's server needs it to run, so it has to be present on
+> preview deploys too. Because a *Preview*-scoped variable is available to
+> **every** preview deployment, that staging key is reachable from any preview —
+> which is acceptable **only because staging holds throwaway/made-up data, never
+> real client data** (that's the whole point of the STAGING banner telling people
+> not to enter real information). It is a **separate** key from your production
+> project, so it can never touch live data. If you later want to tighten this,
+> Vercel lets you scope a Preview variable to a **specific branch** only — say
+> the word and I'll walk you through it.
+
 > **How do I check it worked?** Open the preview link on your next PR. If you
-> see the yellow "STAGING — safe test copy" bar at the top, it's wired
-> correctly and you're looking at staging data, not real data.
+> see the yellow **STAGING** bar at the top, it's wired correctly and you're
+> looking at the staging database, not real data.
 
 ---
 
@@ -132,21 +157,31 @@ roll back to the last good one in seconds — **no code, no waiting**:
 > **Important nuance:** rollback instantly restores the **app** (the screens and
 > logic). It does **not** rewind the **database**. So if a bad change also wrote
 > or deleted data, rolling back the app fixes the behaviour but not the data —
-> which is exactly why testing on staging first matters. For data safety over
-> time, the paid Supabase plan adds point-in-time database recovery (see
-> Appendix).
+> which is exactly why testing on staging first matters. For rewinding the
+> database itself, Supabase's Point-in-Time Recovery add-on exists (see Appendix
+> for what it actually costs).
 
 ---
 
 ## Appendix — the hands-off paid option
 
-If the one-time schema copy in Part A feels like too much, Supabase's **Pro plan
-(~$25/month)** has a **Branching** feature that creates a staging database for
-every preview automatically, with the structure already cloned and kept in sync
-— zero manual copying, ever. It also adds **downloadable backups** and
-**point-in-time recovery** (rewind the database to any moment in the last 7
-days), which is a real safety net as GtCV grows.
+If the one-time schema copy in Part A feels like too much, Supabase's
+**Branching** feature (available on the **Pro plan**, which starts at ~$25/month)
+creates a staging database for every preview automatically, with the structure
+already cloned and kept in sync — zero manual copying, ever.
+
+Be aware of how the costs actually stack up, so there are no surprises:
+
+- **Pro plan** — ~$25/month base. **Includes daily backups** with 7-day
+  retention (a real safety net as GtCV grows).
+- **Branching** — **billed by usage on top of the Pro base**, not a flat fee:
+  roughly $0.01344 per active branch per hour of compute, plus any storage/egress
+  that branch uses. Short-lived preview branches are cheap; long-running ones add
+  up. (This usage is not covered by the spend cap.)
+- **Point-in-Time Recovery** (rewind the database to any moment in the last 7
+  days) — a **separate add-on**, about **$100/month**, not included in Pro. Only
+  worth it once there's real client data worth being able to rewind.
 
 Everything else in this guide (the Preview-scoped Vercel variables, the STAGING
 banner, one-click app rollback) stays the same either way. Say the word and I'll
-give you the click-by-click to switch this on.
+give you the click-by-click to switch Branching on.

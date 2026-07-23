@@ -16,6 +16,24 @@ function getAdminClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
+// Base URL the invitation email link points at. Order:
+//   1. NEXT_PUBLIC_APP_URL — set explicitly per environment (the live domain on
+//      Production; optionally the staging URL on Preview).
+//   2. On a NON-production Vercel deploy with no explicit URL, the deploy's own
+//      preview URL (VERCEL_URL) — so a staging invite links back to STAGING.
+//   3. Live domain — only as the final default, and only when nothing above
+//      applies (i.e. on production, where NEXT_PUBLIC_APP_URL is set anyway).
+// The point: a preview/staging deploy must NEVER silently email a link to the
+// live production site.
+function inviteBaseUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_APP_URL
+  if (explicit) return explicit.replace(/\/+$/, '')
+  const vercelEnv = process.env.VERCEL_ENV
+  const vercelUrl = process.env.VERCEL_URL // host only, no scheme
+  if (vercelEnv && vercelEnv !== 'production' && vercelUrl) return `https://${vercelUrl}`
+  return 'https://clearview.habibonifade.com'
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json() as {
@@ -119,19 +137,26 @@ export async function POST(req: NextRequest) {
     //     client's slug (/dashboard/<slug>). This used to be hardwired to the
     //     retired CONAS route, which dropped every invited client user onto the
     //     wrong dashboard; now it follows the client they were invited into.
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://clearview.habibonifade.com'
+    const appUrl = inviteBaseUrl()
     let redirectTo = `${appUrl}/coach`
     if (role !== 'coach' && role !== 'funder') {
       // clientId is guaranteed present for client roles (validated above).
-      const { data: clientRow } = await admin
+      const { data: clientRow, error: lookupErr } = await admin
         .from('engagement_clients')
         .select('slug')
         .eq('id', clientId)
-        // maybeSingle: a no-match returns { data: null } cleanly instead of an
-        // error, so a bad/stale clientId just drops to the safe login fallback.
+        // maybeSingle: a no-match returns { data: null, error: null } cleanly,
+        // separating "no such client" from a real database error below.
         .maybeSingle()
-      // Fall back to the login page (never a bespoke route) if the slug is
-      // somehow missing, so a client user is never dropped onto some other
+      // A genuine DB error must NOT be treated like "no slug" — otherwise we'd
+      // send the invite anyway with a degraded /login redirect. Abort before
+      // emailing so the inviter can simply retry.
+      if (lookupErr) {
+        console.error('invite-user: client slug lookup failed', lookupErr.message)
+        return NextResponse.json({ error: 'Could not prepare the invitation just now. Nothing was sent — please try again.' }, { status: 503 })
+      }
+      // Fall back to the login page (never a bespoke route) only on a genuine
+      // no-match/missing slug, so a client user is never dropped onto some other
       // client's dashboard.
       redirectTo = clientRow?.slug ? `${appUrl}/dashboard/${clientRow.slug}` : `${appUrl}/`
     }

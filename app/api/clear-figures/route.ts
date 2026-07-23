@@ -53,6 +53,13 @@ export async function POST(req: NextRequest) {
     // Destructive op — cap how often one account can clear, so a compromised or
     // careless CEO/FM token can't loop-wipe.
     const rl = await checkRateLimit(admin, `clear-figures:${user.id}`, 10, 3600)
+    // FAIL CLOSED here (unlike most routes): if we can't even evaluate the safety
+    // cap — limiter DB blip or the counter function isn't installed — do NOT run
+    // an irreversible wipe. Block and ask the caller to retry, rather than let an
+    // un-throttled destructive operation through.
+    if (rl.errored) {
+      return NextResponse.json({ error: 'Could not verify the safety limit just now. Nothing was changed — please try again in a moment.' }, { status: 503 })
+    }
     if (!rl.allowed) return NextResponse.json({ error: 'Too many clear operations recently. Please wait a while before trying again.' }, { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } })
 
     // Do the whole reset ATOMICALLY via a single-transaction DB function. This
