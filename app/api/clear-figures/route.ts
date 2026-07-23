@@ -19,6 +19,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { getBearerToken } from '@/lib/auth/api-authz'
 import { writeAuditLog, auditIp } from '@/lib/audit-log'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -48,6 +49,11 @@ export async function POST(req: NextRequest) {
       (['ceo', 'finance_manager'].includes(actor.role) && actor.engagement_client_id === clientId)
     )
     if (!allowed) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
+    // Destructive op — cap how often one account can clear, so a compromised or
+    // careless CEO/FM token can't loop-wipe.
+    const rl = await checkRateLimit(admin, `clear-figures:${user.id}`, 10, 3600)
+    if (!rl.allowed) return NextResponse.json({ error: 'Too many clear operations recently. Please wait a while before trying again.' }, { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } })
 
     // Do the whole reset ATOMICALLY via a single-transaction DB function. This
     // is the ONLY path — there is deliberately no sequential fallback, so a
