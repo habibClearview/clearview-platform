@@ -49,29 +49,41 @@ export async function POST(req: NextRequest) {
     )
     if (!allowed) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    // Always clear the recorded actuals.
-    const { error: actErr } = await admin.from('generic_actuals').delete().eq('client_id', clientId)
-    if (actErr) { console.error('clear-figures: actuals delete failed', actErr.message); return NextResponse.json({ error: 'Could not clear the recorded figures. Please try again.' }, { status: 500 }) }
+    // Do the whole reset ATOMICALLY via a single-transaction DB function, so a
+    // mid-way failure can never leave a half-cleared model.
+    const { error: rpcErr } = await admin.rpc('clear_client_figures', { p_client_id: clientId, p_scope: scope })
+    if (rpcErr) {
+      // If the function isn't installed yet on this environment (migration not
+      // run), fall back to sequential calls — but ORDERED so the worst case is
+      // harmless, never destructive: for 'model' we reset the config FIRST, so
+      // if a later step fails we've only left orphaned actuals/events (which the
+      // engine ignores by plan_line_id) rather than deleting actuals while the
+      // plan survives.
+      const missingFn = ['PGRST202', '42883'].includes((rpcErr as any).code) || /clear_client_figures|not exist|could not find/i.test(rpcErr.message || '')
+      if (!missingFn) { console.error('clear-figures: rpc failed', (rpcErr as any).code, rpcErr.message); return NextResponse.json({ error: 'Could not clear the figures. Please try again.' }, { status: 500 }) }
 
-    if (scope === 'model') {
-      // Reset the model to empty, keeping identity/currency/settings. Marketing
-      // events reference plan lines we're removing, so clear them too (best
-      // effort — a missing table on some environment is ignored).
-      const { error: mkErr } = await admin.from('generic_market_events').delete().eq('client_id', clientId)
-      if (mkErr && (mkErr as any).code !== '42P01') console.warn('clear-figures: market events delete failed', mkErr.message)
-      const { error: cfgErr } = await admin.from('generic_model_config')
-        .update({ plan_lines: [], business_units: [], shared_lines: [] })
-        .eq('client_id', clientId)
-      if (cfgErr) { console.error('clear-figures: config reset failed', cfgErr.message); return NextResponse.json({ error: 'Cleared the recorded figures, but could not reset the model. Please try again.' }, { status: 500 }) }
+      if (scope === 'model') {
+        const { error: cfgErr } = await admin.from('generic_model_config')
+          .update({ plan_lines: [], business_units: [], shared_lines: [] }).eq('client_id', clientId)
+        if (cfgErr) { console.error('clear-figures: config reset failed', cfgErr.message); return NextResponse.json({ error: 'Could not reset the model. Please try again.' }, { status: 500 }) }
+        const { error: mkErr } = await admin.from('generic_market_events').delete().eq('client_id', clientId)
+        if (mkErr && (mkErr as any).code !== '42P01') console.warn('clear-figures: market events delete failed', mkErr.message)
+      }
+      const { error: actErr } = await admin.from('generic_actuals').delete().eq('client_id', clientId)
+      if (actErr) { console.error('clear-figures: actuals delete failed', actErr.message); return NextResponse.json({ error: 'Could not clear the recorded figures. Please try again.' }, { status: 500 }) }
     }
 
-    await writeAuditLog(admin, {
-      actorId: user.id, actorEmail: (actor as any)?.email || user.email, actorRole: (actor as any)?.role,
-      action: 'client.figures_cleared',
-      targetId: clientId, targetEmail: null,
-      detail: { scope },
-      ip: auditIp(req.headers),
-    })
+    // Audit the destructive action. The clear has already happened, so a failed
+    // log must NOT flip the response to an error — log it and move on.
+    try {
+      await writeAuditLog(admin, {
+        actorId: user.id, actorEmail: (actor as any)?.email || user.email, actorRole: (actor as any)?.role,
+        action: 'client.figures_cleared',
+        targetId: clientId, targetEmail: null,
+        detail: { scope },
+        ip: auditIp(req.headers),
+      })
+    } catch (logErr) { console.error('clear-figures: audit log failed (clear already applied)', logErr) }
 
     return NextResponse.json({ ok: true, scope })
   } catch (e: any) {
