@@ -49,28 +49,22 @@ export async function POST(req: NextRequest) {
     )
     if (!allowed) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    // Do the whole reset ATOMICALLY via a single-transaction DB function, so a
-    // mid-way failure can never leave a half-cleared model.
+    // Do the whole reset ATOMICALLY via a single-transaction DB function. This
+    // is the ONLY path — there is deliberately no sequential fallback, so a
+    // partial/half-cleared state is impossible: either the function ran (all or
+    // nothing) or nothing changed. If the function isn't installed on this
+    // environment yet, fail clearly and tell the coach to run the one-time
+    // migration rather than doing a risky non-atomic wipe.
     const { error: rpcErr } = await admin.rpc('clear_client_figures', { p_client_id: clientId, p_scope: scope })
     if (rpcErr) {
-      // If the function isn't installed yet on this environment (migration not
-      // run), fall back to sequential calls — but ORDERED so the worst case is
-      // harmless, never destructive: for 'model' we reset the config FIRST, so
-      // if a later step fails we've only left orphaned actuals/events (which the
-      // engine ignores by plan_line_id) rather than deleting actuals while the
-      // plan survives.
-      const missingFn = ['PGRST202', '42883'].includes((rpcErr as any).code) || /clear_client_figures|not exist|could not find/i.test(rpcErr.message || '')
-      if (!missingFn) { console.error('clear-figures: rpc failed', (rpcErr as any).code, rpcErr.message); return NextResponse.json({ error: 'Could not clear the figures. Please try again.' }, { status: 500 }) }
-
-      if (scope === 'model') {
-        const { error: cfgErr } = await admin.from('generic_model_config')
-          .update({ plan_lines: [], business_units: [], shared_lines: [] }).eq('client_id', clientId)
-        if (cfgErr) { console.error('clear-figures: config reset failed', cfgErr.message); return NextResponse.json({ error: 'Could not reset the model. Please try again.' }, { status: 500 }) }
-        const { error: mkErr } = await admin.from('generic_market_events').delete().eq('client_id', clientId)
-        if (mkErr && (mkErr as any).code !== '42P01') console.warn('clear-figures: market events delete failed', mkErr.message)
+      const missingFn = ['PGRST202', '42883'].includes((rpcErr as any).code) || /clear_client_figures/i.test(rpcErr.message || '')
+      console.error('clear-figures: rpc failed', (rpcErr as any).code, rpcErr.message)
+      if (missingFn) {
+        return NextResponse.json({
+          error: 'In-app clearing needs a one-time database setup that has not been applied yet. Please ask your coach to run the clear_client_figures migration, then try again. Nothing was changed.',
+        }, { status: 409 })
       }
-      const { error: actErr } = await admin.from('generic_actuals').delete().eq('client_id', clientId)
-      if (actErr) { console.error('clear-figures: actuals delete failed', actErr.message); return NextResponse.json({ error: 'Could not clear the recorded figures. Please try again.' }, { status: 500 }) }
+      return NextResponse.json({ error: 'Could not clear the figures. Nothing was changed — please try again.' }, { status: 500 })
     }
 
     // Audit the destructive action. The clear has already happened, so a failed

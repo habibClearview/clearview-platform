@@ -20,6 +20,12 @@
 -- SAFE TO APPLY: creates one function. Paste into the Supabase SQL editor and Run.
 -- ============================================================
 
+-- NOTE ON TYPES: p_client_id is TEXT, not uuid. Client ids in this platform
+-- are the engagement_clients.id TEXT values (e.g. 'client_1784...'), and
+-- generic_actuals / generic_model_config / generic_market_events all store
+-- client_id as TEXT — the repo's migration validator even requires client_id to
+-- be TEXT. So `where client_id = p_client_id` is a text = text comparison; there
+-- is no uuid/text mismatch.
 create or replace function public.clear_client_figures(p_client_id text, p_scope text)
 returns void
 language plpgsql
