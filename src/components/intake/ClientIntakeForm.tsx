@@ -1,8 +1,15 @@
 // @ts-nocheck
 'use client'
 import React, { useState, useEffect, Component } from 'react'
+import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase'
-import SpreadsheetUpload from '@/components/intake/SpreadsheetUpload'
+// Lazy-load the uploader (pulls in the heavy `xlsx` library) so the public
+// intake form's first paint isn't blocked by it — it loads when the client
+// switches to "Upload completed template".
+const SpreadsheetUpload = dynamic(() => import('@/components/intake/SpreadsheetUpload'), {
+  ssr: false,
+  loading: () => <div style={{fontFamily:'monospace',fontSize:'0.9rem',padding:'0.6rem 0',color:'#4A5A6A'}}>Loading uploader…</div>,
+})
 
 const C = {
   navy:'#1B2A4A', cyan:'#00B4D8', cream:'#F8F4EE', white:'#FFFFFF',

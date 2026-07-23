@@ -10,7 +10,14 @@ import {
 import { supabase } from '@/lib/supabase'
 import ActiveSessionsButton from '@/components/auth/ActiveSessionsButton'
 import { authedFetch } from '@/lib/authed-fetch'
-import SpreadsheetUpload from '@/components/intake/SpreadsheetUpload'
+import dynamic from 'next/dynamic'
+// Lazy-load the spreadsheet uploader: it pulls in the heavy `xlsx` library,
+// which otherwise ships in the coach dashboard's initial bundle even though
+// uploading is occasional. Loads on demand when the upload panel is opened.
+const SpreadsheetUpload = dynamic(() => import('@/components/intake/SpreadsheetUpload'), {
+  ssr: false,
+  loading: () => <div style={{fontFamily:'monospace',fontSize:'0.9rem',padding:'0.6rem 0',color:'var(--cv-slate)'}}>Loading uploader…</div>,
+})
 import BuildStamp from '@/components/BuildStamp'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import TeamPayments from '@/components/coach/TeamPayments'
