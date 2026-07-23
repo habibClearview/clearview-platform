@@ -24,7 +24,7 @@ import BuildStamp from '@/components/BuildStamp'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import VerificationRecognition from '@/components/generic/VerificationRecognition'
 import PaymentReviewQueue from '@/components/generic/PaymentReviewQueue'
-import { computeFreePerformance, operatingMarginPct, grossMarginPct, ebitdaMarginPct, netMarginPct, revenueGrowthPct, ruleOf40, isRuleOf40Strong, burnMultiple } from '@/lib/business-performance-metrics'
+import { computeFreePerformance, operatingMarginPct, grossMarginPct, ebitdaMarginPct, netMarginPct, revenueGrowthPct, ruleOf40, isRuleOf40Strong, burnMultiple, clv, ltvToCac, cacPaybackMonths, mrr, arr } from '@/lib/business-performance-metrics'
 import { syntheticPlanLinesFromDrivers, summariseByChannel, type Channel, type Driver } from '@/lib/drivers-engine'
 import { syntheticPlanLinesFromEvents, type MarketEvent } from '@/lib/market-events'
 
@@ -1009,7 +1009,7 @@ export default function GenericDashboard({
         {view==='overview'    && <OverviewTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} pendingApprovalCount={pendingApprovalCount} pendingActualsCount={pendingActualsCount} onGoToApprovals={()=>setView('approvals')} onGoToIntelligence={()=>setView('intelligence')}/>}
         {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P} marketEvents={marketEvents} onMarketEventsChanged={reloadMarketEvents} onApprovalActioned={reloadPendingActualsCount}/>}
         {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods} onNavigate={setView}/>}
-        {view==='performance' && <PerformanceTab config={config} result={result} months={months} cc={cc} clientId={clientId} onGoToIntelligence={()=>setView('intelligence')}/>}
+        {view==='performance' && <PerformanceTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={onSave} onGoToIntelligence={()=>setView('intelligence')}/>}
         {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} clientId={clientId} marketEvents={marketEvents} marketEventsError={marketEventsError} onMarketEventsChanged={reloadMarketEvents}/>}
         {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods}/>}
         {view==='cashflow'    && <CashFlowTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
@@ -1177,8 +1177,31 @@ function MonthlyTrendChart({months,rev,ebitda,selStart,selEnd,cc}:{
   )
 }
 
-function PerformanceTab({config,result,months,cc,clientId,onGoToIntelligence}) {
+function PerformanceTab({config,result,months,cc,clientId,P,onSave,onGoToIntelligence}) {
   const [win,setWin] = useState('plan')
+  // Customer-economics figures the coach/CEO enters here to light up CLV, LTV:CAC,
+  // CAC payback, MRR and ARR (otherwise "needs input"). Stored in the model
+  // config's settings so they persist and travel with the client.
+  const ce0 = (config.settings && config.settings.customer_economics) || {}
+  const [ceForm,setCeForm] = useState({
+    avgPurchaseValue: ce0.avgPurchaseValue ?? '', purchasesPerYear: ce0.purchasesPerYear ?? '',
+    avgLifespanYears: ce0.avgLifespanYears ?? '', monthlyGrossProfitPerCustomer: ce0.monthlyGrossProfitPerCustomer ?? '',
+    recurringSubscribers: ce0.recurringSubscribers ?? '', arpu: ce0.arpu ?? '',
+  })
+  const [ceEditing,setCeEditing] = useState(false)
+  const [ceSaving,setCeSaving] = useState(false)
+  const canEditCE = P && (P.role==='super_coach' || P.role==='ceo' || P.role==='finance_manager')
+  const num = (v:any)=>{ const n=Number(v); return Number.isFinite(n)&&n>0 ? n : null }
+  async function saveCE(){
+    if(!onSave) return
+    setCeSaving(true)
+    const clean: Record<string,number> = {}
+    ;['avgPurchaseValue','purchasesPerYear','avgLifespanYears','monthlyGrossProfitPerCustomer','recurringSubscribers','arpu'].forEach(k=>{
+      const n=Number((ceForm as any)[k]); if(Number.isFinite(n)&&n>=0) clean[k]=n
+    })
+    try{ await onSave({ ...config, settings: { ...(config.settings||{}), customer_economics: clean } }) }catch{ notify('Could not save these figures. Please try again.') }
+    setCeSaving(false); setCeEditing(false)
+  }
   // Customer-acquisition figures the client already enters under
   // Intelligence -> Marketing Events (management_events). Loaded here so CAC can
   // show on the Performance tab alongside the model-derived metrics, rather than
@@ -1366,30 +1389,77 @@ function PerformanceTab({config,result,months,cc,clientId,onGoToIntelligence}) {
         </div>
       </div>
 
-      {/* Customer economics — roadmap */}
-      <div style={{marginBottom:'0.4rem'}}>
-        <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'0.7rem'}}>
-          <span style={secLabel}>Customer economics</span>
-          <span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>needs customer data</span>
+      {/* Customer economics */}
+      {(()=>{
+        const cacVal = custGrowth ? custGrowth.blendedCAC : null
+        const hasClv = !!(num(ceForm.avgPurchaseValue) && num(ceForm.purchasesPerYear) && num(ceForm.avgLifespanYears))
+        const clvVal = hasClv ? clv(Number(ceForm.avgPurchaseValue), Number(ceForm.purchasesPerYear), Number(ceForm.avgLifespanYears)) : null
+        const ltvCac = (clvVal!=null && cacVal) ? ltvToCac(clvVal, cacVal) : null
+        const gpPer = num(ceForm.monthlyGrossProfitPerCustomer)
+        const payback = (cacVal!=null && gpPer) ? cacPaybackMonths(cacVal, gpPer) : null
+        const subs = num(ceForm.recurringSubscribers), arpuV = num(ceForm.arpu)
+        const mrrVal = (subs && arpuV) ? mrr(subs, arpuV) : null
+        const arrVal = mrrVal!=null ? arr(mrrVal) : null
+        const anySet = clvVal!=null || mrrVal!=null
+        const field = (label:string,key:string,hintTxt:string)=>(
+          <div><label style={lbl}>{label}</label>
+            <input style={inp} type="number" min={0} value={(ceForm as any)[key]} onChange={e=>setCeForm(f=>({...f,[key]:e.target.value}))}/>
+            <div style={hint}>{hintTxt}</div>
+          </div>
+        )
+        return (
+        <div style={{marginBottom:'0.4rem'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'0.7rem',flexWrap:'wrap'}}>
+            <span style={secLabel}>Customer economics</span>
+            {!anySet && <span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>needs customer data</span>}
+            {canEditCE && <button style={addBtn(true,C.teal)} onClick={()=>setCeEditing(e=>!e)}>{ceEditing?'Close':'Enter customer figures'}</button>}
+          </div>
+          <p style={{color:C.slate,fontSize:'0.94rem',lineHeight:1.5,margin:'0 0 0.8rem',maxWidth:'70ch'}}>
+            <strong>CAC</strong> is live from the marketing events you record on{' '}
+            <span onClick={()=>onGoToIntelligence&&onGoToIntelligence()} style={{color:C.teal,cursor:'pointer',fontWeight:600,textDecoration:'underline'}}>Clearview Intelligence → Marketing Events</span>.
+            {canEditCE ? ' Enter a few customer figures to light up lifetime value, LTV : CAC, payback, MRR and ARR.' : ' The remaining cards need customer figures your CEO or Finance Manager can enter here.'}
+          </p>
+          {ceEditing && canEditCE && (
+            <div style={{...card,border:`1px solid ${C.cyan}`}}>
+              <div style={fGrid}>
+                {field('Average sale value','avgPurchaseValue','What a typical customer spends per purchase.')}
+                {field('Purchases per year','purchasesPerYear','How many times a year a typical customer buys.')}
+                {field('Avg customer lifespan (years)','avgLifespanYears','How long a customer keeps buying from you.')}
+                {field('Monthly gross profit per customer','monthlyGrossProfitPerCustomer','Optional — enables CAC payback.')}
+                {field('Recurring customers','recurringSubscribers','Customers who buy every month (for MRR).')}
+                {field('Avg monthly revenue per recurring customer','arpu','What each recurring customer pays per month.')}
+              </div>
+              <div style={{marginTop:'0.8rem',display:'flex',gap:'0.5rem',alignItems:'center'}}>
+                <button style={solidBtn(C.teal)} disabled={ceSaving} onClick={saveCE}>{ceSaving?'Saving…':'Save figures'}</button>
+                <span style={hint}>Leave a field blank to skip that metric. CLV = avg sale × purchases/year × lifespan. MRR = recurring customers × avg monthly revenue.</span>
+              </div>
+            </div>
+          )}
+          <div style={gridStyle}>
+            {cacVal!==null
+              ? <PerfMetric label="CAC" value={fmt(cacVal,cc)} tag={custGrowth?`${custGrowth.totalCustomersAcquired.toLocaleString()} won`:undefined} tagTone="info" formula="Sales &amp; marketing spend ÷ new customers won. From your Marketing Events." travelsTo="intelligence"/>
+              : <PerfMetric label="CAC" formula="Sales &amp; marketing spend ÷ new customers won." needsInput travelsTo="intelligence" hint="Add a Marketing Event (its cost + customers won) on the Intelligence tab and CAC appears here."/>}
+            {clvVal!=null
+              ? <PerfMetric label="Customer lifetime value" value={fmt(clvVal,cc)} formula="Avg sale × purchases per year × lifespan."/>
+              : <PerfMetric label="Customer lifetime value" formula="Avg sale × purchases per year × lifespan." needsInput hint="Click “Enter customer figures” above: average sale value, purchases per year, and typical lifespan."/>}
+            {ltvCac!=null
+              ? <PerfMetric label="LTV : CAC" value={`${ltvCac.toFixed(1)}×`} formula="Lifetime value ÷ acquisition cost. Over 3× is healthy."/>
+              : <PerfMetric label="LTV : CAC" formula="Lifetime value ÷ acquisition cost. Over 3× is healthy." needsInput travelsTo="intelligence" hint="Shows once Customer lifetime value and CAC are both available."/>}
+            {payback!=null
+              ? <PerfMetric label="CAC payback" value={`${payback.toFixed(1)} mo`} formula="CAC ÷ monthly gross profit per customer."/>
+              : <PerfMetric label="CAC payback" formula="CAC ÷ monthly gross profit per customer, in months." needsInput travelsTo="intelligence" hint="Enter monthly gross profit per customer (above) and record a Marketing Event."/>}
+            <PerfMetric label="Churn" formula="Customers lost ÷ customers at the start. Lower is better." needsInput travelsTo="intelligence"/>
+            <PerfMetric label="Net revenue retention" formula="Revenue from existing customers, this period ÷ last. Over 100% grows without new customers." needsInput travelsTo="intelligence"/>
+            {mrrVal!=null
+              ? <PerfMetric label="MRR" value={fmt(mrrVal,cc)} formula="Recurring customers × avg monthly revenue."/>
+              : <PerfMetric label="MRR" formula="Recurring customers × avg monthly revenue." needsInput hint="Enter recurring customers and their average monthly revenue (above)."/>}
+            {arrVal!=null
+              ? <PerfMetric label="ARR" value={fmt(arrVal,cc)} formula="MRR × 12. Annual recurring revenue."/>
+              : <PerfMetric label="ARR" formula="MRR × 12. Annual recurring revenue." needsInput hint="Shows once MRR is available."/>}
+          </div>
         </div>
-        <p style={{color:C.slate,fontSize:'0.94rem',lineHeight:1.5,margin:'0 0 0.8rem',maxWidth:'70ch'}}>
-          <strong>CAC</strong> below is live — it comes from the marketing events you record on the{' '}
-          <span onClick={()=>onGoToIntelligence&&onGoToIntelligence()} style={{color:C.teal,cursor:'pointer',fontWeight:600,textDecoration:'underline'}}>Clearview Intelligence → Marketing Events</span>{' '}
-          tab (each event's cost and customers won). The other three still need a little customer data, explained on each card.
-        </p>
-        <div style={gridStyle}>
-          {custGrowth && custGrowth.blendedCAC!==null
-            ? <PerfMetric label="CAC" value={fmt(custGrowth.blendedCAC,cc)} tag={`${custGrowth.totalCustomersAcquired.toLocaleString()} won`} tagTone="info" formula="Sales &amp; marketing spend ÷ new customers won. From your Marketing Events." travelsTo="intelligence"/>
-            : <PerfMetric label="CAC" formula="Sales &amp; marketing spend ÷ new customers won." needsInput travelsTo="intelligence" hint="Add a Marketing Event (its cost + customers won) on the Intelligence tab and CAC appears here."/>}
-          <PerfMetric label="Customer lifetime value" formula="Avg purchase × yearly frequency × avg lifespan." needsInput hint="Needs three figures not collected yet: average sale value, purchases per year, and typical customer lifespan."/>
-          <PerfMetric label="LTV : CAC" formula="Lifetime value ÷ acquisition cost. Over 3× is healthy." needsInput travelsTo="intelligence" hint="Shows automatically once Customer lifetime value (left) is available."/>
-          <PerfMetric label="CAC payback" formula="CAC ÷ monthly gross profit per customer, in months." needsInput travelsTo="intelligence" hint="Shows once customer lifetime value and gross profit per customer are available."/>
-          <PerfMetric label="Churn" formula="Customers lost ÷ customers at the start. Lower is better." needsInput travelsTo="intelligence"/>
-          <PerfMetric label="Net revenue retention" formula="Revenue from existing customers, this period ÷ last. Over 100% grows without new customers." needsInput travelsTo="intelligence"/>
-          <PerfMetric label="MRR" formula="Active subscribers × avg revenue per user. Recurring lines only." needsInput travelsTo="coach"/>
-          <PerfMetric label="ARR" formula="MRR × 12. Annual recurring revenue." needsInput travelsTo="coach"/>
-        </div>
-      </div>
+        )
+      })()}
       {segRev && segRev.length>0 && (()=>{
         const total = segRev.reduce((s,r)=>s+r.total,0) || 1
         return (
