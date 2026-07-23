@@ -112,11 +112,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Cannot invite users to a different organisation' }, { status: 403 })
     }
 
-    // coach/funder logins land on the Coach Dashboard shell, not a
-    // single client's /dashboard/conas -- everything else keeps its
-    // existing redirect exactly as before.
+    // Where the invitee lands after they click the email link and set their
+    // password:
+    //   * coach / funder    -> the Coach Dashboard shell (/coach)
+    //   * every client role  -> their OWN client dashboard, resolved by the
+    //     client's slug (/dashboard/<slug>). This used to be hardwired to the
+    //     retired CONAS route, which dropped every invited client user onto the
+    //     wrong dashboard; now it follows the client they were invited into.
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://clearview.habibonifade.com'
-    const redirectTo = (role === 'coach' || role === 'funder') ? `${appUrl}/coach` : `${appUrl}/dashboard/conas`
+    let redirectTo = `${appUrl}/coach`
+    if (role !== 'coach' && role !== 'funder') {
+      // clientId is guaranteed present for client roles (validated above).
+      const { data: clientRow } = await admin
+        .from('engagement_clients')
+        .select('slug')
+        .eq('id', clientId)
+        .single()
+      // Fall back to the login page (never a bespoke route) if the slug is
+      // somehow missing, so a client user is never dropped onto some other
+      // client's dashboard.
+      redirectTo = clientRow?.slug ? `${appUrl}/dashboard/${clientRow.slug}` : `${appUrl}/`
+    }
 
     // Send the invitation email via Supabase Auth admin API
     const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
