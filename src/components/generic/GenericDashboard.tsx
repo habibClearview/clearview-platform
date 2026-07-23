@@ -4967,6 +4967,66 @@ function SettingsTab({config,P,onSave,theme,setThemeMode}) {
       <div style={{marginTop:'1.25rem',display:'flex',gap:'0.75rem'}}>
         <button style={solidBtn('var(--cv-header)')} disabled={saving} onClick={save}>{saving?'Saving...':'Save All Settings'}</button>
       </div>
+      <ClearFiguresPanel config={config} P={P}/>
+    </div>
+  )
+}
+
+// A client can reset their own figures in-app (no SQL) — or the coach can do it
+// for them. Choose the scope in the dialog, type the business name to confirm.
+// The work + audit happen server-side (/api/clear-figures), which re-checks the
+// caller's role; this UI only offers it to those who may actually do it.
+function ClearFiguresPanel({config,P}:{config:any,P:any}) {
+  const [open,setOpen] = useState(false)
+  const [scope,setScope] = useState<'actuals'|'model'>('actuals')
+  const [text,setText] = useState('')
+  const [busy,setBusy] = useState(false)
+  const canClear = P && (P.role==='super_coach' || P.role==='ceo' || P.role==='finance_manager')
+  if (!canClear) return null
+  const name = config.business_name || 'this client'
+  const isMatch = text.trim().toLowerCase() === String(name).trim().toLowerCase()
+  async function run() {
+    setBusy(true)
+    try {
+      const { data:{ session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/clear-figures',{
+        method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${session?.access_token||''}`},
+        body: JSON.stringify({ clientId: config.client_id, scope }),
+      })
+      const data = await res.json().catch(()=>({}))
+      if(!res.ok){ notify(data.error||'Could not clear the figures. Please try again.'); setBusy(false); return }
+      notify(scope==='model' ? 'The whole model was reset. Reloading…' : 'The recorded figures were cleared. Reloading…')
+      setTimeout(()=>{ if(typeof window!=='undefined') window.location.reload() }, 900)
+    } catch { notify('Could not clear the figures. Please try again.'); setBusy(false) }
+  }
+  return (
+    <div style={{...card,border:`1px solid ${C.red}`,background:'var(--cv-tint-red)',marginTop:'1.5rem'}}>
+      <div style={{fontWeight:700,color:C.red,marginBottom:'0.4rem'}}>Clear figures</div>
+      <p style={{fontSize:'1.02rem',color:C.navy,lineHeight:1.6,margin:'0 0 0.8rem',maxWidth:'75ch'}}>
+        Reset {name}’s figures to start fresh. This does not delete the client and never touches field-app sales, stock or catalogue.
+      </p>
+      {!open
+        ? <button style={addBtn(false,C.red)} onClick={()=>setOpen(true)}>Clear figures…</button>
+        : (
+        <div>
+          <div style={{display:'flex',flexDirection:'column',gap:'0.4rem',marginBottom:'0.8rem'}}>
+            <label style={{display:'flex',gap:'0.5rem',alignItems:'flex-start',cursor:'pointer'}}>
+              <input type="radio" checked={scope==='actuals'} onChange={()=>setScope('actuals')}/>
+              <span style={{fontSize:'1.0rem',color:C.navy}}><strong>Clear recorded actuals only</strong> — wipes the real monthly figures entered so far, but keeps the planning model, business units and catalogue.</span>
+            </label>
+            <label style={{display:'flex',gap:'0.5rem',alignItems:'flex-start',cursor:'pointer'}}>
+              <input type="radio" checked={scope==='model'} onChange={()=>setScope('model')}/>
+              <span style={{fontSize:'1.0rem',color:C.navy}}><strong>Reset the whole model</strong> — also clears the plan lines, business units and marketing activities, back to an empty model. Keeps the organisation, currency and settings.</span>
+            </label>
+          </div>
+          <p style={{fontSize:'0.96rem',color:C.navy,marginBottom:'0.4rem'}}>This cannot be undone. Type the business name <strong>{name}</strong> to confirm.</p>
+          <input style={{...inp,marginBottom:'0.75rem',maxWidth:340}} placeholder={name} value={text} onChange={e=>setText(e.target.value)}/>
+          <div style={{display:'flex',gap:'0.6rem'}}>
+            <button disabled={!isMatch||busy} onClick={run} style={{fontFamily:'monospace',fontSize:'1.0rem',fontWeight:700,padding:'0.5rem 1.1rem',border:'none',borderRadius:5,background:isMatch?C.red:C.border,color:'var(--cv-on-accent)',cursor:isMatch?'pointer':'not-allowed'}}>{busy?'Clearing…':(scope==='model'?'Reset the whole model':'Clear recorded actuals')}</button>
+            <button style={addBtn(true,C.slate)} onClick={()=>{setOpen(false);setText('')}}>Cancel</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
