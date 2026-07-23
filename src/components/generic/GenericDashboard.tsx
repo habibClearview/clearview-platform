@@ -1191,6 +1191,30 @@ function PerformanceTab({config,result,months,cc,clientId,onGoToIntelligence}) {
       .then(({data,error})=>{ if(active) setCustGrowth(error ? null : computeCustomerGrowthSummary(data||[])) })
     return ()=>{ active = false }
   },[clientId])
+  // Revenue by customer segment, from real field sales (each sale carries the
+  // segment the operator picked). Null while loading / if the segments feature
+  // isn't set up yet (e.g. migration not run) so the card simply stays hidden;
+  // [] means set up but nothing tagged yet.
+  const [segRev,setSegRev] = useState<{name:string;total:number}[]|null>(null)
+  useEffect(()=>{
+    if(!clientId) return
+    let active = true
+    ;(async()=>{
+      const { data: txs, error } = await supabase.from('field_transactions')
+        .select('segment_id,amount').eq('client_id',clientId).eq('category','revenue').not('segment_id','is',null)
+      if(!active) return
+      if(error){ setSegRev(null); return }
+      if(!txs || txs.length===0){ setSegRev([]); return }
+      const byId: Record<string,number> = {}
+      for(const t of txs){ const k=(t as any).segment_id as string; byId[k]=(byId[k]||0)+(Number((t as any).amount)||0) }
+      const ids = Object.keys(byId)
+      const { data: names } = await supabase.from('catalogue_value_lists').select('id,name').in('id',ids)
+      if(!active) return
+      const nameById: Record<string,string> = Object.fromEntries((names||[]).map((n:any)=>[n.id,n.name]))
+      setSegRev(ids.map(id=>({name:nameById[id]||'Unknown',total:byId[id]})).sort((a,b)=>b.total-a.total))
+    })()
+    return ()=>{ active = false }
+  },[clientId])
   if (!result || !result.metrics) return (
     <div style={card}>
       <div style={{...secH,marginBottom:'0.5rem'}}>Performance &amp; Growth</div>
@@ -1366,6 +1390,30 @@ function PerformanceTab({config,result,months,cc,clientId,onGoToIntelligence}) {
           <PerfMetric label="ARR" formula="MRR × 12. Annual recurring revenue." needsInput travelsTo="coach"/>
         </div>
       </div>
+      {segRev && segRev.length>0 && (()=>{
+        const total = segRev.reduce((s,r)=>s+r.total,0) || 1
+        return (
+          <div style={{marginTop:'1.6rem'}}>
+            <div style={{...secLabel,marginBottom:'0.5rem'}}>Revenue by customer segment</div>
+            <p style={{color:C.slate,fontSize:'0.94rem',lineHeight:1.5,margin:'0 0 0.9rem',maxWidth:'70ch'}}>
+              From real field sales, grouped by the customer type recorded on each sale (the “Who bought this?” choice).
+            </p>
+            {segRev.map(r=>{
+              const pct = Math.round(r.total/total*100)
+              return (
+                <div key={r.name} style={{marginBottom:'0.7rem'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:'1.0rem',color:C.navy,marginBottom:'0.25rem'}}>
+                    <span>{r.name}</span><span style={{fontWeight:700}}>{fmt(r.total,cc)} · {pct}%</span>
+                  </div>
+                  <div style={{height:8,borderRadius:4,background:'var(--cv-border)',overflow:'hidden'}}>
+                    <div style={{height:8,borderRadius:4,width:`${pct}%`,background:C.teal}}/>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })()}
     </div>
   )
 }
