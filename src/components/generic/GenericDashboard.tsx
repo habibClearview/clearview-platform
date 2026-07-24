@@ -919,6 +919,11 @@ export default function GenericDashboard({
     ['performance','Performance'],
     ['planning','Planning'],
     ['actuals_wc','Actuals & Working Capital'],
+    // Stores & Production setup (locations / loss reasons). Management-only —
+    // reads are open on the API, but this slice is pure list management, so it
+    // only shows to those who can actually change the lists (same gate as the
+    // catalogue). Later slices add staff-visible balances/stock cards.
+    ...(P.canManageCatalogue ? [['stores','Stores']] : []),
     ['pl','P&L'],
     ['cashflow','Cash Flow'],
     ['balancesheet','Balance Sheet'],
@@ -1015,6 +1020,7 @@ export default function GenericDashboard({
         {view==='cashflow'    && <CashFlowTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
         {view==='balancesheet'&& <BalanceSheetTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods} onCloseStatusChanged={loadClosedPeriods}/>}
         {view==='actuals_wc'  && <ActualsAndWorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} onCloseStatusChanged={loadClosedPeriods}/>}
+        {view==='stores'      && <StoresTab config={config} clientId={clientId} P={P}/>}
         {view==='settings'    && <SettingsAndAdminTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={saveConfig} theme={theme} setThemeMode={setThemeMode}/>}
         </ErrorBoundary>
       </main>
@@ -4713,6 +4719,233 @@ function StockAndTransfersSection({clientId,businessUnits}:{clientId:string;busi
             </tbody>
           </table>
         </div>
+      )}
+    </div>
+  )
+}
+
+// ── Stores & Production: client-managed lists (Phase 1 UI) ──
+// The first clickable slice of the Stores & Production tracker. It lets a
+// manager (super_coach / CEO / Finance Manager) set up their OWN vocabulary:
+// the physical PLACES stock can sit (Farm, Store, Cold Room…) and the WORDS
+// they use for a loss (Breakage, Mortality, Spoilage…). Nothing is seeded —
+// every option is the client's own, typed here. Backed by the hardened
+// /api/field/admin/value-lists route (kinds 'location' & 'loss_reason'): reads
+// are open to the client's staff, writes are management-only and tenant-scoped,
+// and a re-added name is a harmless no-op (never a silent edit). Recording
+// movements and seeing balances against these lists lands in later slices; this
+// slice is deliberately just the setup everything else references.
+function ValueListManager({clientId, businessUnitId, unitName, kind, title, singular, blurb, examples, canManage}) {
+  const [items, setItems] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [newName, setNewName] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [busyId, setBusyId] = useState<string|null>(null)
+  const [editId, setEditId] = useState<string|null>(null)
+  const [editName, setEditName] = useState('')
+
+  async function load() {
+    if (!businessUnitId) { setItems([]); setLoading(false); return }
+    setLoading(true)
+    try {
+      const res = await authedFetch(`/api/field/admin/value-lists?client_id=${encodeURIComponent(clientId)}&kind=${encodeURIComponent(kind)}&business_unit_id=${encodeURIComponent(businessUnitId)}`)
+      const data = await res.json()
+      if (res.ok) setItems(data.items||[])
+      else notify(data.error || `Could not load ${title.toLowerCase()}.`)
+    } catch { /* leave the list as-is; it shows empty rather than a broken page */ }
+    setLoading(false)
+  }
+  useEffect(()=>{ load() }, [clientId, businessUnitId, kind])
+
+  async function add() {
+    const name = newName.trim()
+    if (!name) { notify(`Give the ${singular.toLowerCase()} a name first.`); return }
+    if (!businessUnitId) { notify('Pick a business unit first.'); return }
+    setAdding(true)
+    try {
+      const res = await authedFetch('/api/field/admin/value-lists', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({client_id: clientId, business_unit_id: businessUnitId, kind, name}),
+      })
+      const data = await res.json()
+      if (!res.ok) { notify(data.error || `Could not add that ${singular.toLowerCase()}.`); setAdding(false); return }
+      // POST is insert-only: a duplicate name comes back unchanged with
+      // duplicate:true (200), never re-edited. Tell the user it was already
+      // there rather than claiming a fresh add.
+      if (data.duplicate) notify(`"${name}" is already in this list.`, 'info')
+      else notify(`Added "${name}".`, 'success')
+      setNewName('')
+      await load()
+    } catch {
+      notify(`No connection — could not add that ${singular.toLowerCase()}. Please try again.`)
+    }
+    setAdding(false)
+  }
+
+  async function saveRename(id: string) {
+    const name = editName.trim()
+    if (!name) { notify('A name cannot be empty.'); return }
+    setBusyId(id)
+    try {
+      const res = await authedFetch('/api/field/admin/value-lists', {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id, name}),
+      })
+      const data = await res.json()
+      if (res.ok) { setEditId(null); setEditName(''); await load() }
+      else notify(data.error || 'Could not rename that option.')
+    } catch {
+      notify('No connection — could not rename. Please try again.')
+    }
+    setBusyId(null)
+  }
+
+  async function toggleActive(id: string, active: boolean) {
+    setBusyId(id)
+    try {
+      const res = await authedFetch('/api/field/admin/value-lists', {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id, active}),
+      })
+      const data = await res.json()
+      if (res.ok) await load()
+      else notify(data.error || 'Could not update that option.')
+    } catch {
+      notify('No connection — could not update. Please try again.')
+    }
+    setBusyId(null)
+  }
+
+  return (
+    <div style={card}>
+      <div style={secH}>{title}</div>
+      <p style={{fontSize:'1.06rem',color:C.slate,marginBottom:'1rem',lineHeight:1.6}}>
+        {blurb}{unitName ? <> These are for <strong style={{color:C.navy}}>{unitName}</strong>.</> : null} Examples: {examples}.
+      </p>
+
+      {canManage && businessUnitId && (
+        <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
+          <input
+            style={{...inp, maxWidth:340}}
+            value={newName}
+            onChange={e=>setNewName(e.target.value)}
+            onKeyDown={e=>{ if(e.key==='Enter') add() }}
+            placeholder={`Add a ${singular.toLowerCase()}…`}
+            aria-label={`New ${singular.toLowerCase()} name`}
+          />
+          <button type="button" style={solidBtn('var(--cv-header)')} disabled={adding} onClick={add}>{adding?'Adding…':`+ Add ${singular}`}</button>
+        </div>
+      )}
+
+      {loading ? (
+        <p style={{color:C.slate,fontSize:'1.06rem'}}>Loading…</p>
+      ) : items.length===0 ? (
+        <p style={{color:C.slate,fontSize:'1.06rem'}}>
+          {businessUnitId ? `No ${title.toLowerCase()} yet.${canManage?' Add your first one above.':''}` : 'Select a business unit to manage its list.'}
+        </p>
+      ) : (
+        <div style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.06rem'}}>
+            <thead>
+              <tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
+                {[singular,'Status',...(canManage?['']:[])].map((h,i)=>(
+                  <th key={i} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'1.0rem'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it:any,i:number)=>(
+                <tr key={it.id} style={{background:i%2===0?C.cream:C.white}}>
+                  <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>
+                    {editId===it.id ? (
+                      <input style={{...inp,maxWidth:280}} value={editName} autoFocus aria-label="Edit name"
+                        onChange={e=>setEditName(e.target.value)}
+                        onKeyDown={e=>{ if(e.key==='Enter') saveRename(it.id); if(e.key==='Escape'){setEditId(null);setEditName('')} }}/>
+                    ) : it.name}
+                  </td>
+                  <td style={{padding:'8px 10px'}}><Badge text={it.active?'Active':'Hidden'} color={it.active?C.green:C.slate}/></td>
+                  {canManage && (
+                    <td style={{padding:'8px 10px',whiteSpace:'nowrap'}}>
+                      {editId===it.id ? (
+                        <>
+                          <button type="button" disabled={busyId===it.id} style={{...addBtn(true),marginRight:'0.4rem'}} onClick={()=>saveRename(it.id)}>{busyId===it.id?'…':'Save'}</button>
+                          <button type="button" style={addBtn(true,C.slate)} onClick={()=>{setEditId(null);setEditName('')}}>Cancel</button>
+                        </>
+                      ) : (
+                        <>
+                          <button type="button" disabled={busyId===it.id} style={{...addBtn(true,C.slate),marginRight:'0.4rem'}} onClick={()=>{setEditId(it.id);setEditName(it.name)}}>Rename</button>
+                          <button type="button" disabled={busyId===it.id} style={addBtn(true,C.slate)} onClick={()=>toggleActive(it.id,!it.active)}>{busyId===it.id?'…':it.active?'Hide':'Unhide'}</button>
+                        </>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StoresTab({config, clientId, P}) {
+  const businessUnits = config.business_units || []
+  const activeUnits = businessUnits.filter((u:any)=>u.active)
+  const [unitId, setUnitId] = useState(activeUnits[0]?.id || '')
+  const [section, setSection] = useState('location')
+  const canManage = !!P.canManageCatalogue
+  const unitName = businessUnits.find((u:any)=>u.id===unitId)?.name || ''
+  const multiUnit = activeUnits.length > 1
+
+  const sections: [string,string][] = [['location','Locations'],['loss_reason','Loss Reasons']]
+
+  return (
+    <div>
+      <div style={card}>
+        <div style={secH}>Stores &amp; Production</div>
+        <p style={{fontSize:'1.06rem',color:C.slate,lineHeight:1.6,marginBottom: multiUnit ? '1rem' : 0}}>
+          Set up the building blocks the stores tracker uses — the <strong style={{color:C.navy}}>places</strong> your
+          stock can sit and the <strong style={{color:C.navy}}>reasons</strong> you record a loss. Nothing is pre-filled:
+          every option here is your own, in your own words. Recording stock movements and seeing balances against these
+          comes in the next steps — this is the setup they build on.
+        </p>
+        {multiUnit && (
+          <div style={{maxWidth:340}}>
+            <label htmlFor="stores-unit" style={lbl}>Business unit</label>
+            <select id="stores-unit" style={inp} value={unitId} onChange={e=>setUnitId(e.target.value)}>
+              {activeUnits.map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {activeUnits.length===0 ? (
+        <div style={card}>
+          <p style={{color:C.slate,fontSize:'1.06rem'}}>
+            Add a business unit under <strong style={{color:C.navy}}>Settings → Business Units</strong> first — locations and loss reasons belong to a unit.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div style={{display:'flex',gap:'0.4rem',marginBottom:'1.4rem',flexWrap:'wrap'}}>
+            {sections.map(([id,label])=>(
+              <button key={id} style={subtabPill(section===id)} onClick={()=>setSection(id)}>{label}</button>
+            ))}
+          </div>
+          {section==='location' && (
+            <ValueListManager clientId={clientId} businessUnitId={unitId} unitName={multiUnit?unitName:''} kind="location"
+              title="Locations" singular="Location" canManage={canManage}
+              blurb="The physical places your stock can sit — so a movement can say where it went."
+              examples="Main Store, Cold Room, Farm, Warehouse, Shop Front"/>
+          )}
+          {section==='loss_reason' && (
+            <ValueListManager clientId={clientId} businessUnitId={unitId} unitName={multiUnit?unitName:''} kind="loss_reason"
+              title="Loss Reasons" singular="Loss reason" canManage={canManage}
+              blurb="Your own words for why stock was lost — so breakage, spoilage and the rest can be told apart."
+              examples="Breakage, Mortality, Spoilage, Theft, Expiry"/>
+          )}
+        </>
       )}
     </div>
   )
