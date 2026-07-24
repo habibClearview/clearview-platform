@@ -19,6 +19,13 @@ export interface RateLimitResult {
   allowed: boolean
   /** Seconds the caller should wait before retrying (the window length). */
   retryAfter: number
+  /**
+   * True when the limiter could NOT be evaluated (DB error / RPC missing / threw).
+   * The default behaviour still ALLOWS the request (fail-open) so a limiter blip
+   * can't take an endpoint down — but a destructive route can read this flag and
+   * choose to fail CLOSED instead (block until the limiter is healthy again).
+   */
+  errored?: boolean
 }
 
 /**
@@ -39,12 +46,12 @@ export async function checkRateLimit(
     })
     if (error) {
       console.error('Rate limit check failed (allowing request):', error.message)
-      return { allowed: true, retryAfter: 0 }
+      return { allowed: true, retryAfter: 0, errored: true }
     }
     return { allowed: data === true, retryAfter: windowSeconds }
   } catch (e) {
     console.error('Rate limit check threw (allowing request):', e)
-    return { allowed: true, retryAfter: 0 }
+    return { allowed: true, retryAfter: 0, errored: true }
   }
 }
 
