@@ -27,6 +27,7 @@ import PaymentReviewQueue from '@/components/generic/PaymentReviewQueue'
 import { computeFreePerformance, operatingMarginPct, grossMarginPct, ebitdaMarginPct, netMarginPct, revenueGrowthPct, ruleOf40, isRuleOf40Strong, burnMultiple, clv, ltvToCac, cacPaybackMonths, mrr, arr } from '@/lib/business-performance-metrics'
 import { syntheticPlanLinesFromDrivers, summariseByChannel, type Channel, type Driver } from '@/lib/drivers-engine'
 import { syntheticPlanLinesFromEvents, type MarketEvent } from '@/lib/market-events'
+import { balancesByHolder, itemTotalBalance, lossTotal } from '@/lib/stores-engine'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
@@ -4889,26 +4890,134 @@ function ValueListManager({clientId, businessUnitId, unitName, kind, title, sing
   )
 }
 
+// Stock-on-hand view for the Stores tab. Reads the raw movement ledger from
+// /api/field/admin/movements and derives every balance CLIENT-SIDE through the
+// same pure, unit-tested src/lib/stores-engine.ts the tests use — no second
+// balance implementation. Shows each catalogue item's on-hand total and where
+// that stock sits (per location / per person), plus total recorded loss.
+// Read-only: recording new movements from here is a later slice.
+function StoresBalances({clientId, businessUnitId}) {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  async function load() {
+    if (!businessUnitId) { setData(null); setLoading(false); return }
+    setLoading(true)
+    try {
+      const res = await authedFetch(`/api/field/admin/movements?client_id=${encodeURIComponent(clientId)}&business_unit_id=${encodeURIComponent(businessUnitId)}`)
+      const d = await res.json()
+      if (res.ok) setData(d)
+      else notify(d.error || 'Could not load stock balances.')
+    } catch { /* leave as-is; shows the empty state rather than a broken page */ }
+    setLoading(false)
+  }
+  useEffect(()=>{ load() }, [clientId, businessUnitId])
+
+  const view = useMemo(()=>{
+    if (!data) return null
+    const moves = data.movements || []
+    const itemById = new Map((data.items||[]).map((x:any)=>[x.id, x]))
+    const locName = new Map((data.locations||[]).map((x:any)=>[x.id, x.name]))
+    const opName  = new Map((data.operators||[]).map((x:any)=>[x.id, x.name]))
+    const holderLabel = (key:string) => {
+      if (key==='unassigned') return 'Not yet located'
+      const [t,id] = key.split(':')
+      if (t==='location') return locName.get(id) || 'Unknown place'
+      if (t==='operator') return opName.get(id) || 'Unknown person'
+      return key
+    }
+    const byHolder = balancesByHolder(moves) as Record<string, Record<string, number>>
+    const cards = Object.keys(byHolder).map(itemId => {
+      const it:any = itemById.get(itemId)
+      const holders = Object.entries(byHolder[itemId])
+        .filter(([,q])=>Math.abs(q) > 1e-9)
+        .map(([key,qty])=>({key, name:holderLabel(key), qty}))
+        .sort((a,b)=>b.qty-a.qty)
+      return {
+        itemId,
+        name: it?.name || 'Unknown item',
+        unit: it?.unit_label || '',
+        total: itemTotalBalance(moves, itemId),
+        holders,
+      }
+    }).sort((a,b)=>a.name.localeCompare(b.name))
+    return { cards, totalLoss: lossTotal(moves), count: moves.length }
+  }, [data])
+
+  if (loading) return <div style={card}><p style={{color:C.slate,fontSize:'1.06rem'}}>Loading…</p></div>
+  if (!view || view.cards.length===0) return (
+    <div style={card}>
+      <div style={secH}>Stock on hand</div>
+      <p style={{color:C.slate,fontSize:'1.06rem',lineHeight:1.6}}>
+        No stock movements recorded yet. As sales, stock-ins, production and losses come in — from the field app and
+        the recording steps coming next — on-hand balances appear here, broken down by where the stock sits.
+      </p>
+    </div>
+  )
+  const nf = (n:number) => Number(n).toLocaleString(undefined,{maximumFractionDigits:2})
+  return (
+    <div style={card}>
+      <div style={secH}>Stock on hand</div>
+      <p style={{fontSize:'1.06rem',color:C.slate,marginBottom:'1rem',lineHeight:1.6}}>
+        Worked out live from the movement ledger — every stock-in, sale, transfer, production and loss — so it always
+        reflects what has actually been recorded. As movements start carrying a location, the “where it sits” column
+        fills in.
+      </p>
+      <div style={{display:'flex',gap:'1.5rem',flexWrap:'wrap',marginBottom:'1.1rem',fontSize:'1.0rem',color:C.slate}}>
+        <span><strong style={{color:C.navy,fontSize:'1.2rem'}}>{view.cards.length}</strong> item{view.cards.length!==1?'s':''} tracked</span>
+        <span><strong style={{color:C.navy,fontSize:'1.2rem'}}>{view.count}</strong> movement{view.count!==1?'s':''} recorded</span>
+        <span><strong style={{color:view.totalLoss>0?C.red:C.navy,fontSize:'1.2rem'}}>{nf(view.totalLoss)}</strong> total loss</span>
+      </div>
+      <div style={{overflowX:'auto'}}>
+        <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.06rem'}}>
+          <thead>
+            <tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
+              {['Item','On hand','Where it sits'].map(h=>(
+                <th key={h} style={{padding:'8px 10px',textAlign:h==='On hand'?'right':'left',fontWeight:600,fontSize:'1.0rem'}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {view.cards.map((c:any,i:number)=>(
+              <tr key={c.itemId} style={{background:i%2===0?C.cream:C.white,verticalAlign:'top'}}>
+                <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{c.name}{c.unit?<span style={{color:C.slate,fontWeight:400}}> · {c.unit}</span>:null}</td>
+                <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:700,color:c.total<0?C.red:C.navy}}>{nf(c.total)}</td>
+                <td style={{padding:'8px 10px',color:C.slate}}>
+                  {c.holders.length===0 ? '—' : c.holders.map((h:any)=>(
+                    <span key={h.key} style={{display:'inline-block',marginRight:'0.8rem',whiteSpace:'nowrap'}}>
+                      {h.name} <strong style={{color:C.navy,fontFamily:'monospace'}}>{nf(h.qty)}</strong>
+                    </span>
+                  ))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 function StoresTab({config, clientId, P}) {
   const businessUnits = config.business_units || []
   const activeUnits = businessUnits.filter((u:any)=>u.active)
   const [unitId, setUnitId] = useState(activeUnits[0]?.id || '')
-  const [section, setSection] = useState('location')
+  const [section, setSection] = useState('balances')
   const canManage = !!P.canManageCatalogue
   const unitName = businessUnits.find((u:any)=>u.id===unitId)?.name || ''
   const multiUnit = activeUnits.length > 1
 
-  const sections: [string,string][] = [['location','Locations'],['loss_reason','Loss Reasons']]
+  const sections: [string,string][] = [['balances','Stock on hand'],['location','Locations'],['loss_reason','Loss Reasons']]
 
   return (
     <div>
       <div style={card}>
         <div style={secH}>Stores &amp; Production</div>
         <p style={{fontSize:'1.06rem',color:C.slate,lineHeight:1.6,marginBottom: multiUnit ? '1rem' : 0}}>
-          Set up the building blocks the stores tracker uses — the <strong style={{color:C.navy}}>places</strong> your
+          See what stock is on hand and set up the building blocks the tracker uses — the <strong style={{color:C.navy}}>places</strong> your
           stock can sit and the <strong style={{color:C.navy}}>reasons</strong> you record a loss. Nothing is pre-filled:
-          every option here is your own, in your own words. Recording stock movements and seeing balances against these
-          comes in the next steps — this is the setup they build on.
+          every option here is your own, in your own words. Balances are worked out live from the movement ledger;
+          recording movements from here is the next step.
         </p>
         {multiUnit && (
           <div style={{maxWidth:340}}>
@@ -4933,6 +5042,9 @@ function StoresTab({config, clientId, P}) {
               <button key={id} style={subtabPill(section===id)} onClick={()=>setSection(id)}>{label}</button>
             ))}
           </div>
+          {section==='balances' && (
+            <StoresBalances clientId={clientId} businessUnitId={unitId}/>
+          )}
           {section==='location' && (
             <ValueListManager clientId={clientId} businessUnitId={unitId} unitName={multiUnit?unitName:''} kind="location"
               title="Locations" singular="Location" canManage={canManage}
