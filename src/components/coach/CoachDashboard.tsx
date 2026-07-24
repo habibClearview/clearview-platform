@@ -1879,11 +1879,17 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     }
     return(
       <div>
-        <div style={{display:'flex',gap:'0.45rem',marginBottom:'1.25rem',flexWrap:'wrap',alignItems:'center'}}>
+        <div style={{display:'flex',gap:'0.45rem',marginBottom:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
           <button style={addBtn(true,C.teal)} onClick={refreshClients} disabled={refreshing}>{refreshing?'Refreshing...':'↻ Refresh'}</button>
-          {isSuperCoach&&<button style={{...addBtn(true,C.teal),marginLeft:'auto'}} onClick={()=>{setShowUpload(!showUpload);setShowNew(false)}}>Upload Spreadsheet</button>}
+          {isSuperCoach&&<a href="/Clearview_Data_Capture_Template_v8.xlsx" download="Clearview_Data_Capture_Template_v8.xlsx"
+            title="Download the blank data-capture spreadsheet to send to a client. When they return it filled in, use 'Upload Spreadsheet' — that creates the client automatically, so you do NOT need to add the client first."
+            style={{...addBtn(true,C.teal),marginLeft:'auto',textDecoration:'none',display:'inline-flex',alignItems:'center'}}>⬇ Download Template</a>}
+          {isSuperCoach&&<button style={addBtn(true,C.teal)} onClick={()=>{setShowUpload(!showUpload);setShowNew(false)}}>⬆ Upload Spreadsheet</button>}
           {isSuperCoach&&<button style={addBtn()} onClick={()=>{setShowNew(!showNew);setShowUpload(false);setNewClientPrefill(null)}}>+ New Client</button>}
         </div>
+        {isSuperCoach&&<div style={{fontSize:'0.8rem',color:C.slate,marginBottom:'1.25rem'}}>
+          New client? <strong>Download Template</strong> → send it to them → when they return it, <strong>Upload Spreadsheet</strong> creates the client automatically. No need to add the client first. (<strong>+ New Client</strong> is only for entering details by hand.)
+        </div>}
         {showUpload&&<SpreadsheetUpload onSuccess={(clientId)=>{setShowUpload(false);supabase.from('engagement_clients').select('*').eq('id',clientId).single().then(({data})=>{if(data)setClients(prev=>[...prev,data])})}}/>}
         {(showNew||newClientPrefill)&&<NewClientForm programmes={programmes} initial={newClientPrefill} onSave={async c=>{
           const {data,error}=await supabase.from('engagement_clients').insert([c]).select().single()
