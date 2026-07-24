@@ -55,10 +55,20 @@ export function movementDelta(m: StockMovement): number {
   return 0
 }
 
-/** Stable key for the holder a movement affects: a place, a person, or neither. */
+/**
+ * Stable key for the holder a movement affects: a place, a person, or neither.
+ * A row with BOTH a location and an operator is invalid (a movement has exactly
+ * one holder — enforced by a DB CHECK, num_nonnulls(location_id, operator_id) <=
+ * 1). If one ever slips through we return a distinct 'invalid' key rather than
+ * silently attributing the stock to the place, so it shows up instead of
+ * corrupting a real balance.
+ */
 export function movementHolderKey(m: StockMovement): string {
-  if (m.location_id) return `location:${m.location_id}`
-  if (m.operator_id) return `operator:${m.operator_id}`
+  const hasLocation = !!m.location_id
+  const hasOperator = !!m.operator_id
+  if (hasLocation && hasOperator) return 'invalid:dual-holder'
+  if (hasLocation) return `location:${m.location_id}`
+  if (hasOperator) return `operator:${m.operator_id}`
   return 'unassigned'
 }
 
@@ -105,40 +115,61 @@ const zeroPosition = (): HolderPosition => ({
   transferredOut: 0, loss: 0, adjustment: 0, balance: 0,
 })
 
+// Fold one movement into a position accumulator (magnitudes positive; balance
+// signed). Shared by the per-item and grouped reconcilers.
+function accumulate(p: HolderPosition, m: StockMovement): void {
+  const q = Math.abs(Number(m.quantity) || 0)
+  switch (m.movement_type) {
+    case 'stock_in': p.received += q; break
+    case 'produced': p.produced += q; break
+    case 'transfer_in': p.transferredIn += q; break
+    case 'sale': p.sold += q; break
+    case 'issue': p.issued += q; break
+    case 'transfer_out': p.transferredOut += q; break
+    case 'loss': p.loss += q; break
+    case 'adjustment': p.adjustment += (Number(m.quantity) || 0); break
+  }
+  p.balance += movementDelta(m)
+}
+
 /**
- * A holder's full position broken out by movement type (magnitudes, positive),
- * plus the net balance. Used for stock cards and the day-end reconciliation:
- * for a driver, balance = transferredIn − sold − transferredOut − loss (+adj) —
- * the number they must be able to account for at the end of the day.
+ * A holder's position for ONE catalogue item, broken out by movement type
+ * (magnitudes, positive) plus the net balance. Reconciliation is always
+ * per-item — different items (eggs vs birds vs feed) have different units and
+ * must NEVER be summed into one balance. For a driver, balance = transferredIn
+ * − sold − transferredOut − loss (+adj): the quantity of THIS item they must
+ * account for at day-end.
  */
-export function reconcileHolder(moves: StockMovement[], holderKey: string): HolderPosition {
+export function reconcileHolder(moves: StockMovement[], holderKey: string, catalogueItemId: string): HolderPosition {
   const p = zeroPosition()
   for (const m of moves) {
     if (movementHolderKey(m) !== holderKey) continue
-    const q = Math.abs(Number(m.quantity) || 0)
-    switch (m.movement_type) {
-      case 'stock_in': p.received += q; break
-      case 'produced': p.produced += q; break
-      case 'transfer_in': p.transferredIn += q; break
-      case 'sale': p.sold += q; break
-      case 'issue': p.issued += q; break
-      case 'transfer_out': p.transferredOut += q; break
-      case 'loss': p.loss += q; break
-      case 'adjustment': p.adjustment += (Number(m.quantity) || 0); break
-    }
-    p.balance += movementDelta(m)
+    if (m.catalogue_item_id !== catalogueItemId) continue
+    accumulate(p, m)
   }
   return p
 }
 
-/** Convenience: reconcile a person (operator) by id. */
-export function reconcileOperator(moves: StockMovement[], operatorId: string): HolderPosition {
-  return reconcileHolder(moves, `operator:${operatorId}`)
+/** Every item's position at a holder: itemId → position. The whole day-end
+ *  picture for a place or person, one row per item (never combined). */
+export function reconcileHolderByItem(moves: StockMovement[], holderKey: string): Record<string, HolderPosition> {
+  const out: Record<string, HolderPosition> = {}
+  for (const m of moves) {
+    if (!m || !m.catalogue_item_id) continue
+    if (movementHolderKey(m) !== holderKey) continue
+    accumulate((out[m.catalogue_item_id] ||= zeroPosition()), m)
+  }
+  return out
 }
 
-/** Convenience: reconcile a place (location) by id. */
-export function reconcileLocation(moves: StockMovement[], locationId: string): HolderPosition {
-  return reconcileHolder(moves, `location:${locationId}`)
+/** Convenience: reconcile one item for a person (operator). */
+export function reconcileOperator(moves: StockMovement[], operatorId: string, catalogueItemId: string): HolderPosition {
+  return reconcileHolder(moves, `operator:${operatorId}`, catalogueItemId)
+}
+
+/** Convenience: reconcile one item for a place (location). */
+export function reconcileLocation(moves: StockMovement[], locationId: string, catalogueItemId: string): HolderPosition {
+  return reconcileHolder(moves, `location:${locationId}`, catalogueItemId)
 }
 
 /** Total breakage/loss (magnitude) across a set of movements, optionally per item. */

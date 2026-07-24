@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   movementDelta, movementHolderKey, balancesByHolder, itemBalanceAtHolder,
-  itemTotalBalance, reconcileHolder, reconcileOperator, reconcileLocation,
-  lossTotal, salesByChannel, type StockMovement,
+  itemTotalBalance, reconcileHolder, reconcileHolderByItem, reconcileOperator,
+  reconcileLocation, lossTotal, salesByChannel, type StockMovement,
 } from '@/lib/stores-engine'
 
 const mv = (p: Partial<StockMovement> & Pick<StockMovement, 'movement_type' | 'quantity'>): StockMovement => ({
@@ -31,11 +31,15 @@ describe('movementDelta — direction from type, magnitude from |quantity|', () 
   })
 })
 
-describe('movementHolderKey — place, person, or neither', () => {
-  it('prefers a location, then an operator, then unassigned', () => {
+describe('movementHolderKey — place, person, neither, or invalid', () => {
+  it('a location, an operator, or unassigned', () => {
     expect(movementHolderKey(mv({ movement_type: 'stock_in', quantity: 1, location_id: 'farm' }))).toBe('location:farm')
     expect(movementHolderKey(mv({ movement_type: 'sale', quantity: 1, operator_id: 'musa' }))).toBe('operator:musa')
     expect(movementHolderKey(mv({ movement_type: 'stock_in', quantity: 1 }))).toBe('unassigned')
+  })
+  it('a dual-holder row is flagged invalid, never attributed to the place', () => {
+    expect(movementHolderKey(mv({ movement_type: 'stock_in', quantity: 1, location_id: 'farm', operator_id: 'musa' })))
+      .toBe('invalid:dual-holder')
   })
 })
 
@@ -70,21 +74,37 @@ describe('balances', () => {
   })
 })
 
-describe('reconcileHolder / reconcileOperator — the day-end check', () => {
-  it("breaks a driver's day into loaded, sold, delivered, loss and carried balance", () => {
+describe('reconcileHolder / reconcileOperator — the day-end check (per item)', () => {
+  it("breaks a driver's day for one item into loaded, sold, delivered, loss and carried", () => {
     // Musa loads 100 eggs, sells 50 on the road, breaks 5, delivers 40 to the store.
     const moves: StockMovement[] = [
-      mv({ movement_type: 'transfer_in', quantity: 100, operator_id: 'musa' }),
-      mv({ movement_type: 'sale', quantity: 50, operator_id: 'musa' }),
-      mv({ movement_type: 'loss', quantity: 5, operator_id: 'musa' }),
-      mv({ movement_type: 'transfer_out', quantity: 40, operator_id: 'musa' }),
+      mv({ movement_type: 'transfer_in', quantity: 100, operator_id: 'musa', catalogue_item_id: 'egg' }),
+      mv({ movement_type: 'sale', quantity: 50, operator_id: 'musa', catalogue_item_id: 'egg' }),
+      mv({ movement_type: 'loss', quantity: 5, operator_id: 'musa', catalogue_item_id: 'egg' }),
+      mv({ movement_type: 'transfer_out', quantity: 40, operator_id: 'musa', catalogue_item_id: 'egg' }),
     ]
-    const p = reconcileOperator(moves, 'musa')
+    const p = reconcileOperator(moves, 'musa', 'egg')
     expect(p.transferredIn).toBe(100)
     expect(p.sold).toBe(50)
     expect(p.loss).toBe(5)
     expect(p.transferredOut).toBe(40)
     expect(p.balance).toBe(5) // 100 - 50 - 5 - 40 = 5 still carried
+  })
+
+  it('NEVER combines different items into one balance', () => {
+    // Musa carries eggs AND birds. Their positions must stay separate.
+    const moves: StockMovement[] = [
+      mv({ movement_type: 'transfer_in', quantity: 100, operator_id: 'musa', catalogue_item_id: 'egg' }),
+      mv({ movement_type: 'sale', quantity: 60, operator_id: 'musa', catalogue_item_id: 'egg' }),
+      mv({ movement_type: 'transfer_in', quantity: 20, operator_id: 'musa', catalogue_item_id: 'bird' }),
+      mv({ movement_type: 'sale', quantity: 8, operator_id: 'musa', catalogue_item_id: 'bird' }),
+    ]
+    expect(reconcileOperator(moves, 'musa', 'egg').balance).toBe(40)  // 100 - 60
+    expect(reconcileOperator(moves, 'musa', 'bird').balance).toBe(12) // 20 - 8
+    const byItem = reconcileHolderByItem(moves, 'operator:musa')
+    expect(byItem['egg'].balance).toBe(40)
+    expect(byItem['bird'].balance).toBe(12)
+    expect(Object.keys(byItem).sort()).toEqual(['bird', 'egg'])
   })
 
   it('a location position reflects received, issued and produced', () => {
@@ -93,7 +113,7 @@ describe('reconcileHolder / reconcileOperator — the day-end check', () => {
       mv({ movement_type: 'issue', quantity: 33, location_id: 'store', catalogue_item_id: 'feed' }),
       mv({ movement_type: 'adjustment', quantity: -1, location_id: 'store', catalogue_item_id: 'feed' }),
     ]
-    const p = reconcileLocation(moves, 'store')
+    const p = reconcileLocation(moves, 'store', 'feed')
     expect(p.received).toBe(40)
     expect(p.issued).toBe(33)
     expect(p.adjustment).toBe(-1)
@@ -102,10 +122,10 @@ describe('reconcileHolder / reconcileOperator — the day-end check', () => {
 
   it('only counts the requested holder', () => {
     const moves: StockMovement[] = [
-      mv({ movement_type: 'sale', quantity: 10, operator_id: 'musa' }),
-      mv({ movement_type: 'sale', quantity: 99, operator_id: 'other' }),
+      mv({ movement_type: 'sale', quantity: 10, operator_id: 'musa', catalogue_item_id: 'egg' }),
+      mv({ movement_type: 'sale', quantity: 99, operator_id: 'other', catalogue_item_id: 'egg' }),
     ]
-    expect(reconcileHolder(moves, 'operator:musa').sold).toBe(10)
+    expect(reconcileHolder(moves, 'operator:musa', 'egg').sold).toBe(10)
   })
 })
 

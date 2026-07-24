@@ -86,6 +86,17 @@ alter table field_stock_movements
 alter table field_stock_movements
   add column if not exists reason_id uuid references catalogue_value_lists(id) on delete set null;
 
+-- A movement has AT MOST ONE holder — a place or a person, never both. This
+-- prevents a balance being mis-attributed. Safe on existing rows: location_id
+-- was just added (all NULL), so num_nonnulls is 0 or 1 for every existing row.
+-- (location_id references a 'location' row and reason_id a 'loss_reason' row of
+-- the SAME client — that kind/tenant match is enforced in the movements write
+-- path, mirroring how channel_id/segment_id are validated on sync; a plain FK
+-- can't express it and an over-strict DB rule would add no value at this scale.)
+alter table field_stock_movements drop constraint if exists field_stock_movements_single_holder_check;
+alter table field_stock_movements add constraint field_stock_movements_single_holder_check
+  check (num_nonnulls(location_id, operator_id) <= 1);
+
 -- 5) The sales-channel tag on an actual sale. TEXT, because it references an id
 --    inside the client's config.settings.channels JSON list (the SAME channels
 --    used in planning and available to the field app) — not a table row, so no
@@ -102,7 +113,8 @@ alter table generic_market_events
 -- 7) Indexes for the new read patterns: per-holder stock balances, and
 --    sales-by-channel reporting. Partial/where-not-null keeps them small.
 create index if not exists idx_fsm_holder
-  on field_stock_movements (client_id, business_unit_id, catalogue_item_id, location_id);
+  on field_stock_movements (client_id, business_unit_id, catalogue_item_id, location_id)
+  where location_id is not null;
 create index if not exists idx_fsm_operator_holder
   on field_stock_movements (client_id, business_unit_id, catalogue_item_id, operator_id)
   where operator_id is not null;
