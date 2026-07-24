@@ -6,17 +6,21 @@
 //
 // Deliberately client-defined: NO options are seeded here — the client types
 // their own. Stored in catalogue_value_lists, the same per-client table the
-// catalogue/segments use. Service-role writes, so this route authenticates the
-// caller and confirms they may act on the client (super_coach, or the client's
-// own CEO / Finance Manager) before any change, and confirms the business unit
-// really belongs to that client (no cross-tenant tagging).
+// catalogue/segments use. This is a service-role route (RLS bypassed), so it is
+// the trust boundary and enforces BOTH:
+//   * tenant scope  — actorMayAccessClient: the caller belongs to this client
+//     (super_coach excepted), so one client can never touch another's lists; and
+//   * role          — WRITES (add / rename / on-off) are a management action,
+//     allowed only to a super_coach or the client's own CEO / Finance Manager.
+//     READS stay open to any of the client's staff, who must see the options to
+//     record movements against them.
 //
 // Channels are intentionally NOT handled here — they already live in the
 // client's config.settings.channels list and are reused, never duplicated.
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
 import { getFieldSupabase as getSupabase } from '@/lib/field-auth'
-import { resolveFieldAdminActor, actorMayAccessClient } from '@/lib/auth/field-admin-authz'
+import { resolveFieldAdminActor, actorMayAccessClient, type FieldAdminActor } from '@/lib/auth/field-admin-authz'
 
 // Only the two new Stores lists may be managed through this route. Other kinds
 // (category/type/size/supplier/segment) have their own meaning and routes; an
@@ -25,6 +29,15 @@ const ALLOWED_KINDS = new Set(['location', 'loss_reason'])
 
 function kindOk(kind: unknown): kind is string {
   return typeof kind === 'string' && ALLOWED_KINDS.has(kind)
+}
+
+// Role gate for WRITES. Tenant scope is checked separately (actorMayAccessClient
+// / the row's own client on PATCH); this adds the operation-level role check so
+// only management can change a client's lists — not every staff login tied to
+// the client. super_coach is the cross-tenant admin exception.
+const WRITE_ROLES = new Set(['ceo', 'finance_manager'])
+function actorMayWrite(actor: FieldAdminActor): boolean {
+  return actor.role === 'super_coach' || WRITE_ROLES.has(actor.role)
 }
 
 // ── GET: list a client's locations or loss reasons (optionally one unit) ──
@@ -69,6 +82,9 @@ export async function POST(req: NextRequest) {
     const actor = await resolveFieldAdminActor(supabase, req)
     if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     if (!actorMayAccessClient(actor, client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    // Role gate: tenant scope alone is not enough for a WRITE — only a
+    // super_coach or the client's own CEO / Finance Manager may change the lists.
+    if (!actorMayWrite(actor)) return NextResponse.json({ error: 'Only a CEO or Finance Manager can change these lists.' }, { status: 403 })
 
     // Tenant scoping: being allowed to act on client_id is not enough — the
     // business_unit_id must ALSO be one of THIS client's own (active) units, so
@@ -80,18 +96,29 @@ export async function POST(req: NextRequest) {
     if (!unitOk) return NextResponse.json({ error: 'That business unit does not belong to this client.' }, { status: 400 })
 
     if (typeof name !== 'string' || !name.trim()) return NextResponse.json({ error: 'A name is required' }, { status: 400 })
+    const trimmed = name.trim()
 
     // created_by is intentionally NOT trusted from the request body (spoofable);
     // the row's provenance is the authenticated client scope enforced above.
     void created_by
+    // Insert (NOT upsert): re-adding a name that already exists must be a no-op,
+    // never an edit — an upsert would silently reset an existing option's active
+    // flag / sort order / provenance. On a duplicate we return the existing row
+    // UNCHANGED so the UI still gets the option it asked for.
     const { data, error } = await supabase.from('catalogue_value_lists')
-      .upsert(
-        { client_id, business_unit_id, kind, name: name.trim(), active: true, sort_order: 0, created_by: null },
-        { onConflict: 'client_id,business_unit_id,kind,name' },
-      )
+      .insert({ client_id, business_unit_id, kind, name: trimmed, active: true, sort_order: 0, created_by: null })
       .select('id, business_unit_id, name, active, sort_order')
       .single()
-    if (error) throw error
+    if (error) {
+      if ((error as any).code === '23505') {
+        const { data: existing } = await supabase.from('catalogue_value_lists')
+          .select('id, business_unit_id, name, active, sort_order')
+          .eq('client_id', client_id).eq('business_unit_id', business_unit_id)
+          .eq('kind', kind).eq('name', trimmed).maybeSingle()
+        return NextResponse.json({ item: existing, duplicate: true }, { status: 200 })
+      }
+      throw error
+    }
     return NextResponse.json({ item: data }, { status: 201 })
   } catch (err: any) {
     console.error('Value-lists admin POST error:', err)
@@ -117,6 +144,8 @@ export async function PATCH(req: NextRequest) {
     if (fetchErr || !existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (!kindOk(existing.kind)) return NextResponse.json({ error: 'Not an editable list here' }, { status: 400 })
     if (!actorMayAccessClient(actor, existing.client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    // Same write-role gate as POST: only super_coach / CEO / Finance Manager.
+    if (!actorMayWrite(actor)) return NextResponse.json({ error: 'Only a CEO or Finance Manager can change these lists.' }, { status: 403 })
 
     const updates: Record<string, any> = { updated_at: new Date().toISOString() }
     if (name !== undefined) {
