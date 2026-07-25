@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getFieldSupabase } from '@/lib/field-auth'
 import { applyStockMovement } from '@/lib/field-stock'
 import { randomUUID } from 'crypto'
-import { resolveFieldAdminActor, actorMayAccessClient } from '@/lib/auth/field-admin-authz'
+import { resolveFieldAdminActor, actorMayAccessClient, actorMayManageCatalogue } from '@/lib/auth/field-admin-authz'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +46,8 @@ export async function PATCH(req: NextRequest) {
       .from('field_stock_levels').select('client_id').eq('id', stock_level_id).single()
     if (lvlErr || !level) return NextResponse.json({ error: 'Stock level not found' }, { status: 404 })
     if (!actorMayAccessClient(actor, level.client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    // Write-role gate: setting reorder thresholds is stores management.
+    if (!actorMayManageCatalogue(actor)) return NextResponse.json({ error: 'You do not have permission to change stock settings.' }, { status: 403 })
 
     const { error } = await supabase
       .from('field_stock_levels')
@@ -81,6 +83,9 @@ export async function POST(req: NextRequest) {
     const actor = await resolveFieldAdminActor(supabase, req)
     if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     if (!actorMayAccessClient(actor, client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    // Write-role gate: moving inventory between units is an administrative
+    // (management) action, not open to every staff login tied to the client.
+    if (!actorMayManageCatalogue(actor)) return NextResponse.json({ error: 'You do not have permission to transfer stock.' }, { status: 403 })
 
     const qty = Number(quantity)
     const transferPairId = randomUUID()

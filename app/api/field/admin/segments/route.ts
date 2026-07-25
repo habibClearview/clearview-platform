@@ -8,7 +8,7 @@
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
 import { getFieldSupabase as getSupabase } from '@/lib/field-auth'
-import { resolveFieldAdminActor, actorMayAccessClient } from '@/lib/auth/field-admin-authz'
+import { resolveFieldAdminActor, actorMayAccessClient, actorMayManageCatalogue } from '@/lib/auth/field-admin-authz'
 
 // The common customer types seeded on request, so a coach doesn't have to type
 // them for every client. Editable/removable afterwards like any other segment.
@@ -59,6 +59,8 @@ export async function POST(req: NextRequest) {
     const actor = await resolveFieldAdminActor(supabase, req)
     if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     if (!actorMayAccessClient(actor, client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    // Write-role gate: managing customer segments matches canManageCatalogue.
+    if (!actorMayManageCatalogue(actor)) return NextResponse.json({ error: 'You do not have permission to manage segments.' }, { status: 403 })
 
     // Tenant scoping: being allowed to act on client_id is not enough — the
     // business_unit_id must ALSO be one of THIS client's own (active) units.
@@ -113,6 +115,7 @@ export async function PATCH(req: NextRequest) {
     if (fetchErr || !existing) return NextResponse.json({ error: 'Segment not found' }, { status: 404 })
     if (existing.kind !== 'segment') return NextResponse.json({ error: 'Not a segment' }, { status: 400 })
     if (!actorMayAccessClient(actor, existing.client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!actorMayManageCatalogue(actor)) return NextResponse.json({ error: 'You do not have permission to manage segments.' }, { status: 403 })
 
     const updates: Record<string, any> = { updated_at: new Date().toISOString() }
     if (name !== undefined) {

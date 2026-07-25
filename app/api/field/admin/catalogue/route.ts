@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isPlanLineValidForUnit } from '@/lib/catalogue-validation'
 import { getFieldSupabase as getSupabase } from '@/lib/field-auth'
-import { resolveFieldAdminActor, actorMayAccessClient } from '@/lib/auth/field-admin-authz'
+import { resolveFieldAdminActor, actorMayAccessClient, actorMayManageCatalogue } from '@/lib/auth/field-admin-authz'
 
 // ── GET: list catalogue items for a client (optionally one unit) ──
 export async function GET(req: NextRequest) {
@@ -54,6 +54,9 @@ export async function POST(req: NextRequest) {
     const actor = await resolveFieldAdminActor(supabase, req)
     if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     if (!actorMayAccessClient(actor, client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    // Write-role gate (tenant scope alone is not enough): managing the field
+    // catalogue matches the dashboard's canManageCatalogue capability.
+    if (!actorMayManageCatalogue(actor)) return NextResponse.json({ error: 'You do not have permission to manage the catalogue.' }, { status: 403 })
 
     const { data: item, error } = await supabase
       .from('field_catalogue')
@@ -102,6 +105,7 @@ export async function PATCH(req: NextRequest) {
     if (fetchErr) return NextResponse.json({ error: 'Catalogue item not found' }, { status: 404 })
     // Authorize against the item's OWN business (this PATCH takes only the item id).
     if (!actorMayAccessClient(actor, existing.client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!actorMayManageCatalogue(actor)) return NextResponse.json({ error: 'You do not have permission to manage the catalogue.' }, { status: 403 })
 
     const updates: Record<string, any> = { updated_at: new Date().toISOString() }
     if (name !== undefined) updates.name = String(name).trim()

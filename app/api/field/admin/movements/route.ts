@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getFieldSupabase } from '@/lib/field-auth'
-import { resolveFieldAdminActor, actorMayAccessClient, type FieldAdminActor } from '@/lib/auth/field-admin-authz'
+import { resolveFieldAdminActor, actorMayAccessClient, actorMayManageCatalogue } from '@/lib/auth/field-admin-authz'
 import { movementDelta } from '@/lib/stores-engine'
 
 export const dynamic = 'force-dynamic'
@@ -10,15 +10,6 @@ export const dynamic = 'force-dynamic'
 // have their own two-sided endpoint — so both are deliberately excluded here to
 // keep this recorder unambiguous.
 const RECORDABLE_TYPES = new Set(['stock_in', 'produced', 'issue', 'loss', 'adjustment'])
-
-// Role gate for WRITES, mirroring the value-lists route hardened in #245:
-// recording stock is a management action, so only a super_coach or the client's
-// own CEO / Finance Manager may do it from the dashboard. (Field operators record
-// through their own token-authenticated field-app path, not this route.)
-const WRITE_ROLES = new Set(['ceo', 'finance_manager'])
-function actorMayWrite(actor: FieldAdminActor): boolean {
-  return actor.role === 'super_coach' || WRITE_ROLES.has(actor.role)
-}
 
 // GET: the raw stock-movement ledger for a client (optionally one business
 // unit), plus the name lookups the dashboard needs to render it — catalogue
@@ -136,7 +127,7 @@ export async function POST(req: NextRequest) {
     const actor = await resolveFieldAdminActor(supabase, req)
     if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     if (!actorMayAccessClient(actor, client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    if (!actorMayWrite(actor)) return NextResponse.json({ error: 'Only a CEO or Finance Manager can record stock movements.' }, { status: 403 })
+    if (!actorMayManageCatalogue(actor)) return NextResponse.json({ error: 'You do not have permission to record stock movements.' }, { status: 403 })
 
     // The item must belong to THIS client — guards against a stale/mismatched id
     // creating an orphan ledger row.
