@@ -950,6 +950,41 @@ function CopyIntakeLink({client}){
   )
 }
 
+// Generate a STANDALONE intake link (no client attached) to send to a
+// prospective client. When they fill it in and submit, the intake form
+// creates the client automatically (status 'setup') and it surfaces under
+// "New submissions" -- so the coach does NOT have to add the client first.
+// This is the top-of-list counterpart to CopyIntakeLink, which only works
+// for a client that already exists.
+function NewIntakeLink(){
+  const [token,setToken]=useState(null)
+  const [creating,setCreating]=useState(false)
+  const [copied,setCopied]=useState(false)
+  const [err,setErr]=useState('')
+  async function generate(){
+    setCreating(true); setErr('')
+    const {data,error}=await supabase.from('client_intake_links').insert([{
+      client_name:'', client_id:null, programme_id:null, created_by:'coach',
+    }]).select('token').single()
+    if(!error&&data) setToken(data.token)
+    else setErr(error?.message||'Could not create the link.')
+    setCreating(false)
+  }
+  function copy(){
+    if(!token)return
+    navigator.clipboard.writeText(`https://clearview.habibonifade.com/intake/${token}`).then(()=>{
+      setCopied(true); setTimeout(()=>setCopied(false),2000)
+    })
+  }
+  if(err) return <button style={addBtn(true,C.red)} onClick={generate} title={err}>⚠ Retry intake link</button>
+  if(token) return <button style={{...addBtn(true,copied?C.green:C.teal),...(copied?{color:C.green,borderColor:C.green}:{})}} onClick={copy}
+    title="Send this link to a prospective client. When they submit it, a new client is created automatically and appears under New submissions — no need to add the client first.">
+    {copied?'Copied!':'🔗 Copy Intake Link'}</button>
+  return <button style={addBtn(true,C.teal)} onClick={generate} disabled={creating}
+    title="Create a shareable link a prospective client fills in themselves. On submit it creates the client automatically — no need to add them first.">
+    {creating?'Creating link...':'🔗 Generate Intake Link'}</button>
+}
+
 const LRS_DIM_LABELS={marketOpportunity:'Market Opportunity',visibility:'Visibility',trust:'Trust',profitability:'Profitability',capacity:'Capacity',resilience:'Resilience',compliance:'Compliance'}
 const FAC_TYPE_LABELS={credit:'Credit',grant:'Grant',equity:'Equity',consignment:'Consignment',recoverableGrant:'Recoverable Grant'}
 function fmtPortfolioMoney(n,cc){
@@ -1885,10 +1920,11 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             title="Download the blank data-capture spreadsheet to send to a client. When they return it filled in, use 'Upload Spreadsheet' — that creates the client automatically, so you do NOT need to add the client first."
             style={{...addBtn(true,C.teal),marginLeft:'auto',textDecoration:'none',display:'inline-flex',alignItems:'center'}}>⬇ Download Template</a>}
           {isSuperCoach&&<button style={addBtn(true,C.teal)} onClick={()=>{setShowUpload(!showUpload);setShowNew(false)}}>⬆ Upload Spreadsheet</button>}
+          {isSuperCoach&&<NewIntakeLink/>}
           {isSuperCoach&&<button style={addBtn()} onClick={()=>{setShowNew(!showNew);setShowUpload(false);setNewClientPrefill(null)}}>+ New Client</button>}
         </div>
         {isSuperCoach&&<div style={{fontSize:'0.8rem',color:C.slate,marginBottom:'1.25rem'}}>
-          New client? <strong>Download Template</strong> → send it to them → when they return it, <strong>Upload Spreadsheet</strong> creates the client automatically. No need to add the client first. (<strong>+ New Client</strong> is only for entering details by hand.)
+          New client? Two ways, no need to add them first: <strong>Download Template</strong> → send it → <strong>Upload Spreadsheet</strong> when they return it; or <strong>Generate Intake Link</strong> → send the link → they fill it in themselves. Either way the client is created automatically and shows under <strong>New submissions</strong>. (<strong>+ New Client</strong> is only for entering details by hand.)
         </div>}
         {showUpload&&<SpreadsheetUpload onSuccess={(clientId)=>{setShowUpload(false);supabase.from('engagement_clients').select('*').eq('id',clientId).single().then(({data})=>{if(data)setClients(prev=>[...prev,data])})}}/>}
         {(showNew||newClientPrefill)&&<NewClientForm programmes={programmes} initial={newClientPrefill} onSave={async c=>{
