@@ -20,7 +20,7 @@
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
 import { getFieldSupabase as getSupabase } from '@/lib/field-auth'
-import { resolveFieldAdminActor, actorMayAccessClient, type FieldAdminActor } from '@/lib/auth/field-admin-authz'
+import { resolveFieldAdminActor, actorMayAccessClient, actorMayManageCatalogue } from '@/lib/auth/field-admin-authz'
 
 // Only the two new Stores lists may be managed through this route. Other kinds
 // (category/type/size/supplier/segment) have their own meaning and routes; an
@@ -31,14 +31,11 @@ function kindOk(kind: unknown): kind is string {
   return typeof kind === 'string' && ALLOWED_KINDS.has(kind)
 }
 
-// Role gate for WRITES. Tenant scope is checked separately (actorMayAccessClient
-// / the row's own client on PATCH); this adds the operation-level role check so
-// only management can change a client's lists — not every staff login tied to
-// the client. super_coach is the cross-tenant admin exception.
-const WRITE_ROLES = new Set(['ceo', 'finance_manager'])
-function actorMayWrite(actor: FieldAdminActor): boolean {
-  return actor.role === 'super_coach' || WRITE_ROLES.has(actor.role)
-}
+// Role gate for WRITES is actorMayManageCatalogue (shared) — tenant scope is
+// checked separately (actorMayAccessClient / the row's own client on PATCH).
+// These lists are part of the Stores setup the dashboard gates behind
+// canManageCatalogue, so this honours the same "Manage Field Catalogue"
+// delegation the UI grants — not every staff login tied to the client.
 
 // ── GET: list a client's locations or loss reasons (optionally one unit) ──
 export async function GET(req: NextRequest) {
@@ -84,7 +81,7 @@ export async function POST(req: NextRequest) {
     if (!actorMayAccessClient(actor, client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     // Role gate: tenant scope alone is not enough for a WRITE — only a
     // super_coach or the client's own CEO / Finance Manager may change the lists.
-    if (!actorMayWrite(actor)) return NextResponse.json({ error: 'Only a CEO or Finance Manager can change these lists.' }, { status: 403 })
+    if (!actorMayManageCatalogue(actor)) return NextResponse.json({ error: 'You do not have permission to change these lists.' }, { status: 403 })
 
     // Tenant scoping: being allowed to act on client_id is not enough — the
     // business_unit_id must ALSO be one of THIS client's own (active) units, so
@@ -145,7 +142,7 @@ export async function PATCH(req: NextRequest) {
     if (!kindOk(existing.kind)) return NextResponse.json({ error: 'Not an editable list here' }, { status: 400 })
     if (!actorMayAccessClient(actor, existing.client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     // Same write-role gate as POST: only super_coach / CEO / Finance Manager.
-    if (!actorMayWrite(actor)) return NextResponse.json({ error: 'Only a CEO or Finance Manager can change these lists.' }, { status: 403 })
+    if (!actorMayManageCatalogue(actor)) return NextResponse.json({ error: 'You do not have permission to change these lists.' }, { status: 403 })
 
     const updates: Record<string, any> = { updated_at: new Date().toISOString() }
     if (name !== undefined) {

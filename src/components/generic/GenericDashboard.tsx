@@ -27,6 +27,7 @@ import PaymentReviewQueue from '@/components/generic/PaymentReviewQueue'
 import { computeFreePerformance, operatingMarginPct, grossMarginPct, ebitdaMarginPct, netMarginPct, revenueGrowthPct, ruleOf40, isRuleOf40Strong, burnMultiple, clv, ltvToCac, cacPaybackMonths, mrr, arr } from '@/lib/business-performance-metrics'
 import { syntheticPlanLinesFromDrivers, summariseByChannel, type Channel, type Driver } from '@/lib/drivers-engine'
 import { syntheticPlanLinesFromEvents, type MarketEvent } from '@/lib/market-events'
+import { balancesByHolder, itemTotalBalance, lossTotal } from '@/lib/stores-engine'
 
 // ── Design tokens ────────────────────────────────────────────
 const C = {
@@ -919,6 +920,11 @@ export default function GenericDashboard({
     ['performance','Performance'],
     ['planning','Planning'],
     ['actuals_wc','Actuals & Working Capital'],
+    // Stores & Production setup (locations / loss reasons). Management-only —
+    // reads are open on the API, but this slice is pure list management, so it
+    // only shows to those who can actually change the lists (same gate as the
+    // catalogue). Later slices add staff-visible balances/stock cards.
+    ...(P.canManageCatalogue ? [['stores','Stores']] : []),
     ['pl','P&L'],
     ['cashflow','Cash Flow'],
     ['balancesheet','Balance Sheet'],
@@ -1015,6 +1021,7 @@ export default function GenericDashboard({
         {view==='cashflow'    && <CashFlowTab config={config} result={result} months={months} cc={cc} closedPeriods={closedPeriods}/>}
         {view==='balancesheet'&& <BalanceSheetTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods} onCloseStatusChanged={loadClosedPeriods}/>}
         {view==='actuals_wc'  && <ActualsAndWorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} onCloseStatusChanged={loadClosedPeriods}/>}
+        {view==='stores'      && <StoresTab config={config} clientId={clientId} P={P}/>}
         {view==='settings'    && <SettingsAndAdminTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={saveConfig} theme={theme} setThemeMode={setThemeMode}/>}
         </ErrorBoundary>
       </main>
@@ -4713,6 +4720,483 @@ function StockAndTransfersSection({clientId,businessUnits}:{clientId:string;busi
             </tbody>
           </table>
         </div>
+      )}
+    </div>
+  )
+}
+
+// ── Stores & Production: client-managed lists (Phase 1 UI) ──
+// The first clickable slice of the Stores & Production tracker. It lets a
+// manager (super_coach / CEO / Finance Manager) set up their OWN vocabulary:
+// the physical PLACES stock can sit (Farm, Store, Cold Room…) and the WORDS
+// they use for a loss (Breakage, Mortality, Spoilage…). Nothing is seeded —
+// every option is the client's own, typed here. Backed by the hardened
+// /api/field/admin/value-lists route (kinds 'location' & 'loss_reason'): reads
+// are open to the client's staff, writes are management-only and tenant-scoped,
+// and a re-added name is a harmless no-op (never a silent edit). Recording
+// movements and seeing balances against these lists lands in later slices; this
+// slice is deliberately just the setup everything else references.
+function ValueListManager({clientId, businessUnitId, unitName, kind, title, singular, blurb, examples, canManage}) {
+  const [items, setItems] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [newName, setNewName] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [busyId, setBusyId] = useState<string|null>(null)
+  const [editId, setEditId] = useState<string|null>(null)
+  const [editName, setEditName] = useState('')
+
+  async function load() {
+    if (!businessUnitId) { setItems([]); setLoading(false); return }
+    setLoading(true)
+    try {
+      const res = await authedFetch(`/api/field/admin/value-lists?client_id=${encodeURIComponent(clientId)}&kind=${encodeURIComponent(kind)}&business_unit_id=${encodeURIComponent(businessUnitId)}`)
+      const data = await res.json()
+      if (res.ok) setItems(data.items||[])
+      else notify(data.error || `Could not load ${title.toLowerCase()}.`)
+    } catch { /* leave the list as-is; it shows empty rather than a broken page */ }
+    setLoading(false)
+  }
+  useEffect(()=>{ load() }, [clientId, businessUnitId, kind])
+
+  async function add() {
+    const name = newName.trim()
+    if (!name) { notify(`Give the ${singular.toLowerCase()} a name first.`); return }
+    if (!businessUnitId) { notify('Pick a business unit first.'); return }
+    setAdding(true)
+    try {
+      const res = await authedFetch('/api/field/admin/value-lists', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({client_id: clientId, business_unit_id: businessUnitId, kind, name}),
+      })
+      const data = await res.json()
+      if (!res.ok) { notify(data.error || `Could not add that ${singular.toLowerCase()}.`); setAdding(false); return }
+      // POST is insert-only: a duplicate name comes back unchanged with
+      // duplicate:true (200), never re-edited. Tell the user it was already
+      // there rather than claiming a fresh add.
+      if (data.duplicate) notify(`"${name}" is already in this list.`, 'info')
+      else notify(`Added "${name}".`, 'success')
+      setNewName('')
+      await load()
+    } catch {
+      notify(`No connection — could not add that ${singular.toLowerCase()}. Please try again.`)
+    }
+    setAdding(false)
+  }
+
+  async function saveRename(id: string) {
+    const name = editName.trim()
+    if (!name) { notify('A name cannot be empty.'); return }
+    setBusyId(id)
+    try {
+      const res = await authedFetch('/api/field/admin/value-lists', {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id, name}),
+      })
+      const data = await res.json()
+      if (res.ok) { setEditId(null); setEditName(''); await load() }
+      else notify(data.error || 'Could not rename that option.')
+    } catch {
+      notify('No connection — could not rename. Please try again.')
+    }
+    setBusyId(null)
+  }
+
+  async function toggleActive(id: string, active: boolean) {
+    setBusyId(id)
+    try {
+      const res = await authedFetch('/api/field/admin/value-lists', {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id, active}),
+      })
+      const data = await res.json()
+      if (res.ok) await load()
+      else notify(data.error || 'Could not update that option.')
+    } catch {
+      notify('No connection — could not update. Please try again.')
+    }
+    setBusyId(null)
+  }
+
+  return (
+    <div style={card}>
+      <div style={secH}>{title}</div>
+      <p style={{fontSize:'1.06rem',color:C.slate,marginBottom:'1rem',lineHeight:1.6}}>
+        {blurb}{unitName ? <> These are for <strong style={{color:C.navy}}>{unitName}</strong>.</> : null} Examples: {examples}.
+      </p>
+
+      {canManage && businessUnitId && (
+        <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
+          <input
+            style={{...inp, maxWidth:340}}
+            value={newName}
+            onChange={e=>setNewName(e.target.value)}
+            onKeyDown={e=>{ if(e.key==='Enter') add() }}
+            placeholder={`Add a ${singular.toLowerCase()}…`}
+            aria-label={`New ${singular.toLowerCase()} name`}
+          />
+          <button type="button" style={solidBtn('var(--cv-header)')} disabled={adding} onClick={add}>{adding?'Adding…':`+ Add ${singular}`}</button>
+        </div>
+      )}
+
+      {loading ? (
+        <p style={{color:C.slate,fontSize:'1.06rem'}}>Loading…</p>
+      ) : items.length===0 ? (
+        <p style={{color:C.slate,fontSize:'1.06rem'}}>
+          {businessUnitId ? `No ${title.toLowerCase()} yet.${canManage?' Add your first one above.':''}` : 'Select a business unit to manage its list.'}
+        </p>
+      ) : (
+        <div style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.06rem'}}>
+            <thead>
+              <tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
+                {[singular,'Status',...(canManage?['']:[])].map((h,i)=>(
+                  <th key={i} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,fontSize:'1.0rem'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it:any,i:number)=>(
+                <tr key={it.id} style={{background:i%2===0?C.cream:C.white}}>
+                  <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>
+                    {editId===it.id ? (
+                      <input style={{...inp,maxWidth:280}} value={editName} autoFocus aria-label="Edit name"
+                        onChange={e=>setEditName(e.target.value)}
+                        onKeyDown={e=>{ if(e.key==='Enter') saveRename(it.id); if(e.key==='Escape'){setEditId(null);setEditName('')} }}/>
+                    ) : it.name}
+                  </td>
+                  <td style={{padding:'8px 10px'}}><Badge text={it.active?'Active':'Hidden'} color={it.active?C.green:C.slate}/></td>
+                  {canManage && (
+                    <td style={{padding:'8px 10px',whiteSpace:'nowrap'}}>
+                      {editId===it.id ? (
+                        <>
+                          <button type="button" disabled={busyId===it.id} style={{...addBtn(true),marginRight:'0.4rem'}} onClick={()=>saveRename(it.id)}>{busyId===it.id?'…':'Save'}</button>
+                          <button type="button" style={addBtn(true,C.slate)} onClick={()=>{setEditId(null);setEditName('')}}>Cancel</button>
+                        </>
+                      ) : (
+                        <>
+                          <button type="button" disabled={busyId===it.id} style={{...addBtn(true,C.slate),marginRight:'0.4rem'}} onClick={()=>{setEditId(it.id);setEditName(it.name)}}>Rename</button>
+                          <button type="button" disabled={busyId===it.id} style={addBtn(true,C.slate)} onClick={()=>toggleActive(it.id,!it.active)}>{busyId===it.id?'…':it.active?'Hide':'Unhide'}</button>
+                        </>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Record-a-movement form for the Stores tab. Lets a manager record one stock
+// movement by hand — a delivery received, stock produced/collected, stock issued
+// to production, a loss, or a stocktake correction — tagged to where it sits and
+// (for a loss) why. Posts to /api/field/admin/movements; on success it calls
+// onRecorded so the balances view refreshes. Dropdown options are the client's
+// OWN items / locations / people / loss reasons — nothing hardcoded.
+const MOVEMENT_KINDS: [string,string,string][] = [
+  ['stock_in',   'Received',              'Stock bought in / delivered'],
+  ['produced',   'Produced / collected',  'Made or gathered (eggs collected, birds reared)'],
+  ['issue',      'Issued to production',  'Released to be used up (feed issued, inputs consumed)'],
+  ['loss',       'Loss',                  'Breakage, mortality or spoilage'],
+  ['adjustment', 'Adjustment',            'Stocktake correction (use a minus quantity to reduce)'],
+]
+function StoresRecordMovement({clientId, businessUnitId, canManage, onRecorded}) {
+  const [opts, setOpts] = useState<any>(null)
+  const [form, setForm] = useState<any>({ movement_type:'stock_in', catalogue_item_id:'', quantity:'', holder:'', reason_id:'', notes:'' })
+  const [saving, setSaving] = useState(false)
+
+  async function loadOpts() {
+    if (!businessUnitId) { setOpts(null); return }
+    try {
+      const res = await authedFetch(`/api/field/admin/movements?client_id=${encodeURIComponent(clientId)}&business_unit_id=${encodeURIComponent(businessUnitId)}`)
+      const d = await res.json()
+      if (res.ok) setOpts(d)
+    } catch { /* dropdowns just stay empty; the form still guards on submit */ }
+  }
+  useEffect(()=>{ loadOpts() }, [clientId, businessUnitId])
+
+  const set = (k:string,v:any) => setForm((f:any)=>({...f, [k]:v}))
+  const isLoss = form.movement_type === 'loss'
+
+  async function submit() {
+    if (!form.catalogue_item_id) { notify('Choose an item.'); return }
+    const qty = Number(form.quantity)
+    if (!Number.isFinite(qty) || qty === 0) { notify('Enter a quantity.'); return }
+    if (form.movement_type !== 'adjustment' && qty < 0) { notify('Quantity must be a positive number.'); return }
+    // The single "where" control encodes the holder as location:<id> / operator:<id>.
+    let location_id:string|null = null, operator_id:string|null = null
+    if (form.holder.startsWith('location:')) location_id = form.holder.slice('location:'.length)
+    else if (form.holder.startsWith('operator:')) operator_id = form.holder.slice('operator:'.length)
+    setSaving(true)
+    try {
+      const res = await authedFetch('/api/field/admin/movements', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          client_id: clientId, business_unit_id: businessUnitId,
+          catalogue_item_id: form.catalogue_item_id, movement_type: form.movement_type,
+          quantity: qty, location_id, operator_id,
+          reason_id: isLoss ? (form.reason_id || null) : null,
+          notes: form.notes || null,
+        }),
+      })
+      const d = await res.json()
+      if (res.ok) {
+        notify('Movement recorded.')
+        setForm((f:any)=>({...f, quantity:'', reason_id:'', notes:''}))
+        onRecorded && onRecorded()
+      } else notify(d.error || 'Could not record the movement.')
+    } catch { notify('Could not record the movement.') }
+    setSaving(false)
+  }
+
+  if (!canManage) return (
+    <div style={card}>
+      <div style={secH}>Record a movement</div>
+      <p style={{color:C.slate,fontSize:'1.06rem',lineHeight:1.6}}>Only a CEO or Finance Manager can record stock movements from here.</p>
+    </div>
+  )
+  const items:any[] = opts?.items || []
+  const locations:any[] = opts?.locations || []
+  const operators:any[] = opts?.operators || []
+  const reasons:any[] = opts?.reasons || []
+  const sel = { padding:'10px 12px', borderRadius:8, border:`1px solid ${C.border}`, fontSize:'1.06rem', background:C.white, color:C.navy, width:'100%' }
+  const lbl = { display:'block', fontSize:'0.95rem', fontWeight:600, color:C.slate, marginBottom:'0.35rem' }
+  return (
+    <div style={card}>
+      <div style={secH}>Record a movement</div>
+      <p style={{fontSize:'1.06rem',color:C.slate,marginBottom:'1.1rem',lineHeight:1.6}}>
+        Record one change to your stock. It appears in “Stock on hand” straight away.
+      </p>
+      {items.length === 0 ? (
+        <p style={{color:C.slate,fontSize:'1.06rem',lineHeight:1.6}}>
+          No stock items set up for this unit yet. Add items in the field catalogue first, then you can record movements against them.
+        </p>
+      ) : (
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))',gap:'1rem',alignItems:'end'}}>
+        <div>
+          <label style={lbl}>What happened?</label>
+          <select style={sel} value={form.movement_type} onChange={e=>set('movement_type', e.target.value)}>
+            {MOVEMENT_KINDS.map(([v,label])=><option key={v} value={v}>{label}</option>)}
+          </select>
+          <div style={{fontSize:'0.9rem',color:C.slate,marginTop:'0.3rem'}}>{(MOVEMENT_KINDS.find(k=>k[0]===form.movement_type)||[])[2]}</div>
+        </div>
+        <div>
+          <label style={lbl}>Item</label>
+          <select style={sel} value={form.catalogue_item_id} onChange={e=>set('catalogue_item_id', e.target.value)}>
+            <option value="">Choose an item…</option>
+            {items.map(it=><option key={it.id} value={it.id}>{it.name}{it.unit_label?` (${it.unit_label})`:''}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={lbl}>Quantity{form.movement_type==='adjustment'?' (− to reduce)':''}</label>
+          <input style={sel} type="number" inputMode="decimal" value={form.quantity} onChange={e=>set('quantity', e.target.value)} placeholder="0"/>
+        </div>
+        <div>
+          <label style={lbl}>Where is it? <span style={{fontWeight:400}}>(optional)</span></label>
+          <select style={sel} value={form.holder} onChange={e=>set('holder', e.target.value)}>
+            <option value="">— not specified —</option>
+            {locations.length>0 && <optgroup label="Places">{locations.map(l=><option key={l.id} value={`location:${l.id}`}>{l.name}</option>)}</optgroup>}
+            {operators.length>0 && <optgroup label="People">{operators.map(o=><option key={o.id} value={`operator:${o.id}`}>{o.name}</option>)}</optgroup>}
+          </select>
+        </div>
+        {isLoss && (
+          <div>
+            <label style={lbl}>Reason for loss</label>
+            <select style={sel} value={form.reason_id} onChange={e=>set('reason_id', e.target.value)}>
+              <option value="">Choose a reason…</option>
+              {reasons.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+            {reasons.length===0 && <div style={{fontSize:'0.9rem',color:C.slate,marginTop:'0.3rem'}}>Tip: add loss reasons under the “Loss Reasons” tab.</div>}
+          </div>
+        )}
+        <div>
+          <label style={lbl}>Note <span style={{fontWeight:400}}>(optional)</span></label>
+          <input style={sel} type="text" value={form.notes} onChange={e=>set('notes', e.target.value)} placeholder="e.g. morning collection"/>
+        </div>
+        <div>
+          <button style={{...solidBtn(C.cyan), opacity: saving?0.6:1, width:'100%'}} disabled={saving} onClick={submit}>{saving?'Recording…':'Record movement'}</button>
+        </div>
+      </div>
+      )}
+    </div>
+  )
+}
+
+// Stock-on-hand view for the Stores tab. Reads the raw movement ledger from
+// /api/field/admin/movements and derives every balance CLIENT-SIDE through the
+// same pure, unit-tested src/lib/stores-engine.ts the tests use — no second
+// balance implementation. Shows each catalogue item's on-hand total and where
+// that stock sits (per location / per person), plus total recorded loss.
+// Read-only: recording new movements from here is a later slice.
+function StoresBalances({clientId, businessUnitId, refreshKey}) {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  async function load() {
+    if (!businessUnitId) { setData(null); setLoading(false); return }
+    setLoading(true)
+    try {
+      const res = await authedFetch(`/api/field/admin/movements?client_id=${encodeURIComponent(clientId)}&business_unit_id=${encodeURIComponent(businessUnitId)}`)
+      const d = await res.json()
+      if (res.ok) setData(d)
+      else notify(d.error || 'Could not load stock balances.')
+    } catch { /* leave as-is; shows the empty state rather than a broken page */ }
+    setLoading(false)
+  }
+  useEffect(()=>{ load() }, [clientId, businessUnitId, refreshKey])
+
+  const view = useMemo(()=>{
+    if (!data) return null
+    const moves = data.movements || []
+    const itemById = new Map((data.items||[]).map((x:any)=>[x.id, x]))
+    const locName = new Map((data.locations||[]).map((x:any)=>[x.id, x.name]))
+    const opName  = new Map((data.operators||[]).map((x:any)=>[x.id, x.name]))
+    const holderLabel = (key:string) => {
+      if (key==='unassigned') return 'Not yet located'
+      const [t,id] = key.split(':')
+      if (t==='location') return locName.get(id) || 'Unknown place'
+      if (t==='operator') return opName.get(id) || 'Unknown person'
+      return key
+    }
+    const byHolder = balancesByHolder(moves) as Record<string, Record<string, number>>
+    const cards = Object.keys(byHolder).map(itemId => {
+      const it:any = itemById.get(itemId)
+      const holders = Object.entries(byHolder[itemId])
+        .filter(([,q])=>Math.abs(q) > 1e-9)
+        .map(([key,qty])=>({key, name:holderLabel(key), qty}))
+        .sort((a,b)=>b.qty-a.qty)
+      return {
+        itemId,
+        name: it?.name || 'Unknown item',
+        unit: it?.unit_label || '',
+        total: itemTotalBalance(moves, itemId),
+        holders,
+      }
+    }).sort((a,b)=>a.name.localeCompare(b.name))
+    return { cards, totalLoss: lossTotal(moves), count: moves.length }
+  }, [data])
+
+  if (loading) return <div style={card}><p style={{color:C.slate,fontSize:'1.06rem'}}>Loading…</p></div>
+  if (!view || view.cards.length===0) return (
+    <div style={card}>
+      <div style={secH}>Stock on hand</div>
+      <p style={{color:C.slate,fontSize:'1.06rem',lineHeight:1.6}}>
+        No stock movements recorded yet. As sales, stock-ins, production and losses come in — from the field app and
+        the recording steps coming next — on-hand balances appear here, broken down by where the stock sits.
+      </p>
+    </div>
+  )
+  const nf = (n:number) => Number(n).toLocaleString(undefined,{maximumFractionDigits:2})
+  return (
+    <div style={card}>
+      <div style={secH}>Stock on hand</div>
+      <p style={{fontSize:'1.06rem',color:C.slate,marginBottom:'1rem',lineHeight:1.6}}>
+        Worked out live from the movement ledger — every stock-in, sale, transfer, production and loss — so it always
+        reflects what has actually been recorded. As movements start carrying a location, the “where it sits” column
+        fills in.
+      </p>
+      <div style={{display:'flex',gap:'1.5rem',flexWrap:'wrap',marginBottom:'1.1rem',fontSize:'1.0rem',color:C.slate}}>
+        <span><strong style={{color:C.navy,fontSize:'1.2rem'}}>{view.cards.length}</strong> item{view.cards.length!==1?'s':''} tracked</span>
+        <span><strong style={{color:C.navy,fontSize:'1.2rem'}}>{view.count}</strong> movement{view.count!==1?'s':''} recorded</span>
+        <span><strong style={{color:view.totalLoss>0?C.red:C.navy,fontSize:'1.2rem'}}>{nf(view.totalLoss)}</strong> total loss</span>
+      </div>
+      <div style={{overflowX:'auto'}}>
+        <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.06rem'}}>
+          <thead>
+            <tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
+              {['Item','On hand','Where it sits'].map(h=>(
+                <th key={h} style={{padding:'8px 10px',textAlign:h==='On hand'?'right':'left',fontWeight:600,fontSize:'1.0rem'}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {view.cards.map((c:any,i:number)=>(
+              <tr key={c.itemId} style={{background:i%2===0?C.cream:C.white,verticalAlign:'top'}}>
+                <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{c.name}{c.unit?<span style={{color:C.slate,fontWeight:400}}> · {c.unit}</span>:null}</td>
+                <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:700,color:c.total<0?C.red:C.navy}}>{nf(c.total)}</td>
+                <td style={{padding:'8px 10px',color:C.slate}}>
+                  {c.holders.length===0 ? '—' : c.holders.map((h:any)=>(
+                    <span key={h.key} style={{display:'inline-block',marginRight:'0.8rem',whiteSpace:'nowrap'}}>
+                      {h.name} <strong style={{color:C.navy,fontFamily:'monospace'}}>{nf(h.qty)}</strong>
+                    </span>
+                  ))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function StoresTab({config, clientId, P}) {
+  const businessUnits = config.business_units || []
+  const activeUnits = businessUnits.filter((u:any)=>u.active)
+  const [unitId, setUnitId] = useState(activeUnits[0]?.id || '')
+  const [section, setSection] = useState('balances')
+  const [ver, setVer] = useState(0)   // bumped after a movement is recorded, so the balances view reloads
+  const canManage = !!P.canManageCatalogue
+  const unitName = businessUnits.find((u:any)=>u.id===unitId)?.name || ''
+  const multiUnit = activeUnits.length > 1
+
+  const sections: [string,string][] = [['balances','Stock on hand'],['record','Record movement'],['location','Locations'],['loss_reason','Loss Reasons']]
+
+  return (
+    <div>
+      <div style={card}>
+        <div style={secH}>Stores &amp; Production</div>
+        <p style={{fontSize:'1.06rem',color:C.slate,lineHeight:1.6,marginBottom: multiUnit ? '1rem' : 0}}>
+          See what stock is on hand, <strong style={{color:C.navy}}>record</strong> what comes in, is produced, is used or is lost,
+          and set up the building blocks the tracker uses — the <strong style={{color:C.navy}}>places</strong> your
+          stock can sit and the <strong style={{color:C.navy}}>reasons</strong> you record a loss. Nothing is pre-filled:
+          every option here is your own, in your own words. Balances are worked out live from what you record.
+        </p>
+        {multiUnit && (
+          <div style={{maxWidth:340}}>
+            <label htmlFor="stores-unit" style={lbl}>Business unit</label>
+            <select id="stores-unit" style={inp} value={unitId} onChange={e=>setUnitId(e.target.value)}>
+              {activeUnits.map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {activeUnits.length===0 ? (
+        <div style={card}>
+          <p style={{color:C.slate,fontSize:'1.06rem'}}>
+            Add a business unit under <strong style={{color:C.navy}}>Settings → Business Units</strong> first — locations and loss reasons belong to a unit.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div style={{display:'flex',gap:'0.4rem',marginBottom:'1.4rem',flexWrap:'wrap'}}>
+            {sections.map(([id,label])=>(
+              <button key={id} style={subtabPill(section===id)} onClick={()=>setSection(id)}>{label}</button>
+            ))}
+          </div>
+          {section==='balances' && (
+            <StoresBalances clientId={clientId} businessUnitId={unitId} refreshKey={ver}/>
+          )}
+          {section==='record' && (
+            <StoresRecordMovement clientId={clientId} businessUnitId={unitId} canManage={canManage} onRecorded={()=>setVer(v=>v+1)}/>
+          )}
+          {section==='location' && (
+            <ValueListManager clientId={clientId} businessUnitId={unitId} unitName={multiUnit?unitName:''} kind="location"
+              title="Locations" singular="Location" canManage={canManage}
+              blurb="The physical places your stock can sit — so a movement can say where it went."
+              examples="Main Store, Cold Room, Farm, Warehouse, Shop Front"/>
+          )}
+          {section==='loss_reason' && (
+            <ValueListManager clientId={clientId} businessUnitId={unitId} unitName={multiUnit?unitName:''} kind="loss_reason"
+              title="Loss Reasons" singular="Loss reason" canManage={canManage}
+              blurb="Your own words for why stock was lost — so breakage, spoilage and the rest can be told apart."
+              examples="Breakage, Mortality, Spoilage, Theft, Expiry"/>
+          )}
+        </>
       )}
     </div>
   )

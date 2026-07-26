@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getFieldSupabase } from '@/lib/field-auth'
 import { isPlanLineValidForUnit } from '@/lib/catalogue-validation'
-import { resolveFieldAdminActor, actorMayAccessClient } from '@/lib/auth/field-admin-authz'
+import { resolveFieldAdminActor, actorMayAccessClient, actorMayEnterActuals } from '@/lib/auth/field-admin-authz'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,6 +58,9 @@ export async function POST(req: NextRequest) {
     if (fetchErr || !pending) return NextResponse.json({ error: 'Pending cost not found, or already categorized' }, { status: 404 })
     // Authorize against the cost's OWN business (this POST takes only the record id).
     if (!actorMayAccessClient(actor, pending.client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    // Write-role gate: categorising a pending cost into the model is an actuals
+    // action (dashboard canEnterActuals) — not open to every staff login.
+    if (!actorMayEnterActuals(actor)) return NextResponse.json({ error: 'You do not have permission to categorise costs.' }, { status: 403 })
 
     // Confirm the chosen plan line genuinely belongs to this cost's own
     // unit and is a real cost category -- the same validation principle

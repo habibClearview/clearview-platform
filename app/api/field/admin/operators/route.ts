@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { randomBytes } from 'crypto'
-import { resolveFieldAdminActor, actorMayAccessClient } from '@/lib/auth/field-admin-authz'
+import { resolveFieldAdminActor, actorMayAccessClient, actorMayManageTeam } from '@/lib/auth/field-admin-authz'
 
 // Lazy init -- must never call createClient() at module level on Vercel.
 function getSupabase() {
@@ -58,6 +58,9 @@ export async function POST(req: NextRequest) {
     const actor = await resolveFieldAdminActor(supabase, req)
     if (!actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     if (!actorMayAccessClient(actor, client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    // Write-role gate: provisioning field operators is a team-management action
+    // (dashboard canManageTeam: super_coach or the client's own CEO).
+    if (!actorMayManageTeam(actor)) return NextResponse.json({ error: 'You do not have permission to manage operators.' }, { status: 403 })
 
     const { data: operator, error: opErr } = await supabase
       .from('field_operators')
@@ -119,6 +122,7 @@ export async function PATCH(req: NextRequest) {
       .single()
     if (opLookupErr || !opRow) return NextResponse.json({ error: 'Operator not found' }, { status: 404 })
     if (!actorMayAccessClient(actor, opRow.client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!actorMayManageTeam(actor)) return NextResponse.json({ error: 'You do not have permission to manage operators.' }, { status: 403 })
 
     if (active !== undefined) {
       const { error } = await supabase
