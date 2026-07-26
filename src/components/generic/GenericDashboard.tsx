@@ -6640,7 +6640,7 @@ const TC_UNASSIGNED = '__unassigned__'
 // decision tool — but its figures reconcile exactly to it (see
 // src/lib/working-capital-statement.ts). Deliberately per-period, not an average.
 function CashCoverageStatement({result, months, cc}) {
-  const [showDetail, setShowDetail] = useState(false)
+  const [showDetail, setShowDetail] = useState(true)   // list the in/out items by default
   if (!result?.cf || !result?.con) return null
   const stmt = computeWorkingCapitalStatement(result)
   const M = stmt.months
