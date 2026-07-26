@@ -17,6 +17,7 @@ import { buildDebtSchedule, defaultCoachAssessment, dscrLabel, dscrColor, dscrRa
 import { computeNPV, computeIRR, buildInvestmentCashFlows, computeCustomerGrowthSummary, annualRateToMonthlyRate, monthlyRateToAnnualRate } from '@/lib/investment-metrics'
 import { computeLiquidityReadinessScore, computeLRSTimeSeries, computeFitScore, FIT_SCORE_PRESETS, LRS_WEIGHTS } from '@/lib/liquidity-readiness'
 import { computePathwayToReadiness } from '@/lib/pathway-to-readiness'
+import { computeWorkingCapitalStatement } from '@/lib/working-capital-statement'
 import { combinedActual, computeActualsTotals, applyPeriodActual, buildHybridConsolidated, computeCatalogueLineTotal } from '@/lib/actuals'
 import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
 import { yearStartPeriod, canCloseCalendarYear, computeYearEndBalanceSheet } from '@/lib/annual-close'
@@ -6631,6 +6632,116 @@ function legacyOutstanding(line:any, months:number): number[] {
 const TC_ALL = '__all__'
 const TC_UNASSIGNED = '__unassigned__'
 
+// WORKING CAPITAL — MATCHING INCOMINGS WITH OUTGOINGS
+// Guidance for the accountant and CEO: for each period, does the cash
+// expected IN cover every obligation due OUT? Shows Money in vs Money out,
+// the match (surplus/shortfall), whether the month is covered, and the
+// working capital to secure. NOT a repeat of the Cash Flow statement — a
+// decision tool — but its figures reconcile exactly to it (see
+// src/lib/working-capital-statement.ts). Deliberately per-period, not an average.
+function CashCoverageStatement({result, months, cc}) {
+  const [showDetail, setShowDetail] = useState(true)   // list the in/out items by default
+  if (!result?.cf || !result?.con) return null
+  const stmt = computeWorkingCapitalStatement(result)
+  const M = stmt.months
+  if (!M.length) return null
+
+  const has = (sel:(m:any)=>number) => M.some(m=>Math.abs(sel(m))>0.5)
+  const anyFin = has(m=>m.financingIn), anyInt = has(m=>m.interest), anyPrin = has(m=>m.principalRepayment)
+  const anyTax = has(m=>m.tax), anyCapex = has(m=>m.capex), anyOther = has(m=>m.otherAdj)
+
+  const inDetail = [
+    {label:'from customers',                    get:(m:any)=>m.collections,  tone:'in', indent:true},
+    anyFin && {label:'financing (equity, grants, loans)', get:(m:any)=>m.financingIn, tone:'in', indent:true},
+  ].filter(Boolean)
+  const outDetail = [
+    {label:'to suppliers',                      get:(m:any)=>-m.supplierPayments,   tone:'out', indent:true},
+    {label:'operating costs (staff, overheads)',get:(m:any)=>-m.operatingCosts,     tone:'out', indent:true},
+    anyInt   && {label:'loan interest',         get:(m:any)=>-m.interest,           tone:'out', indent:true},
+    anyPrin  && {label:'loan repayment',        get:(m:any)=>-m.principalRepayment, tone:'out', indent:true},
+    anyTax   && {label:'tax',                   get:(m:any)=>-m.tax,                tone:'out', indent:true},
+    anyCapex && {label:'capital purchases',     get:(m:any)=>-m.capex,              tone:'out', indent:true},
+    anyOther && {label:'other movements',       get:(m:any)=>-m.otherAdj,           tone:'out', indent:true},
+  ].filter(Boolean)
+
+  const rows = [
+    {label:'Opening cash in hand',   get:(m:any)=>m.opening,           tone:'muted'},
+    {label:'Money expected IN',      get:(m:any)=>m.totalIn,           tone:'in',  bold:true},
+    ...(showDetail ? inDetail : []),
+    {label:'Money due OUT',          get:(m:any)=>-m.totalObligations, tone:'out', bold:true},
+    ...(showDetail ? outDetail : []),
+    {label:'Match — surplus / (shortfall)', get:(m:any)=>m.surplus,    tone:'net',   bold:true},
+    {label:'Cash left after the month',     get:(m:any)=>m.closing,    tone:'close', bold:true},
+  ] as any[]
+
+  const fmtSigned = (v:number) => { const r=Math.round(v); return r<0 ? `(${fmt(Math.abs(r),cc)})` : fmt(r,cc) }
+  const worstLabel = stmt.peakFundingMonthIndex>=0 ? (months[stmt.peakFundingMonthIndex]||`M${stmt.peakFundingMonthIndex+1}`) : ''
+  const short = stmt.peakFundingNeed>0
+  const mismatchMonths = M.filter((m:any)=>m.surplus < -0.5).length   // periods where OUT exceeds IN
+
+  const chip = (bg:string,bd:string,label:string,value:React.ReactNode,sub:React.ReactNode)=>(
+    <div style={{flex:'1 1 250px',background:bg,border:`1px solid ${bd}55`,borderRadius:12,padding:'0.9rem 1.1rem'}}>
+      <div style={{fontFamily:'monospace',fontSize:'0.96rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate,marginBottom:'0.25rem'}}>{label}</div>
+      <div style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,color:bd,lineHeight:1.1}}>{value}</div>
+      <div style={{fontSize:'0.94rem',color:C.slate,marginTop:'0.25rem',lineHeight:1.45}}>{sub}</div>
+    </div>
+  )
+
+  return (
+    <div style={{marginBottom:'1.4rem'}}>
+      <div style={{display:'flex',gap:'0.9rem',flexWrap:'wrap',marginBottom:'1rem'}}>
+        {chip(short?'var(--cv-tint-amber, #FFF6E9)':'var(--cv-tint-teal-soft)', short?C.amber:C.teal,
+          'Working capital to secure',
+          fmt(Math.round(short?stmt.peakFundingNeed:0),cc),
+          short ? <>so the shortfall in <strong>{worstLabel}</strong> is covered</> : <>cash never runs dry over the plan</>)}
+        {chip(mismatchMonths>0?'var(--cv-tint-amber, #FFF6E9)':'var(--cv-tint-teal-soft)', mismatchMonths>0?C.red:C.teal,
+          'Months not matched',
+          <>{mismatchMonths} <span style={{fontSize:'1rem',color:C.slate}}>of {M.length}</span></>,
+          mismatchMonths>0 ? <>periods where money OUT is more than money IN</> : <>every period’s incomings cover its outgoings</>)}
+      </div>
+
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.6rem',marginBottom:'0.35rem',flexWrap:'wrap'}}>
+        <div style={{fontSize:'0.94rem',color:C.slate}}>Aim: each period’s <strong style={{color:C.teal}}>money in</strong> should cover its <strong style={{color:C.navy}}>money out</strong>.</div>
+        <button onClick={()=>setShowDetail(v=>!v)} style={{...addBtn(true),whiteSpace:'nowrap'}}>{showDetail?'Hide breakdown':'Show breakdown'}</button>
+      </div>
+
+      <div style={{overflowX:'auto'}}>
+        <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily:'monospace'}}>
+          <thead>
+            <tr style={{background:'var(--cv-header)'}}>
+              <th style={{textAlign:'left',padding:'8px 10px',color:'var(--cv-on-accent)',minWidth:230,fontSize:'1.0rem',position:'sticky',left:0,background:'var(--cv-header)'}}>Matching in &amp; out · per period</th>
+              {months.map((m:string,i:number)=><th key={i} style={{textAlign:'right',padding:'8px 8px',color:'var(--cv-on-accent)',whiteSpace:'nowrap',fontSize:'0.96rem'}}>{m}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r:any,ri:number)=>{
+              const isClose=r.tone==='close', isNet=r.tone==='net'
+              const rowBg=isClose?'var(--cv-tint-cyan)':isNet?C.lightBg:C.white
+              return (
+                <tr key={ri} style={{borderTop:isNet?`2px solid ${C.border}`:`1px solid ${C.border}`,background:rowBg}}>
+                  <td style={{padding:'6px 10px',paddingLeft:r.indent?'1.8rem':'10px',fontWeight:r.bold?700:400,color:r.indent?C.slate:C.navy,fontSize:r.indent?'0.94rem':'1.0rem',position:'sticky',left:0,background:rowBg,whiteSpace:'nowrap'}}>{r.label}</td>
+                  {M.map((mo:any,ci:number)=>{
+                    const v=r.get(mo); const neg=v<0
+                    const col = isClose ? (mo.closing<0?C.red:C.navy)
+                      : isNet ? (mo.surplus<0?C.red:C.green)
+                      : r.tone==='in' ? C.teal
+                      : r.tone==='out' ? (r.indent?C.slate:C.navy)
+                      : neg ? C.red : C.navy
+                    return <td key={ci} style={{padding:'6px 8px',textAlign:'right',color:col,fontWeight:r.bold?700:400,fontSize:r.indent?'0.94rem':'1.0rem',whiteSpace:'nowrap'}}>{fmtSigned(v)}</td>
+                  })}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p style={{fontSize:'0.9rem',color:C.slate,margin:'0.5rem 0 0',lineHeight:1.5}}>
+        Whole-business, per period — <strong>actual values, not averages</strong>. This is a matching guide, not a repeat of the Cash Flow tab: every figure reconciles to it (interest, tax and repayments are real obligations). A red <strong>shortfall</strong> means that month’s outgoings exceed its incomings — cover it from the cash buffer or arrange funding. Enter your month-end debtor/creditor balances below to sharpen the collections &amp; supplier-payment lines.
+      </p>
+    </div>
+  )
+}
+
 function WorkingCapitalTab({config,result,months,cc,P,onSave}) {
   const lines: any[] = config.settings.trade_credit_lines || []
   const canEdit = P.canEditPlan
@@ -6725,9 +6836,11 @@ function WorkingCapitalTab({config,result,months,cc,P,onSave}) {
     <div>
       <div style={{background:'var(--cv-tint-cyan)',borderRadius:6,padding:'0.85rem 1rem',marginBottom:'1.25rem'}}>
         <p style={{fontSize:'1.06rem',color:C.navy,lineHeight:1.6,margin:0}}>
-          Track, per business unit, the credit you extend to customers or partners (Receivable) and the credit your suppliers extend to you (Payable). For each month simply enter the <strong>outstanding balance at month end</strong> — what customers still owe you, and what you still owe suppliers — read straight off your debtors and creditors book. The days-to-collect (DSO), days-to-pay (DPO) and the cash impact are all worked out automatically and feed into Cash Flow and Going Concern.
+          For each period this shows the <strong>real cash</strong> you expect to collect and every obligation you must pay — supplier payments, operating costs, loan interest and repayment, tax and capital purchases — so you can see, month by month, whether there is enough to meet everything and how much working capital to secure. Below, enter the <strong>month-end outstanding balance</strong> your customers still owe you (Receivable) and what you still owe suppliers (Payable), read straight off your debtors and creditors book — these sharpen the collections and supplier-payment figures above and feed Cash Flow and Going Concern.
         </p>
       </div>
+
+      <CashCoverageStatement result={result} months={months} cc={cc}/>
 
       {/* Business-unit selector */}
       <div style={{display:'flex',gap:'0.45rem',marginBottom:'1rem',flexWrap:'wrap'}}>
@@ -6743,55 +6856,6 @@ function WorkingCapitalTab({config,result,months,cc,P,onSave}) {
           )
         })}
       </div>
-
-      {s && (()=>{
-        const dso=isEstimate?estDsoDays:tc.dso, dpo=isEstimate?estDpoDays:tc.dpo, gap=dso-dpo
-        const payOut=isEstimate?estPayable:(tc.totalPayableOutstanding[tc.totalPayableOutstanding.length-1]||0)
-        const recOut=isEstimate?estReceivable:(tc.totalReceivableOutstanding[tc.totalReceivableOutstanding.length-1]||0)
-        // Ring fill is a purely visual gauge over a 90-day reference window --
-        // no new score is computed; the day counts themselves come straight
-        // from the engine's tradeCredit output (or, when no real lines have
-        // been entered yet, from the estimate derived above).
-        const ringFrac=(d:number)=>Math.max(0,Math.min(1,d/90))
-        const gapCol=gap<=0?C.green:gap>30?C.red:C.amber
-        const scopeLabel = selUnit===TC_ALL ? 'all units' : selUnit===TC_UNASSIGNED ? 'unassigned lines' : (activeUnits.find((u:any)=>u.id===selUnit)?.name || 'unit')
-        return (
-          <>
-            <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'0.4rem'}}>
-              <div style={{...ovLabel,marginBottom:0}}>Payment behaviour · {scopeLabel}</div>
-              {isEstimate && (
-                <span style={{fontFamily:'monospace',fontSize:'0.82rem',padding:'0.15rem 0.5rem',borderRadius:4,background:C.amber+'22',color:C.amber,border:`1px solid ${C.amber}55`}}>
-                  ESTIMATE from intake -- enter actual balances below to replace
-                </span>
-              )}
-            </div>
-            <div className="cv-grid-3" style={{marginBottom:'1.35rem'}}>
-              <div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)',borderLeft:`4px solid ${C.navy}`}}>
-                <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.45rem'}}>Days to collect · DSO</div>
-                <div style={{display:'flex',alignItems:'center',gap:'0.8rem'}}>
-                  <MiniDonut frac={ringFrac(dso)} color={C.amber} size={46} center=""/>
-                  <div>
-                    <div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:C.navy,lineHeight:1.05}}>{dso.toFixed(0)}d</div>
-                    <div style={{fontSize:'0.94rem',color:C.slate,fontFamily:'monospace'}}>{fmt(recOut,cc)} {isEstimate?'estimated':'outstanding'}</div>
-                  </div>
-                </div>
-              </div>
-              <div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)',borderLeft:`4px solid ${C.navy}`}}>
-                <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.45rem'}}>Days to pay · DPO</div>
-                <div style={{display:'flex',alignItems:'center',gap:'0.8rem'}}>
-                  <MiniDonut frac={ringFrac(dpo)} color={C.teal} size={46} center=""/>
-                  <div>
-                    <div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:C.navy,lineHeight:1.05}}>{dpo.toFixed(0)}d</div>
-                    <div style={{fontSize:'0.94rem',color:C.slate,fontFamily:'monospace'}}>{fmt(payOut,cc)} {isEstimate?'estimated':'outstanding'}</div>
-                  </div>
-                </div>
-              </div>
-              <GlanceCard label="Cash conversion gap" value={`${gap.toFixed(0)}d`} accent={gapCol} valueColor={gapCol}
-                desc={gap>0?`you pay ${gap.toFixed(0)} days before you collect`:'you collect before you pay'}/>
-            </div>
-          </>
-        )
-      })()}
 
       <div style={card}>
         <SectionHeader title="What customers still owe you (month-end)" action={canEdit?<button style={addBtn(true)} onClick={()=>addLine('receivable')}>+ Add Receivable Line</button>:null}/>
