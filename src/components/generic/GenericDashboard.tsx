@@ -6632,13 +6632,15 @@ function legacyOutstanding(line:any, months:number): number[] {
 const TC_ALL = '__all__'
 const TC_UNASSIGNED = '__unassigned__'
 
-// WORKING CAPITAL — MATCHING INCOMINGS WITH OUTGOINGS
-// Guidance for the accountant and CEO: for each period, does the cash
-// expected IN cover every obligation due OUT? Shows Money in vs Money out,
-// the match (surplus/shortfall), whether the month is covered, and the
-// working capital to secure. NOT a repeat of the Cash Flow statement — a
-// decision tool — but its figures reconcile exactly to it (see
-// src/lib/working-capital-statement.ts). Deliberately per-period, not an average.
+// WORKING CAPITAL — CASH REQUIRED vs CASH AVAILABLE
+// The principle: how much cash is required to keep the business running each
+// period, and is the cash available (or going to be available) to meet it?
+// For the accountant and CEO. Per period it sets cash available (opening +
+// expected in) against cash required (all obligations out), flags any month
+// where available cash falls short, and sizes the working capital to secure.
+// NOT a repeat of the Cash Flow statement — a decision tool — but its figures
+// reconcile exactly to it (see src/lib/working-capital-statement.ts).
+// Deliberately per-period, not an average.
 function CashCoverageStatement({result, months, cc}) {
   const [showDetail, setShowDetail] = useState(true)   // list the in/out items by default
   if (!result?.cf || !result?.con) return null
@@ -6665,19 +6667,20 @@ function CashCoverageStatement({result, months, cc}) {
   ].filter(Boolean)
 
   const rows = [
-    {label:'Opening cash in hand',   get:(m:any)=>m.opening,           tone:'muted'},
-    {label:'Money expected IN',      get:(m:any)=>m.totalIn,           tone:'in',  bold:true},
+    {label:'Cash in hand at start',          get:(m:any)=>m.opening,           tone:'muted'},
+    {label:'+ Cash coming in',               get:(m:any)=>m.totalIn,           tone:'in',   bold:true},
     ...(showDetail ? inDetail : []),
-    {label:'Money due OUT',          get:(m:any)=>-m.totalObligations, tone:'out', bold:true},
+    {label:'= Cash available',               get:(m:any)=>m.opening+m.totalIn, tone:'avail', bold:true},
+    {label:'− Cash required to keep running', get:(m:any)=>-m.totalObligations, tone:'out',  bold:true},
     ...(showDetail ? outDetail : []),
-    {label:'Match — surplus / (shortfall)', get:(m:any)=>m.surplus,    tone:'net',   bold:true},
-    {label:'Cash left after the month',     get:(m:any)=>m.closing,    tone:'close', bold:true},
+    {label:'= Cash left after obligations',  get:(m:any)=>m.closing,           tone:'close', bold:true},
+    {label:'Enough to keep running?',        tone:'status'},
   ] as any[]
 
   const fmtSigned = (v:number) => { const r=Math.round(v); return r<0 ? `(${fmt(Math.abs(r),cc)})` : fmt(r,cc) }
   const worstLabel = stmt.peakFundingMonthIndex>=0 ? (months[stmt.peakFundingMonthIndex]||`M${stmt.peakFundingMonthIndex+1}`) : ''
   const short = stmt.peakFundingNeed>0
-  const mismatchMonths = M.filter((m:any)=>m.surplus < -0.5).length   // periods where OUT exceeds IN
+  const shortMonths = M.filter((m:any)=>m.closing < -0.5).length   // months where available cash can't cover what's required
 
   const chip = (bg:string,bd:string,label:string,value:React.ReactNode,sub:React.ReactNode)=>(
     <div style={{flex:'1 1 250px',background:bg,border:`1px solid ${bd}55`,borderRadius:12,padding:'0.9rem 1.1rem'}}>
@@ -6693,15 +6696,15 @@ function CashCoverageStatement({result, months, cc}) {
         {chip(short?'var(--cv-tint-amber, #FFF6E9)':'var(--cv-tint-teal-soft)', short?C.amber:C.teal,
           'Working capital to secure',
           fmt(Math.round(short?stmt.peakFundingNeed:0),cc),
-          short ? <>so the shortfall in <strong>{worstLabel}</strong> is covered</> : <>cash never runs dry over the plan</>)}
-        {chip(mismatchMonths>0?'var(--cv-tint-amber, #FFF6E9)':'var(--cv-tint-teal-soft)', mismatchMonths>0?C.red:C.teal,
-          'Months not matched',
-          <>{mismatchMonths} <span style={{fontSize:'1rem',color:C.slate}}>of {M.length}</span></>,
-          mismatchMonths>0 ? <>periods where money OUT is more than money IN</> : <>every period’s incomings cover its outgoings</>)}
+          short ? <>extra cash to raise so obligations in <strong>{worstLabel}</strong> can be met</> : <>cash on hand covers every month — nothing to raise</>)}
+        {chip(shortMonths>0?'var(--cv-tint-amber, #FFF6E9)':'var(--cv-tint-teal-soft)', shortMonths>0?C.red:C.teal,
+          'Months short of cash',
+          <>{shortMonths} <span style={{fontSize:'1rem',color:C.slate}}>of {M.length}</span></>,
+          shortMonths>0 ? <>periods where available cash can’t meet what’s required</> : <>available cash covers what’s required every period</>)}
       </div>
 
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.6rem',marginBottom:'0.35rem',flexWrap:'wrap'}}>
-        <div style={{fontSize:'0.94rem',color:C.slate}}>Aim: each period’s <strong style={{color:C.teal}}>money in</strong> should cover its <strong style={{color:C.navy}}>money out</strong>.</div>
+        <div style={{fontSize:'0.94rem',color:C.slate}}>The question each period: is the <strong style={{color:C.teal}}>cash available</strong> enough to meet the <strong style={{color:C.navy}}>cash required</strong> to keep running?</div>
         <button onClick={()=>setShowDetail(v=>!v)} style={{...addBtn(true),whiteSpace:'nowrap'}}>{showDetail?'Hide breakdown':'Show breakdown'}</button>
       </div>
 
@@ -6709,21 +6712,25 @@ function CashCoverageStatement({result, months, cc}) {
         <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily:'monospace'}}>
           <thead>
             <tr style={{background:'var(--cv-header)'}}>
-              <th style={{textAlign:'left',padding:'8px 10px',color:'var(--cv-on-accent)',minWidth:230,fontSize:'1.0rem',position:'sticky',left:0,background:'var(--cv-header)'}}>Matching in &amp; out · per period</th>
+              <th style={{textAlign:'left',padding:'8px 10px',color:'var(--cv-on-accent)',minWidth:230,fontSize:'1.0rem',position:'sticky',left:0,background:'var(--cv-header)'}}>Cash required vs available · per period</th>
               {months.map((m:string,i:number)=><th key={i} style={{textAlign:'right',padding:'8px 8px',color:'var(--cv-on-accent)',whiteSpace:'nowrap',fontSize:'0.96rem'}}>{m}</th>)}
             </tr>
           </thead>
           <tbody>
             {rows.map((r:any,ri:number)=>{
-              const isClose=r.tone==='close', isNet=r.tone==='net'
-              const rowBg=isClose?'var(--cv-tint-cyan)':isNet?C.lightBg:C.white
+              const isClose=r.tone==='close', isAvail=r.tone==='avail', isStatus=r.tone==='status'
+              const rowBg=isClose?'var(--cv-tint-cyan)':isAvail?'var(--cv-tint-teal-soft)':isStatus?C.lightBg:C.white
               return (
-                <tr key={ri} style={{borderTop:isNet?`2px solid ${C.border}`:`1px solid ${C.border}`,background:rowBg}}>
-                  <td style={{padding:'6px 10px',paddingLeft:r.indent?'1.8rem':'10px',fontWeight:r.bold?700:400,color:r.indent?C.slate:C.navy,fontSize:r.indent?'0.94rem':'1.0rem',position:'sticky',left:0,background:rowBg,whiteSpace:'nowrap'}}>{r.label}</td>
+                <tr key={ri} style={{borderTop:(isClose||isAvail||isStatus)?`2px solid ${C.border}`:`1px solid ${C.border}`,background:rowBg}}>
+                  <td style={{padding:'6px 10px',paddingLeft:r.indent?'1.8rem':'10px',fontWeight:r.bold||isStatus?700:400,color:r.indent?C.slate:C.navy,fontSize:r.indent?'0.94rem':'1.0rem',position:'sticky',left:0,background:rowBg,whiteSpace:'nowrap'}}>{r.label}</td>
                   {M.map((mo:any,ci:number)=>{
+                    if (isStatus) {
+                      const ok = mo.closing >= -0.5
+                      return <td key={ci} style={{padding:'6px 8px',textAlign:'right',color:ok?C.green:C.red,fontWeight:700,whiteSpace:'nowrap'}}>{ok?'✓ yes':`short ${fmt(Math.round(-mo.closing),cc)}`}</td>
+                    }
                     const v=r.get(mo); const neg=v<0
                     const col = isClose ? (mo.closing<0?C.red:C.navy)
-                      : isNet ? (mo.surplus<0?C.red:C.green)
+                      : isAvail ? (v<0?C.red:C.navy)
                       : r.tone==='in' ? C.teal
                       : r.tone==='out' ? (r.indent?C.slate:C.navy)
                       : neg ? C.red : C.navy
@@ -6736,7 +6743,7 @@ function CashCoverageStatement({result, months, cc}) {
         </table>
       </div>
       <p style={{fontSize:'0.9rem',color:C.slate,margin:'0.5rem 0 0',lineHeight:1.5}}>
-        Whole-business, per period — <strong>actual values, not averages</strong>. This is a matching guide, not a repeat of the Cash Flow tab: every figure reconciles to it (interest, tax and repayments are real obligations). A red <strong>shortfall</strong> means that month’s outgoings exceed its incomings — cover it from the cash buffer or arrange funding. Enter your month-end debtor/creditor balances below to sharpen the collections &amp; supplier-payment lines.
+        Whole-business, per period — <strong>actual values, not averages</strong>. Working capital is the cash <strong>required to keep the business running</strong> (suppliers, operating costs, interest, loan repayments, tax, capital purchases) set against the cash <strong>available or that will become available</strong> (cash on hand plus what is expected in, including any funding to be drawn). A red <strong>“short”</strong> means available cash cannot meet what is required that month — raise the working capital shown above, or bring cash in sooner. Every figure reconciles to the Cash Flow statement and Going Concern; enter your month-end debtor/creditor balances below to sharpen it.
       </p>
     </div>
   )
@@ -6836,7 +6843,7 @@ function WorkingCapitalTab({config,result,months,cc,P,onSave}) {
     <div>
       <div style={{background:'var(--cv-tint-cyan)',borderRadius:6,padding:'0.85rem 1rem',marginBottom:'1.25rem'}}>
         <p style={{fontSize:'1.06rem',color:C.navy,lineHeight:1.6,margin:0}}>
-          For each period this shows the <strong>real cash</strong> you expect to collect and every obligation you must pay — supplier payments, operating costs, loan interest and repayment, tax and capital purchases — so you can see, month by month, whether there is enough to meet everything and how much working capital to secure. Below, enter the <strong>month-end outstanding balance</strong> your customers still owe you (Receivable) and what you still owe suppliers (Payable), read straight off your debtors and creditors book — these sharpen the collections and supplier-payment figures above and feed Cash Flow and Going Concern.
+          Working capital is about one thing: <strong>how much cash is required to keep the business running each period, and whether the cash is — or will be — available to meet it</strong>. Month by month this sets the cash available (on hand plus what is expected in) against the cash required (supplier payments, operating costs, loan interest and repayment, tax and capital purchases), and flags any month where it falls short and how much working capital to secure. Below, enter the <strong>month-end outstanding balance</strong> your customers still owe you (Receivable) and what you still owe suppliers (Payable), read straight off your debtors and creditors book — these sharpen the figures above and feed Cash Flow and Going Concern.
         </p>
       </div>
 
