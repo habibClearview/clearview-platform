@@ -25,6 +25,9 @@ import BuildStamp from '@/components/BuildStamp'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import VerificationRecognition from '@/components/generic/VerificationRecognition'
 import PaymentReviewQueue from '@/components/generic/PaymentReviewQueue'
+import AdminConsoleTab from '@/components/generic/AdminConsoleTab'
+import CustomersMarketingTab from '@/components/generic/CustomersMarketingTab'
+import OperationsTab from '@/components/generic/OperationsTab'
 import { computeFreePerformance, operatingMarginPct, grossMarginPct, ebitdaMarginPct, netMarginPct, revenueGrowthPct, ruleOf40, isRuleOf40Strong, burnMultiple, clv, ltvToCac, cacPaybackMonths, mrr, arr } from '@/lib/business-performance-metrics'
 import { syntheticPlanLinesFromDrivers, summariseByChannel, type Channel, type Driver } from '@/lib/drivers-engine'
 import { syntheticPlanLinesFromEvents, type MarketEvent } from '@/lib/market-events'
@@ -949,10 +952,22 @@ export default function GenericDashboard({
     ]},
     { title:'BUSINESS', items:[
       {key:'customers',label:'Customers & Marketing',view:'customers'},
-      ...(P.canManageCatalogue ? [{key:'operations',label:'Operations',view:'stores'}] : []),
+      // Operations = the day-to-day service log (deliveries, complaints, staff
+      // scorecards) plus, for those who manage stock, the Stores & Stock screen
+      // as a secondary tab. Deliveries/service is visible to every client user;
+      // the Stores tab only appears for catalogue managers (unchanged access).
+      {key:'operations',label:'Operations',tabs:[
+        ['operations','Deliveries & Service'],
+        ...(P.canManageCatalogue ? [['stores','Stores & Stock']] : []),
+      ]},
     ]},
     { title:'MANAGE', items:[
-      {key:'admin',label:'Admin',view:'settings'},
+      // Admin groups the user/access console (team managers only) alongside the
+      // existing Settings screen. Non-managers land straight on Settings.
+      {key:'admin',label:'Admin',tabs:[
+        ...(P.canManageTeam ? [['admin','Users & Access']] : []),
+        ['settings','Settings'],
+      ]},
     ]},
   ]
 
@@ -1082,13 +1097,9 @@ export default function GenericDashboard({
         {view==='actuals_wc'  && <ActualsAndWorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} onCloseStatusChanged={loadClosedPeriods}/>}
         {view==='stores'      && <StoresTab config={config} clientId={clientId} P={P}/>}
         {view==='settings'    && <SettingsAndAdminTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={saveConfig} theme={theme} setThemeMode={setThemeMode}/>}
-        {view==='customers'   && (
-          <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:12,padding:'2rem',maxWidth:760}}>
-            <div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.12em',color:C.cyan,textTransform:'uppercase',marginBottom:'0.5rem'}}>Business · Customers &amp; Marketing</div>
-            <h2 style={{fontFamily:'Georgia,serif',color:C.navy,margin:'0 0 0.75rem'}}>Customers &amp; Marketing</h2>
-            <p style={{color:C.slate,lineHeight:1.65,margin:0}}>This section is being built. It will hold the customer journey — leads → prospects → clients tracked per sales/marketing officer with conversion rates, the customer records captured in the field app, and campaign spend with cost per customer acquired (CAC).</p>
-          </div>
-        )}
+        {view==='customers'   && <CustomersMarketingTab config={config} clientId={clientId} cc={cc} P={P}/>}
+        {view==='operations'  && <OperationsTab config={config} clientId={clientId} cc={cc} P={P}/>}
+        {view==='admin'       && <AdminConsoleTab config={config} clientId={clientId} cc={cc} P={P}/>}
         </ErrorBoundary>
         </main>
       </div>
