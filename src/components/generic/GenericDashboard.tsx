@@ -911,33 +911,27 @@ export default function GenericDashboard({
   // programme -> Edit -> "Funder sees".
   const isFunder = P.role === 'funder'
   const funderFull = isFunder && P.funderDetailLevel === 'full'
-  const mainNav = isFunder ? [
-    ['overview','Overview'],
-    ['intelligence','Clearview Intelligence'],
-    ...(funderFull ? [['pl','P&L'],['cashflow','Cash Flow'],['balancesheet','Balance Sheet']] : []),
+  const approvalsLabel = (()=>{
+    // Only count pending marketing activities for users who can actually approve
+    // them, so a non-approver never sees a badge that leads to an empty queue.
+    const canApproveEvents = ['finance_manager','ceo','super_coach','coach'].includes(P.role)
+    const eventsPending = canApproveEvents ? marketEvents.filter(e=>e.status==='proposed').length : 0
+    const n=pendingApprovalCount+pendingActualsCount+eventsPending
+    return `Approvals${n>0?` (${n})`:''}`
+  })()
+  // Left-hand navigation, grouped by purpose. Screen ids are UNCHANGED so every
+  // setView(...) cross-link keeps working — this only regroups/relabels how the
+  // existing screens are presented. Order: orientation, then the INPUT surfaces
+  // (plan & record), then the OUTPUT accounts, then operate, then manage.
+  const navGroups: {title:string; items:string[][]}[] = isFunder ? [
+    { title:'', items:[['overview','Overview'],['intelligence','Clearview Intelligence']] },
+    ...(funderFull ? [{ title:'ACCOUNTS', items:[['pl','P&L'],['cashflow','Cash Flow'],['balancesheet','Balance Sheet']] }] : []),
   ] : [
-    ['overview','Overview'],
-    ['intelligence','Clearview Intelligence'],
-    ['performance','Performance'],
-    ['planning','Planning'],
-    ['actuals_wc','Actuals & Working Capital'],
-    // Stores & Production setup (locations / loss reasons). Management-only —
-    // reads are open on the API, but this slice is pure list management, so it
-    // only shows to those who can actually change the lists (same gate as the
-    // catalogue). Later slices add staff-visible balances/stock cards.
-    ...(P.canManageCatalogue ? [['stores','Stores']] : []),
-    ['pl','P&L'],
-    ['cashflow','Cash Flow'],
-    ['balancesheet','Balance Sheet'],
-    ['approvals',(()=>{
-      // Only count pending marketing activities for users who can actually approve
-      // them, so a non-approver never sees a badge that leads to an empty queue.
-      const canApproveEvents = ['finance_manager','ceo','super_coach','coach'].includes(P.role)
-      const eventsPending = canApproveEvents ? marketEvents.filter(e=>e.status==='proposed').length : 0
-      const n=pendingApprovalCount+pendingActualsCount+eventsPending
-      return `Approvals${n>0?` (${n})`:''}`
-    })()],
-    ['settings','Settings'],
+    { title:'', items:[['overview','Overview'],['intelligence','Clearview Intelligence']] },
+    { title:'PLAN & RECORD', items:[['planning','Planning'],['actuals_wc','Actuals & Working Capital']] },
+    { title:'ACCOUNTS', items:[['pl','P&L'],['cashflow','Cash Flow'],['balancesheet','Balance Sheet'],['performance','Performance']] },
+    ...(P.canManageCatalogue ? [{ title:'OPERATIONS', items:[['stores','Stores']] }] : []),
+    { title:'MANAGE', items:[['approvals',approvalsLabel],['settings','Settings']] },
   ]
 
   return (
@@ -982,20 +976,41 @@ export default function GenericDashboard({
         </div>
       </header>
 
-      {/* Nav */}
-      <nav style={{background:'var(--cv-nav)',borderBottom:`1px solid var(--cv-cyan-dim)`}}>
-        <div style={{maxWidth:1600,margin:'0 auto',padding:'0 1.5rem',display:'flex',flexWrap:'wrap'}}>
-          {mainNav.map(([id,label])=>(
-            <button key={id} style={navBtn(view===id)} onClick={()=>setView(id)}>{label}</button>
+      {/* Body: left-hand sidebar navigation + content. The sidebar groups the
+          screens by purpose — plan/record the numbers (inputs), read the
+          accounts (outputs), operate, manage — instead of one long tab strip.
+          Screen ids are unchanged so every in-app setView cross-link keeps
+          working; each tab still renders in an ErrorBoundary keyed by view. */}
+      <style>{`
+        .cv-shell{display:flex;max-width:1600px;margin:0 auto;align-items:stretch}
+        .cv-side{flex:0 0 234px;width:234px;border-right:1px solid ${C.border};background:${C.white};padding:0.5rem 0}
+        .cv-main{flex:1;min-width:0;padding:1.5rem}
+        .cv-navgroup{padding:0.1rem 0}
+        .cv-navgroup-title{font-family:monospace;font-size:0.72rem;letter-spacing:0.12em;color:${C.slate};text-transform:uppercase;padding:0.7rem 1.25rem 0.35rem;opacity:0.7}
+        .cv-navbtn{display:block;width:100%;text-align:left;font-family:monospace;font-size:0.95rem;line-height:1.3;padding:0.6rem 1.1rem 0.6rem 1.25rem;border:none;border-left:3px solid transparent;background:transparent;color:${C.slate};font-weight:500;cursor:pointer}
+        .cv-navbtn:hover{background:var(--cv-tint-cyan)}
+        .cv-navbtn.active{border-left-color:${C.cyan};background:var(--cv-tint-cyan);color:${C.navy};font-weight:700}
+        @media (max-width:860px){
+          .cv-shell{flex-direction:column}
+          .cv-side{flex:none;width:100%;border-right:none;border-bottom:1px solid ${C.border};display:flex;overflow-x:auto;padding:0.25rem 0.4rem}
+          .cv-navgroup{display:flex;align-items:center;padding:0}
+          .cv-navgroup-title{display:none}
+          .cv-navbtn{width:auto;white-space:nowrap;border-left:none;border-bottom:3px solid transparent;padding:0.55rem 0.85rem}
+          .cv-navbtn.active{border-left:none;border-bottom-color:${C.cyan}}
+        }
+      `}</style>
+      <div className="cv-shell">
+        <aside className="cv-side" aria-label="Sections">
+          {navGroups.map((g,gi)=>(
+            <div className="cv-navgroup" key={gi}>
+              {g.title && <div className="cv-navgroup-title">{g.title}</div>}
+              {g.items.map(([id,label])=>(
+                <button key={id} className={`cv-navbtn${view===id?' active':''}`} onClick={()=>setView(id)}>{label}</button>
+              ))}
+            </div>
           ))}
-        </div>
-      </nav>
-
-      {/* Main. Each tab renders inside an ErrorBoundary keyed by the active
-          view, so if one section throws it shows a contained "couldn't load"
-          message (and the nav/other tabs still work) instead of white-screening
-          the whole dashboard. Keying by view resets the boundary on tab switch. */}
-      <main style={{maxWidth:1600,margin:'0 auto',padding:'1.5rem'}}>
+        </aside>
+        <main className="cv-main">
         {/* Dashboard-wide save status. saveConfig is used by every editing tab
             (Planning, Overview, Intelligence, Actuals, Settings, drivers), so
             the status lives here — a failed or stalled save is visible no matter
@@ -1025,7 +1040,8 @@ export default function GenericDashboard({
         {view==='stores'      && <StoresTab config={config} clientId={clientId} P={P}/>}
         {view==='settings'    && <SettingsAndAdminTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={saveConfig} theme={theme} setThemeMode={setThemeMode}/>}
         </ErrorBoundary>
-      </main>
+        </main>
+      </div>
 
       <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.88rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>
         Canvas Coach · Clearview · {config.business_name} · habibonifade.com · Confidential
