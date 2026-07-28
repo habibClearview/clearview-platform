@@ -3176,9 +3176,9 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll}) {
   const lines = config.plan_lines.filter((l:any)=>l.unit_id===selUnit&&l.active&&!l.name.startsWith('Add '))
   const sections:[string,string][] = [['revenue','Revenue'],['cost_of_sales','Cost of Sales'],['staff','Staff'],['direct_opex','Overheads']]
   const sectioned = sections
-    .map(([cat,label])=>[label, lines.filter((l:any)=>l.category===cat)] as [string, any[]])
-    .filter(([,ls])=>ls.length>0)
-  const flatLines = sectioned.flatMap(([,ls])=>ls)
+    .map(([cat,label])=>[cat, label, lines.filter((l:any)=>l.category===cat)] as [string, string, any[]])
+    .filter(([,,ls])=>ls.length>0)
+  const flatLines = sectioned.flatMap(([,,ls])=>ls)
 
   // Load the unit's actuals for every visible period in one query.
   useEffect(()=>{
@@ -3333,15 +3333,20 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll}) {
               <th style={{...thBase,borderLeft:'2px solid var(--cv-wa-20)'}}>Total</th>
             </tr></thead>
             <tbody>
-              {sectioned.map(([label,ls])=>{
+              {sectioned.map(([cat,label,ls])=>{
                 let flatBase = 0
-                for (const [,prev] of sectioned) { if (prev===ls) break; flatBase += prev.length }
+                for (const [,,prev] of sectioned) { if (prev===ls) break; flatBase += prev.length }
+                const secColor = cat==='revenue'?C.green:C.red
+                const secTotal = ls.reduce((s:number,l:any)=>s+lineTotal(l.id),0)
                 return (
                   <React.Fragment key={label}>
                     <tr>
-                      <td style={grpTd}>{label}</td>
-                      {periods.map(p=><td key={p.value} style={{...grpTd,background:C.lightBg}}/>)}
-                      <td style={{...grpTd,background:C.lightBg}}/>
+                      <td style={{...grpTd,color:secColor}}>{label}</td>
+                      {periods.map(p=>{
+                        const st = ls.reduce((s:number,l:any)=>s+cellCombined(p.value,l.id),0)
+                        return <td key={p.value} style={{...grpTd,textAlign:'right',color:secColor}}>{st?fmt(st,cc):''}</td>
+                      })}
+                      <td style={{...grpTd,textAlign:'right',color:secColor,borderLeft:`2px solid ${C.border}`}}>{secTotal?fmt(secTotal,cc):''}</td>
                     </tr>
                     {ls.map((l:any,li:number)=>{
                       const flatIdx = flatBase + li
