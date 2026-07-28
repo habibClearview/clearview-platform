@@ -293,22 +293,23 @@ function DeptSection({ dept, rows, currency, clientId, canManage, allRows, targe
                       <td style={td}>{s.full_name}</td>
                       <td style={{ ...td, fontFamily: 'monospace', color: C.slate }}>{s.phone || '—'}</td>
                       <td style={td}>
-                        {current.length === 0 ? <span style={{ color: C.slate }}>—</span> : (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                            {current.map(t => (
-                              <span key={t.id} style={{ fontFamily: 'monospace', fontSize: '0.74rem', color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.08rem 0.4rem' }}>
-                                {fmtTarget(t, currency)}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+                          {current.map(t => (
+                            <span key={t.id} style={{ fontFamily: 'monospace', fontSize: '0.74rem', color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.08rem 0.4rem' }}>
+                              {fmtTarget(t, currency)}
+                            </span>
+                          ))}
+                          {current.length === 0 && !canManage && <span style={{ color: C.slate }}>—</span>}
+                          {canManage && (
+                            <button onClick={() => { setTargetsFor(targetsFor === s.id ? null : s.id); setEditing(null) }} style={btn(tone, current.length === 0)}>
+                              {targetsFor === s.id ? 'Close' : current.length === 0 ? '+ Set targets' : 'Set / raise'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td style={td}>{s.active ? <Badge text="ACTIVE" tone={C.green} /> : <Badge text="INACTIVE" tone={C.slate} />}</td>
                       {canManage && (
                         <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                          <button onClick={() => { setTargetsFor(targetsFor === s.id ? null : s.id); setEditing(null) }} style={{ ...btn(tone), marginRight: 6 }}>
-                            {targetsFor === s.id ? 'Close targets' : 'Targets'}
-                          </button>
                           <button onClick={() => { setEditing(s.id); setTargetsFor(null) }} style={btn(C.cyan)}>Edit</button>
                         </td>
                       )}
