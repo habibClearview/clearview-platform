@@ -80,3 +80,7 @@ create policy staff_targets_update on staff_targets for update
 
 create policy staff_targets_delete on staff_targets for delete
   using (my_role() = 'super_coach' or can_view_client(client_id));
+
+-- Table-level GRANT for the logged-in role (see note in 2026_07_28_staff.sql).
+-- RLS policies above still enforce client scoping.
+grant select, insert, update, delete on staff_targets to authenticated;

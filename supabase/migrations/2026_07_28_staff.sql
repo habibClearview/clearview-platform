@@ -89,3 +89,10 @@ create policy staff_update on staff for update
 
 create policy staff_delete on staff for delete
   using (my_role() = 'super_coach' or can_view_client(client_id));
+
+-- Table-level GRANT. RLS restricts WHICH rows the caller sees, but the logged-in
+-- `authenticated` Postgres role still needs privilege on the table itself or the
+-- request fails with "permission denied for table staff" before RLS runs (same
+-- reason 2026_07_19_audit_log.sql grants explicitly). Row scoping stays enforced
+-- by the policies above.
+grant select, insert, update, delete on staff to authenticated;
