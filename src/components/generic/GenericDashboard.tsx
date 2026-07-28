@@ -2593,6 +2593,9 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
   // "Many months · grid" (the multi-month catch-up grid). The guided path's
   // logic is entirely unchanged; the grid is a separate self-contained view.
   const [view, setView] = useState<'guided'|'grid'>('guided')
+  // #54: add custom line items to any category, right from Actuals.
+  const [addLineCat, setAddLineCat] = useState<string|null>(null)
+  const [addLineName, setAddLineName] = useState('')
 
   // Rolling 24 months
   const periodMonths = Array.from({length:24},(_,i)=>{
@@ -2761,6 +2764,19 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
   const updateComp = (lineId:string,idx:number,field:'name'|'amount',value:any) =>
     setComps(lineId,(cogsDetail[lineId]||[]).map((c,i)=>i===idx?{...c,[field]:value}:c))
   const removeComp = (lineId:string,idx:number) => setComps(lineId,(cogsDetail[lineId]||[]).filter((_,i)=>i!==idx))
+
+  // Add a custom line item to a category (revenue / cost of sales / staff /
+  // overheads) right here in Actuals. Reuses blankLine + the same config save as
+  // Planning, so the new line appears in the grid, in Planning and in the P&L.
+  // Structure edit — gated to canEditPlan.
+  function createLine(cat:string) {
+    if (!selUnit) return
+    const name = addLineName.trim() || 'New line'
+    const id = `${selUnit}_${cat}_${Date.now()}_${Math.random().toString(36).slice(2,9)}`
+    const newLine = blankLine(id, selUnit, name, cat as any, config.planning_months)
+    onSave({...config, plan_lines:[...config.plan_lines, newLine]})
+    setAddLineCat(null); setAddLineName('')
+  }
 
   // Month-end close: computes the exception report from real data --
   // stale cost prices (client-wide) and, per unit, actual revenue vs
@@ -3006,7 +3022,6 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
           <>
             {sections.map(([cat,label])=>{
               const sLines = lines.filter(l=>l.category===cat)
-              if (sLines.length===0) return null
               const sTotal = sLines.reduce((s,l)=>s+combined(l.id),0)
               return (
                 <div key={cat} style={{marginBottom:'1.5rem'}}>
@@ -3099,6 +3114,21 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
                     </div>
                     )
                   })}
+                  {P.canEditPlan && (addLineCat===cat ? (
+                    <div style={{display:'flex',gap:'0.4rem',marginTop:'0.5rem',alignItems:'center'}}>
+                      <input autoFocus value={addLineName} onChange={e=>setAddLineName(e.target.value)}
+                        onKeyDown={e=>{ if(e.key==='Enter') createLine(cat); if(e.key==='Escape'){setAddLineCat(null);setAddLineName('')} }}
+                        placeholder={`Name this line — e.g. ${cat==='revenue'?'Wholesale sales':cat==='cost_of_sales'?'Packaging':cat==='staff'?'Casual wages':'Electricity'}`}
+                        style={{flex:1,padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'1.0rem',color:C.navy,background:C.white,boxSizing:'border-box'}}/>
+                      <button type="button" style={addBtn(true)} onClick={()=>createLine(cat)}>Add</button>
+                      <button type="button" onClick={()=>{setAddLineCat(null);setAddLineName('')}} style={{fontFamily:'monospace',fontSize:'0.96rem',padding:'0.42rem 0.7rem',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.slate,cursor:'pointer'}}>Cancel</button>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={()=>{setAddLineCat(cat);setAddLineName('')}}
+                      style={{marginTop:'0.4rem',background:'none',border:`1px dashed ${cat==='revenue'?C.green:C.red}`,color:cat==='revenue'?C.green:C.red,fontFamily:'monospace',fontSize:'0.96rem',padding:'0.42rem 0.8rem',borderRadius:4,cursor:'pointer'}}>
+                      + Add a {cat==='revenue'?'revenue':cat==='cost_of_sales'?'cost of sales':cat==='staff'?'staff':'overhead'} line
+                    </button>
+                  ))}
                 </div>
               )
             })}
@@ -3403,7 +3433,7 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll}) {
         </div>
       )}
       <div style={{fontSize:'0.96rem',color:C.teal,fontFamily:'monospace',padding:'0.6rem 1.1rem',borderTop:`1px solid ${C.border}`}}>
-        Tip: copy a block from Excel and paste straight into the grid. Field-app figures are shown in blue and can't be edited by hand; closed months are locked in green.
+        Tip: copy a block from Excel and paste straight into the grid. Field-app figures are shown in blue and can't be edited by hand; closed months are locked in green. To add or rename line items, use “One month · guided” (or Planning).
       </div>
     </div>
   )
