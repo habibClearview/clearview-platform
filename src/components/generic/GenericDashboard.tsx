@@ -1105,7 +1105,8 @@ export default function GenericDashboard({
         {view==='stores'      && <StoresTab config={config} clientId={clientId} P={P}/>}
         {view==='settings'    && <SettingsAndAdminTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={saveConfig} theme={theme} setThemeMode={setThemeMode}/>}
         {view==='staff'       && <StaffTab config={config} clientId={clientId} cc={cc} P={P}/>}
-        {view==='customers'   && <CustomersMarketingTab config={config} clientId={clientId} cc={cc} P={P}/>}
+        {view==='customers'   && <CustomersMarketingTab config={config} clientId={clientId} cc={cc} P={P}
+                                    activitiesNode={<MarketActivitiesSection clientId={clientId} config={config} cc={cc} P={P} events={marketEvents} loadError={marketEventsError} onChanged={reloadMarketEvents}/>}/>}
         {view==='operations'  && <OperationsTab config={config} clientId={clientId} cc={cc} P={P}/>}
         {view==='admin'       && <AdminConsoleTab config={config} clientId={clientId} cc={cc} P={P}/>}
         </ErrorBoundary>
@@ -1825,6 +1826,11 @@ const SERVICE_FEE_SUBROWS: [string,string,boolean][] = [
 function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,marketEventsError,onMarketEventsChanged}) {
   const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active)?.id||'')
   const [selSection, setSelSection] = useState<LineCategory>('revenue')
+  // Drivers & Channels is not a P&L category — it is the forecast engine that
+  // spans revenue AND costs. It gets its OWN tab so it appears ONCE, instead of
+  // trailing under every category view. driversMode swaps the category editor
+  // for the drivers editor without disturbing selSection.
+  const [driversMode, setDriversMode] = useState(false)
   // Cost of Sales product scope: '__whole__' = whole unit / shared, otherwise a
   // revenue line id. NOTE: no persisted cost->revenue link exists in the model
   // (GenericPlanLine has no revenue_line_id), so this is a presentation-only
@@ -2008,17 +2014,34 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
         ))}
       </div>
 
-      {/* Section tabs */}
-      <div style={{display:'flex',gap:'0.35rem',marginBottom:'1.25rem',borderBottom:`1px solid ${C.border}`,paddingBottom:'0.5rem'}}>
-        {sections.map(([cat,label])=>(
-          <button key={cat} style={{fontFamily:'monospace',fontSize:'0.96rem',padding:'0.4rem 0.85rem',border:'none',
-            background:selSection===cat?'var(--cv-header)':C.white,color:selSection===cat?'var(--cv-on-accent)':C.slate,
-            borderRadius:4,cursor:'pointer',fontWeight:selSection===cat?700:400}}
-            onClick={()=>setSelSection(cat)}>
-            {label}
-          </button>
-        ))}
+      {/* Section tabs — the four P&L categories, plus Drivers & Channels as its
+          own tab (the forecast engine, shown once rather than under each). */}
+      <div style={{display:'flex',gap:'0.35rem',marginBottom:'1.25rem',borderBottom:`1px solid ${C.border}`,paddingBottom:'0.5rem',flexWrap:'wrap'}}>
+        {sections.map(([cat,label])=>{
+          const on = !driversMode && selSection===cat
+          return (
+            <button key={cat} style={{fontFamily:'monospace',fontSize:'0.96rem',padding:'0.4rem 0.85rem',border:'none',
+              background:on?'var(--cv-header)':C.white,color:on?'var(--cv-on-accent)':C.slate,
+              borderRadius:4,cursor:'pointer',fontWeight:on?700:400}}
+              onClick={()=>{setDriversMode(false);setSelSection(cat)}}>
+              {label}
+            </button>
+          )
+        })}
+        <button key="drivers" style={{fontFamily:'monospace',fontSize:'0.96rem',padding:'0.4rem 0.85rem',border:'none',
+          background:driversMode?'var(--cv-header)':C.white,color:driversMode?'var(--cv-on-accent)':C.teal,
+          borderRadius:4,cursor:'pointer',fontWeight:driversMode?700:400,marginLeft:'0.5rem'}}
+          onClick={()=>setDriversMode(true)}>
+          Drivers &amp; Channels
+        </button>
       </div>
+
+      {/* Drivers & Channels view (its own tab) */}
+      {driversMode && (
+        <DriversSection key={clientId} config={config} cc={cc} P={P} onSave={onSave}/>
+      )}
+      {!driversMode && (<>
+      {/* ── category editor (revenue / cost of sales / staff / overheads) ── */}
 
       {/* Instruction bar — calm workflow guidance + plan/actual legend */}
       <div style={{display:'flex',alignItems:'center',gap:'0.9rem',flexWrap:'wrap',background:C.lightBg,border:'1px solid var(--cv-border-soft)',borderLeft:`4px solid ${accent}`,borderRadius:10,padding:'0.7rem 1rem',marginBottom:'1.1rem'}}>
@@ -2029,52 +2052,49 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
         </span>
       </div>
 
-      {/* Assumptions strip — real settings only (scenario). Payment-terms drivers
-          do not exist in this model, so they are omitted rather than faked. */}
-      <div style={{display:'flex',alignItems:'center',gap:'1.1rem',flexWrap:'wrap',background:C.white,border:'1px solid var(--cv-border-soft)',borderLeft:`4px solid ${C.cyan}`,borderRadius:10,padding:'0.75rem 1.1rem',marginBottom:'1.4rem',boxShadow:'0 1px 2px var(--cv-shadow-1)'}}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.06rem',fontWeight:700,color:C.navy}}>Assumptions</div>
-        <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
+      {/* Assumptions — condensed to a single slim line. Scenario is the only
+          real control (no payment-terms drivers in this model); the longer
+          explanation now lives in the Scenarios tab, not shouting here. */}
+      {scenarios.length>0 && (
+        <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',marginBottom:'1.2rem'}}>
           <label style={{...lbl,marginBottom:0}}>Scenario</label>
-          {scenarios.length>0
-            ? <select style={{...inp,width:'auto',minWidth:210}} value={activeScenarioId} disabled={!P.canEditPlan}
-                onChange={e=>setActiveScenario(e.target.value)} aria-label="Active scenario">
-                {scenarios.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
-              </select>
-            : <span style={{...hint,marginTop:0}}>No scenarios defined — add them in the Scenarios tab.</span>
-          }
-        </div>
-        <span style={{...hint,marginTop:0,maxWidth:360}}>Scenario multipliers are edited in the Scenarios tab. This model has no payment-terms (DSO/DPO) drivers, so those controls are intentionally omitted.</span>
-      </div>
-
-      {/* Cost of Sales — product / revenue-line scope selector */}
-      {selSection==='cost_of_sales' && (
-        <div style={{display:'flex',alignItems:'center',gap:'0.9rem',flexWrap:'wrap',background:C.white,border:'1px solid var(--cv-border-soft)',borderLeft:`4px solid ${C.red}`,borderRadius:10,padding:'0.75rem 1.1rem',marginBottom:'1.3rem',boxShadow:'0 1px 2px var(--cv-shadow-1)'}}>
-          <label style={{...lbl,marginBottom:0}}>Costs for</label>
-          <select style={{...inp,width:'auto',minWidth:220}} value={costProduct} onChange={e=>setCostProduct(e.target.value)} aria-label="Cost of sales product scope">
-            <option value="__whole__">Whole unit / shared</option>
-            {revLines.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
+          <select style={{...inp,width:'auto',minWidth:200}} value={activeScenarioId} disabled={!P.canEditPlan}
+            onChange={e=>setActiveScenario(e.target.value)} aria-label="Active scenario">
+            {scenarios.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
           </select>
-          <span style={{...hint,marginTop:0,maxWidth:440}}>Working view only: cost lines are not yet linked to a specific revenue line in the data model, so every cost line for this unit is shown regardless of the selection above.</span>
+          <span style={{...hint,marginTop:0,fontSize:'0.9rem'}}>Multipliers are set in the Scenarios tab.</span>
         </div>
       )}
 
-      {/* Cost of Sales — "what makes up this cost?" suggestions. Same plain-
-          language guidance and the same suggested parts as the Actuals guided
-          entry, so planning and recording are consistent. Each suggestion adds
-          a real Cost of Sales line (via addLine) that flows straight into the
-          engine and shows itemised in the P&L — no separate breakdown data
-          structure to keep in sync. */}
-      {selSection==='cost_of_sales' && P.canEditPlan && (
-        <div style={{background:C.white,border:'1px solid var(--cv-border-soft)',borderLeft:`4px solid ${C.red}`,borderRadius:10,padding:'0.85rem 1.1rem',marginBottom:'1.3rem',boxShadow:'0 1px 2px var(--cv-shadow-1)'}}>
-          <div style={{fontSize:'1.0rem',color:C.navy,marginBottom:'0.5rem',lineHeight:1.55}}>What makes up your cost of sales? <span style={{color:C.slate}}>These are costs <strong>directly tied to the products you sold</strong> — the goods themselves, raw materials, packaging, direct labour, freight to bring stock in. <em>Not</em> rent, admin pay, marketing or delivery to customers (those belong under Overheads). Add a line for each part your business has; name it however you like.</span></div>
-          <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',alignItems:'center'}}>
-            <span style={{fontSize:'0.92rem',color:C.slate,marginRight:'0.15rem'}}>Add a cost line:</span>
-            {['Goods bought for resale','Raw materials','Direct labour','Packaging','Freight in (bringing stock to you)','Import duties / clearing','Wastage / spoilage'].map(name=>(
-              <button key={name} style={addBtn(true,C.red)} onClick={()=>addLine('cost_of_sales',name)}>+ {name}</button>
-            ))}
-            <button style={addBtn(true)} onClick={()=>addLine('cost_of_sales')}>+ Other (name it)</button>
-          </div>
+      {/* Cost of Sales — product scope selector (compact, short note). */}
+      {selSection==='cost_of_sales' && (
+        <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',marginBottom:'1rem'}}>
+          <label style={{...lbl,marginBottom:0}}>Costs for</label>
+          <select style={{...inp,width:'auto',minWidth:200}} value={costProduct} onChange={e=>setCostProduct(e.target.value)} aria-label="Cost of sales product scope">
+            <option value="__whole__">Whole unit / shared</option>
+            {revLines.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+          <span style={{...hint,marginTop:0,fontSize:'0.9rem'}}>Shows every cost line for this unit.</span>
         </div>
+      )}
+
+      {/* Cost of Sales — "what makes up this cost?" quick-add. The long guidance
+          is now collapsed behind a one-line summary so the page stays calm; the
+          same suggested parts each add a real Cost of Sales line (via addLine)
+          that flows into the engine and shows itemised in the P&L. */}
+      {selSection==='cost_of_sales' && P.canEditPlan && (
+        <details style={{background:C.white,border:'1px solid var(--cv-border-soft)',borderLeft:`4px solid ${C.red}`,borderRadius:10,padding:'0.7rem 1.1rem',marginBottom:'1.2rem'}}>
+          <summary style={{cursor:'pointer',fontSize:'1.0rem',color:C.navy,fontWeight:600}}>Quick-add a cost part <span style={{color:C.slate,fontWeight:400}}>— goods, materials, packaging, labour, freight…</span></summary>
+          <div style={{marginTop:'0.7rem'}}>
+            <p style={{fontSize:'0.94rem',color:C.slate,marginBottom:'0.6rem',lineHeight:1.5}}>Costs <strong>directly tied to the products you sold</strong>. <em>Not</em> rent, admin pay, marketing or delivery to customers — those go under Overheads.</p>
+            <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',alignItems:'center'}}>
+              {['Goods bought for resale','Raw materials','Direct labour','Packaging','Freight in (bringing stock to you)','Import duties / clearing','Wastage / spoilage'].map(name=>(
+                <button key={name} style={addBtn(true,C.red)} onClick={()=>addLine('cost_of_sales',name)}>+ {name}</button>
+              ))}
+              <button style={addBtn(true)} onClick={()=>addLine('cost_of_sales')}>+ Other (name it)</button>
+            </div>
+          </div>
+        </details>
       )}
 
       {/* Section header + add */}
@@ -2114,15 +2134,10 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
         return (
           <div key={l.id} id={`planrow-${l.id}`} style={{...card,padding:0,overflow:'hidden',
             ...(l.id===newLineId ? {outline:`3px solid ${C.cyan}`, boxShadow:`0 0 0 4px var(--cv-cyan-20, rgba(0,180,216,0.25))`, transition:'outline 0.2s'} : {})}}>
-            {/* Header with coloured accent bar */}
-            <div style={{display:'flex',alignItems:'center',gap:'0.85rem',padding:'0.8rem 1.1rem',borderLeft:`5px solid ${accent}`,background:C.lightBg,borderBottom:'1px solid var(--cv-border-soft)',flexWrap:'wrap'}}>
-              <div style={{flex:'1 1 220px',minWidth:180}}>
-                {P.canEditPlan
-                  ? <BufferedInput value={l.name} onCommit={(val)=>updateLineName(l.id,String(val))} ariaLabel="Line name"
-                      style={{...inp,background:'transparent',border:'none',padding:0,fontSize:'1.09rem',fontWeight:700,fontFamily:'Georgia,serif',color:C.navy}}/>
-                  : <span style={{fontSize:'1.09rem',fontWeight:700,fontFamily:'Georgia,serif',color:C.navy}}>{l.name}</span>
-                }
-              </div>
+            {/* Slim meta strip — the line NAME now lives inline with the numbers
+                (frozen first column of the table below), so this bar only carries
+                the type, badge, annual total and delete. */}
+            <div style={{display:'flex',alignItems:'center',gap:'0.85rem',padding:'0.55rem 1.1rem',borderLeft:`5px solid ${accent}`,background:C.lightBg,borderBottom:'1px solid var(--cv-border-soft)',flexWrap:'wrap'}}>
               {selSection==='revenue' && P.canEditPlan && (
                 <select style={{...inp,width:'auto',padding:'0.3rem 0.5rem',fontSize:'0.96rem'}}
                   value={l.line_type} onChange={e=>changeLineType(l.id,e.target.value as LineType)} aria-label="Line type">
@@ -2132,9 +2147,9 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
                 </select>
               )}
               <span style={{fontFamily:'monospace',fontSize:'0.88rem',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',color:badgeColor,border:`1px solid ${badgeColor}`,borderRadius:20,padding:'0.15rem 0.6rem',whiteSpace:'nowrap'}}>{badgeLabel}</span>
-              <div style={{textAlign:'right',minWidth:100}}>
-                <div style={{fontSize:'0.88rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.06em'}}>Annual total</div>
-                <div style={{fontFamily:'monospace',fontSize:'1.09rem',fontWeight:700,color:C.navy}}>{fmt(total,cc)}</div>
+              <div style={{textAlign:'right',minWidth:100,marginLeft:'auto'}}>
+                <span style={{fontSize:'0.84rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.06em',marginRight:'0.5rem'}}>Annual total</span>
+                <span style={{fontFamily:'monospace',fontSize:'1.09rem',fontWeight:700,color:C.navy}}>{fmt(total,cc)}</span>
               </div>
               {P.canEditPlan&&<button style={delBtn} onClick={()=>deleteLine(l.id)} aria-label={`Delete ${l.name}`}>×</button>}
             </div>
@@ -2155,7 +2170,7 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
               <table style={{borderCollapse:'collapse',fontSize:'0.96rem',fontFamily:'monospace'}}>
                 <thead>
                   <tr>
-                    <th style={{minWidth:96}}></th>
+                    <th style={{position:'sticky',left:0,zIndex:2,background:C.white,minWidth:160,maxWidth:220,textAlign:'left',padding:'2px 10px 2px 2px',color:C.slate,fontSize:'0.84rem',fontWeight:600,borderRight:`1px solid ${C.border}`}}>Line</th>
                     {months.map((m,i)=><th key={i} style={{textAlign:'right',padding:'2px 4px',color:C.slate,whiteSpace:'nowrap',fontSize:'0.88rem',fontWeight:600}}>{m}</th>)}
                     <th style={{textAlign:'right',padding:'2px 8px',color:C.navy,fontWeight:700,fontSize:'0.88rem',borderLeft:`2px solid ${C.border}`}}>Total</th>
                     {P.canEditPlan&&<th style={{width:16}}></th>}
@@ -2163,7 +2178,14 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
                 </thead>
                 <tbody>
                   <tr>
-                    <td style={{padding:'3px 8px',fontSize:'0.88rem',color:C.slate,whiteSpace:'nowrap'}}>{(isSpread||isServiceFee)?'↳ Revenue':'Monthly plan'}</td>
+                    <td style={{position:'sticky',left:0,zIndex:1,background:C.white,padding:'3px 10px 3px 2px',minWidth:160,maxWidth:220,borderRight:`1px solid ${C.border}`,verticalAlign:'middle'}}>
+                      {P.canEditPlan
+                        ? <BufferedInput value={l.name} onCommit={(val)=>updateLineName(l.id,String(val))} ariaLabel="Line name"
+                            style={{...inp,background:'transparent',border:'none',padding:0,fontSize:'1.0rem',fontWeight:700,fontFamily:'Georgia,serif',color:C.navy,width:'100%'}}/>
+                        : <span style={{fontSize:'1.0rem',fontWeight:700,fontFamily:'Georgia,serif',color:C.navy}}>{l.name}</span>
+                      }
+                      {(isSpread||isServiceFee)&&<span style={{display:'block',fontSize:'0.78rem',color:C.slate,fontFamily:'monospace'}}>↳ revenue</span>}
+                    </td>
                     {(isSpread||isServiceFee)
                       ? revenueByMonth.map((v,m)=>(
                           <td key={m} style={{padding:'2px 4px'}}>
@@ -2250,8 +2272,11 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
           ))}
         </div>
       )}
-      <DriversSection key={clientId} config={config} cc={cc} P={P} onSave={onSave}/>
-      <MarketActivitiesSection clientId={clientId} config={config} cc={cc} P={P} events={marketEvents} loadError={marketEventsError} onChanged={onMarketEventsChanged}/>
+      </>)}
+      {/* Marketing activities moved OUT of Planning to Customers & Marketing
+          (its natural home). Its forecast uplift still flows into the model via
+          the marketEvents loaded at the dashboard level — moving the editor does
+          not change the numbers. */}
     </div>
   )
 }

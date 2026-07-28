@@ -97,9 +97,9 @@ function pct(numer: number, denom: number): string {
   return Math.round((numer / denom) * 100) + '%'
 }
 
-export default function CustomersMarketingTab({ config, clientId, cc, P }: any) {
+export default function CustomersMarketingTab({ config, clientId, cc, P, activitiesNode }: any) {
   const fmt = (n: any) => cc + ' ' + Math.round(Number(n) || 0).toLocaleString()
-  const [tab, setTab] = useState<'funnel'|'customers'|'campaigns'>('funnel')
+  const [tab, setTab] = useState<'funnel'|'customers'|'campaigns'|'activities'>('funnel')
 
   return (
     <div>
@@ -107,11 +107,13 @@ export default function CustomersMarketingTab({ config, clientId, cc, P }: any) 
         <button style={navBtn(tab==='funnel')} onClick={()=>setTab('funnel')}>Funnel</button>
         <button style={navBtn(tab==='customers')} onClick={()=>setTab('customers')}>Customers</button>
         <button style={navBtn(tab==='campaigns')} onClick={()=>setTab('campaigns')}>Campaigns</button>
+        {activitiesNode && <button style={navBtn(tab==='activities')} onClick={()=>setTab('activities')}>Marketing activities</button>}
       </div>
 
-      {tab==='funnel'    && <FunnelTab clientId={clientId} P={P} />}
-      {tab==='customers' && <CustomersTab clientId={clientId} />}
-      {tab==='campaigns' && <CampaignsTab clientId={clientId} fmt={fmt} />}
+      {tab==='funnel'     && <FunnelTab clientId={clientId} P={P} />}
+      {tab==='customers'  && <CustomersTab clientId={clientId} />}
+      {tab==='campaigns'  && <CampaignsTab clientId={clientId} fmt={fmt} />}
+      {tab==='activities' && activitiesNode}
     </div>
   )
 }
