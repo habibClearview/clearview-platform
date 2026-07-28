@@ -51,19 +51,12 @@ create table if not exists staff (
   phone text,
   active boolean not null default true,
   notes text,
-  -- Every staff member carries a target (HR requirement: "all staff get some
-  -- sort of target"). The target is a single headline number plus the metric
-  -- it is counted in and the period it applies to, so it can mean different
-  -- things per role: an S&M recruiter's target might be "12 customers per
-  -- month", a shopkeeper's "150000 sales value per month". Actual-vs-target
-  -- is computed downstream in the KPI scorecards; period history can be added
-  -- later without touching this row.
-  target_value numeric,                             -- the headline target number (nullable = not set yet)
-  target_metric text default 'customers_recruited'  -- what the number counts
-    check (target_metric in ('customers_recruited','conversions','sales_value','sales_count','repeat_rate','custom')),
-  target_metric_label text,                         -- free-text label when target_metric = 'custom'
-  target_period text not null default 'monthly'
-    check (target_period in ('weekly','monthly','quarterly')),
+  -- Targets are NOT stored on the person: these are growing businesses that
+  -- raise targets monthly — sometimes weekly in season — and each past period
+  -- must be graded against the target that applied AT THAT TIME, per metric.
+  -- That history lives in `staff_targets` (2026_07_28_staff_targets.sql), one
+  -- effective-dated row per target change. Keeping it separate is what makes
+  -- the scorecards undisputable numbers rather than a single moving goalpost.
   field_operator_id uuid,                           -- optional link to field_operators.id (no FK: predates migrations)
   created_by_uid uuid references auth.users(id) default auth.uid(),
   created_at timestamptz not null default now(),
