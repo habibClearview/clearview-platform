@@ -67,9 +67,31 @@ export async function POST(req: NextRequest) {
     await del('management_events', 'client_id')
     // Intake links.
     await del('client_intake_links', 'client_id')
-    // Logins scoped to this client (revokes access; leaves the auth user, which
-    // can do nothing without a profile — same principle as remove-co-implementer).
+
+    // Logins scoped to this client. Deleting the profile revokes access, but on
+    // its own it ORPHANS the Supabase Auth user: the account stays registered,
+    // attached to nothing. That orphan then blocks the email from ever being
+    // re-invited ("This email address already has an account"), with no admin
+    // screen to clear it. So: capture the login ids first, delete the profiles,
+    // then delete the underlying auth users too — a clean, reusable email.
+    const { data: clientLogins } = await admin
+      .from('user_profiles')
+      .select('id')
+      .eq('engagement_client_id', clientId)
+    const loginIds = (clientLogins || []).map((r: { id: string }) => r.id)
+
     await del('user_profiles', 'engagement_client_id')
+
+    // Remove the auth users (best-effort; a failure here must not block the
+    // client delete — it just leaves that one account for manual cleanup, which
+    // the invite-reclaim path below can also resolve). Each user_profiles.id IS
+    // the auth user id, so these are exactly this client's logins and nobody
+    // else's (coach/funder/super_coach logins have engagement_client_id = null
+    // and were never selected above).
+    for (const uid of loginIds) {
+      const { error: authDelErr } = await admin.auth.admin.deleteUser(uid)
+      if (authDelErr) console.warn(`delete-client: could not remove auth user ${uid}: ${authDelErr.message}`)
+    }
 
     // Finally the client itself — THIS result is authoritative.
     const { error: delErr } = await admin.from('engagement_clients').delete().eq('id', clientId)
