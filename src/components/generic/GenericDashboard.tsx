@@ -1852,13 +1852,13 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
     onSave(newConfig)
   }
 
-  function addLine(category:LineCategory) {
+  function addLine(category:LineCategory, presetName?:string) {
     if (!selUnit) return
     // Collision-safe id: Date.now() alone can repeat on rapid clicks, which would
     // duplicate the React key AND the planrow-<id> DOM id the scroll/focus/
     // highlight below target — so add a random suffix.
     const id = `${selUnit}_${category}_${Date.now()}_${Math.random().toString(36).slice(2,9)}`
-    const newLine = blankLine(id, selUnit, 'New line', category, config.planning_months)
+    const newLine = blankLine(id, selUnit, presetName||'New line', category, config.planning_months)
     onSave({...config, plan_lines:[...config.plan_lines, newLine]})
     // The new line is appended to the BOTTOM of what can be a long list, so on a
     // section with many rows it lands off-screen and looks like nothing happened.
@@ -2047,6 +2047,25 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
             {revLines.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
           <span style={{...hint,marginTop:0,maxWidth:440}}>Working view only: cost lines are not yet linked to a specific revenue line in the data model, so every cost line for this unit is shown regardless of the selection above.</span>
+        </div>
+      )}
+
+      {/* Cost of Sales — "what makes up this cost?" suggestions. Same plain-
+          language guidance and the same suggested parts as the Actuals guided
+          entry, so planning and recording are consistent. Each suggestion adds
+          a real Cost of Sales line (via addLine) that flows straight into the
+          engine and shows itemised in the P&L — no separate breakdown data
+          structure to keep in sync. */}
+      {selSection==='cost_of_sales' && P.canEditPlan && (
+        <div style={{background:C.white,border:'1px solid var(--cv-border-soft)',borderLeft:`4px solid ${C.red}`,borderRadius:10,padding:'0.85rem 1.1rem',marginBottom:'1.3rem',boxShadow:'0 1px 2px var(--cv-shadow-1)'}}>
+          <div style={{fontSize:'1.0rem',color:C.navy,marginBottom:'0.5rem',lineHeight:1.55}}>What makes up your cost of sales? <span style={{color:C.slate}}>These are costs <strong>directly tied to the products you sold</strong> — the goods themselves, raw materials, packaging, direct labour, freight to bring stock in. <em>Not</em> rent, admin pay, marketing or delivery to customers (those belong under Overheads). Add a line for each part your business has; name it however you like.</span></div>
+          <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',alignItems:'center'}}>
+            <span style={{fontSize:'0.92rem',color:C.slate,marginRight:'0.15rem'}}>Add a cost line:</span>
+            {['Goods bought for resale','Raw materials','Direct labour','Packaging','Freight in (bringing stock to you)','Import duties / clearing','Wastage / spoilage'].map(name=>(
+              <button key={name} style={addBtn(true,C.red)} onClick={()=>addLine('cost_of_sales',name)}>+ {name}</button>
+            ))}
+            <button style={addBtn(true)} onClick={()=>addLine('cost_of_sales')}>+ Other (name it)</button>
+          </div>
         </div>
       )}
 
@@ -7159,8 +7178,11 @@ function TradeCreditBalanceGrid({lines,months,cc,canEdit,planningMonths,updateLi
 // calculation in src/lib is touched.
 function PLVarianceView({ config, result, months, cc, view, selUnit, setSelUnit, lineActuals }) {
   const [period, setPeriod] = useState<'month'|'quarter'|'ytd'>('ytd')
+  // Category line items show EXPANDED by default, so the P&L reveals the same
+  // individual lines as Planning and Actuals without needing a click. A key
+  // absent from `expanded` counts as open; clicking a header collapses it.
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  const toggle = (k:string) => setExpanded(e => ({ ...e, [k]: !e[k] }))
+  const toggle = (k:string) => setExpanded(e => ({ ...e, [k]: !(e[k] ?? true) }))
 
   // Scenario multipliers, read the same way the engine reads them, so the
   // per-line plan we compute here matches the plan totals on `result`.
@@ -7408,7 +7430,7 @@ function PLVarianceView({ config, result, months, cc, view, selUnit, setSelUnit,
                 const dPts = actual - r.plan
                 const col = r.isPct ? (dPts>0.0005?C.green:dPts<-0.0005?C.red:C.slate) : favColor(f)
                 const canDrill = !!r.drill
-                const open = canDrill && expanded[r.key]
+                const open = canDrill && (expanded[r.key] ?? true)
                 const bg = r.highlight?'var(--cv-tint-cyan)':r.bold?C.lightBg:(ri%2===0?C.cream:C.white)
                 const lines = open ? drillLines(r.drill as string) : []
                 // Biggest unfavourable driver within the group (most negative
