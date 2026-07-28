@@ -951,27 +951,35 @@ export default function GenericDashboard({
       {key:'actuals',label:'Actuals',tabs:[['actuals_wc','Record Actuals'],['approvals',approvalsLabel]]},
       {key:'performance',label:'Performance',view:'performance'},
     ]},
-    { title:'BUSINESS', items:[
-      // Staff = the canonical people roster (Sales & Marketing / Operations)
-      // that Customers & Marketing, Operations and the field app all attribute
-      // work to. It leads the group because it is the anchor everything below
-      // references. (Distinct from the Admin "Team" console, which manages
-      // platform logins; this roster includes field staff with no login.)
-      {key:'staff',label:'Staff',view:'staff'},
+    // The BUSINESS group is split into the real departments a business runs —
+    // the rooms you can walk into. Business UNITS (Retail / Wholesale) are a
+    // different axis (divisions, not functions), so they stay a scope selector
+    // inside screens, not a nav group.
+    { title:'MARKETING', items:[
+      // Customer acquisition — funnel, customers, campaigns, marketing
+      // activities, acquisition channels and segments.
       {key:'customers',label:'Customers & Marketing',view:'customers'},
-      // Operations = the day-to-day service log (deliveries, complaints, staff
-      // scorecards) plus, for those who manage stock, the Stores & Stock screen
-      // as a secondary tab. Deliveries/service is visible to every client user;
-      // the Stores tab only appears for catalogue managers (unchanged access).
+    ]},
+    { title:'HUMAN RESOURCES', items:[
+      // The canonical people roster (departments, codes, targets) that sales
+      // sourcing, attendance and the scorecards all attribute work to. Includes
+      // field staff with no platform login — distinct from Settings › Users &
+      // Access, which manages logins.
+      {key:'staff',label:'Staff',view:'staff'},
+    ]},
+    { title:'OPERATIONS', items:[
+      // Day-to-day running: deliveries & service, complaints, and (for stock
+      // managers) Stores & Stock. Business/office admin, logistics and
+      // procurement will land here as they are built.
       {key:'operations',label:'Operations',tabs:[
         ['operations','Deliveries & Service'],
         ...(P.canManageCatalogue ? [['stores','Stores & Stock']] : []),
       ]},
     ]},
-    { title:'MANAGE', items:[
-      // Admin groups the user/access console (team managers only) alongside the
-      // existing Settings screen. Non-managers land straight on Settings.
-      {key:'admin',label:'Admin',tabs:[
+    { title:'SETTINGS', items:[
+      // Platform settings — managing user logins & access is about the software,
+      // not the business, so it lives here rather than under Operations.
+      {key:'admin',label:'Users & Settings',tabs:[
         ...(P.canManageTeam ? [['admin','Users & Access']] : []),
         ['settings','Settings'],
       ]},
@@ -2032,7 +2040,7 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
           background:driversMode?'var(--cv-header)':C.white,color:driversMode?'var(--cv-on-accent)':C.teal,
           borderRadius:4,cursor:'pointer',fontWeight:driversMode?700:400,marginLeft:'0.5rem'}}
           onClick={()=>setDriversMode(true)}>
-          Drivers &amp; Channels
+          Sales routes
         </button>
       </div>
 
@@ -2348,7 +2356,7 @@ function DriversSection({config,cc,P,onSave}) {
   const driverRow = (d:Driver)=> (
     <div key={d.id} style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:'0.5rem',alignItems:'end',padding:'0.5rem 0',borderBottom:'1px solid var(--cv-border-soft)'}}>
       <div><label style={lbl} htmlFor={`drv-${d.id}-name`}>Name</label><input id={`drv-${d.id}-name`} style={inp} value={d.name} disabled={!canEdit} onChange={e=>updDriver(d.id,{name:e.target.value})}/></div>
-      {d.kind==='sales'&&<div><label style={lbl} htmlFor={`drv-${d.id}-channel`}>Channel</label><select id={`drv-${d.id}-channel`} style={inp} value={d.channel_id||''} disabled={!canEdit} onChange={e=>updDriver(d.id,{channel_id:e.target.value||null})}><option value="">— none —</option>{channels.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>}
+      {d.kind==='sales'&&<div><label style={lbl} htmlFor={`drv-${d.id}-channel`}>Sales route</label><select id={`drv-${d.id}-channel`} style={inp} value={d.channel_id||''} disabled={!canEdit} onChange={e=>updDriver(d.id,{channel_id:e.target.value||null})}><option value="">— none —</option>{channels.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>}
       <div><label style={lbl} htmlFor={`drv-${d.id}-unit`}>Unit</label><select id={`drv-${d.id}-unit`} style={inp} value={d.unit_id||''} disabled={!canEdit} onChange={e=>updDriver(d.id,{unit_id:e.target.value||null})}><option value="">Whole business</option>{units.map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
       <div><label style={lbl} htmlFor={`drv-${d.id}-mode`}>How</label><select id={`drv-${d.id}-mode`} style={inp} value={d.mode} disabled={!canEdit} onChange={e=>updDriver(d.id,{mode:e.target.value as any})}><option value="smart">Qty × rate</option><option value="flat">Flat figure</option></select></div>
       <div><label style={lbl} htmlFor={`drv-${d.id}-qty`}>{d.mode==='smart'?`Qty/month${d.unit_label?` (${d.unit_label})`:''}`:'Amount/month'}</label><input id={`drv-${d.id}-qty`} type="number" style={inp} value={perMonth(d)||''} disabled={!canEdit} onChange={e=>setPerMonth(d,Number(e.target.value))}/></div>
@@ -2361,43 +2369,51 @@ function DriversSection({config,cc,P,onSave}) {
 
   return (
     <div style={card}>
-      <SectionHeader title="Drivers & Channels"/>
-      <p style={{fontSize:'1.06rem',color:C.slate,marginBottom:'0.75rem'}}>The levers your business runs on. Group sales into <strong>channels</strong> (walk-in, retailers, large farms, export). Each driver is <strong>quantity × rate</strong> — set a buy price on a sales driver and the buy/sell <strong>spread</strong> flows to margin automatically. Change a driver and the whole plan (P&amp;L, cash flow) moves.</p>
+      <SectionHeader title="Sales routes"/>
+      <p style={{fontSize:'1.06rem',color:C.slate,marginBottom:'0.4rem'}}>This is where you plan <strong>how you sell</strong> and <strong>what it costs</strong>. Do it in three easy steps.</p>
+      <p style={{fontSize:'1.0rem',color:C.slate,marginBottom:'0.9rem'}}>The plan below (your profit, your cash) updates by itself as you type.</p>
 
-      {/* Channels */}
+      {/* Sales routes (was "channels") */}
       <div style={{marginBottom:'1.25rem'}}>
-        <SectionHeader title="Channels" action={canEdit?<button style={addBtn(true,C.teal)} onClick={addChannel}>+ Add channel</button>:null}/>
-        {channels.length===0? <div style={{fontSize:'1.0rem',color:C.slate}}>No channels yet.</div> :
+        <SectionHeader title="① Your sales routes" action={canEdit?<button style={addBtn(true,C.teal)} onClick={addChannel}>+ Add a sales route</button>:null}/>
+        <p style={{fontSize:'1.0rem',color:C.slate,marginBottom:'0.6rem',lineHeight:1.55}}>A <strong>sales route</strong> is simply a <strong>way you sell</strong> your things. For example:
+          <br/>• <strong>Walk-in shop</strong> — people come to you and buy.
+          <br/>• <strong>Sell to other shops</strong> — you sell a big load to another shop.
+          <br/>• <strong>Send to the city</strong> — you send goods to a town far away.
+          <br/>Add one line for each way you sell. Give it a name you understand.</p>
+        {channels.length===0? <div style={{fontSize:'1.0rem',color:C.slate}}>No sales routes yet.</div> :
           channels.map(c=>(
             <div key={c.id} style={{display:'flex',gap:'0.5rem',alignItems:'center',padding:'0.35rem 0',borderBottom:'1px solid var(--cv-border-soft)',flexWrap:'wrap'}}>
-              <input aria-label="Channel name" style={{...inp,maxWidth:220}} value={c.name} disabled={!canEdit} onChange={e=>updChannel(c.id,{name:e.target.value})}/>
-              <select aria-label={`Business unit for ${c.name||'channel'}`} style={{...inp,maxWidth:220}} value={c.unit_id||''} disabled={!canEdit} onChange={e=>updChannel(c.id,{unit_id:e.target.value||null})}>
+              <input aria-label="Sales route name" placeholder="e.g. Walk-in shop" style={{...inp,maxWidth:220}} value={c.name} disabled={!canEdit} onChange={e=>updChannel(c.id,{name:e.target.value})}/>
+              <select aria-label={`Which part of the business for ${c.name||'this route'}`} style={{...inp,maxWidth:220}} value={c.unit_id||''} disabled={!canEdit} onChange={e=>updChannel(c.id,{unit_id:e.target.value||null})}>
                 <option value="">Whole business</option>{units.map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
-              {canEdit&&<button style={delBtn} aria-label="Delete channel" title="Delete channel" onClick={()=>delChannel(c.id)}>×</button>}
+              {canEdit&&<button style={delBtn} aria-label="Delete sales route" title="Delete sales route" onClick={()=>delChannel(c.id)}>×</button>}
             </div>
           ))}
       </div>
 
-      {/* Sales drivers */}
+      {/* Sales drivers → "what you sell" */}
       <div style={{marginBottom:'1.25rem'}}>
-        <SectionHeader title="Sales drivers" action={canEdit?<button style={addBtn(true,C.green)} onClick={()=>addDriver('sales')}>+ Add sales driver</button>:null}/>
-        {salesDrivers.length===0? <div style={{fontSize:'1.0rem',color:C.slate}}>No sales drivers yet.</div> : salesDrivers.map(driverRow)}
+        <SectionHeader title="② What you sell" action={canEdit?<button style={addBtn(true,C.green)} onClick={()=>addDriver('sales')}>+ Add a thing you sell</button>:null}/>
+        <p style={{fontSize:'1.0rem',color:C.slate,marginBottom:'0.6rem'}}>For each thing you sell, pick the <strong>sales route</strong> it goes through, then say <strong>how many</strong> you sell and the <strong>price</strong>. If you know what it cost you to buy, add that too and we work out your profit.</p>
+        {salesDrivers.length===0? <div style={{fontSize:'1.0rem',color:C.slate}}>Nothing added yet.</div> : salesDrivers.map(driverRow)}
       </div>
 
-      {/* Cost drivers */}
+      {/* Cost drivers → "what you spend on" */}
       <div style={{marginBottom:'1.25rem'}}>
-        <SectionHeader title="Cost drivers" action={canEdit?<button style={addBtn(true,C.red)} onClick={()=>addDriver('cost')}>+ Add cost driver</button>:null}/>
-        {costDrivers.length===0? <div style={{fontSize:'1.0rem',color:C.slate}}>No cost drivers yet.</div> : costDrivers.map(driverRow)}
+        <SectionHeader title="③ What you spend on" action={canEdit?<button style={addBtn(true,C.red)} onClick={()=>addDriver('cost')}>+ Add a cost</button>:null}/>
+        <p style={{fontSize:'1.0rem',color:C.slate,marginBottom:'0.6rem'}}>Money that goes out each month — like rent, wages or transport. Give it a name and how much.</p>
+        {costDrivers.length===0? <div style={{fontSize:'1.0rem',color:C.slate}}>Nothing added yet.</div> : costDrivers.map(driverRow)}
       </div>
 
-      {/* Channel margin summary (live impact) */}
+      {/* Sales-route margin summary (live impact) */}
       {channelSummary.length>0&&(
         <div>
-          <div style={{fontWeight:700,color:C.navy,marginBottom:'0.5rem',fontSize:'1.06rem'}}>By channel — annual (from your drivers)</div>
+          <div style={{fontWeight:700,color:C.navy,marginBottom:'0.5rem',fontSize:'1.06rem'}}>Which sales route makes the most money (per year)</div>
           <div style={{overflowX:'auto'}}>
             <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily:'monospace'}}>
-              <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Channel','Revenue','Cost of sales','Margin','Margin %'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600}}>{h}</th>)}</tr></thead>
+              <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Sales route','Revenue','Cost of sales','Margin','Margin %'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600}}>{h}</th>)}</tr></thead>
               <tbody>{channelSummary.map((s,i)=>(
                 <tr key={s.channel_id===null?'unassigned':`channel:${s.channel_id}`} style={{background:i%2===0?C.cream:C.white}}>
                   <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{s.channel_name}</td>
