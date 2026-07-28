@@ -2572,6 +2572,8 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
   const [lineValues, setLineValues] = useState<Record<string,number>>({})
   const [fieldLineValues, setFieldLineValues] = useState<Record<string,number>>({})
   const [catalogueQuantities, setCatalogueQuantities] = useState<Record<string,Record<string,number>>>({})
+  // 1b: optional per-cost-line breakdown into named parts. { [lineId]: [{name,amount}] }
+  const [cogsDetail, setCogsDetail] = useState<Record<string,{name:string,amount:number}[]>>({})
   const [entryMode, setEntryMode] = useState<Record<string,'catalogue'|'manual'>>({})
   const [unitCatalogue, setUnitCatalogue] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -2617,6 +2619,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
         setLineValues(data?.line_values||{})
         setFieldLineValues(data?.field_line_values||{})
         setCatalogueQuantities(data?.catalogue_quantities||{})
+        setCogsDetail(data?.cogs_line_detail||{})
         setSubmitted(data?.submitted||false)
         setApproved(data?.approved||false)
         setReviewNote(data?.review_note||null)
@@ -2694,7 +2697,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
     setSaving(true); setSaveMsg(null)
     const {error} = await supabase.from('generic_actuals').upsert({
       client_id:config.client_id, unit_id:selUnit, period:selPeriod,
-      line_values:lineValues, catalogue_quantities:catalogueQuantities, submitted:submit||(submitted&&!canSeeAll),
+      line_values:lineValues, catalogue_quantities:catalogueQuantities, cogs_line_detail:cogsDetail, submitted:submit||(submitted&&!canSeeAll),
       submitted_at:submit?new Date().toISOString():undefined,
       submitted_by:submit?P.fullName:undefined,
       // Editing the figures always clears a prior approval: an "Approved" stamp
@@ -2729,15 +2732,31 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
     setSaving(true); setSaveMsg(null)
     const {error} = await supabase.from('generic_actuals').upsert({
       client_id:config.client_id, unit_id:selUnit, period:selPeriod,
-      line_values:{}, catalogue_quantities:{}, submitted:false,
+      line_values:{}, catalogue_quantities:{}, cogs_line_detail:{}, submitted:false,
       approved:false, approved_at:null, approved_by:null, review_note:null,
       entered_by:P.fullName, entered_at:new Date().toISOString(), updated_at:new Date().toISOString(),
     },{onConflict:'client_id,unit_id,period'})
     setSaving(false)
     if (error) { setSaveMsg({ok:false, text:'Could not clear — '+error.message}); return }
-    setLineValues({}); setCatalogueQuantities({}); setSubmitted(false); setApproved(false); setReviewNote(null)
+    setLineValues({}); setCatalogueQuantities({}); setCogsDetail({}); setSubmitted(false); setApproved(false); setReviewNote(null)
     setSaveMsg({ok:true, text:'This month cleared ✓ — enter the correct figures and Save.'})
   }
+
+  // ── Cost breakdown (1b) ───────────────────────────────────────
+  // Any business can split a cost line into named parts (materials, packaging,
+  // labour, transport, wastage… or their own names). Plain language; the parts
+  // are summed into the line total the engine already reads (line_values), so
+  // no calculation changes. Stored additively in generic_actuals.cogs_line_detail.
+  const COST_PARTS = ['Raw materials','Packaging','Direct labour','Transport / delivery','Rent / utilities','Wastage / losses','Other (name it)']
+  const sumComps = (arr:{name:string,amount:number}[]) => (arr||[]).reduce((s,c)=>s+(Number(c.amount)||0),0)
+  function setComps(lineId:string, arr:{name:string,amount:number}[]) {
+    setCogsDetail(d=>({...d,[lineId]:arr}))
+    setLineValues(v=>({...v,[lineId]:sumComps(arr)}))
+  }
+  const addComp = (lineId:string,name='') => setComps(lineId,[...(cogsDetail[lineId]||[]),{name,amount:0}])
+  const updateComp = (lineId:string,idx:number,field:'name'|'amount',value:any) =>
+    setComps(lineId,(cogsDetail[lineId]||[]).map((c,i)=>i===idx?{...c,[field]:value}:c))
+  const removeComp = (lineId:string,idx:number) => setComps(lineId,(cogsDetail[lineId]||[]).filter((_,i)=>i!==idx))
 
   // Month-end close: computes the exception report from real data --
   // stale cost prices (client-wide) and, per unit, actual revenue vs
@@ -3026,16 +3045,44 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
                             Total: {fmt(lineValues[l.id]||0,cc)}
                           </div>
                         </div>
-                      ) : (
-                        <div style={{display:'grid',gridTemplateColumns:'1fr 180px',alignItems:'center',gap:'0.75rem'}}>
-                          <span/>
-                          <input id={`actual-${l.id}`} type="number"
-                            style={{width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'1.06rem',fontFamily:'monospace',background:disabled?'var(--cv-disabled)':C.white,color:C.navy,textAlign:'right',boxSizing:'border-box'}}
-                            value={lineValues[l.id]??''} placeholder="0"
-                            disabled={disabled}
-                            onChange={e=>setLineValues(v=>({...v,[l.id]:Number(e.target.value)}))}/>
+                      ) : (()=>{
+                        const comps = cogsDetail[l.id]||[]
+                        const hasComps = cat==='cost_of_sales' && comps.length>0
+                        return (
+                        <div>
+                          <div style={{display:'grid',gridTemplateColumns:'1fr 180px',alignItems:'center',gap:'0.75rem'}}>
+                            <span style={{fontSize:'0.95rem',color:C.slate}}>{hasComps?'Total — added up from the parts below':''}</span>
+                            <input id={`actual-${l.id}`} type="number"
+                              style={{width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'1.06rem',fontFamily:'monospace',background:(disabled||hasComps)?'var(--cv-disabled)':C.white,color:C.navy,textAlign:'right',boxSizing:'border-box'}}
+                              value={lineValues[l.id]??''} placeholder="0"
+                              disabled={disabled||hasComps}
+                              onChange={e=>setLineValues(v=>({...v,[l.id]:Number(e.target.value)}))}/>
+                          </div>
+                          {/* 1b: optional plain-language breakdown of what makes up a cost of
+                              sale. Works for ANY business — name the parts however you like;
+                              we add them up into the total above (which is all the P&L reads). */}
+                          {cat==='cost_of_sales' && (
+                            <div style={{marginTop:'0.55rem',paddingTop:'0.5rem',borderTop:`1px dashed ${C.border}`}}>
+                              <div style={{fontSize:'0.95rem',color:C.slate,marginBottom:'0.45rem'}}>What makes up this cost? <span style={{opacity:0.85}}>Add the parts — materials, packaging, labour, transport, whatever fits — and we add them up for you. Name them however your business does.</span></div>
+                              {comps.map((c,idx)=>(
+                                <div key={idx} style={{display:'grid',gridTemplateColumns:'1fr 140px 30px',gap:'0.4rem',marginBottom:'0.35rem',alignItems:'center'}}>
+                                  <input value={c.name} placeholder="e.g. Raw materials" disabled={disabled} onChange={e=>updateComp(l.id,idx,'name',e.target.value)} style={{width:'100%',padding:'0.34rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.98rem',boxSizing:'border-box',background:disabled?'var(--cv-disabled)':C.white,color:C.navy}}/>
+                                  <input type="number" value={c.amount||''} placeholder="0" disabled={disabled} onChange={e=>updateComp(l.id,idx,'amount',Number(e.target.value))} style={{width:'100%',padding:'0.34rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.98rem',fontFamily:'monospace',textAlign:'right',boxSizing:'border-box',background:disabled?'var(--cv-disabled)':C.white,color:C.navy}}/>
+                                  {!disabled && <button type="button" onClick={()=>removeComp(l.id,idx)} title="Remove this part" aria-label="Remove" style={{border:'none',background:'none',color:C.red,cursor:'pointer',fontSize:'1.15rem',lineHeight:1}}>×</button>}
+                                </div>
+                              ))}
+                              {!disabled && (
+                                <div style={{display:'flex',flexWrap:'wrap',gap:'0.35rem',marginTop:comps.length?'0.45rem':0}}>
+                                  {COST_PARTS.map(name=>(
+                                    <button key={name} type="button" onClick={()=>addComp(l.id,name==='Other (name it)'?'':name)} style={{fontFamily:'monospace',fontSize:'0.9rem',padding:'0.3rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:14,background:C.white,color:C.teal,cursor:'pointer'}}>+ {name}</button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      )}
+                        )
+                      })()}
                       {/* Field-app figure is read-only here -- it's written exclusively
                           by aggregate_field_transactions(), never editable by hand.
                           The input above is manual entry only (e.g. a paper-only store);
