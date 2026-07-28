@@ -2747,7 +2747,11 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
   // labour, transport, wastage… or their own names). Plain language; the parts
   // are summed into the line total the engine already reads (line_values), so
   // no calculation changes. Stored additively in generic_actuals.cogs_line_detail.
-  const COST_PARTS = ['Raw materials','Packaging','Direct labour','Transport / delivery','Rent / utilities','Wastage / losses','Other (name it)']
+  // True COGS parts only — costs DIRECTLY tied to the goods sold. Deliberately
+  // excludes overheads (rent, admin pay, marketing) and delivery TO customers,
+  // which are operating expenses, not cost of sales. "Freight in" = bringing
+  // stock/materials to you (a real COGS item), not shipping to customers.
+  const COST_PARTS = ['Goods bought for resale','Raw materials','Direct labour','Packaging','Freight in (bringing stock to you)','Import duties / clearing','Wastage / spoilage','Other (name it)']
   const sumComps = (arr:{name:string,amount:number}[]) => (arr||[]).reduce((s,c)=>s+(Number(c.amount)||0),0)
   function setComps(lineId:string, arr:{name:string,amount:number}[]) {
     setCogsDetail(d=>({...d,[lineId]:arr}))
@@ -3063,7 +3067,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
                               we add them up into the total above (which is all the P&L reads). */}
                           {cat==='cost_of_sales' && (
                             <div style={{marginTop:'0.55rem',paddingTop:'0.5rem',borderTop:`1px dashed ${C.border}`}}>
-                              <div style={{fontSize:'0.95rem',color:C.slate,marginBottom:'0.45rem'}}>What makes up this cost? <span style={{opacity:0.85}}>Add the parts — materials, packaging, labour, transport, whatever fits — and we add them up for you. Name them however your business does.</span></div>
+                              <div style={{fontSize:'0.95rem',color:C.slate,marginBottom:'0.45rem'}}>What makes up this cost? <span style={{opacity:0.85}}>These are costs <strong>directly tied to the products you sold</strong> — the goods themselves, raw materials, packaging, direct labour, freight to bring stock in. <em>Not</em> rent, admin pay, marketing or delivery to customers (those belong under Overheads). Name the parts however your business does; we add them up for you.</span></div>
                               {comps.map((c,idx)=>(
                                 <div key={idx} style={{display:'grid',gridTemplateColumns:'1fr 140px 30px',gap:'0.4rem',marginBottom:'0.35rem',alignItems:'center'}}>
                                   <input value={c.name} placeholder="e.g. Raw materials" disabled={disabled} onChange={e=>updateComp(l.id,idx,'name',e.target.value)} style={{width:'100%',padding:'0.34rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.98rem',boxSizing:'border-box',background:disabled?'var(--cv-disabled)':C.white,color:C.navy}}/>
@@ -3151,6 +3155,9 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll}) {
   const [manual, setManual] = useState<Record<string,string>>({})          // `${period}|${lineId}` -> raw string
   const [loadedManual, setLoadedManual] = useState<Record<string,Record<string,number>>>({})
   const [field, setField] = useState<Record<string,Record<string,number>>>({})
+  // 1b consistency: cost-of-sales breakdowns per period, so a broken-down cost
+  // shows its parts here too (read-only; edited in the One-month · guided view).
+  const [cogsByPeriod, setCogsByPeriod] = useState<Record<string,Record<string,{name:string,amount:number}[]>>>({})
   const [submittedByPeriod, setSubmittedByPeriod] = useState<Record<string,boolean>>({})
   const [dirty, setDirty] = useState<Set<string>>(new Set())
   const [closedSet, setClosedSet] = useState<Set<string>>(new Set())
@@ -3183,14 +3190,15 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll}) {
       .eq('client_id',config.client_id).eq('unit_id',selUnit).in('period',pv)
       .then(({data})=>{
         if (!active) return
-        const lm:Record<string,Record<string,number>>={}, fm:Record<string,Record<string,number>>={}, sm:Record<string,boolean>={}, man:Record<string,string>={}
+        const lm:Record<string,Record<string,number>>={}, fm:Record<string,Record<string,number>>={}, sm:Record<string,boolean>={}, man:Record<string,string>={}, cd:Record<string,Record<string,{name:string,amount:number}[]>>={}
         ;(data||[]).forEach((row:any)=>{
           lm[row.period]=row.line_values||{}
           fm[row.period]=row.field_line_values||{}
           sm[row.period]=!!row.submitted
+          cd[row.period]=row.cogs_line_detail||{}
           Object.entries(row.line_values||{}).forEach(([lid,v])=>{ man[`${row.period}|${lid}`]=String(v) })
         })
-        setLoadedManual(lm); setField(fm); setSubmittedByPeriod(sm); setManual(man); setDirty(new Set()); setLoading(false)
+        setLoadedManual(lm); setField(fm); setSubmittedByPeriod(sm); setManual(man); setCogsByPeriod(cd); setDirty(new Set()); setLoading(false)
       })
     return ()=>{ active=false }
   },[selUnit,monthsCount,config.client_id])
@@ -3344,6 +3352,18 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll}) {
                             const locked=isLocked(p.value)
                             const fAmt=fieldNum(p.value,l.id)
                             const hasField=fAmt!==0
+                            const parts = l.category==='cost_of_sales' ? (cogsByPeriod[p.value]?.[l.id]||[]) : []
+                            if (parts.length>0) {
+                              const partsLabel = parts.map((pt:any)=>`${pt.name||'part'}: ${fmt(Number(pt.amount)||0,cc)}`).join('  ·  ')
+                              return (
+                                <td key={p.value} style={{padding:'3px 5px',borderBottom:'1px solid var(--cv-border-soft)'}}>
+                                  <div title={`Broken down into parts — edit in "One month · guided".\n${partsLabel}`}
+                                    style={{width:'100%',minWidth:66,textAlign:'right',padding:'0.3rem 0.35rem',borderRadius:4,fontFamily:'monospace',fontSize:'0.96rem',boxSizing:'border-box',background:'var(--cv-tint-cyan)',color:C.navy,cursor:'help'}}>
+                                    {fmt(manualNum(p.value,l.id),cc)} <span style={{fontSize:'0.82rem',color:C.teal}} aria-label="has a breakdown">▣</span>
+                                  </div>
+                                </td>
+                              )
+                            }
                             return (
                               <td key={p.value} style={{padding:'3px 5px',borderBottom:'1px solid var(--cv-border-soft)'}}>
                                 <input inputMode="decimal" disabled={locked}
