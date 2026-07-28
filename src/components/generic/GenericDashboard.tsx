@@ -7064,31 +7064,42 @@ function PLVarianceView({ config, result, months, cc, view, selUnit, setSelUnit,
   const con = result.con
 
   type Kind = 'revenue'|'cost'|'profit'
-  interface StmtRow { key:string; label:string; kind:Kind; bold?:boolean; highlight?:boolean; plan:number; actual:number|null; drill?:string; note?:string }
+  interface StmtRow { key:string; label:string; kind:Kind; bold?:boolean; highlight?:boolean; isPct?:boolean; plan:number; actual:number|null; drill?:string; note?:string }
 
   let rows: StmtRow[] = []
   if (view==='unit') {
     if (!pl) return <div style={card}><p style={{color:C.slate}}>No data for this unit.</p></div>
+    const uRevP=sumRange(pl.rev),    uRevA=sumRange(pl.act_rev)
+    const uGpP=sumRange(pl.gp),      uGpA=sumRange(pl.act_gp)
+    const uEbP=sumRange(pl.ebitda),  uEbA=sumRange(pl.act_ebitda)
     rows = [
-      { key:'rev',    label:'Revenue',                   kind:'revenue', bold:true, plan:sumRange(pl.rev),    actual:sumRange(pl.act_rev),    drill:'revenue' },
+      { key:'rev',    label:'Revenue',                   kind:'revenue', bold:true, plan:uRevP,    actual:uRevA,    drill:'revenue' },
       { key:'cogs',   label:'Cost of sales',             kind:'cost',               plan:sumRange(pl.cogs),   actual:sumRange(pl.act_cogs),   drill:'cost_of_sales' },
-      { key:'gp',     label:'Gross profit',              kind:'profit',  bold:true, highlight:true, plan:sumRange(pl.gp),  actual:sumRange(pl.act_gp) },
+      { key:'gp',     label:'Gross profit',              kind:'profit',  bold:true, highlight:true, plan:uGpP,  actual:uGpA },
+      { key:'gpm',    label:'Gross margin %',            kind:'profit',  isPct:true, plan:uRevP>0?uGpP/uRevP:0, actual:uRevA>0?uGpA/uRevA:null },
       { key:'staff',  label:'Staff costs',               kind:'cost',               plan:sumRange(pl.staff),  actual:sumRange(pl.act_staff),  drill:'staff' },
       { key:'opex',   label:'Other operating expenses',  kind:'cost',               plan:sumRange(pl.opex),   actual:sumRange(pl.act_opex),   drill:'direct_opex' },
       { key:'shared', label:'Shared costs (allocated)',  kind:'cost',               plan:sumRange(pl.shared), actual:sumRange(pl.shared),     note:'allocated — no separate actual' },
-      { key:'ebitda', label:'EBITDA',                    kind:'profit',  bold:true, highlight:true, plan:sumRange(pl.ebitda), actual:sumRange(pl.act_ebitda) },
+      { key:'totopex',label:'Operating expenses',        kind:'cost',    bold:true, plan:uGpP-uEbP, actual:uGpA-uEbA, note:'staff + overheads + shared' },
+      { key:'ebitda', label:'EBITDA',                    kind:'profit',  bold:true, highlight:true, plan:uEbP, actual:uEbA },
+      { key:'ebm',    label:'EBITDA margin %',           kind:'profit',  isPct:true, plan:uRevP>0?uEbP/uRevP:0, actual:uRevA>0?uEbA/uRevA:null },
     ]
   } else {
     // Actual total operating costs at the consolidated level are not stored
     // as a single actual array, but equal actual GP minus actual EBITDA by
     // construction (the engine's own identity), so derive them from those.
     const actTotOpex = rangeIdx.reduce((s,i)=> s + ((con.act_gp[i]!=null && con.act_ebitda[i]!=null) ? (con.act_gp[i]-con.act_ebitda[i]) : 0), 0)
+    const cRevP=sumRange(con.rev),    cRevA=sumRange(con.act_rev)
+    const cGpP=sumRange(con.gp),      cGpA=sumRange(con.act_gp)
+    const cEbP=sumRange(con.ebitda),  cEbA=sumRange(con.act_ebitda)
     rows = [
-      { key:'rev',      label:'Revenue',               kind:'revenue', bold:true, plan:sumRange(con.rev),  actual:sumRange(con.act_rev),  drill:'revenue' },
+      { key:'rev',      label:'Revenue',               kind:'revenue', bold:true, plan:cRevP,  actual:cRevA,  drill:'revenue' },
       { key:'cogs',     label:'Cost of sales',         kind:'cost',               plan:sumRange(con.cogs), actual:sumRange(con.act_cogs), drill:'cost_of_sales' },
-      { key:'gp',       label:'Gross profit',          kind:'profit',  bold:true, highlight:true, plan:sumRange(con.gp), actual:sumRange(con.act_gp) },
+      { key:'gp',       label:'Gross profit',          kind:'profit',  bold:true, highlight:true, plan:cGpP, actual:cGpA },
+      { key:'gpm',      label:'Gross margin %',        kind:'profit',  isPct:true, plan:cRevP>0?cGpP/cRevP:0, actual:cRevA>0?cGpA/cRevA:null },
       { key:'opex',     label:'Total operating costs', kind:'cost',               plan:sumRange(con.opex), actual:actTotOpex, note:'staff + overheads + shared' },
-      { key:'ebitda',   label:'EBITDA',                kind:'profit',  bold:true, highlight:true, plan:sumRange(con.ebitda), actual:sumRange(con.act_ebitda) },
+      { key:'ebitda',   label:'EBITDA',                kind:'profit',  bold:true, highlight:true, plan:cEbP, actual:cEbA },
+      { key:'ebm',      label:'EBITDA margin %',       kind:'profit',  isPct:true, plan:cRevP>0?cEbP/cRevP:0, actual:cRevA>0?cEbA/cRevA:null },
       { key:'interest', label:'Finance costs',         kind:'cost',               plan:sumRange(con.interest), actual:sumRange(con.interest), note:'from loan terms — not a plan/actual figure' },
       { key:'nbt',      label:'Profit before tax',     kind:'profit',  bold:true, plan:sumRange(con.nbt),  actual:sumRange(con.act_nbt) },
       { key:'tax',      label:'Tax',                   kind:'cost',               plan:sumRange(con.tax),  actual:sumRange(con.act_tax) },
@@ -7184,7 +7195,8 @@ function PLVarianceView({ config, result, months, cc, view, selUnit, setSelUnit,
                 const actual = r.actual ?? 0
                 const f = favVar(r.kind, r.plan, actual)
                 const fp = r.plan!==0 ? f/Math.abs(r.plan) : 0
-                const col = favColor(f)
+                const dPts = actual - r.plan
+                const col = r.isPct ? (dPts>0.0005?C.green:dPts<-0.0005?C.red:C.slate) : favColor(f)
                 const canDrill = !!r.drill
                 const open = canDrill && expanded[r.key]
                 const bg = r.highlight?'var(--cv-tint-cyan)':r.bold?C.lightBg:(ri%2===0?C.cream:C.white)
@@ -7201,10 +7213,10 @@ function PLVarianceView({ config, result, months, cc, view, selUnit, setSelUnit,
                         {r.label}
                         {r.note && <span style={{fontSize:'0.88rem',color:C.slate,marginLeft:6,fontWeight:400}}>{r.note}</span>}
                       </td>
-                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',color:C.navy,fontWeight:r.bold?700:400}}>{valDisp(r.kind, r.plan)}</td>
-                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',color:C.navy,fontWeight:r.bold?700:400}}>{hasActual?valDisp(r.kind, actual):'—'}</td>
-                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',color:col,fontWeight:700}}>{hasActual?signMoney(f):'—'}</td>
-                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',color:col,fontWeight:600}}>{hasActual?signPct(fp):'—'}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',color:C.navy,fontWeight:r.bold?700:400}}>{r.isPct?pct(r.plan):valDisp(r.kind, r.plan)}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',color:C.navy,fontWeight:r.bold?700:400}}>{hasActual?(r.isPct?pct(actual):valDisp(r.kind, actual)):'—'}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',color:col,fontWeight:700}}>{hasActual?(r.isPct?`${dPts>=0?'+':'−'}${(Math.abs(dPts)*100).toFixed(1)} pts`:signMoney(f)):'—'}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',color:col,fontWeight:600}}>{hasActual?(r.isPct?'—':signPct(fp)):'—'}</td>
                     </tr>
                     {open && lines.length===0 && (
                       <tr style={{background:C.white}}><td colSpan={5} style={{padding:'6px 10px 6px 30px',fontSize:'0.96rem',color:C.slate}}>No component lines.</td></tr>
@@ -7243,7 +7255,7 @@ function PLVarianceView({ config, result, months, cc, view, selUnit, setSelUnit,
 }
 
 function PLTab({config,result,months,cc,P,closedPeriods}) {
-  const [plMode, setPlMode] = useState<'statement'|'variance'>('statement')
+  const [plMode, setPlMode] = useState<'statement'|'variance'>('variance')
   const [viewMode, setViewMode] = useState<'unit'|'consolidated'|'margins'>('unit')
   const [selUnit, setSelUnit] = useState(config.business_units.find(u=>u.active)?.id||'')
   // Per-line actuals for the Plan vs Actual drill-down. Loaded the same way
