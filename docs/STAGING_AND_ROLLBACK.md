@@ -124,17 +124,79 @@ staging database instead."
 
 ---
 
+## Part B2 — Make the staging link openable, with one fixed address
+
+> **Read this if a staging/preview link ever refused to open, or kept changing.**
+> Those are the two default Vercel behaviours this part fixes. Do it once.
+
+**The two problems, plainly:**
+
+1. **The link is locked.** By default, Vercel puts every preview behind a
+   *"Vercel Authentication"* login wall — only people signed in to the Vercel
+   team can open it. If you clicked a preview link and got a Vercel login screen
+   (or a blank/"authentication required" page), *this* is why — not a broken build.
+2. **The link keeps changing.** Every new commit makes a brand-new preview URL,
+   so there's no single address to bookmark or share.
+
+We fix both by giving staging **one permanent, openable address**.
+
+### Step 1 — Create a permanent `staging` branch (one time, ~1 minute)
+A long-lived branch called `staging` gives Vercel a **stable** URL that does not
+change with every commit. In GitHub:
+1. Go to the repo → the branch dropdown → type `staging` → **Create branch: `staging` from `main`**.
+
+That's it. Tell me when it exists and I'll point new work at it so what you test
+on staging is exactly what will go live.
+
+### Step 2 — Unlock the staging address (one time, ~2 minutes)
+In **Vercel → your `clearview-platform` project → Settings → Deployment Protection**:
+- Find **Vercel Authentication**. Set it so **Production is protected but Preview is not**
+  (the option is usually *"Only Production"* / toggling Preview **off**).
+- Leave everything else as-is and **Save**.
+
+This makes the staging link open for anyone who has it — which is safe here
+because staging holds only made-up data, shows the yellow **STAGING** bar, and is
+now marked **noindex** in code (Step 4), so search engines never list it. If you'd
+rather keep a lock, Vercel's **Password Protection** (a Pro-plan feature) lets you
+set one shared password instead — say the word and I'll give you those clicks.
+
+### Step 3 — Give it a friendly, fixed web address (one time, ~3 minutes)
+So you can bookmark `staging.clearview.habibonifade.com` instead of a long
+Vercel URL:
+1. In **Vercel → project → Settings → Domains**, click **Add**.
+2. Enter **`staging.clearview.habibonifade.com`**.
+3. When asked which branch it serves, choose **`staging`** (not Production).
+4. Vercel shows one DNS record to add wherever `habibonifade.com` is managed.
+   Add it, wait a few minutes, and the address goes live.
+
+Now **`staging.clearview.habibonifade.com`** always shows the latest staging
+build, opens without a login, and looks exactly like production — with the yellow
+STAGING bar so it can never be mistaken for the real thing.
+
+### Step 4 — (already done in code) staging is hidden from Google
+No action needed: the app now sends a **`noindex`** instruction to search engines
+on every non-production page, so the staging site can be openable **and** stay
+out of search results. The live site is unaffected and fully indexable.
+
+---
+
 ## Part C — The new everyday habit (this is the whole point)
 
 From now on, the safe order for **any** change is:
 
-1. I open a Pull Request. Its **preview link** runs on staging.
-2. You (and I) test the change on that preview link — enter figures, click
-   buttons, try the risky thing — knowing it's the **safe copy**.
+1. I put the change on the **`staging` branch**. Within a minute it appears at
+   **`staging.clearview.habibonifade.com`** (the one fixed address from Part B2) —
+   running on the **staging database**, with the yellow STAGING bar.
+2. You (and I) test it there — enter figures, click buttons, try the risky thing —
+   knowing it's the **safe copy** and no real client can be affected.
 3. If a change needs a **database migration** (a `.sql` file), you run it on the
    **staging** project's SQL Editor **first** and we confirm it works there.
-4. Only when it all looks right do we **merge** — and only then does it reach the
-   **live** site and real clients.
+4. Only when it all looks right do we **merge to `main`** — and only then does it
+   reach the **live** site and real clients.
+
+(Individual Pull Requests still get their own preview links too, if you ever want
+to look at one change in isolation — but the fixed staging address above is the
+one to bookmark.)
 
 That "run it on staging first" step is exactly the *test-before-production*
 safety you asked for. It also keeps the two databases' structures in sync over

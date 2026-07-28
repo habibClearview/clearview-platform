@@ -54,6 +54,34 @@ const csp = [
   'upgrade-insecure-requests',
 ].join('; ')
 
+// ---------------------------------------------------------------------------
+// Production, or a non-production (staging / preview) build?
+//
+// This mirrors src/lib/app-env.ts EXACTLY so the two never disagree. We use it
+// to add a "noindex" header on staging: because we deliberately make the
+// staging link openable without a Vercel login (see docs/STAGING_AND_ROLLBACK.md),
+// this stops Google and other search engines from ever listing the test copy.
+//
+// We only add noindex when we can POSITIVELY tell it is non-production. With no
+// signal at all we assume production and add nothing — so the real live site is
+// never accidentally hidden from search. On Vercel each environment builds with
+// its own variables, so Production builds with VERCEL_ENV=production (indexable)
+// and Preview builds with VERCEL_ENV=preview (noindex) with no per-request work.
+// ---------------------------------------------------------------------------
+function resolveAppEnv() {
+  const explicit = (process.env.NEXT_PUBLIC_APP_ENV || '').trim().toLowerCase()
+  if (explicit === 'staging' || explicit === 'preview') return 'staging'
+  if (explicit === 'development' || explicit === 'dev' || explicit === 'local') return 'development'
+  if (explicit === 'production' || explicit === 'prod') return 'production'
+
+  const vercel = (process.env.VERCEL_ENV || '').trim().toLowerCase()
+  if (vercel === 'preview') return 'staging'
+  if (vercel === 'development') return 'development'
+
+  return 'production'
+}
+const isNonProdBuild = resolveAppEnv() !== 'production'
+
 const securityHeaders = [
   { key: 'Content-Security-Policy', value: csp },
   // Force HTTPS for two years, including subdomains; eligible for the preload list.
@@ -67,6 +95,12 @@ const securityHeaders = [
   // Turn off powerful features the app never uses.
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()' },
 ]
+
+// On staging / preview only: tell search engines never to index the test copy.
+// The live production site is left fully indexable.
+if (isNonProdBuild) {
+  securityHeaders.push({ key: 'X-Robots-Tag', value: 'noindex, nofollow' })
+}
 
 const nextConfig = {
   // Surface Vercel's server-only VERCEL_ENV ('production' | 'preview' |

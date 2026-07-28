@@ -34,6 +34,27 @@ function inviteBaseUrl(): string {
   return 'https://clearview.habibonifade.com'
 }
 
+// Find an existing Supabase Auth user by email. The admin API has no
+// get-by-email, so page through listUsers (tiny user base; capped so a runaway
+// can't page forever). Case-insensitive match — auth stores emails lowercased,
+// but callers may type any case. Returns the auth user id, or null if none.
+async function findAuthUserIdByEmail(
+  admin: ReturnType<typeof getAdminClient>,
+  email: string,
+): Promise<string | null> {
+  const target = email.trim().toLowerCase()
+  const PER_PAGE = 200
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: PER_PAGE })
+    if (error) { console.error('findAuthUserIdByEmail: listUsers failed', error.message); return null }
+    const users = data?.users || []
+    const hit = users.find(u => (u.email || '').trim().toLowerCase() === target)
+    if (hit) return hit.id
+    if (users.length < PER_PAGE) break // last page
+  }
+  return null
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json() as {
@@ -162,20 +183,73 @@ export async function POST(req: NextRequest) {
     }
 
     // Send the invitation email via Supabase Auth admin API
-    const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
+    const inviteOpts = {
       redirectTo,
       data: {
         full_name: fullName,
         role,
         client_id: clientId,
       },
-    })
+    }
+    let { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, inviteOpts)
+
+    if (inviteErr && inviteErr.message.includes('already been registered')) {
+      // The email is already registered in Supabase Auth. There are two very
+      // different reasons for this, and they must be handled differently:
+      //
+      //  (a) It belongs to a LIVE account — an active user we must never touch.
+      //  (b) It's an ORPHAN — a login left behind when its client was deleted
+      //      (older deletes removed the profile but not the auth user). It's
+      //      attached to nothing and only serves to block this email forever.
+      //
+      // A profile-less auth user is, by definition, an orphan: every real login
+      // has a user_profiles row. So: only a super_coach (the platform admin) may
+      // reclaim, and only when NO profile exists for that account. Anyone else,
+      // or any account that still has a profile, gets a safe, honest refusal —
+      // no account is ever silently deleted or hijacked by inviting its email.
+      if (inviterRole !== 'super_coach') {
+        return NextResponse.json({ error: 'This email address already has an account. Ask your Clearview coach to reset it.' }, { status: 409 })
+      }
+
+      const existingId = await findAuthUserIdByEmail(admin, email)
+      if (!existingId) {
+        // Registered but not locatable via listUsers — do not guess; refuse.
+        return NextResponse.json({ error: 'This email address already has an account that could not be located automatically. Please contact Clearview support.' }, { status: 409 })
+      }
+
+      const { data: existingProfile } = await admin
+        .from('user_profiles')
+        .select('role, full_name, engagement_client_id')
+        .eq('id', existingId)
+        .maybeSingle()
+
+      if (existingProfile) {
+        // A live account. Name it so the admin knows exactly who holds this
+        // email, and refuse — reinviting must never delete a real user.
+        const who = [existingProfile.full_name, existingProfile.role && `(${existingProfile.role})`].filter(Boolean).join(' ')
+        return NextResponse.json({
+          error: `This email already belongs to an active account${who ? `: ${who}` : ''}. Remove that user first, then invite this address.`,
+        }, { status: 409 })
+      }
+
+      // Orphan confirmed (registered auth user, no profile). Remove it, then
+      // send a clean invite through the normal path below.
+      const { error: orphanDelErr } = await admin.auth.admin.deleteUser(existingId)
+      if (orphanDelErr) {
+        console.error('invite-user: failed to remove orphaned auth user', orphanDelErr.message)
+        return NextResponse.json({ error: 'Could not reset the old login for this email. Nothing was sent — please try again in a moment.' }, { status: 500 })
+      }
+      await writeAuditLog(admin, {
+        actorId: inviter.id, actorEmail: inviter.email, actorRole: inviterRole,
+        action: 'user.orphan_reclaimed',
+        targetId: existingId, targetEmail: email,
+        detail: { reinvited_as_role: role, engagement_client_id: clientId ?? null },
+        ip: auditIp(req.headers),
+      })
+      ;({ data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, inviteOpts))
+    }
 
     if (inviteErr) {
-      // Handle "user already exists" gracefully
-      if (inviteErr.message.includes('already been registered')) {
-        return NextResponse.json({ error: 'This email address already has an account. Contact your administrator.' }, { status: 409 })
-      }
       return NextResponse.json({ error: inviteErr.message }, { status: 400 })
     }
 
