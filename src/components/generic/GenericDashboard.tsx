@@ -923,15 +923,37 @@ export default function GenericDashboard({
   // setView(...) cross-link keeps working — this only regroups/relabels how the
   // existing screens are presented. Order: orientation, then the INPUT surfaces
   // (plan & record), then the OUTPUT accounts, then operate, then manage.
-  const navGroups: {title:string; items:string[][]}[] = isFunder ? [
-    { title:'', items:[['overview','Overview'],['intelligence','Clearview Intelligence']] },
-    ...(funderFull ? [{ title:'ACCOUNTS', items:[['pl','P&L'],['cashflow','Cash Flow'],['balancesheet','Balance Sheet']] }] : []),
+  // Sidebar sections — EXACTLY the approved blueprint: INSIGHT / FINANCE /
+  // BUSINESS / MANAGE. Each item wires to an existing screen id (view) or, for
+  // Accounts and Actuals, to a set of secondary tabs. Screen ids are unchanged,
+  // so every setView(...) cross-link keeps working.
+  type NavItem = { key:string; label:string; view?:string; tabs?:string[][] }
+  const navGroups: {title:string; items:NavItem[]}[] = isFunder ? [
+    { title:'INSIGHT', items:[
+      {key:'overview',label:'Overview',view:'overview'},
+      {key:'intelligence',label:'Intelligence',view:'intelligence'},
+    ]},
+    ...(funderFull ? [{ title:'FINANCE', items:[
+      {key:'accounts',label:'Accounts',tabs:[['pl','Profit & Loss'],['cashflow','Cash Flow'],['balancesheet','Balance Sheet']]},
+    ]}] : []),
   ] : [
-    { title:'', items:[['overview','Overview'],['intelligence','Clearview Intelligence']] },
-    { title:'PLAN & RECORD', items:[['planning','Planning'],['actuals_wc','Actuals & Working Capital']] },
-    { title:'ACCOUNTS', items:[['pl','P&L'],['cashflow','Cash Flow'],['balancesheet','Balance Sheet'],['performance','Performance']] },
-    ...(P.canManageCatalogue ? [{ title:'OPERATIONS', items:[['stores','Stores']] }] : []),
-    { title:'MANAGE', items:[['approvals',approvalsLabel],['settings','Settings']] },
+    { title:'INSIGHT', items:[
+      {key:'overview',label:'Overview',view:'overview'},
+      {key:'intelligence',label:'Intelligence',view:'intelligence'},
+    ]},
+    { title:'FINANCE', items:[
+      {key:'accounts',label:'Accounts',tabs:[['pl','Profit & Loss'],['cashflow','Cash Flow'],['balancesheet','Balance Sheet']]},
+      {key:'planning',label:'Planning',view:'planning'},
+      {key:'actuals',label:'Actuals',tabs:[['actuals_wc','Record Actuals'],['approvals',approvalsLabel]]},
+      {key:'performance',label:'Performance',view:'performance'},
+    ]},
+    { title:'BUSINESS', items:[
+      {key:'customers',label:'Customers & Marketing',view:'customers'},
+      ...(P.canManageCatalogue ? [{key:'operations',label:'Operations',view:'stores'}] : []),
+    ]},
+    { title:'MANAGE', items:[
+      {key:'admin',label:'Admin',view:'settings'},
+    ]},
   ]
 
   return (
@@ -990,6 +1012,10 @@ export default function GenericDashboard({
         .cv-navbtn{display:block;width:100%;text-align:left;font-family:monospace;font-size:0.95rem;line-height:1.3;padding:0.6rem 1.1rem 0.6rem 1.25rem;border:none;border-left:3px solid transparent;background:transparent;color:${C.slate};font-weight:500;cursor:pointer}
         .cv-navbtn:hover{background:var(--cv-tint-cyan)}
         .cv-navbtn.active{border-left-color:${C.cyan};background:var(--cv-tint-cyan);color:${C.navy};font-weight:700}
+        .cv-subtabs{display:flex;gap:2px;flex-wrap:wrap;border-bottom:1px solid ${C.border};margin-bottom:1.25rem}
+        .cv-subtab{font-family:monospace;font-size:0.98rem;padding:0.5rem 0.95rem 0.7rem;border:none;border-bottom:2px solid transparent;background:transparent;color:${C.slate};cursor:pointer;margin-bottom:-1px}
+        .cv-subtab:hover{color:${C.navy}}
+        .cv-subtab.active{color:${C.navy};border-bottom-color:${C.cyan};font-weight:700}
         @media (max-width:860px){
           .cv-shell{flex-direction:column}
           .cv-side{flex:none;width:100%;border-right:none;border-bottom:1px solid ${C.border};display:flex;overflow-x:auto;padding:0.25rem 0.4rem}
@@ -1004,13 +1030,30 @@ export default function GenericDashboard({
           {navGroups.map((g,gi)=>(
             <div className="cv-navgroup" key={gi}>
               {g.title && <div className="cv-navgroup-title">{g.title}</div>}
-              {g.items.map(([id,label])=>(
-                <button key={id} className={`cv-navbtn${view===id?' active':''}`} onClick={()=>setView(id)}>{label}</button>
-              ))}
+              {g.items.map(item=>{
+                const active = item.view===view || !!item.tabs?.some(t=>t[0]===view)
+                const target = item.view ?? (item.tabs ? item.tabs[0][0] : view)
+                return <button key={item.key} className={`cv-navbtn${active?' active':''}`} onClick={()=>setView(target)}>{item.label}</button>
+              })}
             </div>
           ))}
         </aside>
         <main className="cv-main">
+        {/* Secondary tab strip: shown only for sections that group several
+            screens (Accounts → P&L / Cash Flow / Balance Sheet; Actuals →
+            Record Actuals / Approvals). Same view ids, so switching a sub-tab
+            is just setView. */}
+        {(()=>{
+          const act = navGroups.flatMap(g=>g.items).find(it => it.view===view || !!it.tabs?.some(t=>t[0]===view))
+          if(!act?.tabs || act.tabs.length<2) return null
+          return (
+            <div className="cv-subtabs">
+              {act.tabs.map(([vid,vlabel])=>(
+                <button key={vid} className={`cv-subtab${view===vid?' active':''}`} onClick={()=>setView(vid)}>{vlabel}</button>
+              ))}
+            </div>
+          )
+        })()}
         {/* Dashboard-wide save status. saveConfig is used by every editing tab
             (Planning, Overview, Intelligence, Actuals, Settings, drivers), so
             the status lives here — a failed or stalled save is visible no matter
@@ -1039,6 +1082,13 @@ export default function GenericDashboard({
         {view==='actuals_wc'  && <ActualsAndWorkingCapitalTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} onCloseStatusChanged={loadClosedPeriods}/>}
         {view==='stores'      && <StoresTab config={config} clientId={clientId} P={P}/>}
         {view==='settings'    && <SettingsAndAdminTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={saveConfig} theme={theme} setThemeMode={setThemeMode}/>}
+        {view==='customers'   && (
+          <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:12,padding:'2rem',maxWidth:760}}>
+            <div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.12em',color:C.cyan,textTransform:'uppercase',marginBottom:'0.5rem'}}>Business · Customers &amp; Marketing</div>
+            <h2 style={{fontFamily:'Georgia,serif',color:C.navy,margin:'0 0 0.75rem'}}>Customers &amp; Marketing</h2>
+            <p style={{color:C.slate,lineHeight:1.65,margin:0}}>This section is being built. It will hold the customer journey — leads → prospects → clients tracked per sales/marketing officer with conversion rates, the customer records captured in the field app, and campaign spend with cost per customer acquired (CAC).</p>
+          </div>
+        )}
         </ErrorBoundary>
         </main>
       </div>
