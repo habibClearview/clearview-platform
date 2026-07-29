@@ -5018,7 +5018,10 @@ function StockAndTransfersSection({clientId,businessUnits}:{clientId:string;busi
 function ValueListManager({clientId, businessUnitId, unitName, kind, title, singular, blurb, examples, canManage}) {
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [newName, setNewName] = useState('')
+  // Uncontrolled input read via ref on submit. On mobile a controlled input's
+  // onChange can lag the tap, so state read "" while the box had text — the
+  // "give it a name first" bug. Reading the DOM value at submit fixes that.
+  const nameRef = useRef<HTMLInputElement>(null)
   const [adding, setAdding] = useState(false)
   const [busyId, setBusyId] = useState<string|null>(null)
   const [editId, setEditId] = useState<string|null>(null)
@@ -5038,8 +5041,8 @@ function ValueListManager({clientId, businessUnitId, unitName, kind, title, sing
   useEffect(()=>{ load() }, [clientId, businessUnitId, kind])
 
   async function add() {
-    const name = newName.trim()
-    if (!name) { notify(`Give the ${singular.toLowerCase()} a name first.`); return }
+    const name = (nameRef.current?.value || '').trim()
+    if (!name) { nameRef.current?.focus(); notify(`Give the ${singular.toLowerCase()} a name first.`); return }
     if (!businessUnitId) { notify('Pick a business unit first.'); return }
     setAdding(true)
     try {
@@ -5054,7 +5057,7 @@ function ValueListManager({clientId, businessUnitId, unitName, kind, title, sing
       // there rather than claiming a fresh add.
       if (data.duplicate) notify(`"${name}" is already in this list.`, 'info')
       else notify(`Added "${name}".`, 'success')
-      setNewName('')
+      if (nameRef.current) nameRef.current.value = ''
       await load()
     } catch {
       notify(`No connection — could not add that ${singular.toLowerCase()}. Please try again.`)
@@ -5106,9 +5109,9 @@ function ValueListManager({clientId, businessUnitId, unitName, kind, title, sing
       {canManage && businessUnitId && (
         <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
           <input
+            ref={nameRef}
             style={{...inp, maxWidth:340}}
-            value={newName}
-            onChange={e=>setNewName(e.target.value)}
+            defaultValue=""
             onKeyDown={e=>{ if(e.key==='Enter') add() }}
             placeholder={`Add a ${singular.toLowerCase()}…`}
             aria-label={`New ${singular.toLowerCase()} name`}
@@ -5852,20 +5855,29 @@ function MiniDonut({frac,color,center,size=42}:{frac:number;color:string;center:
 // SVG polygon radar. Generic over any number of axes -- pentagon for the
 // five going-concern factors, heptagon for the seven LRS dimensions. Each
 // axis carries a 0..1 fraction. Rings/spokes use theme border tokens.
-function RadarChart({axes,color}:{axes:{label:string;frac:number}[];color:string}) {
-  const cx=150, cy=145, R=104, n=axes.length
-  const ang=(i:number)=> -Math.PI/2 + i*2*Math.PI/n
-  const pt=(i:number,rad:number):[number,number]=>[cx+rad*Math.cos(ang(i)), cy+rad*Math.sin(ang(i))]
-  const poly = axes.map((a,i)=>{const [x,y]=pt(i,R*Math.max(0,Math.min(1,a.frac||0)));return `${x.toFixed(1)},${y.toFixed(1)}`}).join(' ')
+// Horizontal score bars. Replaces the old radar/spider chart — research (and
+// client feedback) is that people read a radar poorly; a labelled bar per
+// factor, longest = strongest, is understood at a glance and works far better
+// on a phone. Same props as before so call sites barely change: each axis is
+// one factor with a 0–1 fraction.
+function ScoreBars({axes,color}:{axes:{label:string;frac:number}[];color:string}) {
   return (
-    <svg width="100%" viewBox="0 0 300 290" style={{maxWidth:300}}>
-      <g fill="none" style={{stroke:'var(--cv-border-soft)'}}>{[0.25,0.5,0.75,1].map((f,i)=><circle key={i} cx={cx} cy={cy} r={R*f}/>)}</g>
-      <g style={{stroke:'var(--cv-border-soft)'}}>{axes.map((a,i)=>{const [x,y]=pt(i,R);return <line key={i} x1={cx} y1={cy} x2={x} y2={y}/>})}</g>
-      <polygon points={poly} fill={color} fillOpacity={0.17} stroke={color} strokeWidth="2"/>
-      <g fontSize="8" style={{fill:C.slate}} textAnchor="middle" fontFamily="monospace">
-        {axes.map((a,i)=>{const [x,y]=pt(i,R+18);return <text key={i} x={x} y={y+3}>{a.label}</text>})}
-      </g>
-    </svg>
+    <div style={{width:'100%',maxWidth:420,display:'flex',flexDirection:'column',gap:'0.7rem',padding:'0.6rem 0.4rem'}}>
+      {axes.map((a,i)=>{
+        const pct = Math.round(Math.max(0,Math.min(1,a.frac||0))*100)
+        return (
+          <div key={i}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:4}}>
+              <span style={{fontSize:'0.98rem',color:C.slate}}>{a.label}</span>
+              <span style={{fontFamily:'monospace',fontSize:'0.98rem',fontWeight:700,color}}>{pct}%</span>
+            </div>
+            <div style={{height:11,borderRadius:6,background:'var(--cv-border-soft)',overflow:'hidden'}}>
+              <div style={{height:'100%',width:`${pct}%`,background:color,borderRadius:6,transition:'width 0.3s'}}/>
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
@@ -6532,7 +6544,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
             <div className="cv-dim-radar" style={{...card,margin:0,padding:0,overflow:'hidden',display:'flex',flexDirection:'column'}}>
               <div style={cardHead}>Going concern profile</div>
               <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'0.4rem'}}>
-                <RadarChart color={s.gcColor} axes={gcFactors.map(f=>({label:f.radar,frac:f.sc/f.max}))}/>
+                <ScoreBars color={s.gcColor} axes={gcFactors.map(f=>({label:f.radar,frac:f.sc/f.max}))}/>
               </div>
             </div>
             {gcFactors.map(f=>{
@@ -6630,7 +6642,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
                   <div className="cv-dim-radar" style={{...card,margin:0,padding:0,overflow:'hidden',display:'flex',flexDirection:'column'}}>
                     <div style={cardHead}>Readiness profile</div>
                     <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'0.4rem'}}>
-                      <RadarChart color={C.teal} axes={dims.map(d=>({label:d.label.split(' ')[0],frac:d.dim.score/100}))}/>
+                      <ScoreBars color={C.teal} axes={dims.map(d=>({label:d.label,frac:d.dim.score/100}))}/>
                     </div>
                   </div>
                   {dims.map(d=>{
