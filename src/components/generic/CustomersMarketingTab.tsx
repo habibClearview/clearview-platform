@@ -85,12 +85,17 @@ interface Lead {
   name: string | null
   contact: string | null
   officer: string | null
+  officer_staff_id: string | null
+  location: string | null
+  business_size: string | null
+  expected_spend: number | null
   stage: Stage
   source: string | null
   notes: string | null
   created_at: string | null
   updated_at: string | null
 }
+interface StaffLite { id: string; full_name: string; staff_code: string; department: string; active: boolean }
 
 function pct(numer: number, denom: number): string {
   if (!denom) return '—'
@@ -110,7 +115,7 @@ export default function CustomersMarketingTab({ config, clientId, cc, P, activit
         {activitiesNode && <button style={navBtn(tab==='activities')} onClick={()=>setTab('activities')}>Marketing activities</button>}
       </div>
 
-      {tab==='funnel'     && <FunnelTab clientId={clientId} P={P} />}
+      {tab==='funnel'     && <FunnelTab clientId={clientId} P={P} cc={cc} />}
       {tab==='customers'  && <CustomersTab clientId={clientId} />}
       {tab==='campaigns'  && <CampaignsTab clientId={clientId} fmt={fmt} />}
       {tab==='activities' && activitiesNode}
@@ -119,7 +124,7 @@ export default function CustomersMarketingTab({ config, clientId, cc, P, activit
 }
 
 // ── 1) FUNNEL ────────────────────────────────────────────────
-function FunnelTab({ clientId, P }: { clientId: string; P: any }) {
+function FunnelTab({ clientId, P, cc }: { clientId: string; P: any; cc: string }) {
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string|null>(null)
@@ -127,20 +132,22 @@ function FunnelTab({ clientId, P }: { clientId: string; P: any }) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [busyId, setBusyId] = useState<string|null>(null)
-  const [form, setForm] = useState({ name:'', contact:'', officer:'', source:'', notes:'' })
+  const [staff, setStaff] = useState<StaffLite[]>([])
+  const [form, setForm] = useState({ name:'', contact:'', officer_staff_id:'', source:'', location:'', business_size:'', expected_spend:'', notes:'' })
 
   async function load() {
     setLoading(true); setError(null)
-    const { data, error } = await supabase
-      .from('customer_leads')
-      .select('*')
-      .eq('client_id', clientId)
-      .order('created_at', { ascending: false })
-    if (error) setError(error.message)
-    else setLeads((data as Lead[]) || [])
+    const [lRes, sRes] = await Promise.all([
+      supabase.from('customer_leads').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+      supabase.from('staff').select('id,full_name,staff_code,department,active').eq('client_id', clientId).eq('active', true).order('full_name', { ascending: true }),
+    ])
+    if (lRes.error) setError(lRes.error.message)
+    else setLeads((lRes.data as Lead[]) || [])
+    if (!sRes.error) setStaff((sRes.data as StaffLite[]) || [])
     setLoading(false)
   }
   useEffect(() => { load() }, [clientId])
+  const staffName = (id: string | null) => staff.find(s => s.id === id)?.full_name || null
 
   const officers = useMemo(() => {
     const set = new Set<string>()
@@ -182,8 +189,14 @@ function FunnelTab({ clientId, P }: { clientId: string; P: any }) {
       client_id: clientId,
       name: form.name.trim() || null,
       contact: form.contact.trim() || null,
-      officer: form.officer.trim() || null,
+      // Store BOTH the staff link (for undisputable per-person KPIs) and the
+      // name (denormalised, so the per-officer breakdown keeps working).
+      officer_staff_id: form.officer_staff_id || null,
+      officer: staffName(form.officer_staff_id) || null,
       source: form.source.trim() || null,
+      location: form.location.trim() || null,
+      business_size: form.business_size.trim() || null,
+      expected_spend: form.expected_spend.trim() === '' ? null : Number(form.expected_spend),
       notes: form.notes.trim() || null,
       stage: 'lead' as Stage,
     }
@@ -191,7 +204,7 @@ function FunnelTab({ clientId, P }: { clientId: string; P: any }) {
     if (error) setError(error.message)
     else if (data) {
       setLeads(prev => [data as Lead, ...prev])
-      setForm({ name:'', contact:'', officer:'', source:'', notes:'' })
+      setForm({ name:'', contact:'', officer_staff_id:'', source:'', location:'', business_size:'', expected_spend:'', notes:'' })
       setShowForm(false)
     }
     setSaving(false)
@@ -229,9 +242,9 @@ function FunnelTab({ clientId, P }: { clientId: string; P: any }) {
       <div style={card}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'1rem',flexWrap:'wrap',marginBottom: (showForm ? '1rem' : 0)}}>
           <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap'}}>
-            <span style={{fontFamily:'monospace',fontSize:'0.96rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.08em'}}>Officer</span>
+            <span style={{fontFamily:'monospace',fontSize:'0.96rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.08em'}}>Recruiter</span>
             <select style={{...inp,width:'auto',minWidth:180}} value={officerFilter} onChange={e=>setOfficerFilter(e.target.value)}>
-              <option value="__all__">All officers</option>
+              <option value="__all__">All recruiters</option>
               {officers.map(o => <option key={o} value={o}>{o}</option>)}
               <option value="__none__">Unassigned</option>
             </select>
@@ -242,11 +255,19 @@ function FunnelTab({ clientId, P }: { clientId: string; P: any }) {
         {showForm && (
           <div style={{borderTop:`1px solid ${C.border}`,paddingTop:'1rem'}}>
             <div style={fGrid}>
-              <div><label style={lbl}>Name</label><input style={inp} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Lead / contact person"/></div>
+              <div><label style={lbl}>Name</label><input style={inp} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Customer / business name"/></div>
               <div><label style={lbl}>Contact</label><input style={inp} value={form.contact} onChange={e=>setForm(f=>({...f,contact:e.target.value}))} placeholder="Phone or email"/></div>
-              <div><label style={lbl}>Officer</label><input style={inp} list="cm-officer-list" value={form.officer} onChange={e=>setForm(f=>({...f,officer:e.target.value}))} placeholder="Salesperson / marketer"/>
-                <datalist id="cm-officer-list">{officers.map(o=><option key={o} value={o}/>)}</datalist>
+              <div><label style={lbl}>Recruited by</label>
+                {staff.length === 0
+                  ? <input style={{...inp,background:'var(--cv-alt)'}} disabled value="Add staff first (HR › Staff)"/>
+                  : <select style={inp} value={form.officer_staff_id} onChange={e=>setForm(f=>({...f,officer_staff_id:e.target.value}))}>
+                      <option value="">— unassigned —</option>
+                      {staff.map(s=><option key={s.id} value={s.id}>{s.full_name} ({s.staff_code})</option>)}
+                    </select>}
               </div>
+              <div><label style={lbl}>Location</label><input style={inp} value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))} placeholder="Town / area"/></div>
+              <div><label style={lbl}>Business size</label><input style={inp} value={form.business_size} onChange={e=>setForm(f=>({...f,business_size:e.target.value}))} placeholder="e.g. Small kiosk, Large farm"/></div>
+              <div><label style={lbl}>Expected spend / month</label><input style={inp} type="number" inputMode="numeric" value={form.expected_spend} onChange={e=>setForm(f=>({...f,expected_spend:e.target.value}))} placeholder={`${cc} per month`}/></div>
               <div><label style={lbl}>Source</label><input style={inp} value={form.source} onChange={e=>setForm(f=>({...f,source:e.target.value}))} placeholder="e.g. Field day, Referral"/></div>
               <div style={{gridColumn:'1/-1'}}><label style={lbl}>Notes</label><textarea style={{...inp,minHeight:56,resize:'vertical'}} value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/></div>
             </div>
@@ -260,7 +281,7 @@ function FunnelTab({ clientId, P }: { clientId: string; P: any }) {
 
       {/* Per-officer breakdown */}
       <div style={card}>
-        <div style={secH}>Funnel by Officer</div>
+        <div style={secH}>Conversion by Recruiter</div>
         {loading ? <Spinner/> : byOfficer.length === 0 ? (
           <Empty>No leads recorded yet. Add a lead above to start tracking the funnel per officer.</Empty>
         ) : (
@@ -268,8 +289,8 @@ function FunnelTab({ clientId, P }: { clientId: string; P: any }) {
             <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem'}}>
               <thead>
                 <tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
-                  {['Officer','Leads','Prospects','Clients','Total','Lead→Prospect','Prospect→Client','Overall'].map(h=>(
-                    <th key={h} style={{padding:'8px 10px',textAlign:h==='Officer'?'left':'right',fontWeight:600,fontSize:'1.0rem',whiteSpace:'nowrap'}}>{h}</th>
+                  {['Recruiter','Leads','Prospects','Clients','Total','Lead→Prospect','Prospect→Client','Overall'].map(h=>(
+                    <th key={h} style={{padding:'8px 10px',textAlign:h==='Recruiter'?'left':'right',fontWeight:600,fontSize:'1.0rem',whiteSpace:'nowrap'}}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -307,7 +328,14 @@ function FunnelTab({ clientId, P }: { clientId: string; P: any }) {
                   <div style={{minWidth:180}}>
                     <div style={{fontWeight:600,fontSize:'1.06rem',color:C.navy}}>{l.name || l.contact || 'Unnamed lead'}</div>
                     <div style={{fontSize:'0.96rem',color:C.slate}}>
-                      {[l.officer && `Officer: ${l.officer}`, l.contact && l.name ? l.contact : null, l.source && `via ${l.source}`].filter(Boolean).join(' · ') || '—'}
+                      {[
+                        l.officer && `Recruited by ${l.officer}`,
+                        l.contact && l.name ? l.contact : null,
+                        l.location && `at ${l.location}`,
+                        l.business_size,
+                        l.expected_spend != null && `~${cc} ${Math.round(l.expected_spend).toLocaleString()}/mo expected`,
+                        l.source && `via ${l.source}`,
+                      ].filter(Boolean).join(' · ') || '—'}
                     </div>
                   </div>
                   <div style={{display:'flex',gap:'0.5rem',alignItems:'center',flexWrap:'wrap'}}>
