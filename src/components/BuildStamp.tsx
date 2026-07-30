@@ -10,7 +10,7 @@
 // Bump BUILD_STAMP on every change you want to be able to verify
 // landed. Keep it short and unmistakable.
 // ============================================================
-export const BUILD_STAMP = 'BUILD 2026-07-30 · CODE R186 (Funnel: staff-linked recruiter + recruitment details + per-recruiter conversion)'
+export const BUILD_STAMP = 'BUILD 2026-07-30 · CODE R187 (staging: field-app referred-by at till + sales credited to recruiter)'
 
 export default function BuildStamp() {
   return (

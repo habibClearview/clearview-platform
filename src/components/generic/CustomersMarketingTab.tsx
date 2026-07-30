@@ -133,6 +133,7 @@ function FunnelTab({ clientId, P, cc }: { clientId: string; P: any; cc: string }
   const [saving, setSaving] = useState(false)
   const [busyId, setBusyId] = useState<string|null>(null)
   const [staff, setStaff] = useState<StaffLite[]>([])
+  const [credited, setCredited] = useState<Record<string, number>>({})   // staff_id → sales value credited (referred-by at the till)
   const [form, setForm] = useState({ name:'', contact:'', officer_staff_id:'', source:'', location:'', business_size:'', expected_spend:'', notes:'' })
 
   async function load() {
@@ -144,6 +145,17 @@ function FunnelTab({ clientId, P, cc }: { clientId: string; P: any; cc: string }
     if (lRes.error) setError(lRes.error.message)
     else setLeads((lRes.data as Lead[]) || [])
     if (!sRes.error) setStaff((sRes.data as StaffLite[]) || [])
+    // Sales credited to recruiters via the field-app "who sent this customer?"
+    // pick. Tolerant: the referred_by_staff_id column may not exist yet (its
+    // migration pending) — on any error we just show no credited sales.
+    const { data: ftx, error: ftxErr } = await supabase
+      .from('field_transactions').select('referred_by_staff_id, amount')
+      .eq('client_id', clientId).eq('transaction_type', 'sale').not('referred_by_staff_id', 'is', null)
+    if (!ftxErr && ftx) {
+      const m: Record<string, number> = {}
+      ftx.forEach((r: any) => { if (r.referred_by_staff_id) m[r.referred_by_staff_id] = (m[r.referred_by_staff_id] || 0) + Number(r.amount || 0) })
+      setCredited(m)
+    } else setCredited({})
     setLoading(false)
   }
   useEffect(() => { load() }, [clientId])
@@ -313,6 +325,32 @@ function FunnelTab({ clientId, P, cc }: { clientId: string; P: any; cc: string }
           </div>
         )}
       </div>
+
+      {/* Sales credited to recruiters (field-app "who sent this customer?") */}
+      {Object.keys(credited).length > 0 && (
+        <div style={card}>
+          <div style={secH}>Sales credited to recruiters</div>
+          <p style={{fontSize:'0.96rem',color:C.slate,marginBottom:'0.75rem'}}>Value of field-app sales where the shopkeeper tagged the recruiter who sent the customer — the sales credit that follows the person who recruited them.</p>
+          <div style={{overflowX:'auto'}}>
+            <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem'}}>
+              <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
+                <th style={{padding:'8px 10px',textAlign:'left',fontWeight:600}}>Recruiter</th>
+                <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600}}>Sales credited</th>
+              </tr></thead>
+              <tbody>
+                {Object.entries(credited).map(([sid,amt])=>({ name: staffName(sid) || '(removed staff)', amt }))
+                  .sort((a,b)=>b.amt-a.amt)
+                  .map((r,i)=>(
+                    <tr key={i} style={{background:i%2===0?C.cream:C.white}}>
+                      <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{r.name}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',color:C.green,fontWeight:700}}>{cc} {Math.round(r.amt).toLocaleString()}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Lead list with stage advance */}
       <div style={card}>

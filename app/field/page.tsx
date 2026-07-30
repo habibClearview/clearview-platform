@@ -56,6 +56,7 @@ interface AuthData {
   cost_lines: CostLine[]
   customers: Customer[]
   segments?: { id:string; name:string }[]
+  staff?: { id:string; full_name:string; staff_code:string; department:string }[]
 }
 // A sale queued from the catalogue: operator picked an item and a volume.
 // Price is never entered by the operator -- it's the catalogue's price,
@@ -93,7 +94,7 @@ export default function FieldCapturePage() {
   const [receiveQty, setReceiveQty] = useState('')
   const [receiving, setReceiving] = useState(false)
   const [selectedItem, setSelectedItem] = useState<CatalogueItem|null>(null)
-  const [saleForm, setSaleForm] = useState({quantity:'', payment_method:'cash', customer_id:'', segment_id:'', notes:'', override:false, override_price:''})
+  const [saleForm, setSaleForm] = useState({quantity:'', payment_method:'cash', customer_id:'', segment_id:'', referred_by_staff_id:'', notes:'', override:false, override_price:''})
   const [costForm, setCostForm] = useState({plan_line_id:'', amount:'', notes:'', description:''})
   const [search, setSearch] = useState('')
   const [queueOpen, setQueueOpen] = useState(false)
@@ -229,7 +230,7 @@ export default function FieldCapturePage() {
   function openSaleDetail(item: CatalogueItem) {
     setSelectedItem(item)
     setEditingSaleId(null)
-    setSaleForm({quantity:'', payment_method:'cash', customer_id:'', segment_id:'', notes:'', override:false, override_price:String(item.price)})
+    setSaleForm({quantity:'', payment_method:'cash', customer_id:'', segment_id:'', referred_by_staff_id:'', notes:'', override:false, override_price:String(item.price)})
     setMode('sale-detail')
   }
 
@@ -243,7 +244,7 @@ export default function FieldCapturePage() {
     setEditingSaleId(q.local_id)
     setSaleForm({
       quantity: String(q.quantity), payment_method: q.payment_method||'cash',
-      customer_id: q.customer_id||'', segment_id: q.segment_id||'', notes: q.notes||'',
+      customer_id: q.customer_id||'', segment_id: q.segment_id||'', referred_by_staff_id: q.referred_by_staff_id||'', notes: q.notes||'',
       override: q.override_price!==undefined, override_price: String(q.override_price ?? item.price),
     })
     setMode('sale-detail')
@@ -268,6 +269,7 @@ export default function FieldCapturePage() {
       payment_method: saleForm.payment_method || undefined,
       customer_id: saleForm.customer_id || undefined,
       segment_id: saleForm.segment_id || undefined,
+      referred_by_staff_id: saleForm.referred_by_staff_id || undefined,
       transaction_date: new Date().toISOString().split('T')[0],
       notes: saleForm.notes || undefined,
     }
@@ -336,7 +338,7 @@ export default function FieldCapturePage() {
           local_id: s.local_id,
           catalogue_item_id: s.catalogue_item_id, quantity: s.quantity,
           override_price: s.override_price, payment_method: s.payment_method,
-          customer_id: s.customer_id, segment_id: s.segment_id, transaction_date: s.transaction_date, notes: s.notes,
+          customer_id: s.customer_id, segment_id: s.segment_id, referred_by_staff_id: s.referred_by_staff_id, transaction_date: s.transaction_date, notes: s.notes,
           // Real moment of sale (from the offline queue), so a mobile-money sale
           // can be matched to its payment on a time window later. transaction_date
           // is day-only and synced_at is end-of-day, so neither would work.
@@ -861,6 +863,15 @@ export default function FieldCapturePage() {
                   <select style={inp} value={saleForm.customer_id} onChange={e=>setSaleForm(f=>({...f,customer_id:e.target.value}))}>
                     <option value="">None</option>
                     {auth.customers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </>
+              )}
+              {(auth.staff?.length||0)>0 && (
+                <>
+                  <label style={lbl}>Who sent this customer? (optional)</label>
+                  <select style={inp} value={saleForm.referred_by_staff_id} onChange={e=>setSaleForm(f=>({...f,referred_by_staff_id:e.target.value}))}>
+                    <option value="">Nobody / walk-in</option>
+                    {auth.staff!.map(s=><option key={s.id} value={s.id}>{s.full_name} ({s.staff_code})</option>)}
                   </select>
                 </>
               )}

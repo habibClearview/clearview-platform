@@ -29,6 +29,11 @@ export interface QueuedSale {
   payment_method?: string
   customer_id?: string
   segment_id?: string
+  // Which staff member (an S&M recruiter) referred this customer. Optional,
+  // non-indexed — it rides along in the stored object, so adding it needs NO
+  // Dexie version bump and NO service-worker change (the SW forwards the whole
+  // queued object to /api/field/sync untouched).
+  referred_by_staff_id?: string
   transaction_date: string
   notes?: string
   queued_at: number

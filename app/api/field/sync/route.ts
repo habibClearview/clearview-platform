@@ -80,6 +80,19 @@ export async function POST(req: NextRequest) {
           validSegmentIds = new Set((segRows || []).map((r: any) => r.id))
         }
 
+        // Validate referred-by staff the same way: the id must be a staff row
+        // belonging to THIS operator's client. A browser-supplied id that isn't
+        // is stored as null (never trusted / cross-tenant), not rejected — the
+        // sale is still valid, it just isn't credited to a recruiter.
+        const referrerIds = Array.from(new Set(saleEntries.map((t: any) => t.referred_by_staff_id).filter(Boolean)))
+        let validReferrerIds = new Set<string>()
+        if (referrerIds.length > 0) {
+          const { data: stf, error: stfErr } = await supabase
+            .from('staff').select('id').in('id', referrerIds).eq('client_id', operator.client_id)
+          if (stfErr) errors.push(`Referrer lookup error: ${stfErr.message}`)
+          validReferrerIds = new Set((stf || []).map((r: any) => r.id))
+        }
+
         for (const t of saleEntries) {
           const item = catalogueById.get(t.catalogue_item_id)
           if (!item) { errors.push(`Unknown or inactive catalogue item: ${t.catalogue_item_id}`); continue }
@@ -110,6 +123,7 @@ export async function POST(req: NextRequest) {
             payment_method: t.payment_method || null,
             customer_id: t.customer_id || null,
             segment_id: (t.segment_id && validSegmentIds.has(t.segment_id)) ? t.segment_id : null,
+            referred_by_staff_id: (t.referred_by_staff_id && validReferrerIds.has(t.referred_by_staff_id)) ? t.referred_by_staff_id : null,
             transaction_date: t.transaction_date || new Date().toISOString().split('T')[0],
             // Real capture time from the field queue; enables payment
             // reconciliation on a time window. Nullable -- older clients that
@@ -258,6 +272,16 @@ export async function POST(req: NextRequest) {
         // segment-tagged until the migration runs.
         if (txErr && (txErr as any).code === '42703' && /segment_id/i.test(txErr.message || '')) {
           const stripped = rows.map(({ segment_id, ...rest }: any) => rest)
+          ;({ data: insertedTx, error: txErr } = await supabase
+            .from('field_transactions')
+            .upsert(stripped, { onConflict: 'client_id,local_id', ignoreDuplicates: true })
+            .select('id'))
+        }
+        // Same fallback for referred_by_staff_id: if 2026_07_30_field_referred_by
+        // hasn't been applied yet, strip it and retry so sales still sync (they
+        // just aren't credited to a recruiter until the migration runs).
+        if (txErr && (txErr as any).code === '42703' && /referred_by_staff_id/i.test(txErr.message || '')) {
+          const stripped = rows.map(({ referred_by_staff_id, ...rest }: any) => rest)
           ;({ data: insertedTx, error: txErr } = await supabase
             .from('field_transactions')
             .upsert(stripped, { onConflict: 'client_id,local_id', ignoreDuplicates: true })

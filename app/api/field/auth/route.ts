@@ -75,6 +75,17 @@ export async function POST(req: NextRequest) {
       .eq('active', true)
       .order('sort_order')
 
+    // Active staff for this client — the field app offers these as the
+    // "Referred by" options at the till, so a sale can credit the recruiter.
+    // Tolerant of the staff table not existing yet (older environments): a
+    // failure just yields an empty list, the picker hides itself.
+    const { data: staff } = await supabase
+      .from('staff')
+      .select('id, full_name, staff_code, department')
+      .eq('client_id', operator.client_id)
+      .eq('active', true)
+      .order('full_name')
+
     return NextResponse.json({
       operator: {
         id: operator.id,
@@ -94,6 +105,7 @@ export async function POST(req: NextRequest) {
       cost_lines: costLines,
       customers: customers || [],
       segments: segments || [],
+      staff: staff || [],
       authenticated_at: new Date().toISOString(),
     })
 
