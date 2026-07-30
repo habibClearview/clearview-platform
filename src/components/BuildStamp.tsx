@@ -10,7 +10,7 @@
 // Bump BUILD_STAMP on every change you want to be able to verify
 // landed. Keep it short and unmistakable.
 // ============================================================
-export const BUILD_STAMP = 'BUILD 2026-07-30 · CODE R188 (KPI Scorecards — per-staff trend vs target, no migration)'
+export const BUILD_STAMP = 'BUILD 2026-07-30 · CODE R189 (Attendance register — mark present/late/absent, monthly on-time rate)'
 
 export default function BuildStamp() {
   return (
