@@ -65,12 +65,13 @@ insert into departments (client_id, name, kind, sort_order)
   select id, 'Operations', 'service', 2 from engagement_clients
   on conflict (client_id, lower(name)) do nothing;
 
--- Migrate existing staff from the internal codes to the display names so they
--- line up with departments.name.
-update staff set department = 'Sales & Marketing' where department = 'sales_marketing';
-update staff set department = 'Operations'        where department = 'operations';
-
--- Relax the old 2-value CHECK so any client-defined department name is allowed;
--- keep NOT NULL, refresh the default to a friendly name.
+-- Relax the old 2-value CHECK FIRST — otherwise renaming the rows below to the
+-- display names ("Sales & Marketing") would violate the still-active constraint.
+-- Keep NOT NULL; refresh the default to a friendly name.
 alter table staff drop constraint if exists staff_department_check;
 alter table staff alter column department set default 'Sales & Marketing';
+
+-- Now migrate existing staff from the internal codes to the display names so
+-- they line up with departments.name.
+update staff set department = 'Sales & Marketing' where department = 'sales_marketing';
+update staff set department = 'Operations'        where department = 'operations';
