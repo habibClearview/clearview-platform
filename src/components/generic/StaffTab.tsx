@@ -1,32 +1,25 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────
-// BUSINESS › Staff  (per-client dashboard section)
+// BUSINESS › Staff  (Human Resources — per-client dashboard section)
 //
 // The canonical people roster for a client's business — the single list
-// that every other feature attributes work to. Before this, staff identity
-// was fragmented across field_operators (uuid), user_profiles (uuid) and
-// free-text names (op_deliveries.handled_by, customer_leads.officer, …),
-// which collide and cannot carry a target or a department.
+// that every other feature attributes work to.
 //
-// Two departments, matching how the businesses actually run:
-//   • Sales & Marketing — the outbound team who RECRUIT customers (they
-//                         SOURCE a customer). Measured on new customers and
-//                         conversion.
-//   • Operations        — shopkeepers / till staff who SERVE a sale.
-//                         Measured on sales, sales-to-target and repeat
-//                         business.
+// Departments are now CLIENT-DEFINED (table `departments`): each business
+// names its own — Finance, Marketing, whatever suits them — and the roster
+// groups staff under them. Two starter departments (Sales & Marketing,
+// Operations) are seeded, but the client can add/rename/remove freely.
+// staff.department holds the department NAME (kept in step with the list).
 //
-// Targets are effective-dated and per-metric (staff_targets), NOT a single
-// number on the person: these are growing businesses that raise targets
-// monthly — sometimes weekly in season — and each period must be graded
-// against the target that applied then. Raising a target = add a new dated
-// row; the old one still governs the periods it covered.
+// Targets are effective-dated + per-metric (staff_targets), raised any time;
+// each period is graded against the target that applied then, so performance
+// is undisputable numbers.
 //
 // Backed by:
-//   supabase/migrations/2026_07_28_staff.sql          (table `staff`)
-//   supabase/migrations/2026_07_28_staff_targets.sql  (table `staff_targets`)
-// Both client-scoped via RLS; created_by_uid defaults to auth.uid().
+//   supabase/migrations/2026_07_28_staff.sql          (staff)
+//   supabase/migrations/2026_07_28_staff_targets.sql  (staff_targets)
+//   supabase/migrations/2026_07_29_departments.sql    (departments)
 //
 // Prop contract (wired in by GenericDashboard): { config, clientId, cc, P }
 // ─────────────────────────────────────────────────────────────
@@ -71,35 +64,22 @@ function Badge({ text, tone }: { text: string; tone: string }) {
 }
 
 // ── Types ────────────────────────────────────────────────────
-type Department = 'operations' | 'sales_marketing'
 type Metric =
   | 'new_customers' | 'lead_conversion' | 'prospect_conversion'
   | 'sales_value' | 'sales_count' | 'repeat_rate' | 'attendance_rate' | 'custom'
 type Period = 'weekly' | 'monthly' | 'quarterly'
 
+interface Department { id: string; name: string; kind: string | null; sort_order: number; active: boolean }
 interface Staff {
-  id: string
-  staff_code: string
-  full_name: string
-  department: Department
-  phone: string | null
-  active: boolean
-  notes: string | null
-  created_at: string
+  id: string; staff_code: string; full_name: string; department: string
+  phone: string | null; active: boolean; notes: string | null; created_at: string
 }
 interface Target {
-  id: string
-  staff_id: string
-  metric: Metric
-  metric_label: string | null
-  target_value: number
-  period: Period
-  effective_from: string
-  notes: string | null
-  created_at: string
+  id: string; staff_id: string; metric: Metric; metric_label: string | null
+  target_value: number; period: Period; effective_from: string; notes: string | null; created_at: string
 }
 
-// ── Metric config (numeric, objective — no free-text scores) ──
+// ── Metric config (numeric, objective) ───────────────────────
 type MetricKind = 'count' | 'percent' | 'value'
 const METRIC: Record<Metric, { label: string; kind: MetricKind; unit?: string }> = {
   new_customers:       { label: 'New customers',        kind: 'count',   unit: 'customers' },
@@ -111,47 +91,41 @@ const METRIC: Record<Metric, { label: string; kind: MetricKind; unit?: string }>
   attendance_rate:     { label: 'On-time attendance',   kind: 'percent' },
   custom:              { label: 'Custom',               kind: 'count' },
 }
-// Which metrics a manager can set per department (first = default).
-const METRICS_FOR: Record<Department, Metric[]> = {
-  sales_marketing: ['new_customers', 'lead_conversion', 'prospect_conversion', 'sales_value', 'custom'],
-  operations:      ['sales_value', 'sales_count', 'repeat_rate', 'attendance_rate', 'custom'],
-}
+// Any department can be given any target — the manager picks what's relevant.
+const ALL_METRICS: Metric[] = ['new_customers', 'lead_conversion', 'prospect_conversion', 'sales_value', 'sales_count', 'repeat_rate', 'attendance_rate', 'custom']
 const PERIODS: Period[] = ['weekly', 'monthly', 'quarterly']
 const perWord = (p: Period) => (p === 'monthly' ? 'mo' : p === 'weekly' ? 'wk' : 'qtr')
-
-const DEPT_LABEL: Record<Department, string> = { sales_marketing: 'Sales & Marketing', operations: 'Operations' }
-const DEPT_BLURB: Record<Department, string> = {
-  sales_marketing: 'Go out and recruit customers — measured on new customers won and conversion rates.',
-  operations: 'Run the shop and serve sales — measured on sales, sales-to-target and repeat business.',
-}
-
+const TONES = ['var(--cv-cyan)', 'var(--cv-amber)', 'var(--cv-green)', 'var(--cv-purple, #8B5CF6)', 'var(--cv-teal, #14B8A6)', 'var(--cv-red)']
 const TODAY = new Date().toISOString().slice(0, 10)
 
-// Human-readable target, e.g. "≥ 12 customers/mo" · "≥ 60%/mo" · "≥ NGN 150,000/mo".
 function fmtTarget(t: Target, cc: string): string {
-  const m = METRIC[t.metric]
-  const per = perWord(t.period)
+  const m = METRIC[t.metric]; const per = perWord(t.period)
   const label = t.metric === 'custom' ? (t.metric_label || 'target') : m.label.toLowerCase()
   if (m.kind === 'percent') return `${m.label}: ≥ ${t.target_value}%/${per}`
   if (m.kind === 'value') return `${m.label}: ≥ ${cc ? cc + ' ' : ''}${Number(t.target_value).toLocaleString()}/${per}`
   const unit = t.metric === 'custom' ? label : (m.unit || '')
   return `${t.metric === 'custom' ? label : m.label}: ≥ ${Number(t.target_value).toLocaleString()} ${unit}/${per}`
 }
-
-// Current target per metric = latest row with effective_from <= today.
 function currentTargets(all: Target[]): Target[] {
   const byMetric = new Map<Metric, Target>()
   for (const t of all) {
-    if (t.effective_from > TODAY) continue          // future-dated: not in force yet
+    if (t.effective_from > TODAY) continue
     const prev = byMetric.get(t.metric)
     if (!prev || t.effective_from > prev.effective_from) byMetric.set(t.metric, t)
   }
   return Array.from(byMetric.values())
 }
-
-// Suggest the next stable code for a department: SM01, SM02 … / OP01 …
-function suggestCode(dept: Department, all: Staff[]): string {
-  const prefix = dept === 'sales_marketing' ? 'SM' : 'OP'
+// Stable staff code prefix from a department name: initials, e.g.
+// "Sales & Marketing" → SM, "Operations" → OP, "Finance" → FI.
+function deptPrefix(name: string): string {
+  const words = (name || '').trim().split(/\s+/).filter(w => /[a-z]/i.test(w))
+  let p = 'ST'
+  if (words.length >= 2) p = words[0][0] + words[1][0]
+  else if (words.length === 1) p = words[0].slice(0, 2)
+  return (p.toUpperCase().replace(/[^A-Z]/g, '') || 'ST')
+}
+function suggestCode(deptName: string, all: Staff[]): string {
+  const prefix = deptPrefix(deptName)
   let max = 0
   for (const s of all) {
     const m = (s.staff_code || '').toUpperCase().match(new RegExp(`^${prefix}(\\d+)$`))
@@ -165,26 +139,38 @@ export default function StaffTab({ config, clientId, cc, P }: any) {
   void config
   const currency = cc || ''
   const [rows, setRows] = useState<Staff[]>([])
+  const [depts, setDepts] = useState<Department[]>([])
   const [targets, setTargets] = useState<Target[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
-  const [editing, setEditing] = useState<string | null>(null)   // staff id, or 'new'
-  const [targetsFor, setTargetsFor] = useState<string | null>(null) // staff id whose targets panel is open
+  const [editing, setEditing] = useState<string | null>(null)      // staff id, or 'new'
+  const [targetsFor, setTargetsFor] = useState<string | null>(null)
   const canManage = !!(P?.canManageTeam ?? true)
 
   async function load() {
     setLoading(true); setErr(null)
     try {
-      const [sRes, tRes] = await Promise.all([
-        supabase.from('staff').select('*').eq('client_id', clientId)
-          .order('department', { ascending: true }).order('staff_code', { ascending: true }),
-        supabase.from('staff_targets').select('*').eq('client_id', clientId)
-          .order('effective_from', { ascending: false }),
+      let [sRes, tRes, dRes] = await Promise.all([
+        supabase.from('staff').select('*').eq('client_id', clientId).order('staff_code', { ascending: true }),
+        supabase.from('staff_targets').select('*').eq('client_id', clientId).order('effective_from', { ascending: false }),
+        supabase.from('departments').select('*').eq('client_id', clientId).order('sort_order', { ascending: true }).order('name', { ascending: true }),
       ])
       if (sRes.error) throw sRes.error
       if (tRes.error) throw tRes.error
+      if (dRes.error) throw dRes.error
+      // Seed the two starter departments if this client has none yet (covers
+      // clients created after the migration). Unique index makes it safe.
+      if (((dRes.data as Department[]) || []).length === 0 && canManage) {
+        await supabase.from('departments').insert([
+          { client_id: clientId, name: 'Sales & Marketing', kind: 'sales', sort_order: 1 },
+          { client_id: clientId, name: 'Operations', kind: 'service', sort_order: 2 },
+        ])
+        const re = await supabase.from('departments').select('*').eq('client_id', clientId).order('sort_order', { ascending: true })
+        if (!re.error) dRes = re
+      }
       setRows((sRes.data as Staff[]) || [])
       setTargets((tRes.data as Target[]) || [])
+      setDepts((dRes.data as Department[]) || [])
     } catch (e: any) {
       setErr(e?.message || 'Could not load the staff roster.')
     } finally {
@@ -199,20 +185,21 @@ export default function StaffTab({ config, clientId, cc, P }: any) {
     return m
   }, [targets])
 
-  const byDept = useMemo(() => ({
-    sales_marketing: rows.filter(r => r.department === 'sales_marketing'),
-    operations: rows.filter(r => r.department === 'operations'),
-  }), [rows])
+  const activeDepts = depts.filter(d => d.active)
+  // Staff whose department no longer matches any active department (e.g. a
+  // department was removed) surface under "Unassigned" so no one vanishes.
+  const knownNames = new Set(depts.map(d => d.name.toLowerCase()))
+  const orphanStaff = rows.filter(r => !r.department || !knownNames.has(r.department.toLowerCase()))
 
   return (
     <div>
       <div style={{ marginBottom: '1rem' }}>
         <div style={H('1.35rem')}>Staff</div>
-        <div style={{ color: C.slate, fontSize: '0.9rem', marginTop: 4, maxWidth: 740 }}>
-          One roster for everyone in the business, split into the two departments that run it.
-          Each person has a stable code and dated targets. Targets can be raised any time —
-          each period is scored against the target that applied then, so performance is
-          undisputable numbers, never opinion.
+        <div style={{ color: C.slate, fontSize: '0.9rem', marginTop: 4, maxWidth: 760 }}>
+          Everyone in the business, grouped by <strong>your own departments</strong> — name them
+          however suits you. Each person has a stable code and dated targets; targets can be raised
+          any time and each period is scored against the target that applied then, so performance is
+          undisputable numbers.
         </div>
       </div>
 
@@ -222,53 +209,162 @@ export default function StaffTab({ config, clientId, cc, P }: any) {
         <div style={{ ...CARD, color: C.slate, textAlign: 'center' }}>Loading…</div>
       ) : (
         <>
+          {canManage && <DepartmentsManager depts={depts} rows={rows} clientId={clientId} onChanged={load} />}
+
           {canManage && editing !== 'new' && (
-            <button onClick={() => { setEditing('new'); setTargetsFor(null) }} style={{ ...btn(C.cyan, true), marginBottom: '1.1rem' }}>
+            <button onClick={() => { setEditing('new'); setTargetsFor(null) }}
+              disabled={activeDepts.length === 0}
+              title={activeDepts.length === 0 ? 'Add a department first' : ''}
+              style={{ ...btn(C.cyan, true), marginBottom: '1.1rem', opacity: activeDepts.length === 0 ? 0.5 : 1 }}>
               + Add a person
             </button>
           )}
           {editing === 'new' && (
-            <StaffForm clientId={clientId} allRows={rows}
+            <StaffForm clientId={clientId} allRows={rows} depts={activeDepts}
               onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />
           )}
 
-          {(['sales_marketing', 'operations'] as Department[]).map(dept => (
+          {activeDepts.map((dept, i) => (
             <DeptSection
-              key={dept} dept={dept} rows={byDept[dept]} currency={currency} clientId={clientId}
-              canManage={canManage} allRows={rows} targetsByStaff={targetsByStaff}
-              editing={editing} setEditing={setEditing}
-              targetsFor={targetsFor} setTargetsFor={setTargetsFor}
-              onChanged={load} createdBy={P?.userId}
+              key={dept.id} deptName={dept.name} tone={TONES[i % TONES.length]}
+              rows={rows.filter(r => r.department && r.department.toLowerCase() === dept.name.toLowerCase())}
+              currency={currency} clientId={clientId} canManage={canManage} allRows={rows} depts={activeDepts}
+              targetsByStaff={targetsByStaff} editing={editing} setEditing={setEditing}
+              targetsFor={targetsFor} setTargetsFor={setTargetsFor} onChanged={load}
             />
           ))}
+          {orphanStaff.length > 0 && (
+            <DeptSection
+              deptName="Unassigned" tone={C.slate} rows={orphanStaff} currency={currency} clientId={clientId}
+              canManage={canManage} allRows={rows} depts={activeDepts} targetsByStaff={targetsByStaff}
+              editing={editing} setEditing={setEditing} targetsFor={targetsFor} setTargetsFor={setTargetsFor}
+              onChanged={load}
+            />
+          )}
         </>
       )}
     </div>
   )
 }
 
+// ── Departments manager ──────────────────────────────────────
+function DepartmentsManager({ depts, rows, clientId, onChanged }: {
+  depts: Department[]; rows: Staff[]; clientId: string; onChanged: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [msg, setMsg] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const countFor = (name: string) => rows.filter(r => r.department && r.department.toLowerCase() === name.toLowerCase()).length
+
+  async function add() {
+    const name = newName.trim()
+    if (!name) { setMsg('Type a department name.'); return }
+    if (depts.some(d => d.name.toLowerCase() === name.toLowerCase())) { setMsg(`"${name}" already exists.`); return }
+    setBusy(true); setMsg(null)
+    const { error } = await supabase.from('departments').insert({ client_id: clientId, name, sort_order: depts.length + 1 })
+    setBusy(false)
+    if (error) { setMsg(error.message); return }
+    setNewName(''); onChanged()
+  }
+  async function rename(d: Department) {
+    const name = editName.trim()
+    if (!name) { setMsg('Name cannot be empty.'); return }
+    if (depts.some(x => x.id !== d.id && x.name.toLowerCase() === name.toLowerCase())) { setMsg(`"${name}" already exists.`); return }
+    setBusy(true); setMsg(null)
+    // Rename the department AND every staff member sitting in it (department is
+    // stored as the name), so the group keeps its people.
+    const r1 = await supabase.from('departments').update({ name, updated_at: new Date().toISOString() }).eq('id', d.id)
+    if (r1.error) { setBusy(false); setMsg(r1.error.message); return }
+    await supabase.from('staff').update({ department: name }).eq('client_id', clientId).eq('department', d.name)
+    setBusy(false); setEditId(null); setEditName(''); onChanged()
+  }
+  async function remove(d: Department) {
+    const n = countFor(d.name)
+    if (n > 0) { setMsg(`Move or remove the ${n} person(s) in "${d.name}" first.`); return }
+    if (!window.confirm(`Remove the "${d.name}" department?`)) return
+    setBusy(true); setMsg(null)
+    const { error } = await supabase.from('departments').delete().eq('id', d.id)
+    setBusy(false)
+    if (error) { setMsg(error.message); return }
+    onChanged()
+  }
+
+  return (
+    <div style={{ ...CARD, background: C.cream }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setOpen(o => !o)}>
+        <div style={H('1.05rem')}>Departments <span style={{ ...LABEL, fontSize: '0.7rem' }}>· {depts.length}</span></div>
+        <button style={btn(C.cyan)}>{open ? 'Close' : 'Manage departments'}</button>
+      </div>
+      {open && (
+        <div style={{ marginTop: '0.9rem' }}>
+          <div style={{ color: C.slate, fontSize: '0.84rem', marginBottom: '0.8rem' }}>
+            Name your departments however suits this business. Staff and their targets sit under these.
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.9rem' }}>
+            <input style={{ ...inputStyle, minWidth: 200 }} value={newName} onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') add() }} placeholder="e.g. Finance, Logistics, Procurement…" />
+            <button onClick={add} disabled={busy} style={btn(C.green, true)}>+ Add department</button>
+          </div>
+          {msg && <div style={{ color: C.red, fontSize: '0.82rem', marginBottom: '0.7rem' }}>{msg}</div>}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 420 }}>
+              <thead><tr><th style={th}>Department</th><th style={th}>People</th><th style={th}></th></tr></thead>
+              <tbody>
+                {depts.map(d => (
+                  <tr key={d.id}>
+                    <td style={td}>
+                      {editId === d.id
+                        ? <input autoFocus style={{ ...inputStyle, width: '100%' }} value={editName} onChange={e => setEditName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') rename(d); if (e.key === 'Escape') setEditId(null) }} />
+                        : <span style={{ fontWeight: 600 }}>{d.name}</span>}
+                    </td>
+                    <td style={{ ...td, fontFamily: 'monospace' }}>{countFor(d.name)}</td>
+                    <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                      {editId === d.id ? (
+                        <>
+                          <button onClick={() => rename(d)} disabled={busy} style={{ ...btn(C.green, true), marginRight: 6 }}>Save</button>
+                          <button onClick={() => setEditId(null)} style={btn(C.slate)}>Cancel</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => { setEditId(d.id); setEditName(d.name); setMsg(null) }} style={{ ...btn(C.cyan), marginRight: 6 }}>Rename</button>
+                          <button onClick={() => remove(d)} style={btn(C.red)}>Remove</button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── One department block ─────────────────────────────────────
-function DeptSection({ dept, rows, currency, clientId, canManage, allRows, targetsByStaff, editing, setEditing, targetsFor, setTargetsFor, onChanged }: {
-  dept: Department; rows: Staff[]; currency: string; clientId: string; canManage: boolean
-  allRows: Staff[]; targetsByStaff: Map<string, Target[]>
+function DeptSection({ deptName, tone, rows, currency, clientId, canManage, allRows, depts, targetsByStaff, editing, setEditing, targetsFor, setTargetsFor, onChanged }: {
+  deptName: string; tone: string; rows: Staff[]; currency: string; clientId: string; canManage: boolean
+  allRows: Staff[]; depts: Department[]; targetsByStaff: Map<string, Target[]>
   editing: string | null; setEditing: (v: string | null) => void
-  targetsFor: string | null; setTargetsFor: (v: string | null) => void
-  onChanged: () => void; createdBy?: string
+  targetsFor: string | null; setTargetsFor: (v: string | null) => void; onChanged: () => void
 }) {
   const activeCount = rows.filter(r => r.active).length
   const withTarget = rows.filter(r => currentTargets(targetsByStaff.get(r.id) || []).length > 0).length
-  const tone = dept === 'sales_marketing' ? C.cyan : C.amber
 
   return (
     <div style={CARD}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.35rem' }}>
-        <div style={H('1.1rem')}>{DEPT_LABEL[dept]}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
+        <div style={H('1.1rem')}>{deptName}</div>
         <div style={{ ...LABEL, color: tone }}>{activeCount} active · {withTarget}/{rows.length} with a target</div>
       </div>
-      <div style={{ color: C.slate, fontSize: '0.84rem', marginBottom: '0.9rem' }}>{DEPT_BLURB[dept]}</div>
 
       {rows.length === 0 ? (
-        <div style={{ color: C.slate, fontSize: '0.86rem', fontStyle: 'italic' }}>No one added yet.</div>
+        <div style={{ color: C.slate, fontSize: '0.86rem', fontStyle: 'italic' }}>No one here yet.</div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
@@ -282,7 +378,7 @@ function DeptSection({ dept, rows, currency, clientId, canManage, allRows, targe
                 const current = currentTargets(staffTargets)
                 if (editing === s.id) return (
                   <tr key={s.id}><td style={{ ...td, padding: 0 }} colSpan={canManage ? 6 : 5}>
-                    <StaffForm clientId={clientId} allRows={allRows} existing={s}
+                    <StaffForm clientId={clientId} allRows={allRows} depts={depts} existing={s}
                       onClose={() => setEditing(null)} onSaved={() => { setEditing(null); onChanged() }} />
                   </td></tr>
                 )
@@ -316,8 +412,7 @@ function DeptSection({ dept, rows, currency, clientId, canManage, allRows, targe
                     </tr>
                     {targetsFor === s.id && (
                       <tr><td style={{ ...td, padding: 0, background: C.cream }} colSpan={canManage ? 6 : 5}>
-                        <TargetsPanel staff={s} rows={staffTargets} currency={currency} clientId={clientId}
-                          canManage={canManage} onChanged={onChanged} />
+                        <TargetsPanel staff={s} rows={staffTargets} currency={currency} clientId={clientId} canManage={canManage} onChanged={onChanged} />
                       </td></tr>
                     )}
                   </Fragment>
@@ -335,8 +430,7 @@ function DeptSection({ dept, rows, currency, clientId, canManage, allRows, targe
 function TargetsPanel({ staff, rows, currency, clientId, canManage, onChanged }: {
   staff: Staff; rows: Target[]; currency: string; clientId: string; canManage: boolean; onChanged: () => void
 }) {
-  const metrics = METRICS_FOR[staff.department]
-  const [metric, setMetric] = useState<Metric>(metrics[0])
+  const [metric, setMetric] = useState<Metric>(ALL_METRICS[0])
   const [value, setValue] = useState('')
   const [period, setPeriod] = useState<Period>('monthly')
   const [effFrom, setEffFrom] = useState(TODAY)
@@ -358,13 +452,9 @@ function TargetsPanel({ staff, rows, currency, clientId, canManage, onChanged }:
         target_value: Number(value), period, effective_from: effFrom,
       })
       if (error) throw error
-      setValue(''); setCustomLabel('')
-      onChanged()
-    } catch (e: any) {
-      setMsg(e?.message || 'Could not save the target.'); setSaving(false)
-    }
+      setValue(''); setCustomLabel(''); onChanged()
+    } catch (e: any) { setMsg(e?.message || 'Could not save the target.'); setSaving(false) }
   }
-
   async function remove(id: string) {
     if (!window.confirm('Remove this target entry? Past periods it governed will no longer be graded against it.')) return
     const { error } = await supabase.from('staff_targets').delete().eq('id', id)
@@ -376,11 +466,10 @@ function TargetsPanel({ staff, rows, currency, clientId, canManage, onChanged }:
     <div style={{ padding: '1.1rem 1.3rem' }}>
       <div style={{ ...H('1rem'), marginBottom: '0.2rem' }}>Targets — {staff.full_name}</div>
       <div style={{ color: C.slate, fontSize: '0.82rem', marginBottom: '0.9rem' }}>
-        Raise a target any time by adding a new row with a later start date. Old rows keep
-        governing the periods before that date, so history stays fair.
+        Raise a target any time by adding a new row with a later start date. Old rows keep governing
+        the periods before that date, so history stays fair.
       </div>
 
-      {/* Current targets in force */}
       <div style={{ ...LABEL, marginBottom: 6 }}>In force now</div>
       {current.length === 0 ? (
         <div style={{ color: C.slate, fontSize: '0.85rem', fontStyle: 'italic', marginBottom: '0.9rem' }}>No target set yet.</div>
@@ -394,7 +483,6 @@ function TargetsPanel({ staff, rows, currency, clientId, canManage, onChanged }:
         </div>
       )}
 
-      {/* Add / raise */}
       {canManage && (
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: '0.9rem 1rem', marginBottom: '1rem' }}>
           <div style={{ ...LABEL, marginBottom: 8 }}>Set or raise a target</div>
@@ -402,7 +490,7 @@ function TargetsPanel({ staff, rows, currency, clientId, canManage, onChanged }:
             <label style={{ display: 'block' }}>
               <div style={{ ...LABEL, marginBottom: 4 }}>Metric</div>
               <select style={{ ...inputStyle, width: '100%' }} value={metric} onChange={e => setMetric(e.target.value as Metric)}>
-                {metrics.map(m => <option key={m} value={m}>{METRIC[m].label}</option>)}
+                {ALL_METRICS.map(m => <option key={m} value={m}>{METRIC[m].label}</option>)}
               </select>
             </label>
             {metric === 'custom' && (
@@ -431,16 +519,13 @@ function TargetsPanel({ staff, rows, currency, clientId, canManage, onChanged }:
         </div>
       )}
 
-      {/* Full history */}
       <div style={{ ...LABEL, marginBottom: 6 }}>Target history</div>
       {rows.length === 0 ? (
         <div style={{ color: C.slate, fontSize: '0.85rem', fontStyle: 'italic' }}>Nothing yet.</div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 460 }}>
-            <thead><tr>
-              <th style={th}>Metric</th><th style={th}>Target</th><th style={th}>Starts</th>{canManage && <th style={th}></th>}
-            </tr></thead>
+            <thead><tr><th style={th}>Metric</th><th style={th}>Target</th><th style={th}>Starts</th>{canManage && <th style={th}></th>}</tr></thead>
             <tbody>
               {rows.map(t => (
                 <tr key={t.id}>
@@ -460,15 +545,16 @@ function TargetsPanel({ staff, rows, currency, clientId, canManage, onChanged }:
   )
 }
 
-// ── Add / edit person (roster fields only) ───────────────────
-function StaffForm({ clientId, allRows, existing, onClose, onSaved }: {
-  clientId: string; allRows: Staff[]; existing?: Staff
+// ── Add / edit person ────────────────────────────────────────
+function StaffForm({ clientId, allRows, depts, existing, onClose, onSaved }: {
+  clientId: string; allRows: Staff[]; depts: Department[]; existing?: Staff
   onClose: () => void; onSaved: () => void
 }) {
   const isNew = !existing
-  const [dept, setDept] = useState<Department>(existing?.department || 'sales_marketing')
+  const firstDept = existing?.department || depts[0]?.name || ''
+  const [dept, setDept] = useState<string>(firstDept)
   const [form, setForm] = useState({
-    staff_code: existing?.staff_code || suggestCode(existing?.department || 'sales_marketing', allRows),
+    staff_code: existing?.staff_code || suggestCode(firstDept, allRows),
     full_name: existing?.full_name || '',
     phone: existing?.phone || '',
     active: existing?.active ?? true,
@@ -477,9 +563,9 @@ function StaffForm({ clientId, allRows, existing, onClose, onSaved }: {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
-  function changeDept(d: Department) {
-    setDept(d)
-    setForm(f => ({ ...f, staff_code: isNew ? suggestCode(d, allRows) : f.staff_code }))
+  function changeDept(name: string) {
+    setDept(name)
+    setForm(f => ({ ...f, staff_code: isNew ? suggestCode(name, allRows) : f.staff_code }))
   }
   function set<K extends string>(k: K, v: any) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -487,6 +573,7 @@ function StaffForm({ clientId, allRows, existing, onClose, onSaved }: {
     const name = form.full_name.trim(); const code = form.staff_code.trim()
     if (!name) { setMsg('Please enter the person’s name.'); return }
     if (!code) { setMsg('Please enter a staff code.'); return }
+    if (!dept) { setMsg('Pick a department.'); return }
     const clash = allRows.find(r => r.id !== existing?.id && r.staff_code.toLowerCase() === code.toLowerCase())
     if (clash) { setMsg(`Code “${code}” is already used by ${clash.full_name}.`); return }
     setSaving(true); setMsg(null)
@@ -513,18 +600,13 @@ function StaffForm({ clientId, allRows, existing, onClose, onSaved }: {
   return (
     <div style={wrap}>
       <div style={{ ...H('1rem'), marginBottom: '0.9rem' }}>{isNew ? 'Add a person' : `Edit ${existing!.full_name}`}</div>
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-        {(['sales_marketing', 'operations'] as Department[]).map(d => (
-          <button key={d} onClick={() => changeDept(d)} style={{
-            fontFamily: 'monospace', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer',
-            padding: '0.45rem 0.95rem', borderRadius: 8,
-            border: `1px solid ${dept === d ? C.cyan : C.border}`,
-            background: dept === d ? C.cyan : 'transparent',
-            color: dept === d ? 'var(--cv-on-accent)' : C.slate,
-          }}>{DEPT_LABEL[d]}</button>
-        ))}
-      </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '0.8rem', marginBottom: '0.9rem' }}>
+        {field('Department', (
+          <select style={{ ...inputStyle, width: '100%' }} value={dept} onChange={e => changeDept(e.target.value)}>
+            {depts.length === 0 && <option value="">— add a department first —</option>}
+            {depts.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+          </select>
+        ))}
         {field('Full name', <input style={{ ...inputStyle, width: '100%' }} value={form.full_name} onChange={e => set('full_name', e.target.value)} placeholder="e.g. Amina Bello" />)}
         {field('Staff code', <input style={{ ...inputStyle, width: '100%', fontFamily: 'monospace' }} value={form.staff_code} onChange={e => set('staff_code', e.target.value)} />)}
         {field('Phone (optional)', <input style={{ ...inputStyle, width: '100%' }} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="080…" />)}
@@ -537,7 +619,7 @@ function StaffForm({ clientId, allRows, existing, onClose, onSaved }: {
         Active (uncheck for someone who has left or is on hold)
       </label>
       <div style={{ color: C.slate, fontSize: '0.8rem', marginBottom: '1rem' }}>
-        Set this person’s targets with the <strong style={{ color: C.navy }}>Targets</strong> button on their row after saving.
+        Set this person’s targets with the <strong style={{ color: C.navy }}>Set targets</strong> button on their row after saving.
       </div>
       {msg && <div style={{ color: C.red, fontSize: '0.84rem', marginBottom: '0.7rem' }}>{msg}</div>}
       <div style={{ display: 'flex', gap: '0.6rem' }}>
