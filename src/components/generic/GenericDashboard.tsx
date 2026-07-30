@@ -29,6 +29,7 @@ import AdminConsoleTab from '@/components/generic/AdminConsoleTab'
 import CustomersMarketingTab from '@/components/generic/CustomersMarketingTab'
 import OperationsTab from '@/components/generic/OperationsTab'
 import StaffTab from '@/components/generic/StaffTab'
+import ScorecardsTab from '@/components/generic/ScorecardsTab'
 import { computeFreePerformance, operatingMarginPct, grossMarginPct, ebitdaMarginPct, netMarginPct, revenueGrowthPct, ruleOf40, isRuleOf40Strong, burnMultiple, clv, ltvToCac, cacPaybackMonths, mrr, arr } from '@/lib/business-performance-metrics'
 import { syntheticPlanLinesFromDrivers, summariseByChannel, type Channel, type Driver } from '@/lib/drivers-engine'
 import { syntheticPlanLinesFromEvents, type MarketEvent } from '@/lib/market-events'
@@ -966,6 +967,9 @@ export default function GenericDashboard({
       // field staff with no platform login — distinct from Settings › Users &
       // Access, which manages logins.
       {key:'staff',label:'Staff',view:'staff'},
+      // Per-staff performance in numbers (conversion, credited sales) with a
+      // 6-month trend vs the target that applied. Reads existing data only.
+      {key:'scorecards',label:'Scorecards',view:'scorecards'},
     ]},
     { title:'OPERATIONS', items:[
       // Day-to-day running: deliveries & service, complaints, and (for stock
@@ -1113,6 +1117,7 @@ export default function GenericDashboard({
         {view==='stores'      && <StoresTab config={config} clientId={clientId} P={P}/>}
         {view==='settings'    && <SettingsAndAdminTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={saveConfig} theme={theme} setThemeMode={setThemeMode}/>}
         {view==='staff'       && <StaffTab config={config} clientId={clientId} cc={cc} P={P}/>}
+        {view==='scorecards'  && <ScorecardsTab config={config} clientId={clientId} cc={cc} P={P}/>}
         {view==='customers'   && <CustomersMarketingTab config={config} clientId={clientId} cc={cc} P={P}
                                     activitiesNode={<MarketActivitiesSection clientId={clientId} config={config} cc={cc} P={P} events={marketEvents} loadError={marketEventsError} onChanged={reloadMarketEvents}/>}/>}
         {view==='operations'  && <OperationsTab config={config} clientId={clientId} cc={cc} P={P}/>}
