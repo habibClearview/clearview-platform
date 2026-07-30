@@ -307,6 +307,37 @@ function UsersAndLogins({ config, clientId, P }: any) {
     setBusyId(null)
   }
 
+  // Normal path: email the user a "set a new password" link (same link the
+  // login page's "Forgot password?" sends). Use when their email works.
+  async function emailReset(m: Member) {
+    setBusyId(m.id); setMsg(m.id, true, '')
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(m.email, { redirectTo: `${window.location.origin}/reset-password` })
+      if (error) setMsg(m.id, false, error.message || 'Could not send the reset email.')
+      else setMsg(m.id, true, `Reset link emailed to ${m.email}. Ask them to check spam if it doesn’t arrive.`)
+    } catch { setMsg(m.id, false, 'Could not reach the server.') }
+    setBusyId(null)
+  }
+
+  // Fallback when the email never reaches them: set a temporary password
+  // server-side and show it here for you to read out / send. They log in with
+  // it, then change it in Settings.
+  async function setTempPassword(m: Member) {
+    if (!window.confirm(`Set a temporary password for ${m.full_name || m.email}?\n\nTheir current password stops working immediately. You'll get a temporary password to give them; they can change it after signing in.`)) return
+    setBusyId(m.id); setMsg(m.id, true, '')
+    try {
+      const res = await authedFetch('/api/admin-set-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId: m.id, requesterToken: await requesterToken() }),
+      })
+      const data = await res.json().catch(() => ({} as any))
+      if (!res.ok) setMsg(m.id, false, data.error || 'Could not set a temporary password.')
+      else setMsg(m.id, true, `TEMP PASSWORD for ${m.email}: ${data.tempPassword} — give this to them; they can change it in Settings after signing in.`)
+    } catch { setMsg(m.id, false, 'Could not reach the server.') }
+    setBusyId(null)
+  }
+
   return (
     <div>
       {P?.canManageTeam && (
@@ -351,6 +382,9 @@ function UsersAndLogins({ config, clientId, P }: any) {
                   const canForce = canForceSignoutUX(P?.role, m.role) && !isSelf
                   const canDeact = canDeactivateUsers(P?.role) && !isSelf
                   const canRe = status !== 'active'
+                  // Resetting a password is the same authority as deactivating
+                  // (managers, not yourself); the server re-checks scope/role.
+                  const canReset = canDeactivateUsers(P?.role) && !isSelf
                   const busy = busyId === m.id
                   const msg = rowMsg[m.id]
                   return (
@@ -408,6 +442,12 @@ function UsersAndLogins({ config, clientId, P }: any) {
                             ))}
                             {canRe && (
                               <button style={btn(C.cyan)} disabled={busy} onClick={() => reInvite(m)}>Re-invite</button>
+                            )}
+                            {canReset && (
+                              <>
+                                <button style={btn(C.cyan)} disabled={busy} onClick={() => emailReset(m)} title="Email them a link to set a new password">Email reset link</button>
+                                <button style={btn(C.amber)} disabled={busy} onClick={() => setTempPassword(m)} title="Set a temporary password to give them directly (use when email doesn't reach them)">Set temp password</button>
+                              </>
                             )}
                           </div>
                           {msg?.text && (
