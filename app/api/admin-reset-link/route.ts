@@ -1,12 +1,17 @@
 // ============================================================
-// API ROUTE: /api/admin-set-password
+// API ROUTE: /api/admin-reset-link
 // Server-side only — uses the service role key (never in browser).
 //
-// Lets a manager set a TEMPORARY password for a user they administer, to be
-// read out / sent to that user, for when the person cannot use the emailed
-// "Forgot password?" link themselves (e.g. the email isn't reaching them).
-// The invite route already tells users "ask your Clearview coach to reset it" —
-// this is the mechanism that promise implied.
+// Best-practice "reset on behalf of a user": generates a one-time password
+// RECOVERY link that the manager can hand to the user through any channel
+// (WhatsApp, SMS, read out in person). The user clicks it and sets THEIR OWN
+// password on /reset-password — the manager never sees or sets the password.
+// This also solves the real-world case the emailed "Forgot password?" flow
+// can't: when the recovery email simply isn't reaching the user, the manager
+// delivers the link directly.
+//
+// The invite route already tells users "ask your Clearview coach to reset it";
+// this is that mechanism, done the right way (no admin-known credential).
 //
 // Authz mirrors /api/invite-user exactly:
 //   * super_coach may reset anyone
@@ -17,7 +22,6 @@
 // ============================================================
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { randomBytes } from 'crypto'
 import { writeAuditLog, auditIp } from '@/lib/audit-log'
 import { checkRateLimit } from '@/lib/rate-limit'
 
@@ -28,14 +32,17 @@ function getAdminClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
-// Readable, unambiguous temporary password: 3 groups of 4 (e.g. Kd7m-Rp9x-Tn4w).
-// Excludes 0/O/1/l/I to avoid confusion when read out over the phone.
-function genTempPassword(): string {
-  const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
-  const bytes = randomBytes(12)
-  let out = ''
-  for (let i = 0; i < 12; i++) out += charset[bytes[i] % charset.length]
-  return `${out.slice(0, 4)}-${out.slice(4, 8)}-${out.slice(8, 12)}`
+// Where the recovery link lands after the user clicks it — the same
+// /reset-password page the login "Forgot password?" uses. Mirrors
+// invite-user's base-URL resolution so a staging deploy never points at
+// production and vice-versa.
+function appBaseUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_APP_URL
+  if (explicit) return explicit.replace(/\/+$/, '')
+  const vercelEnv = process.env.VERCEL_ENV
+  const vercelUrl = process.env.VERCEL_URL
+  if (vercelEnv && vercelEnv !== 'production' && vercelUrl) return `https://${vercelUrl}`
+  return 'https://clearview.habibonifade.com'
 }
 
 const CLIENT_ROLES = ['ceo', 'finance_manager', 'unit_head', 'accounts_assistant']
@@ -50,15 +57,13 @@ export async function POST(req: NextRequest) {
 
     const admin = getAdminClient()
 
-    // Verify the requester's identity via their JWT.
     const { data: { user: actor }, error: authErr } = await admin.auth.getUser(requesterToken)
     if (authErr || !actor) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
-    // Rate-limit: a reset changes someone's credentials — cap per actor per hour.
-    const rl = await checkRateLimit(admin, `admin-set-password:${actor.id}`, 20, 3600)
+    const rl = await checkRateLimit(admin, `admin-reset-link:${actor.id}`, 20, 3600)
     if (!rl.allowed) {
       return NextResponse.json(
-        { error: 'Too many password resets. Please wait a while before doing more.' },
+        { error: 'Too many reset links generated. Please wait a while before doing more.' },
         { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } },
       )
     }
@@ -74,6 +79,7 @@ export async function POST(req: NextRequest) {
     const { data: targetProfile } = await admin
       .from('user_profiles').select('role, engagement_client_id, email, full_name').eq('id', targetUserId).single()
     if (!targetProfile) return NextResponse.json({ error: 'That user was not found' }, { status: 404 })
+    if (!targetProfile.email) return NextResponse.json({ error: 'That user has no email on file.' }, { status: 400 })
 
     const actorRole = actorProfile.role
     const canReset =
@@ -86,15 +92,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'You do not have permission to reset this user’s password.' }, { status: 403 })
     }
 
-    const tempPassword = genTempPassword()
-    const { error: updErr } = await admin.auth.admin.updateUserById(targetUserId, { password: tempPassword })
-    if (updErr) {
-      return NextResponse.json({ error: `Could not set the password: ${updErr.message}` }, { status: 400 })
+    // Generate (do NOT auto-email) a one-time recovery link the manager delivers
+    // themselves. The user sets their own password when they open it.
+    const { data, error: genErr } = await admin.auth.admin.generateLink({
+      type: 'recovery',
+      email: targetProfile.email,
+      options: { redirectTo: `${appBaseUrl()}/reset-password` },
+    })
+    if (genErr || !data?.properties?.action_link) {
+      return NextResponse.json({ error: `Could not generate a reset link${genErr ? `: ${genErr.message}` : ''}` }, { status: 400 })
     }
 
     await writeAuditLog(admin, {
       actorId: actor.id, actorEmail: actor.email, actorRole,
-      action: 'user.password_set_temp',
+      action: 'user.reset_link_generated',
       targetId: targetUserId, targetEmail: targetProfile.email,
       detail: { engagement_client_id: targetProfile.engagement_client_id ?? null },
       ip: auditIp(req.headers),
@@ -102,12 +113,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      tempPassword,
+      link: data.properties.action_link,
       email: targetProfile.email,
       name: targetProfile.full_name,
     })
   } catch (err) {
-    console.error('admin-set-password error:', err)
+    console.error('admin-reset-link error:', err)
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 })
   }
 }

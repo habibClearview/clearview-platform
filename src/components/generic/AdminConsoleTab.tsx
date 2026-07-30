@@ -319,21 +319,25 @@ function UsersAndLogins({ config, clientId, P }: any) {
     setBusyId(null)
   }
 
-  // Fallback when the email never reaches them: set a temporary password
-  // server-side and show it here for you to read out / send. They log in with
-  // it, then change it in Settings.
-  async function setTempPassword(m: Member) {
-    if (!window.confirm(`Set a temporary password for ${m.full_name || m.email}?\n\nTheir current password stops working immediately. You'll get a temporary password to give them; they can change it after signing in.`)) return
+  // Best-practice fallback when the email never reaches them: generate a
+  // one-time recovery LINK and copy it, for you to send through any channel
+  // (WhatsApp/SMS). The user opens it and sets THEIR OWN password — you never
+  // see or set it. Shown as a copyable link so the record can be delivered.
+  const [resetLink, setResetLink] = useState<Record<string, string>>({})
+  async function getResetLink(m: Member) {
     setBusyId(m.id); setMsg(m.id, true, '')
     try {
-      const res = await authedFetch('/api/admin-set-password', {
+      const res = await authedFetch('/api/admin-reset-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetUserId: m.id, requesterToken: await requesterToken() }),
       })
       const data = await res.json().catch(() => ({} as any))
-      if (!res.ok) setMsg(m.id, false, data.error || 'Could not set a temporary password.')
-      else setMsg(m.id, true, `TEMP PASSWORD for ${m.email}: ${data.tempPassword} — give this to them; they can change it in Settings after signing in.`)
+      if (!res.ok || !data.link) { setMsg(m.id, false, data.error || 'Could not generate a reset link.'); setBusyId(null); return }
+      setResetLink(r => ({ ...r, [m.id]: data.link }))
+      let copied = false
+      try { await navigator.clipboard.writeText(data.link); copied = true } catch { /* clipboard may be blocked; link is shown below to copy manually */ }
+      setMsg(m.id, true, `${copied ? 'Reset link copied. ' : ''}Send it to ${m.full_name || m.email} — they open it and set their own password. It expires in about 1 hour.`)
     } catch { setMsg(m.id, false, 'Could not reach the server.') }
     setBusyId(null)
   }
@@ -446,10 +450,17 @@ function UsersAndLogins({ config, clientId, P }: any) {
                             {canReset && (
                               <>
                                 <button style={btn(C.cyan)} disabled={busy} onClick={() => emailReset(m)} title="Email them a link to set a new password">Email reset link</button>
-                                <button style={btn(C.amber)} disabled={busy} onClick={() => setTempPassword(m)} title="Set a temporary password to give them directly (use when email doesn't reach them)">Set temp password</button>
+                                <button style={btn(C.amber)} disabled={busy} onClick={() => getResetLink(m)} title="Get a link to send them directly (use when email doesn't reach them) — they set their own password">Get reset link</button>
                               </>
                             )}
                           </div>
+                          {resetLink[m.id] && (
+                            <div style={{ marginTop: 6 }}>
+                              <div style={{ ...label, textTransform: 'none', fontSize: '0.72rem' }}>One-time reset link (send to this person):</div>
+                              <input readOnly value={resetLink[m.id]} onFocus={e => e.currentTarget.select()}
+                                style={{ width: '100%', maxWidth: 320, fontSize: '0.72rem', fontFamily: 'monospace', padding: '0.3rem 0.4rem', border: `1px solid ${C.border}`, borderRadius: 6, color: C.navy, background: C.card }} />
+                            </div>
+                          )}
                           {msg?.text && (
                             <div style={{ marginTop: 5, fontSize: '0.8rem', color: msg.ok ? C.green : C.red, maxWidth: 260 }}>
                               {msg.text}

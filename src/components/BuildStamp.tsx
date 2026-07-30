@@ -10,7 +10,7 @@
 // Bump BUILD_STAMP on every change you want to be able to verify
 // landed. Keep it short and unmistakable.
 // ============================================================
-export const BUILD_STAMP = 'BUILD 2026-07-30 · CODE R190 (Users & Access: email reset link + set temporary password)'
+export const BUILD_STAMP = 'BUILD 2026-07-30 · CODE R191 (Users & Access: password reset — email + admin-generated recovery link)'
 
 export default function BuildStamp() {
   return (
