@@ -99,6 +99,56 @@ function TrendChart({ plan, actual, months, cc }: { plan: number[]; actual: (num
   )
 }
 
+// ── Monthly figures table: Plan | Actual | Difference per month ──
+function MetricTable({ metric, months, cc }: { metric: Metric; months: string[]; cc: string }) {
+  const n = Math.min(metric.plan.length, months.length)
+  const nowIdx = lastActualIdx(metric.actual)
+  const th: React.CSSProperties = { ...LABEL, padding: '0.5rem 0.7rem', borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, background: C.card, textAlign: 'right' }
+  const td: React.CSSProperties = { padding: '0.4rem 0.7rem', fontSize: '0.86rem', textAlign: 'right', fontFamily: 'ui-monospace,monospace', fontVariantNumeric: 'tabular-nums', borderBottom: `1px solid ${C.borderSoft}` }
+  let planTot = 0, actTot = 0
+  const rows = months.slice(0, n).map((mo, i) => {
+    const p = metric.plan[i] || 0
+    const a = metric.actual[i]
+    const hasA = a !== null
+    planTot += p; if (hasA) actTot += (a as number)
+    const diff = hasA ? (a as number) - p : null
+    const fav = diff === null ? null : (metric.higherBetter ? diff >= 0 : diff <= 0)
+    return { mo, p, a, hasA, diff, fav, isNow: i === nowIdx }
+  })
+  const totDiff = actTot - (rows.filter(r => r.hasA).reduce((s, r) => s + r.p, 0))
+  const totFav = metric.higherBetter ? totDiff >= 0 : totDiff <= 0
+  const tone = (fav: boolean | null) => fav === null ? C.slate : fav ? C.green : C.red
+  return (
+    <div style={{ marginTop: '1.2rem' }}>
+      <div style={{ ...LABEL, marginBottom: 6 }}>Month by month · {metric.label}</div>
+      <div style={{ overflowX: 'auto', maxHeight: 420, overflowY: 'auto', border: `1px solid ${C.borderSoft}`, borderRadius: 10 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 420 }}>
+          <thead><tr>
+            <th style={{ ...th, textAlign: 'left' }}>Month</th><th style={th}>Plan</th><th style={th}>Actual</th><th style={th}>Difference</th>
+          </tr></thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} style={r.isNow ? { background: 'var(--cv-tint-cyan, rgba(0,180,216,.08))' } : undefined}>
+                <td style={{ ...td, textAlign: 'left', fontFamily: 'inherit', color: C.navy, fontWeight: r.isNow ? 700 : 400 }}>{r.mo}{r.isNow ? ' · now' : ''}</td>
+                <td style={{ ...td, color: C.slate }}>{fmt(r.p, cc)}</td>
+                <td style={{ ...td, color: r.hasA ? C.navy : C.slate, fontWeight: r.hasA ? 700 : 400 }}>{r.hasA ? fmt(r.a as number, cc) : '—'}</td>
+                <td style={{ ...td, color: tone(r.fav), fontWeight: 700 }}>{r.diff === null ? '—' : `${r.diff > 0 ? '+' : ''}${fmt(r.diff, cc)}`}</td>
+              </tr>
+            ))}
+            <tr>
+              <td style={{ ...td, textAlign: 'left', fontWeight: 700, color: C.navy, borderTop: `2px solid ${C.border}` }}>Total</td>
+              <td style={{ ...td, fontWeight: 700, borderTop: `2px solid ${C.border}` }}>{fmt(planTot, cc)}</td>
+              <td style={{ ...td, fontWeight: 700, borderTop: `2px solid ${C.border}` }}>{fmt(actTot, cc)} <span style={{ color: C.slate, fontWeight: 400, fontSize: '0.72rem' }}>to date</span></td>
+              <td style={{ ...td, fontWeight: 700, color: tone(totFav), borderTop: `2px solid ${C.border}` }}>{totDiff > 0 ? '+' : ''}{fmt(totDiff, cc)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style={{ fontSize: '0.74rem', color: C.slate, marginTop: 5 }}>“Difference” compares actual with plan for months already recorded; future months show the plan only. Total difference is actual-to-date vs the plan for those same months.</div>
+    </div>
+  )
+}
+
 // ── Small sparkline (actual where present, else plan) ──
 function Spark({ series, color }: { series: number[]; color: string }) {
   const w = 150, h = 30, pad = 2
@@ -181,6 +231,7 @@ export default function FiguresTrendsTab({ config, result, months, cc, P }: any)
               <div style={{ ...H('1.05rem'), marginBottom: 2 }}>{metric.label} — actual vs plan</div>
               <div style={{ fontSize: '0.8rem', color: C.slate, marginBottom: '0.6rem' }}>{currency} · {months?.[0]} → {months?.[months.length - 1]}</div>
               <TrendChart plan={metric.plan} actual={metric.actual} months={months || []} cc={currency} />
+              <MetricTable metric={metric} months={months || []} cc={currency} />
             </>
           ) : (
             <div style={{ color: C.slate }}>No series available for this view.</div>

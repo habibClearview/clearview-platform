@@ -16,8 +16,14 @@ function expectBalanceSheetBalances(result: ReturnType<typeof runGenericModel>) 
 // here (rather than redefined per describe block) to avoid drift
 // between copies.
 function monthsAgoISO(n: number): string {
-  const d = new Date()
-  d.setUTCMonth(d.getUTCMonth() - n)
+  // Build from UTC year/month directly with day pinned to 1. Using
+  // setUTCMonth(month - n) on a month-end day (29th-31st) overflows the day
+  // into the wrong month (e.g. on the 31st, "June 31" rolls to July 1), which
+  // shifted the start_date a month and made these calendar-rule tests fail only
+  // on those days. Date.UTC normalizes a negative/overflow month correctly when
+  // the day is 1, so this is deterministic on every day of the month.
+  const now = new Date()
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - n, 1))
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`
 }
 function makeCalendarConfig(pastMonths: number, futureMonths: number, overrides: Record<string, any> = {}) {
