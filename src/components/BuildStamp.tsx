@@ -10,7 +10,7 @@
 // Bump BUILD_STAMP on every change you want to be able to verify
 // landed. Keep it short and unmistakable.
 // ============================================================
-export const BUILD_STAMP = 'BUILD 2026-07-31 · CODE R193 (staging: Trends chart + monthly figures table; date-robust engine tests)'
+export const BUILD_STAMP = 'BUILD 2026-07-31 · CODE R194 (staging: Figures This-month view — Plan editable, Actual read-only, beside Planning/Actuals)'
 
 export default function BuildStamp() {
   return (

@@ -32,6 +32,7 @@ import StaffTab from '@/components/generic/StaffTab'
 import ScorecardsTab from '@/components/generic/ScorecardsTab'
 import AttendanceTab from '@/components/generic/AttendanceTab'
 import FiguresTrendsTab from '@/components/generic/FiguresTrendsTab'
+import FiguresTab from '@/components/generic/FiguresTab'
 import { computeFreePerformance, operatingMarginPct, grossMarginPct, ebitdaMarginPct, netMarginPct, revenueGrowthPct, ruleOf40, isRuleOf40Strong, burnMultiple, clv, ltvToCac, cacPaybackMonths, mrr, arr } from '@/lib/business-performance-metrics'
 import { syntheticPlanLinesFromDrivers, summariseByChannel, type Channel, type Driver } from '@/lib/drivers-engine'
 import { syntheticPlanLinesFromEvents, type MarketEvent } from '@/lib/market-events'
@@ -952,6 +953,10 @@ export default function GenericDashboard({
       {key:'accounts',label:'Accounts',tabs:[['pl','Profit & Loss'],['cashflow','Cash Flow'],['balancesheet','Balance Sheet']]},
       {key:'planning',label:'Planning',view:'planning'},
       {key:'actuals',label:'Actuals',tabs:[['actuals_wc','Record Actuals'],['approvals',approvalsLabel]]},
+      // Figures = the unified surface. Stage 2a: a single "This month" screen
+      // with Plan | Actual | Difference side by side (Plan editable here, Actual
+      // read-only for now). Runs beside Planning/Actuals while it settles.
+      {key:'figures',label:'Figures',view:'figures'},
       // Trends = Stage 1 of the unified "Figures" surface: a read-only
       // actual-vs-plan-over-time view. Entry stays in Planning/Actuals for now.
       {key:'trends',label:'Trends',view:'trends'},
@@ -1115,6 +1120,7 @@ export default function GenericDashboard({
         {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P} marketEvents={marketEvents} onMarketEventsChanged={reloadMarketEvents} onApprovalActioned={reloadPendingActualsCount}/>}
         {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods} onNavigate={setView}/>}
         {view==='performance' && <PerformanceTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={saveConfig} onGoToIntelligence={()=>setView('intelligence')}/>}
+        {view==='figures'     && <FiguresTab config={config} months={months} cc={cc} P={P} onSave={saveConfig} onGoToOverTime={()=>setView('trends')}/>}
         {view==='trends'      && <FiguresTrendsTab config={config} result={result} months={months} cc={cc} P={P}/>}
         {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} clientId={clientId} marketEvents={marketEvents} marketEventsError={marketEventsError} onMarketEventsChanged={reloadMarketEvents}/>}
         {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods}/>}
