@@ -953,9 +953,11 @@ export default function GenericDashboard({
       {key:'accounts',label:'Accounts',tabs:[['pl','Profit & Loss'],['cashflow','Cash Flow'],['balancesheet','Balance Sheet']]},
       {key:'planning',label:'Planning',view:'planning'},
       {key:'actuals',label:'Actuals',tabs:[['actuals_wc','Record Actuals'],['approvals',approvalsLabel]]},
-      // Figures = the unified surface. Stage 2a: a single "This month" screen
-      // with Plan | Actual | Difference side by side (Plan editable here, Actual
-      // read-only for now). Runs beside Planning/Actuals while it settles.
+      // Figures = the unified surface. A single "This month" screen with
+      // Plan | Actual | Difference side by side — Plan saves as you type
+      // (like Planning), Actual is manual entry with Save/Submit + the same
+      // close/approval locks (like Actuals). Runs beside Planning/Actuals
+      // while it settles.
       {key:'figures',label:'Figures',view:'figures'},
       // Trends = Stage 1 of the unified "Figures" surface: a read-only
       // actual-vs-plan-over-time view. Entry stays in Planning/Actuals for now.
