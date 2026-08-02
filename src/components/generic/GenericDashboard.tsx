@@ -950,18 +950,18 @@ export default function GenericDashboard({
       {key:'intelligence',label:'Intelligence',view:'intelligence'},
     ]},
     { title:'FINANCE', items:[
-      {key:'accounts',label:'Accounts',tabs:[['pl','Profit & Loss'],['cashflow','Cash Flow'],['balancesheet','Balance Sheet']]},
-      {key:'planning',label:'Planning',view:'planning'},
-      {key:'actuals',label:'Actuals',tabs:[['actuals_wc','Record Actuals'],['approvals',approvalsLabel]]},
-      // Figures = the unified surface. A single "This month" screen with
-      // Plan | Actual | Difference side by side — Plan saves as you type
-      // (like Planning), Actual is manual entry with Save/Submit + the same
-      // close/approval locks (like Actuals). Runs beside Planning/Actuals
-      // while it settles.
+      // Figures is now the SINGLE front door for the numbers: plan and actual
+      // side by side, in one friendly screen. The old Planning and Actuals
+      // tabs are folded in here (they no longer sit in the everyday nav) but
+      // their advanced tools stay reachable from inside Figures via links, so
+      // nothing is lost: 'planning' (seasons/drivers/scenarios) and
+      // 'actuals_wc' (fill many past months at once) views are still mounted.
       {key:'figures',label:'Figures',view:'figures'},
-      // Trends = Stage 1 of the unified "Figures" surface: a read-only
-      // actual-vs-plan-over-time view. Entry stays in Planning/Actuals for now.
+      {key:'accounts',label:'Accounts',tabs:[['pl','Profit & Loss'],['cashflow','Cash Flow'],['balancesheet','Balance Sheet']]},
       {key:'trends',label:'Trends',view:'trends'},
+      // Approvals = the review queue (coach / CEO / finance manager sign off
+      // submitted figures). Kept as its own item now that Actuals is folded in.
+      {key:'approvals',label:approvalsLabel,view:'approvals'},
       {key:'performance',label:'Performance',view:'performance'},
     ]},
     // The BUSINESS group is split into the real departments a business runs —
@@ -1122,7 +1122,7 @@ export default function GenericDashboard({
         {view==='approvals'   && <ApprovalsAndSpendTab clientId={clientId} config={config} cc={cc} P={P} marketEvents={marketEvents} onMarketEventsChanged={reloadMarketEvents} onApprovalActioned={reloadPendingActualsCount}/>}
         {view==='intelligence'&& <ClearviewIntelligenceTab clientId={clientId} config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} closedPeriods={closedPeriods} onNavigate={setView}/>}
         {view==='performance' && <PerformanceTab config={config} result={result} months={months} cc={cc} clientId={clientId} P={P} onSave={saveConfig} onGoToIntelligence={()=>setView('intelligence')}/>}
-        {view==='figures'     && <FiguresTab config={config} months={months} cc={cc} P={P} onSave={saveConfig} onGoToOverTime={()=>setView('trends')}/>}
+        {view==='figures'     && <FiguresTab config={config} months={months} cc={cc} P={P} onSave={saveConfig} onGoToOverTime={()=>setView('trends')} onGoToPlanningTools={()=>setView('planning')} onGoToCatchUp={()=>setView('actuals_wc')}/>}
         {view==='trends'      && <FiguresTrendsTab config={config} result={result} months={months} cc={cc} P={P}/>}
         {view==='planning'    && <PlanningTab config={config} result={result} months={months} cc={cc} P={P} onSave={saveConfig} clientId={clientId} marketEvents={marketEvents} marketEventsError={marketEventsError} onMarketEventsChanged={reloadMarketEvents}/>}
         {view==='pl'          && <PLTab config={config} result={result} months={months} cc={cc} P={P} closedPeriods={closedPeriods}/>}

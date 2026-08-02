@@ -10,7 +10,7 @@
 // Bump BUILD_STAMP on every change you want to be able to verify
 // landed. Keep it short and unmistakable.
 // ============================================================
-export const BUILD_STAMP = 'BUILD 2026-08-01 · CODE R195 (staging: Figures — Actual column editable with Save/Submit + close/approval locks)'
+export const BUILD_STAMP = 'BUILD 2026-08-02 · CODE R196 (Figures is now the single Finance front door; plain language, info popovers, icons, colour coding, add-line)'
 
 export default function BuildStamp() {
   return (
