@@ -54,27 +54,27 @@ const CATS: {
 }[] = [
   {
     key: 'revenue', label: 'Money in (sales)', icon: '💰', color: 'var(--cv-green)', cost: false,
-    help: 'This is all the money customers pay you. If you sold a product, or did a job and got paid for it, it belongs here. Money you borrowed or a loan you received does not go here.',
+    help: 'The money your customers pay you for what you sell. Example: you run a drinks shop and this month customers paid you 60,000 for drinks. That 60,000 goes here. Do NOT put money you borrowed or a loan here, this is only money from selling.',
     addLabel: 'Add another product or service', placeholder: 'e.g. Bottled water',
   },
   {
     key: 'cost_of_sales', label: 'Cost of what you sold', icon: '📦', color: 'var(--cv-red)', cost: true,
-    help: 'This is what each sale cost you directly. In a shop it is the price you paid for the goods you then sold. For a service it is the materials and the direct work for that job. Rent, salaries and electricity do not go here, they belong under Running costs.',
-    addLabel: 'Add another cost of a sale', placeholder: 'e.g. Cost of the drinks you buy',
+    help: 'What the things you sold cost YOU to get. Example: you buy a crate of drinks for 4,000 and sell it for 6,000. The 4,000 is the cost of what you sold, and it goes here. For a tailor it is the cloth and thread used on the clothes you finished. This is ONLY the cost of the goods you actually sold. Rent, wages and electricity do NOT go here, they go under Running costs.',
+    addLabel: 'Add another cost of a sale', placeholder: 'e.g. Drinks you buy to resell',
   },
   {
     key: 'staff', label: 'Staff pay', icon: '👥', color: 'var(--cv-purple, #8B5CF6)', cost: true,
-    help: 'This is what you pay the people who work for you. Wages, salaries and allowances for your team.',
+    help: 'What you pay the people who work for you. Example: you pay a shopkeeper 30,000 and a cleaner 10,000 this month, so 40,000 goes here. This covers wages, salaries and allowances for your team.',
     addLabel: 'Add another staff cost', placeholder: 'e.g. Shopkeeper wages',
   },
   {
     key: 'direct_opex', label: 'Running costs', icon: '🏠', color: 'var(--cv-amber)', cost: true,
-    help: 'These are the bills you pay to keep going, whether or not you make a sale. Rent, electricity, transport, phone and internet.',
-    addLabel: 'Add another running cost', placeholder: 'e.g. Electricity',
+    help: 'The bills you pay to keep the business open, whether or not you sell anything. Example: shop rent 15,000, electricity 5,000 and airtime 2,000 this month, so 22,000 goes here. Rent, electricity, transport, phone and internet all belong here.',
+    addLabel: 'Add another running cost', placeholder: 'e.g. Shop rent',
   },
 ]
-const PLAN_HELP = 'Your target for this month. What you are aiming for, or what you expect to happen.'
-const ACTUAL_HELP = 'What really happened. Once you know the real numbers for the month, type them in here.'
+const PLAN_HELP = 'Your target for this month, set before or early in the month. Example: you aim to sell 60,000 of drinks, so you type 60,000 in the Planned box. It is what you are aiming for.'
+const ACTUAL_HELP = 'What really happened. Example: by month end you actually sold 52,000 of drinks, so you type 52,000 in the Actual box once you know the real number.'
 
 const fmt = (n: number, cc: string) => `${cc ? cc + ' ' : ''}${Math.round(n).toLocaleString()}`
 const firstOfThisMonth = () => { const d = new Date(); d.setDate(1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01` }
@@ -400,7 +400,7 @@ export default function FiguresTab({ config, months, cc, P, onSave, onGoToOverTi
                   )
                 })}
                 <tr>
-                  <td style={{ ...td, textAlign: 'left', ...H('1.05rem'), borderTop: `2px solid ${C.border}`, paddingTop: '0.75rem' }}>💵 What you kept (profit)<InfoDot text="This is what is left over after you take all your costs away from your sales. If it is green you kept more than you planned. If it is red, less." /></td>
+                  <td style={{ ...td, textAlign: 'left', ...H('1.05rem'), borderTop: `2px solid ${C.border}`, paddingTop: '0.75rem' }}>💵 What you kept (profit)<InfoDot text="What is left over after you take all your costs away from your sales. Example: 52,000 came in and your costs were 40,000, so you kept 12,000. Green means you kept more than you planned, red means less." /></td>
                   <td style={{ ...td, fontWeight: 700, borderTop: `2px solid ${C.border}` }}>{fmt(totals.profitPlan, currency)}</td>
                   <td style={{ ...td, fontWeight: 700, borderTop: `2px solid ${C.border}`, color: isPastOrCurrent ? C.navy : C.slate }}>{isPastOrCurrent ? fmt(totals.profitActual, currency) : '—'}</td>
                   <td style={{ ...td, borderTop: `2px solid ${C.border}` }}>{diffCell(totals.profitPlan, totals.profitActual, false)}</td>
