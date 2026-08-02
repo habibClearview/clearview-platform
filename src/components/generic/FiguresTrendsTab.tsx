@@ -204,12 +204,12 @@ export default function FiguresTrendsTab({ config, result, months, cc, P }: any)
       <div style={{ marginBottom: '1rem' }}>
         <div style={H('1.4rem')}>Trends</div>
         <div style={{ color: C.slate, fontSize: '0.95rem', marginTop: 4, maxWidth: 780, lineHeight: 1.5 }}>
-          How your money moves month by month. A <strong style={{ color: C.navy }}>solid line</strong> is what really happened, a <strong style={{ color: C.slate }}>dashed line</strong> is your plan (it keeps going past “now” into the months you have planned). This is a view only, you set your plan and record your actuals in Figures.
+          How your money moves month by month. A <strong style={{ color: C.navy }}>solid line</strong> is what really happened, a <strong style={{ color: C.slate }}>dashed line</strong> is your plan (it keeps going past “now” into the months you have planned). This is a view only, you set your plan and record what happened in Sales, Costs &amp; Profit.
         </div>
       </div>
 
       {!result?.con && !result?.unitPL ? (
-        <div style={{ ...CARD, color: C.slate }}>No numbers yet. Add some plan or actual figures in Figures first.</div>
+        <div style={{ ...CARD, color: C.slate }}>No numbers yet. Add some plan or actual figures in Sales, Costs &amp; Profit first.</div>
       ) : (
         <div style={CARD}>
           <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1rem' }}>

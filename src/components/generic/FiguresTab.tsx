@@ -274,9 +274,9 @@ export default function FiguresTab({ config, months, cc, P, onSave, onGoToOverTi
   return (
     <div>
       <div style={{ marginBottom: '0.8rem' }}>
-        <div style={H('1.4rem')}>Figures</div>
+        <div style={H('1.4rem')}>Sales, Costs & Profit</div>
         <div style={{ color: C.slate, fontSize: '0.95rem', marginTop: 4, maxWidth: 780, lineHeight: 1.5 }}>
-          Your plan and what really happened, side by side. Pick a month, set your target, then fill in the real numbers once you have them.
+          Your plan and what really happened, side by side. Pick a month, set your target for your sales and costs, then fill in the real numbers once you have them. What is left over is your profit.
         </div>
       </div>
 

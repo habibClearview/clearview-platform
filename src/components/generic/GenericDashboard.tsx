@@ -956,7 +956,7 @@ export default function GenericDashboard({
       // their advanced tools stay reachable from inside Figures via links, so
       // nothing is lost: 'planning' (seasons/drivers/scenarios) and
       // 'actuals_wc' (fill many past months at once) views are still mounted.
-      {key:'figures',label:'Figures',view:'figures'},
+      {key:'figures',label:'Sales, Costs & Profit',view:'figures'},
       {key:'accounts',label:'Accounts',tabs:[['pl','Profit & Loss'],['cashflow','Cash Flow'],['balancesheet','Balance Sheet']]},
       {key:'trends',label:'Trends',view:'trends'},
       // Approvals = the review queue (coach / CEO / finance manager sign off
