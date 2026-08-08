@@ -91,12 +91,28 @@ export default function PipelineTracker({ clientId, canManage }) {
   const load = useCallback(async () => {
     if (!clientId) { setRows([]); setLoading(false); return }
     setLoading(true)
-    const { data, error } = await supabase
-      .from(TABLE).select('*').eq('client_id', clientId)
-      .order('sort_order', { ascending: true }).order('created_at', { ascending: true })
-    if (error) setSave({ ok: false, text: `Could not load the pipeline. ${error.message}` })
-    setRows(data || [])
-    setLoading(false)
+    try {
+      const { data, error } = await supabase
+        .from(TABLE).select('*').eq('client_id', clientId)
+        .order('sort_order', { ascending: true }).order('created_at', { ascending: true })
+      if (error) {
+        // A failed read leaves what was on screen alone. Blanking the table
+        // would say the pipeline is empty, which is a different and much worse
+        // statement than saying the read failed.
+        console.error('PipelineTracker: load failed', error)
+        setSave({ ok: false, text: 'Could not load the pipeline. What you can see may be out of date.' })
+        return
+      }
+      setSave(null)
+      setRows(data || [])
+    } catch (e) {
+      console.error('PipelineTracker: load threw', e)
+      setSave({ ok: false, text: 'Could not load the pipeline. What you can see may be out of date.' })
+    } finally {
+      // Runs on every path, so a rejected query cannot leave the panel stuck
+      // on Loading forever.
+      setLoading(false)
+    }
   }, [clientId])
 
   useEffect(() => { load() }, [load])

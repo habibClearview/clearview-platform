@@ -467,8 +467,8 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         <div style={strip}>
           <span style={pill(C.tintCyan, C.navy)}>{hypotheses.length} on the board</span>
           <span style={pill(shortlistCount > 0 ? C.green : C.faint, 'var(--cv-on-accent)')}>{shortlistCount} in the shortlist</span>
-          {hypotheses.length > ADVANCE_CEILING && (
-            <span style={pill(C.tintAmber, C.navy)}>{hypotheses.length - ADVANCE_CEILING} held back</span>
+          {hypotheses.length - shortlistCount > 0 && (
+            <span style={pill(C.tintAmber, C.navy)}>{hypotheses.length - shortlistCount} held back</span>
           )}
         </div>
         {hypotheses.length === 0 ? (

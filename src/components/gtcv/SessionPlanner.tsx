@@ -496,7 +496,17 @@ export default function SessionPlanner({ clientId, canManage }) {
   async function applyRequiredAttendance(session, kind, extraRoles) {
     const def = kindDef(kind)
     const roles = Array.from(new Set([...(def ? def.required : []), ...(extraRoles || [])]))
-    const existing = (attBySession[session.id] || [])
+
+    // Read what is actually recorded rather than trusting local state. Two
+    // room changes in quick succession both used to see the same stale list
+    // and both inserted, leaving the session with the same person required
+    // twice. Reading first, plus the unique index the database now carries,
+    // means running this again changes nothing.
+    const { data: fresh, error: readErr } = await supabase
+      .from(ATTENDANCE_TABLE).select('*').eq('session_id', session.id)
+    if (readErr) { reportError('Could not read the attendance for this session', readErr); return }
+    const existing = fresh || []
+
     const toInsert = []
     const toMark = []
 
@@ -522,8 +532,17 @@ export default function SessionPlanner({ clientId, canManage }) {
     let inserted = []
     if (toInsert.length) {
       const { data, error } = await supabase.from(ATTENDANCE_TABLE).insert(toInsert).select()
-      if (error) { reportError('Could not set the required attendees', error); return }
-      inserted = data || []
+      if (error) {
+        // A unique violation means somebody else got there first and the row
+        // is already present, which is the end state this function wants. Any
+        // other error is real.
+        if (error.code !== '23505') { reportError('Could not set the required attendees', error); return }
+        const { data: after } = await supabase
+          .from(ATTENDANCE_TABLE).select('*').eq('session_id', session.id)
+        inserted = (after || []).filter((r) => !existing.some((e) => e.id === r.id))
+      } else {
+        inserted = data || []
+      }
     }
     if (toMark.length) {
       const { error } = await supabase.from(ATTENDANCE_TABLE).update({ required: true }).in('id', toMark)
@@ -551,12 +570,27 @@ export default function SessionPlanner({ clientId, canManage }) {
       .from(SESSIONS_TABLE)
       .update({ session_kind: kind || null, updated_at: new Date().toISOString() })
       .eq('id', session.id)
+    if (error) { reportError('Could not change the session kind', error); return }
+    // Copy the nested object before changing it. Deleting straight out of
+    // next[session.id] edits the object the previous state still holds, and
+    // React may call this updater more than once. Clearing it only after the
+    // write succeeds also means a failed change stays marked unsaved.
     setDirty((prev) => {
+      const row = prev[session.id]
+      if (!row) return prev
+      const { session_kind, ...rest } = row
       const next = { ...prev }
-      if (next[session.id]) { delete next[session.id].session_kind; if (!Object.keys(next[session.id]).length) delete next[session.id] }
+      if (Object.keys(rest).length) next[session.id] = rest
+      else delete next[session.id]
       return next
     })
-    if (error) { reportError('Could not change the session kind', error); return }
+    if (dirtyRef.current[session.id]) {
+      const { session_kind, ...rest } = dirtyRef.current[session.id]
+      const n = { ...dirtyRef.current }
+      if (Object.keys(rest).length) n[session.id] = rest
+      else delete n[session.id]
+      dirtyRef.current = n
+    }
     if (kind) await applyRequiredAttendance(session, kind, [])
   }
 

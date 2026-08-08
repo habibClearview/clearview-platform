@@ -273,6 +273,10 @@ export interface EngagementView {
   // first not-started gate that follows a completed one. null when nothing has
   // started or everything is complete.
   current_dp_id: DpId | null
+  // Plain names of anything that failed to load, so a page can say the view is
+  // incomplete rather than presenting a missing read as an empty engagement.
+  // Empty when everything loaded.
+  load_errors: string[]
 }
 
 export const INDEPENDENCE_TESTS: IndependenceTest[] = [

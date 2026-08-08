@@ -217,6 +217,23 @@ export default function GateSignOffPanel({ clientId, dpId, canManage }) {
     act('authorised', 'lead_consultant', null, null)
   }
 
+  // Authorising with signatures still outstanding is allowed, because a lead
+  // consultant sometimes has to open the next zone while a signature is
+  // travelling. It is not allowed to happen by accident: the button looked
+  // faded but clicked through, so one stray press closed a gate without its
+  // evidence. Now the outstanding roles are named and the override is a
+  // deliberate answer.
+  function authoriseWithCheck() {
+    if (outstanding.length > 0) {
+      const who = outstanding.map(roleLabel).join(', ')
+      const plural = outstanding.length === 1 ? 'has' : 'have'
+      if (typeof window !== 'undefined' && !window.confirm(
+        `${who} ${plural} not signed this gate. Authorising now opens the next zone without their signature. Continue?`,
+      )) return
+    }
+    authorise()
+  }
+
   function submitReturn() {
     if (!returnNote.trim()) { setErr('Name the gap before returning the gate'); return }
     act('returned', 'lead_consultant', returnNote.trim(), null)
@@ -327,10 +344,13 @@ export default function GateSignOffPanel({ clientId, dpId, canManage }) {
             {canManage && !authorised && (
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button
+                  type="button"
                   style={outstanding.length ? { ...solidBtn, opacity: 0.6 } : solidBtn}
-                  onClick={authorise}
+                  onClick={authoriseWithCheck}
                   disabled={busy}
-                  title={outstanding.length ? 'Signatures are still outstanding on this gate' : ''}
+                  title={outstanding.length
+                    ? `Signatures are still outstanding: ${outstanding.map(roleLabel).join(', ')}`
+                    : 'Open the next zone'}
                 >
                   Authorise the next zone
                 </button>

@@ -156,7 +156,10 @@ export function numOrNull(value: unknown): number | null {
  * in, never assumed. With no currency the number prints on its own.
  */
 export function formatAmount(value: number, currency?: string | null, maximumFractionDigits = 0): string {
-  const body = num(value).toLocaleString(undefined, { maximumFractionDigits })
+  // The locale is pinned. Left to the environment, the same figure prints as
+  // 1,250 on one machine and 1.250 on another, and a costing document that
+  // reads differently depending on who opened it is not a costing document.
+  const body = num(value).toLocaleString('en-GB', { maximumFractionDigits })
   const cur = (currency || '').trim()
   return cur ? `${cur} ${body}` : body
 }
@@ -489,8 +492,17 @@ export interface TierCoverage {
  */
 export function requiredTierCoverage(tiers: PricingTierInput[]): TierCoverage[] {
   const list = tiers || []
+  // A row is claimed by one required tier and then taken out of the running.
+  // Matching each key independently let a single row named, for example,
+  // "Entry to Standard bundle" satisfy both entry and standard, so the coach
+  // was shown a complete set of tiers that did not exist and no gap was
+  // raised. One row, one tier.
+  const claimed = new Set<number>()
   return REQUIRED_TIERS.map((req) => {
-    const match = list.find((t) => String((t && t.tier_name) || '').toLowerCase().includes(req.key))
+    const index = list.findIndex((t, i) =>
+      !claimed.has(i) && String((t && t.tier_name) || '').toLowerCase().includes(req.key))
+    const match = index >= 0 ? list[index] : null
+    if (index >= 0) claimed.add(index)
     return {
       key: req.key,
       label: req.label,

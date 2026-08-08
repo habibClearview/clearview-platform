@@ -57,7 +57,10 @@ export default function CoverPanel({ slug }) {
   const parties = view.parties || []
   const gs = view.gate_status || {}
   const done = Object.values(gs).filter((s) => s === 'complete').length
-  const total = 12
+  // Counted from the engagement's own gates rather than fixed at twelve, so an
+  // engagement that runs a different set does not report against a number that
+  // has nothing to do with it.
+  const total = Object.keys(gs).length || 12
 
   const lead = parties.find((p) => p.party_role === 'lead_consultant')
   const co = parties.find((p) => p.party_role === 'co_implementer')

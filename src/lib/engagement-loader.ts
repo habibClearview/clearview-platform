@@ -179,6 +179,27 @@ export async function loadEngagementView(slugOrId: string): Promise<EngagementVi
 
   const current_dp_id = deriveCurrentDp(gate_status)
 
+  // A failed read and an engagement with nothing recorded look identical once
+  // the rows are gone, so the failures are carried out with the view. A page
+  // that shows every gate as not started when the gate query failed is telling
+  // the coach something untrue about their engagement, and telling it
+  // confidently. Callers show a warning when this list is not empty.
+  const load_errors = [
+    ['configuration', configRes.error],
+    ['parties', partiesRes.error],
+    ['deliverables', deliverablesRes.error],
+    ['the deliverable mapping', gateMapRes.error],
+    ['the Charter', charterRes.error],
+    ['meetings', meetingsRes.error],
+    ['the gate status', canvasRes.error],
+  ]
+    .filter(([, e]) => Boolean(e))
+    .map(([what]) => what as string)
+
+  if (load_errors.length > 0) {
+    console.error('loadEngagementView: some queries failed', load_errors)
+  }
+
   return {
     client,
     programme_name,
@@ -193,5 +214,6 @@ export async function loadEngagementView(slugOrId: string): Promise<EngagementVi
     gate_status,
     gate_detail,
     current_dp_id,
+    load_errors,
   }
 }
