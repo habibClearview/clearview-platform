@@ -55,8 +55,17 @@ export async function POST(req: NextRequest) {
     created = true
   } else {
     // Already registered: find them and set the password.
-    const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 })
-    const found = list?.users?.find((u) => (u.email || '').toLowerCase() === email.toLowerCase())
+    // Page through rather than reading the first page only. Stopping at one
+    // page means an existing user further down the list looks like a missing
+    // one, and the caller gets a confusing failure instead of their password
+    // being reset.
+    let found: { id: string } | undefined
+    for (let page = 1; page <= 20 && !found; page++) {
+      const { data: list } = await admin.auth.admin.listUsers({ page, perPage: 200 })
+      const users = list?.users || []
+      found = users.find((u) => (u.email || '').toLowerCase() === email.toLowerCase())
+      if (users.length < 200) break
+    }
     if (!found) {
       return NextResponse.json({ error: createErr?.message || 'Could not create the user' }, { status: 500 })
     }

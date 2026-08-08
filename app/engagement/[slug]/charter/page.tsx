@@ -346,7 +346,7 @@ export default function EngagementCharterPage({ slugOverride }: any = {}) {
   const status = charter?.status || 'draft'
   const statusLabel = status === 'draft' ? 'Draft' : status === 'issued' ? 'Issued' : status === 'signed' ? 'Signed' : 'Superseded'
   const engWindow = (charter?.content && charter.content.window) || null
-  const minConv = view.config?.validation_min_per_segment || DEFAULT_VALIDATION_MIN_PER_SEGMENT
+  const minConv = view.config?.validation_min_per_segment ?? DEFAULT_VALIDATION_MIN_PER_SEGMENT
 
   const metaParts = [beneficiary, programme].filter(Boolean).join(' · ')
   const metaTail = [funder ? `with ${funder}` : null, engWindow].filter(Boolean).join(' · ')
@@ -758,8 +758,7 @@ export default function EngagementCharterPage({ slugOverride }: any = {}) {
                               onClick={() => run(`sign:${p.id}`, () => signCharter({
                                 clientId: view.client.id,
                                 charterId: charter.id,
-                                signerRole: PARTY_ROLE_LABELS[p.party_role] || p.party_role,
-                                signerName: p.name,
+                                signerRole: p.party_role,
                                 signatureMethod: 'click',
                               }), 'Your signature has been recorded on this version.')}
                             >{busy === `sign:${p.id}` ? 'Signing...' : 'Sign here'}</button>

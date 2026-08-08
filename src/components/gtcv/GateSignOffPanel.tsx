@@ -177,11 +177,15 @@ export default function GateSignOffPanel({ clientId, dpId, canManage }) {
   const myRole = me && me.party ? me.party.party_role : null
   const iCanSign = !!myRole && needed.includes(myRole) && !signedRoles.has(myRole)
 
-  async function act(decision, signerRole, signerName, note) {
+  // The route resolves who is signing from the party list, so the name is
+  // never sent from here. What is sent is which role the screen believed it
+  // was acting for, which the route checks rather than trusts, and for a
+  // signature given in the room, which party it belongs to.
+  async function act(decision, signerRole, note, onBehalfOfPartyId) {
     if (busy) return
     setBusy(true)
     try {
-      await postSignoff({ clientId, dpId, decision, signerRole, signerName, note })
+      await postSignoff({ clientId, dpId, decision, signerRole, note, onBehalfOfPartyId })
       setErr(null)
       setReturnOpen(false)
       setReturnNote('')
@@ -194,25 +198,28 @@ export default function GateSignOffPanel({ clientId, dpId, canManage }) {
 
   function signAsMe() {
     if (!me || !me.party) return
-    act('signed', me.party.party_role, me.party.name)
+    act('signed', me.party.party_role, null, null)
   }
 
   function recordSignatureFor(role) {
     const party = partyFor(role)
-    const name = party ? party.name : roleLabel(role)
-    if (typeof window !== 'undefined' && !window.confirm(`Record the signature given in the room by ${name}?`)) return
-    act('signed', role, name)
+    if (!party) {
+      setErr(`Nobody is named as ${roleLabel(role)} on this engagement yet. Add them in Engagement Setup before recording their signature.`)
+      return
+    }
+    if (typeof window !== 'undefined' && !window.confirm(
+      `Record the signature given in the room by ${party.name}? The record will show that you entered it.`,
+    )) return
+    act('signed', party.party_role, null, party.id)
   }
 
   function authorise() {
-    const lc = partyFor('lead_consultant')
-    act('authorised', 'lead_consultant', lc ? lc.name : 'Lead consultant')
+    act('authorised', 'lead_consultant', null, null)
   }
 
   function submitReturn() {
     if (!returnNote.trim()) { setErr('Name the gap before returning the gate'); return }
-    const lc = partyFor('lead_consultant')
-    act('returned', 'lead_consultant', lc ? lc.name : 'Lead consultant', returnNote.trim())
+    act('returned', 'lead_consultant', returnNote.trim(), null)
   }
 
   const gateState = returns.length > 0 && !authorised

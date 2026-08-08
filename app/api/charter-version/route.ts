@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
       .from('engagement_charters')
       .insert({
         client_id: clientId,
-        version: (current.version || 1) + 1,
+        version: (current.version ?? 0) + 1,
         title: current.title,
         content: current.content,
         status: 'draft',

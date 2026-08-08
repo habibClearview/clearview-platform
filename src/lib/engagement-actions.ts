@@ -48,13 +48,18 @@ export function resolveCharterComment(input: {
 }
 
 // ─── Charter signing ─────────────────────────────────────────
+// The signer's identity is resolved on the server from the engagement's party
+// list, so the name is deliberately not sent from here. signerRole is what the
+// screen believed the role to be; the route checks it against the party it
+// resolved and refuses a mismatch rather than accepting the caller's word.
 export function signCharter(input: {
   clientId: string
   charterId: string
   signerRole: string
-  signerName: string
   signatureMethod?: 'click' | 'typed'
   typedName?: string
+  /** Set only when the lead consultant enters a signature given in the room. */
+  onBehalfOfPartyId?: string
 }) {
   return postJson('/api/charter-sign', input)
 }

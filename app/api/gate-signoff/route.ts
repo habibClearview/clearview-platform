@@ -16,10 +16,15 @@
 //   'returned'   the gate goes back with the gap named instead of closing.
 //                Also the lead consultant's call.
 //
-// So: signing is open to a signatory who can view the engagement, and is
-// always recorded as the authenticated user. Authorising and returning
-// require manage rights, which is what resolveClientAccess grants to the
-// super coach and the assigned co-implementer.
+// WHO THE RECORD SAYS SIGNED. The role and name come from the engagement's
+// own party list, resolved server side from the session, and never from the
+// request body. This matters more here than almost anywhere else in the
+// platform: the write is an upsert keyed on the role, so a caller who could
+// choose their own role could overwrite the Executive Director's signature
+// with their own and leave no trace of the original. Resolving the role from
+// the party record closes both holes at once, because only the actual
+// Executive Director, or the lead consultant explicitly recording a signature
+// given in the room, can ever write the Executive Director's row.
 //
 // Service-role route, so it authenticates the caller and authorizes with
 // resolveClientAccess before writing. Database errors are logged server
@@ -29,6 +34,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { getBearerToken } from '@/lib/auth/api-authz'
 import { resolveClientAccess } from '@/lib/auth/engagement-access'
+import { isRefusal, resolveSigner } from '@/lib/auth/signing-party'
 import { checkRateLimit } from '@/lib/rate-limit'
 
 // The three actions a gate record can carry.
@@ -38,9 +44,10 @@ const DECISIONS = ['signed', 'authorised', 'returned']
 // zone and returning a gate are both the lead consultant's, per the method.
 const MANAGE_ONLY = ['authorised', 'returned']
 
-// The role that signs a gate. Party roles come from engagement_parties;
+// The roles that sign a gate. Party roles come from engagement_parties;
 // 'lsp_ed' is the Executive Director. The funder representative co-signs
-// the diagnostic and completion records.
+// the diagnostic and completion records, and the board chair signs the
+// pre-engagement diagnostic and the scale pathway commitment.
 const SIGNING_ROLES = ['lsp_ed', 'funder_rep', 'lsp_board']
 
 function getAdminClient() {
@@ -52,9 +59,15 @@ function getAdminClient() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { clientId, dpId, decision, signerRole, signerName, note } = (await req.json()) as {
-      clientId?: string; dpId?: string; decision?: string
-      signerRole?: string; signerName?: string; note?: string
+    const { clientId, dpId, decision, signerRole, note, onBehalfOfPartyId } = (await req.json()) as {
+      clientId?: string
+      dpId?: string
+      decision?: string
+      /** What the screen believed the role to be. Checked, never trusted. */
+      signerRole?: string
+      note?: string
+      /** Set only when the lead consultant enters a signature given in the room. */
+      onBehalfOfPartyId?: string
     }
 
     if (!clientId || !dpId) {
@@ -62,9 +75,6 @@ export async function POST(req: NextRequest) {
     }
     if (!decision || !DECISIONS.includes(decision)) {
       return NextResponse.json({ error: 'Invalid decision' }, { status: 400 })
-    }
-    if (!signerRole || !signerName) {
-      return NextResponse.json({ error: 'Signer role and name are required' }, { status: 400 })
     }
 
     const admin = getAdminClient()
@@ -87,13 +97,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Signing is the Executive Director's, with the funder representative
-    // co-signing the diagnostic and completion records. Someone with manage
-    // rights may also record a signature taken in the room.
-    if (decision === 'signed' && !SIGNING_ROLES.includes(signerRole) && !access.canManage) {
-      return NextResponse.json({ error: 'That role does not sign this gate' }, { status: 403 })
-    }
-
     const rl = await checkRateLimit(admin, `gate-signoff:${user.id}`, 60, 3600)
     if (!rl.allowed) {
       return NextResponse.json(
@@ -102,18 +105,63 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // One record per role per action per gate: repeating an action updates
-    // the row rather than stacking duplicates. signer_user_id always comes
-    // from the authenticated session, never from the request body.
     const now = new Date().toISOString()
+
+    // Authorising and returning are the lead consultant acting as themselves
+    // in their platform role, not a party signature, so they are recorded
+    // against the caller directly.
+    if (decision !== 'signed') {
+      const { data, error } = await admin
+        .from('gtcv_gate_signoffs')
+        .upsert({
+          client_id: clientId,
+          dp_id: dpId,
+          signer_role: 'lead_consultant',
+          signer_name: access.fullName || 'Lead consultant',
+          signer_user_id: user.id,
+          recorded_by_user_id: user.id,
+          signature_method: 'self',
+          decision,
+          note: note || null,
+          signed_at: now,
+        }, { onConflict: 'client_id,dp_id,signer_role,decision' })
+        .select('id')
+        .single()
+
+      if (error) {
+        console.error('gate-signoff POST: write failed', error)
+        return NextResponse.json({ error: 'Could not record the sign-off' }, { status: 500 })
+      }
+      return NextResponse.json({ ok: true, id: data.id, dpId, decision })
+    }
+
+    // Signing. The identity comes from the party list, so nobody can sign as
+    // anybody else and nobody can overwrite another party's row.
+    const signer = await resolveSigner(admin, {
+      clientId,
+      userId: user.id,
+      canManage: access.canManage,
+      onBehalfOfPartyId: onBehalfOfPartyId || null,
+      expectedRole: signerRole || null,
+    })
+    if (isRefusal(signer)) {
+      return NextResponse.json({ error: signer.error }, { status: signer.status })
+    }
+
+    if (!SIGNING_ROLES.includes(signer.party.party_role)) {
+      return NextResponse.json({ error: 'That role does not sign a gate' }, { status: 403 })
+    }
+
     const { data, error } = await admin
       .from('gtcv_gate_signoffs')
       .upsert({
         client_id: clientId,
         dp_id: dpId,
-        signer_role: signerRole,
-        signer_name: signerName,
-        signer_user_id: user.id,
+        signer_role: signer.party.party_role,
+        signer_name: signer.party.name,
+        signer_user_id: signer.signerUserId,
+        recorded_by_user_id: signer.recordedBy,
+        signature_method: signer.mode,
         decision,
         note: note || null,
         signed_at: now,
@@ -126,7 +174,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Could not record the sign-off' }, { status: 500 })
     }
 
-    return NextResponse.json({ ok: true, id: data.id, dpId, decision })
+    return NextResponse.json({
+      ok: true,
+      id: data.id,
+      dpId,
+      decision,
+      signerRole: signer.party.party_role,
+      signerName: signer.party.name,
+      mode: signer.mode,
+    })
   } catch (e: any) {
     console.error('gate-signoff POST: unexpected error', e)
     return NextResponse.json({ error: 'Could not record the sign-off' }, { status: 500 })
