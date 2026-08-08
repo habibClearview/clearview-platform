@@ -349,6 +349,7 @@ export const CANVAS_TABS = [
   { id: 'eng_setup',    label: 'Engagement Setup',         number: 5,  phase: 'setup' },
   { id: 'diagnostic',   label: 'Pre-Engagement Diagnostic',number: 6,  phase: 'setup' },
   { id: 'sessions',     label: 'Sessions and Rooms',       number: 7,  phase: 'any' },
+  { id: 'deliverables', label: 'Deliverables and Claims',  number: 7,  phase: 'any', coachOnly: true },
   { id: 'tracker',      label: 'Engagement Tracker',       number: 8,  phase: 'phase0' },
   { id: 'decisions',    label: 'Canvas Decision Record',   number: 8,  phase: 'phase0' },
   { id: 'evidence',     label: 'Evidence Library',         number: 9,  phase: 'phase0' },
