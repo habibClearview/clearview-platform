@@ -59,6 +59,21 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // The charter has to belong to this client. Without the check, someone who
+    // can view client A could post a comment carrying client B's charter_id,
+    // and the Charter page, which reads comments by charter_id, would show it
+    // to client B. The composite foreign key added in
+    // 2026_08_09_charter_child_integrity.sql stops the write regardless; this
+    // turns a database error into a plain answer.
+    const { data: parent } = await admin
+      .from('engagement_charters')
+      .select('id, client_id')
+      .eq('id', body.charterId)
+      .maybeSingle()
+    if (!parent || parent.client_id !== body.clientId) {
+      return NextResponse.json({ error: 'Charter not found for this client' }, { status: 404 })
+    }
+
     const { data, error } = await admin
       .from('charter_comments')
       .insert({
@@ -73,7 +88,10 @@ export async function POST(req: NextRequest) {
       })
       .select('id')
       .single()
-    if (error) return NextResponse.json({ error: 'Could not save the comment' }, { status: 500 })
+    if (error) {
+      console.error('charter-comment POST: write failed', error)
+      return NextResponse.json({ error: 'Could not save the comment' }, { status: 500 })
+    }
 
     return NextResponse.json({ ok: true, id: data.id })
   } catch (e: any) {

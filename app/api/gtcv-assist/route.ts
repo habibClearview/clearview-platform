@@ -44,6 +44,7 @@ import { CLEARVIEW_STYLE } from '@/lib/ai-style'
 import { getBearerToken } from '@/lib/auth/api-authz'
 import { resolveClientAccess } from '@/lib/auth/engagement-access'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { fetchWithTimeout } from '@/lib/validate-input'
 
 // The shared instruction. It sits in front of every task, and every line of
 // it is there to stop the model doing a coach's thinking for them.
@@ -194,7 +195,7 @@ export async function POST(req: NextRequest) {
       material,
     ].join('\n')
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -207,11 +208,13 @@ export async function POST(req: NextRequest) {
         system: `${CLEARVIEW_STYLE} ${ASSIST_GUARD}`,
         messages: [{ role: 'user', content: prompt }],
       }),
-    })
+    }, 45000)
 
     if (!response.ok) {
       // Generic on purpose. The upstream message can carry account and key
-      // detail that has no business reaching a browser.
+      // detail that has no business reaching a browser, so it goes to the log.
+      const detail = await response.text().catch(() => '')
+      console.error('gtcv-assist: model call failed', response.status, detail)
       return NextResponse.json({ error: 'The draft could not be generated. Please try again.' }, { status: 502 })
     }
 
@@ -224,7 +227,10 @@ export async function POST(req: NextRequest) {
     // A draft, and labelled as one. Nothing has been written anywhere: the
     // coach accepts or discards it on the surface that asked for it.
     return NextResponse.json({ draft: text, task, status: 'draft' })
-  } catch {
+  } catch (e) {
+    // A caught error that nobody records is a fault nobody can find. The
+    // reply stays generic; the reason goes to the log.
+    console.error('gtcv-assist: unexpected error', e)
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 })
   }
 }

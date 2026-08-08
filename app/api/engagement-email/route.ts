@@ -18,6 +18,7 @@
 // ============================================================
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { cleanRecipients, isWebUrl } from '@/lib/validate-input'
 import { getBearerToken } from '@/lib/auth/api-authz'
 import { checkRateLimit } from '@/lib/rate-limit'
 import {
@@ -50,10 +51,14 @@ export async function POST(req: NextRequest) {
     if (stage !== 'scope' && stage !== 'triparty') {
       return NextResponse.json({ error: 'Invalid stage' }, { status: 400 })
     }
-    if (!Array.isArray(recipients) || recipients.length === 0) {
-      return NextResponse.json({ error: 'At least one recipient is required' }, { status: 400 })
+    // An unbounded recipient list turns one authorised send into a mailshot,
+    // and a link that is not a web address is a way to hand a reader something
+    // other than the page they think they are opening.
+    const cleaned = cleanRecipients(recipients)
+    if (!cleaned.ok) return NextResponse.json({ error: cleaned.error }, { status: 400 })
+    if (!isWebUrl(journeyUrl)) {
+      return NextResponse.json({ error: 'The journey link must be a web address' }, { status: 400 })
     }
-    if (!journeyUrl) return NextResponse.json({ error: 'Missing journeyUrl' }, { status: 400 })
 
     const token = getBearerToken(req)
     if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
@@ -154,14 +159,14 @@ export async function POST(req: NextRequest) {
 
     const { subject, html } = stage === 'scope' ? buildScopeEmail(cfg) : buildTriPartyEmail(cfg)
 
-    const result = await sendEmail({ to: recipients, subject, html })
+    const result = await sendEmail({ to: cleaned.recipients, subject, html })
     if (!result.sent) {
       // The provider rejected the send (bad key, provider error). Report it
       // without crashing so the caller can retry or show the link.
       return NextResponse.json({ ok: false, emailConfigured: true, reason: result.reason }, { status: 502 })
     }
 
-    return NextResponse.json({ ok: true, stage, recipients: recipients.length })
+    return NextResponse.json({ ok: true, stage, recipients: cleaned.recipients.length })
   } catch (e: any) {
     console.error('engagement-email: unexpected error', e)
     return NextResponse.json({ error: 'Could not send the engagement email' }, { status: 500 })

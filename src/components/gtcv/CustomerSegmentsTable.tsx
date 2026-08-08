@@ -171,6 +171,7 @@ export default function CustomerSegmentsTable({ clientId, canManage }) {
   const [msg, setMsg] = useState(null)
   const [adding, setAdding] = useState(false)
   const timers = useRef({})
+  const pending = useRef({})
   const alive = useRef(true)
 
   useEffect(() => {
@@ -200,18 +201,31 @@ export default function CustomerSegmentsTable({ clientId, canManage }) {
 
   // Edit locally at once, write to the database 600ms after typing stops.
   // One timer per row, so two rows edited together do not cancel each other.
+  // Changes accumulate per row rather than the timer closing over the last
+  // one. Editing two fields inside the debounce window used to send only the
+  // second, so the first was lost quietly: local state still showed it, and it
+  // vanished on reload. Merging into a pending bag and sending the bag fixes
+  // that. A failed write puts the changes back so the next edit carries them.
   function patch(id, changes) {
     if (!canManage) return
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...changes } : r)))
     setStatus('saving'); setMsg(null)
+    pending.current[id] = { ...(pending.current[id] || {}), ...changes }
     clearTimeout(timers.current[id])
     timers.current[id] = setTimeout(async () => {
+      const merged = pending.current[id] || {}
+      delete pending.current[id]
       const { error } = await supabase
         .from(TABLE)
-        .update({ ...changes, updated_at: new Date().toISOString() })
+        .update({ ...merged, updated_at: new Date().toISOString() })
         .eq('id', id)
       if (!alive.current) return
-      if (error) { setStatus('error'); setMsg(error.message) } else { setStatus('saved'); setMsg(null) }
+      if (error) {
+        pending.current[id] = { ...merged, ...(pending.current[id] || {}) }
+        setStatus('error'); setMsg(error.message)
+      } else {
+        setStatus('saved'); setMsg(null)
+      }
     }, 600)
   }
 

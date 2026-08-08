@@ -34,7 +34,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { CLEARVIEW_STYLE } from '@/lib/ai-style'
 import { getBearerToken } from '@/lib/auth/api-authz'
 import { resolveClientAccess } from '@/lib/auth/engagement-access'
-import { brandedEmail, emailAvailable, sendEmail } from '@/lib/email'
+import { brandedEmail, emailAvailable, escapeHtml, raw, sendEmail } from '@/lib/email'
 import { checkRateLimit } from '@/lib/rate-limit'
 
 function getAdminClient() {
@@ -323,17 +323,21 @@ export async function POST(req: NextRequest) {
 
       const gates = Array.isArray(pack.gates) ? pack.gates : []
       const gapLines = gates.filter((g: any) => g.gap).map((g: any) => `${g.label}: ${g.gap}`)
-      const paragraphs = [
-        ...(pack.covering_note ? String(pack.covering_note).split(/\n{2,}/).map((p: string) => p.trim()).filter(Boolean) : []),
-        `<b>Amount claimed:</b> ${money(pack.amount, pack.currency || 'USD')}`,
-        '<b>Decision gates evidencing this claim</b>',
-        gates.map((g: any) =>
-          `${g.label}: ${g.evidence_count} evidence ${g.evidence_count === 1 ? 'entry' : 'entries'}, ${g.signature_count} ${g.signature_count === 1 ? 'signature' : 'signatures'}`,
-        ).join('<br/>'),
+      // The covering note and the gate labels are text a person typed, so they
+      // are escaped. Only the markup this route writes itself is passed raw.
+      const paragraphs: any[] = [
+        ...(pack.covering_note
+          ? String(pack.covering_note).split(/\n{2,}/).map((p: string) => p.trim()).filter(Boolean)
+          : []),
+        raw(`<b>Amount claimed:</b> ${escapeHtml(money(pack.amount, pack.currency || 'USD'))}`),
+        raw('<b>Decision gates evidencing this claim</b>'),
+        raw(gates.map((g: any) =>
+          `${escapeHtml(g.label)}: ${g.evidence_count} evidence ${g.evidence_count === 1 ? 'entry' : 'entries'}, ${g.signature_count} ${g.signature_count === 1 ? 'signature' : 'signatures'}`,
+        ).join('<br/>')),
       ]
       if (gapLines.length > 0) {
-        paragraphs.push('<b>Noted gaps</b>')
-        paragraphs.push(gapLines.join('<br/>'))
+        paragraphs.push(raw('<b>Noted gaps</b>'))
+        paragraphs.push(raw(gapLines.map((l: string) => escapeHtml(l)).join('<br/>')))
       }
 
       const html = brandedEmail({

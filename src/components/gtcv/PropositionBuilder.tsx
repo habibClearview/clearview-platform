@@ -144,6 +144,7 @@ export default function PropositionBuilder({ clientId, canManage }) {
   const [msg, setMsg] = useState(null)
   const [adding, setAdding] = useState(false)
   const timers = useRef({})
+  const pending = useRef({})
   const alive = useRef(true)
 
   useEffect(() => {
@@ -177,16 +178,27 @@ export default function PropositionBuilder({ clientId, canManage }) {
 
   // Edit locally at once, write 600ms after typing stops. One timer per
   // record so simultaneous edits do not cancel each other.
+  // Changes accumulate per record rather than the timer closing over the last
+  // one. Editing two fields inside the debounce window used to send only the
+  // second, and the first was lost quietly on reload.
   function schedule(table, id, changes, key) {
     setStatus('saving'); setMsg(null)
+    pending.current[key] = { ...(pending.current[key] || {}), ...changes }
     clearTimeout(timers.current[key])
     timers.current[key] = setTimeout(async () => {
+      const merged = pending.current[key] || {}
+      delete pending.current[key]
       const { error } = await supabase
         .from(table)
-        .update({ ...changes, updated_at: new Date().toISOString() })
+        .update({ ...merged, updated_at: new Date().toISOString() })
         .eq('id', id)
       if (!alive.current) return
-      if (error) { setStatus('error'); setMsg(error.message) } else { setStatus('saved'); setMsg(null) }
+      if (error) {
+        pending.current[key] = { ...merged, ...(pending.current[key] || {}) }
+        setStatus('error'); setMsg(error.message)
+      } else {
+        setStatus('saved'); setMsg(null)
+      }
     }, 600)
   }
 

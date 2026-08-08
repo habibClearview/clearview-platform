@@ -144,12 +144,19 @@ export default function ServiceInventoryTable({ clientId, canManage }) {
     if (!row) return
     const patch = { updated_at: new Date().toISOString() }
     fields.forEach((f) => { patch[f] = row[f] === '' ? null : row[f] })
-    setDirty((prev) => { const next = { ...prev }; delete next[id]; return next })
-    dirtyRef.current = (() => { const n = { ...dirtyRef.current }; delete n[id]; return n })()
+    // The row stays marked unsaved until the write comes back. Clearing it
+    // first made the Save button disappear on a failed write, so the coach saw
+    // an error with nothing left to retry and lost the edit on reload.
     setStatus('saving')
     const { error } = await supabase.from(TABLE).update(patch).eq('id', id)
-    if (error) { setErr('Could not save: ' + error.message); setStatus('idle') }
-    else { setErr(null); setStatus('saved') }
+    if (error) {
+      setErr('Could not save. Your changes are still here, try again.')
+      setStatus('idle')
+      return
+    }
+    setDirty((prev) => { const next = { ...prev }; delete next[id]; return next })
+    dirtyRef.current = (() => { const n = { ...dirtyRef.current }; delete n[id]; return n })()
+    setErr(null); setStatus('saved')
   }
 
   async function saveAll() {

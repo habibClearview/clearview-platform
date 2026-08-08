@@ -144,11 +144,38 @@ export async function POST(req: NextRequest) {
     // Re-issue: supersede this version and open the next one as a draft
     // carrying the content forward. Existing signatures stay attached to the
     // superseded version, which is the record of what each party agreed to.
-    const { error: supErr } = await admin
+    //
+    // Only a live version can be re-issued. Re-issuing one that is already
+    // superseded would fork the history into two live drafts, and neither
+    // would be the version the parties are looking at.
+    if (current.status !== 'issued' && current.status !== 'draft') {
+      return NextResponse.json(
+        { error: 'That version is no longer the live one. Re-issue the current version instead.' },
+        { status: 409 },
+      )
+    }
+
+    // The two writes are guarded rather than transactional, because PostgREST
+    // has no transaction across calls. The supersede is conditional on the
+    // status still being what was read, so two people pressing Re-issue at the
+    // same moment produce one new version rather than two. The second gets a
+    // plain answer instead of a fork.
+    const { data: superseded, error: supErr } = await admin
       .from('engagement_charters')
       .update({ status: 'superseded', updated_at: now })
       .eq('id', charterId)
-    if (supErr) return NextResponse.json({ error: 'Could not supersede the current version' }, { status: 500 })
+      .eq('status', current.status)
+      .select('id')
+    if (supErr) {
+      console.error('charter-version POST: supersede failed', supErr)
+      return NextResponse.json({ error: 'Could not supersede the current version' }, { status: 500 })
+    }
+    if (!superseded || superseded.length === 0) {
+      return NextResponse.json(
+        { error: 'Somebody else changed this Charter a moment ago. Reload and try again.' },
+        { status: 409 },
+      )
+    }
 
     const { data: made, error: newErr } = await admin
       .from('engagement_charters')

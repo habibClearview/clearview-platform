@@ -11,10 +11,20 @@
 // ============================================================
 import { timingSafeEqual } from 'crypto'
 
-/** True only on a non production environment. */
+/**
+ * True only when the environment positively says it is not production.
+ *
+ * The earlier version returned true when neither variable was set, which is
+ * exactly backwards: an unknown environment is the one case where you must
+ * assume the worst. A missing variable is a misconfiguration, and a
+ * misconfiguration must not open a route that creates users and grants the
+ * super coach role. So an environment that does not name itself is refused.
+ */
 export function nonProductionOnly(): boolean {
   const appEnv = (process.env.NEXT_PUBLIC_APP_ENV || '').toLowerCase()
   const vercelEnv = (process.env.VERCEL_ENV || '').toLowerCase()
+  const named = appEnv || vercelEnv
+  if (!named) return false
   return appEnv !== 'production' && vercelEnv !== 'production'
 }
 

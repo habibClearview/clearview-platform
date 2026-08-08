@@ -450,6 +450,13 @@ export default function SessionPlanner({ clientId, canManage }) {
     setStatus('idle')
   }
 
+  // Database error text is for the log, not for the coach. It names tables and
+  // columns, which tells them nothing and tells anyone watching too much.
+  function reportError(what, error) {
+    console.error('SessionPlanner: ' + what, error)
+    setErr(what + '. Try again.')
+  }
+
   async function saveSession(id) {
     const fields = Object.keys(dirtyRef.current[id] || {})
     if (!fields.length) return
@@ -461,16 +468,26 @@ export default function SessionPlanner({ clientId, canManage }) {
       if (f === 'duration_minutes') patch[f] = v === '' || v === null ? null : Number(v)
       else patch[f] = v === '' ? null : v
     })
-    setDirty((prev) => { const next = { ...prev }; delete next[id]; return next })
-    dirtyRef.current = (() => { const n = { ...dirtyRef.current }; delete n[id]; return n })()
+    // The session stays marked unsaved until the write comes back, so a failed
+    // write leaves something to retry rather than removing the Save button and
+    // losing the edit on reload.
     setStatus('saving')
     const { error } = await supabase.from(SESSIONS_TABLE).update(patch).eq('id', id)
-    if (error) { setErr('Could not save the session: ' + error.message); setStatus('idle') }
-    else { setErr(null); setStatus('saved') }
+    if (error) {
+      setErr('Could not save the session. Your changes are still here, try again.')
+      setStatus('idle')
+      return
+    }
+    setDirty((prev) => { const next = { ...prev }; delete next[id]; return next })
+    dirtyRef.current = (() => { const n = { ...dirtyRef.current }; delete n[id]; return n })()
+    setErr(null); setStatus('saved')
   }
 
   async function saveAll() {
-    for (const id of Object.keys(dirtyRef.current)) await saveSession(id)
+    // Snapshot the list first. A row that fails to save stays dirty now, so
+    // reading the live keys mid-loop would revisit it forever.
+    const ids = Object.keys(dirtyRef.current)
+    for (const id of ids) await saveSession(id)
   }
 
   // Insert the required attendance rows for a room, so the coach sees who
@@ -505,16 +522,16 @@ export default function SessionPlanner({ clientId, canManage }) {
     let inserted = []
     if (toInsert.length) {
       const { data, error } = await supabase.from(ATTENDANCE_TABLE).insert(toInsert).select()
-      if (error) { setErr('Could not set the required attendees: ' + error.message); return }
+      if (error) { reportError('Could not set the required attendees', error); return }
       inserted = data || []
     }
     if (toMark.length) {
       const { error } = await supabase.from(ATTENDANCE_TABLE).update({ required: true }).in('id', toMark)
-      if (error) { setErr('Could not set the required attendees: ' + error.message); return }
+      if (error) { reportError('Could not set the required attendees', error); return }
     }
     if (noLonger.length) {
       const { error } = await supabase.from(ATTENDANCE_TABLE).update({ required: false }).in('id', noLonger)
-      if (error) { setErr('Could not clear the previous requirement: ' + error.message); return }
+      if (error) { reportError('Could not clear the previous requirement', error); return }
     }
 
     setErr(null)
@@ -539,7 +556,7 @@ export default function SessionPlanner({ clientId, canManage }) {
       if (next[session.id]) { delete next[session.id].session_kind; if (!Object.keys(next[session.id]).length) delete next[session.id] }
       return next
     })
-    if (error) { setErr('Could not change the session kind: ' + error.message); return }
+    if (error) { reportError('Could not change the session kind', error); return }
     if (kind) await applyRequiredAttendance(session, kind, [])
   }
 
@@ -560,7 +577,7 @@ export default function SessionPlanner({ clientId, canManage }) {
     }
     const { data, error } = await supabase.from(SESSIONS_TABLE).insert([payload]).select().single()
     setBusy(false)
-    if (error) { setErr('Could not add the session: ' + error.message); return }
+    if (error) { reportError('Could not add the session', error); return }
     setErr(null)
     setSessions((prev) => [...prev, data])
     setPickerDp(null)
@@ -576,7 +593,7 @@ export default function SessionPlanner({ clientId, canManage }) {
     setAttendance((prev) => prev.filter((a) => a.session_id !== id))
     setDirty((prev) => { const next = { ...prev }; delete next[id]; return next })
     const { error } = await supabase.from(SESSIONS_TABLE).delete().eq('id', id)
-    if (error) setErr('Could not delete the session: ' + error.message)
+    if (error) reportError('Could not delete the session', error)
     else setErr(null)
   }
 
@@ -588,7 +605,7 @@ export default function SessionPlanner({ clientId, canManage }) {
       const nextVal = row.attended ? null : true
       setAttendance((prev) => prev.map((a) => (a.id === row.id ? { ...a, attended: nextVal } : a)))
       const { error } = await supabase.from(ATTENDANCE_TABLE).update({ attended: nextVal }).eq('id', row.id)
-      if (error) setErr('Could not record attendance: ' + error.message)
+      if (error) reportError('Could not record attendance', error)
       else setErr(null)
       return
     }
@@ -597,7 +614,7 @@ export default function SessionPlanner({ clientId, canManage }) {
       party_role: party.party_role, required: false, attended: true,
     }
     const { data, error } = await supabase.from(ATTENDANCE_TABLE).insert([insert]).select().single()
-    if (error) { setErr('Could not record attendance: ' + error.message); return }
+    if (error) { reportError('Could not record attendance', error); return }
     setErr(null)
     setAttendance((prev) => [...prev, data])
   }

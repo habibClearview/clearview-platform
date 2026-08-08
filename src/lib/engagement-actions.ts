@@ -83,6 +83,14 @@ export async function sendEngagementEmail(input: {
   if (res.status === 401 || res.status === 403) {
     throw new Error(data?.error || 'You do not have permission to send this email')
   }
+  // Any other failure is a failure. Returning the body on a 500 made the
+  // screen say the email had gone when nothing had been sent, which is the
+  // worst possible answer: the coach stops waiting for a reply that will
+  // never come. The one case that is not a failure is email being switched
+  // off, which the route answers with 200 and emailConfigured false.
+  if (!res.ok) {
+    throw new Error(data?.error || 'The email could not be sent. Try again.')
+  }
   return data as { ok?: boolean; emailConfigured?: boolean; message?: string; reason?: string }
 }
 

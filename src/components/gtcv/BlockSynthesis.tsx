@@ -101,13 +101,25 @@ export default function BlockSynthesis({ clientId, dpId, canManage }) {
   async function save() {
     if (busy || !canManage) return
     setBusy(true); setNote('')
-    const { error } = await supabase
+    // An update that matches no row succeeds and changes nothing, so the
+    // count is what says whether anything was actually written. Without it a
+    // gate that has no row yet reports Saved and loses the text on reload.
+    const { data, error } = await supabase
       .from('canvas_decision_points')
       .update({ evidence_summary: text, last_reviewed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       .eq('client_id', clientId)
       .eq('dp_id', dpId)
+      .select('dp_id')
     setBusy(false)
-    if (error) { setNote('Could not save. Try again.'); return }
+    if (error) {
+      console.error('BlockSynthesis: save failed', error)
+      setNote('Could not save. Your text is still here, try again.')
+      return
+    }
+    if (!data || data.length === 0) {
+      setNote('This gate has no record yet, so there is nothing to save it against. Open the gate once from the tracker, then save again.')
+      return
+    }
     setSaved(text)
     setNote('Saved to the gate record.')
   }

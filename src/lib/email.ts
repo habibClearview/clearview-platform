@@ -47,47 +47,102 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   if (!key) return { sent: false, reason: 'RESEND_API_KEY is not configured' }
 
   const to = Array.isArray(input.to) ? input.to : [input.to]
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: FROM_ADDRESS,
-      to,
-      subject: input.subject,
-      html: input.html,
-      ...(input.replyTo ? { reply_to: input.replyTo } : {}),
-    }),
-  })
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '')
-    return { sent: false, reason: `Resend responded ${res.status}: ${detail}` }
+
+  // A request with no ceiling can hold a serverless invocation open until the
+  // platform kills it, and the caller never learns what happened.
+  const abort = new AbortController()
+  const timer = setTimeout(() => abort.abort(), 15000)
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: FROM_ADDRESS,
+        to,
+        subject: input.subject,
+        html: input.html,
+        ...(input.replyTo ? { reply_to: input.replyTo } : {}),
+      }),
+      signal: abort.signal,
+    })
+    if (!res.ok) {
+      // The provider's own text goes to the log. What comes back to a caller,
+      // and from there possibly to a screen, says only that it did not send.
+      const detail = await res.text().catch(() => '')
+      console.error('sendEmail: provider rejected the request', res.status, detail)
+      return { sent: false, reason: 'The email provider did not accept the message' }
+    }
+    return { sent: true }
+  } catch (e) {
+    console.error('sendEmail: request failed', e)
+    return { sent: false, reason: 'The email provider could not be reached' }
+  } finally {
+    clearTimeout(timer)
   }
-  return { sent: true }
+}
+
+/**
+ * Escape text destined for an HTML email.
+ *
+ * Everything the template interpolates comes from somewhere a person typed:
+ * an organisation name, a coach's name, a covering note. An ampersand in an
+ * organisation name breaks the markup and a stray angle bracket does worse, so
+ * text is escaped rather than trusted. Callers that genuinely need markup, for
+ * example a list of gates, pass it through `raw`.
+ */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/** Mark a string as already-safe markup, so brandedEmail leaves it alone. */
+export function raw(markup: string): { __html: string } {
+  return { __html: markup }
+}
+
+function render(value: string | { __html: string } | undefined): string {
+  if (value === undefined || value === null) return ''
+  if (typeof value === 'object' && '__html' in value) return value.__html
+  return escapeHtml(value)
 }
 
 // ─── Branded template ────────────────────────────────────────
 // Inline hex colours (email clients do not support CSS variables), matching
 // the existing OTP template: navy #1B2A41, cyan #00CCCC, cream #F5F0E8.
 
+export type EmailText = string | { __html: string }
+
 export interface BrandedEmailInput {
-  heading: string
-  /** Paragraphs of body text, in order. Plain strings, rendered as <p>. */
-  paragraphs: string[]
+  heading: EmailText
+  /**
+   * Paragraphs of body text, in order. Plain strings are escaped. Pass
+   * raw('...') for a paragraph that is deliberately markup.
+   */
+  paragraphs: EmailText[]
   ctaLabel?: string
   ctaUrl?: string
-  footNote?: string
+  footNote?: EmailText
 }
 
 export function brandedEmail(input: BrandedEmailInput): string {
   const body = input.paragraphs
-    .map((p) => `<p style="margin:0 0 14px;">${p}</p>`)
+    .map((p) => `<p style="margin:0 0 14px;">${render(p)}</p>`)
     .join('')
+  // A link only goes in when its address is one a browser will follow safely.
+  // A javascript: or data: address in a mail template is a way to hand a
+  // reader something that is not the page they think they are opening.
+  const safeCtaUrl = input.ctaUrl && /^https?:\/\//i.test(input.ctaUrl) ? input.ctaUrl : null
   const cta =
-    input.ctaLabel && input.ctaUrl
-      ? `<p style="margin:22px 0 6px;"><a href="${input.ctaUrl}" style="display:inline-block;background:#00767A;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:8px;">${input.ctaLabel}</a></p>`
+    input.ctaLabel && safeCtaUrl
+      ? `<p style="margin:22px 0 6px;"><a href="${escapeHtml(safeCtaUrl)}" style="display:inline-block;background:#00767A;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:8px;">${escapeHtml(input.ctaLabel)}</a></p>`
       : ''
   const foot = input.footNote
-    ? `<p style="color:#4A5A6A;font-size:13px;margin:18px 0 0;">${input.footNote}</p>`
+    ? `<p style="color:#4A5A6A;font-size:13px;margin:18px 0 0;">${render(input.footNote)}</p>`
     : ''
   return `
     <div style="font-family:'Segoe UI',system-ui,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">
@@ -96,7 +151,7 @@ export function brandedEmail(input: BrandedEmailInput): string {
         <p style="margin:4px 0 0;font-size:20px;color:#F5F0E8;font-family:Georgia,serif;">Grant-to-Commercial Viability</p>
       </div>
       <div style="background:#F5F0E8;padding:26px 24px;border-radius:0 0 8px 8px;border:1px solid #D8E0E8;border-top:none;color:#1B2A41;line-height:1.6;">
-        <h1 style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin:0 0 14px;">${input.heading}</h1>
+        <h1 style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin:0 0 14px;">${render(input.heading)}</h1>
         ${body}
         ${cta}
         ${foot}
