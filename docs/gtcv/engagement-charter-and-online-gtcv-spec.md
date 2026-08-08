@@ -209,15 +209,15 @@ first instance:
   financial model independently by the end of the Commercial Viability phase; its **Field Team**
   conducts the validation conversations and pilots under the capture discipline; its **Board** approves
   the Scale Pathway Commitment.
-- **The Lead Consultant / Coach (Habib · The Canvas Coach)** — owns and runs the method; holds every
+- **The Lead Consultant / Coach** (named per engagement) — owns and runs the method; holds every
   decision gate (no zone opens until the prior gate closes with evidence); brings local market
   calibration; present for the core gate sessions; runs the first pilot iteration and backstops the
-  second; approves all reports before they reach the funder; co-evaluates and signs the handover.
-  Retains all IP (GtCV Canvas™, tools, ClearView).
-- **The In-Country Associate / Co-implementer (Ganiat Ettu)** — leads the interim working sessions and
-  provides day-to-day continuity; owns engagement setup and administration; drafts gate
-  outputs for review; supervises fieldwork; trains the Finance Lead on the model; submits the weekly
-  report for approval.
+  second; **approves the co-implementer's work — gate outputs and reports — before it reaches the
+  client/funder**; co-evaluates and signs the handover. Retains all IP (GtCV Canvas™, tools, ClearView).
+- **The In-Country Associate / Co-implementer** (named per engagement; absent in a solo engagement) —
+  leads the interim working sessions and provides day-to-day continuity; owns engagement setup and
+  administration; **drafts the gate outputs and the weekly report for the lead's approval**;
+  supervises fieldwork; trains the Finance Lead on the model.
 - **(Where applicable) a Licensed Advisor** — delivers the method under licence within their own
   engagements, with attribution preserved intact.
 
@@ -225,6 +225,12 @@ first instance:
 > visits, or "remote." Presence is stated neutrally ("lead present" / "co-implementer present"), so the
 > wording holds whether the coach flies in, is co-located, or delivers solo. In a solo engagement the
 > co-implementer section simply does not appear (config-driven).
+
+> **Roles are fixed; the people are configuration (Habib).** "Lead Consultant" and "Co-implementer"
+> are **roles, not people** — anyone can be named to either (from `engagement_parties`); never hardcode
+> a person. For the Tanager engagement the Lead is Habib Onifade and the Co-implementer is Ganiat Ettu,
+> but that is instance data. The **Lead always approves the Co-implementer's work** (gate outputs and
+> the weekly report) before it leaves the team — this is a role rule, independent of who fills it.
 
 ### 6.4 Roles & permission phases (system-enforced)
 The source enforces access by instruction and by keeping finance in a separate file; the web app
