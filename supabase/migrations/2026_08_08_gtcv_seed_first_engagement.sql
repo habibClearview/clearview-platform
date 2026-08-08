@@ -71,7 +71,11 @@ select * from (values
   ('client-ikore', 'lsp_leadership',  'Leadership Team',        'Ikore',   null,                  false, 4),
   ('client-ikore', 'lsp_finance',     'Finance Lead',           'Ikore',   'Finance Lead',        false, 5),
   ('client-ikore', 'lsp_field',       'Field Team',             'Ikore',   null,                  false, 6),
-  ('client-ikore', 'lsp_board',       'Board Chair',            'Ikore',   'Board Chair',         false, 7),
+  -- The board chair signs the pre-engagement diagnostic record and approves
+  -- the scale pathway commitment, so they are a signatory. Marked false here
+  -- originally, which meant the lead consultant could not even record their
+  -- signature, because only a signatory can be recorded.
+  ('client-ikore', 'lsp_board',       'Board Chair',            'Ikore',   'Board Chair',         true,  7),
   ('client-ikore', 'lead_consultant', 'Habib Onifade',          'The Canvas Coach', 'Lead Consultant', true, 8),
   ('client-ikore', 'co_implementer',  'Ganiat Ettu',            'The Canvas Coach', 'Co-implementer',  false, 9)
 ) as v(client_id, party_role, name, organisation, title, is_signatory, sort_order)
