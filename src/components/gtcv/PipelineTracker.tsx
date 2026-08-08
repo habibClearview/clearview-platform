@@ -185,7 +185,7 @@ export default function PipelineTracker({ clientId, canManage }) {
 
   const textCell = (row, field, placeholder) => (
     canManage
-      ? <input style={inp} value={row[field] || ''} placeholder={placeholder}
+      ? <input aria-label={placeholder || field} style={inp} value={row[field] || ''} placeholder={placeholder}
           onChange={(e) => edit(row.id, field, e.target.value)}
           onBlur={(e) => commit(row.id, { [field]: e.target.value || null })} />
       : <span>{row[field] || '-'}</span>
@@ -223,7 +223,7 @@ export default function PipelineTracker({ clientId, canManage }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.7rem' }}>
           <h3 style={{ ...secH, fontSize: '1.1rem' }}>Prospects ({shown.length}{filter === 'all' ? '' : ` of ${rows.length}`})</h3>
           <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <select style={{ ...inp, width: 'auto' }} value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <select aria-label="Filter by stage" style={{ ...inp, width: 'auto' }} value={filter} onChange={(e) => setFilter(e.target.value)}>
               <option value="all">All stages</option>
               {STAGES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
@@ -268,7 +268,7 @@ export default function PipelineTracker({ clientId, canManage }) {
                       <td style={td}>{textCell(r, 'contact_role', 'Their role')}</td>
                       <td style={td}>
                         {canManage
-                          ? <select style={{ ...inp, borderLeft: `4px solid ${stage.colour}` }} value={r.stage || 'identified'}
+                          ? <select aria-label="Stage" style={{ ...inp, borderLeft: `4px solid ${stage.colour}` }} value={r.stage || 'identified'}
                               onChange={(e) => commit(r.id, { stage: e.target.value })}>
                               {STAGES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                             </select>
@@ -278,10 +278,10 @@ export default function PipelineTracker({ clientId, canManage }) {
                         <div style={{ display: 'flex', gap: '0.3rem' }}>
                           {canManage
                             ? <>
-                                <input style={{ ...inp, width: 62 }} value={r.value_currency || ''} placeholder="USD"
+                                <input aria-label="Currency" style={{ ...inp, width: 62 }} value={r.value_currency || ''} placeholder="USD"
                                   onChange={(e) => edit(r.id, 'value_currency', e.target.value)}
                                   onBlur={(e) => commit(r.id, { value_currency: e.target.value || null })} />
-                                <input style={inp} type="number" value={r.value_estimate ?? ''} placeholder="0"
+                                <input aria-label="Estimated value" style={inp} type="number" value={r.value_estimate ?? ''} placeholder="0"
                                   onChange={(e) => edit(r.id, 'value_estimate', e.target.value)}
                                   onBlur={(e) => commit(r.id, { value_estimate: e.target.value === '' ? null : Number(e.target.value) })} />
                               </>
@@ -292,7 +292,7 @@ export default function PipelineTracker({ clientId, canManage }) {
                       <td style={td}>{textCell(r, 'next_action', 'What happens next')}</td>
                       <td style={td}>
                         {canManage
-                          ? <input type="date" style={{ ...inp, ...(late ? { borderColor: C.amber } : {}) }} value={r.next_action_date || ''}
+                          ? <input aria-label="Next action date" type="date" style={{ ...inp, ...(late ? { borderColor: C.amber } : {}) }} value={r.next_action_date || ''}
                               onChange={(e) => commit(r.id, { next_action_date: e.target.value || null })} />
                           : <span style={{ color: late ? C.amber : C.navy }}>{r.next_action_date || '-'}</span>}
                         {late && <div style={{ ...mono, fontSize: '0.72rem', color: C.amber, marginTop: '0.15rem' }}>Past due</div>}

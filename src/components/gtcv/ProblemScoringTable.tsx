@@ -307,7 +307,7 @@ export default function ProblemScoringTable({ clientId, canManage }) {
                   <td style={{ ...td, fontFamily: 'monospace', fontWeight: 700, color: advancing ? C.green : C.slate }}>{rank}</td>
                   <td style={td}>
                     {canManage ? (
-                      <textarea style={{ ...inputStyle, minHeight: 56, resize: 'vertical' }} value={r.problem_statement || ''}
+                      <textarea aria-label="State the problem as the customer states it" style={{ ...inputStyle, minHeight: 56, resize: 'vertical' }} value={r.problem_statement || ''}
                         placeholder="State the problem as the customer states it"
                         onChange={(e) => patch(r.id, { problem_statement: e.target.value })} />
                     ) : (r.problem_statement || '-')}
@@ -315,7 +315,7 @@ export default function ProblemScoringTable({ clientId, canManage }) {
                   <td style={td}>
                     {canManage ? (
                       <div style={{ display: 'grid', gap: 5 }}>
-                        <select style={inputStyle} value={r.segment_id || ''}
+                        <select aria-label="Who feels this problem" style={inputStyle} value={r.segment_id || ''}
                           onChange={(e) => patch(r.id, { segment_id: e.target.value || null })}>
                           <option value="">No segment linked</option>
                           {segments.map((s) => (
@@ -323,7 +323,7 @@ export default function ProblemScoringTable({ clientId, canManage }) {
                           ))}
                         </select>
                         {!r.segment_id && (
-                          <input style={inputStyle} value={r.segment_label || ''} placeholder="Or name them here"
+                          <input aria-label="Or name them here" style={inputStyle} value={r.segment_label || ''} placeholder="Or name them here"
                             onChange={(e) => patch(r.id, { segment_label: e.target.value })} />
                         )}
                       </div>
@@ -332,7 +332,7 @@ export default function ProblemScoringTable({ clientId, canManage }) {
                   {DIMENSIONS.map((d) => (
                     <td key={d.key} style={td} title={d.help}>
                       {canManage ? (
-                        <select style={{ ...inputStyle, fontFamily: 'monospace' }} value={r[d.key] == null ? '' : String(r[d.key])}
+                        <select aria-label={d.label} style={{ ...inputStyle, fontFamily: 'monospace' }} value={r[d.key] == null ? '' : String(r[d.key])}
                           onChange={(e) => patch(r.id, { [d.key]: e.target.value === '' ? null : Number(e.target.value) })}>
                           <option value="">-</option>
                           {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
@@ -356,7 +356,7 @@ export default function ProblemScoringTable({ clientId, canManage }) {
                   </td>
                   <td style={td}>
                     {canManage ? (
-                      <textarea style={{ ...inputStyle, minHeight: 56, resize: 'vertical' }} value={r.notes || ''}
+                      <textarea aria-label="What the score rests on" style={{ ...inputStyle, minHeight: 56, resize: 'vertical' }} value={r.notes || ''}
                         placeholder="What the score rests on"
                         onChange={(e) => patch(r.id, { notes: e.target.value })} />
                     ) : (r.notes || '-')}

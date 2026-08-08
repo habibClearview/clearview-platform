@@ -406,13 +406,13 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
           <div style={{ ...LABEL, marginBottom: 4 }}>Segment</div>
           {canManage ? (
             <div style={{ display: 'grid', gap: 5 }}>
-              <select style={inputStyle} value={r.segment_id || ''}
+              <select aria-label="Customer segment" style={inputStyle} value={r.segment_id || ''}
                 onChange={(e) => patch(r.id, { segment_id: e.target.value || null })}>
                 <option value="">No segment linked</option>
                 {segments.map((s) => <option key={s.id} value={s.id}>{s.segment_name || 'Unnamed segment'}</option>)}
               </select>
               {!r.segment_id && (
-                <input style={inputStyle} value={r.segment_label || ''} placeholder="Or name the segment here"
+                <input aria-label="Or name the segment here" style={inputStyle} value={r.segment_label || ''} placeholder="Or name the segment here"
                   onChange={(e) => patch(r.id, { segment_label: e.target.value })} />
               )}
             </div>
@@ -442,7 +442,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
           <label key={p.key} style={{ display: 'block' }} title={p.help}>
             <div style={{ ...LABEL, marginBottom: 4 }}>{p.label}</div>
             {canManage ? (
-              <textarea style={{ ...inputStyle, minHeight: 62, resize: 'vertical' }} value={r[p.key] || ''}
+              <textarea aria-label={p.label} style={{ ...inputStyle, minHeight: 62, resize: 'vertical' }} value={r[p.key] || ''}
                 placeholder={p.placeholder} onChange={(e) => patch(r.id, { [p.key]: e.target.value })} />
             ) : (
               <div style={{ fontSize: '0.85rem', color: C.navy, lineHeight: 1.45 }}>{r[p.key] || '-'}</div>
@@ -463,7 +463,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
         <label style={{ display: 'block' }}>
           <div style={{ ...LABEL, marginBottom: 4 }}>Differentiation type</div>
           {canManage ? (
-            <select style={inputStyle} value={r.differentiation_type || ''}
+            <select aria-label="Kind of differentiation" style={inputStyle} value={r.differentiation_type || ''}
               onChange={(e) => patch(r.id, { differentiation_type: e.target.value || null })}>
               <option value="">Choose one</option>
               {DIFF_TYPES.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
@@ -479,7 +479,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
         <label style={{ display: 'block' }}>
           <div style={{ ...LABEL, marginBottom: 4 }}>Differentiation statement</div>
           {canManage ? (
-            <textarea style={{ ...inputStyle, minHeight: 62, resize: 'vertical' }} value={r.differentiation_statement || ''}
+            <textarea aria-label="Say the difference in one line" style={{ ...inputStyle, minHeight: 62, resize: 'vertical' }} value={r.differentiation_statement || ''}
               placeholder="Say the difference in one line" onChange={(e) => patch(r.id, { differentiation_statement: e.target.value })} />
           ) : (
             <div style={{ fontSize: '0.85rem', lineHeight: 1.45 }}>{r.differentiation_statement || '-'}</div>
@@ -488,7 +488,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
         <label style={{ display: 'block' }}>
           <div style={{ ...LABEL, marginBottom: 4 }}>Credibility signal</div>
           {canManage ? (
-            <textarea style={{ ...inputStyle, minHeight: 62, resize: 'vertical' }} value={r.credibility_signal || ''}
+            <textarea aria-label="The proof that makes the claim believable" style={{ ...inputStyle, minHeight: 62, resize: 'vertical' }} value={r.credibility_signal || ''}
               placeholder="The proof that makes the claim believable" onChange={(e) => patch(r.id, { credibility_signal: e.target.value })} />
           ) : (
             <div style={{ fontSize: '0.85rem', lineHeight: 1.45 }}>{r.credibility_signal || '-'}</div>
@@ -513,6 +513,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
         </div>
         {canManage ? (
           <textarea
+            aria-label="The proposition written as one thing you could say out loud"
             style={{ ...inputStyle, minHeight: 92, resize: 'vertical', fontSize: '0.92rem', lineHeight: 1.5 }}
             value={shown}
             placeholder="Fill the four parts above and this writes itself. Then edit it into their language."
@@ -563,32 +564,32 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
                   <tr key={t.id}>
                     <td style={td}>
                       {canManage ? (
-                        <input style={inputStyle} value={t.tested_with || ''} placeholder="Name and organisation"
+                        <input aria-label="Name and organisation" style={inputStyle} value={t.tested_with || ''} placeholder="Name and organisation"
                           onChange={(e) => patchTest(t.id, { tested_with: e.target.value })} />
                       ) : (t.tested_with || '-')}
                     </td>
                     <td style={td}>
                       {canManage ? (
-                        <input style={inputStyle} value={t.tested_with_role || ''} placeholder="Role"
+                        <input aria-label="Role" style={inputStyle} value={t.tested_with_role || ''} placeholder="Role"
                           onChange={(e) => patchTest(t.id, { tested_with_role: e.target.value })} />
                       ) : (t.tested_with_role || '-')}
                     </td>
                     <td style={td}>
                       {canManage ? (
-                        <input type="date" style={{ ...inputStyle, fontFamily: 'monospace' }} value={t.tested_on || ''}
+                        <input aria-label="Date tested" type="date" style={{ ...inputStyle, fontFamily: 'monospace' }} value={t.tested_on || ''}
                           onChange={(e) => patchTest(t.id, { tested_on: e.target.value || null })} />
                       ) : (t.tested_on || '-')}
                     </td>
                     <td style={td}>
                       {canManage ? (
-                        <textarea style={{ ...inputStyle, minHeight: 54, resize: 'vertical' }} value={t.reaction || ''}
+                        <textarea aria-label="What they said or did" style={{ ...inputStyle, minHeight: 54, resize: 'vertical' }} value={t.reaction || ''}
                           placeholder="What they said or did"
                           onChange={(e) => patchTest(t.id, { reaction: e.target.value })} />
                       ) : (t.reaction || '-')}
                     </td>
                     <td style={td}>
                       {canManage ? (
-                        <textarea style={{ ...inputStyle, minHeight: 54, resize: 'vertical' }} value={t.what_changed || ''}
+                        <textarea aria-label="What you changed in the proposition" style={{ ...inputStyle, minHeight: 54, resize: 'vertical' }} value={t.what_changed || ''}
                           placeholder="What you changed in the proposition"
                           onChange={(e) => patchTest(t.id, { what_changed: e.target.value })} />
                       ) : (t.what_changed || '-')}
@@ -614,7 +615,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
           </div>
         )}
         {canManage ? (
-          <textarea style={{ ...inputStyle, minHeight: 54, resize: 'vertical', marginTop: 4 }} value={r.notes || ''}
+          <textarea aria-label="Anything the next person needs to know" style={{ ...inputStyle, minHeight: 54, resize: 'vertical', marginTop: 4 }} value={r.notes || ''}
             placeholder="Anything the next person needs to know"
             onChange={(e) => patch(r.id, { notes: e.target.value })} />
         ) : (

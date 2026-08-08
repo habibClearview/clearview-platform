@@ -429,6 +429,7 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
                   <td style={td}>
                     {canManage ? (
                       <input
+                        aria-label="Date captured"
                         style={cell}
                         type="date"
                         value={r.date || ''}
@@ -441,7 +442,7 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
                   <td style={td}>
                     {canManage ? (
                       <input
-                        style={cell}
+aria-label="Coach or organisation"                         style={cell}
                         value={r.uploaded_by || ''}
                         placeholder="Coach or organisation"
                         onChange={(e) => setField(r.id, 'uploaded_by', e.target.value)}
@@ -452,7 +453,7 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
 
                   <td style={td}>
                     {canManage ? (
-                      <select style={cell} value={r.type || ''} onChange={(e) => setAndSave(r.id, 'type', e.target.value)}>
+                      <select aria-label="Type of evidence" style={cell} value={r.type || ''} onChange={(e) => setAndSave(r.id, 'type', e.target.value)}>
                         {optionsWith(TYPE_OPTIONS, r.type).map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
                       </select>
                     ) : <div style={readCell}>{optionLabel(TYPE_OPTIONS, r.type)}</div>}
@@ -460,7 +461,7 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
 
                   <td style={td}>
                     {canManage ? (
-                      <select style={cell} value={r.dp_id || ''} onChange={(e) => setAndSave(r.id, 'dp_id', e.target.value)}>
+                      <select aria-label="Decision gate" style={cell} value={r.dp_id || ''} onChange={(e) => setAndSave(r.id, 'dp_id', e.target.value)}>
                         {optionsWith(DP_OPTIONS, r.dp_id).map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
                       </select>
                     ) : <div style={readCell}>{optionLabel(DP_OPTIONS, r.dp_id)}</div>}
@@ -469,6 +470,7 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
                   <td style={td}>
                     {canManage ? (
                       <textarea
+                        aria-label="Description of this evidence"
                         style={{ ...cell, minHeight: 62, resize: 'vertical', lineHeight: 1.35 }}
                         value={r.description || ''}
                         placeholder="What was captured and what it shows. Verbatim where possible."
@@ -481,7 +483,7 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
                   <td style={td}>
                     {canManage ? (
                       <input
-                        style={cell}
+aria-label="Paste a link, or a file name"                         style={cell}
                         value={r.url || ''}
                         placeholder="Paste a link, or a file name"
                         onChange={(e) => setField(r.id, 'url', e.target.value)}
@@ -504,6 +506,7 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
                         <label style={{ ...ghostBtn, cursor: uploadingId === r.id ? 'default' : 'pointer', margin: 0, display: 'inline-block' }}>
                           {uploadingId === r.id ? 'Uploading...' : r.file_path ? 'Replace file' : '+ Upload file'}
                           <input
+                            aria-label="Attach the file itself"
                             type="file"
                             style={{ display: 'none' }}
                             disabled={uploadingId === r.id}
@@ -530,7 +533,7 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
 
                   <td style={td}>
                     {canManage ? (
-                      <select style={cell} value={r.reliability || ''} onChange={(e) => setAndSave(r.id, 'reliability', e.target.value)}>
+                      <select aria-label="How reliable this evidence is" style={cell} value={r.reliability || ''} onChange={(e) => setAndSave(r.id, 'reliability', e.target.value)}>
                         {optionsWith(RELIABILITY_OPTIONS, r.reliability).map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
                       </select>
                     ) : (
@@ -542,7 +545,7 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
 
                   <td style={td}>
                     {canManage ? (
-                      <select style={cell} value={r.status || ''} onChange={(e) => setAndSave(r.id, 'status', e.target.value)}>
+                      <select aria-label="Status" style={cell} value={r.status || ''} onChange={(e) => setAndSave(r.id, 'status', e.target.value)}>
                         {optionsWith(STATUS_OPTIONS, r.status).map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
                       </select>
                     ) : (

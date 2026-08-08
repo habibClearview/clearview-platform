@@ -500,6 +500,7 @@ export default function InterviewCaptureForm({ clientId, canManage }) {
                 <label style={lbl}>{f.label}</label>
                 {editable ? (
                   <input
+                    aria-label={f.label}
                     style={cell}
                     type={f.type === 'date' ? 'date' : 'text'}
                     value={open[f.key] || ''}
@@ -543,7 +544,7 @@ export default function InterviewCaptureForm({ clientId, canManage }) {
                     <label style={lbl}>Verbatim evidence, their exact words</label>
                     {editable ? (
                       <textarea
-                        style={{ ...cell, minHeight: 88, resize: 'vertical', lineHeight: 1.4 }}
+aria-label="Write exactly what was said. Do not polish it."                         style={{ ...cell, minHeight: 88, resize: 'vertical', lineHeight: 1.4 }}
                         value={open[`${d.key}_verbatim`] || ''}
                         placeholder="Write exactly what was said. Do not polish it."
                         onChange={(e) => setField(open.id, `${d.key}_verbatim`, e.target.value)}
@@ -557,7 +558,7 @@ export default function InterviewCaptureForm({ clientId, canManage }) {
                     <label style={lbl}>Interpretation, what this tells us</label>
                     {editable ? (
                       <textarea
-                        style={{ ...cell, minHeight: 88, resize: 'vertical', lineHeight: 1.4 }}
+aria-label="Your reading of it, written after the verbatim"                         style={{ ...cell, minHeight: 88, resize: 'vertical', lineHeight: 1.4 }}
                         value={open[`${d.key}_interpretation`] || ''}
                         placeholder="Your reading of it, written after the verbatim"
                         onChange={(e) => setField(open.id, `${d.key}_interpretation`, e.target.value)}
@@ -587,6 +588,7 @@ export default function InterviewCaptureForm({ clientId, canManage }) {
                     <div style={readCell}>{open[f.key] || ''}</div>
                   ) : f.type === 'select' ? (
                     <select
+                      aria-label={f.label}
                       style={cell}
                       value={open[f.key] || ''}
                       onChange={(e) => setAndSave(open.id, f.key, e.target.value)}
@@ -595,6 +597,7 @@ export default function InterviewCaptureForm({ clientId, canManage }) {
                     </select>
                   ) : (
                     <textarea
+                      aria-label={f.label}
                       style={{ ...cell, minHeight: 72, resize: 'vertical', lineHeight: 1.4 }}
                       value={open[f.key] || ''}
                       placeholder={f.placeholder || ''}

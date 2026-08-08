@@ -246,13 +246,13 @@ export default function PilotCapture({ clientId, canManage }) {
               <div>
                 <label style={lbl}>Date</label>
                 {canManage
-                  ? <input type="date" style={inp} value={r.session_date || ''} onChange={(e) => commit(r.id, { session_date: e.target.value || null })} />
+                  ? <input aria-label="Session date" type="date" style={inp} value={r.session_date || ''} onChange={(e) => commit(r.id, { session_date: e.target.value || null })} />
                   : <div style={{ ...hint, color: C.navy }}>{r.session_date || '-'}</div>}
               </div>
               <div>
                 <label style={lbl}>Iteration</label>
                 {canManage
-                  ? <select style={inp} value={Number(r.iteration) || 1} onChange={(e) => commit(r.id, { iteration: Number(e.target.value) })}>
+                  ? <select aria-label="Pilot iteration" style={inp} value={Number(r.iteration) || 1} onChange={(e) => commit(r.id, { iteration: Number(e.target.value) })}>
                       {ITERATIONS.map((n) => <option key={n} value={n}>Iteration {n}</option>)}
                     </select>
                   : <div style={{ ...hint, color: C.navy }}>Iteration {r.iteration}</div>}
@@ -261,7 +261,7 @@ export default function PilotCapture({ clientId, canManage }) {
               <div>
                 <label style={lbl}>Paying client number</label>
                 {canManage
-                  ? <select style={inp} value={Number(r.client_number) || 1} onChange={(e) => commit(r.id, { client_number: Number(e.target.value) })}>
+                  ? <select aria-label="Which client" style={inp} value={Number(r.client_number) || 1} onChange={(e) => commit(r.id, { client_number: Number(e.target.value) })}>
                       {CLIENT_SLOTS.map((n) => <option key={n} value={n}>Client {n}</option>)}
                     </select>
                   : <div style={{ ...hint, color: C.navy }}>Client {r.client_number}</div>}
@@ -325,7 +325,7 @@ export default function PilotCapture({ clientId, canManage }) {
                 <div>
                   <label style={lbl}>Close</label>
                   {canManage
-                    ? <select style={inp} value={r.close_type || ''} onChange={(e) => commit(r.id, { close_type: e.target.value || null })}>
+                    ? <select aria-label="How the session closed" style={inp} value={r.close_type || ''} onChange={(e) => commit(r.id, { close_type: e.target.value || null })}>
                         <option value="">Not recorded</option>
                         {CLOSES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                       </select>
@@ -335,7 +335,7 @@ export default function PilotCapture({ clientId, canManage }) {
                 <div>
                   <label style={lbl}>Viability, 1 to 5</label>
                   {canManage
-                    ? <select style={inp} value={r.viability || ''} onChange={(e) => commit(r.id, { viability: e.target.value ? Number(e.target.value) : null })}>
+                    ? <select aria-label="Viability read" style={inp} value={r.viability || ''} onChange={(e) => commit(r.id, { viability: e.target.value ? Number(e.target.value) : null })}>
                         <option value="">-</option>
                         {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
                       </select>

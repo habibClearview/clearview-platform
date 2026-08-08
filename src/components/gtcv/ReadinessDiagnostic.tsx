@@ -124,7 +124,7 @@ function SaveIndicator({ state, message }) {
 }
 
 // One cell of the grid: a score and the evidence that earns it.
-function ScoreCell({ row, canManage, message, onScore, onEvidence }) {
+function ScoreCell({ row, canManage, message, onScore, onEvidence, ariaLabel }) {
   const score = num(row?.score)
   const [local, setLocal] = useState(row?.evidence ?? '')
   useEffect(() => { setLocal(row?.evidence ?? '') }, [row?.evidence])
@@ -136,6 +136,7 @@ function ScoreCell({ row, canManage, message, onScore, onEvidence }) {
     <div style={{ background: tint, borderRadius: 8, padding: tint ? '0.4rem' : 0 }}>
       {canManage ? (
         <select
+          aria-label={ariaLabel || 'Score'}
           style={{ ...inputBase, fontFamily: 'monospace' }}
           value={score}
           onChange={(e) => onScore(num(e.target.value), local)}
@@ -148,7 +149,7 @@ function ScoreCell({ row, canManage, message, onScore, onEvidence }) {
 
       {canManage ? (
         <textarea
-          style={{ ...inputBase, marginTop: '0.35rem' }}
+aria-label="Evidence: what was observed, and where"           style={{ ...inputBase, marginTop: '0.35rem' }}
           rows={2}
           placeholder="Evidence: what was observed, and where"
           value={local}
@@ -411,6 +412,7 @@ export default function ReadinessDiagnostic({ clientId, canManage }) {
                           <td key={cp.id} style={td}>
                             <ScoreCell
                               row={cells[key]}
+                              ariaLabel={`${ft.label || ft.id}, ${cp.label || cp.id}`}
                               canManage={editable}
                               message={messages[key]}
                               onScore={(next, evidenceInBox) => changeScore(ft.id, cp.id, next, evidenceInBox)}

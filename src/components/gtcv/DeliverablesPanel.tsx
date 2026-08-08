@@ -178,9 +178,9 @@ export default function DeliverablesPanel({ clientId, canManage }) {
             what each one pays. What comes back is a proposal. Nothing counts until you approve each
             mapping, and rejecting one leaves nothing behind.
           </p>
-          <input style={{ ...field, marginBottom: '0.5rem' }} placeholder="Document reference, for example the contract number"
+          <input aria-label="Document reference, for example the contract number" style={{ ...field, marginBottom: '0.5rem' }} placeholder="Document reference, for example the contract number"
             value={torRef} onChange={(e) => setTorRef(e.target.value)} />
-          <textarea style={{ ...field, minHeight: 180, resize: 'vertical' }} value={torText}
+          <textarea aria-label="Deliverable 1: ... payable on ..." style={{ ...field, minHeight: 180, resize: 'vertical' }} value={torText}
             onChange={(e) => setTorText(e.target.value)}
             placeholder="Deliverable 1: ... payable on ..." />
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.7rem' }}>
@@ -199,15 +199,15 @@ export default function DeliverablesPanel({ clientId, canManage }) {
       {addOpen ? (
         <div style={{ border: `1px dashed ${C.border}`, borderRadius: 12, padding: '1rem 1.1rem', background: C.card }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '0.6rem' }}>
-            <Lab l="Code"><input style={field} value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} placeholder="D1" /></Lab>
-            <Lab l="Title"><input style={field} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></Lab>
-            <Lab l="Milestone"><input style={field} value={draft.milestoneLabel} onChange={(e) => setDraft({ ...draft, milestoneLabel: e.target.value })} placeholder="On acceptance" /></Lab>
-            <Lab l="Amount"><input style={field} type="number" value={draft.amount} onChange={(e) => setDraft({ ...draft, amount: e.target.value })} /></Lab>
-            <Lab l="Currency"><input style={field} value={draft.currency} onChange={(e) => setDraft({ ...draft, currency: e.target.value.toUpperCase() })} /></Lab>
-            <Lab l="Due"><input style={field} value={draft.dueWindow} onChange={(e) => setDraft({ ...draft, dueWindow: e.target.value })} placeholder="Within 30 days" /></Lab>
+            <Lab l="Code"><input aria-label="D1" style={field} value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} placeholder="D1" /></Lab>
+            <Lab l="Title"><input aria-label="Deliverable title" style={field} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></Lab>
+            <Lab l="Milestone"><input aria-label="On acceptance" style={field} value={draft.milestoneLabel} onChange={(e) => setDraft({ ...draft, milestoneLabel: e.target.value })} placeholder="On acceptance" /></Lab>
+            <Lab l="Amount"><input aria-label="Amount" style={field} type="number" value={draft.amount} onChange={(e) => setDraft({ ...draft, amount: e.target.value })} /></Lab>
+            <Lab l="Currency"><input aria-label="Currency" style={field} value={draft.currency} onChange={(e) => setDraft({ ...draft, currency: e.target.value.toUpperCase() })} /></Lab>
+            <Lab l="Due"><input aria-label="Within 30 days" style={field} value={draft.dueWindow} onChange={(e) => setDraft({ ...draft, dueWindow: e.target.value })} placeholder="Within 30 days" /></Lab>
           </div>
           <div style={{ marginTop: '0.6rem' }}>
-            <Lab l="What it is"><textarea style={{ ...field, minHeight: 70, resize: 'vertical' }} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Lab>
+            <Lab l="What it is"><textarea aria-label="What this deliverable is" style={{ ...field, minHeight: 70, resize: 'vertical' }} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Lab>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.7rem' }}>
             <button type="button" style={btn(C.teal, true)} disabled={busy === 'add' || !draft.title.trim()}
@@ -339,12 +339,12 @@ function Deliverable({ d, maps, packs, busy, run, clientId, onOpenPack }) {
                 <div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '0.5rem' }}>
                     <Lab l="Gate">
-                      <select style={field} value={editing.dp_id} onChange={(e) => setEditing({ ...editing, dp_id: e.target.value })}>
+                      <select aria-label="Which decision gate evidences this" style={field} value={editing.dp_id} onChange={(e) => setEditing({ ...editing, dp_id: e.target.value })}>
                         {DP_IDS.map((k) => <option key={k} value={k}>{DP_LABEL[k]}</option>)}
                       </select>
                     </Lab>
                     <Lab l="Evidence the funder needs to see">
-                      <input style={field} value={editing.required_evidence || ''} onChange={(e) => setEditing({ ...editing, required_evidence: e.target.value })} />
+                      <input aria-label="Evidence the funder needs to see" style={field} value={editing.required_evidence || ''} onChange={(e) => setEditing({ ...editing, required_evidence: e.target.value })} />
                     </Lab>
                   </div>
                   <div style={{ display: 'flex', gap: '0.45rem', marginTop: '0.55rem' }}>
@@ -402,7 +402,7 @@ function Deliverable({ d, maps, packs, busy, run, clientId, onOpenPack }) {
       <div style={{ display: 'flex', gap: '0.45rem', marginTop: '0.6rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div style={{ minWidth: 220 }}>
           <Lab l="Attach another gate">
-            <select style={field} value={addGate} onChange={(e) => setAddGate(e.target.value)}>
+            <select aria-label="Gate to attach" style={field} value={addGate} onChange={(e) => setAddGate(e.target.value)}>
               <option value="">Choose a gate</option>
               {DP_IDS.map((k) => <option key={k} value={k}>{DP_LABEL[k]}</option>)}
             </select>
@@ -521,7 +521,7 @@ function PackViewer({ clientId, packId, onClose }) {
 
       <div style={{ marginTop: '0.9rem' }}>
         <Lab l="Covering note">
-          <textarea style={{ ...field, minHeight: 150, resize: 'vertical' }} value={noteText}
+          <textarea aria-label="Covering note" style={{ ...field, minHeight: 150, resize: 'vertical' }} value={noteText}
             readOnly={pack.status !== 'draft'}
             onChange={(e) => setNoteText(e.target.value)} />
         </Lab>
@@ -539,7 +539,7 @@ function PackViewer({ clientId, packId, onClose }) {
         ) : null}
         {pack.status === 'approved' ? (
           <>
-            <input style={{ ...field, maxWidth: 320 }} placeholder="Recipients, comma separated"
+            <input aria-label="Recipients, comma separated" style={{ ...field, maxWidth: 320 }} placeholder="Recipients, comma separated"
               value={recipients} onChange={(e) => setRecipients(e.target.value)} />
             <button type="button" style={btn(C.teal, true)} disabled={busy === 'send' || !recipients.includes('@')}
               onClick={() => act('send', {

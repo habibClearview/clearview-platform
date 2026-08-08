@@ -114,7 +114,7 @@ const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
 const blank = (v) => !String(v ?? '').trim()
 
 // ─── Small building blocks ───────────────────────────────────
-function TextCell({ value, onCommit, canManage, placeholder, rows = 2 }) {
+function TextCell({ value, onCommit, canManage, placeholder, rows = 2, ariaLabel }) {
   const [local, setLocal] = useState(value ?? '')
   useEffect(() => { setLocal(value ?? '') }, [value])
   if (!canManage) {
@@ -122,6 +122,7 @@ function TextCell({ value, onCommit, canManage, placeholder, rows = 2 }) {
   }
   return (
     <textarea
+      aria-label={ariaLabel || placeholder}
       style={cellInput}
       rows={rows}
       placeholder={placeholder}
@@ -500,6 +501,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                         <td key={f.key} style={td}>
                           {editable ? (
                             <select
+                              aria-label={f.label}
                               style={{ ...selectStyle, minWidth: 70 }}
                               value={num(r[f.key])}
                               onChange={(e) => updHypothesis(r.id, { [f.key]: num(e.target.value) })}
@@ -577,7 +579,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                       <td style={td}><TextCell value={r.believed} canManage={editable} placeholder="Belief with no observation behind it" onCommit={(v) => updSignal(r.id, { believed: v })} /></td>
                       <td style={td}>
                         {editable ? (
-                          <select style={selectStyle} value={r.classification || 'unclassified'} onChange={(e) => updSignal(r.id, { classification: e.target.value })}>
+                          <select aria-label="Signal or story" style={selectStyle} value={r.classification || 'unclassified'} onChange={(e) => updSignal(r.id, { classification: e.target.value })}>
                             {CLASSIFICATIONS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
                           </select>
                         ) : (
@@ -647,7 +649,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                       <td style={td}><TextCell value={r.activity} canManage={editable} placeholder="The activity" onCommit={(v) => updDecision(r.id, { activity: v })} /></td>
                       <td style={td}>
                         {editable ? (
-                          <select style={selectStyle} value={r.decision || 'undecided'} onChange={(e) => updDecision(r.id, { decision: e.target.value })}>
+                          <select aria-label="Continue, pause or kill" style={selectStyle} value={r.decision || 'undecided'} onChange={(e) => updDecision(r.id, { decision: e.target.value })}>
                             {DECISIONS.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
                           </select>
                         ) : (
@@ -662,7 +664,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                       </td>
                       <td style={td}>
                         {editable ? (
-                          <select style={{ ...selectStyle, minWidth: 200 }} value={r.destination_dp || ''} onChange={(e) => updDecision(r.id, { destination_dp: e.target.value || null })}>
+                          <select aria-label="Which block this goes to" style={{ ...selectStyle, minWidth: 200 }} value={r.destination_dp || ''} onChange={(e) => updDecision(r.id, { destination_dp: e.target.value || null })}>
                             {DESTINATION_OPTIONS.map((o) => <option key={o.id || 'none'} value={o.id}>{o.label}</option>)}
                           </select>
                         ) : (

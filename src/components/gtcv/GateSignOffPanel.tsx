@@ -386,6 +386,7 @@ export default function GateSignOffPanel({ clientId, dpId, canManage }) {
             <div style={{ border: `1px solid ${C.red}`, borderRadius: 8, padding: '0.7rem 0.8rem', marginTop: '0.7rem' }}>
               <div style={{ ...mono, marginBottom: '0.35rem' }}>Name the gap</div>
               <textarea
+                aria-label="Name the gap that sends this gate back"
                 style={{ ...cell, minHeight: 64, resize: 'vertical', lineHeight: 1.35 }}
                 value={returnNote}
                 placeholder="What is missing, and what has to be true before this gate closes"

@@ -206,7 +206,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
   // never lags behind the keyboard.
   const textCell = (table, row, field, placeholder) => (
     canManage
-      ? <input style={inp} value={row[field] ?? ''} placeholder={placeholder}
+      ? <input aria-label={placeholder || field} style={inp} value={row[field] ?? ''} placeholder={placeholder}
           onChange={(e) => edit(table, row.id, field, e.target.value)}
           onBlur={(e) => commit(table, row.id, { [field]: e.target.value || null })} />
       : <span>{row[field] || '-'}</span>
@@ -214,7 +214,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
 
   const numCell = (table, row, field, placeholder, render) => (
     canManage
-      ? <input style={{ ...inp, textAlign: 'right' }} type="number" value={row[field] ?? ''} placeholder={placeholder}
+      ? <input aria-label={placeholder || field} style={{ ...inp, textAlign: 'right' }} type="number" value={row[field] ?? ''} placeholder={placeholder}
           onChange={(e) => edit(table, row.id, field, e.target.value)}
           onBlur={(e) => commit(table, row.id, { [field]: e.target.value === '' ? null : Number(e.target.value) })} />
       : <span style={mono}>{orDash(row[field], render || money)}</span>
@@ -467,7 +467,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
                     <td style={td}>{textCell(T_MARKET, r, 'quality_level', 'High, Mid, Low')}</td>
                     <td style={td}>
                       {canManage
-                        ? <input type="date" style={inp} value={r.source_date || ''}
+                        ? <input aria-label="Date this price was seen" type="date" style={inp} value={r.source_date || ''}
                             onChange={(e) => commit(T_MARKET, r.id, { source_date: e.target.value || null })} />
                         : <span>{r.source_date || '-'}</span>}
                     </td>
@@ -651,7 +651,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', flexWrap: 'wrap', marginTop: '1rem' }}>
           <span style={{ ...hint, color: C.navy }}>Target deliveries a year</span>
           {canManage
-            ? <input style={{ ...inp, width: 110, textAlign: 'right' }} type="number"
+            ? <input aria-label="Target deliveries per year" style={{ ...inp, width: 110, textAlign: 'right' }} type="number"
                 value={targetOverride === null ? seededTarget : targetOverride}
                 onChange={(e) => setTargetOverride(e.target.value === '' ? 0 : Number(e.target.value))} />
             : <span style={{ ...mono, color: C.navy }}>{targetDeliveries || '-'}</span>}

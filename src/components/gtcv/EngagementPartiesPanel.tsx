@@ -264,25 +264,25 @@ function PartyFields({ value, onChange }) {
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: '0.6rem' }}>
       <div>
         <label style={lab}>Role</label>
-        <select style={field} value={value.party_role} onChange={set('party_role')}>
+        <select aria-label="Role on this engagement" style={field} value={value.party_role} onChange={set('party_role')}>
           {ROLE_KEYS.map((k) => <option key={k} value={k}>{PARTY_ROLE_LABELS[k]}</option>)}
         </select>
       </div>
       <div>
         <label style={lab}>Name</label>
-        <input style={field} value={value.name || ''} onChange={set('name')} placeholder="Full name" />
+        <input aria-label="Full name" style={field} value={value.name || ''} onChange={set('name')} placeholder="Full name" />
       </div>
       <div>
         <label style={lab}>Job title</label>
-        <input style={field} value={value.title || ''} onChange={set('title')} placeholder="As it appears on the Charter" />
+        <input aria-label="As it appears on the Charter" style={field} value={value.title || ''} onChange={set('title')} placeholder="As it appears on the Charter" />
       </div>
       <div>
         <label style={lab}>Organisation</label>
-        <input style={field} value={value.organisation || ''} onChange={set('organisation')} />
+        <input aria-label="Organisation" style={field} value={value.organisation || ''} onChange={set('organisation')} />
       </div>
       <div>
         <label style={lab}>Email they log in with</label>
-        <input style={field} type="email" value={value.email || ''} onChange={set('email')} placeholder="Leave blank if they have no account" />
+        <input aria-label="Leave blank if they have no account" style={field} type="email" value={value.email || ''} onChange={set('email')} placeholder="Leave blank if they have no account" />
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 4 }}>
         <label style={{ ...hint, display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer' }}>

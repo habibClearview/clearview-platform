@@ -284,7 +284,8 @@ export default function ServiceInventoryTable({ clientId, canManage }) {
                         </div>
                       ) : f.type === 'select' ? (
                         <select
-                          style={cell}
+                           aria-label={f.label}
+                           style={cell}
                           value={r[f.key] || ''}
                           onChange={(e) => setField(r.id, f.key, e.target.value)}
                           onBlur={() => saveRow(r.id)}
@@ -293,7 +294,8 @@ export default function ServiceInventoryTable({ clientId, canManage }) {
                         </select>
                       ) : f.type === 'area' ? (
                         <textarea
-                          style={{ ...cell, minHeight: 54, resize: 'vertical', lineHeight: 1.35 }}
+                           aria-label={f.label}
+                           style={{ ...cell, minHeight: 54, resize: 'vertical', lineHeight: 1.35 }}
                           value={r[f.key] || ''}
                           placeholder={f.placeholder}
                           onChange={(e) => setField(r.id, f.key, e.target.value)}
@@ -301,7 +303,8 @@ export default function ServiceInventoryTable({ clientId, canManage }) {
                         />
                       ) : (
                         <input
-                          style={cell}
+                           aria-label={f.label}
+                           style={cell}
                           value={r[f.key] || ''}
                           placeholder={f.placeholder}
                           onChange={(e) => setField(r.id, f.key, e.target.value)}

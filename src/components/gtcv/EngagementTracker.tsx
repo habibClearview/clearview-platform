@@ -186,6 +186,7 @@ export default function EngagementTracker({ clientId, canManage }) {
                 </td>
                 <td style={cell}>
                   <select
+                    aria-label={`Status of ${r.label || r.dp_id}`}
                     value={r.status || 'not_started'}
                     disabled={!canManage || saving === r.dp_id}
                     onChange={(e) => save(r, { status: e.target.value })}
@@ -196,7 +197,7 @@ export default function EngagementTracker({ clientId, canManage }) {
                 </td>
                 <td style={cell}>
                   <textarea
-                    rows={2}
+aria-label="One or two sentences on what exists"                     rows={2}
                     defaultValue={r.evidence_summary || ''}
                     disabled={!canManage}
                     placeholder="One or two sentences on what exists"
@@ -206,7 +207,7 @@ export default function EngagementTracker({ clientId, canManage }) {
                 </td>
                 <td style={cell}>
                   <textarea
-                    rows={2}
+aria-label="The single next thing that moves this block"                     rows={2}
                     defaultValue={r.priority_action || ''}
                     disabled={!canManage}
                     placeholder="The single next thing that moves this block"

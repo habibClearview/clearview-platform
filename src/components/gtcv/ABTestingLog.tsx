@@ -216,7 +216,7 @@ export default function ABTestingLog({ clientId, canManage }) {
 
   const textCell = (row, field, placeholder) => (
     canManage
-      ? <input style={inp} value={row[field] || ''} placeholder={placeholder}
+      ? <input aria-label={placeholder || field} style={inp} value={row[field] || ''} placeholder={placeholder}
           onChange={(e) => edit(row.id, field, e.target.value)}
           onBlur={(e) => commit(row.id, { [field]: e.target.value || null })} />
       : <span>{row[field] || '-'}</span>
@@ -286,21 +286,21 @@ export default function ABTestingLog({ clientId, canManage }) {
                     <td style={td}>{textCell(r, 'organisation', 'Organisation')}</td>
                     <td style={td}>
                       {canManage
-                        ? <select style={inp} value={r.variant || 'A'} onChange={(e) => commit(r.id, { variant: e.target.value })}>
+                        ? <select aria-label="Message variant" style={inp} value={r.variant || 'A'} onChange={(e) => commit(r.id, { variant: e.target.value })}>
                             {VARIANTS.map((x) => <option key={x} value={x}>{x}</option>)}
                           </select>
                         : <span>{r.variant}</span>}
                     </td>
                     <td style={td}>
                       {canManage
-                        ? <select style={inp} value={r.response || 'no'} onChange={(e) => commit(r.id, { response: e.target.value })}>
+                        ? <select aria-label="Did they respond" style={inp} value={r.response || 'no'} onChange={(e) => commit(r.id, { response: e.target.value })}>
                             {RESPONSES.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
                           </select>
                         : <span>{(RESPONSES.find((x) => x.value === r.response) || {}).label || '-'}</span>}
                     </td>
                     <td style={td}>
                       {canManage
-                        ? <select style={inp} value={r.response_quality || ''} onChange={(e) => commit(r.id, { response_quality: e.target.value ? Number(e.target.value) : null })}>
+                        ? <select aria-label="Quality of the response" style={inp} value={r.response_quality || ''} onChange={(e) => commit(r.id, { response_quality: e.target.value ? Number(e.target.value) : null })}>
                             <option value="">-</option>
                             {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
                           </select>
@@ -309,14 +309,14 @@ export default function ABTestingLog({ clientId, canManage }) {
                     <td style={td}>{textCell(r, 'key_phrase', 'Their words, not yours')}</td>
                     <td style={td}>
                       {canManage
-                        ? <select style={inp} value={r.purchasing_signal || 'unsure'} onChange={(e) => commit(r.id, { purchasing_signal: e.target.value })}>
+                        ? <select aria-label="Purchasing signal" style={inp} value={r.purchasing_signal || 'unsure'} onChange={(e) => commit(r.id, { purchasing_signal: e.target.value })}>
                             {SIGNALS.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
                           </select>
                         : <span>{(SIGNALS.find((x) => x.value === r.purchasing_signal) || {}).label || '-'}</span>}
                     </td>
                     <td style={td}>
                       {canManage
-                        ? <input type="date" style={inp} value={r.contact_date || ''} onChange={(e) => commit(r.id, { contact_date: e.target.value || null })} />
+                        ? <input aria-label="Contact date" type="date" style={inp} value={r.contact_date || ''} onChange={(e) => commit(r.id, { contact_date: e.target.value || null })} />
                         : <span>{r.contact_date || '-'}</span>}
                     </td>
                     <td style={td}>{textCell(r, 'notes', 'What happened')}</td>

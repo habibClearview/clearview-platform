@@ -344,13 +344,13 @@ export default function CustomerSegmentsTable({ clientId, canManage }) {
                     <tr style={{ borderTop: `1px solid ${C.borderSoft}` }}>
                       <td style={td}>
                         {canManage ? (
-                          <input style={inputStyle} value={r.segment_name || ''} placeholder="Who they are"
+                          <input aria-label="Who they are" style={inputStyle} value={r.segment_name || ''} placeholder="Who they are"
                             onChange={(e) => patch(r.id, { segment_name: e.target.value })} />
                         ) : (r.segment_name || '-')}
                       </td>
                       <td style={td}>
                         {canManage ? (
-                          <textarea style={{ ...inputStyle, minHeight: 58, resize: 'vertical' }} value={r.problem_in_their_words || ''}
+                          <textarea aria-label="Quote them, do not paraphrase" style={{ ...inputStyle, minHeight: 58, resize: 'vertical' }} value={r.problem_in_their_words || ''}
                             placeholder="Quote them, do not paraphrase"
                             onChange={(e) => patch(r.id, { problem_in_their_words: e.target.value })} />
                         ) : (r.problem_in_their_words || '-')}
@@ -358,9 +358,9 @@ export default function CustomerSegmentsTable({ clientId, canManage }) {
                       <td style={td}>
                         {canManage ? (
                           <div style={{ display: 'grid', gap: 5 }}>
-                            <input style={inputStyle} value={r.budget_holder_name || ''} placeholder="Name"
+                            <input aria-label="Name" style={inputStyle} value={r.budget_holder_name || ''} placeholder="Name"
                               onChange={(e) => patch(r.id, { budget_holder_name: e.target.value })} />
-                            <input style={inputStyle} value={r.budget_holder_role || ''} placeholder="Role"
+                            <input aria-label="Role" style={inputStyle} value={r.budget_holder_role || ''} placeholder="Role"
                               onChange={(e) => patch(r.id, { budget_holder_role: e.target.value })} />
                           </div>
                         ) : (
@@ -372,7 +372,7 @@ export default function CustomerSegmentsTable({ clientId, canManage }) {
                       </td>
                       <td style={td}>
                         {canManage ? (
-                          <select style={{ ...inputStyle, fontFamily: 'monospace' }} value={r.problem_urgency == null ? '' : String(r.problem_urgency)}
+                          <select aria-label="How urgent the problem is" style={{ ...inputStyle, fontFamily: 'monospace' }} value={r.problem_urgency == null ? '' : String(r.problem_urgency)}
                             onChange={(e) => patch(r.id, { problem_urgency: e.target.value === '' ? null : Number(e.target.value) })}>
                             <option value="">-</option>
                             {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
@@ -382,7 +382,7 @@ export default function CustomerSegmentsTable({ clientId, canManage }) {
                       {STAGES.map((s) => (
                         <td key={s.key} style={td} title={s.question}>
                           {canManage ? (
-                            <select style={{ ...inputStyle, fontFamily: 'monospace' }} value={r[s.key] || 'unsure'}
+                            <select aria-label={s.label} style={{ ...inputStyle, fontFamily: 'monospace' }} value={r[s.key] || 'unsure'}
                               onChange={(e) => patch(r.id, { [s.key]: e.target.value })}>
                               {ANSWERS.map((a) => <option key={a} value={a}>{a}</option>)}
                             </select>
@@ -394,21 +394,21 @@ export default function CustomerSegmentsTable({ clientId, canManage }) {
                       </td>
                       <td style={td}>
                         {canManage ? (
-                          <input style={{ ...inputStyle, fontFamily: 'monospace' }} inputMode="numeric" value={r.conversations_logged ?? 0}
+                          <input aria-label="Conversations held" style={{ ...inputStyle, fontFamily: 'monospace' }} inputMode="numeric" value={r.conversations_logged ?? 0}
                             onChange={(e) => patch(r.id, { conversations_logged: Math.max(0, Number(e.target.value) || 0) })} />
                         ) : (r.conversations_logged ?? 0)}
                         <div style={{ ...LABEL, marginTop: 3 }}>of {MIN_CONVERSATIONS}</div>
                       </td>
                       <td style={td}>
                         {canManage ? (
-                          <input style={{ ...inputStyle, fontFamily: 'monospace' }} inputMode="numeric" value={r.converging_count ?? 0}
+                          <input aria-label="How many converged" style={{ ...inputStyle, fontFamily: 'monospace' }} inputMode="numeric" value={r.converging_count ?? 0}
                             onChange={(e) => patch(r.id, { converging_count: Math.max(0, Number(e.target.value) || 0) })} />
                         ) : (r.converging_count ?? 0)}
                         <div style={{ ...LABEL, marginTop: 3 }}>of {MIN_CONVERGING}</div>
                       </td>
                       <td style={td}>
                         {canManage ? (
-                          <textarea style={{ ...inputStyle, minHeight: 58, resize: 'vertical' }} value={r.notes || ''}
+                          <textarea aria-label="What the conversations changed" style={{ ...inputStyle, minHeight: 58, resize: 'vertical' }} value={r.notes || ''}
                             placeholder="What the conversations changed"
                             onChange={(e) => patch(r.id, { notes: e.target.value })} />
                         ) : (r.notes || '-')}
