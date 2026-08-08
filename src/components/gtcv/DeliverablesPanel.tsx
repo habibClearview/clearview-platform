@@ -466,7 +466,44 @@ function PackViewer({ clientId, packId, onClose }) {
     return (
       <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '1rem', background: C.card }}>
         <p style={hint}>{err || 'Loading the claim...'}</p>
-        <button type="button" style={btn(C.slate)} onClick={onClose}>Close</button>
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={btn(C.slate)}
+            onClick={async () => {
+              // The document is built on the server from the stored pack, so
+              // what downloads is what was claimed, not what the evidence says
+              // today. The browser only asks for it and saves it.
+              setErr(null)
+              try {
+                const { data } = await supabase.auth.getSession()
+                const token = data.session?.access_token
+                const res = await fetch(
+                  `/api/invoice-pack?packId=${encodeURIComponent(packId)}&clientId=${encodeURIComponent(clientId)}&format=docx`,
+                  { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+                )
+                if (!res.ok) {
+                  const j = await res.json().catch(() => ({}))
+                  throw new Error(j?.error || 'Could not build the document')
+                }
+                const blob = await res.blob()
+                const name = (res.headers.get('Content-Disposition') || '')
+                  .split('filename=')[1]?.replace(/\"/g, '') || `${pack.reference || 'claim'}.docx`
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = name
+                document.body.appendChild(a)
+                a.click()
+                a.remove()
+                URL.revokeObjectURL(url)
+              } catch (e) {
+                setErr(e.message || 'Could not build the document')
+              }
+            }}
+          >Download as a document</button>
+          <button type="button" style={btn(C.slate)} onClick={onClose}>Close</button>
+        </div>
       </div>
     )
   }

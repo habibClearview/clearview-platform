@@ -34,6 +34,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { CLEARVIEW_STYLE } from '@/lib/ai-style'
 import { getBearerToken } from '@/lib/auth/api-authz'
 import { resolveClientAccess } from '@/lib/auth/engagement-access'
+import { buildClaimPack } from '@/lib/claim-pack-builder'
 import { brandedEmail, emailAvailable, escapeHtml, raw, sendEmail } from '@/lib/email'
 import { checkRateLimit } from '@/lib/rate-limit'
 
@@ -241,6 +242,7 @@ export async function GET(req: NextRequest) {
   try {
     const packId = req.nextUrl.searchParams.get('packId')
     const clientId = req.nextUrl.searchParams.get('clientId')
+    const format = req.nextUrl.searchParams.get('format')
     if (!packId || !clientId) return NextResponse.json({ error: 'Missing packId or clientId' }, { status: 400 })
 
     const admin = getAdminClient()
@@ -251,6 +253,44 @@ export async function GET(req: NextRequest) {
     if (!data || data.client_id !== clientId) {
       return NextResponse.json({ error: 'That claim is not on this engagement' }, { status: 404 })
     }
+
+    // A funder receives a document, not a screen. Built from the stored pack
+    // and nothing else, so what downloads today is what was claimed then, even
+    // if the evidence has been edited since.
+    if (format === 'docx') {
+      const [{ data: deliverable }, { data: client }, { data: config }] = await Promise.all([
+        admin.from('engagement_deliverables')
+          .select('title, code, milestone_label, milestone_no').eq('id', data.deliverable_id).maybeSingle(),
+        admin.from('engagement_clients').select('name, programme_id').eq('id', clientId).maybeSingle(),
+        admin.from('engagement_config').select('tor_reference').eq('client_id', clientId).maybeSingle(),
+      ])
+
+      let programme: string | null = null
+      if (client?.programme_id) {
+        const { data: p } = await admin.from('programmes').select('name').eq('id', client.programme_id).maybeSingle()
+        programme = p?.name ?? null
+      }
+
+      const { buffer, fileName } = await buildClaimPack(data as any, {
+        organisation: client?.name || 'This engagement',
+        programme,
+        deliverableTitle: deliverable?.title || 'Deliverable',
+        deliverableCode: deliverable?.code || null,
+        milestone: deliverable?.milestone_label
+          || (deliverable?.milestone_no != null ? `Milestone ${deliverable.milestone_no}` : null),
+        torReference: config?.tor_reference || null,
+      })
+
+      return new NextResponse(new Uint8Array(buffer), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'Content-Disposition': `attachment; filename="${fileName}"`,
+          'Cache-Control': 'no-store',
+        },
+      })
+    }
+
     return NextResponse.json({ pack: data })
   } catch (e: any) {
     console.error('invoice-pack GET: unexpected error', e)
