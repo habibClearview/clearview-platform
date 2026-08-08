@@ -310,7 +310,13 @@ export default function InterviewCaptureForm({ clientId, canManage }) {
   const editable = canManage && open && open.status !== 'submitted'
   const elapsed = open && open.status !== 'submitted' ? elapsedState(open, nowMs) : null
 
-  function ScoreRow({ row, field }) {
+  // A plain render function rather than a component declared in the body.
+  // Declared inside, it is a new component type on every render, so React
+  // throws the buttons away and builds them again each time: focus is lost
+  // mid-click and every score button remounts on any keystroke elsewhere in
+  // the form. PilotCapture documents the same hazard and avoids it the same
+  // way.
+  function scoreRow(row, field, label) {
     const value = Number(row[field]) || 0
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
@@ -320,6 +326,8 @@ export default function InterviewCaptureForm({ clientId, canManage }) {
             <button
               key={n}
               type="button"
+              aria-label={label ? `Score ${n} out of 5 for ${label}` : `Score ${n} out of 5`}
+              aria-pressed={on}
               disabled={!editable}
               onClick={() => editable && setAndSave(row.id, field, n)}
               style={{
@@ -333,7 +341,12 @@ export default function InterviewCaptureForm({ clientId, canManage }) {
           )
         })}
         {editable && value > 0 && (
-          <button type="button" style={{ ...ghostBtn, borderColor: C.border, color: C.slate }} onClick={() => setAndSave(row.id, field, null)}>Clear</button>
+          <button
+            type="button"
+            aria-label={label ? `Clear the score for ${label}` : 'Clear the score'}
+            style={{ ...ghostBtn, borderColor: C.border, color: C.slate }}
+            onClick={() => setAndSave(row.id, field, null)}
+          >Clear</button>
         )}
       </div>
     )
@@ -535,7 +548,7 @@ export default function InterviewCaptureForm({ clientId, canManage }) {
                   </div>
                   <div>
                     <label style={lbl}>Score 1 to 5</label>
-                    <ScoreRow row={open} field={`${d.key}_score`} />
+                    {scoreRow(open, `${d.key}_score`, d.label)}
                   </div>
                 </div>
 
@@ -611,7 +624,7 @@ aria-label="Your reading of it, written after the verbatim"                     
 
             <div style={{ marginTop: '1rem' }}>
               <label style={lbl}>Overall score for this interviewee, 1 to 5</label>
-              <ScoreRow row={open} field="overall_score" />
+              {scoreRow(open, 'overall_score', 'the conversation overall')}
             </div>
           </div>
 
