@@ -244,6 +244,35 @@ describe('pricing tiers', () => {
     expect(coverage[1]).toMatchObject({ present: true, priced: false })
     expect(coverage[2]).toMatchObject({ present: false, priced: false })
   })
+
+  it('does not let one row stand in for two required tiers', () => {
+    // A row named for two tiers used to satisfy both, because each required
+    // key was matched independently. The coach was then shown a complete set of
+    // tiers that did not exist, and no missing-tier gap was raised.
+    const coverage = requiredTierCoverage([
+      { tier_name: 'Entry to Standard bundle', price: 2000 },
+    ])
+    expect(coverage[0]).toMatchObject({ key: 'entry', present: true })
+    expect(coverage[1]).toMatchObject({ key: 'standard', present: false })
+    expect(coverage[2]).toMatchObject({ key: 'premium', present: false })
+  })
+
+  it('claims rows in the order the tiers are required, one row each', () => {
+    const coverage = requiredTierCoverage([
+      { tier_name: 'Standard, entry level', price: 1000 },
+      { tier_name: 'Standard core', price: 2000 },
+    ])
+    // The first row matches entry and is taken out of the running, so the
+    // second is what covers standard. Two rows, two tiers, never one for both.
+    expect(coverage[0]).toMatchObject({ key: 'entry', present: true })
+    expect(coverage[1]).toMatchObject({ key: 'standard', present: true })
+    expect(coverage[2]).toMatchObject({ key: 'premium', present: false })
+  })
+
+  it('reports nothing present when there are no tiers at all', () => {
+    const coverage = requiredTierCoverage([])
+    expect(coverage.every((c) => !c.present && !c.priced)).toBe(true)
+  })
 })
 
 describe('break even', () => {
