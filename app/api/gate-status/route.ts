@@ -60,10 +60,12 @@ export async function POST(req: NextRequest) {
     const { error } = await admin
       .from('canvas_decision_points')
       .upsert({
-        // canvas_decision_points.id is text, not uuid, and has been since the
-        // canvas tables were created. The pair (client_id, dp_id) is what
-        // identifies a gate, so the id is built from the pair and the upsert
-        // conflicts on it. Confirmed against the live schema.
+        // The pair (client_id, dp_id) is what identifies a gate, and there is
+        // now a unique index on it, so the upsert conflicts on the pair rather
+        // than on a string that happens to encode it. The id column is text
+        // and stays the primary key, so it is still supplied for a new row;
+        // for an existing one the conflict target decides the match and this
+        // value is not what is compared.
         id: `${clientId}-${dpId}`,
         client_id: clientId,
         dp_id: dpId,
@@ -71,7 +73,7 @@ export async function POST(req: NextRequest) {
         status,
         completed_at: status === 'complete' ? now : null,
         updated_at: now,
-      }, { onConflict: 'id' })
+      }, { onConflict: 'client_id,dp_id' })
     if (error) {
       console.error('gate-status POST: write failed', error)
       return NextResponse.json({ error: 'Could not update the gate' }, { status: 500 })

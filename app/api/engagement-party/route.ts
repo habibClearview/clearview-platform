@@ -206,7 +206,7 @@ export async function DELETE(req: NextRequest) {
 
     const { data: existing } = await admin
       .from('engagement_parties')
-      .select('id, client_id, party_role')
+      .select('id, client_id, party_role, user_id')
       .eq('id', id)
       .maybeSingle()
     if (!existing || existing.client_id !== clientId) {
@@ -216,11 +216,27 @@ export async function DELETE(req: NextRequest) {
     // A signature belongs to a person. Removing the person would leave the
     // record pointing at nobody, so the answer is to correct the party rather
     // than delete it.
+    //
+    // The check is by party id, not by role. A role can be changed: edit the
+    // Executive Director's row to say Leadership Team and a check keyed on the
+    // role stops matching the signature they already gave, so the party
+    // becomes deletable and the signature is left pointing at somebody who is
+    // no longer on the engagement. The party id does not change, and it is
+    // what charter_signatures already carries.
+    //
+    // gtcv_gate_signoffs has no party_id column, so it is matched on the
+    // signer's account where there is one and on the role otherwise. That is
+    // the strongest link available for a gate sign off, and it errs towards
+    // refusing the delete rather than allowing an orphan.
+    const gateFilter = admin.from('gtcv_gate_signoffs')
+      .select('id', { count: 'exact', head: true })
+      .eq('client_id', clientId)
     const [{ count: charterSigs }, { count: gateSigs }] = await Promise.all([
       admin.from('charter_signatures').select('id', { count: 'exact', head: true })
-        .eq('client_id', clientId).eq('signer_role', existing.party_role),
-      admin.from('gtcv_gate_signoffs').select('id', { count: 'exact', head: true })
-        .eq('client_id', clientId).eq('signer_role', existing.party_role),
+        .eq('client_id', clientId).eq('party_id', existing.id),
+      existing.user_id
+        ? gateFilter.or(`signer_user_id.eq.${existing.user_id},signer_role.eq.${existing.party_role}`)
+        : gateFilter.eq('signer_role', existing.party_role),
     ])
     if ((charterSigs || 0) > 0 || (gateSigs || 0) > 0) {
       return NextResponse.json(

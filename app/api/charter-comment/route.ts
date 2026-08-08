@@ -80,6 +80,13 @@ export async function POST(req: NextRequest) {
         client_id: body.clientId,
         charter_id: body.charterId,
         section_key: body.sectionKey ?? null,
+        // The author comes from the caller's profile rather than from the
+        // party list, unlike a signature, which is resolved from the party
+        // record and never from the request. The difference is deliberate: a
+        // comment binds nobody, so attributing it to the account that wrote it
+        // is both accurate and sufficient, and someone who can see the Charter
+        // but is not a named party should still be able to raise a point on
+        // it. A signature is the opposite case, which is why it is stricter.
         author_name: access.fullName,
         author_role: access.role,
         kind,
