@@ -281,17 +281,27 @@ replace with **per-field audit + undo + concurrent-edit handling**.
 
 ## F. Reconciliation — RESOLVED by the Handbook (now read in full)
 
-- ✅ **Five independence tests** → the **Handbook (Ch.17) is canonical** and matches the **Tools
-  Workbook** set: **Financial Model · Value Proposition · Outreach Process · Client Management
-  Process · Commercial Identity.** (The Engagement Workbook's Pipeline/Scale-Pathway pair is not the
-  canonical five.) App default: `independence_test_set = 'tools'`.
+- 🔶 **Five independence tests** → UNDER RECONCILIATION (Habib). The two lists are not rivals but the
+  same five at different levels: the Engagement Workbook names *categories*; the Handbook/Tools list
+  names the *costable, operable steps* inside them. Habib's mapping: Engagement WB "Commercial Model"
+  ⊇ **Outreach Process** (must be costed); "Pipeline" ↔ **Client Management Process** (how to operate
+  the client pipeline); "Scale Pathway" ↔ **Commercial Identity** (how you decide to scale). Proposed
+  reconciled five (plain language — "at handover the LSP can, without the coach:"): (1) **Run the
+  numbers** [Financial Model]; (2) **Prove the value** [Value Proposition]; (3) **Win the work**
+  [Outreach + pipeline, costed]; (4) **Deliver & manage the client** [Client Management Process];
+  (5) **Position & grow** [Commercial Identity → Scale]. Pending Habib's confirmation of the framing
+  and the #3/#5 groupings. For the Handover module, not blocking the spine.
 - ✅ **DP02 minimum validation conversations** → the **Handbook states five** minimum, and the real
-  pass condition is **≥3 converging** on the same problem/budget/willingness. App default: 5.
-- ✅ **Asset Liquidity Hierarchy™** → **not defined in the Handbook** (trademark-only, alongside
-  Liquidity Decision Framework™, Investment Infrastructure Development Model™, IDC-MS, PSE Mastery
-  Canvas). It is **separate licensed IP, not part of the taught GtCV flow** — do not build a module or
-  help content for it from these sources. Only the **Canvas (9 DPs)** and the **Three-Stage Adoption
-  Test™** are methodologically defined here.
+  pass condition is **≥3 converging** on the same problem/budget/willingness. **Per Habib: default 5
+  but changeable per engagement** (`engagement_config.validation_min_per_segment`, NULL ⇒ 5).
+- ✅ **Asset Liquidity Hierarchy™** → **RULED BY HABIB (IP owner): the generic tier model IS the
+  framework; livestock is one example.** So it is a real GtCV framework — a generic
+  Tier 1 Liquid / Tier 2 Semi-liquid / Tier 3 Illiquid model, illustrated with sector examples (e.g.
+  poultry = immediate, small ruminants = medium, large ruminants = long-term). The Handbook e-book
+  names it but does not expand it (the methodology lives elsewhere); build it as a generic framework
+  with swappable sector examples, not as livestock-specific. (Liquidity Decision Framework™,
+  Investment Infrastructure Development Model™, IDC-MS, PSE Mastery Canvas remain named-only in these
+  sources — treat as separate IP until their definitions are supplied.)
 - ✅ **Fit-test scoring** → **0–3 per test, max 18** (Handbook), consistent with the cost proposal and
   `README.md`. A workbook variant used 1–5 / max 30; the Handbook is canonical.
 - Minor: Engagement Workbook Cover says 25 tabs; export renders 24 (cosmetic).
