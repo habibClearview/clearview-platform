@@ -132,23 +132,32 @@ July–December 2026.
 `docs/STAGING_AND_ROLLBACK.md`, and must pass the CI migration validator and route-auth gate.
 Use `engagement_client_id` (TEXT) everywhere; the legacy `clients` UUID is deprecated.
 
-New tables/columns (staging-first; names indicative, finalised in the migration task):
+**IMPORTANT — the canvas persistence layer already exists.** `evidence_library`, `handover_record`,
+`canvas_decision_points`, `canvas_components`, `canvas_dp_status`, `hypotheses`, `interviews`,
+`pilot_observations`, `engagement_diagnostic`, `canvas_engagements`, and related tables are already in
+the database (RLS in `2026_07_13_funder_coimplementer_access.sql`; loaders in `CoachDashboard.tsx`;
+dp ids `setup`/`phase_0`/`dp01`…`dp09`/`handover`). **We reuse these — no duplication.** (Note: their
+`CREATE TABLE` statements are not in the repo — applied directly to the DB — so their schema lives in
+the app queries. A follow-up should capture them as a migration file to end the drift.)
 
-- **`engagements`** — the per-engagement config: `engagement_client_id`, title, currency, start/end,
-  ToR reference, brand overrides, status. One per contract.
-- **`engagement_parties`** — parties + roles (client leadership / co-implementer / funder / coach),
-  names, emails, signatory flags. Config-driven recipients for the email flow and Charter.
-- **`engagement_deliverables`** — the deliverables schedule (D1…Dn), each with a payment milestone
-  amount and due window.
-- **`deliverable_gate_map`** — the mapping rows (`deliverable_id` ↔ `gate/DP`), with per-gate
-  required evidence / means-of-verification, plus an approval flag set when the coach confirms.
-- **`engagement_charters`** + **`charter_signatures`** — the Charter content snapshot and the
-  tri-party e-signatures (reuse the `GateSignOff` shape from `canvas-types.ts`).
-- **Per-client live canvas state** — persistence for gate status, evidence entries, diagnostic
-  scores, and sign-offs (the *types* exist in `canvas-types.ts`; the tables do not yet).
+What did *not* exist — and what the migration
+[`2026_08_08_gtcv_engagement_commercial_layer.sql`](../../supabase/migrations/2026_08_08_gtcv_engagement_commercial_layer.sql)
+adds — is the **commercial/engagement layer** (all additive, RLS-scoped via the established
+`can_view_client` / `can_manage_client_access` helpers):
 
-Every table is RLS-scoped by engagement/client exactly like the existing
-`2026_07_04_client_scoped_rls.sql` pattern.
+- **`engagement_config`** — 1:1 per-client config (ToR reference, terminology, momentum status,
+  method thresholds, brand overrides, showcase flag). A companion table so the live
+  `engagement_clients` row is never altered.
+- **`engagement_parties`** — parties + roles (incl. non-login parties like a funder rep), emails,
+  signatory flags. Config-driven recipients for the email flow and Charter.
+- **`engagement_deliverables`** — the deliverables schedule (D1…Dn), each with its payment milestone
+  amount and lifecycle (`pending → in_progress → accepted → invoiced → paid`).
+- **`deliverable_gate_map`** — mapping rows (`deliverable_id` ↔ `dp_id`) with per-gate required
+  evidence, an `approved` flag (coach confirm/edit/reject/approve), and `source` (`manual` /
+  `ai_proposed`) for the Phase-2 engine.
+- **`engagement_charters`** + **`charter_signatures`** — the Charter content snapshot and tri-party
+  e-signatures (a signer may insert their own signature; non-login signers sign via a service-role
+  route, like the access-grant flow).
 
 ---
 
@@ -328,11 +337,15 @@ via the shared email helper. Human-in-the-loop at sign-off; automation only for 
 - **Deliverable→gate mapping for Tanager** (§4.2) — ✅ confirmed by Habib (matches how he'll invoice);
   stays editable per engagement.
 - **Charter responsibilities** (§6.3) — drafted and sourced; awaiting Habib's red-line.
-- **Method reconciliation** (method-reference §F) — pick one canonical, per-engagement-configurable
-  definition for: the **five independence tests** (two wordings), the **Asset Liquidity Hierarchy™**
-  (livestock vs Tier 1/2/3), and the **DP02 validation-conversation minimum** (≥2 / ≥4 / ≥5).
-- **Missing source files** — obtain the **Handbook e-book** and the separate **Financial Model file**
-  before building DP04 and the IP-framework help content.
+- **Method reconciliation** — ✅ resolved by the Handbook (method-reference §F): five independence
+  tests = Tools/Handbook set; DP02 minimum = 5 (with ≥3 converging); Asset Liquidity Hierarchy™ is
+  separate IP, out of the GtCV flow; fit tests score 0–3 / max 18.
+- **Missing source files** — ✅ obtained and read (Handbook + Financial Model). DP04 build reference
+  captured in method-reference §G.
+- **DP04 vs existing engine** — decide at DP04 build time how much reuses `generic-engine.ts` vs the
+  GtCV Financial Model spec (method-reference §G).
+- **Canvas schema drift** — the canvas tables aren't captured as migration files; add a follow-up to
+  snapshot them so the repo matches the DB.
 - **Scheduling** — reuse an existing integration vs a lightweight in-app scheduler.
 - **Palette reconciliation** — how far to unify the two brand palettes as part of this work vs later.
 
@@ -340,6 +353,11 @@ via the shared email helper. Human-in-the-loop at sign-off; automation only for 
 
 ## 13. Changelog
 
+- **v1.2 (2026-08-08):** Discovered the canvas persistence layer already exists in the DB (reuse, no
+  duplication) — rewrote §5 accordingly and added the commercial-layer migration
+  `2026_08_08_gtcv_engagement_commercial_layer.sql`. Read the Handbook + Financial Model in full:
+  resolved all method-reconciliation items (§12) and captured the DP04 build reference
+  (method-reference §G) and the canonical DP09 scoring (0–3 / 18).
 - **v1.1 (2026-08-08):** Added `gtcv-method-reference.md` (responsibilities, gate model, tools,
   permission phases, momentum protocol, friction points — sourced from the manual & workbooks).
   Upgraded the Charter responsibilities layer from "to draft" to a sourced, drafted articulation

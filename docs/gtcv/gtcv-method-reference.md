@@ -142,11 +142,27 @@ Each gate requires the DP's named output(s), the "signal" observed, evidence cit
 **DP07 is non-negotiable** — cannot be compressed, deferred, or substituted; ≥4 real client
 engagements; if timeline threatens it, escalate to the funder.
 
-### DP09 — six fit tests & readiness bands
-Fit tests: **01 Problem-Provider · 02 Problem-Solution · 03 Solution-Problem-Owner · 04
-Solution-Pilot · 05 Solution-Market · 06 Solution-Scale-Channel.** Scored 1–5 (evidence required for
-any score > 1). **Bands (out of 30):** 1–6 Grant-Dependent · 7–12 Commercially Aware · 13–19
-Market-Ready · 20–25 Commercially Viable · 26–30 Commercially Independent.
+### DP09 — six fit tests & readiness (Handbook-canonical)
+Fit tests: **Problem–Provider · Problem–Solution · Solution–Customer · Solution–Pilot ·
+Solution–Market · Solution–Scale.** **Scored 0–3 each, max 18** (matching the cost proposal's
+"Commercial Readiness /18" and `docs/gtcv/README.md`), taken **3× (baseline / mid-point / final)** —
+it measures *change*, so baseline is not pass/fail. **Bands:** baseline typically 3–7; mid-point
+10–14 solid / 6–9 significant gaps / <6 rebuild foundations; final <12 not ready (Verdict 02/03) /
+12–15 ready to scale / 15–18 comprehensively validated (rare). Each *failed* fit test routes to the
+specific DP to revisit — the diagnostic doubles as navigation.
+> A GtCV workbook variant scored these 1–5 / max 30; the **Handbook 0–3 / max 18 is canonical**.
+
+**Gate discipline (from the Handbook):**
+- **Governing Principle** — *"No service is designed, priced, or scaled without evidence of paying
+  demand from a customer with budget authority."*
+- Every DP must produce a **tangible documented output** before the next unlocks (the "load-bearing"
+  test).
+- **Entry gate to DP07 (pilots):** do not open the pilots unless, at mid-point, **Problem–Solution
+  Fit ≥2 AND Solution–Customer Fit ≥2**.
+- **DP02** enforces the **Three-Stage Adoption Test™** (Willing → Able → Prioritised, in order) and
+  requires an **adoption stage profile** output carried into DP03/04/05.
+- **IP/attribution is immutable** on every screen and export ("Grant-to-Commercial Viability
+  Canvas™ · The Canvas Coach · habibonifade.com · © Habib Onifade"); stripping it is a licence breach.
 
 ### Handover — five independence tests
 Engagement closes when the org can operate independently, *"not when the months are up."* Signed by
@@ -263,12 +279,45 @@ replace with **per-field audit + undo + concurrent-edit handling**.
 
 ---
 
-## F. Reconciliation items (need one canonical, per-engagement-configurable definition)
+## F. Reconciliation — RESOLVED by the Handbook (now read in full)
 
-- **Five independence tests** — Engagement Workbook vs Tools Workbook wordings differ.
-- **Asset Liquidity Hierarchy™** — livestock expression (Tools WB) vs generic Tier 1/2/3 (Engagement WB).
-- **DP02 validation-conversation minimum** — Manual says ≥4/segment; Tools WB DP02.5 says ≥5; Canvas
-  DP02.5 says ≥2.
-- **Tab count** — Engagement Workbook Cover says 25 tabs; export renders 24.
-- **Missing source files** — obtain the Handbook e-book and the Financial Model file before building
-  DP04 and the IP-framework help.
+- ✅ **Five independence tests** → the **Handbook (Ch.17) is canonical** and matches the **Tools
+  Workbook** set: **Financial Model · Value Proposition · Outreach Process · Client Management
+  Process · Commercial Identity.** (The Engagement Workbook's Pipeline/Scale-Pathway pair is not the
+  canonical five.) App default: `independence_test_set = 'tools'`.
+- ✅ **DP02 minimum validation conversations** → the **Handbook states five** minimum, and the real
+  pass condition is **≥3 converging** on the same problem/budget/willingness. App default: 5.
+- ✅ **Asset Liquidity Hierarchy™** → **not defined in the Handbook** (trademark-only, alongside
+  Liquidity Decision Framework™, Investment Infrastructure Development Model™, IDC-MS, PSE Mastery
+  Canvas). It is **separate licensed IP, not part of the taught GtCV flow** — do not build a module or
+  help content for it from these sources. Only the **Canvas (9 DPs)** and the **Three-Stage Adoption
+  Test™** are methodologically defined here.
+- ✅ **Fit-test scoring** → **0–3 per test, max 18** (Handbook), consistent with the cost proposal and
+  `README.md`. A workbook variant used 1–5 / max 30; the Handbook is canonical.
+- Minor: Engagement Workbook Cover says 25 tabs; export renders 24 (cosmetic).
+
+## G. DP04 — the "Clearview" financial model (build reference)
+
+The GtCV Financial Model (6 tabs) is the DP04 output. Convention: **blue = user input, white =
+calculated.** Core rules the DP04 module must implement:
+- **Cost floor** = sum of **five cost categories** (Direct Labour · Direct Materials · Travel &
+  Logistics · Quality Assurance · Overhead Allocation), computed **once** and consumed everywhere
+  (single source of truth). **Overhead ≥ 20% of direct costs** is a validation flag.
+- **Pricing tiers** — 3 required (Entry · Standard · Premium) + 2 optional. Per tier:
+  **Margin = Price − Cost Floor**; **% above floor = Margin ÷ Cost Floor**. Selling below the floor
+  is a structural deficit (flag).
+- **Break-even** = annual fixed costs ÷ (Price − Cost Floor) per tier; flag break-even-at-target Y/N
+  and annual surplus/deficit.
+- **36-month projection** = Deliveries × Avg Price (with an annual price-growth %), across three
+  scenarios: **Conservative / Base / Optimistic**.
+- **Five monthly metrics** with targets: Revenue per delivery · Delivery volume · Cost per delivery
+  (target = cost floor) · Renewal rate (target 40%+ by month 12) · Grant-dependency ratio (target
+  −10%/quarter).
+- **Currency is user-set once, applied globally** (the model is currency-agnostic).
+> **Overlap to reconcile at DP04 build time:** the app already has a mature financial engine
+> (`src/lib/generic-engine.ts`, LRS, etc.). Decide how much of DP04 reuses it vs the GtCV model spec.
+
+## H. Source coverage
+Manual, Tools Workbook, Canvas Workbook, Engagement Workbook, **Handbook e-book**, and the
+**GtCV Financial Model** have all now been read in full. Working extracts are in the session
+scratchpad.
