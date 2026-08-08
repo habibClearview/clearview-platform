@@ -243,19 +243,40 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
   async function addEntry() {
     if (!clientId || busy) return
     setBusy(true)
-    const reference = nextReference(rows)
-    const payload = {
-      client_id: clientId,
-      reference,
-      date: new Date().toISOString().split('T')[0],
-      status: 'active',
+    try {
+      // The reference is computed from what this browser can see, so two
+      // people adding at the same moment both compute E-004. References are
+      // quoted in funder packs, where two entries sharing one reference makes
+      // the claim ambiguous, so the database now refuses the duplicate and
+      // this retries from the numbers that are actually recorded. A few
+      // attempts is plenty: the loser of a race only has to step past the
+      // winner.
+      let lastError = null
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const { data: current } = await supabase
+          .from(TABLE).select('reference').eq('client_id', clientId)
+        const reference = nextReference(current || rows)
+        const payload = {
+          client_id: clientId,
+          reference,
+          date: new Date().toISOString().split('T')[0],
+          status: 'active',
+        }
+        if (dpId) payload.dp_id = dpId
+        const { data, error } = await supabase.from(TABLE).insert([payload]).select().single()
+        if (!error) {
+          setErr(null)
+          setRows((prev) => [...prev, data])
+          return
+        }
+        lastError = error
+        if (error.code !== '23505') break
+      }
+      console.error('EvidenceLibraryPanel: add failed', lastError)
+      setErr('Could not add an entry. Try again.')
+    } finally {
+      setBusy(false)
     }
-    if (dpId) payload.dp_id = dpId
-    const { data, error } = await supabase.from(TABLE).insert([payload]).select().single()
-    setBusy(false)
-    if (error) { setErr('Could not add an entry: ' + error.message); return }
-    setErr(null)
-    setRows((prev) => [...prev, data])
   }
 
   async function removeEntry(id) {
@@ -265,7 +286,13 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
     setRows((prev) => prev.filter((r) => r.id !== id))
     setDirty((prev) => { const next = { ...prev }; delete next[id]; return next })
     const { error } = await supabase.from(TABLE).delete().eq('id', id)
-    if (error) setErr('Could not delete: ' + error.message)
+    if (error) {
+      // Put it back. A failed delete used to leave the row hidden while it was
+      // still recorded, so the library on screen disagreed with the record.
+      console.error('EvidenceLibraryPanel: delete failed', error)
+      if (row) setRows((prev) => [...prev, row])
+      setErr('Could not delete that entry. Try again.')
+    }
     else setErr(null)
   }
 

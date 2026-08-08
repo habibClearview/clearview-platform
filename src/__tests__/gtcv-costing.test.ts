@@ -149,15 +149,34 @@ describe('the overhead check', () => {
     expect(cost.emptyCategories).toContain('overhead')
   })
 
+  // The comparison in buildCostFloor is a strict `<`, so equality is the case
+  // that decides whether "at least 20 percent" means at least or more than.
+  // The previous version of this test put overhead a whole unit above the
+  // minimum, which exercises the comfortable case and says nothing about the
+  // boundary it is named after.
   it('sits exactly on the boundary without flagging', () => {
+    const directTotal = 1000
     const cost = buildCostFloor([
-      { category: 'direct_labour', qty_per_cycle: 1, unit_cost: 1000 },
-      { category: 'direct_materials', qty_per_cycle: 1, unit_cost: 0.0001 },
-      { category: 'travel_logistics', qty_per_cycle: 1, unit_cost: 0.0001 },
-      { category: 'quality_assurance', qty_per_cycle: 1, unit_cost: 0.0001 },
-      { category: 'overhead', qty_per_cycle: 1, unit_cost: 1000 * OVERHEAD_MINIMUM_SHARE + 1 },
+      { category: 'direct_labour', qty_per_cycle: 1, unit_cost: 400 },
+      { category: 'direct_materials', qty_per_cycle: 1, unit_cost: 300 },
+      { category: 'travel_logistics', qty_per_cycle: 1, unit_cost: 200 },
+      { category: 'quality_assurance', qty_per_cycle: 1, unit_cost: 100 },
+      { category: 'overhead', qty_per_cycle: 1, unit_cost: directTotal * OVERHEAD_MINIMUM_SHARE },
     ])
+    expect(cost.overheadShareOfDirect).toBeCloseTo(OVERHEAD_MINIMUM_SHARE, 10)
     expect(cost.overheadBelowMinimum).toBe(false)
+  })
+
+  it('flags the smallest step below the boundary', () => {
+    const directTotal = 1000
+    const cost = buildCostFloor([
+      { category: 'direct_labour', qty_per_cycle: 1, unit_cost: 400 },
+      { category: 'direct_materials', qty_per_cycle: 1, unit_cost: 300 },
+      { category: 'travel_logistics', qty_per_cycle: 1, unit_cost: 200 },
+      { category: 'quality_assurance', qty_per_cycle: 1, unit_cost: 100 },
+      { category: 'overhead', qty_per_cycle: 1, unit_cost: directTotal * OVERHEAD_MINIMUM_SHARE - 0.01 },
+    ])
+    expect(cost.overheadBelowMinimum).toBe(true)
   })
 
   it('reports no share at all when there are no direct costs to measure against', () => {

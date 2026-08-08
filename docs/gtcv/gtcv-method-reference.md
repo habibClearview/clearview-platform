@@ -17,10 +17,12 @@
 | **GtCV_Canvas_Workbook_v2** (`1016o…`, 9 DP × 9 components × 5 layers) | The engagement *record* | Client-agnostic |
 | **GtCV_Engagement_Workbook_v2** (`1IGO0…`, 24 tabs) | The operational backbone; field-capture templates; permissions model | Hybrid |
 
-**Not yet provided** (cited but absent): the **Handbook e-book** (`GtCV_Handbook_FromGrantToCommercial_FINAL`
-, full IP-framework methodology) and the separate **Financial Model** file (`GtCV_Financial_Model_v1`
-, live cost/pricing/break-even/36-month projection = DP04 / "Clearview"). Obtain both before building
-DP04 and the framework help content.
+**Source status, as at the build.** The **Handbook e-book**
+(`GtCV_Handbook_FromGrantToCommercial_FINAL`) and the **Financial Model** (`GtCV_Financial_Model_v1`,
+cost, pricing, break-even and the 36 month projection, the DP04 output) were both supplied and read in
+full, and the DP04 rules in section G below come from them. An earlier draft of this reference said
+they were still to be obtained; that is no longer true and the sentence has been corrected here rather
+than left to mislead somebody into rebuilding what is already done.
 
 **Terminology (from the Manual):** *Zone N = Decision Point DPN = Decision Zone* (interchangeable).
 Phase 0 = "Assumption Clearing." Standard status everywhere: **○ Not Started / ◐ In Progress /
@@ -93,7 +95,8 @@ Owns the evidence and the outputs. Sub-roles:
   complete and LSP-owned; co-signs completion.
 
 ### A4. Co-implementer (CI, e.g. Ganiat Ettu)
-- **Daily continuity lead** between LC visits; **leads sessions when the LC is remote**. **Owns
+- **Daily continuity lead** on the days the lead consultant is not leading; **leads sessions the lead
+  consultant is not leading**. **Owns
   Engagement Workbook setup/admin.** **Submits the Weekly Progress Report every Friday** (for LC
   approval); raises AMBER immediately. **Records verbatim** at the diagnostic and all Zone 9 sessions.
 - **Setup:** completes Engagement Setup, links the Financial Model, sets permissions, duplicates
@@ -151,7 +154,7 @@ Fit tests: **Problem-Provider · Problem-Solution · Solution-Customer · Soluti
 Solution-Market · Solution-Scale.** **Scored 0-3 each, max 18** (matching the cost proposal's
 "Commercial Readiness /18" and `docs/gtcv/README.md`), taken **3× (baseline / mid-point / final)**, it measures *change*, so baseline is not pass/fail. **Bands:** baseline typically 3-7; mid-point
 10-14 solid / 6-9 significant gaps / <6 rebuild foundations; final <12 not ready (Verdict 02/03) /
-12-15 ready to scale / 15-18 comprehensively validated (rare). Each *failed* fit test routes to the
+12 to 14 ready to scale / 15 to 18 comprehensively validated (rare). Each *failed* fit test routes to the
 specific DP to revisit, the diagnostic doubles as navigation.
 > A GtCV workbook variant scored these 1-5 / max 30; the **Handbook 0-3 / max 18 is canonical**.
 
@@ -185,15 +188,15 @@ Engagement closes when the org can operate independently, *"not when the months 
 
 ## C. Tools / digitisation map
 
-Audience tags: **[C]** coach · **[O]** client/LSP · **[F]** field team · **[Fn]** finance.
+Audience tags: **`[C]`** coach · **`[O]`** client/LSP · **`[F]`** field team · **`[Fn]`** finance.
 
-- **Orientation/cross-cutting:** Coach Quick Reference [C]; IP Framework Reference [C]; Canvas Template
-  spatial overview [C][O]; How-to-Use/Start [C].
-- **Engagement management:** Engagement Setup [C]; Pre-Engagement Diagnostic [C][O]; Engagement
-  Tracker [C]; Canvas Decision Record [C][O]; **Evidence Library (E-001 system)** [C][O][F]; Handover
-  Record [C][O].
-- **Phase 0 (five tools):** Assumption Dump Canvas [C][O] · Problem-Owner-Budget Matrix [C][O] ·
-  Hypothesis Shortlist Board [C][O] · Signal vs Story Board [C] · Continue/Pause/Kill Table [C][O].
+- **Orientation/cross-cutting:** Coach Quick Reference `[C]`; IP Framework Reference `[C]`; Canvas Template
+  spatial overview `[C]``[O]`; How-to-Use/Start `[C]`.
+- **Engagement management:** Engagement Setup `[C]`; Pre-Engagement Diagnostic `[C]``[O]`; Engagement
+  Tracker `[C]`; Canvas Decision Record `[C]``[O]`; **Evidence Library (E-001 system)** `[C]``[O]``[F]`; Handover
+  Record `[C]``[O]`.
+- **Phase 0 (five tools):** Assumption Dump Canvas `[C]``[O]` · Problem-Owner-Budget Matrix `[C]``[O]` ·
+  Hypothesis Shortlist Board `[C]``[O]` · Signal vs Story Board `[C]` · Continue/Pause/Kill Table `[C]``[O]`.
 - **Per-DP working tools:** each DP = 9 components × 5 layers (*What it is · Why it matters · Coach
   guidance · Action trigger · Signal*) + status + evidence ref. Named outputs per DP include the
   Service Inventory & Stop/Pause/Redesign Register (DP01); Customer Profiles, Interview Tracker,
@@ -202,13 +205,13 @@ Audience tags: **[C]** coach · **[O]** client/LSP · **[F]** field team · **[F
   Tracker (coaching vs operational views)** (DP05); Partner Type Map & Commercial Vehicle option
   (DP06); Pilot Selection/Observation/Comparison, Pilot Learning Summary (DP07); Channel Logic Table,
   36-month projection, Scale Commitment (DP08); the 3× CRD scoring grid & Close Investment Case (DP09).
-- **Field-capture templates [F] (CI-administered):** Interview Briefing (eight rules); **Interview
+- **Field-capture templates `[F]` (CI-administered):** Interview Briefing (eight rules); **Interview
   Capture** (six dimensions, Role & Accountability · Problem Reality · Consequence Severity · Current
   Attempts · Budget & Authority · Willingness to Pay, 1-5 + verbatim, within 30 min); Interview
   Reporting; **Hypothesis Tracker** (problem / what-must-be-true / falsification test / status); **Pilot
   Observation** (pre-brief → live → debrief; five dimensions: Engagement · Language · Resistance ·
   Surprise · The Price Moment).
-- **IP frameworks [C]:** Three-Stage Adoption Test™ (Willingness · Ability · Prioritisation);
+- **IP frameworks `[C]`:** Three-Stage Adoption Test™ (Willingness · Ability · Prioritisation);
   Commercial Structures Reference (B2B/B2C/B2G/B2D/Licence…); Asset Liquidity Hierarchy™; Liquidity
   Decision Framework™; Investment Infrastructure Development Model™. *(Full methodology in the
   Handbook, obtain it.)*
@@ -272,7 +275,9 @@ replace with **per-field audit + undo + concurrent-edit handling**.
    fieldwork counts) + auto-drafted weekly/phase reports for LC approval.
 7. **Hand-computed CRD** → auto totals, auto readiness band, block score increases lacking evidence,
    chart baseline→mid→close.
-8. **Two-file financial model** → embed with its own permission boundary, guided tiers, overhead-<20%
+8. **Two-file financial model** → embed with its own permission boundary, guided tiers, an overhead
+   flag raised when overhead is **below** 20 percent of direct costs (the same rule as section G,
+   stated once)
    and cost-floor flags, recorded independence-test interaction.
 9. **Manual A/B & pipeline tallies** → auto response rates, winning-variant flag, pipeline analytics +
    dual coaching/operational view.
@@ -298,9 +303,15 @@ replace with **per-field audit + undo + concurrent-edit handling**.
      *(Identity → Scale)*
   Judgement call flagged for veto: #3 (winning work) and #4 (delivering work) kept as two separate
   tests. For the Handover module (later); does not block the spine.
-- ✅ **DP02 minimum validation conversations** → the **Handbook states five** minimum, and the real
-  pass condition is **≥3 converging** on the same problem/budget/willingness. **Per Habib: default 5
-  but changeable per engagement** (`engagement_config.validation_min_per_segment`, NULL ⇒ 5).
+- ✅ **DP02 minimum validation conversations** → **five is the default, not a floor and not
+  immutable.** The Handbook states five as the minimum and the pass condition is **≥3 converging** on
+  the same problem, budget and willingness. Per Habib it is changeable per engagement, so
+  `engagement_config.validation_min_per_segment` carries the number and NULL means five
+  (`DEFAULT_VALIDATION_MIN_PER_SEGMENT`). An engagement may set it lower or higher; the app records
+  what was agreed rather than arguing with it. **The ≥3 converging rule does not scale with it.**
+  Three is the point at which a pattern stops being an anecdote, and that does not change because an
+  engagement chose to hold four conversations or eight. Where the configured minimum is below three,
+  convergence cannot be reached at all and the surface says so rather than passing the gate.
 - ✅ **Asset Liquidity Hierarchy™** → **RULED BY HABIB (IP owner): the generic tier model IS the
   framework; livestock is one example.** So it is a real GtCV framework, a generic
   Tier 1 Liquid / Tier 2 Semi-liquid / Tier 3 Illiquid model, illustrated with sector examples (e.g.
@@ -319,12 +330,18 @@ The GtCV Financial Model (6 tabs) is the DP04 output. Convention: **blue = user 
 calculated.** Core rules the DP04 module must implement:
 - **Cost floor** = sum of **five cost categories** (Direct Labour · Direct Materials · Travel &
   Logistics · Quality Assurance · Overhead Allocation), computed **once** and consumed everywhere
-  (single source of truth). **Overhead ≥ 20% of direct costs** is a validation flag.
+  (single source of truth). Overhead is expected to be **at least 20 percent of direct costs**, and the flag is raised when it is
+  **below** that, because too little overhead means the floor is understated and the price built on it
+  is too low. `OVERHEAD_MINIMUM_SHARE` in `src/lib/gtcv-costing.ts` is the single implementation.
 - **Pricing tiers**, 3 required (Entry · Standard · Premium) + 2 optional. Per tier:
   **Margin = Price − Cost Floor**; **% above floor = Margin ÷ Cost Floor**. Selling below the floor
   is a structural deficit (flag).
-- **Break-even** = annual fixed costs ÷ (Price − Cost Floor) per tier; flag break-even-at-target Y/N
-  and annual surplus/deficit.
+- **Break-even** = annual fixed costs ÷ (Price − Cost Floor) per tier, but **only when the price
+  clears the floor**. When Price equals the Cost Floor there is no contribution and the division has
+  no answer; when Price is below the floor the arithmetic returns a positive-looking number that is
+  nonsense, because more volume makes the loss larger, not smaller. Both cases are structurally
+  invalid tiers and `breakEvenDeliveries` returns **null** for them rather than a figure. Flag
+  break-even-at-target Y/N and the annual surplus or deficit.
 - **36-month projection** = Deliveries × Avg Price (with an annual price-growth %), across three
   scenarios: **Conservative / Base / Optimistic**.
 - **Five monthly metrics** with targets: Revenue per delivery · Delivery volume · Cost per delivery

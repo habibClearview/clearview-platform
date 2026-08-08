@@ -151,8 +151,9 @@ create index if not exists idx_gtcv_continue_pause_kill_client on gtcv_continue_
 --    'solution_customer','solution_pilot','solution_market',
 --    'solution_scale'.
 --
---    Bands on the checkpoint total: under 12 not ready, 12 to 15 ready to
---    scale, 15 to 18 comprehensively validated. Pilot entry gate: at mid
+--    Bands on the checkpoint total, as disjoint ranges so no total falls in
+--    two of them: 0 to 11 not ready, 12 to 14 ready to scale, 15 to 18
+--    comprehensively validated. Pilot entry gate: at mid
 --    point, problem_solution and solution_customer must both be at least 2.
 -- ------------------------------------------------------------
 create table if not exists gtcv_readiness_scores (

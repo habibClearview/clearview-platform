@@ -88,7 +88,13 @@ trigger. We do not invent a new lifecycle; we attach money and evidence to the o
 | DP08 | Pilot Iteration 2 / Scale | |
 | DP09 | Commercial Readiness Diagnostic | Commercial Readiness score /18 |
 
-Plus `setup`, `phase0`, and `handover` phases.
+Plus `setup`, `phase_0`, and `handover` phases.
+
+> **The identifier is `phase_0`, with an underscore.** The canvas persistence layer has used that
+> spelling since it was created, and everything joins on it: `canvas_decision_points.dp_id`,
+> `CANVAS_DP_IDS`, `deliverable_gate_map.dp_id`, the block registry and the gate sign-off. An earlier
+> draft of this document wrote `phase0`; anything using that spelling silently fails to join Phase 0
+> and reports it as not started. There is one spelling and this is it.
 
 ---
 
@@ -106,23 +112,36 @@ confirmed by the coach, never code.
    evidence / means-of-verification each gate needs.
 3. The coach **confirms, edits, rejects, or approves** each line.
 4. On approval the engagement goes live; the journey map and Charter render from this config.
-5. When a gate is authorised → (Phase 2) the evidence pack is assembled → the coach approves →
-   the invoice + evidence pack is sent to the client automatically.
+5. When the gates a deliverable maps to have been worked, the claim is assembled → the coach reads
+   it and approves → the claim and its evidence pack go to the client.
 
-### 4.2 Tanager, the first record (proposed, pending confirmation)
+**Which gates make a milestone claimable.** **All** of the deliverable's approved gate mappings, not
+any one of them. A milestone that maps to `setup` and `phase_0` is not claimable because `setup`
+closed. `/api/invoice-pack` assembles from every approved mapping, and any gate in the set that has no
+evidence or no signature appears in the pack as a **named gap** rather than being left out, so the
+person approving the claim sees the hole before the funder does. Assembly is also refused outright
+when none of the mappings have been approved. Assembling twice creates a **new** pack rather than
+rewriting the old one, so what was claimed stays what was claimed.
+
+### 4.2 Tanager, the first record (illustrative seed, not contractual)
 
 Fixed price **$39,000 incl. 7.5% VAT** (fee $36,279 + VAT $2,721), 55 consultant days,
 July-December 2026.
 
 | Milestone | Deliverables | Zones / gates | Payment on `coach_authorised` |
 |---|---|---|---|
-| 1 · Inception | Inception Report (workplan, methodology note, baseline cost structure) | `setup` + `phase0` | **$7,800** |
+| 1 · Inception | Inception Report (workplan, methodology note, baseline cost structure) | `setup` + `phase_0` | **$7,800** |
 | 2 · Service Bundle Refinement | D1 refined bundles, D2 value propositions, D3 pricing models | DP01-DP04 (Service Reality → Commercial Viability / Clearview) | **$13,650** |
 | 3 · Iteration I | D4 go-to-market & comms, D5 lessons (partial) | DP05-DP07 (Market Entry → Org Identity → Pilot 1) | **$9,750** |
 | 4 · Final Delivery | Priced bundles, lessons-learnt report, tools/templates handover, close-out | DP08-DP09 (Pilot 2/Scale → Readiness Diagnostic) + `handover` | **$7,800** |
 
-> This mapping is stored as the Tanager config row and is fully editable. It is *illustrative of the
-> engine*, not baked into the product.
+> **Status: illustrative seed data.** This mapping is stored as the Tanager config row, is fully
+> editable, and is *illustrative of the engine* rather than baked into the product. It has **not** been
+> approved as a contractual mapping, and the app treats it accordingly: `deliverable_gate_map.approved`
+> is what billing reads, `deliverable_gate_map.source` records where a row came from, and
+> `approved_by` and `approved_at` record who approved it and when. A seeded row that nobody has
+> approved cannot be claimed against. An earlier section of this document said the mapping had been
+> confirmed; it had not, and billing must never treat an illustration as an agreement.
 
 ---
 
@@ -136,9 +155,27 @@ Use `engagement_client_id` (TEXT) everywhere; the legacy `clients` UUID is depre
 `canvas_decision_points`, `canvas_components`, `canvas_dp_status`, `hypotheses`, `interviews`,
 `pilot_observations`, `engagement_diagnostic`, `canvas_engagements`, and related tables are already in
 the database (RLS in `2026_07_13_funder_coimplementer_access.sql`; loaders in `CoachDashboard.tsx`;
-dp ids `setup`/`phase_0`/`dp01`…`dp09`/`handover`). **We reuse these, no duplication.** (Note: their
-`CREATE TABLE` statements are not in the repo, applied directly to the DB, so their schema lives in
-the app queries. A follow-up should capture them as a migration file to end the drift.)
+dp ids `setup`/`phase_0`/`dp01`…`dp09`/`handover`). **We reuse these, no duplication.**
+
+**Their `CREATE TABLE` statements are not in this repository.** They were applied straight to the
+database before migrations were kept here, so their schema lives only in the app's queries and in
+whichever projects already have them. The consequence is real: a fresh Supabase project, or a
+rollback, comes up looking healthy while half the app has nothing to talk to, and the failure is
+quiet, because a query against a missing table surfaces as "could not load", which reads like a
+glitch. Capturing them as migrations is still the right end state.
+
+Until that is done, `scripts/preflight-schema.mjs` makes the failure loud instead of quiet. It probes
+every table the app depends on, separates the ones this repository creates from the ones it inherits,
+and exits non-zero naming exactly which are missing and which of the two problems that is. Run it
+against any project before pointing a deployment at it:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/preflight-schema.mjs
+```
+
+It checks existence, not row level security, because the REST surface answers the same way with RLS
+on or off. RLS is enforced at the point tables are created, by
+`.github/scripts/validate-migration.py`, which blocks any migration that creates a table without it.
 
 What did *not* exist, and what the migration
 [`2026_08_08_gtcv_engagement_commercial_layer.sql`](../../supabase/migrations/2026_08_08_gtcv_engagement_commercial_layer.sql)
@@ -175,8 +212,15 @@ The client-facing view of the nine zones mapped to *their* deliverables and mile
 are, what's next, what each gate will produce.
 - **Engagement mode:** authenticated (client leadership / co-implementer / funder roles already
   exist in `user_profiles`).
-- **Showcase mode:** a **no-login** link for prospects, reusing `client_access_grants` +
-  `app/access/[token]`. Same page, read-only, safe to share.
+- **Showcase mode:** NOT BUILT, and deliberately not built as described here. A no-login link that
+  reuses the engagement page is not read-only in any useful sense: the page loads parties with their
+  email addresses, signatures, evidence entries, gate notes and the deliverable mapping, and hiding
+  them in the browser hides nothing at all. Before this ships it needs an **allowlist enforced in the
+  server loader**, naming the fields a prospect may see (the block titles, the questions each block
+  asks, and the shape of the journey) and excluding party emails and names, signatures, evidence
+  entries and their references, gate synthesis text, the deliverable mapping, every commercial field,
+  and anything coach-only. The allowlist belongs in the loader because the client is not a place where
+  access decisions can be enforced.
 Uses the accessible `--cv-*` brand tokens (see §8).
 
 ### 6.3 The Engagement Charter + e-signature
@@ -297,16 +341,38 @@ variables), matching the existing template: navy `#1B2A41`, cyan `#00CCCC`, crea
 ## 9. Phase 2, flexibility engines (design now, build right after launch)
 
 ### 9.1 ToR → gate auto-mapping (human-approved)
-Upload any client's ToR + deliverables → `app/api/ai-generate` (Anthropic) proposes the
-`deliverable_gate_map` rows + required evidence per gate → the coach **confirms / edits / rejects /
-approves** each line in a review UI → approved mapping goes live. This is *the* flexibility feature:
-the canvas is unchanged; only the mapping is generated, and always under human control.
+Paste a client's deliverables section → `/api/deliverables` with `action: 'propose'` sends it to
+Anthropic → the model returns the deliverables it found and the gates that evidence each one → the
+rows are written with `approved = false` and `source = 'ai'` → the coach **confirms, edits, rejects or
+approves** each line → only approved rows count for anything. This is *the* flexibility feature: the
+canvas is unchanged; only the mapping is generated, and always under human control.
+
+**Data handling for the text that is sent.** This sends a client's contractual document to a third
+party, so the rules are explicit rather than assumed:
+- **Minimisation.** Only the pasted deliverables section is sent, not the whole document, and not the
+  engagement's evidence, conversations, financials or party details. The route caps the text at 40,000
+  characters and refuses anything longer, which forces the narrowing rather than trusting it.
+- **Who decides.** The coach chooses what to paste. Nothing is uploaded automatically and no document
+  is read from storage, so a document nobody chose to send cannot be sent.
+- **Basis.** The consultant holds the ToR under the engagement contract. Where a funder's terms
+  restrict onward disclosure, the coach types the deliverables by hand instead, which the same screen
+  supports and which produces the identical result.
+- **Retention.** Anthropic's API is not used to train models on submitted content. Nothing is stored
+  by this route beyond the deliverable rows it creates, which live in the engagement's own tables.
+- **When it is unavailable.** With no `ANTHROPIC_API_KEY` the route answers 503 with a plain sentence
+  pointing at the manual path. The feature degrades to typing, it does not break.
+- **Audit.** `deliverable_gate_map.source` records that a row came from a document rather than a
+  person, and `approved_by` and `approved_at` record who accepted it. A generated row is traceable as
+  generated for as long as it exists.
 
 ### 9.2 Auto-invoice loop
-Gate reaches `coach_authorised` → the system **assembles** the evidence + means-of-verification for
-that gate/deliverable (reusing the `docx` export machinery) into an **approval request to the coach
-first** → the coach approves → the **invoice + evidence pack is sent to the client automatically**
-via the shared email helper. Human-in-the-loop at sign-off; automation only for the toil.
+The coach assembles a claim against a deliverable → `/api/invoice-pack` gathers every approved gate
+mapping, the evidence recorded against those gates, and the signatures that closed them, snapshots
+them into `engagement_invoice_packs`, and drafts a covering note → the coach **reads the pack and
+approves it** → the claim goes to the client through the shared email helper. Human in the loop at
+sign-off; automation only for the toil. The pack is a snapshot rather than a live view, so evidence
+edited later cannot change a claim that has already been submitted, and every state change records who
+made it.
 
 ---
 

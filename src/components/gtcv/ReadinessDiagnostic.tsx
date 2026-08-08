@@ -17,9 +17,9 @@
 //     still scored above 1.
 //   * Pilot entry gate: at the mid point, Problem-Solution and
 //     Solution-Customer must both be at least 2.
-//   * Bands on a checkpoint total: under 12 not ready, 12 to 15 ready to
-//     scale, 15 to 18 comprehensively validated. A total of exactly 15 is
-//     read as the upper band.
+//   * Bands on a checkpoint total, written as disjoint ranges so no total
+//     falls in two of them: 0 to 11 not ready, 12 to 14 ready to scale,
+//     15 to 18 comprehensively validated.
 //
 // Writes one row per client, fit test and checkpoint to
 // gtcv_readiness_scores (see supabase/migrations/
@@ -97,10 +97,12 @@ const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
 const blank = (v) => !String(v ?? '').trim()
 const cellKey = (fitTest, checkpoint) => `${fitTest}:${checkpoint}`
 
-// Bands on a checkpoint total. Exactly 15 reads as the upper band.
+// Bands on a checkpoint total, as disjoint ranges: 0 to 11, 12 to 14,
+// 15 to 18. Written this way because a total of exactly 15 previously
+// matched two of them on paper, and the surface has to make one call.
 function band(total) {
   if (total < 12) return { label: 'Not ready', color: C.red, detail: 'Under 12. The organisation is not ready to sell this.' }
-  if (total < 15) return { label: 'Ready to scale', color: C.amber, detail: '12 to 15. Enough is proven to move, with gaps still open.' }
+  if (total < 15) return { label: 'Ready to scale', color: C.amber, detail: '12 to 14. Enough is proven to move, with gaps still open.' }
   return { label: 'Comprehensively validated', color: C.green, detail: '15 to 18. Every fit test is carrying real evidence.' }
 }
 
@@ -455,7 +457,7 @@ export default function ReadinessDiagnostic({ clientId, canManage }) {
             <span><strong style={{ color: C.navy }}>3</strong> proven, repeatedly and independently</span>
           </div>
           <div style={{ marginTop: '0.6rem', fontSize: '0.85rem', color: C.slate }}>
-            Bands on a checkpoint total: under 12 not ready, 12 to 15 ready to scale, 15 to 18 comprehensively
+            Bands on a checkpoint total: 0 to 11 not ready, 12 to 14 ready to scale, 15 to 18 comprehensively
             validated. A total of exactly 15 is read as the upper band.
           </div>
         </div>
