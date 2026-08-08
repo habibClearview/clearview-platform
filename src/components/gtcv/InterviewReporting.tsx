@@ -32,14 +32,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { DEFAULT_VALIDATION_MIN_PER_SEGMENT } from '@/lib/engagement-types'
+// The rules live in a pure module with tests, because "does this converge" is
+// the question the gate turns on and it is not something to work out from a
+// screen. See src/__tests__/interview-report.test.ts.
+import { CONVERGENCE_MINIMUM, buildInterviewReport } from '@/lib/interview-report'
 
 const CAPTURES = 'gtcv_interview_captures'
 const SEGMENTS = 'gtcv_customer_segments'
 const CONFIG = 'engagement_config'
-
-// The convergence bar is the method's, not the engagement's, so it is a
-// constant here rather than configuration. See the header.
-const CONVERGENCE_MINIMUM = 3
 
 const C = {
   card: 'var(--cv-card)', alt: 'var(--cv-alt)', border: 'var(--cv-border)',
@@ -48,22 +48,6 @@ const C = {
 }
 const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
 const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
-
-// The six dimensions, in the order the workbook lists them. Kept here so the
-// report reads in the same order as the form that produced it.
-const DIMENSIONS = [
-  { key: 'role_accountability', label: 'Role and accountability' },
-  { key: 'problem_reality', label: 'Problem reality' },
-  { key: 'consequence_severity', label: 'Consequence severity' },
-  { key: 'current_attempts', label: 'Current attempts' },
-  { key: 'budget_authority', label: 'Budget and authority' },
-  { key: 'willingness_to_pay', label: 'Willingness to pay' },
-]
-
-// A budget signal is a named budget, a budget holder, a spend already made or
-// a purchase already authorised. Interest is not a budget signal, and the
-// difference is what separates a market from an opinion.
-const REAL_BUDGET = ['strong', 'moderate']
 
 export default function InterviewReporting({ clientId }) {
   const [captures, setCaptures] = useState([])
@@ -102,81 +86,10 @@ export default function InterviewReporting({ clientId }) {
 
   useEffect(() => { load() }, [load])
 
-  const report = useMemo(() => {
-    const submitted = captures.filter((c) => c.status === 'submitted')
-    const bySegment = new Map()
-
-    // The capture stores the segment as free text, because a field team types
-    // what they were sent to talk to rather than picking from a list. Matching
-    // is therefore case and space insensitive against the segment names, and
-    // anything that matches nothing is grouped as unassigned rather than
-    // dropped: a capture nobody can place is a gap in the record, and the panel
-    // says so instead of quietly losing it.
-    const norm = (v) => String(v || '').trim().toLowerCase()
-    const byName = new Map(segments.map((s) => [norm(s.segment_name), s.id]))
-    const key = (c) => byName.get(norm(c.segment)) || '__unassigned'
-    for (const c of submitted) {
-      const k = key(c)
-      if (!bySegment.has(k)) bySegment.set(k, [])
-      bySegment.get(k).push(c)
-    }
-
-    const rows = []
-    const named = segments.map((s) => ({ id: s.id, name: s.segment_name || 'Unnamed segment' }))
-    const unassigned = bySegment.get('__unassigned') || []
-    const all = [...named, ...(unassigned.length ? [{ id: '__unassigned', name: 'Not assigned to a segment' }] : [])]
-
-    for (const s of all) {
-      const list = bySegment.get(s.id) || []
-      const withBudget = list.filter((c) => REAL_BUDGET.includes(String(c.budget_signal_strength || '').toLowerCase()))
-      const confirmed = list.filter((c) => c.assumption_confirmed)
-      const overturned = list.filter((c) => c.assumption_overturned)
-      const followUp = list.filter((c) => c.follow_up_needed)
-      const referrals = list.filter((c) => c.referral_obtained)
-
-      // Convergence is counted on conversations that both carry a real budget
-      // signal and confirmed the assumption being tested. Either alone is not
-      // convergence: a budget with no confirmed problem is somebody who spends
-      // on something else, and a confirmed problem with no budget is sympathy.
-      const converging = list.filter((c) =>
-        REAL_BUDGET.includes(String(c.budget_signal_strength || '').toLowerCase()) && c.assumption_confirmed)
-
-      const dimensions = DIMENSIONS.map((d) => {
-        const scores = list.map((c) => Number(c[`${d.key}_score`])).filter((n) => Number.isFinite(n) && n > 0)
-        return {
-          ...d,
-          scored: scores.length,
-          low: scores.length ? Math.min(...scores) : null,
-          high: scores.length ? Math.max(...scores) : null,
-          // The count at each score, so the shape is visible rather than
-          // flattened into one number.
-          spread: [1, 2, 3, 4, 5].map((n) => scores.filter((s) => s === n).length),
-        }
-      })
-
-      rows.push({
-        id: s.id,
-        name: s.name,
-        held: list.length,
-        meetsMinimum: list.length >= minimum,
-        withBudget: withBudget.length,
-        converging: converging.length,
-        converges: converging.length >= CONVERGENCE_MINIMUM,
-        confirmed: confirmed.length,
-        overturned: overturned.length,
-        followUp: followUp.length,
-        referrals: referrals.length,
-        dimensions,
-        verbatims: list.map((c) => c.most_important_verbatim).filter(Boolean),
-      })
-    }
-
-    return {
-      rows,
-      submitted: submitted.length,
-      drafts: captures.length - submitted.length,
-    }
-  }, [captures, segments, minimum])
+  const report = useMemo(
+    () => buildInterviewReport(captures, segments, minimum),
+    [captures, segments, minimum],
+  )
 
   if (loading) return <p style={hint}>Reading the conversations...</p>
 
