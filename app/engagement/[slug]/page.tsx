@@ -20,6 +20,7 @@ import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { loadEngagementView } from '@/lib/engagement-loader'
 import { CANVAS_DP_IDS } from '@/lib/engagement-types'
+import BlockWorkspace, { hasWorkspace } from '@/components/gtcv/BlockWorkspace'
 
 // ─── Scoped design CSS (faithful to the approved preview) ────
 // Scoped under .gj so the tokens, pseudo-elements and media queries reproduce
@@ -571,6 +572,13 @@ export default function EngagementJourneyPage({ slugOverride }: any = {}) {
 
               <h3 style={{ fontFamily: 'var(--fm)', fontSize: 10.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--teal)', margin: '22px 0 8px' }}>Fit test</h3>
               <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-soft)' }}>{b.fit}</p>
+
+              {hasWorkspace(openDp) ? (
+                <div style={{ marginTop: 24 }}>
+                  <h3 style={{ fontFamily: 'var(--fm)', fontSize: 10.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--teal)', margin: '0 0 10px' }}>Do the work</h3>
+                  <BlockWorkspace dpId={openDp} clientId={view.client.id} canManage={canManage} />
+                </div>
+              ) : null}
 
               {canManage ? (
                 <>
