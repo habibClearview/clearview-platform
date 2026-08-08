@@ -227,9 +227,9 @@ function Message({ title, body }) {
   )
 }
 
-export default function EngagementCharterPage() {
+export default function EngagementCharterPage({ slugOverride }: any = {}) {
   const params = useParams()
-  const slug = params?.slug as string
+  const slug = (slugOverride || params?.slug) as string
   const [checking, setChecking] = useState(true)
   const [hasSession, setHasSession] = useState(false)
   const [view, setView] = useState<any>(null)

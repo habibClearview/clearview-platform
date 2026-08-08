@@ -341,7 +341,9 @@ export interface CoachState {
 // ─── 25-TAB STRUCTURE ────────────────────────────────────────
 export const CANVAS_TABS = [
   { id: 'cover',        label: 'Cover',                    number: 1,  phase: 'setup' },
-  { id: 'how_to_start', label: 'How to Start',             number: 2,  phase: 'setup' },
+  { id: 'journey',      label: 'Journey Canvas',            number: 2,  phase: 'any' },
+  { id: 'charter',      label: 'Engagement Charter',        number: 3,  phase: 'any' },
+  { id: 'how_to_start', label: 'How to Start',             number: 4,  phase: 'setup' },
   { id: 'coach_ref',    label: 'Coach Quick Reference',    number: 3,  phase: 'setup', coachOnly: true },
   { id: 'ip_framework', label: 'IP Framework Reference',   number: 4,  phase: 'setup' },
   { id: 'eng_setup',    label: 'Engagement Setup',         number: 5,  phase: 'setup' },

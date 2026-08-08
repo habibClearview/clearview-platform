@@ -8,6 +8,8 @@ import {
   READINESS_QUESTIONS, buildEmptyCanvas,
 } from '@/lib/coach-types'
 import { supabase } from '@/lib/supabase'
+import EngagementJourneyView from '../../../app/engagement/[slug]/page'
+import EngagementCharterView from '../../../app/engagement/[slug]/charter/page'
 import ActiveSessionsButton from '@/components/auth/ActiveSessionsButton'
 import { authedFetch } from '@/lib/authed-fetch'
 import dynamic from 'next/dynamic'
@@ -2133,6 +2135,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               <TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/>
               {!selClient.programme_id&&<ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>}
             </>}
+            {activeTab==='journey'&&<EngagementJourneyView slugOverride={selClient.slug}/>}
+            {activeTab==='charter'&&<EngagementCharterView slugOverride={selClient.slug}/>}
             {activeTab==='how_to_start'&&<TabHowToStart client={selClient}/>}
             {activeTab==='coach_ref'&&canViewCoachGuidance(userRole)&&<TabCoachRef/>}
             {activeTab==='ip_framework'&&<TabIPFramework/>}
