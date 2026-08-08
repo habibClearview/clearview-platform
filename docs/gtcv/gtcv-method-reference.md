@@ -1,8 +1,8 @@
-# GtCV™ Method Reference — Responsibilities, Gates, Tools, Permissions
+# GtCV™ Method Reference, Responsibilities, Gates, Tools, Permissions
 
 > **Status:** Reference v1 (2026-08-08). Extracted from the source materials below.
 > **Purpose:** the durable, sourced knowledge base the [Engagement Charter](./engagement-charter-and-online-gtcv-spec.md)
-> and the online-GtCV build both draw from — who does what, the gate model, the tools to
+> and the online-GtCV build both draw from, who does what, the gate model, the tools to
 > digitise, and the role/permission phases.
 > **IP:** Grant-to-Commercial Viability Canvas™, Three-Stage Adoption Test™, Liquidity Decision
 > Framework™, Asset Liquidity Hierarchy™, Investment Infrastructure Development Model™ are trademarks
@@ -18,8 +18,8 @@
 | **GtCV_Engagement_Workbook_v2** (`1IGO0…`, 24 tabs) | The operational backbone; field-capture templates; permissions model | Hybrid |
 
 **Not yet provided** (cited but absent): the **Handbook e-book** (`GtCV_Handbook_FromGrantToCommercial_FINAL`
-— full IP-framework methodology) and the separate **Financial Model** file (`GtCV_Financial_Model_v1`
-— live cost/pricing/break-even/36-month projection = DP04 / "Clearview"). Obtain both before building
+, full IP-framework methodology) and the separate **Financial Model** file (`GtCV_Financial_Model_v1`
+, live cost/pricing/break-even/36-month projection = DP04 / "Clearview"). Obtain both before building
 DP04 and the framework help content.
 
 **Terminology (from the Manual):** *Zone N = Decision Point DPN = Decision Zone* (interchangeable).
@@ -61,7 +61,7 @@ Owns the evidence and the outputs. Sub-roles:
   DP01 service-survival decisions before Zone 2 opens. Present at all Zone 9 diagnostics. Co-signs
   Handover.
 - **Leadership Team (LT):** the decision-making body; **produces almost every canvas output**
-  (inventory, classifications, value propositions, pricing commitment, identity, scale pathway) —
+  (inventory, classifications, value propositions, pricing commitment, identity, scale pathway),
   written by the LT, not signed off from the coach's draft. **Leads Iteration 2 pilots**; **delivers
   the Formal Handover Presentation unassisted**. Writes the commitment statements; shares key
   registers with its **board**.
@@ -73,10 +73,10 @@ Owns the evidence and the outputs. Sub-roles:
 - **Field Team (FT):** runs customer-validation conversations (DP02), proposition testing (DP03),
   A/B message testing (DP05); completes Interview Capture **within 30 minutes**; follows the eight
   interview rules; **leads Iteration 2 client sessions**. **Excluded from cost totals** (finance
-  privacy protocol) — sees delivery-time assumptions only.
+  privacy protocol), sees delivery-time assumptions only.
 
-### A3. Lead Consultant / Coach (LC — Habib)
-- Owns and runs the method; **holds every gate** — *"no zone opens until the previous gate is closed
+### A3. Lead Consultant / Coach (LC, Habib)
+- Owns and runs the method; **holds every gate**, *"no zone opens until the previous gate is closed
   with documented evidence… a zone opened without a completed gate is a workshop, not a canvas
   engagement."* **Sole gate-approval authority** into the next zone.
 - **Approves the Weekly Progress Report before it goes to the funder.** Brings **COACH CALIBRATION**
@@ -84,16 +84,15 @@ Owns the evidence and the outputs. Sub-roles:
 - **Presence:** present for the core gate sessions (diagnostic, DP04 cost-mapping, DP07 pilots,
   DP09/handover); the co-implementer leads the interim sessions and reviews of outputs happen before
   each gate closes.
-  > **Client-facing rule (Habib):** there is only a **Lead Consultant** and a **Co-implementer** —
-  > no "in-country/out-country" and nothing implying travel, visits, or "remote". State presence
+  > **Client-facing rule (Habib):** there is only a **Lead Consultant** and a **Co-implementer**, with no "in-country/out-country" and nothing implying travel, visits, or "remote". State presence
   > neutrally ("lead present" / "co-implementer present"); it must also fit a solo, co-located
   > engagement (co-implementer absent entirely).
 - **Pilots:** **runs Iteration 1** (LSP observes); **backstop only in Iteration 2** (intervenes only
-  for misrepresentation, client distress, or unusable drift — and only indirectly).
+  for misrepresentation, client distress, or unusable drift, and only indirectly).
 - **Handover:** **co-evaluator with the funder**; gives written confirmation the commercial model is
   complete and LSP-owned; co-signs completion.
 
-### A4. Co-implementer (CI — e.g. Ganiat Ettu)
+### A4. Co-implementer (CI, e.g. Ganiat Ettu)
 - **Daily continuity lead** between LC visits; **leads sessions when the LC is remote**. **Owns
   Engagement Workbook setup/admin.** **Submits the Weekly Progress Report every Friday** (for LC
   approval); raises AMBER immediately. **Records verbatim** at the diagnostic and all Zone 9 sessions.
@@ -112,21 +111,21 @@ Owns the evidence and the outputs. Sub-roles:
 
 ## B. The gate / decision-point model
 
-### Pre-Engagement Diagnostic (before Zone 1) — three questions
+### Pre-Engagement Diagnostic (before Zone 1), three questions
 2-hour structured conversation. Mandatory: ED (non-delegable), Board Chair, Funder Rep, LC (leads),
 CI (records). All sign; filed with the funder. Weak answers → no Zone 1 without a funder-present
 follow-up.
-1. **Organisational survival** — *"What specific commercial outcome do you want… and why does it
+1. **Organisational survival**, *"What specific commercial outcome do you want… and why does it
    matter to your organisation's survival beyond this programme?"*
-2. **Decision readiness** — *"What decisions are you prepared to make differently… including services
+2. **Decision readiness**, *"What decisions are you prepared to make differently… including services
    you deliver, clients you serve, and prices you charge?"*
-3. **Success definition** — *"What would have to be true at month six for you to say this was worth
+3. **Success definition**, *"What would have to be true at month six for you to say this was worth
    six months of your team's commitment?"*
 
-### Phase 0 — Assumption Clearing
-Core question: *"What are we actually operating on — and which assumptions have commercial signal?"*
+### Phase 0, Assumption Clearing
+Core question: *"What are we actually operating on, and which assumptions have commercial signal?"*
 Output: Continue/Pause/Kill on every activity; only hypotheses with a named **problem owner and
-budget holder** proceed. Signal: *"the team pauses silently before classifying an activity."* ~2–3 hrs.
+budget holder** proceed. Signal: *"the team pauses silently before classifying an activity."* ~2-3 hrs.
 
 ### The nine Decision Points
 Each gate requires the DP's named output(s), the "signal" observed, evidence cited by E-number, plus
@@ -144,39 +143,38 @@ Each gate requires the DP's named output(s), the "signal" observed, evidence cit
 | **08 Scale & Expansion Pathway** | What does growth look like, and what's needed? | Scale Pathway Map (≥2 segments, **independent** channels), 36-month projection ×3 scenarios, board-approved Scale Pathway Commitment | LT cites the Scale Commitment when making an unplanned decision |
 | **09 Commercial Readiness Diagnostic** | Where are we, and what does the evidence show? | CRD scored **3×** (baseline/mid/close) on six fit tests, Close Investment Case, unassisted Handover Presentation | Org shares the Investment Case with a funder and gets a follow-up request |
 
-**DP07 is non-negotiable** — cannot be compressed, deferred, or substituted; ≥4 real client
+**DP07 is non-negotiable**, cannot be compressed, deferred, or substituted; ≥4 real client
 engagements; if timeline threatens it, escalate to the funder.
 
-### DP09 — six fit tests & readiness (Handbook-canonical)
-Fit tests: **Problem–Provider · Problem–Solution · Solution–Customer · Solution–Pilot ·
-Solution–Market · Solution–Scale.** **Scored 0–3 each, max 18** (matching the cost proposal's
-"Commercial Readiness /18" and `docs/gtcv/README.md`), taken **3× (baseline / mid-point / final)** —
-it measures *change*, so baseline is not pass/fail. **Bands:** baseline typically 3–7; mid-point
-10–14 solid / 6–9 significant gaps / <6 rebuild foundations; final <12 not ready (Verdict 02/03) /
-12–15 ready to scale / 15–18 comprehensively validated (rare). Each *failed* fit test routes to the
-specific DP to revisit — the diagnostic doubles as navigation.
-> A GtCV workbook variant scored these 1–5 / max 30; the **Handbook 0–3 / max 18 is canonical**.
+### DP09, six fit tests & readiness (Handbook-canonical)
+Fit tests: **Problem-Provider · Problem-Solution · Solution-Customer · Solution-Pilot ·
+Solution-Market · Solution-Scale.** **Scored 0-3 each, max 18** (matching the cost proposal's
+"Commercial Readiness /18" and `docs/gtcv/README.md`), taken **3× (baseline / mid-point / final)**, it measures *change*, so baseline is not pass/fail. **Bands:** baseline typically 3-7; mid-point
+10-14 solid / 6-9 significant gaps / <6 rebuild foundations; final <12 not ready (Verdict 02/03) /
+12-15 ready to scale / 15-18 comprehensively validated (rare). Each *failed* fit test routes to the
+specific DP to revisit, the diagnostic doubles as navigation.
+> A GtCV workbook variant scored these 1-5 / max 30; the **Handbook 0-3 / max 18 is canonical**.
 
 **Gate discipline (from the Handbook):**
-- **Governing Principle** — *"No service is designed, priced, or scaled without evidence of paying
+- **Governing Principle**, *"No service is designed, priced, or scaled without evidence of paying
   demand from a customer with budget authority."*
 - Every DP must produce a **tangible documented output** before the next unlocks (the "load-bearing"
   test).
-- **Entry gate to DP07 (pilots):** do not open the pilots unless, at mid-point, **Problem–Solution
-  Fit ≥2 AND Solution–Customer Fit ≥2**.
+- **Entry gate to DP07 (pilots):** do not open the pilots unless, at mid-point, **Problem-Solution
+  Fit ≥2 AND Solution-Customer Fit ≥2**.
 - **DP02** enforces the **Three-Stage Adoption Test™** (Willing → Able → Prioritised, in order) and
   requires an **adoption stage profile** output carried into DP03/04/05.
 - **IP/attribution is immutable** on every screen and export ("Grant-to-Commercial Viability
   Canvas™ · The Canvas Coach · habibonifade.com · © Habib Onifade"); stripping it is a licence breach.
 
-### Handover — five independence tests
+### Handover, five independence tests
 Engagement closes when the org can operate independently, *"not when the months are up."* Signed by
-**LC, ED, Funder Rep.** (Engagement Workbook wording — canonical):
-1. **Financial Model** — FL updates a cost item and recalculates break-even live, unassisted.
-2. **Value Proposition** — an LT member presents it unscripted, handles two challenge questions.
-3. **Commercial Model** — LT explains pricing rationale, cost floor, break-even to a non-specialist.
-4. **Pipeline** — LT names top-3 pipeline clients, stage, last action, next action + date.
-5. **Scale Pathway** — LT presents entry/scale segments, independent channel logic, sustainability
+**LC, ED, Funder Rep.** (Engagement Workbook wording, canonical):
+1. **Financial Model**, FL updates a cost item and recalculates break-even live, unassisted.
+2. **Value Proposition**, an LT member presents it unscripted, handles two challenge questions.
+3. **Commercial Model**, LT explains pricing rationale, cost floor, break-even to a non-specialist.
+4. **Pipeline**, LT names top-3 pipeline clients, stage, last action, next action + date.
+5. **Scale Pathway**, LT presents entry/scale segments, independent channel logic, sustainability
    threshold, unprompted.
 
 > **Reconcile:** the Tools Workbook frames the five tests differently (Financial Model / Value
@@ -205,43 +203,42 @@ Audience tags: **[C]** coach · **[O]** client/LSP · **[F]** field team · **[F
   (DP06); Pilot Selection/Observation/Comparison, Pilot Learning Summary (DP07); Channel Logic Table,
   36-month projection, Scale Commitment (DP08); the 3× CRD scoring grid & Close Investment Case (DP09).
 - **Field-capture templates [F] (CI-administered):** Interview Briefing (eight rules); **Interview
-  Capture** (six dimensions — Role & Accountability · Problem Reality · Consequence Severity · Current
-  Attempts · Budget & Authority · Willingness to Pay — 1–5 + verbatim, within 30 min); Interview
+  Capture** (six dimensions, Role & Accountability · Problem Reality · Consequence Severity · Current
+  Attempts · Budget & Authority · Willingness to Pay, 1-5 + verbatim, within 30 min); Interview
   Reporting; **Hypothesis Tracker** (problem / what-must-be-true / falsification test / status); **Pilot
   Observation** (pre-brief → live → debrief; five dimensions: Engagement · Language · Resistance ·
   Surprise · The Price Moment).
 - **IP frameworks [C]:** Three-Stage Adoption Test™ (Willingness · Ability · Prioritisation);
   Commercial Structures Reference (B2B/B2C/B2G/B2D/Licence…); Asset Liquidity Hierarchy™; Liquidity
   Decision Framework™; Investment Infrastructure Development Model™. *(Full methodology in the
-  Handbook — obtain it.)*
+  Handbook, obtain it.)*
 
 ---
 
 ## D. Operational flow, roles & permission phases
 
 ### Two-file system
-- **Engagement Workbook** — one operational file everyone works in.
-- **Financial Model** — a **separate file for financial-sensitivity reasons** (= DP04 / Clearview).
+- **Engagement Workbook**, one operational file everyone works in.
+- **Financial Model**, a **separate file for financial-sensitivity reasons** (= DP04 / Clearview).
   → In the web app: keep finance on its **own permission boundary**.
 
-### Setup steps ("How to Start" — CI does; LC reviews before Zone 1)
-1. Before opening: complete Engagement Setup; link the Financial Model; **set permissions — LC + CI
+### Setup steps ("How to Start", CI does; LC reviews before Zone 1)
+1. Before opening: complete Engagement Setup; link the Financial Model; **set permissions, LC + CI
    Editors; DO NOT add the LSP team yet**; run the Pre-Engagement Diagnostic; all sign before Zone 1.
 2. Before Zone 2 fieldwork: duplicate Interview Capture **per field-team member**; each edits **only
    their own** tab; brief on the eight rules; test the form.
 3. Before Zone 7 pilots: duplicate the Pilot Observation template **×4**; complete each pre-brief the
    evening before with the LC.
 
-### Permission phases (the access model to build — system-enforced, not by instruction)
+### Permission phases (the access model to build, system-enforced, not by instruction)
 1. **Setup:** LC + CI only. **LSP excluded** until fieldwork.
 2. **Fieldwork (Zone 2+):** field team added, **row/tab-scoped to their own capture** only.
-3. **Finance boundary (Zone 4):** cost totals limited to LC/LT/FL; **field team never sees totals** —
-   delivery-time assumptions only.
-4. **Coach-only fields:** e.g. the "Consultant Assessment" synthesis row — never shared with the team.
+3. **Finance boundary (Zone 4):** cost totals limited to LC/LT/FL; **field team never sees totals**,    delivery-time assumptions only.
+4. **Coach-only fields:** e.g. the "Consultant Assessment" synthesis row, never shared with the team.
 5. **Funder:** **receive + sign** role (weekly/phase reports, mid-point diagnostic, final deliverable;
-   signs diagnostic + completion) — not general editor access.
+   signs diagnostic + completion), not general editor access.
 6. **Handover / operational mode:** the Pipeline Tracker flips from coaching view to a clean
-   operational BD tool — same data, two views.
+   operational BD tool, same data, two views.
 
 Multi-user simultaneous editing is assumed; the current safety net is Google version history →
 replace with **per-field audit + undo + concurrent-edit handling**.
@@ -255,7 +252,7 @@ replace with **per-field audit + undo + concurrent-edit handling**.
   stalled > 2 weeks) → **engagement pauses; LC + LSP + funder review within 5 working days; written
   recovery plan before resuming.**
 - The delivery rhythm (session cadence, hours, sequencing) is engagement config. The app never
-  implies travel or movement in/out of a country — only a Lead Consultant and a Co-implementer.
+  implies travel or movement in/out of a country, only a Lead Consultant and a Co-implementer.
 
 ---
 
@@ -268,7 +265,7 @@ replace with **per-field audit + undo + concurrent-edit handling**.
 3. **Template duplication per member/pilot** → structured records with per-user ownership auto-rolling
    into synthesis (no duplicate tabs, no cross-editing).
 4. **Permission juggling** → role-based access with **phase gating**, field-level finance masking,
-   coach-only fields, and a funder receive+sign role — all system-enforced.
+   coach-only fields, and a funder receive+sign role, all system-enforced.
 5. **Manual sign-offs** → digital sign-off (identity + timestamp + immutable); gate cannot close
    without required signatures.
 6. **No client/funder progress view** → live funder dashboard (status, gates, CRD progression,
@@ -285,19 +282,19 @@ replace with **per-field audit + undo + concurrent-edit handling**.
 
 ---
 
-## F. Reconciliation — RESOLVED by the Handbook (now read in full)
+## F. Reconciliation, RESOLVED by the Handbook (now read in full)
 
 - ✅ **Five independence tests** → RECONCILED with Habib. The two workbook lists are the same five at
   two altitudes: the Engagement Workbook names *categories*, the Handbook/Tools list names the
   *costable, operable steps*. Habib's rulings: **outreach is part of the pipeline** (one test, one
   name); **positioning → identity → scale is one chain** (positioning becomes identity, which sets the
-  scale pathway). Settled five — "at handover, the organisation can do this **without the coach**":
-  1. **The numbers** — update a cost and recalculate price/break-even. *(Financial Model)*
-  2. **The pitch** — present the value proposition and handle pushback. *(Value Proposition)*
-  3. **The pipeline** — run outreach and work the funnel to win clients, knowing the cost.
-     *(Pipeline — includes outreach + its cost)*
-  4. **The delivery** — plan, run, debrief and document a real client engagement. *(Client Management)*
-  5. **Positioning & scale** — state the commercial identity and use it to set the scale pathway.
+  scale pathway). Settled five, "at handover, the organisation can do this **without the coach**":
+  1. **The numbers**, update a cost and recalculate price/break-even. *(Financial Model)*
+  2. **The pitch**, present the value proposition and handle pushback. *(Value Proposition)*
+  3. **The pipeline**, run outreach and work the funnel to win clients, knowing the cost.
+     *(Pipeline, includes outreach + its cost)*
+  4. **The delivery**, plan, run, debrief and document a real client engagement. *(Client Management)*
+  5. **Positioning & scale**, state the commercial identity and use it to set the scale pathway.
      *(Identity → Scale)*
   Judgement call flagged for veto: #3 (winning work) and #4 (delivering work) kept as two separate
   tests. For the Handover module (later); does not block the spine.
@@ -305,25 +302,25 @@ replace with **per-field audit + undo + concurrent-edit handling**.
   pass condition is **≥3 converging** on the same problem/budget/willingness. **Per Habib: default 5
   but changeable per engagement** (`engagement_config.validation_min_per_segment`, NULL ⇒ 5).
 - ✅ **Asset Liquidity Hierarchy™** → **RULED BY HABIB (IP owner): the generic tier model IS the
-  framework; livestock is one example.** So it is a real GtCV framework — a generic
+  framework; livestock is one example.** So it is a real GtCV framework, a generic
   Tier 1 Liquid / Tier 2 Semi-liquid / Tier 3 Illiquid model, illustrated with sector examples (e.g.
   poultry = immediate, small ruminants = medium, large ruminants = long-term). The Handbook e-book
   names it but does not expand it (the methodology lives elsewhere); build it as a generic framework
   with swappable sector examples, not as livestock-specific. (Liquidity Decision Framework™,
   Investment Infrastructure Development Model™, IDC-MS, PSE Mastery Canvas remain named-only in these
-  sources — treat as separate IP until their definitions are supplied.)
-- ✅ **Fit-test scoring** → **0–3 per test, max 18** (Handbook), consistent with the cost proposal and
-  `README.md`. A workbook variant used 1–5 / max 30; the Handbook is canonical.
+  sources, treat as separate IP until their definitions are supplied.)
+- ✅ **Fit-test scoring** → **0-3 per test, max 18** (Handbook), consistent with the cost proposal and
+  `README.md`. A workbook variant used 1-5 / max 30; the Handbook is canonical.
 - Minor: Engagement Workbook Cover says 25 tabs; export renders 24 (cosmetic).
 
-## G. DP04 — the "Clearview" financial model (build reference)
+## G. DP04, the "Clearview" financial model (build reference)
 
 The GtCV Financial Model (6 tabs) is the DP04 output. Convention: **blue = user input, white =
 calculated.** Core rules the DP04 module must implement:
 - **Cost floor** = sum of **five cost categories** (Direct Labour · Direct Materials · Travel &
   Logistics · Quality Assurance · Overhead Allocation), computed **once** and consumed everywhere
   (single source of truth). **Overhead ≥ 20% of direct costs** is a validation flag.
-- **Pricing tiers** — 3 required (Entry · Standard · Premium) + 2 optional. Per tier:
+- **Pricing tiers**, 3 required (Entry · Standard · Premium) + 2 optional. Per tier:
   **Margin = Price − Cost Floor**; **% above floor = Margin ÷ Cost Floor**. Selling below the floor
   is a structural deficit (flag).
 - **Break-even** = annual fixed costs ÷ (Price − Cost Floor) per tier; flag break-even-at-target Y/N

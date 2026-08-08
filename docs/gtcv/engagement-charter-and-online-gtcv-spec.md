@@ -1,13 +1,13 @@
-# Engagement Charter & Online GtCV — Build Spec
+# Engagement Charter & Online GtCV, Build Spec
 
-> **Status:** Draft v1 (living document — update whenever the design changes)
+> **Status:** Draft v1 (living document, update whenever the design changes)
 > **Owner:** Habib Onifade (Canvas Coach)
 > **Created:** 2026-08-08
-> **First engagement:** Tanager · IGNITE+ Nigeria (RFP 149) — the *first record*, not the schema
+> **First engagement:** Tanager · IGNITE+ Nigeria (RFP 149), the *first record*, not the schema
 > **Branch:** `claude/coach-deploy-corrections-2kj6q4` (rebased onto `main`)
 > **Related docs:** [`docs/gtcv/README.md`](./README.md) (product bible),
 > [`docs/gtcv/gtcv-method-reference.md`](./gtcv-method-reference.md) (**responsibilities, gates,
-> tools, permission phases — sourced from the manual & workbooks**),
+> tools, permission phases, sourced from the manual & workbooks**),
 > [`docs/STAGING_AND_ROLLBACK.md`](../STAGING_AND_ROLLBACK.md),
 > [`docs/ACCOUNTING_ARCHITECTURE.md`](../ACCOUNTING_ARCHITECTURE.md)
 
@@ -15,23 +15,23 @@
 
 ## 1. Purpose
 
-Build the **interactive, gated, client-facing GtCV workflow** — the online version of the
-Grant-to-Commercial Viability Canvas™ — plus the commercial spine around it: a per-engagement
+Build the **interactive, gated, client-facing GtCV workflow**, the online version of the
+Grant-to-Commercial Viability Canvas™, plus the commercial spine around it: a per-engagement
 **journey map**, a tri-party **Engagement Charter** with e-signature, a configurable **two-stage
 email flow**, and **meeting scheduling**. Later phases add a **ToR→gate auto-mapping** engine and
 an **auto-invoice loop**.
 
 This is the online GtCV that `docs/gtcv/README.md` explicitly deferred *"until Clearview is
 client-ready."* Clearview is now client-ready, and Tanager is paying into exactly this. Two of the
-features here — *"GtCV zone progression, decision gate records, and a Tanager visibility dashboard"*
-and *"six-month ClearView platform access"* — are **already contracted** in the RFP 149 cost
+features here, *"GtCV zone progression, decision gate records, and a Tanager visibility dashboard"*
+and *"six-month ClearView platform access"*, are **already contracted** in the RFP 149 cost
 proposal. We are building what has been sold.
 
 ---
 
-## 2. Founding principle — the Canvas is invariant; the engagement is configuration
+## 2. Founding principle, the Canvas is invariant; the engagement is configuration
 
-The nine zones, the seven diagnostic tools, and the gate method are **fixed IP** — identical for
+The nine zones, the seven diagnostic tools, and the gate method are **fixed IP**, identical for
 every client, forever. Nothing about any single client is ever hardcoded.
 
 What varies **per engagement** is a *configuration record*:
@@ -43,7 +43,7 @@ What varies **per engagement** is a *configuration record*:
 - the **payment milestones** tied to those gates.
 
 Tanager is simply the **first record** in this structure. Ikore, the next donor, a private
-client — all run on the same code, different config. This is not a new idea we are inventing; it is
+client, all run on the same code, different config. This is not a new idea we are inventing; it is
 **already the grain of the codebase** (see §4): the bespoke per-client dashboards (CONAS, Wonderland)
 were deliberately removed in favour of a single config-driven path
 (`2026_07_23_drop_bespoke_conas_wonderland_tables.sql`). We stay on that path.
@@ -60,10 +60,10 @@ exists**. The gap is the *interactive gated workflow*, not the model.
 
 | Need | Already in the codebase | Reuse how |
 |---|---|---|
-| Nine zones, gate state machine, diagnostic, evidence, sign-offs, handover tests | `src/lib/canvas-types.ts` (541 lines), `src/lib/coach-types.ts` | The domain model is done — we add persistence + UI wiring |
+| Nine zones, gate state machine, diagnostic, evidence, sign-offs, handover tests | `src/lib/canvas-types.ts` (541 lines), `src/lib/coach-types.ts` | The domain model is done, we add persistence + UI wiring |
 | Multi-tenant client model | `engagement_clients` (slug, `engagement_mode: 'canvas'\|'financial'`, `clearview_active`) + `generic_model_config` | Add engagement config alongside; Tanager is a record |
 | No-login external viewing | `client_access_grants` + `app/access/[token]/page.tsx` + `app/api/access-grant/[token]/route.ts` (time-limited, revocable, OTP) | Powers the journey-map **showcase link** |
-| Email sending (Resend, live in production) | `app/api/access-grant/[token]/route.ts` — direct `fetch('https://api.resend.com/emails')`, `RESEND_API_KEY`, `otpAvailable()` flag, graceful fallback | Generalise the pattern into a shared helper for engagement emails |
+| Email sending (Resend, live in production) | `app/api/access-grant/[token]/route.ts`, direct `fetch('https://api.resend.com/emails')`, `RESEND_API_KEY`, `otpAvailable()` flag, graceful fallback | Generalise the pattern into a shared helper for engagement emails |
 | Staging isolation | `staging.clearview.habibonifade.com` (separate Supabase project, throwaway data), `src/lib/app-env.ts`, `EnvBanner` | Build & demo entirely on staging; live client untouched |
 | AI proxy | `app/api/ai-generate/route.ts` (Anthropic, `ANTHROPIC_API_KEY` server-only, rate-limited) | Powers Phase-2 ToR→gate auto-mapping |
 | Security scaffolding | RLS throughout, `src/lib/rate-limit.ts`, `src/lib/audit-log.ts`, CI route-auth gate (`.github/scripts/route_auth_check.py`), migration validator | New routes/tables must satisfy these |
@@ -71,7 +71,7 @@ exists**. The gap is the *interactive gated workflow*, not the model.
 
 **The gate state machine already models acceptance:**
 `GateStatus = locked → not_started → in_progress → evidence_submitted → ceo_signed → coach_authorised`.
-The terminal state `coach_authorised` **is deliverable acceptance** — and therefore the payment
+The terminal state `coach_authorised` **is deliverable acceptance**, and therefore the payment
 trigger. We do not invent a new lifecycle; we attach money and evidence to the one that exists.
 
 **The nine zones** (`CANVAS_DECISION_POINTS` in `canvas-types.ts`):
@@ -97,7 +97,7 @@ Plus `setup`, `phase0`, and `handover` phases.
 This is the heart of the commercial design. A client's **contractual deliverables** and **payment
 milestones** are mapped onto the **decision gates**. When a gate reaches `coach_authorised`
 (acceptance), the deliverable is accepted and the milestone becomes payable. The mapping is **data**,
-confirmed by the coach — never code.
+confirmed by the coach, never code.
 
 ### 4.1 The mechanism (reusable for any client)
 
@@ -109,17 +109,17 @@ confirmed by the coach — never code.
 5. When a gate is authorised → (Phase 2) the evidence pack is assembled → the coach approves →
    the invoice + evidence pack is sent to the client automatically.
 
-### 4.2 Tanager — the first record (proposed, pending confirmation)
+### 4.2 Tanager, the first record (proposed, pending confirmation)
 
 Fixed price **$39,000 incl. 7.5% VAT** (fee $36,279 + VAT $2,721), 55 consultant days,
-July–December 2026.
+July-December 2026.
 
 | Milestone | Deliverables | Zones / gates | Payment on `coach_authorised` |
 |---|---|---|---|
 | 1 · Inception | Inception Report (workplan, methodology note, baseline cost structure) | `setup` + `phase0` | **$7,800** |
-| 2 · Service Bundle Refinement | D1 refined bundles, D2 value propositions, D3 pricing models | DP01–DP04 (Service Reality → Commercial Viability / Clearview) | **$13,650** |
-| 3 · Iteration I | D4 go-to-market & comms, D5 lessons (partial) | DP05–DP07 (Market Entry → Org Identity → Pilot 1) | **$9,750** |
-| 4 · Final Delivery | Priced bundles, lessons-learnt report, tools/templates handover, close-out | DP08–DP09 (Pilot 2/Scale → Readiness Diagnostic) + `handover` | **$7,800** |
+| 2 · Service Bundle Refinement | D1 refined bundles, D2 value propositions, D3 pricing models | DP01-DP04 (Service Reality → Commercial Viability / Clearview) | **$13,650** |
+| 3 · Iteration I | D4 go-to-market & comms, D5 lessons (partial) | DP05-DP07 (Market Entry → Org Identity → Pilot 1) | **$9,750** |
+| 4 · Final Delivery | Priced bundles, lessons-learnt report, tools/templates handover, close-out | DP08-DP09 (Pilot 2/Scale → Readiness Diagnostic) + `handover` | **$7,800** |
 
 > This mapping is stored as the Tanager config row and is fully editable. It is *illustrative of the
 > engine*, not baked into the product.
@@ -132,46 +132,46 @@ July–December 2026.
 `docs/STAGING_AND_ROLLBACK.md`, and must pass the CI migration validator and route-auth gate.
 Use `engagement_client_id` (TEXT) everywhere; the legacy `clients` UUID is deprecated.
 
-**IMPORTANT — the canvas persistence layer already exists.** `evidence_library`, `handover_record`,
+**IMPORTANT, the canvas persistence layer already exists.** `evidence_library`, `handover_record`,
 `canvas_decision_points`, `canvas_components`, `canvas_dp_status`, `hypotheses`, `interviews`,
 `pilot_observations`, `engagement_diagnostic`, `canvas_engagements`, and related tables are already in
 the database (RLS in `2026_07_13_funder_coimplementer_access.sql`; loaders in `CoachDashboard.tsx`;
-dp ids `setup`/`phase_0`/`dp01`…`dp09`/`handover`). **We reuse these — no duplication.** (Note: their
-`CREATE TABLE` statements are not in the repo — applied directly to the DB — so their schema lives in
+dp ids `setup`/`phase_0`/`dp01`…`dp09`/`handover`). **We reuse these, no duplication.** (Note: their
+`CREATE TABLE` statements are not in the repo, applied directly to the DB, so their schema lives in
 the app queries. A follow-up should capture them as a migration file to end the drift.)
 
-What did *not* exist — and what the migration
+What did *not* exist, and what the migration
 [`2026_08_08_gtcv_engagement_commercial_layer.sql`](../../supabase/migrations/2026_08_08_gtcv_engagement_commercial_layer.sql)
-adds — is the **commercial/engagement layer** (all additive, RLS-scoped via the established
+adds, is the **commercial/engagement layer** (all additive, RLS-scoped via the established
 `can_view_client` / `can_manage_client_access` helpers):
 
-- **`engagement_config`** — 1:1 per-client config (ToR reference, terminology, momentum status,
+- **`engagement_config`**, 1:1 per-client config (ToR reference, terminology, momentum status,
   method thresholds, brand overrides, showcase flag). A companion table so the live
   `engagement_clients` row is never altered.
-- **`engagement_parties`** — parties + roles (incl. non-login parties like a funder rep), emails,
+- **`engagement_parties`**, parties + roles (incl. non-login parties like a funder rep), emails,
   signatory flags. Config-driven recipients for the email flow and Charter.
-- **`engagement_deliverables`** — the deliverables schedule (D1…Dn), each with its payment milestone
+- **`engagement_deliverables`**, the deliverables schedule (D1…Dn), each with its payment milestone
   amount and lifecycle (`pending → in_progress → accepted → invoiced → paid`).
-- **`deliverable_gate_map`** — mapping rows (`deliverable_id` ↔ `dp_id`) with per-gate required
+- **`deliverable_gate_map`**, mapping rows (`deliverable_id` ↔ `dp_id`) with per-gate required
   evidence, an `approved` flag (coach confirm/edit/reject/approve), and `source` (`manual` /
   `ai_proposed`) for the Phase-2 engine.
-- **`engagement_charters`** + **`charter_signatures`** — the Charter content snapshot and tri-party
+- **`engagement_charters`** + **`charter_signatures`**, the Charter content snapshot and tri-party
   e-signatures (a signer may insert their own signature; non-login signers sign via a service-role
   route, like the access-grant flow).
 
 ---
 
-## 6. Phase 1 — the week-one orientation spine
+## 6. Phase 1, the week-one orientation spine
 
 The goal: before the contract signs, the client can open a link and **see the journey, sign the
-Charter, and book the kickoff** — all on staging, all reusable, nothing touching the live client.
+Charter, and book the kickoff**, all on staging, all reusable, nothing touching the live client.
 
 ### 6.1 Reusable engagement config
 Model the engagement as configuration on top of `engagement_clients`. Seed Tanager/Ikore/Ganiat
 Ettu as the first record **on staging**. No Tanager-specific code.
 
 ### 6.2 Journey-map page (two modes)
-The client-facing view of the nine zones mapped to *their* deliverables and milestones — where they
+The client-facing view of the nine zones mapped to *their* deliverables and milestones, where they
 are, what's next, what each gate will produce.
 - **Engagement mode:** authenticated (client leadership / co-implementer / funder roles already
   exist in `user_profiles`).
@@ -181,44 +181,43 @@ Uses the accessible `--cv-*` brand tokens (see §8).
 
 ### 6.3 The Engagement Charter + e-signature
 The founding governance document, assembled from three layers:
-1. **Commercial terms** — straight from the RFP 149 cost proposal (scope, 55 days, fee, milestones,
+1. **Commercial terms**, straight from the RFP 149 cost proposal (scope, 55 days, fee, milestones,
    IP split: GtCV Canvas™/tools/ClearView remain Habib's IP; deliverables belong to the client/donor).
-2. **Responsibilities** — **drafted and sourced** from the Delivery Guide and workbooks; the full
+2. **Responsibilities**, **drafted and sourced** from the Delivery Guide and workbooks; the full
    party-by-party matrix lives in [`gtcv-method-reference.md` §A](./gtcv-method-reference.md#a-party-responsibilities-matrix).
    The Charter renders a plain-English "Responsibilities of the Parties" section from it (see the
    drafted articulation below), configured per engagement.
-3. **Governance** — the gates, the **GREEN/AMBER/RED momentum protocol** (method-reference §D), the
+3. **Governance**, the gates, the **GREEN/AMBER/RED momentum protocol** (method-reference §D), the
    evidence standard (E-numbered Evidence Library), and the hours commitment behind any staff
    certificates.
 Tri-party **e-signature** reuses the existing sign-off pattern (`GateSignOff` /
 `ceo_signed` / `coach_authorised`). Signatories are config-driven, matching the source's sign-off
 authority (ED signs each gate; LC approves; funder co-signs the diagnostic and completion records).
 
-**Drafted "Responsibilities of the Parties" (for red-line)** — reusable template, Tanager as the
+**Drafted "Responsibilities of the Parties" (for red-line)**, reusable template, Tanager as the
 first instance:
 
-- **The Client / Funder (Tanager)** — commissions the work and is the final acceptor of each
+- **The Client / Funder (Tanager)**, commissions the work and is the final acceptor of each
   deliverable; attends the Pre-Engagement Diagnostic and all three Commercial Readiness diagnostics;
   receives the weekly and milestone reports; is the escalation point for RED status and for protecting
   the (non-negotiable) pilot phase; co-signs the diagnostic record and the Engagement Completion
   Record.
-- **The Beneficiary / LSP (Ikore)** — owns the outputs and the evidence. Its **Executive Director**
+- **The Beneficiary / LSP (Ikore)**, owns the outputs and the evidence. Its **Executive Director**
   attends the diagnostic (non-delegable) and **signs off every gate**; its **Leadership
   Team** produces the canvas outputs, leads the second pilot iteration, and delivers the final
   handover unassisted; its **Finance Lead** attends all cost-mapping sessions and must operate the
   financial model independently by the end of the Commercial Viability phase; its **Field Team**
   conducts the validation conversations and pilots under the capture discipline; its **Board** approves
   the Scale Pathway Commitment.
-- **The Lead Consultant / Coach** (named per engagement) — owns and runs the method; holds every
+- **The Lead Consultant / Coach** (named per engagement), owns and runs the method; holds every
   decision gate (no zone opens until the prior gate closes with evidence); brings local market
   calibration; present for the core gate sessions; runs the first pilot iteration and backstops the
-  second; **approves the co-implementer's work — gate outputs and reports — before it reaches the
+  second; **approves the co-implementer's work, gate outputs and reports, before it reaches the
   client/funder**; co-evaluates and signs the handover. Retains all IP (GtCV Canvas™, tools, ClearView).
-- **The Co-implementer** (named per engagement; absent in a solo engagement) —
-  leads the interim working sessions and provides day-to-day continuity; owns engagement setup and
+- **The Co-implementer** (named per engagement; absent in a solo engagement),   leads the interim working sessions and provides day-to-day continuity; owns engagement setup and
   administration; **drafts the gate outputs and the weekly report for the lead's approval**;
   supervises fieldwork; trains the Finance Lead on the model.
-- **(Where applicable) a Licensed Advisor** — delivers the method under licence within their own
+- **(Where applicable) a Licensed Advisor**, delivers the method under licence within their own
   engagements, with attribution preserved intact.
 
 > **Presence-language rule (Habib):** the Charter and client-facing screens never mention travel,
@@ -227,32 +226,32 @@ first instance:
 > co-implementer section simply does not appear (config-driven).
 
 > **Roles are fixed; the people are configuration (Habib).** "Lead Consultant" and "Co-implementer"
-> are **roles, not people** — anyone can be named to either (from `engagement_parties`); never hardcode
+> are **roles, not people**, anyone can be named to either (from `engagement_parties`); never hardcode
 > a person. For the Tanager engagement the Lead is Habib Onifade and the Co-implementer is Ganiat Ettu,
 > but that is instance data. The **Lead always approves the Co-implementer's work** (gate outputs and
-> the weekly report) before it leaves the team — this is a role rule, independent of who fills it.
+> the weekly report) before it leaves the team, this is a role rule, independent of who fills it.
 
 ### 6.4 Roles & permission phases (system-enforced)
 The source enforces access by instruction and by keeping finance in a separate file; the web app
 enforces it in code (method-reference §D). Build these phases from the start:
-1. **Setup** — coach + co-implementer only; **LSP excluded** until fieldwork.
-2. **Fieldwork** — field team added, **scoped to their own capture records** only.
-3. **Finance boundary** — cost totals limited to coach / leadership / finance lead; **field team never
+1. **Setup**, coach + co-implementer only; **LSP excluded** until fieldwork.
+2. **Fieldwork**, field team added, **scoped to their own capture records** only.
+3. **Finance boundary**, cost totals limited to coach / leadership / finance lead; **field team never
    sees totals** (delivery-time inputs only). The financial model keeps its own permission boundary.
-4. **Coach-only fields** — e.g. the "Consultant Assessment" — never shown to the team.
-5. **Funder** — a **receive + sign** role (reports, mid-point diagnostic, final deliverable; signs
+4. **Coach-only fields**, e.g. the "Consultant Assessment", never shown to the team.
+5. **Funder**, a **receive + sign** role (reports, mid-point diagnostic, final deliverable; signs
    diagnostic + completion), not general editor access.
-6. **Handover / operational mode** — the pipeline flips from a coaching view to a clean BD tool.
+6. **Handover / operational mode**, the pipeline flips from a coaching view to a clean BD tool.
 
 These map onto the existing role/RLS machinery (`user_profiles` roles, client-scoped RLS,
 `client_access_grants` for the funder receive+sign and no-login showcase).
 
 ### 6.5 Two-stage email flow (config-driven recipients)
 Reusing the Resend pattern (§7):
-1. **Stage 1 — client ↔ coach:** sets out the scope of what needs to be done + the link. (For
+1. **Stage 1, client ↔ coach:** sets out the scope of what needs to be done + the link. (For
    Tanager: Tanager and Habib first.)
-2. **Stage 2 — tri-party:** a separate email to all three parties.
-Recipients, subjects, and bodies come from the engagement config — **never hardcoded**.
+2. **Stage 2, tri-party:** a separate email to all three parties.
+Recipients, subjects, and bodies come from the engagement config, **never hardcoded**.
 
 ### 6.6 Meeting scheduling
 Scheduling for the kickoff and gate meetings, config-driven, integrated with the email flow.
@@ -262,7 +261,7 @@ Assess reuse vs a lightweight in-app scheduler in the build task.
 
 ## 7. Email conventions (reuse the live Resend pattern)
 
-Resend is already live in production via a direct API call — **not** the `resend` npm package — in
+Resend is already live in production via a direct API call, **not** the `resend` npm package, in
 `app/api/access-grant/[token]/route.ts`:
 
 - `resendApiKey()` trims the env var (tolerates a stray trailing newline).
@@ -271,8 +270,7 @@ Resend is already live in production via a direct API call — **not** the `rese
   `Canvas Coach <notifications@habibonifade.com>` with branded inline-hex HTML, and **degrades
   gracefully** when the key is absent.
 
-We **generalise this into a shared `src/lib/email` helper** and use it for the engagement emails —
-**without modifying the live access-grant route** (it serves the Uganda client; leave it alone and
+We **generalise this into a shared `src/lib/email` helper** and use it for the engagement emails, **without modifying the live access-grant route** (it serves the Uganda client; leave it alone and
 copy the pattern). Emails use **literal brand hexes** inline (email clients don't support CSS
 variables), matching the existing template: navy `#1B2A41`, cyan `#00CCCC`, cream `#F5F0E8`.
 
@@ -280,7 +278,7 @@ variables), matching the existing template: navy `#1B2A41`, cyan `#00CCCC`, crea
 
 ## 8. Brand & styling conventions
 
-- **Styling is inline React style objects.** Tailwind is installed but effectively unused — do not
+- **Styling is inline React style objects.** Tailwind is installed but effectively unused, do not
   rely on utility classes. Theme tokens live in `app/globals.css` as `--cv-*` custom properties with
   light default and a `:root[data-theme="dark"]` override.
 - **Two palettes exist and should be reconciled toward the accessible tokens:**
@@ -289,14 +287,14 @@ variables), matching the existing template: navy `#1B2A41`, cyan `#00CCCC`, crea
     deliberately darkened from the presentation-spec hexes that failed WCAG contrast (see the comment
     in `globals.css`).
   - Inline literals in `app/page.tsx` / `app/dashboard/[slug]/page.tsx`
-    (`#1B2A4A` / `#00B4D8` / `#F8F4EE`) — legacy; prefer the tokens.
+    (`#1B2A4A` / `#00B4D8` / `#F8F4EE`), legacy; prefer the tokens.
 - **Logo is a text wordmark**, not an image: a monospace "CANVAS COACH" kicker over a Georgia-serif
   "Clearview". Attribution string: "Canvas Coach · habibonifade.com".
 - Body font is system (`'Segoe UI', system-ui, …`); headings `Georgia, serif`.
 
 ---
 
-## 9. Phase 2 — flexibility engines (design now, build right after launch)
+## 9. Phase 2, flexibility engines (design now, build right after launch)
 
 ### 9.1 ToR → gate auto-mapping (human-approved)
 Upload any client's ToR + deliverables → `app/api/ai-generate` (Anthropic) proposes the
@@ -321,7 +319,7 @@ via the shared email helper. Human-in-the-loop at sign-off; automation only for 
 - **Every new API route** must pass the route-auth CI gate (no service-role key without an auth
   check), be rate-limited where expensive, and audit-logged where sensitive.
 - **RLS on every new table**, scoped by engagement/client.
-- **CSP** in `next.config.js` allows self + Supabase only — anything new must fit (no external
+- **CSP** in `next.config.js` allows self + Supabase only, anything new must fit (no external
   script/style/host).
 - **API security hardening** (the existing in-flight task) is the **immediate follow-on** once this
   build lands, at the client's explicit request.
@@ -330,11 +328,11 @@ via the shared email helper. Human-in-the-loop at sign-off; automation only for 
 
 ## 11. Sequenced week-one plan
 
-1. **This spec** (docs) — done when this file is committed.
+1. **This spec** (docs), done when this file is committed.
 2. **Migration** (staging): `engagements`, `engagement_parties`, `engagement_deliverables`,
    `deliverable_gate_map`, `engagement_charters`, `charter_signatures`, live canvas-state tables.
 3. **Engagement config model** + Tanager seed row (staging).
-4. **Journey-map page** — engagement mode + no-login showcase.
+4. **Journey-map page**, engagement mode + no-login showcase.
 5. **Engagement Charter** page + tri-party e-signature.
 6. **Shared email helper** + two-stage engagement email flow.
 7. **Meeting scheduling**.
@@ -345,32 +343,32 @@ via the shared email helper. Human-in-the-loop at sign-off; automation only for 
 
 ## 12. Open decisions
 
-- **Deliverable→gate mapping for Tanager** (§4.2) — ✅ confirmed by Habib (matches how he'll invoice);
+- **Deliverable→gate mapping for Tanager** (§4.2), ✅ confirmed by Habib (matches how he'll invoice);
   stays editable per engagement.
-- **Charter responsibilities** (§6.3) — drafted and sourced; awaiting Habib's red-line.
-- **Method reconciliation** — ✅ resolved by the Handbook (method-reference §F): five independence
+- **Charter responsibilities** (§6.3), drafted and sourced; awaiting Habib's red-line.
+- **Method reconciliation**, ✅ resolved by the Handbook (method-reference §F): five independence
   tests = Tools/Handbook set; DP02 minimum = 5 (with ≥3 converging); Asset Liquidity Hierarchy™ is
-  separate IP, out of the GtCV flow; fit tests score 0–3 / max 18.
-- **Missing source files** — ✅ obtained and read (Handbook + Financial Model). DP04 build reference
+  separate IP, out of the GtCV flow; fit tests score 0-3 / max 18.
+- **Missing source files**, ✅ obtained and read (Handbook + Financial Model). DP04 build reference
   captured in method-reference §G.
-- **DP04 vs existing engine** — decide at DP04 build time how much reuses `generic-engine.ts` vs the
+- **DP04 vs existing engine**, decide at DP04 build time how much reuses `generic-engine.ts` vs the
   GtCV Financial Model spec (method-reference §G).
-- **Canvas schema drift** — the canvas tables aren't captured as migration files; add a follow-up to
+- **Canvas schema drift**, the canvas tables aren't captured as migration files; add a follow-up to
   snapshot them so the repo matches the DB.
-- **Scheduling** — reuse an existing integration vs a lightweight in-app scheduler.
-- **Palette reconciliation** — how far to unify the two brand palettes as part of this work vs later.
+- **Scheduling**, reuse an existing integration vs a lightweight in-app scheduler.
+- **Palette reconciliation**, how far to unify the two brand palettes as part of this work vs later.
 
 ---
 
 ## 13. Changelog
 
 - **v1.2 (2026-08-08):** Discovered the canvas persistence layer already exists in the DB (reuse, no
-  duplication) — rewrote §5 accordingly and added the commercial-layer migration
+  duplication), rewrote §5 accordingly and added the commercial-layer migration
   `2026_08_08_gtcv_engagement_commercial_layer.sql`. Read the Handbook + Financial Model in full:
   resolved all method-reconciliation items (§12) and captured the DP04 build reference
-  (method-reference §G) and the canonical DP09 scoring (0–3 / 18).
+  (method-reference §G) and the canonical DP09 scoring (0-3 / 18).
 - **v1.1 (2026-08-08):** Added `gtcv-method-reference.md` (responsibilities, gate model, tools,
-  permission phases, momentum protocol, friction points — sourced from the manual & workbooks).
+  permission phases, momentum protocol, friction points, sourced from the manual & workbooks).
   Upgraded the Charter responsibilities layer from "to draft" to a sourced, drafted articulation
   (§6.3); added the six system-enforced permission phases (§6.4); recorded method-reconciliation and
   missing-source-file decisions (§12). Deliverable→gate mapping confirmed by Habib.
