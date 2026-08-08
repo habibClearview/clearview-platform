@@ -45,6 +45,8 @@ const InterviewCaptureForm  = lazy(() => import('./InterviewCaptureForm'))
 const EvidenceLibraryPanel  = lazy(() => import('./EvidenceLibraryPanel'))
 const GateSignOffPanel      = lazy(() => import('./GateSignOffPanel'))
 const BlockSynthesis        = lazy(() => import('./BlockSynthesis'))
+const HandoverIndependence  = lazy(() => import('./HandoverIndependence'))
+const InterviewReporting    = lazy(() => import('./InterviewReporting'))
 
 // What each block carries. Title is what the coach sees above the surface,
 // so it says what the tool is for rather than repeating the block name.
@@ -60,6 +62,7 @@ const BLOCK_SURFACES = {
     { key: 'scoring', title: 'Problem prioritisation', Comp: ProblemScoringTable },
     { key: 'brief', title: 'Before you go out: the conversation rules', Comp: InterviewBriefing },
     { key: 'capture', title: 'Customer conversation capture', Comp: InterviewCaptureForm },
+    { key: 'reporting', title: 'What the conversations add up to', Comp: InterviewReporting },
   ],
   dp03: [
     { key: 'proposition', title: 'Proposition builder', Comp: PropositionBuilder },
@@ -82,6 +85,9 @@ const BLOCK_SURFACES = {
   ],
   dp09: [
     { key: 'readiness', title: 'Commercial readiness', Comp: ReadinessDiagnostic },
+  ],
+  handover: [
+    { key: 'independence', title: 'The five independence tests', Comp: HandoverIndependence },
   ],
 }
 

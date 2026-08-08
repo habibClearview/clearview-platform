@@ -20,6 +20,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { cleanRecipients, isWebUrl } from '@/lib/validate-input'
 import { getBearerToken } from '@/lib/auth/api-authz'
+import { resolveClientAccess } from '@/lib/auth/engagement-access'
 import { checkRateLimit } from '@/lib/rate-limit'
 import {
   emailAvailable,
@@ -67,25 +68,16 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error: authErr } = await admin.auth.getUser(token)
     if (authErr || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
-    // Authorize: super_coach may send for any client; an assigned co-implementer
-    // (role 'coach' whose co_implementers row lists this client) may send for
-    // their own clients. This re-derives can_manage_client_access server-side.
-    const { data: actor } = await admin
-      .from('user_profiles')
-      .select('role, full_name, co_implementer_id')
-      .eq('id', user.id)
-      .single()
-
-    let allowed = !!actor && actor.role === 'super_coach'
-    if (!allowed && actor?.role === 'coach' && actor.co_implementer_id) {
-      const { data: ci } = await admin
-        .from('co_implementers')
-        .select('client_ids')
-        .eq('id', actor.co_implementer_id)
-        .single()
-      allowed = Array.isArray(ci?.client_ids) && ci!.client_ids.includes(clientId)
+    // Authorization goes through resolveClientAccess, the same helper every
+    // other route uses. This block used to re-derive the rule by hand, reading
+    // the profile and the co-implementer's client list itself. It agreed with
+    // the helper, but two copies of an access rule is one copy too many: the
+    // day the rule changes, whichever copy nobody remembers becomes a hole.
+    const access = await resolveClientAccess(admin, user.id, clientId)
+    if (!access.canManage) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
-    if (!allowed) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    const actor = { full_name: access.fullName, role: access.role }
 
     // Each send fans out to a list of recipients; cap how many sends one
     // account can trigger per hour so the endpoint can't spray mail.
