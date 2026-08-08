@@ -110,7 +110,11 @@ export default function HandoverIndependence({ clientId, canManage }) {
       ...patch,
       updated_at: new Date().toISOString(),
     }
-    const { error } = await supabase.from(TABLE).upsert(payload, { onConflict: 'id' })
+    // Conflicts on the pair that identifies a handover record, not on the id
+    // that encodes it. There is one result per test per engagement, and the
+    // database now holds that rather than trusting every writer to build the
+    // same id string.
+    const { error } = await supabase.from(TABLE).upsert(payload, { onConflict: 'client_id,test_number' })
     if (error) throw error
   }
 
