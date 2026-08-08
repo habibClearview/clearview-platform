@@ -10,6 +10,10 @@ import {
 import { supabase } from '@/lib/supabase'
 import EngagementJourneyView from '../../../app/engagement/[slug]/page'
 import BlockWorkspace from '@/components/gtcv/BlockWorkspace'
+import SessionPlanner from '@/components/gtcv/SessionPlanner'
+import EvidenceLibraryPanel from '@/components/gtcv/EvidenceLibraryPanel'
+import InterviewBriefing from '@/components/gtcv/InterviewBriefing'
+import InterviewCaptureForm from '@/components/gtcv/InterviewCaptureForm'
 import CoverPanel from '@/components/gtcv/CoverPanel'
 import CoachQuickReference from '@/components/gtcv/CoachQuickReference'
 import GtcvEngagementTracker from '@/components/gtcv/EngagementTracker'
@@ -2146,8 +2150,10 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             {activeTab==='ip_framework'&&<TabIPFramework/>}
             {activeTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
             {activeTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={userRole} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
+            {activeTab==='sessions'&&<SessionPlanner clientId={selClient.id} canManage={canEdit(userRole)}/>}
             {activeTab==='tracker'&&<><GtcvEngagementTracker clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/><TabTracker client={selClient} canvas={canvas}/></>}
             {activeTab==='decisions'&&<TabDecisions client={selClient} decisions={decisions} userRole={userRole} userName={userName} onAdd={async(d)=>{const {data}=await supabase.from('canvas_decisions').insert([{...d,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:[...decisions,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`decisions:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:decisions.map(d=>d.id!==id?d:{...d,...updates})}})),()=>supabase.from('canvas_decisions').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
+            {activeTab==='evidence'&&<><EvidenceLibraryPanel clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/></>}
             {activeTab==='evidence'&&<TabEvidence client={selClient} evidence={evidence} onAdd={async(e)=>{const ref=`E-${String(evidence.length+1).padStart(3,'0')}`;const {data}=await supabase.from('evidence_library').insert([{...e,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:[...evidence,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`evidence:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:evidence.map(e=>e.id!==id?e:{...e,...updates})}})),()=>supabase.from('evidence_library').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
             {activeTab==='handover'&&<TabHandover client={selClient} handover={handover} canvas={canvas} userRole={userRole} onUpdate={(id,updates)=>optimisticWrite(`handover:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,handover:handover.map(h=>h.id!==id?h:{...h,...updates})}})),()=>supabase.from('handover_record').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
             {activeTab==='phase0'&&<TabDP client={selClient} dp={canvas.find(d=>d.dp_id==='phase_0')} userRole={userRole} onUpdateDP={u=>updateDP(selClient.id,'phase_0',u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,'phase_0',cn,u)}/>}
@@ -2158,7 +2164,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             {['dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09'].map(dpKey=>(
               activeTab===dpKey&&<div key={`ws-${dpKey}`} style={{marginTop:26}}><BlockWorkspace dpId={dpKey} clientId={selClient.id} canManage={canEdit(userRole)}/></div>
             ))}
+            {activeTab==='int_brief'&&<><InterviewBriefing/><div style={{height:22}}/></>}
             {activeTab==='int_brief'&&<TabInterviewBriefing client={selClient} interviews={interviews} onAdd={async(i)=>{const ref=`INT-${String(interviews.length+1).padStart(3,'0')}`;const {data}=await supabase.from('interviews').insert([{...i,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,interviews:[...interviews,data]}}))}}/>}
+            {activeTab==='int_capture'&&<><InterviewCaptureForm clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/></>}
             {activeTab==='int_capture'&&<TabInterviewCapture client={selClient} interviews={interviews}
               onAdd={async(i)=>{
                 const ref=`INT-${String(interviews.length+1).padStart(3,'0')}`

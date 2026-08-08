@@ -8,6 +8,14 @@
 // what belongs to which block, so the canvas panel and the sidebar tab show
 // exactly the same thing and neither can drift from the other.
 //
+// Three layers stack in every block:
+//   1. the block's own working tables
+//   2. the evidence library, filtered to this block
+//   3. the gate sign off, which is how the block closes
+//
+// Layers 2 and 3 are universal because the method says every gate closes on
+// evidence and a signature, so no block should be missing either one.
+//
 // Surfaces are loaded on demand. A coach who opens Block 1 should not pay
 // for the pilot capture or the costing model they are not looking at.
 // ============================================================
@@ -31,6 +39,11 @@ const PilotCapture          = lazy(() => import('./PilotCapture'))
 const ChannelLogicTable     = lazy(() => import('./ChannelLogicTable'))
 const ReadinessDiagnostic   = lazy(() => import('./ReadinessDiagnostic'))
 const PhaseZeroWorkspace    = lazy(() => import('./PhaseZeroWorkspace'))
+const CommercialViability   = lazy(() => import('./CommercialViability'))
+const InterviewBriefing     = lazy(() => import('./InterviewBriefing'))
+const InterviewCaptureForm  = lazy(() => import('./InterviewCaptureForm'))
+const EvidenceLibraryPanel  = lazy(() => import('./EvidenceLibraryPanel'))
+const GateSignOffPanel      = lazy(() => import('./GateSignOffPanel'))
 
 // What each block carries. Title is what the coach sees above the surface,
 // so it says what the tool is for rather than repeating the block name.
@@ -44,9 +57,14 @@ const BLOCK_SURFACES = {
   dp02: [
     { key: 'segments', title: 'Customer segments and the adoption test', Comp: CustomerSegmentsTable },
     { key: 'scoring', title: 'Problem prioritisation', Comp: ProblemScoringTable },
+    { key: 'brief', title: 'Before you go out: the conversation rules', Comp: InterviewBriefing },
+    { key: 'capture', title: 'Customer conversation capture', Comp: InterviewCaptureForm },
   ],
   dp03: [
     { key: 'proposition', title: 'Proposition builder', Comp: PropositionBuilder },
+  ],
+  dp04: [
+    { key: 'viability', title: 'Cost, break even and pricing', Comp: CommercialViability },
   ],
   dp05: [
     { key: 'ab', title: 'Message testing', Comp: ABTestingLog },
@@ -66,15 +84,28 @@ const BLOCK_SURFACES = {
   ],
 }
 
-/** True when this block has any working surface built. */
+// Every block closes the same way, so these two follow the block's own tables
+// rather than being repeated in each entry above.
+const CLOSING_SURFACES = [
+  { key: 'evidence', title: 'Evidence for this gate', Comp: EvidenceLibraryPanel },
+  { key: 'signoff', title: 'Gate sign off', Comp: GateSignOffPanel },
+]
+
+/** Every block has work, so this is always true. Kept for call sites that ask. */
 export function hasWorkspace(dpId) {
+  return Boolean(dpId)
+}
+
+/** True when the block has working tables of its own beyond evidence and sign off. */
+export function hasOwnTables(dpId) {
   return Array.isArray(BLOCK_SURFACES[dpId]) && BLOCK_SURFACES[dpId].length > 0
 }
 
-export default function BlockWorkspace({ dpId, clientId, canManage }) {
-  const surfaces = BLOCK_SURFACES[dpId] || []
+export default function BlockWorkspace({ dpId, clientId, canManage, currency }) {
+  const own = BLOCK_SURFACES[dpId] || []
+  const surfaces = [...own, ...CLOSING_SURFACES]
 
-  if (!clientId) {
+  if (!clientId || !dpId) {
     return (
       <p style={{ fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: 13.5, color: '#8B8272' }}>
         Select a client to open this block.
@@ -82,28 +113,26 @@ export default function BlockWorkspace({ dpId, clientId, canManage }) {
     )
   }
 
-  if (surfaces.length === 0) {
-    return (
-      <div style={{
-        fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: 13.5, color: '#4C5A6B',
-        background: '#FBF7EE', border: '1px dashed rgba(27,42,65,.18)', borderRadius: 12,
-        padding: '14px 16px',
-      }}>
-        This block does not have a working table of its own. The work is captured in its nine
-        components, the evidence library, and the gate sign off.
-      </div>
-    )
-  }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+      {own.length === 0 ? (
+        <div style={{
+          fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: 13.5, color: '#4C5A6B',
+          background: '#FBF7EE', border: '1px dashed rgba(27,42,65,.18)', borderRadius: 12,
+          padding: '14px 16px',
+        }}>
+          This block is worked through its nine components above. The evidence and the signature
+          below are what close it.
+        </div>
+      ) : null}
+
       {surfaces.map(({ key, title, Comp }) => (
         <section key={key}>
           <h3 style={{
             fontFamily: 'Georgia,serif', fontSize: 17, fontWeight: 600, margin: '0 0 10px',
             color: '#1B2A41',
           }}>{title}</h3>
-          <Comp clientId={clientId} canManage={canManage} />
+          <Comp clientId={clientId} canManage={canManage} dpId={dpId} currency={currency} />
         </section>
       ))}
     </div>
