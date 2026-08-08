@@ -6,6 +6,8 @@
 > **First engagement:** Tanager · IGNITE+ Nigeria (RFP 149) — the *first record*, not the schema
 > **Branch:** `claude/coach-deploy-corrections-2kj6q4` (rebased onto `main`)
 > **Related docs:** [`docs/gtcv/README.md`](./README.md) (product bible),
+> [`docs/gtcv/gtcv-method-reference.md`](./gtcv-method-reference.md) (**responsibilities, gates,
+> tools, permission phases — sourced from the manual & workbooks**),
 > [`docs/STAGING_AND_ROLLBACK.md`](../STAGING_AND_ROLLBACK.md),
 > [`docs/ACCOUNTING_ARCHITECTURE.md`](../ACCOUNTING_ARCHITECTURE.md)
 
@@ -172,21 +174,67 @@ Uses the accessible `--cv-*` brand tokens (see §8).
 The founding governance document, assembled from three layers:
 1. **Commercial terms** — straight from the RFP 149 cost proposal (scope, 55 days, fee, milestones,
    IP split: GtCV Canvas™/tools/ClearView remain Habib's IP; deliverables belong to the client/donor).
-2. **Responsibilities** — *drafted for review* (the cost proposal does not spell these out): who does
-   what at each gate, drawn from the Delivery Guide and the method.
-3. **Governance** — the gates, the GREEN/AMBER/RED momentum protocol, the evidence standard, and the
-   hours commitment behind any staff certificates.
+2. **Responsibilities** — **drafted and sourced** from the Delivery Guide and workbooks; the full
+   party-by-party matrix lives in [`gtcv-method-reference.md` §A](./gtcv-method-reference.md#a-party-responsibilities-matrix).
+   The Charter renders a plain-English "Responsibilities of the Parties" section from it (see the
+   drafted articulation below), configured per engagement.
+3. **Governance** — the gates, the **GREEN/AMBER/RED momentum protocol** (method-reference §D), the
+   evidence standard (E-numbered Evidence Library), and the hours commitment behind any staff
+   certificates.
 Tri-party **e-signature** reuses the existing sign-off pattern (`GateSignOff` /
-`ceo_signed` / `coach_authorised`). Signatories are config-driven.
+`ceo_signed` / `coach_authorised`). Signatories are config-driven, matching the source's sign-off
+authority (ED signs each gate; LC approves; funder co-signs the diagnostic and completion records).
 
-### 6.4 Two-stage email flow (config-driven recipients)
+**Drafted "Responsibilities of the Parties" (for red-line)** — reusable template, Tanager as the
+first instance:
+
+- **The Client / Funder (Tanager)** — commissions the work and is the final acceptor of each
+  deliverable; attends the Pre-Engagement Diagnostic and all three Commercial Readiness diagnostics;
+  receives the weekly and milestone reports; is the escalation point for RED status and for protecting
+  the (non-negotiable) pilot phase; co-signs the diagnostic record and the Engagement Completion
+  Record.
+- **The Beneficiary / LSP (Ikore)** — owns the outputs and the evidence. Its **Executive Director**
+  attends the diagnostic in person (non-delegable) and **signs off every gate**; its **Leadership
+  Team** produces the canvas outputs, leads the second pilot iteration, and delivers the final
+  handover unassisted; its **Finance Lead** attends all cost-mapping sessions and must operate the
+  financial model independently by the end of the Commercial Viability phase; its **Field Team**
+  conducts the validation conversations and pilots under the capture discipline; its **Board** approves
+  the Scale Pathway Commitment.
+- **The Lead Consultant / Coach (Habib · The Canvas Coach)** — owns and runs the method; holds every
+  decision gate (no zone opens until the prior gate closes with evidence); brings local market
+  calibration; runs the first pilot iteration and backstops the second; approves all reports before
+  they reach the funder; co-evaluates and signs the handover. Retains all IP (GtCV Canvas™, tools,
+  ClearView).
+- **The In-Country Associate / Co-implementer (Ganiat Ettu)** — the daily continuity lead; runs
+  sessions between the lead consultant's visits; owns engagement setup and administration; drafts gate
+  outputs for review; supervises fieldwork; trains the Finance Lead on the model; submits the weekly
+  report for approval.
+- **(Where applicable) a Licensed Advisor** — delivers the method under licence within their own
+  engagements, with attribution preserved intact.
+
+### 6.4 Roles & permission phases (system-enforced)
+The source enforces access by instruction and by keeping finance in a separate file; the web app
+enforces it in code (method-reference §D). Build these phases from the start:
+1. **Setup** — coach + co-implementer only; **LSP excluded** until fieldwork.
+2. **Fieldwork** — field team added, **scoped to their own capture records** only.
+3. **Finance boundary** — cost totals limited to coach / leadership / finance lead; **field team never
+   sees totals** (delivery-time inputs only). The financial model keeps its own permission boundary.
+4. **Coach-only fields** — e.g. the "Consultant Assessment" — never shown to the team.
+5. **Funder** — a **receive + sign** role (reports, mid-point diagnostic, final deliverable; signs
+   diagnostic + completion), not general editor access.
+6. **Handover / operational mode** — the pipeline flips from a coaching view to a clean BD tool.
+
+These map onto the existing role/RLS machinery (`user_profiles` roles, client-scoped RLS,
+`client_access_grants` for the funder receive+sign and no-login showcase).
+
+### 6.5 Two-stage email flow (config-driven recipients)
 Reusing the Resend pattern (§7):
 1. **Stage 1 — client ↔ coach:** sets out the scope of what needs to be done + the link. (For
    Tanager: Tanager and Habib first.)
 2. **Stage 2 — tri-party:** a separate email to all three parties.
 Recipients, subjects, and bodies come from the engagement config — **never hardcoded**.
 
-### 6.5 Meeting scheduling
+### 6.6 Meeting scheduling
 Scheduling for the kickoff and gate meetings, config-driven, integrated with the email flow.
 Assess reuse vs a lightweight in-app scheduler in the build task.
 
@@ -277,9 +325,14 @@ via the shared email helper. Human-in-the-loop at sign-off; automation only for 
 
 ## 12. Open decisions
 
-- **Deliverable→gate mapping for Tanager** (§4.2) — confirm the split, especially Milestone 3 closing
-  at DP07.
-- **Charter responsibilities** — Habib to review the drafted responsibilities layer (§6.3).
+- **Deliverable→gate mapping for Tanager** (§4.2) — ✅ confirmed by Habib (matches how he'll invoice);
+  stays editable per engagement.
+- **Charter responsibilities** (§6.3) — drafted and sourced; awaiting Habib's red-line.
+- **Method reconciliation** (method-reference §F) — pick one canonical, per-engagement-configurable
+  definition for: the **five independence tests** (two wordings), the **Asset Liquidity Hierarchy™**
+  (livestock vs Tier 1/2/3), and the **DP02 validation-conversation minimum** (≥2 / ≥4 / ≥5).
+- **Missing source files** — obtain the **Handbook e-book** and the separate **Financial Model file**
+  before building DP04 and the IP-framework help content.
 - **Scheduling** — reuse an existing integration vs a lightweight in-app scheduler.
 - **Palette reconciliation** — how far to unify the two brand palettes as part of this work vs later.
 
@@ -287,6 +340,11 @@ via the shared email helper. Human-in-the-loop at sign-off; automation only for 
 
 ## 13. Changelog
 
+- **v1.1 (2026-08-08):** Added `gtcv-method-reference.md` (responsibilities, gate model, tools,
+  permission phases, momentum protocol, friction points — sourced from the manual & workbooks).
+  Upgraded the Charter responsibilities layer from "to draft" to a sourced, drafted articulation
+  (§6.3); added the six system-enforced permission phases (§6.4); recorded method-reconciliation and
+  missing-source-file decisions (§12). Deliverable→gate mapping confirmed by Habib.
 - **v1 (2026-08-08):** Initial draft. Founding principle, reuse map, deliverable→gate→payment
   mapping (Tanager as first record), Phase-1 spine, Phase-2 flexibility engines, conventions,
   week-one plan.
