@@ -17,6 +17,7 @@ import InterviewReporting from '@/components/gtcv/InterviewReporting'
 import EngagementPartiesPanel from '@/components/gtcv/EngagementPartiesPanel'
 import ShowcaseSharing from '@/components/gtcv/ShowcaseSharing'
 import EngagementSettings from '@/components/gtcv/EngagementSettings'
+import WhatNeedsYou from '@/components/gtcv/WhatNeedsYou'
 import EvidenceLibraryPanel from '@/components/gtcv/EvidenceLibraryPanel'
 import InterviewBriefing from '@/components/gtcv/InterviewBriefing'
 import InterviewCaptureForm from '@/components/gtcv/InterviewCaptureForm'
@@ -2145,7 +2146,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 
           {/* Main content area */}
           <div>
-            {activeTab==='cover'&&<><CoverPanel slug={selClient.slug}/><div style={{height:18}}/>
+            {activeTab==='cover'&&<><WhatNeedsYou clientId={selClient.id} canManage={canEdit(userRole)} onGoTo={setActiveTab}/><CoverPanel slug={selClient.slug}/><div style={{height:18}}/>
               <TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/>
               {!selClient.programme_id&&<ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>}
             </>}
