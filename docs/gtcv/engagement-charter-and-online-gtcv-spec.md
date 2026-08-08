@@ -214,7 +214,7 @@ first instance:
   calibration; present for the core gate sessions; runs the first pilot iteration and backstops the
   second; **approves the co-implementer's work — gate outputs and reports — before it reaches the
   client/funder**; co-evaluates and signs the handover. Retains all IP (GtCV Canvas™, tools, ClearView).
-- **The In-Country Associate / Co-implementer** (named per engagement; absent in a solo engagement) —
+- **The Co-implementer** (named per engagement; absent in a solo engagement) —
   leads the interim working sessions and provides day-to-day continuity; owns engagement setup and
   administration; **drafts the gate outputs and the weekly report for the lead's approval**;
   supervises fieldwork; trains the Finance Lead on the model.

@@ -12,7 +12,7 @@
 
 | Source | What it is | Register |
 |---|---|---|
-| **Delivery Guide / Manual** (`1kZF7…`) | Richest source on *who does what*; a concrete 26-week, two-country rhythm | Engagement-specific (names Tanager/LSP; uses "Zone", role abbreviations LC/CI/ED/LT/FT/FL) |
+| **Delivery Guide / Manual** (`1kZF7…`) | Richest source on *who does what*; a concrete 26-week delivery rhythm | Engagement-specific (names Tanager/LSP; uses "Zone", role abbreviations LC/CI/ED/LT/FT/FL) |
 | **GtCV_Tools_Workbook_v1** (`1DmJg…`, 17 tabs) | The working tools per Decision Point | Client-agnostic ("the Organisation", "the Coach") |
 | **GtCV_Canvas_Workbook_v2** (`1016o…`, 9 DP × 9 components × 5 layers) | The engagement *record* | Client-agnostic |
 | **GtCV_Engagement_Workbook_v2** (`1IGO0…`, 24 tabs) | The operational backbone; field-capture templates; permissions model | Hybrid |
@@ -27,13 +27,13 @@ Phase 0 = "Assumption Clearing." Standard status everywhere: **○ Not Started /
 ✓ Complete / ⚠ Needs Revisiting**, with the standing rule *"any DP01 or DP02 showing ⚠ takes priority
 over all downstream work."*
 
-**Role glossary:** **LC** Lead Consultant / Coach (Habib) · **CI** Co-implementer / In-Country
-Associate (e.g. Ganiat Ettu) · **ED** LSP Executive Director · **LT** LSP Leadership Team ·
+**Role glossary:** **LC** Lead Consultant / Coach (Habib) · **CI** Co-implementer (e.g. Ganiat
+Ettu) · **ED** LSP Executive Director · **LT** LSP Leadership Team ·
 **FT** LSP Field Team · **FL** LSP Finance Lead · **Client/Funder** the programme (e.g. Tanager) ·
 **LSP** the Beneficiary / Local Service Provider (e.g. Ikore) · **Licensed Advisor** a coach
 delivering under licence.
 
-> **Client-agnostic rule:** all party names, currency, geography, country-stagger, and the
+> **Client-agnostic rule:** all party names, currency, location, and the
 > "Zone vs DP" label are **engagement configuration**. Tanager/Ikore/Ganiat are the *first instance*,
 > never hardcoded.
 
@@ -81,18 +81,19 @@ Owns the evidence and the outputs. Sub-roles:
   engagement."* **Sole gate-approval authority** into the next zone.
 - **Approves the Weekly Progress Report before it goes to the funder.** Brings **COACH CALIBRATION**
   (local market/cost/competitor intelligence the method deliberately omits).
-- **Presence:** physically present at the diagnostic, DP04 cost-mapping, DP07 pilots, and DP09/handover;
-  remote lead otherwise (daily check-in, reviews all outputs before gates close).
-  > **Client-facing rule (Habib):** this internal rhythm describes the *source's* two-country model.
-  > Client-facing text (the Charter, screens) must **never** say travel / visits / "remote" — state
-  > presence neutrally ("lead present" / "co-implementer present"), so it also fits solo, co-located
-  > engagements (where the co-implementer role is absent entirely).
+- **Presence:** present for the core gate sessions (diagnostic, DP04 cost-mapping, DP07 pilots,
+  DP09/handover); the co-implementer leads the interim sessions and reviews of outputs happen before
+  each gate closes.
+  > **Client-facing rule (Habib):** there is only a **Lead Consultant** and a **Co-implementer** —
+  > no "in-country/out-country" and nothing implying travel, visits, or "remote". State presence
+  > neutrally ("lead present" / "co-implementer present"); it must also fit a solo, co-located
+  > engagement (co-implementer absent entirely).
 - **Pilots:** **runs Iteration 1** (LSP observes); **backstop only in Iteration 2** (intervenes only
   for misrepresentation, client distress, or unusable drift — and only indirectly).
 - **Handover:** **co-evaluator with the funder**; gives written confirmation the commercial model is
   complete and LSP-owned; co-signs completion.
 
-### A4. In-Country Associate / Co-implementer (CI — e.g. Ganiat Ettu)
+### A4. Co-implementer (CI — e.g. Ganiat Ettu)
 - **Daily continuity lead** between LC visits; **leads sessions when the LC is remote**. **Owns
   Engagement Workbook setup/admin.** **Submits the Weekly Progress Report every Friday** (for LC
   approval); raises AMBER immediately. **Records verbatim** at the diagnostic and all Zone 9 sessions.
@@ -253,7 +254,8 @@ replace with **per-field audit + undo + concurrent-edit handling**.
   working days, no new zone opens until caught up, LC notified same day · **RED** (≥2 missed / gate
   stalled > 2 weeks) → **engagement pauses; LC + LSP + funder review within 5 working days; written
   recovery plan before resuming.**
-- Optional **two-country stagger** (e.g. 2-week separation) is engagement config.
+- The delivery rhythm (session cadence, hours, sequencing) is engagement config. The app never
+  implies travel or movement in/out of a country — only a Lead Consultant and a Co-implementer.
 
 ---
 
@@ -278,7 +280,7 @@ replace with **per-field audit + undo + concurrent-edit handling**.
 9. **Manual A/B & pipeline tallies** → auto response rates, winning-variant flag, pipeline analytics +
    dual coaching/operational view.
 10. **Client-agnostic vs engagement-specific language** → parameterise names/currency/geography/
-    stagger/terminology as engagement config; Licensed-Advisor mode scopes to own engagements with
+    terminology as engagement config; Licensed-Advisor mode scopes to own engagements with
     immutable IP.
 
 ---
