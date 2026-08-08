@@ -223,6 +223,58 @@ export interface IndependenceTest {
   step: string           // Handbook / Tools costable-operable step
 }
 
+// ─── EngagementView (assembled read model) ───────────────────
+// The single typed object src/lib/engagement-loader.ts returns: the
+// engagement_clients row plus every commercial-layer table and the per-DP
+// gate status read from the existing canvas tables. Nothing here is
+// client-specific; the names and content are all configuration.
+
+// Plain-language gate status, derived from the canvas_decision_points
+// DPStatus symbols (see coach-types.ts): '✓' complete, '◐' in
+// progress, '⚠' blocked, '○' or missing not started.
+export type GateStatusValue = 'not_started' | 'in_progress' | 'complete' | 'blocked'
+
+export interface DpGateStatus {
+  dp_id: DpId
+  status: GateStatusValue
+  // The raw canvas_decision_points row values, when a row exists.
+  raw_symbol: string | null
+  label: string | null
+  ceo_signed_off: boolean
+}
+
+// The subset of engagement_clients the journey and Charter pages read. Fees
+// and payment fields are deliberately NOT surfaced here (they live in a
+// separate, private view).
+export interface EngagementClientSummary {
+  id: string
+  slug: string | null
+  name: string
+  status: string | null
+  programme_id: string | null
+}
+
+export interface EngagementView {
+  client: EngagementClientSummary
+  programme_name: string | null
+  config: EngagementConfig | null
+  parties: EngagementParty[]
+  deliverables: EngagementDeliverable[]
+  gate_map: DeliverableGateMap[]
+  charter: EngagementCharter | null
+  charter_comments: CharterComment[]
+  signatures: CharterSignature[]
+  meetings: EngagementMeeting[]
+  // Per-DP gate status for every Dp in CANVAS_DP_IDS, defaulted to
+  // 'not_started' when the client has no canvas_decision_points row for it.
+  gate_status: Record<DpId, GateStatusValue>
+  gate_detail: DpGateStatus[]
+  // The DP the engagement is working now: the first in-progress gate, else the
+  // first not-started gate that follows a completed one. null when nothing has
+  // started or everything is complete.
+  current_dp_id: DpId | null
+}
+
 export const INDEPENDENCE_TESTS: IndependenceTest[] = [
   {
     key: 'numbers',
