@@ -240,6 +240,41 @@ export default function EngagementCharterPage({ slugOverride }: any = {}) {
   // plain language just above the document.
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null)
+  // Toolbar panels: the adjustable specifics editor and the version list.
+  const [editing, setEditing] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const [versions, setVersions] = useState<any[]>([])
+  const [draft, setDraft] = useState<any>(null)
+
+  // The specifics the Charter says are adjustable per engagement. They live
+  // in the charter content so they belong to the version that was agreed.
+  async function saveSpecifics(next) {
+    const { data } = await supabase.auth.getSession()
+    const res = await fetch('/api/charter-version', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(data.session?.access_token ? { Authorization: `Bearer ${data.session.access_token}` } : {}),
+      },
+      body: JSON.stringify({
+        clientId: view.client.id,
+        charterId: view.charter.id,
+        content: { ...(view.charter.content || {}), commitment: next },
+      }),
+    })
+    const out = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(out?.error || 'Could not save')
+  }
+
+  async function loadVersions() {
+    const { data } = await supabase
+      .from('engagement_charters')
+      .select('id,version,status,issued_at,created_at')
+      .eq('client_id', view.client.id)
+      .order('version', { ascending: false })
+    setVersions(data || [])
+  }
+  useEffect(() => { if (showHistory && view?.client?.id) loadVersions() }, [showHistory, view?.client?.id])
 
   // Re-read the engagement after an action so the page shows the saved state.
   async function reload() {
@@ -341,9 +376,51 @@ export default function EngagementCharterPage({ slugOverride }: any = {}) {
             <span className="vu">Viewing as: <b>{isSuperCoach ? 'Super Coach' : 'Lead Consultant'}</b> · edit access</span>
             <span className="sp"></span>
             <span className="ver">Version v{version} · {statusLabel}</span>
-            <button type="button" data-action="history" disabled>Version history</button>
-            <button type="button" data-action="edit" disabled>Edit charter</button>
-            <button className="pri" type="button" data-action="reissue" disabled>Re-issue for signature</button>
+            <button
+              type="button"
+              onClick={() => { setShowHistory(!showHistory); setNotice(null) }}
+            >{showHistory ? 'Hide history' : 'Version history'}</button>
+            <button
+              type="button"
+              disabled={!charter?.id || charter?.status !== 'draft'}
+              title={charter?.status !== 'draft'
+                ? 'This version has been issued. Re-issue to change the wording.'
+                : 'Edit the adjustable specifics'}
+              onClick={() => { setEditing(!editing); setNotice(null) }}
+            >{editing ? 'Close editor' : 'Edit charter'}</button>
+            <button
+              className="pri"
+              type="button"
+              disabled={busy === 'version' || !charter?.id}
+              onClick={() => {
+                const isDraft = charter?.status === 'draft'
+                const ok = isDraft
+                  ? true
+                  : typeof window === 'undefined' || window.confirm(
+                      'Re-issuing supersedes this version and opens a new one. Everyone signs again, so nobody stays bound to wording that changed after they agreed. Continue?')
+                if (!ok) return
+                run('version', async () => {
+                  const { data } = await supabase.auth.getSession()
+                  const res = await fetch('/api/charter-version', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      ...(data.session?.access_token ? { Authorization: `Bearer ${data.session.access_token}` } : {}),
+                    },
+                    body: JSON.stringify({
+                      clientId: view.client.id, charterId: charter.id,
+                      mode: isDraft ? 'issue' : 'reissue',
+                    }),
+                  })
+                  const out = await res.json().catch(() => ({}))
+                  if (!res.ok) throw new Error(out?.error || 'Could not update the version')
+                }, charter?.status === 'draft'
+                  ? 'Issued for signature. The parties can now sign this version.'
+                  : 'Re-issued. A new draft version is open and signing has reset.')
+              }}
+            >{busy === 'version'
+              ? 'Working...'
+              : charter?.status === 'draft' ? 'Issue for signature' : 'Re-issue for signature'}</button>
             <button
               type="button"
               data-action="send-email"
@@ -370,6 +447,103 @@ export default function EngagementCharterPage({ slugOverride }: any = {}) {
             <span className="hint">Only the lead consultant sees this bar. The parties open the same Charter in a read-only &quot;Review &amp; sign&quot; mode, they can comment or suggest, and sign, but not change the wording.</span>
           </div>
         ) : null}
+
+        {showHistory ? (
+          <div style={{
+            margin: '14px 0 0', border: '1px solid var(--line)', borderRadius: 12,
+            background: 'var(--box)', padding: '14px 16px',
+          }}>
+            <p style={{
+              fontFamily: 'var(--fm)', fontSize: 10, letterSpacing: '.13em', textTransform: 'uppercase',
+              color: 'var(--ink-faint)', margin: '0 0 10px',
+            }}>Versions</p>
+            {versions.length === 0 ? (
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-faint)' }}>Loading...</p>
+            ) : versions.map((v) => (
+              <div key={v.id} style={{
+                display: 'flex', gap: 12, alignItems: 'baseline', flexWrap: 'wrap',
+                padding: '8px 0', borderTop: '1px solid var(--line-soft)', fontSize: 13.5,
+              }}>
+                <b style={{ fontFamily: 'var(--fd)' }}>Version {v.version}</b>
+                <span style={{ color: 'var(--ink-soft)' }}>{v.status}</span>
+                <span style={{ marginLeft: 'auto', color: 'var(--ink-faint)', fontSize: 12 }}>
+                  {v.issued_at ? 'issued ' + fmtDate(v.issued_at) : 'created ' + fmtDate(v.created_at)}
+                </span>
+              </div>
+            ))}
+            <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--ink-faint)' }}>
+              Signatures belong to the version they were given on. A superseded version keeps its
+              signatures as the record of what each party agreed to at the time.
+            </p>
+          </div>
+        ) : null}
+
+        {editing ? (() => {
+          const c = draft || (charter?.content?.commitment) || {}
+          const set = (k, v) => setDraft({ ...c, [k]: v })
+          const F = [
+            ['length', 'How long the engagement runs', 'about six months'],
+            ['rhythm', 'Working rhythm', 'weekly sessions'],
+            ['conversations', 'Customer conversations per segment', '5, with 3 converging'],
+            ['capture_window', 'Capture discipline', 'written up within 30 minutes'],
+            ['pilot_rounds', 'Pilot rounds with real paying clients', 'two rounds, two clients each'],
+            ['scope_note', 'Anything else that differs for this engagement', ''],
+          ]
+          return (
+            <div style={{
+              margin: '14px 0 0', border: '1px solid var(--gold)', borderLeft: '4px solid var(--gold)',
+              borderRadius: 12, background: 'var(--box)', padding: '15px 17px',
+            }}>
+              <p style={{
+                fontFamily: 'var(--fm)', fontSize: 10, letterSpacing: '.13em', textTransform: 'uppercase',
+                color: 'var(--gold)', margin: '0 0 4px',
+              }}>Adjustable specifics</p>
+              <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--ink-soft)' }}>
+                These are the parts the Charter says can differ per engagement. Changing them here
+                changes what the parties read before they sign.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 10 }}>
+                {F.map(([k, label, placeholder]) => (
+                  <label key={k} style={{ fontSize: 12.5, color: 'var(--ink-soft)' }}>
+                    {label}
+                    <input
+                      type="text"
+                      defaultValue={c[k] || ''}
+                      placeholder={placeholder}
+                      onChange={(e) => set(k, e.target.value)}
+                      style={{
+                        display: 'block', width: '100%', marginTop: 4, border: '1px solid var(--line)',
+                        borderRadius: 7, padding: '8px 10px', background: 'var(--card)',
+                        color: 'var(--ink)', fontSize: 13, fontFamily: 'var(--fb)',
+                      }}
+                    />
+                  </label>
+                ))}
+              </div>
+              <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="signbtn"
+                  disabled={busy === 'specifics'}
+                  onClick={() => run('specifics', () => saveSpecifics(draft || c),
+                    'Saved. The parties will see the updated specifics.')}
+                  style={{
+                    background: 'var(--teal)', color: '#fff', border: 'none', borderRadius: 8,
+                    padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  }}
+                >{busy === 'specifics' ? 'Saving...' : 'Save specifics'}</button>
+                <button
+                  type="button"
+                  onClick={() => { setEditing(false); setDraft(null) }}
+                  style={{
+                    background: 'var(--card)', color: 'var(--ink)', border: '1px solid var(--line)',
+                    borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  }}
+                >Cancel</button>
+              </div>
+            </div>
+          )
+        })() : null}
 
         {notice ? (
           <div
