@@ -281,16 +281,20 @@ replace with **per-field audit + undo + concurrent-edit handling**.
 
 ## F. Reconciliation — RESOLVED by the Handbook (now read in full)
 
-- 🔶 **Five independence tests** → UNDER RECONCILIATION (Habib). The two lists are not rivals but the
-  same five at different levels: the Engagement Workbook names *categories*; the Handbook/Tools list
-  names the *costable, operable steps* inside them. Habib's mapping: Engagement WB "Commercial Model"
-  ⊇ **Outreach Process** (must be costed); "Pipeline" ↔ **Client Management Process** (how to operate
-  the client pipeline); "Scale Pathway" ↔ **Commercial Identity** (how you decide to scale). Proposed
-  reconciled five (plain language — "at handover the LSP can, without the coach:"): (1) **Run the
-  numbers** [Financial Model]; (2) **Prove the value** [Value Proposition]; (3) **Win the work**
-  [Outreach + pipeline, costed]; (4) **Deliver & manage the client** [Client Management Process];
-  (5) **Position & grow** [Commercial Identity → Scale]. Pending Habib's confirmation of the framing
-  and the #3/#5 groupings. For the Handover module, not blocking the spine.
+- ✅ **Five independence tests** → RECONCILED with Habib. The two workbook lists are the same five at
+  two altitudes: the Engagement Workbook names *categories*, the Handbook/Tools list names the
+  *costable, operable steps*. Habib's rulings: **outreach is part of the pipeline** (one test, one
+  name); **positioning → identity → scale is one chain** (positioning becomes identity, which sets the
+  scale pathway). Settled five — "at handover, the organisation can do this **without the coach**":
+  1. **The numbers** — update a cost and recalculate price/break-even. *(Financial Model)*
+  2. **The pitch** — present the value proposition and handle pushback. *(Value Proposition)*
+  3. **The pipeline** — run outreach and work the funnel to win clients, knowing the cost.
+     *(Pipeline — includes outreach + its cost)*
+  4. **The delivery** — plan, run, debrief and document a real client engagement. *(Client Management)*
+  5. **Positioning & scale** — state the commercial identity and use it to set the scale pathway.
+     *(Identity → Scale)*
+  Judgement call flagged for veto: #3 (winning work) and #4 (delivering work) kept as two separate
+  tests. For the Handover module (later); does not block the spine.
 - ✅ **DP02 minimum validation conversations** → the **Handbook states five** minimum, and the real
   pass condition is **≥3 converging** on the same problem/budget/willingness. **Per Habib: default 5
   but changeable per engagement** (`engagement_config.validation_min_per_segment`, NULL ⇒ 5).
