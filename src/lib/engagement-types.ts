@@ -167,6 +167,29 @@ export interface CharterSignature {
   created_at: string
 }
 
+// ─── charter_comments (review-before-signature) ──────────────
+// Mirrors supabase/migrations/2026_08_08_charter_comments.sql. Comments and
+// suggestions parties leave on a charter section before signing, each moving
+// through a resolution status a manager sets.
+export type CharterCommentKind = 'comment' | 'suggestion'
+export type CharterCommentStatus = 'open' | 'accepted' | 'declined' | 'noted'
+
+export interface CharterComment {
+  id: string
+  client_id: string
+  charter_id: string
+  section_key: string | null
+  author_party_id: string | null
+  author_name: string | null
+  author_role: string | null
+  kind: CharterCommentKind
+  body: string
+  status: CharterCommentStatus
+  resolved_by: string | null
+  resolved_at: string | null
+  created_at: string
+}
+
 // ─── Handover independence tests (reconciled with Habib) ─────
 // The two source workbooks describe the same five at two altitudes; see
 // docs/gtcv/gtcv-method-reference.md §F. 'tools' is the default set. The
