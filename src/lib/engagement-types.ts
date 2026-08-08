@@ -190,6 +190,27 @@ export interface CharterComment {
   created_at: string
 }
 
+// ─── engagement_meetings (scheduling) ────────────────────────
+// Mirrors supabase/migrations/2026_08_08_engagement_meetings.sql. The
+// proposed and confirmed meetings that run an engagement, optionally tied to
+// the decision point they serve.
+export type MeetingStatus = 'proposed' | 'confirmed' | 'done' | 'cancelled'
+
+export interface EngagementMeeting {
+  id: string
+  client_id: string
+  title: string | null
+  purpose: string | null
+  dp_id: string | null
+  starts_at: string | null
+  ends_at: string | null
+  location: string | null
+  meeting_url: string | null
+  status: MeetingStatus
+  created_by: string | null
+  created_at: string
+}
+
 // ─── Handover independence tests (reconciled with Habib) ─────
 // The two source workbooks describe the same five at two altitudes; see
 // docs/gtcv/gtcv-method-reference.md §F. 'tools' is the default set. The
