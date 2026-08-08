@@ -16,6 +16,7 @@ import HandoverIndependence from '@/components/gtcv/HandoverIndependence'
 import InterviewReporting from '@/components/gtcv/InterviewReporting'
 import EngagementPartiesPanel from '@/components/gtcv/EngagementPartiesPanel'
 import ShowcaseSharing from '@/components/gtcv/ShowcaseSharing'
+import EngagementSettings from '@/components/gtcv/EngagementSettings'
 import EvidenceLibraryPanel from '@/components/gtcv/EvidenceLibraryPanel'
 import InterviewBriefing from '@/components/gtcv/InterviewBriefing'
 import InterviewCaptureForm from '@/components/gtcv/InterviewCaptureForm'
@@ -2153,7 +2154,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             {activeTab==='how_to_start'&&<TabHowToStart client={selClient}/>}
             {activeTab==='coach_ref'&&canViewCoachGuidance(userRole)&&<CoachQuickReference showGuidance={canViewCoachGuidance(userRole)}/>}
             {activeTab==='ip_framework'&&<TabIPFramework/>}
-            {activeTab==='eng_setup'&&<><EngagementPartiesPanel clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/><ShowcaseSharing clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/></>}
+            {activeTab==='eng_setup'&&<><EngagementPartiesPanel clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/><ShowcaseSharing clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/><EngagementSettings clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/></>}
             {activeTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
             {activeTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={userRole} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
             {activeTab==='deliverables'&&canEdit(userRole)&&<DeliverablesPanel clientId={selClient.id} canManage={canEdit(userRole)}/>}
