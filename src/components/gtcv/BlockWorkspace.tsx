@@ -44,6 +44,7 @@ const InterviewBriefing     = lazy(() => import('./InterviewBriefing'))
 const InterviewCaptureForm  = lazy(() => import('./InterviewCaptureForm'))
 const EvidenceLibraryPanel  = lazy(() => import('./EvidenceLibraryPanel'))
 const GateSignOffPanel      = lazy(() => import('./GateSignOffPanel'))
+const BlockSynthesis        = lazy(() => import('./BlockSynthesis'))
 
 // What each block carries. Title is what the coach sees above the surface,
 // so it says what the tool is for rather than repeating the block name.
@@ -88,6 +89,7 @@ const BLOCK_SURFACES = {
 // rather than being repeated in each entry above.
 const CLOSING_SURFACES = [
   { key: 'evidence', title: 'Evidence for this gate', Comp: EvidenceLibraryPanel },
+  { key: 'synthesis', title: 'What this gate established', Comp: BlockSynthesis },
   { key: 'signoff', title: 'Gate sign off', Comp: GateSignOffPanel },
 ]
 
