@@ -27,6 +27,9 @@ import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { loadEngagementView } from '@/lib/engagement-loader'
 import { DEFAULT_VALIDATION_MIN_PER_SEGMENT, PARTY_ROLE_LABELS } from '@/lib/engagement-types'
+import {
+  addCharterComment, resolveCharterComment, signCharter, sendEngagementEmail,
+} from '@/lib/engagement-actions'
 
 const CSS = `
 .gc{
@@ -233,6 +236,36 @@ export default function EngagementCharterPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [role, setRole] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Action state: busy blocks double submits, notice reports the outcome in
+  // plain language just above the document.
+  const [busy, setBusy] = useState<string | null>(null)
+  const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null)
+
+  // Re-read the engagement after an action so the page shows the saved state.
+  async function reload() {
+    try {
+      const v = await loadEngagementView(slug)
+      setView(v)
+    } catch (e: any) {
+      setNotice({ tone: 'warn', text: e?.message || 'Could not refresh the Charter' })
+    }
+  }
+
+  // One wrapper so every action reports the same way: busy while it runs, a
+  // plain message afterwards, and a refresh so the saved result is visible.
+  async function run(key: string, fn: () => Promise<any>, okText: string) {
+    setBusy(key)
+    setNotice(null)
+    try {
+      await fn()
+      await reload()
+      setNotice({ tone: 'ok', text: okText })
+    } catch (e: any) {
+      setNotice({ tone: 'warn', text: e?.message || 'That did not work. Please try again.' })
+    } finally {
+      setBusy(null)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -311,9 +344,42 @@ export default function EngagementCharterPage() {
             <button type="button" data-action="history" disabled>Version history</button>
             <button type="button" data-action="edit" disabled>Edit charter</button>
             <button className="pri" type="button" data-action="reissue" disabled>Re-issue for signature</button>
-            <button type="button" data-action="send-email" disabled>Send to parties</button>
+            <button
+              type="button"
+              data-action="send-email"
+              disabled={busy === 'email'}
+              onClick={() => {
+                const to = parties.map((p) => p.email).filter(Boolean)
+                if (to.length === 0) {
+                  setNotice({ tone: 'warn', text: 'No party has an email address on this engagement yet.' })
+                  return
+                }
+                run('email', async () => {
+                  const res = await sendEngagementEmail({
+                    clientId: view.client.id,
+                    stage: 'triparty',
+                    recipients: to,
+                    journeyUrl: typeof window !== 'undefined' ? window.location.href : '',
+                  })
+                  if (res && res.ok === false) {
+                    throw new Error(res.message || res.reason || 'Email is not configured on this environment.')
+                  }
+                }, `The Charter link was sent to ${to.length} recipient${to.length === 1 ? '' : 's'}.`)
+              }}
+            >{busy === 'email' ? 'Sending...' : 'Send to parties'}</button>
             <span className="hint">Only the lead consultant sees this bar. The parties open the same Charter in a read-only &quot;Review &amp; sign&quot; mode, they can comment or suggest, and sign, but not change the wording.</span>
           </div>
+        ) : null}
+
+        {notice ? (
+          <div
+            role="status"
+            style={{
+              margin: '14px 0 0', padding: '11px 15px', borderRadius: 12, fontSize: 13.5,
+              border: `1px solid ${notice.tone === 'ok' ? 'rgba(46,125,50,.4)' : 'rgba(158,107,16,.4)'}`,
+              background: notice.tone === 'ok' ? 'rgba(46,125,50,.10)' : 'rgba(158,107,16,.12)',
+            }}
+          >{notice.text}</div>
         ) : null}
 
         <div className="doc">
@@ -375,7 +441,20 @@ export default function EngagementCharterPage() {
               </div>
               <p className="adj-note">Every specific here, rhythm, hours, session counts, conversation minimums and scope, is set per engagement and can be adjusted before signing.</p>
 
-              <CommentThread sectionKey="commitment" comments={comments} canManage={canEdit} slug={slug} />
+              <CommentThread
+                sectionKey="commitment"
+                comments={comments}
+                canManage={canEdit}
+                clientId={view.client.id}
+                charterId={charter?.id}
+                busy={busy}
+                onAdd={(kind, body) => run('comment', () => addCharterComment({
+                  clientId: view.client.id, charterId: charter.id, sectionKey: 'commitment', kind, body,
+                }), kind === 'suggestion' ? 'Your suggested change has been sent to the lead consultant.' : 'Your comment has been added.')}
+                onResolve={(id, status) => run(`resolve:${id}`, () => resolveCharterComment({
+                  id, clientId: view.client.id, status,
+                }), status === 'accepted' ? 'Marked as accepted.' : status === 'declined' ? 'Marked as declined.' : 'Updated.')}
+              />
             </section>
 
             <section>
@@ -495,7 +574,23 @@ export default function EngagementCharterPage() {
                         {sig ? (
                           <><span className="signed">{sig.typed_name || sig.signer_name}</span><span className="signdate">{fmtDate(sig.signed_at)}</span></>
                         ) : (
-                          <><button className="signbtn" type="button" data-action="sign" data-party={p.id} disabled={!isSelf}>Sign here</button><span className="signdate"></span></>
+                          <>
+                            <button
+                              className="signbtn"
+                              type="button"
+                              data-action="sign"
+                              disabled={!isSelf || busy === `sign:${p.id}` || !charter?.id}
+                              title={isSelf ? 'Sign this version of the Charter' : 'Only this signatory can sign here'}
+                              onClick={() => run(`sign:${p.id}`, () => signCharter({
+                                clientId: view.client.id,
+                                charterId: charter.id,
+                                signerRole: PARTY_ROLE_LABELS[p.party_role] || p.party_role,
+                                signerName: p.name,
+                                signatureMethod: 'click',
+                              }), 'Your signature has been recorded on this version.')}
+                            >{busy === `sign:${p.id}` ? 'Signing...' : 'Sign here'}</button>
+                            <span className="signdate"></span>
+                          </>
                         )}
                       </div>
                       <span className={`status-sm ${sig ? 'st-signed' : 'st-await'}`}>{sig ? 'Signed' : 'Awaiting signature'}</span>
@@ -522,8 +617,16 @@ export default function EngagementCharterPage() {
 // Renders the comments/suggestions logged against a section and the add form.
 // Managers (lead / super_coach) see Accept / Decline actions. The actual
 // network calls are wired in a later step.
-function CommentThread({ sectionKey, comments, canManage, slug }) {
+function CommentThread({ sectionKey, comments, canManage, clientId, charterId, busy, onAdd, onResolve }) {
+  const [draft, setDraft] = useState('')
   const mine = (comments || []).filter((c) => (c.section_key || 'commitment') === sectionKey)
+  const canPost = !!charterId && draft.trim().length > 0 && busy !== 'comment'
+
+  function submit(kind) {
+    if (!canPost) return
+    onAdd(kind, draft.trim())
+    setDraft('')
+  }
   const openSuggestions = mine.filter((c) => c.kind === 'suggestion' && c.status === 'open').length
   return (
     <div className="comments">
@@ -539,9 +642,12 @@ function CommentThread({ sectionKey, comments, canManage, slug }) {
               <div className="ctext">{c.body}</div>
               {canManage && c.kind === 'suggestion' && c.status === 'open' ? (
                 <div className="cact">
-                  <button className="mini pri" type="button" data-action="accept" data-comment={c.id} disabled>Accept &amp; edit</button>
-                  <button className="mini" type="button" data-action="reply" data-comment={c.id} disabled>Reply</button>
-                  <button className="mini" type="button" data-action="decline" data-comment={c.id} disabled>Decline</button>
+                  <button className="mini pri" type="button" disabled={busy === `resolve:${c.id}`}
+                    onClick={() => onResolve(c.id, 'accepted')}>Accept</button>
+                  <button className="mini" type="button" disabled={busy === `resolve:${c.id}`}
+                    onClick={() => onResolve(c.id, 'noted')}>Note it</button>
+                  <button className="mini" type="button" disabled={busy === `resolve:${c.id}`}
+                    onClick={() => onResolve(c.id, 'declined')}>Decline</button>
                   <span className="consult-tag">Consultant only</span>
                 </div>
               ) : null}
@@ -550,9 +656,20 @@ function CommentThread({ sectionKey, comments, canManage, slug }) {
         )
       })}
       <div className="addcmt">
-        <input type="text" placeholder="Add a comment or suggest a change to this section..." data-section={sectionKey} disabled />
-        <button className="mini" type="button" data-action="comment" data-section={sectionKey} disabled>Comment</button>
-        <button className="mini pri" type="button" data-action="suggest" data-section={sectionKey} disabled>Suggest change</button>
+        <input
+          type="text"
+          placeholder="Add a comment or suggest a change to this section..."
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') submit('comment') }}
+          disabled={!charterId || busy === 'comment'}
+        />
+        <button className="mini" type="button" disabled={!canPost} onClick={() => submit('comment')}>
+          {busy === 'comment' ? 'Saving...' : 'Comment'}
+        </button>
+        <button className="mini pri" type="button" disabled={!canPost} onClick={() => submit('suggestion')}>
+          Suggest change
+        </button>
       </div>
     </div>
   )
