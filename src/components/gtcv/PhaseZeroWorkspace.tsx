@@ -357,7 +357,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         title="Assumption Dump Canvas"
         question="What are we already doing, and what has to be true for it to work?"
         purposeText="List every activity the organisation runs. For each one, name what it delivers, who pays for it today, the assumption sitting underneath it, and what evidence would prove that assumption wrong."
-        right={editable ? <button style={addButton} onClick={addAssumption}>+ Add activity</button> : null}
+        right={editable ? <button type="button" style={addButton} onClick={addAssumption}>+ Add activity</button> : null}
       >
         {assumptions.length === 0 ? (
           <div style={emptyNote}>No activities listed yet.</div>
@@ -382,7 +382,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                     <td style={td}><TextCell value={r.who_pays} canManage={editable} placeholder="Who pays for it now" onCommit={(v) => updAssumption(r.id, { who_pays: v })} /></td>
                     <td style={td}><TextCell value={r.assumption} canManage={editable} placeholder="What has to be true" onCommit={(v) => updAssumption(r.id, { assumption: v })} /></td>
                     <td style={td}><TextCell value={r.disproof} canManage={editable} placeholder="Evidence that would kill it" onCommit={(v) => updAssumption(r.id, { disproof: v })} /></td>
-                    {editable && <td style={td}><button style={delButton} title="Delete this row" onClick={() => delAssumption(r.id)}>Delete</button></td>}
+                    {editable && <td style={td}><button type="button" style={delButton} title="Delete this row" onClick={() => delAssumption(r.id)}>Delete</button></td>}
                   </tr>
                 ))}
               </tbody>
@@ -397,7 +397,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         title="Problem Owner Budget Matrix"
         question="Who has this problem, and who controls the money to fix it?"
         purposeText="For each problem implied by the activity above, name who experiences it, who is accountable for it, who controls the budget, what it costs them not to solve it, and the mechanism through which money would actually be released."
-        right={editable ? <button style={addButton} onClick={addOwner}>+ Add problem</button> : null}
+        right={editable ? <button type="button" style={addButton} onClick={addOwner}>+ Add problem</button> : null}
       >
         <div style={strip}>
           <span style={pill(C.tintCyan, C.navy)}>{owners.length} problem{owners.length === 1 ? '' : 's'}</span>
@@ -446,7 +446,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                       </td>
                       <td style={td}><TextCell value={r.cost_of_not_solving} canManage={editable} placeholder="What it costs them to leave it" onCommit={(v) => updOwner(r.id, { cost_of_not_solving: v })} /></td>
                       <td style={td}><TextCell value={r.budget_mechanism} canManage={editable} placeholder="How the money is released" onCommit={(v) => updOwner(r.id, { budget_mechanism: v })} /></td>
-                      {editable && <td style={td}><button style={delButton} title="Delete this row" onClick={() => delOwner(r.id)}>Delete</button></td>}
+                      {editable && <td style={td}><button type="button" style={delButton} title="Delete this row" onClick={() => delOwner(r.id)}>Delete</button></td>}
                     </tr>
                   )
                 })}
@@ -462,7 +462,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         title="Hypothesis Shortlist Board"
         question="Which of these are worth testing, and which are we carrying out of habit?"
         purposeText="Score each emerging hypothesis 1 to 5 on Urgency, Ownership clarity, Willingness to pay and Access. The total is out of 20. Only the top 3 to 5 advance out of Phase 0."
-        right={editable ? <button style={addButton} onClick={addHypothesis}>+ Add hypothesis</button> : null}
+        right={editable ? <button type="button" style={addButton} onClick={addHypothesis}>+ Add hypothesis</button> : null}
       >
         <div style={strip}>
           <span style={pill(C.tintCyan, C.navy)}>{hypotheses.length} on the board</span>
@@ -529,7 +529,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                         </label>
                       </td>
                       <td style={td}><TextCell value={r.notes} canManage={editable} placeholder="Why this score" onCommit={(v) => updHypothesis(r.id, { notes: v })} /></td>
-                      {editable && <td style={td}><button style={delButton} title="Delete this row" onClick={() => delHypothesis(r.id)}>Delete</button></td>}
+                      {editable && <td style={td}><button type="button" style={delButton} title="Delete this row" onClick={() => delHypothesis(r.id)}>Delete</button></td>}
                     </tr>
                   )
                 })}
@@ -545,7 +545,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         title="Signal vs Story Board"
         question="What did we actually see, and what are we telling ourselves?"
         purposeText="Split each statement in two. A signal is something observed: a behaviour, a payment, a refusal, a document. A story is believed but not observed. Only signals may carry weight in a hypothesis."
-        right={editable ? <button style={addButton} onClick={addSignal}>+ Add item</button> : null}
+        right={editable ? <button type="button" style={addButton} onClick={addSignal}>+ Add item</button> : null}
       >
         <div style={strip}>
           <span style={pill(C.green, 'var(--cv-on-accent)')}>{signalCount} signal{signalCount === 1 ? '' : 's'}</span>
@@ -585,7 +585,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                         )}
                       </td>
                       <td style={td}><TextCell value={r.source} canManage={editable} placeholder="Who said it, where" onCommit={(v) => updSignal(r.id, { source: v })} /></td>
-                      {editable && <td style={td}><button style={delButton} title="Delete this row" onClick={() => delSignal(r.id)}>Delete</button></td>}
+                      {editable && <td style={td}><button type="button" style={delButton} title="Delete this row" onClick={() => delSignal(r.id)}>Delete</button></td>}
                     </tr>
                   )
                 })}
@@ -601,7 +601,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         title="Continue / Pause / Kill Table"
         question="What continues, what pauses, and what stops here?"
         purposeText="Every activity must land somewhere. Give each one a decision, a one sentence rationale, and the decision point it travels to next. An activity with no landing is unfinished Phase 0 work."
-        right={editable ? <button style={addButton} onClick={addDecision}>+ Add activity</button> : null}
+        right={editable ? <button type="button" style={addButton} onClick={addDecision}>+ Add activity</button> : null}
       >
         <div style={strip}>
           <span style={pill(C.green, 'var(--cv-on-accent)')}>{decisionSummary.counts.continue} continue</span>
@@ -674,7 +674,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                           <div style={{ marginTop: '0.3rem', fontSize: '0.8rem', color: C.amber, fontWeight: 600 }}>Name the gate this travels to.</div>
                         )}
                       </td>
-                      {editable && <td style={td}><button style={delButton} title="Delete this row" onClick={() => delDecision(r.id)}>Delete</button></td>}
+                      {editable && <td style={td}><button type="button" style={delButton} title="Delete this row" onClick={() => delDecision(r.id)}>Delete</button></td>}
                     </tr>
                   )
                 })}

@@ -139,12 +139,26 @@ export default function ABTestingLog({ clientId, canManage }) {
   const load = useCallback(async () => {
     if (!clientId) { setRows([]); setLoading(false); return }
     setLoading(true)
-    const { data, error } = await supabase
-      .from(TABLE).select('*').eq('client_id', clientId)
-      .order('sort_order', { ascending: true }).order('created_at', { ascending: true })
-    if (error) setSave({ ok: false, text: `Could not load the log. ${error.message}` })
-    setRows(data || [])
-    setLoading(false)
+    try {
+      const { data, error } = await supabase
+        .from(TABLE).select('*').eq('client_id', clientId)
+        .order('sort_order', { ascending: true }).order('created_at', { ascending: true })
+      if (error) {
+        // Keep what is on screen. Blanking the table would say the log is
+        // empty, which is a different and worse claim than the read failing.
+        console.error('ABTestingLog: load failed', error)
+        setSave({ ok: false, text: 'Could not load the log. What you can see may be out of date.' })
+        return
+      }
+      setSave(null)
+      setRows(data || [])
+    } catch (e) {
+      console.error('ABTestingLog: load threw', e)
+      setSave({ ok: false, text: 'Could not load the log. What you can see may be out of date.' })
+    } finally {
+      // Every path, so a thrown request cannot leave this on Loading forever.
+      setLoading(false)
+    }
   }, [clientId])
 
   useEffect(() => { load() }, [load])

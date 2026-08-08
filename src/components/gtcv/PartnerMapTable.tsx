@@ -96,16 +96,29 @@ export default function PartnerMapTable({ clientId, canManage }) {
     async function load() {
       if (!clientId) { setRows([]); setLoading(false); return }
       setLoading(true)
-      const { data, error } = await supabase
-        .from(TABLE)
-        .select('*')
-        .eq('client_id', clientId)
-        .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: true })
-      if (cancelled) return
-      if (error) setErr('Could not load the partner map: ' + error.message)
-      else { setErr(null); setRows(data || []) }
-      setLoading(false)
+      // setLoading(false) belongs in a finally. Left after the await, a thrown
+      // error, for example an aborted request, skips it and the surface sits on
+      // its loading message forever with nothing to say why.
+      try {
+        const { data, error } = await supabase
+          .from(TABLE)
+          .select('*')
+          .eq('client_id', clientId)
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: true })
+        if (cancelled) return
+        if (error) {
+          console.error('PartnerMapTable: load failed', error)
+          setErr('Could not load the partner map. Try again.')
+        }
+        else { setErr(null); setRows(data || []) }
+      } catch (e) {
+        if (cancelled) return
+        console.error('PartnerMapTable: load threw', e)
+        setErr('Could not load the partner map. Try again.')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
     load()
     return () => { cancelled = true }
@@ -208,8 +221,8 @@ export default function PartnerMapTable({ clientId, canManage }) {
               {pill.text}
             </span>
           )}
-          {canManage && pendingCount > 0 && <button style={solidBtn} onClick={saveAll}>Save</button>}
-          {canManage && <button style={ghostBtn} onClick={addRow} disabled={busy}>+ Add row</button>}
+          {canManage && pendingCount > 0 && <button type="button" style={solidBtn} onClick={saveAll}>Save</button>}
+          {canManage && <button type="button" style={ghostBtn} onClick={addRow} disabled={busy}>+ Add row</button>}
         </div>
       </div>
 
@@ -241,7 +254,7 @@ export default function PartnerMapTable({ clientId, canManage }) {
             List every organisation already in the picture, including the ones that compete
             for the same buyer. Categorise before judging.
           </div>
-          {canManage && <button style={solidBtn} onClick={addRow} disabled={busy}>+ Add the first partner</button>}
+          {canManage && <button type="button" style={solidBtn} onClick={addRow} disabled={busy}>+ Add the first partner</button>}
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
@@ -291,7 +304,7 @@ export default function PartnerMapTable({ clientId, canManage }) {
                   ))}
                   {canManage && (
                     <td style={{ ...td, textAlign: 'right' }}>
-                      <button style={delBtn} onClick={() => removeRow(r.id)} title="Delete this row">x</button>
+                      <button type="button" style={delBtn} onClick={() => removeRow(r.id)} title="Delete this row">x</button>
                     </td>
                   )}
                 </tr>

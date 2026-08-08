@@ -63,21 +63,42 @@ export default function EngagementTracker({ clientId, canManage }) {
   const [saving, setSaving] = useState(null)
   const [note, setNote] = useState(null)
 
-  async function load() {
-    const { data, error } = await supabase
-      .from('canvas_decision_points')
-      .select('id,dp_id,label,status,evidence_summary,priority_action,last_reviewed_at')
-      .eq('client_id', clientId)
-    if (error) { setNote('Could not load the tracker. ' + error.message); setLoading(false); return }
-    const byDp = new Map((data || []).map((r) => [r.dp_id, r]))
-    setRows(ORDER.map((dp) => byDp.get(dp) || {
-      id: `${clientId}-${dp}`, dp_id: dp, label: LABEL[dp], status: 'not_started',
-      evidence_summary: '', priority_action: '', last_reviewed_at: null,
-    }))
-    setLoading(false)
+  // The cancelled flag matters here because a coach switching between clients
+  // can have two reads in flight. Without it the slower one wins and the
+  // tracker shows the previous client's gates under the current client's name.
+  async function load(cancelled) {
+    setLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('canvas_decision_points')
+        .select('id,dp_id,label,status,evidence_summary,priority_action,last_reviewed_at')
+        .eq('client_id', clientId)
+      if (cancelled()) return
+      if (error) {
+        console.error('EngagementTracker: load failed', error)
+        setNote('Could not load the tracker. Try again.')
+        return
+      }
+      setNote(null)
+      const byDp = new Map((data || []).map((r) => [r.dp_id, r]))
+      setRows(ORDER.map((dp) => byDp.get(dp) || {
+        id: `${clientId}-${dp}`, dp_id: dp, label: LABEL[dp], status: 'not_started',
+        evidence_summary: '', priority_action: '', last_reviewed_at: null,
+      }))
+    } catch (e) {
+      if (cancelled()) return
+      console.error('EngagementTracker: load threw', e)
+      setNote('Could not load the tracker. Try again.')
+    } finally {
+      if (!cancelled()) setLoading(false)
+    }
   }
 
-  useEffect(() => { if (clientId) load() }, [clientId])
+  useEffect(() => {
+    let off = false
+    if (clientId) load(() => off)
+    return () => { off = true }
+  }, [clientId])
 
   async function save(row, patch) {
     setSaving(row.dp_id)

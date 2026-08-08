@@ -169,6 +169,7 @@ export default function AssistPanel({
           </div>
 
           <textarea
+            aria-label={`${title}, draft to read and edit before accepting`}
             style={{
               width: '100%', minHeight: 200, padding: '0.6rem 0.7rem',
               border: `1px solid ${C.border}`, borderRadius: 8, background: C.white,

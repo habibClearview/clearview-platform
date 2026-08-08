@@ -113,13 +113,25 @@ export default function PilotCapture({ clientId, canManage }) {
   const load = useCallback(async () => {
     if (!clientId) { setRows([]); setLoading(false); return }
     setLoading(true)
-    const { data, error } = await supabase
-      .from(TABLE).select('*').eq('client_id', clientId)
-      .order('iteration', { ascending: true }).order('client_number', { ascending: true })
-      .order('sort_order', { ascending: true }).order('created_at', { ascending: true })
-    if (error) setSave({ ok: false, text: `Could not load the pilot records. ${error.message}` })
-    setRows(data || [])
-    setLoading(false)
+    try {
+      const { data, error } = await supabase
+        .from(TABLE).select('*').eq('client_id', clientId)
+        .order('iteration', { ascending: true }).order('client_number', { ascending: true })
+        .order('sort_order', { ascending: true }).order('created_at', { ascending: true })
+      if (error) {
+        console.error('PilotCapture: load failed', error)
+        setSave({ ok: false, text: 'Could not load the pilot records. What you can see may be out of date.' })
+        return
+      }
+      setSave(null)
+      setRows(data || [])
+    } catch (e) {
+      console.error('PilotCapture: load threw', e)
+      setSave({ ok: false, text: 'Could not load the pilot records. What you can see may be out of date.' })
+    } finally {
+      // Every path, so a thrown request cannot leave this on Loading forever.
+      setLoading(false)
+    }
   }, [clientId])
 
   useEffect(() => { load() }, [load])

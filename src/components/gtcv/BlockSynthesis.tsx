@@ -166,13 +166,17 @@ export default function BlockSynthesis({ clientId, dpId, canManage }) {
       ) : null}
 
       <div>
-        <label style={{
-          ...mono, fontSize: '0.72rem', letterSpacing: '.1em', textTransform: 'uppercase',
-          color: C.slate, display: 'block', marginBottom: 6,
-        }}>
+        <label
+          htmlFor={`gate-synthesis-${dpId}`}
+          style={{
+            ...mono, fontSize: '0.72rem', letterSpacing: '.1em', textTransform: 'uppercase',
+            color: C.slate, display: 'block', marginBottom: 6,
+          }}
+        >
           What this gate established
         </label>
         <textarea
+          id={`gate-synthesis-${dpId}`}
           value={text}
           onChange={(e) => setText(e.target.value)}
           readOnly={!canManage}
@@ -187,7 +191,7 @@ export default function BlockSynthesis({ clientId, dpId, canManage }) {
         />
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
           {canManage ? (
-            <button
+            <button type="button"
               onClick={save}
               disabled={busy || !dirty}
               style={{

@@ -623,11 +623,25 @@ export default function SessionPlanner({ clientId, canManage }) {
     const s = sessions.find((x) => x.id === id)
     const name = s && s.title ? s.title : 'this session'
     if (typeof window !== 'undefined' && !window.confirm(`Delete ${name} from the plan?`)) return
+    // Hide it at once so the plan feels responsive, but keep what was removed.
+    // A failed delete used to leave the session hidden while the row was still
+    // in the database, so the coach saw an error and a plan that disagreed with
+    // it until they reloaded.
+    const removedSession = s
+    const removedAttendance = attendance.filter((a) => a.session_id === id)
+    const removedDirty = dirty[id]
+
     setSessions((prev) => prev.filter((x) => x.id !== id))
     setAttendance((prev) => prev.filter((a) => a.session_id !== id))
     setDirty((prev) => { const next = { ...prev }; delete next[id]; return next })
+
     const { error } = await supabase.from(SESSIONS_TABLE).delete().eq('id', id)
-    if (error) reportError('Could not delete the session', error)
+    if (error) {
+      if (removedSession) setSessions((prev) => [...prev, removedSession])
+      if (removedAttendance.length) setAttendance((prev) => [...prev, ...removedAttendance])
+      if (removedDirty) setDirty((prev) => ({ ...prev, [id]: removedDirty }))
+      reportError('Could not delete the session', error)
+    }
     else setErr(null)
   }
 
@@ -715,6 +729,7 @@ export default function SessionPlanner({ clientId, canManage }) {
                 >
                   <input
                     type="checkbox"
+                    aria-label={`${party.name} attended`}
                     checked={attended}
                     disabled={!canManage}
                     onChange={() => canManage && toggleAttended(session, party)}
@@ -757,6 +772,7 @@ export default function SessionPlanner({ clientId, canManage }) {
                 style={{ ...cell, fontWeight: 600 }}
                 value={session.title || ''}
                 placeholder="Session name"
+                aria-label="Session name"
                 onChange={(e) => setField(session.id, 'title', e.target.value)}
                 onBlur={() => saveSession(session.id)}
               />
@@ -771,6 +787,7 @@ export default function SessionPlanner({ clientId, canManage }) {
               <select
                 style={cell}
                 value={session.session_kind || ''}
+                aria-label="Room for this session"
                 onChange={(e) => changeKind(session, e.target.value)}
               >
                 <option value="">Not set</option>
@@ -786,6 +803,7 @@ export default function SessionPlanner({ clientId, canManage }) {
             {canManage ? (
               <input
                 type="date" style={cell} value={session.planned_date || ''}
+                aria-label="Planned date"
                 onChange={(e) => setField(session.id, 'planned_date', e.target.value)}
                 onBlur={() => saveSession(session.id)}
               />
@@ -797,6 +815,7 @@ export default function SessionPlanner({ clientId, canManage }) {
             {canManage ? (
               <input
                 type="date" style={cell} value={session.held_date || ''}
+                aria-label="Date it was held"
                 onChange={(e) => setField(session.id, 'held_date', e.target.value)}
                 onBlur={() => saveSession(session.id)}
               />
@@ -809,6 +828,7 @@ export default function SessionPlanner({ clientId, canManage }) {
               <input
                 type="number" min="0" style={cell} value={session.duration_minutes ?? ''}
                 placeholder="e.g. 120"
+                aria-label="Length in minutes"
                 onChange={(e) => setField(session.id, 'duration_minutes', e.target.value)}
                 onBlur={() => saveSession(session.id)}
               />
@@ -821,6 +841,7 @@ export default function SessionPlanner({ clientId, canManage }) {
               <select
                 style={{ ...cell, color: statusColor(session.status) }}
                 value={session.status || 'planned'}
+                aria-label="Session status"
                 onChange={(e) => { setField(session.id, 'status', e.target.value); setTimeout(() => saveSession(session.id), 0) }}
               >
                 {STATUS_OPTIONS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
@@ -834,7 +855,7 @@ export default function SessionPlanner({ clientId, canManage }) {
 
           {canManage && (
             <div style={{ paddingTop: '1.1rem' }}>
-              <button style={delBtn} onClick={() => removeSession(session.id)} title="Delete this session">x</button>
+              <button type="button" style={delBtn} onClick={() => removeSession(session.id)} title="Delete this session">x</button>
             </div>
           )}
         </div>
@@ -848,7 +869,8 @@ export default function SessionPlanner({ clientId, canManage }) {
               style={{ ...cell, minHeight: 54, resize: 'vertical', lineHeight: 1.35 }}
               value={session.purpose || ''}
               placeholder="What this session must produce"
-              onChange={(e) => setField(session.id, 'purpose', e.target.value)}
+              aria-label="What this session is for"
+                onChange={(e) => setField(session.id, 'purpose', e.target.value)}
               onBlur={() => saveSession(session.id)}
             />
           ) : <div style={readCell}>{session.purpose || ''}</div>}
@@ -861,14 +883,15 @@ export default function SessionPlanner({ clientId, canManage }) {
               style={{ ...cell, minHeight: 44, resize: 'vertical', lineHeight: 1.35 }}
               value={session.notes || ''}
               placeholder=""
-              onChange={(e) => setField(session.id, 'notes', e.target.value)}
+              aria-label="Session notes"
+                onChange={(e) => setField(session.id, 'notes', e.target.value)}
               onBlur={() => saveSession(session.id)}
             />
           ) : <div style={readCell}>{session.notes || ''}</div>}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
-          <button style={ghostBtn} onClick={() => setOpenId(open ? null : session.id)}>
+          <button type="button" style={ghostBtn} onClick={() => setOpenId(open ? null : session.id)}>
             {open ? 'Hide attendance' : 'Attendance'}
           </button>
           {flagged && (
@@ -905,7 +928,7 @@ export default function SessionPlanner({ clientId, canManage }) {
                     </div>
                     <div style={{ ...hint, marginTop: '0.15rem' }}>{t.purpose}</div>
                   </div>
-                  <button
+                  <button type="button"
                     style={already ? { ...ghostBtn, opacity: 0.5, cursor: 'default' } : ghostBtn}
                     disabled={already || busy}
                     onClick={() => addSession(dpId, t)}
@@ -918,8 +941,8 @@ export default function SessionPlanner({ clientId, canManage }) {
           </div>
         )}
         <div style={{ marginTop: '0.7rem', display: 'flex', gap: '0.5rem' }}>
-          <button style={ghostBtn} onClick={() => addSession(dpId, null)} disabled={busy}>+ Blank session</button>
-          <button style={ghostBtn} onClick={() => setPickerDp(null)}>Close</button>
+          <button type="button" style={ghostBtn} onClick={() => addSession(dpId, null)} disabled={busy}>+ Blank session</button>
+          <button type="button" style={ghostBtn} onClick={() => setPickerDp(null)}>Close</button>
         </div>
       </div>
     )
@@ -944,7 +967,7 @@ export default function SessionPlanner({ clientId, canManage }) {
               {p.text}
             </span>
           )}
-          {canManage && pendingCount > 0 && <button style={solidBtn} onClick={saveAll}>Save</button>}
+          {canManage && pendingCount > 0 && <button type="button" style={solidBtn} onClick={saveAll}>Save</button>}
         </div>
       </div>
 
@@ -976,7 +999,7 @@ export default function SessionPlanner({ clientId, canManage }) {
                   <span style={{ ...mono, marginLeft: '0.6rem' }}>{list.length} session{list.length === 1 ? '' : 's'}</span>
                 </div>
                 {canManage && g.id !== '__unassigned' && (
-                  <button style={ghostBtn} onClick={() => setPickerDp(pickerDp === g.id ? null : g.id)}>
+                  <button type="button" style={ghostBtn} onClick={() => setPickerDp(pickerDp === g.id ? null : g.id)}>
                     {pickerDp === g.id ? 'Close' : '+ Add session'}
                   </button>
                 )}

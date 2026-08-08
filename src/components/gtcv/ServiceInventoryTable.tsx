@@ -102,16 +102,29 @@ export default function ServiceInventoryTable({ clientId, canManage }) {
     async function load() {
       if (!clientId) { setRows([]); setLoading(false); return }
       setLoading(true)
-      const { data, error } = await supabase
-        .from(TABLE)
-        .select('*')
-        .eq('client_id', clientId)
-        .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: true })
-      if (cancelled) return
-      if (error) setErr('Could not load the service inventory: ' + error.message)
-      else { setErr(null); setRows(data || []) }
-      setLoading(false)
+      // setLoading(false) belongs in a finally. Left after the await, a thrown
+      // error, for example an aborted request, skips it and the surface sits on
+      // its loading message forever with nothing to say why.
+      try {
+        const { data, error } = await supabase
+          .from(TABLE)
+          .select('*')
+          .eq('client_id', clientId)
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: true })
+        if (cancelled) return
+        if (error) {
+          console.error('ServiceInventoryTable: load failed', error)
+          setErr('Could not load the service inventory. Try again.')
+        }
+        else { setErr(null); setRows(data || []) }
+      } catch (e) {
+        if (cancelled) return
+        console.error('ServiceInventoryTable: load threw', e)
+        setErr('Could not load the service inventory. Try again.')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
     load()
     return () => { cancelled = true }
@@ -214,8 +227,8 @@ export default function ServiceInventoryTable({ clientId, canManage }) {
               {pill.text}
             </span>
           )}
-          {canManage && pendingCount > 0 && <button style={solidBtn} onClick={saveAll}>Save</button>}
-          {canManage && <button style={ghostBtn} onClick={addRow} disabled={busy}>+ Add row</button>}
+          {canManage && pendingCount > 0 && <button type="button" style={solidBtn} onClick={saveAll}>Save</button>}
+          {canManage && <button type="button" style={ghostBtn} onClick={addRow} disabled={busy}>+ Add row</button>}
         </div>
       </div>
 
@@ -249,7 +262,7 @@ export default function ServiceInventoryTable({ clientId, canManage }) {
             Start with everything the organisation delivers today, including the work nobody
             calls a service. The decision column comes last.
           </div>
-          {canManage && <button style={solidBtn} onClick={addRow} disabled={busy}>+ Add the first service</button>}
+          {canManage && <button type="button" style={solidBtn} onClick={addRow} disabled={busy}>+ Add the first service</button>}
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
@@ -299,7 +312,7 @@ export default function ServiceInventoryTable({ clientId, canManage }) {
                   ))}
                   {canManage && (
                     <td style={{ ...td, textAlign: 'right' }}>
-                      <button style={delBtn} onClick={() => removeRow(r.id)} title="Delete this row">x</button>
+                      <button type="button" style={delBtn} onClick={() => removeRow(r.id)} title="Delete this row">x</button>
                     </td>
                   )}
                 </tr>

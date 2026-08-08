@@ -1,4 +1,25 @@
 -- ============================================================
+-- NOT A MIGRATION. Kept out of supabase/migrations on purpose.
+--
+-- This file is the three 2026_08_08 migrations concatenated so they can be
+-- pasted into the Supabase SQL editor in one go, which is how the first
+-- staging schema was applied. It is a convenience copy, not a source of truth.
+--
+-- It lived in supabase/migrations, where the runner would have applied the
+-- same DDL a second time and where a fix to any of the three sources had to be
+-- remembered here as well. Nothing detected the divergence when it was not.
+-- The three files it copies are the ones to edit:
+--
+--   supabase/migrations/2026_08_08_gtcv_engagement_commercial_layer.sql
+--   supabase/migrations/2026_08_08_charter_comments.sql
+--   supabase/migrations/2026_08_08_engagement_meetings.sql
+--
+-- Later corrections, in particular the composite foreign keys added in
+-- 2026_08_09_charter_child_integrity.sql, are NOT reflected below. Apply the
+-- real migrations in order rather than this file.
+-- ============================================================
+
+-- ============================================================
 -- GtCV engagement layer: APPLY ALL, one file.
 --
 -- This is the three GtCV migrations combined so they can be applied

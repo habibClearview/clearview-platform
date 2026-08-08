@@ -157,7 +157,7 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
           </div>
         </div>
         {canManage && !adding ? (
-          <button style={btn(C.teal, true)} onClick={() => setAdding(true)}>Add a party</button>
+          <button type="button" style={btn(C.teal, true)} onClick={() => setAdding(true)}>Add a party</button>
         ) : null}
       </div>
 
@@ -179,10 +179,10 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
         <div style={{ marginTop: '0.9rem', border: `1px dashed ${C.border}`, borderRadius: 9, padding: '0.8rem' }}>
           <PartyFields value={draft} onChange={setDraft} />
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.7rem' }}>
-            <button style={btn(C.teal, true)} onClick={add} disabled={busy === 'add' || !draft.name.trim()}>
+            <button type="button" style={btn(C.teal, true)} onClick={add} disabled={busy === 'add' || !draft.name.trim()}>
               {busy === 'add' ? 'Adding...' : 'Add'}
             </button>
-            <button style={btn(C.slate)} onClick={() => { setAdding(false); setDraft(BLANK) }}>Cancel</button>
+            <button type="button" style={btn(C.slate)} onClick={() => { setAdding(false); setDraft(BLANK) }}>Cancel</button>
           </div>
         </div>
       ) : null}
@@ -197,10 +197,10 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
               <div key={r.id} style={{ border: `1px solid ${C.teal}`, borderRadius: 9, padding: '0.8rem' }}>
                 <PartyFields value={editing} onChange={setEditing} />
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.7rem' }}>
-                  <button style={btn(C.teal, true)} onClick={saveEdit} disabled={busy === `edit:${r.id}`}>
+                  <button type="button" style={btn(C.teal, true)} onClick={saveEdit} disabled={busy === `edit:${r.id}`}>
                     {busy === `edit:${r.id}` ? 'Saving...' : 'Save'}
                   </button>
-                  <button style={btn(C.slate)} onClick={() => setEditing(null)}>Cancel</button>
+                  <button type="button" style={btn(C.slate)} onClick={() => setEditing(null)}>Cancel</button>
                 </div>
               </div>
             )
@@ -232,8 +232,8 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
                 </span>
                 {canManage ? (
                   <>
-                    <button style={btn(C.slate)} onClick={() => setEditing({ ...r })}>Edit</button>
-                    <button style={btn(C.red)} onClick={() => remove(r)} disabled={busy === `del:${r.id}`}>
+                    <button type="button" style={btn(C.slate)} onClick={() => setEditing({ ...r })}>Edit</button>
+                    <button type="button" style={btn(C.red)} onClick={() => remove(r)} disabled={busy === `del:${r.id}`}>
                       {busy === `del:${r.id}` ? 'Removing...' : 'Remove'}
                     </button>
                   </>

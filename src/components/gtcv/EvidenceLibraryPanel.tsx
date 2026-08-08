@@ -153,17 +153,27 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
     async function load() {
       if (!clientId) { setRows([]); setLoading(false); return }
       setLoading(true)
-      // Load every row for the client, not just this gate, so the next
-      // reference number is correct even when the panel is filtered.
-      const { data, error } = await supabase
-        .from(TABLE)
-        .select('*')
-        .eq('client_id', clientId)
-        .order('reference', { ascending: true })
-      if (cancelled) return
-      if (error) setErr('Could not load the evidence library: ' + error.message)
-      else { setErr(null); setRows(data || []) }
-      setLoading(false)
+      // setLoading(false) belongs in a finally. Left after the await, a thrown
+      // error, for example an aborted request, skips it and the surface sits on
+      // its loading message forever with nothing to say why.
+      try {
+        // Load every row for the client, not just this gate, so the next
+        // reference number is correct even when the panel is filtered.
+        const { data, error } = await supabase
+          .from(TABLE)
+          .select('*')
+          .eq('client_id', clientId)
+          .order('reference', { ascending: true })
+        if (cancelled) return
+        if (error) setErr('Could not load the evidence library: ' + error.message)
+        else { setErr(null); setRows(data || []) }
+      } catch (e) {
+        if (cancelled) return
+        console.error('EvidenceLibraryPanel: load threw', e)
+        setErr('Could not load the evidence. Try again.')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
     load()
     return () => { cancelled = true }
@@ -319,9 +329,9 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
               {savePill.text}
             </span>
           )}
-          {canManage && pendingCount > 0 && <button style={solidBtn} onClick={saveAll}>Save</button>}
+          {canManage && pendingCount > 0 && <button type="button" style={solidBtn} onClick={saveAll}>Save</button>}
           {canManage && (
-            <button style={ghostBtn} onClick={addEntry} disabled={busy}>
+            <button type="button" style={ghostBtn} onClick={addEntry} disabled={busy}>
               + Add {nextReference(rows)}
             </button>
           )}
@@ -332,7 +342,7 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
       {notice && (
         <div style={{ background: C.alt, borderLeft: `3px solid ${C.amber}`, borderRadius: 8, padding: '0.6rem 0.85rem', margin: '0.6rem 0', fontSize: '1.01rem', color: C.navy, lineHeight: 1.45 }}>
           {notice}
-          <button style={{ ...ghostBtn, marginLeft: '0.6rem', borderColor: C.border, color: C.slate }} onClick={() => setNotice(null)}>Dismiss</button>
+          <button type="button" style={{ ...ghostBtn, marginLeft: '0.6rem', borderColor: C.border, color: C.slate }} onClick={() => setNotice(null)}>Dismiss</button>
         </div>
       )}
 
@@ -363,7 +373,7 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
             Record it as it is captured, not at the end. Be specific about what it shows, and use
             verbatim wherever you can.
           </div>
-          {canManage && <button style={solidBtn} onClick={addEntry} disabled={busy}>+ Add {nextReference(rows)}</button>}
+          {canManage && <button type="button" style={solidBtn} onClick={addEntry} disabled={busy}>+ Add {nextReference(rows)}</button>}
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
@@ -517,7 +527,7 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
 
                   {canManage && (
                     <td style={{ ...td, textAlign: 'right' }}>
-                      <button style={delBtn} onClick={() => removeEntry(r.id)} title="Delete this entry">x</button>
+                      <button type="button" style={delBtn} onClick={() => removeEntry(r.id)} title="Delete this entry">x</button>
                     </td>
                   )}
                 </tr>

@@ -159,16 +159,28 @@ export default function InterviewCaptureForm({ clientId, canManage }) {
     async function load() {
       if (!clientId) { setRows([]); setLoading(false); return }
       setLoading(true)
-      const { data, error } = await supabase
-        .from(TABLE)
-        .select('*')
-        .eq('client_id', clientId)
-        .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: false })
-      if (cancelled) return
-      if (error) setErr('Could not load the interview captures: ' + error.message)
-      else { setErr(null); setRows(data || []) }
-      setLoading(false)
+      try {
+        const { data, error } = await supabase
+          .from(TABLE)
+          .select('*')
+          .eq('client_id', clientId)
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: false })
+        if (cancelled) return
+        if (error) {
+          console.error('InterviewCaptureForm: load failed', error)
+          setErr('Could not load the interview captures. Try again.')
+        } else {
+          setErr(null); setRows(data || [])
+        }
+      } catch (e) {
+        if (cancelled) return
+        console.error('InterviewCaptureForm: load threw', e)
+        setErr('Could not load the interview captures. Try again.')
+      } finally {
+        // Every path, so a thrown request cannot leave this on Loading forever.
+        if (!cancelled) setLoading(false)
+      }
     }
     load()
     return () => { cancelled = true }
@@ -345,8 +357,8 @@ export default function InterviewCaptureForm({ clientId, canManage }) {
                 {savePill.text}
               </span>
             )}
-            {canManage && pendingCount > 0 && <button style={solidBtn} onClick={saveAll}>Save</button>}
-            {canManage && <button style={ghostBtn} onClick={addCapture} disabled={busy}>+ New capture</button>}
+            {canManage && pendingCount > 0 && <button type="button" style={solidBtn} onClick={saveAll}>Save</button>}
+            {canManage && <button type="button" style={ghostBtn} onClick={addCapture} disabled={busy}>+ New capture</button>}
           </div>
         </div>
 
@@ -380,7 +392,7 @@ export default function InterviewCaptureForm({ clientId, canManage }) {
               Start a capture as soon as the conversation ends. Read the Interview Briefing before
               going into the field.
             </div>
-            {canManage && <button style={solidBtn} onClick={addCapture} disabled={busy}>+ Start the first capture</button>}
+            {canManage && <button type="button" style={solidBtn} onClick={addCapture} disabled={busy}>+ Start the first capture</button>}
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -422,11 +434,11 @@ export default function InterviewCaptureForm({ clientId, canManage }) {
                         )}
                       </td>
                       <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <button style={ghostBtn} onClick={() => setOpenId(isOpen ? null : r.id)}>
+                        <button type="button" style={ghostBtn} onClick={() => setOpenId(isOpen ? null : r.id)}>
                           {isOpen ? 'Close' : 'Open'}
                         </button>
                         {canManage && (
-                          <button
+                          <button type="button"
                             style={{ ...ghostBtn, borderColor: C.border, color: C.red, marginLeft: '0.35rem' }}
                             onClick={() => removeCapture(r.id)}
                             title="Delete this capture"
@@ -460,10 +472,10 @@ export default function InterviewCaptureForm({ clientId, canManage }) {
               {open.status === 'submitted' ? (
                 <>
                   <span style={{ fontFamily: 'monospace', fontSize: '0.87rem', color: C.green, border: `1px solid ${C.green}`, borderRadius: 999, padding: '0.15rem 0.6rem' }}>Submitted</span>
-                  {canManage && <button style={ghostBtn} onClick={() => reopenCapture(open.id)}>Reopen as draft</button>}
+                  {canManage && <button type="button" style={ghostBtn} onClick={() => reopenCapture(open.id)}>Reopen as draft</button>}
                 </>
               ) : (
-                canManage && <button style={solidBtn} onClick={() => submitCapture(open.id)}>Submit capture</button>
+                canManage && <button type="button" style={solidBtn} onClick={() => submitCapture(open.id)}>Submit capture</button>
               )}
             </div>
           </div>
@@ -601,9 +613,9 @@ export default function InterviewCaptureForm({ clientId, canManage }) {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.2rem', flexWrap: 'wrap' }}>
-            {canManage && pendingCount > 0 && <button style={ghostBtn} onClick={saveAll}>Save changes</button>}
+            {canManage && pendingCount > 0 && <button type="button" style={ghostBtn} onClick={saveAll}>Save changes</button>}
             {canManage && open.status !== 'submitted' && (
-              <button style={solidBtn} onClick={() => submitCapture(open.id)}>Submit capture</button>
+              <button type="button" style={solidBtn} onClick={() => submitCapture(open.id)}>Submit capture</button>
             )}
           </div>
         </div>

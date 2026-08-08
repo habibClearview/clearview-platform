@@ -159,19 +159,44 @@ export default function PropositionBuilder({ clientId, canManage }) {
   async function load() {
     if (!clientId) { setRows([]); setTests([]); setSegments([]); setLoading(false); return }
     setLoading(true)
-    const [props, logs, segs] = await Promise.all([
-      supabase.from(TABLE).select('*').eq('client_id', clientId)
-        .order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
-      supabase.from(TESTS_TABLE).select('*').eq('client_id', clientId)
-        .order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
-      supabase.from(SEGMENTS_TABLE).select('id, segment_name').eq('client_id', clientId)
-        .order('sort_order', { ascending: true }),
-    ])
-    if (!alive.current) return
-    if (props.error) { setMsg(props.error.message); setStatus('error') } else { setRows(props.data || []) }
-    if (!logs.error) setTests(logs.data || [])
-    if (!segs.error) setSegments(segs.data || [])
-    setLoading(false)
+    try {
+      const [props, logs, segs] = await Promise.all([
+        supabase.from(TABLE).select('*').eq('client_id', clientId)
+          .order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
+        supabase.from(TESTS_TABLE).select('*').eq('client_id', clientId)
+          .order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
+        supabase.from(SEGMENTS_TABLE).select('id, segment_name').eq('client_id', clientId)
+          .order('sort_order', { ascending: true }),
+      ])
+      if (!alive.current) return
+      // Each failure is named. A silently empty test log or segment list reads
+      // as "nothing has been done yet", which is a different statement from
+      // "this did not load".
+      if (props.error) {
+        console.error('PropositionBuilder: propositions failed', props.error)
+        setMsg('Could not load the propositions. Try again.'); setStatus('error')
+      } else {
+        setRows(props.data || [])
+      }
+      if (logs.error) {
+        console.error('PropositionBuilder: tests failed', logs.error)
+        setMsg('Could not load the proposition tests, so the testing history is incomplete.'); setStatus('error')
+      } else {
+        setTests(logs.data || [])
+      }
+      if (segs.error) {
+        console.error('PropositionBuilder: segments failed', segs.error)
+        setMsg('Could not load the customer segments, so the segment list is incomplete.'); setStatus('error')
+      } else {
+        setSegments(segs.data || [])
+      }
+    } catch (e) {
+      if (!alive.current) return
+      console.error('PropositionBuilder: load threw', e)
+      setMsg('Could not load this surface. Try again.'); setStatus('error')
+    } finally {
+      if (alive.current) setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [clientId])
@@ -301,7 +326,7 @@ export default function PropositionBuilder({ clientId, canManage }) {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           {saveWord && <span style={{ ...LABEL, color: saveTone }}>{saveWord}</span>}
           {canManage && (
-            <button onClick={addProposition} disabled={adding} style={btn(C.green, true)}>
+            <button type="button" onClick={addProposition} disabled={adding} style={btn(C.green, true)}>
               {adding ? 'Adding...' : 'Add proposition'}
             </button>
           )}
@@ -403,9 +428,9 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
           />
           {canManage && (
             <>
-              <button style={btn(C.cyan)} onClick={() => bumpRevision(1)} title="Record that this proposition changed after a test">Record revision</button>
-              <button style={btn(C.slate)} onClick={() => bumpRevision(-1)} title="Undo the last revision count">Undo</button>
-              <button style={btn(C.red)} onClick={() => removeProposition(r)} title="Delete this proposition">x</button>
+              <button type="button" style={btn(C.cyan)} onClick={() => bumpRevision(1)} title="Record that this proposition changed after a test">Record revision</button>
+              <button type="button" style={btn(C.slate)} onClick={() => bumpRevision(-1)} title="Undo the last revision count">Undo</button>
+              <button type="button" style={btn(C.red)} onClick={() => removeProposition(r)} title="Delete this proposition">x</button>
             </>
           )}
         </div>
@@ -480,7 +505,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
               title="Shorter and more specific is the direction of travel. Under 60 words reads aloud well." />
             <Pill text={r.assembled_is_custom ? 'Edited by hand' : 'Assembled from the parts'} tone={r.assembled_is_custom ? C.cyan : C.slate} />
             {canManage && (
-              <button style={btn(C.cyan)} onClick={rebuild} title="Replace the wording with a fresh compose from the four parts">
+              <button type="button" style={btn(C.cyan)} onClick={rebuild} title="Replace the wording with a fresh compose from the four parts">
                 Rebuild from parts
               </button>
             )}
@@ -513,7 +538,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
               changed nothing is a test that taught nothing.
             </div>
           </div>
-          {canManage && <button style={btn(C.green)} onClick={() => addTest(r.id)}>Log a test</button>}
+          {canManage && <button type="button" style={btn(C.green)} onClick={() => addTest(r.id)}>Log a test</button>}
         </div>
 
         {tests.length === 0 ? (
@@ -573,7 +598,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
                     </td>
                     {canManage && (
                       <td style={{ ...td, textAlign: 'right' }}>
-                        <button style={btn(C.red)} onClick={() => removeTest(t)} title="Delete this test entry">x</button>
+                        <button type="button" style={btn(C.red)} onClick={() => removeTest(t)} title="Delete this test entry">x</button>
                       </td>
                     )}
                   </tr>

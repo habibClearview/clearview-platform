@@ -445,7 +445,7 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
           {STOPS.map((s) => {
             const st = gs[s.id] || 'not_started'
             const done = st === 'complete'
-            const now = s.id === currentId || (!currentId && false)
+            const now = s.id === currentId
             const cls = ['stop', done ? 'done' : '', now ? 'now' : ''].filter(Boolean).join(' ')
             const content = s.kind === 'symbol' ? (done ? '✓' : '·') : s.glyph
             return (
@@ -534,17 +534,31 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
           ['complete', 'Complete'],
           ['needs_revisiting', 'Needs revisiting'],
         ]
+        const closeDrawer = () => { setOpenDp(null); setFlash(null) }
         return (
+          // The overlay is a backdrop, not a control, so it is marked
+          // presentational and the dialog beside it carries the role. Escape
+          // closes it, because a drawer a keyboard user cannot dismiss is a
+          // drawer that traps them.
           <div
-            onClick={() => { setOpenDp(null); setFlash(null) }}
+            role="presentation"
+            onClick={closeDrawer}
+            onKeyDown={(e) => { if (e.key === 'Escape') closeDrawer() }}
             style={{
               position: 'fixed', inset: 0, background: 'rgba(11,20,32,.55)', zIndex: 60,
               display: 'flex', justifyContent: 'flex-end',
             }}
           >
             <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={`${b.title}, decision block`}
+              tabIndex={-1}
+              ref={(el) => { if (el) el.focus() }}
               onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => { if (e.key === 'Escape') closeDrawer() }}
               style={{
+                outline: 'none',
                 width: 'min(560px, 100%)', height: '100%', overflowY: 'auto',
                 background: 'var(--card)', color: 'var(--ink)', padding: '22px 24px 40px',
                 boxShadow: '-12px 0 40px rgba(0,0,0,.25)', fontFamily: 'var(--fb)',
@@ -594,7 +608,7 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
               {canManage ? (
                 <>
                   <h3 style={{ fontFamily: 'var(--fm)', fontSize: 10.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--gold)', margin: '24px 0 8px' }}>Move this gate</h3>
-                  <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--ink-faint)' }}>Only the lead consultant can move a gate. The next block opens once this one is complete.</p>
+                  <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--ink-faint)' }}>Moving a gate is the coaching team&apos;s, and /api/gate-status enforces the same rule when it saves. The next block opens once this one is complete.</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {OPTIONS.map(([val, lab]) => (
                       <button

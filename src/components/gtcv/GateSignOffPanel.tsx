@@ -138,22 +138,36 @@ export default function GateSignOffPanel({ clientId, dpId, canManage }) {
   const load = useCallback(async () => {
     if (!clientId || !dpId) { setRows([]); setParties([]); setLoading(false); return }
     setLoading(true)
-    const [sRes, pRes, uRes] = await Promise.all([
-      supabase.from(SIGNOFFS_TABLE).select('*').eq('client_id', clientId).eq('dp_id', dpId)
-        .order('signed_at', { ascending: true }),
-      supabase.from(PARTIES_TABLE).select('id, party_role, name, organisation, title, user_id, sort_order')
-        .eq('client_id', clientId).order('sort_order', { ascending: true }),
-      supabase.auth.getUser(),
-    ])
-    const firstErr = sRes.error || pRes.error
-    if (firstErr) setErr('Could not load the gate record: ' + firstErr.message)
-    else setErr(null)
-    const partyRows = pRes.data || []
-    setRows(sRes.data || [])
-    setParties(partyRows)
-    const userId = uRes?.data?.user?.id || null
-    setMe({ userId, party: userId ? partyRows.find((p) => p.user_id === userId) || null : null })
-    setLoading(false)
+    try {
+      const [sRes, pRes, uRes] = await Promise.all([
+        supabase.from(SIGNOFFS_TABLE).select('*').eq('client_id', clientId).eq('dp_id', dpId)
+          .order('signed_at', { ascending: true }),
+        supabase.from(PARTIES_TABLE).select('id, party_role, name, organisation, title, user_id, sort_order')
+          .eq('client_id', clientId).order('sort_order', { ascending: true }),
+        supabase.auth.getUser(),
+      ])
+      const firstErr = sRes.error || pRes.error
+      if (firstErr) {
+        // Say it plainly and stop. A gate panel showing no signatures because
+        // the read failed looks exactly like a gate nobody has signed, and one
+        // of those is a reason to chase people.
+        console.error('GateSignOffPanel: load failed', firstErr)
+        setErr('Could not load the gate record, so what you see may be incomplete. Reload before acting on it.')
+        return
+      }
+      setErr(null)
+      const partyRows = pRes.data || []
+      setRows(sRes.data || [])
+      setParties(partyRows)
+      const userId = uRes?.data?.user?.id || null
+      setMe({ userId, party: userId ? partyRows.find((p) => p.user_id === userId) || null : null })
+    } catch (e) {
+      console.error('GateSignOffPanel: load threw', e)
+      setErr('Could not load the gate record, so what you see may be incomplete. Reload before acting on it.')
+    } finally {
+      // Every path, so a thrown request cannot leave this on Loading forever.
+      setLoading(false)
+    }
   }, [clientId, dpId])
 
   useEffect(() => { load() }, [load])
@@ -307,10 +321,10 @@ export default function GateSignOffPanel({ clientId, dpId, canManage }) {
                       <span style={{ fontFamily: 'monospace', fontSize: '0.87rem', color: C.amber }}>Outstanding</span>
                     )}
                     {!done && myRole === role && (
-                      <button style={solidBtn} onClick={signAsMe} disabled={busy}>Sign</button>
+                      <button type="button" style={solidBtn} onClick={signAsMe} disabled={busy}>Sign</button>
                     )}
                     {!done && myRole !== role && canManage && (
-                      <button style={ghostBtn} onClick={() => recordSignatureFor(role)} disabled={busy}>
+                      <button type="button" style={ghostBtn} onClick={() => recordSignatureFor(role)} disabled={busy}>
                         Record signature
                       </button>
                     )}
@@ -354,7 +368,7 @@ export default function GateSignOffPanel({ clientId, dpId, canManage }) {
                 >
                   Authorise the next zone
                 </button>
-                <button style={warnBtn} onClick={() => setReturnOpen(!returnOpen)} disabled={busy}>
+                <button type="button" style={warnBtn} onClick={() => setReturnOpen(!returnOpen)} disabled={busy}>
                   Return this gate
                 </button>
               </div>
@@ -378,8 +392,8 @@ export default function GateSignOffPanel({ clientId, dpId, canManage }) {
                 onChange={(e) => setReturnNote(e.target.value)}
               />
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <button style={warnBtn} onClick={submitReturn} disabled={busy}>Return the gate</button>
-                <button style={ghostBtn} onClick={() => { setReturnOpen(false); setReturnNote('') }}>Cancel</button>
+                <button type="button" style={warnBtn} onClick={submitReturn} disabled={busy}>Return the gate</button>
+                <button type="button" style={ghostBtn} onClick={() => { setReturnOpen(false); setReturnNote('') }}>Cancel</button>
               </div>
             </div>
           )}

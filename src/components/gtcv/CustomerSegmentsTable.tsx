@@ -289,7 +289,7 @@ export default function CustomerSegmentsTable({ clientId, canManage }) {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           {saveWord && <span style={{ ...LABEL, color: saveTone }}>{saveWord}</span>}
           {canManage && (
-            <button onClick={addRow} disabled={adding} style={btn(C.green, true)}>
+            <button type="button" onClick={addRow} disabled={adding} style={btn(C.green, true)}>
               {adding ? 'Adding...' : 'Add segment'}
             </button>
           )}
@@ -415,7 +415,7 @@ export default function CustomerSegmentsTable({ clientId, canManage }) {
                       </td>
                       {canManage && (
                         <td style={{ ...td, textAlign: 'right' }}>
-                          <button onClick={() => removeRow(r)} style={btn(C.red)} title="Delete this segment">x</button>
+                          <button type="button" onClick={() => removeRow(r)} style={btn(C.red)} title="Delete this segment">x</button>
                         </td>
                       )}
                     </tr>

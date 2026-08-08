@@ -126,16 +126,37 @@ export default function ProblemScoringTable({ clientId, canManage }) {
   async function load() {
     if (!clientId) { setRows([]); setSegments([]); setLoading(false); return }
     setLoading(true)
-    const [scores, segs] = await Promise.all([
-      supabase.from(TABLE).select('*').eq('client_id', clientId)
-        .order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
-      supabase.from(SEGMENTS_TABLE).select('id, segment_name').eq('client_id', clientId)
-        .order('sort_order', { ascending: true }),
-    ])
-    if (!alive.current) return
-    if (scores.error) { setMsg(scores.error.message); setStatus('error') } else { setRows(scores.data || []) }
-    if (!segs.error) setSegments(segs.data || [])
-    setLoading(false)
+    try {
+      const [scores, segs] = await Promise.all([
+        supabase.from(TABLE).select('*').eq('client_id', clientId)
+          .order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
+        supabase.from(SEGMENTS_TABLE).select('id, segment_name').eq('client_id', clientId)
+          .order('sort_order', { ascending: true }),
+      ])
+      if (!alive.current) return
+      if (scores.error) {
+        console.error('ProblemScoringTable: scores failed', scores.error)
+        setMsg('Could not load the problem scores. Try again.'); setStatus('error')
+      } else {
+        setRows(scores.data || [])
+      }
+      // A failed segment read used to pass silently, leaving the "Who feels
+      // it" list empty. An empty list reads as "there are no segments", which
+      // is a different statement from "the segments did not load".
+      if (segs.error) {
+        console.error('ProblemScoringTable: segments failed', segs.error)
+        setMsg('Could not load the customer segments, so the list of who feels the problem is incomplete.')
+        setStatus('error')
+      } else {
+        setSegments(segs.data || [])
+      }
+    } catch (e) {
+      if (!alive.current) return
+      console.error('ProblemScoringTable: load threw', e)
+      setMsg('Could not load this table. Try again.'); setStatus('error')
+    } finally {
+      if (alive.current) setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [clientId])
@@ -230,7 +251,7 @@ export default function ProblemScoringTable({ clientId, canManage }) {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           {saveWord && <span style={{ ...LABEL, color: saveTone }}>{saveWord}</span>}
           {canManage && (
-            <button onClick={addRow} disabled={adding} style={btn(C.green, true)}>
+            <button type="button" onClick={addRow} disabled={adding} style={btn(C.green, true)}>
               {adding ? 'Adding...' : 'Add problem'}
             </button>
           )}
@@ -342,7 +363,7 @@ export default function ProblemScoringTable({ clientId, canManage }) {
                   </td>
                   {canManage && (
                     <td style={{ ...td, textAlign: 'right' }}>
-                      <button onClick={() => removeRow(r)} style={btn(C.red)} title="Delete this problem">x</button>
+                      <button type="button" onClick={() => removeRow(r)} style={btn(C.red)} title="Delete this problem">x</button>
                     </td>
                   )}
                 </tr>

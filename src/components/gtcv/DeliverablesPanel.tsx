@@ -148,10 +148,10 @@ export default function DeliverablesPanel({ clientId, canManage }) {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button style={btn(C.teal, true)} onClick={() => setTorOpen(!torOpen)}>
+            <button type="button" style={btn(C.teal, true)} onClick={() => setTorOpen(!torOpen)}>
               {torOpen ? 'Close' : 'Read a Terms of Reference'}
             </button>
-            <button style={btn(C.slate)} onClick={() => setAddOpen(!addOpen)}>
+            <button type="button" style={btn(C.slate)} onClick={() => setAddOpen(!addOpen)}>
               {addOpen ? 'Close' : 'Add one by hand'}
             </button>
           </div>
@@ -184,14 +184,14 @@ export default function DeliverablesPanel({ clientId, canManage }) {
             onChange={(e) => setTorText(e.target.value)}
             placeholder="Deliverable 1: ... payable on ..." />
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.7rem' }}>
-            <button
+            <button type="button"
               style={btn(C.teal, true)}
               disabled={busy === 'tor' || !torText.trim()}
               onClick={() => run('tor', () => api('/api/deliverables', 'POST', {
                 clientId, action: 'propose', torText, torReference: torRef || null,
               }), (r) => `Proposed ${r.addedDeliverables} deliverables and ${r.addedMappings} gate mappings. Approve each mapping below.`)}
             >{busy === 'tor' ? 'Reading...' : 'Read it and propose the mapping'}</button>
-            <button style={btn(C.slate)} onClick={() => { setTorOpen(false); setTorText('') }}>Cancel</button>
+            <button type="button" style={btn(C.slate)} onClick={() => { setTorOpen(false); setTorText('') }}>Cancel</button>
           </div>
         </div>
       ) : null}
@@ -210,7 +210,7 @@ export default function DeliverablesPanel({ clientId, canManage }) {
             <Lab l="What it is"><textarea style={{ ...field, minHeight: 70, resize: 'vertical' }} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Lab>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.7rem' }}>
-            <button style={btn(C.teal, true)} disabled={busy === 'add' || !draft.title.trim()}
+            <button type="button" style={btn(C.teal, true)} disabled={busy === 'add' || !draft.title.trim()}
               onClick={() => run('add', async () => {
                 await api('/api/deliverables', 'POST', {
                   clientId, action: 'add_deliverable',
@@ -223,7 +223,7 @@ export default function DeliverablesPanel({ clientId, canManage }) {
                 setAddOpen(false)
               })}
             >{busy === 'add' ? 'Adding...' : 'Add'}</button>
-            <button style={btn(C.slate)} onClick={() => setAddOpen(false)}>Cancel</button>
+            <button type="button" style={btn(C.slate)} onClick={() => setAddOpen(false)}>Cancel</button>
           </div>
         </div>
       ) : null}
@@ -294,7 +294,7 @@ function Deliverable({ d, maps, packs, busy, run, clientId, onOpenPack }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <button
+          <button type="button"
             style={btn(C.teal, true)}
             disabled={busy === `pack:${d.id}` || approved.length === 0}
             title={approved.length === 0 ? 'Approve at least one gate mapping first' : 'Assemble the claim from the approved gates'}
@@ -304,7 +304,7 @@ function Deliverable({ d, maps, packs, busy, run, clientId, onOpenPack }) {
               ? `Claim ${r.reference} assembled with gaps noted: ${r.gaps.join('; ')}`
               : `Claim ${r.reference} assembled. Read it and approve it before it goes.`)}
           >{busy === `pack:${d.id}` ? 'Assembling...' : 'Assemble a claim'}</button>
-          <button style={btn(C.red)} disabled={busy === `del:${d.id}`}
+          <button type="button" style={btn(C.red)} disabled={busy === `del:${d.id}`}
             onClick={() => {
               if (typeof window !== 'undefined' && !window.confirm(`Remove "${d.title}"?`)) return
               run(`del:${d.id}`, () => api('/api/deliverables', 'DELETE', { clientId, id: d.id }))
@@ -348,7 +348,7 @@ function Deliverable({ d, maps, packs, busy, run, clientId, onOpenPack }) {
                     </Lab>
                   </div>
                   <div style={{ display: 'flex', gap: '0.45rem', marginTop: '0.55rem' }}>
-                    <button style={btn(C.teal, true)} disabled={busy === `map:${m.id}`}
+                    <button type="button" style={btn(C.teal, true)} disabled={busy === `map:${m.id}`}
                       onClick={() => run(`map:${m.id}`, async () => {
                         await api('/api/deliverables', 'PATCH', {
                           clientId, kind: 'mapping', id: m.id,
@@ -358,7 +358,7 @@ function Deliverable({ d, maps, packs, busy, run, clientId, onOpenPack }) {
                         setEditing(null)
                       })}
                     >Save and approve</button>
-                    <button style={btn(C.slate)} onClick={() => setEditing(null)}>Cancel</button>
+                    <button type="button" style={btn(C.slate)} onClick={() => setEditing(null)}>Cancel</button>
                   </div>
                 </div>
               ) : (
@@ -373,20 +373,20 @@ function Deliverable({ d, maps, packs, busy, run, clientId, onOpenPack }) {
                   </div>
                   <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                     {!m.approved ? (
-                      <button style={btn(C.green, true)} disabled={busy === `ap:${m.id}`}
+                      <button type="button" style={btn(C.green, true)} disabled={busy === `ap:${m.id}`}
                         onClick={() => run(`ap:${m.id}`, () => api('/api/deliverables', 'PATCH', {
                           clientId, kind: 'mapping', id: m.id, approved: true,
                         }))}
                       >Approve</button>
                     ) : (
-                      <button style={btn(C.slate)} disabled={busy === `un:${m.id}`}
+                      <button type="button" style={btn(C.slate)} disabled={busy === `un:${m.id}`}
                         onClick={() => run(`un:${m.id}`, () => api('/api/deliverables', 'PATCH', {
                           clientId, kind: 'mapping', id: m.id, approved: false,
                         }))}
                       >Unapprove</button>
                     )}
-                    <button style={btn(C.slate)} onClick={() => setEditing({ ...m })}>Edit</button>
-                    <button style={btn(C.red)} disabled={busy === `rj:${m.id}`}
+                    <button type="button" style={btn(C.slate)} onClick={() => setEditing({ ...m })}>Edit</button>
+                    <button type="button" style={btn(C.red)} disabled={busy === `rj:${m.id}`}
                       onClick={() => run(`rj:${m.id}`, () => api('/api/deliverables', 'DELETE', {
                         clientId, kind: 'mapping', id: m.id,
                       }))}
@@ -408,7 +408,7 @@ function Deliverable({ d, maps, packs, busy, run, clientId, onOpenPack }) {
             </select>
           </Lab>
         </div>
-        <button style={btn(C.slate)} disabled={!addGate || busy === `addmap:${d.id}`}
+        <button type="button" style={btn(C.slate)} disabled={!addGate || busy === `addmap:${d.id}`}
           onClick={() => run(`addmap:${d.id}`, async () => {
             await api('/api/deliverables', 'POST', { clientId, action: 'add_mapping', deliverableId: d.id, dpId: addGate })
             setAddGate('')
@@ -425,7 +425,7 @@ function Deliverable({ d, maps, packs, busy, run, clientId, onOpenPack }) {
                 {p.reference} · {money(p.amount, p.currency)} · {p.status}
                 {p.sent_at ? ` · sent ${fmtDate(p.sent_at)}` : ''}
               </div>
-              <button style={btn(C.teal)} onClick={() => onOpenPack(p.id)}>Open</button>
+              <button type="button" style={btn(C.teal)} onClick={() => onOpenPack(p.id)}>Open</button>
             </div>
           ))}
         </div>
@@ -466,7 +466,7 @@ function PackViewer({ clientId, packId, onClose }) {
     return (
       <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '1rem', background: C.card }}>
         <p style={hint}>{err || 'Loading the claim...'}</p>
-        <button style={btn(C.slate)} onClick={onClose}>Close</button>
+        <button type="button" style={btn(C.slate)} onClick={onClose}>Close</button>
       </div>
     )
   }
@@ -484,7 +484,7 @@ function PackViewer({ clientId, packId, onClose }) {
             {money(pack.amount, pack.currency)} · {pack.status} · assembled {fmtDate(pack.assembled_at)}
           </div>
         </div>
-        <button style={btn(C.slate)} onClick={onClose}>Close</button>
+        <button type="button" style={btn(C.slate)} onClick={onClose}>Close</button>
       </div>
 
       {err ? <div style={{ color: C.red, fontSize: '0.95rem', marginTop: '0.6rem' }}>{err}</div> : null}
@@ -533,7 +533,7 @@ function PackViewer({ clientId, packId, onClose }) {
 
       <div style={{ display: 'flex', gap: '0.45rem', marginTop: '0.8rem', flexWrap: 'wrap' }}>
         {pack.status === 'draft' ? (
-          <button style={btn(C.green, true)} disabled={busy === 'approve'}
+          <button type="button" style={btn(C.green, true)} disabled={busy === 'approve'}
             onClick={() => act('approve', { action: 'approve', coveringNote: noteText }, 'Approved. It can be sent now.')}
           >{busy === 'approve' ? 'Approving...' : 'Approve this claim'}</button>
         ) : null}
@@ -541,24 +541,24 @@ function PackViewer({ clientId, packId, onClose }) {
           <>
             <input style={{ ...field, maxWidth: 320 }} placeholder="Recipients, comma separated"
               value={recipients} onChange={(e) => setRecipients(e.target.value)} />
-            <button style={btn(C.teal, true)} disabled={busy === 'send' || !recipients.includes('@')}
+            <button type="button" style={btn(C.teal, true)} disabled={busy === 'send' || !recipients.includes('@')}
               onClick={() => act('send', {
                 action: 'send',
                 recipients: recipients.split(',').map((r) => r.trim()).filter(Boolean),
               }, 'Sent.')}
             >{busy === 'send' ? 'Sending...' : 'Send it'}</button>
-            <button style={btn(C.slate)} disabled={busy === 'mark'}
+            <button type="button" style={btn(C.slate)} disabled={busy === 'mark'}
               onClick={() => act('mark', { action: 'mark_sent' }, 'Marked as sent.')}
             >I sent it myself</button>
           </>
         ) : null}
         {pack.status === 'sent' ? (
-          <button style={btn(C.green, true)} disabled={busy === 'paid'}
+          <button type="button" style={btn(C.green, true)} disabled={busy === 'paid'}
             onClick={() => act('paid', { action: 'mark_paid' }, 'Marked as paid.')}
           >Mark as paid</button>
         ) : null}
         {pack.status !== 'paid' && pack.status !== 'withdrawn' ? (
-          <button style={btn(C.red)} disabled={busy === 'wd'}
+          <button type="button" style={btn(C.red)} disabled={busy === 'wd'}
             onClick={() => {
               if (typeof window !== 'undefined' && !window.confirm('Withdraw this claim?')) return
               act('wd', { action: 'withdraw' }, 'Withdrawn.')

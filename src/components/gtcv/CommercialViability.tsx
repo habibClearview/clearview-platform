@@ -123,20 +123,35 @@ export default function CommercialViability({ clientId, canManage, currency }) {
   const load = useCallback(async () => {
     if (!clientId) { setCostLines([]); setTiers([]); setMarket([]); setFixed([]); setLoading(false); return }
     setLoading(true)
-    const order = (q) => q.eq('client_id', clientId).order('sort_order', { ascending: true }).order('created_at', { ascending: true })
-    const [c, t, m, f] = await Promise.all([
-      order(supabase.from(T_COST).select('*')),
-      order(supabase.from(T_TIERS).select('*')),
-      order(supabase.from(T_MARKET).select('*')),
-      order(supabase.from(T_FIXED).select('*')),
-    ])
-    const err = c.error || t.error || m.error || f.error
-    if (err) setSave({ ok: false, text: `Could not load the commercial model. ${err.message}` })
-    setCostLines(c.data || [])
-    setTiers(t.data || [])
-    setMarket(m.data || [])
-    setFixed(f.data || [])
-    setLoading(false)
+    try {
+      const order = (q) => q.eq('client_id', clientId).order('sort_order', { ascending: true }).order('created_at', { ascending: true })
+      const [c, t, m, f] = await Promise.all([
+        order(supabase.from(T_COST).select('*')),
+        order(supabase.from(T_TIERS).select('*')),
+        order(supabase.from(T_MARKET).select('*')),
+        order(supabase.from(T_FIXED).select('*')),
+      ])
+      const err = c.error || t.error || m.error || f.error
+      if (err) {
+        // A cost model with rows missing produces a cost floor that is simply
+        // wrong, and a wrong floor sets a wrong price. Better to say the read
+        // failed than to show a number built on part of the data.
+        console.error('CommercialViability: load failed', err)
+        setSave({ ok: false, text: 'Could not load the commercial model. Do not price from what is on screen until it loads.' })
+        return
+      }
+      setSave(null)
+      setCostLines(c.data || [])
+      setTiers(t.data || [])
+      setMarket(m.data || [])
+      setFixed(f.data || [])
+    } catch (e) {
+      console.error('CommercialViability: load threw', e)
+      setSave({ ok: false, text: 'Could not load the commercial model. Do not price from what is on screen until it loads.' })
+    } finally {
+      // Every path, so a thrown request cannot leave this on Loading forever.
+      setLoading(false)
+    }
   }, [clientId])
 
   useEffect(() => { load() }, [load])
