@@ -83,6 +83,10 @@ Owns the evidence and the outputs. Sub-roles:
   (local market/cost/competitor intelligence the method deliberately omits).
 - **Presence:** physically present at the diagnostic, DP04 cost-mapping, DP07 pilots, and DP09/handover;
   remote lead otherwise (daily check-in, reviews all outputs before gates close).
+  > **Client-facing rule (Habib):** this internal rhythm describes the *source's* two-country model.
+  > Client-facing text (the Charter, screens) must **never** say travel / visits / "remote" — state
+  > presence neutrally ("lead present" / "co-implementer present"), so it also fits solo, co-located
+  > engagements (where the co-implementer role is absent entirely).
 - **Pilots:** **runs Iteration 1** (LSP observes); **backstop only in Iteration 2** (intervenes only
   for misrepresentation, client distress, or unusable drift — and only indirectly).
 - **Handover:** **co-evaluator with the funder**; gives written confirmation the commercial model is

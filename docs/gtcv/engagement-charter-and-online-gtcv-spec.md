@@ -203,7 +203,7 @@ first instance:
   the (non-negotiable) pilot phase; co-signs the diagnostic record and the Engagement Completion
   Record.
 - **The Beneficiary / LSP (Ikore)** — owns the outputs and the evidence. Its **Executive Director**
-  attends the diagnostic in person (non-delegable) and **signs off every gate**; its **Leadership
+  attends the diagnostic (non-delegable) and **signs off every gate**; its **Leadership
   Team** produces the canvas outputs, leads the second pilot iteration, and delivers the final
   handover unassisted; its **Finance Lead** attends all cost-mapping sessions and must operate the
   financial model independently by the end of the Commercial Viability phase; its **Field Team**
@@ -211,15 +211,20 @@ first instance:
   the Scale Pathway Commitment.
 - **The Lead Consultant / Coach (Habib · The Canvas Coach)** — owns and runs the method; holds every
   decision gate (no zone opens until the prior gate closes with evidence); brings local market
-  calibration; runs the first pilot iteration and backstops the second; approves all reports before
-  they reach the funder; co-evaluates and signs the handover. Retains all IP (GtCV Canvas™, tools,
-  ClearView).
-- **The In-Country Associate / Co-implementer (Ganiat Ettu)** — the daily continuity lead; runs
-  sessions between the lead consultant's visits; owns engagement setup and administration; drafts gate
+  calibration; present for the core gate sessions; runs the first pilot iteration and backstops the
+  second; approves all reports before they reach the funder; co-evaluates and signs the handover.
+  Retains all IP (GtCV Canvas™, tools, ClearView).
+- **The In-Country Associate / Co-implementer (Ganiat Ettu)** — leads the interim working sessions and
+  provides day-to-day continuity; owns engagement setup and administration; drafts gate
   outputs for review; supervises fieldwork; trains the Finance Lead on the model; submits the weekly
   report for approval.
 - **(Where applicable) a Licensed Advisor** — delivers the method under licence within their own
   engagements, with attribution preserved intact.
+
+> **Presence-language rule (Habib):** the Charter and client-facing screens never mention travel,
+> visits, or "remote." Presence is stated neutrally ("lead present" / "co-implementer present"), so the
+> wording holds whether the coach flies in, is co-located, or delivers solo. In a solo engagement the
+> co-implementer section simply does not appear (config-driven).
 
 ### 6.4 Roles & permission phases (system-enforced)
 The source enforces access by instruction and by keeping finance in a separate file; the web app
