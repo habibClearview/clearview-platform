@@ -301,6 +301,36 @@ export default function EngagementJourneyPage() {
   const [hasSession, setHasSession] = useState(false)
   const [view, setView] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  // Which block the coach has opened, and the in flight gate change.
+  const [openDp, setOpenDp] = useState<string | null>(null)
+  const [saving, setSaving] = useState<string | null>(null)
+  const [flash, setFlash] = useState<string | null>(null)
+  const [role, setRole] = useState<string | null>(null)
+
+  async function setGate(dpId, status, label) {
+    setSaving(status)
+    setFlash(null)
+    try {
+      const { data } = await supabase.auth.getSession()
+      const res = await fetch('/api/gate-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(data.session?.access_token ? { Authorization: `Bearer ${data.session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ clientId: view.client.id, dpId, status, label }),
+      })
+      const out = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(out?.error || 'Could not update this block')
+      const v = await loadEngagementView(slug)
+      setView(v)
+      setFlash('Saved.')
+    } catch (e: any) {
+      setFlash(e?.message || 'Could not update this block')
+    } finally {
+      setSaving(null)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -309,6 +339,9 @@ export default function EngagementJourneyPage() {
       if (cancelled) return
       if (!session) { setHasSession(false); setChecking(false); return }
       setHasSession(true)
+      const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', session.user.id).single()
+      if (cancelled) return
+      setRole(profile?.role || null)
       const v = await loadEngagementView(slug)
       if (cancelled) return
       setView(v)
@@ -347,10 +380,17 @@ export default function EngagementJourneyPage() {
     const s = gs[dpId] || 'not_started'
     const isCurrent = dpId === currentId
     const cls = ['box', b.color, boxStateClass(s, isCurrent)].filter(Boolean).join(' ')
-    const tagNo = dpId.replace('dp', '').replace(/^0/, '0')
     const label = `${termPrefix} ${dpId.replace('dp', '')}`
     return (
-      <article className={cls}>
+      <article
+        className={cls}
+        role="button"
+        tabIndex={0}
+        title="Open this block"
+        style={{ cursor: 'pointer' }}
+        onClick={() => setOpenDp(dpId)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenDp(dpId) } }}
+      >
         <div className="tagrow">
           <span className="dptag">{label}</span>
           <span className="sublab">{b.sublab}</span>
@@ -464,10 +504,112 @@ export default function EngagementJourneyPage() {
 
         <div className="foot">
           <p className="tm">Grant-to-Commercial Viability Canvas&trade; · The Canvas Coach · habibonifade.com</p>
-          <p>Each block opens to its full detail and evidence. The same canvas serves any client, names and content are configuration. Fees and payments live in a separate, private view and never appear here.</p>
+          <p>Click any block to open it. The same canvas serves any client, names and content are configuration. Fees and payments live in a separate, private view and never appear here.</p>
         </div>
 
       </div>
+
+      {openDp ? (() => {
+        const b = BLOCK[openDp]
+        const s = gs[openDp] || 'not_started'
+        const canManage = role === 'super_coach' || role === 'coach'
+        // The evidence this gate must produce, from the confirmed mapping.
+        const evidence = (view.gate_map || []).filter((m) => m.dp_id === openDp)
+        const OPTIONS = [
+          ['not_started', 'Not started'],
+          ['in_progress', 'In progress'],
+          ['evidence_submitted', 'Evidence submitted'],
+          ['complete', 'Complete'],
+          ['needs_revisiting', 'Needs revisiting'],
+        ]
+        return (
+          <div
+            onClick={() => { setOpenDp(null); setFlash(null) }}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(11,20,32,.55)', zIndex: 60,
+              display: 'flex', justifyContent: 'flex-end',
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: 'min(560px, 100%)', height: '100%', overflowY: 'auto',
+                background: 'var(--card)', color: 'var(--ink)', padding: '22px 24px 40px',
+                boxShadow: '-12px 0 40px rgba(0,0,0,.25)', fontFamily: 'var(--fb)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="dptag" style={{ background: 'var(--navy)' }}>
+                  {termPrefix} {openDp.replace('dp', '')}
+                </span>
+                <span style={{ fontFamily: 'var(--fm)', fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
+                  {statusWord(s)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => { setOpenDp(null); setFlash(null) }}
+                  style={{ marginLeft: 'auto', border: '1px solid var(--line)', background: 'var(--box)', color: 'var(--ink)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}
+                >Close</button>
+              </div>
+
+              <h2 style={{ fontFamily: 'var(--fd)', fontSize: 24, margin: '14px 0 0', lineHeight: 1.15 }}>{b.title}</h2>
+              <p style={{ fontStyle: 'italic', color: 'var(--ink-soft)', margin: '8px 0 0', fontSize: 15 }}>&quot;{b.q}&quot;</p>
+
+              <h3 style={{ fontFamily: 'var(--fm)', fontSize: 10.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--teal)', margin: '22px 0 8px' }}>What this block does</h3>
+              <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.6 }}>
+                {b.bullets.map((li, i) => <li key={i}>{li}</li>)}
+              </ul>
+
+              <h3 style={{ fontFamily: 'var(--fm)', fontSize: 10.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--teal)', margin: '22px 0 8px' }}>Evidence this gate needs</h3>
+              {evidence.length === 0 ? (
+                <p style={{ color: 'var(--ink-faint)', fontSize: 13.5, margin: 0 }}>No evidence mapped to this block yet.</p>
+              ) : (
+                <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.6 }}>
+                  {evidence.map((m) => <li key={m.id}>{m.required_evidence || 'Evidence to be defined'}</li>)}
+                </ul>
+              )}
+
+              <h3 style={{ fontFamily: 'var(--fm)', fontSize: 10.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--teal)', margin: '22px 0 8px' }}>Fit test</h3>
+              <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-soft)' }}>{b.fit}</p>
+
+              {canManage ? (
+                <>
+                  <h3 style={{ fontFamily: 'var(--fm)', fontSize: 10.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--gold)', margin: '24px 0 8px' }}>Move this gate</h3>
+                  <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--ink-faint)' }}>Only the lead consultant can move a gate. The next block opens once this one is complete.</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {OPTIONS.map(([val, lab]) => (
+                      <button
+                        key={val}
+                        type="button"
+                        disabled={!!saving || s === val}
+                        onClick={() => setGate(openDp, val, b.title)}
+                        style={{
+                          border: '1px solid var(--line)', borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 600,
+                          cursor: s === val ? 'default' : 'pointer',
+                          background: s === val ? 'var(--teal)' : 'var(--box)',
+                          color: s === val ? '#fff' : 'var(--ink)',
+                          opacity: saving && saving !== val ? .6 : 1,
+                        }}
+                      >{saving === val ? 'Saving...' : lab}</button>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+
+              {flash ? (
+                <p style={{ marginTop: 14, fontSize: 13.5, color: flash === 'Saved.' ? 'var(--good)' : 'var(--now)' }}>{flash}</p>
+              ) : null}
+
+              <div style={{ marginTop: 26, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
+                <a
+                  href={`/engagement/${slug}/charter`}
+                  style={{ color: 'var(--teal)', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}
+                >Open the Engagement Charter</a>
+              </div>
+            </div>
+          </div>
+        )
+      })() : null}
     </div>
   )
 }
