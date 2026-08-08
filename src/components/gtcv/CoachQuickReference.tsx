@@ -46,11 +46,15 @@ export default function CoachQuickReference({ showGuidance = true }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {points.map((dp) => {
-            const isOpen = open === dp.dp_id
+            // The declared shape is DecisionPoint in canvas-types: id, number,
+            // zone. This read dp.dp_id, dp.title and dp.label, none of which
+            // exist on it, so every panel keyed on undefined and the heading
+            // fell through to the last option every time.
+            const isOpen = open === dp.id
             const components = dp.components || []
             return (
               <div
-                key={dp.dp_id}
+                key={dp.id}
                 style={{
                   background: C.card,
                   border: `1px solid ${C.line}`,
@@ -61,7 +65,7 @@ export default function CoachQuickReference({ showGuidance = true }) {
               >
                 <button
                   type="button"
-                  onClick={() => setOpen(isOpen ? null : dp.dp_id)}
+                  onClick={() => setOpen(isOpen ? null : dp.id)}
                   style={{
                     width: '100%', textAlign: 'left', border: 'none', background: 'transparent',
                     padding: '14px 16px', cursor: 'pointer', display: 'flex', gap: 12,
@@ -72,9 +76,9 @@ export default function CoachQuickReference({ showGuidance = true }) {
                     fontFamily: 'ui-monospace,monospace', fontSize: 10, fontWeight: 700,
                     letterSpacing: '.06em', color: '#fff', background: C.teal,
                     borderRadius: 4, padding: '3px 8px',
-                  }}>{String(dp.dp_id).toUpperCase()}</span>
+                  }}>{dp.number || String(dp.id).toUpperCase()}</span>
                   <span style={{ fontFamily: 'Georgia,serif', fontSize: 17, fontWeight: 600 }}>
-                    {dp.zone || dp.title || dp.label}
+                    {dp.zone}
                   </span>
                   {dp.session_time ? (
                     <span style={{ marginLeft: 'auto', fontSize: 12, color: C.faint }}>
@@ -93,6 +97,20 @@ export default function CoachQuickReference({ showGuidance = true }) {
                       <p style={{
                         fontFamily: 'ui-monospace,monospace', fontSize: 10, letterSpacing: '.14em',
                         textTransform: 'uppercase', color: C.teal, margin: '0 0 8px',
+                      }}>What a good answer sounds like</p>
+                      <p style={{ margin: '0 0 6px', fontSize: 13.5, color: C.soft, lineHeight: 1.55 }}>
+                        {dp.good_answer}
+                      </p>
+                      <p style={{
+                        fontFamily: 'ui-monospace,monospace', fontSize: 10, letterSpacing: '.14em',
+                        textTransform: 'uppercase', color: C.gold, margin: '14px 0 8px',
+                      }}>And what a weak one sounds like</p>
+                      <p style={{ margin: '0 0 6px', fontSize: 13.5, color: C.soft, lineHeight: 1.55 }}>
+                        {dp.weak_answer}
+                      </p>
+                      <p style={{
+                        fontFamily: 'ui-monospace,monospace', fontSize: 10, letterSpacing: '.14em',
+                        textTransform: 'uppercase', color: C.teal, margin: '14px 0 8px',
                       }}>The nine components</p>
                       <ol style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
                         {components.map((c) => (
