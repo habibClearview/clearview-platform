@@ -24,11 +24,8 @@
 // signature is the record that they agreed; deleting the person afterwards
 // would leave a signature belonging to nobody.
 // ============================================================
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { getBearerToken } from '@/lib/auth/api-authz'
-import { resolveClientAccess } from '@/lib/auth/engagement-access'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 
 const PARTY_ROLES = [
   'client_funder', 'funder_rep',
@@ -36,49 +33,19 @@ const PARTY_ROLES = [
   'lead_consultant', 'co_implementer', 'licensed_advisor', 'other',
 ]
 
-function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Supabase admin credentials not configured')
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-}
 
 type Admin = ReturnType<typeof getAdminClient>
 
-interface Refused {
-  ok: false
-  error: string
-  status: 401 | 403 | 429
-  retryAfter?: number
-}
-interface Allowed {
-  ok: true
-  userId: string
-}
-
-async function requireManager(req: NextRequest, admin: Admin, clientId: string): Promise<Allowed | Refused> {
-  const token = getBearerToken(req)
-  if (!token) return { ok: false, error: 'Not authenticated', status: 401 }
-  const { data: { user }, error } = await admin.auth.getUser(token)
-  if (error || !user) return { ok: false, error: 'Not authenticated', status: 401 }
-  const access = await resolveClientAccess(admin, user.id, clientId)
-  if (!access.canManage) {
-    return { ok: false, error: 'Only the lead consultant can change who is on this engagement', status: 403 }
-  }
-  const rl = await checkRateLimit(admin, `engagement-party:${user.id}`, 120, 3600)
-  if (!rl.allowed) {
-    return { ok: false, error: 'Too many changes recently. Please wait a moment.', status: 429, retryAfter: rl.retryAfter }
-  }
-  return { ok: true, userId: user.id }
-}
-
-function refuse(r: Refused) {
-  return NextResponse.json(
-    { error: r.error },
-    r.status === 429
-      ? { status: 429, headers: { 'Retry-After': String(r.retryAfter ?? 60) } }
-      : { status: r.status },
-  )
+/**
+ * Manage rights on this engagement, through the one shared helper. This used
+ * to be a local copy in every route, in slightly different shapes, which is
+ * how a fix lands in one place and leaves the hole in six others.
+ */
+async function requireManager(req: NextRequest, admin: Admin, clientId: string) {
+  return requireAccess(req, admin, clientId, 'manage', {
+    deniedMessage: 'Only the lead consultant can change who is on this engagement',
+    rateLimit: { key: 'engagement-party', max: 120, windowSeconds: 3600 },
+  })
 }
 
 /**
@@ -119,7 +86,7 @@ export async function POST(req: NextRequest) {
 
     const admin = getAdminClient()
     const auth = await requireManager(req, admin, clientId)
-    if (!auth.ok) return refuse(auth)
+    if (!auth.ok) return refuseAccess(auth)
 
     const patch = readBody(body)
     if (!patch.name) return NextResponse.json({ error: 'A party needs a name' }, { status: 400 })
@@ -154,7 +121,7 @@ export async function PATCH(req: NextRequest) {
 
     const admin = getAdminClient()
     const auth = await requireManager(req, admin, clientId)
-    if (!auth.ok) return refuse(auth)
+    if (!auth.ok) return refuseAccess(auth)
 
     const { data: existing } = await admin
       .from('engagement_parties')
@@ -202,7 +169,7 @@ export async function DELETE(req: NextRequest) {
 
     const admin = getAdminClient()
     const auth = await requireManager(req, admin, clientId)
-    if (!auth.ok) return refuse(auth)
+    if (!auth.ok) return refuseAccess(auth)
 
     const { data: existing } = await admin
       .from('engagement_parties')

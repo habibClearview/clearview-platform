@@ -9,26 +9,10 @@
 // Service-role route, so it authenticates the caller and authorizes via
 // resolveClientAccess (the same rules as can_view_client / can_manage_client_access).
 // ============================================================
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { getBearerToken } from '@/lib/auth/api-authz'
-import { resolveClientAccess } from '@/lib/auth/engagement-access'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 
-function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Supabase admin credentials not configured')
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-}
 
-async function authed(req: NextRequest, admin: ReturnType<typeof getAdminClient>) {
-  const token = getBearerToken(req)
-  if (!token) return null
-  const { data: { user }, error } = await admin.auth.getUser(token)
-  if (error || !user) return null
-  return user
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,19 +29,11 @@ export async function POST(req: NextRequest) {
     const kind = body.kind === 'suggestion' ? 'suggestion' : 'comment'
 
     const admin = getAdminClient()
-    const user = await authed(req, admin)
-    if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-
-    const access = await resolveClientAccess(admin, user.id, body.clientId)
-    if (!access.canView) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-
-    const rl = await checkRateLimit(admin, `charter-comment:${user.id}`, 60, 3600)
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { error: 'Too many comments recently. Please wait a moment.' },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } },
-      )
-    }
+    const auth = await requireAccess(req, admin, body.clientId, 'view', {
+      rateLimit: { key: 'charter-comment', max: 60, windowSeconds: 3600 },
+    })
+    if (!auth.ok) return refuseAccess(auth)
+    const access = auth
 
     // The charter has to belong to this client. Without the check, someone who
     // can view client A could post a comment carrying client B's charter_id,
@@ -121,18 +97,21 @@ export async function PATCH(req: NextRequest) {
     }
 
     const admin = getAdminClient()
-    const user = await authed(req, admin)
-    if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-
-    const access = await resolveClientAccess(admin, user.id, body.clientId)
-    if (!access.canManage) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    const auth = await requireAccess(req, admin, body.clientId, 'manage', {
+      deniedMessage: 'Only the lead consultant can resolve a comment',
+      rateLimit: { key: 'charter-comment', max: 60, windowSeconds: 3600 },
+    })
+    if (!auth.ok) return refuseAccess(auth)
 
     const { error } = await admin
       .from('charter_comments')
-      .update({ status: body.status, resolved_by: user.id, resolved_at: new Date().toISOString() })
+      .update({ status: body.status, resolved_by: auth.userId, resolved_at: new Date().toISOString() })
       .eq('id', body.id)
       .eq('client_id', body.clientId)
-    if (error) return NextResponse.json({ error: 'Could not update the comment' }, { status: 500 })
+    if (error) {
+      console.error('charter-comment PATCH: write failed', error)
+      return NextResponse.json({ error: 'Could not update the comment' }, { status: 500 })
+    }
 
     return NextResponse.json({ ok: true })
   } catch (e: any) {

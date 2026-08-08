@@ -24,19 +24,10 @@
 // Non-login signers, for example a funder representative without an account,
 // are handled through the access-grant token flow, not here.
 // ============================================================
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { getBearerToken } from '@/lib/auth/api-authz'
-import { resolveClientAccess } from '@/lib/auth/engagement-access'
+import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 import { isRefusal, resolveSigner } from '@/lib/auth/signing-party'
-import { checkRateLimit } from '@/lib/rate-limit'
 
-function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Supabase admin credentials not configured')
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,21 +50,10 @@ export async function POST(req: NextRequest) {
     }
 
     const admin = getAdminClient()
-    const token = getBearerToken(req)
-    if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    const { data: { user }, error: authErr } = await admin.auth.getUser(token)
-    if (authErr || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-
-    const access = await resolveClientAccess(admin, user.id, body.clientId)
-    if (!access.canView) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-
-    const rl = await checkRateLimit(admin, `charter-sign:${user.id}`, 20, 3600)
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { error: 'Too many attempts recently. Please wait a moment.' },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } },
-      )
-    }
+    const auth = await requireAccess(req, admin, body.clientId, 'view', {
+      rateLimit: { key: 'charter-sign', max: 20, windowSeconds: 3600 },
+    })
+    if (!auth.ok) return refuseAccess(auth)
 
     // The charter must belong to this client and must be open for signature.
     const { data: charter } = await admin
@@ -99,8 +79,8 @@ export async function POST(req: NextRequest) {
 
     const signer = await resolveSigner(admin, {
       clientId: body.clientId,
-      userId: user.id,
-      canManage: access.canManage,
+      userId: auth.userId,
+      canManage: auth.canManage,
       onBehalfOfPartyId: body.onBehalfOfPartyId || null,
       expectedRole: body.signerRole || null,
     })

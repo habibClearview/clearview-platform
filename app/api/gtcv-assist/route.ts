@@ -38,12 +38,9 @@
 // says the feature is not configured, so the surface degrades to manual work
 // rather than breaking.
 // ============================================================
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { CLEARVIEW_STYLE } from '@/lib/ai-style'
-import { getBearerToken } from '@/lib/auth/api-authz'
-import { resolveClientAccess } from '@/lib/auth/engagement-access'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 import { fetchWithTimeout } from '@/lib/validate-input'
 
 // The shared instruction. It sits in front of every task, and every line of
@@ -110,12 +107,6 @@ const TASK_NAMES = Object.keys(TASKS)
 // narrowing what they send rather than sending everything.
 const MAX_PAYLOAD_CHARS = 40000
 
-function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Supabase admin credentials not configured')
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -140,28 +131,11 @@ export async function POST(req: NextRequest) {
     // engagement material, so an unauthenticated caller is both a billing
     // hole and a data hole.
     const admin = getAdminClient()
-    const token = getBearerToken(req)
-    if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    const { data: { user }, error: authErr } = await admin.auth.getUser(token)
-    if (authErr || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-
-    // Authorize against this specific client. Being signed in is not enough:
-    // the payload is one engagement's material, and only people who can see
-    // that engagement may have it synthesised.
-    const access = await resolveClientAccess(admin, user.id, clientId)
-    if (!access.canView) {
-      return NextResponse.json({ error: 'Not authorised for this engagement' }, { status: 403 })
-    }
-
-    // Rate limit per user. Twenty drafts an hour is far more than a coaching
-    // session needs and far less than a runaway loop would use.
-    const rl = await checkRateLimit(admin, `gtcv-assist:${user.id}`, 20, 3600)
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { error: 'Too many drafts requested recently. Please wait a moment and try again.' },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } },
-      )
-    }
+    const auth = await requireAccess(req, admin, clientId, 'view', {
+      deniedMessage: 'Not authorised for this engagement',
+      rateLimit: { key: 'gtcv-assist', max: 20, windowSeconds: 3600 },
+    })
+    if (!auth.ok) return refuseAccess(auth)
 
     const spec = TASKS[task]
     const material = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2)

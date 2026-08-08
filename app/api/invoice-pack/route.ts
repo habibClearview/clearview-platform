@@ -29,50 +29,25 @@
 // Manage rights throughout. The fee is between the consultant and whoever
 // pays, and the organisation being coached has no part in it.
 // ============================================================
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { CLEARVIEW_STYLE } from '@/lib/ai-style'
-import { getBearerToken } from '@/lib/auth/api-authz'
-import { resolveClientAccess } from '@/lib/auth/engagement-access'
+import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 import { buildClaimPack } from '@/lib/claim-pack-builder'
 import { brandedEmail, emailAvailable, escapeHtml, raw, sendEmail } from '@/lib/email'
-import { checkRateLimit } from '@/lib/rate-limit'
 
-function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Supabase admin credentials not configured')
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-}
 
 type Admin = ReturnType<typeof getAdminClient>
 
-interface Refused { ok: false; error: string; status: 401 | 403 | 429; retryAfter?: number }
-interface Allowed { ok: true; userId: string; fullName: string | null }
-
-async function requireManager(req: NextRequest, admin: Admin, clientId: string): Promise<Allowed | Refused> {
-  const token = getBearerToken(req)
-  if (!token) return { ok: false, error: 'Not authenticated', status: 401 }
-  const { data: { user }, error } = await admin.auth.getUser(token)
-  if (error || !user) return { ok: false, error: 'Not authenticated', status: 401 }
-  const access = await resolveClientAccess(admin, user.id, clientId)
-  if (!access.canManage) {
-    return { ok: false, error: 'The fee and the claims are not part of what you can see', status: 403 }
-  }
-  const rl = await checkRateLimit(admin, `invoice-pack:${user.id}`, 40, 3600)
-  if (!rl.allowed) {
-    return { ok: false, error: 'Too many requests recently. Please wait a moment.', status: 429, retryAfter: rl.retryAfter }
-  }
-  return { ok: true, userId: user.id, fullName: access.fullName }
-}
-
-function refuse(r: Refused) {
-  return NextResponse.json(
-    { error: r.error },
-    r.status === 429
-      ? { status: 429, headers: { 'Retry-After': String(r.retryAfter ?? 60) } }
-      : { status: r.status },
-  )
+/**
+ * Manage rights on this engagement, through the one shared helper. This used
+ * to be a local copy in every route, in slightly different shapes, which is
+ * how a fix lands in one place and leaves the hole in six others.
+ */
+async function requireManager(req: NextRequest, admin: Admin, clientId: string) {
+  return requireAccess(req, admin, clientId, 'manage', {
+    deniedMessage: 'The fee and the claims are not part of what you can see',
+    rateLimit: { key: 'invoice-pack', max: 40, windowSeconds: 3600 },
+  })
 }
 
 function money(amount: number | null, currency: string) {
@@ -247,7 +222,7 @@ export async function GET(req: NextRequest) {
 
     const admin = getAdminClient()
     const auth = await requireManager(req, admin, clientId)
-    if (!auth.ok) return refuse(auth)
+    if (!auth.ok) return refuseAccess(auth)
 
     const { data } = await admin.from('engagement_invoice_packs').select('*').eq('id', packId).maybeSingle()
     if (!data || data.client_id !== clientId) {
@@ -306,7 +281,7 @@ export async function POST(req: NextRequest) {
 
     const admin = getAdminClient()
     const auth = await requireManager(req, admin, clientId)
-    if (!auth.ok) return refuse(auth)
+    if (!auth.ok) return refuseAccess(auth)
 
     if (action === 'assemble') {
       const deliverableId = typeof body.deliverableId === 'string' ? body.deliverableId : ''

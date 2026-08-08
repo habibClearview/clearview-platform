@@ -10,20 +10,11 @@
 // Service-role route, so it authenticates the caller and authorizes with
 // resolveClientAccess before writing.
 // ============================================================
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { getBearerToken } from '@/lib/auth/api-authz'
-import { resolveClientAccess } from '@/lib/auth/engagement-access'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 
 const ALLOWED = ['not_started', 'in_progress', 'evidence_submitted', 'complete', 'needs_revisiting']
 
-function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Supabase admin credentials not configured')
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,23 +29,11 @@ export async function POST(req: NextRequest) {
     }
 
     const admin = getAdminClient()
-    const token = getBearerToken(req)
-    if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    const { data: { user }, error: authErr } = await admin.auth.getUser(token)
-    if (authErr || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-
-    const access = await resolveClientAccess(admin, user.id, clientId)
-    if (!access.canManage) {
-      return NextResponse.json({ error: 'Only the lead consultant can move a gate' }, { status: 403 })
-    }
-
-    const rl = await checkRateLimit(admin, `gate-status:${user.id}`, 120, 3600)
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { error: 'Too many changes recently. Please wait a moment.' },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } },
-      )
-    }
+    const auth = await requireAccess(req, admin, clientId, 'manage', {
+      deniedMessage: 'Only the coaching team can move a gate',
+      rateLimit: { key: 'gate-status', max: 120, windowSeconds: 3600 },
+    })
+    if (!auth.ok) return refuseAccess(auth)
 
     const now = new Date().toISOString()
     const { error } = await admin

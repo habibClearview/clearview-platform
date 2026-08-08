@@ -30,12 +30,9 @@
 // resolveClientAccess before writing. Database errors are logged server
 // side and answered with a generic message.
 // ============================================================
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { getBearerToken } from '@/lib/auth/api-authz'
-import { resolveClientAccess } from '@/lib/auth/engagement-access'
+import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 import { isRefusal, resolveSigner } from '@/lib/auth/signing-party'
-import { checkRateLimit } from '@/lib/rate-limit'
 
 // The three actions a gate record can carry.
 const DECISIONS = ['signed', 'authorised', 'returned']
@@ -50,12 +47,6 @@ const MANAGE_ONLY = ['authorised', 'returned']
 // pre-engagement diagnostic and the scale pathway commitment.
 const SIGNING_ROLES = ['lsp_ed', 'funder_rep', 'lsp_board']
 
-function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Supabase admin credentials not configured')
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -78,32 +69,20 @@ export async function POST(req: NextRequest) {
     }
 
     const admin = getAdminClient()
-    const token = getBearerToken(req)
-    if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    const { data: { user }, error: authErr } = await admin.auth.getUser(token)
-    if (authErr || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-
-    const access = await resolveClientAccess(admin, user.id, clientId)
-    if (!access.canView) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
+    const auth = await requireAccess(req, admin, clientId, 'view', {
+      rateLimit: { key: 'gate-signoff', max: 60, windowSeconds: 3600 },
+    })
+    if (!auth.ok) return refuseAccess(auth)
 
     // Authorising the next zone and returning a gate are the lead
     // consultant's alone.
-    if (MANAGE_ONLY.includes(decision) && !access.canManage) {
+    if (MANAGE_ONLY.includes(decision) && !auth.canManage) {
       return NextResponse.json(
         { error: 'Only the lead consultant can authorise or return a gate' },
         { status: 403 },
       )
     }
 
-    const rl = await checkRateLimit(admin, `gate-signoff:${user.id}`, 60, 3600)
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { error: 'Too many attempts recently. Please wait a moment.' },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } },
-      )
-    }
 
     const now = new Date().toISOString()
 
@@ -117,9 +96,9 @@ export async function POST(req: NextRequest) {
           client_id: clientId,
           dp_id: dpId,
           signer_role: 'lead_consultant',
-          signer_name: access.fullName || 'Lead consultant',
-          signer_user_id: user.id,
-          recorded_by_user_id: user.id,
+          signer_name: auth.fullName || 'Lead consultant',
+          signer_user_id: auth.userId,
+          recorded_by_user_id: auth.userId,
           signature_method: 'self',
           decision,
           note: note || null,
@@ -139,8 +118,8 @@ export async function POST(req: NextRequest) {
     // anybody else and nobody can overwrite another party's row.
     const signer = await resolveSigner(admin, {
       clientId,
-      userId: user.id,
-      canManage: access.canManage,
+      userId: auth.userId,
+      canManage: auth.canManage,
       onBehalfOfPartyId: onBehalfOfPartyId || null,
       expectedRole: signerRole || null,
     })

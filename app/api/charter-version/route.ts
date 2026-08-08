@@ -15,29 +15,20 @@
 // Service-role route, so it authenticates the caller and requires manage
 // rights, which matches the method: the lead consultant holds the document.
 // ============================================================
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { getBearerToken } from '@/lib/auth/api-authz'
-import { resolveClientAccess } from '@/lib/auth/engagement-access'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 
-function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Supabase admin credentials not configured')
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-}
 
+/**
+ * Manage rights on this engagement, through the one shared helper. A local
+ * copy in every route is how a security fix lands in one place and leaves the
+ * hole in the others.
+ */
 async function requireManager(req: NextRequest, admin: ReturnType<typeof getAdminClient>, clientId: string) {
-  const token = getBearerToken(req)
-  if (!token) return { error: 'Not authenticated', status: 401 as const }
-  const { data: { user }, error } = await admin.auth.getUser(token)
-  if (error || !user) return { error: 'Not authenticated', status: 401 as const }
-  const access = await resolveClientAccess(admin, user.id, clientId)
-  if (!access.canManage) {
-    return { error: 'Only the lead consultant can edit or re-issue the Charter', status: 403 as const }
-  }
-  return { user }
+  return requireAccess(req, admin, clientId, 'manage', {
+    deniedMessage: 'Only the lead consultant can edit or re-issue the Charter',
+    rateLimit: { key: 'charter-version', max: 60, windowSeconds: 3600 },
+  })
 }
 
 /** Edit the current draft in place. */
@@ -52,15 +43,8 @@ export async function PATCH(req: NextRequest) {
 
     const admin = getAdminClient()
     const auth = await requireManager(req, admin, clientId)
-    if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+    if (!auth.ok) return refuseAccess(auth)
 
-    const rl = await checkRateLimit(admin, `charter-version:${auth.user.id}`, 60, 3600)
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { error: 'Too many changes recently. Please wait a moment.' },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } },
-      )
-    }
 
     const { data: charter } = await admin
       .from('engagement_charters')
@@ -106,15 +90,8 @@ export async function POST(req: NextRequest) {
 
     const admin = getAdminClient()
     const auth = await requireManager(req, admin, clientId)
-    if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+    if (!auth.ok) return refuseAccess(auth)
 
-    const rl = await checkRateLimit(admin, `charter-version:${auth.user.id}`, 60, 3600)
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { error: 'Too many changes recently. Please wait a moment.' },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } },
-      )
-    }
 
     const { data: current } = await admin
       .from('engagement_charters')
@@ -177,6 +154,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // The version number is unique per engagement in the database, so two
+    // people re-issuing at the same instant cannot both create version N + 1.
+    // The guarded supersede above closes most of that window; this closes the
+    // rest, because a check followed by an act is not atomic and only the
+    // database can make the pair so.
     const { data: made, error: newErr } = await admin
       .from('engagement_charters')
       .insert({
@@ -188,10 +170,32 @@ export async function POST(req: NextRequest) {
       })
       .select('id, version')
       .single()
+
     if (newErr) {
       // Put the old version back rather than leaving the engagement with no
-      // live charter at all.
-      await admin.from('engagement_charters').update({ status: current.status }).eq('id', charterId)
+      // live charter at all. If even that fails, say so loudly: an engagement
+      // whose only charter is marked superseded is a state somebody has to be
+      // told about, not one to discover from an empty page.
+      const { error: restoreErr } = await admin
+        .from('engagement_charters').update({ status: current.status }).eq('id', charterId)
+      if (restoreErr) {
+        console.error(
+          'charter-version POST: could not create the new version AND could not restore the old one. '
+          + 'This engagement now has no live charter and needs fixing by hand.',
+          { charterId, clientId, newErr, restoreErr },
+        )
+        return NextResponse.json(
+          { error: 'The re-issue failed and could not be undone. Reload the Charter and check which version is live before doing anything else.' },
+          { status: 500 },
+        )
+      }
+      console.error('charter-version POST: could not create the new version', newErr)
+      if ((newErr as any).code === '23505') {
+        return NextResponse.json(
+          { error: 'Somebody else re-issued this Charter a moment ago. Reload to see the current version.' },
+          { status: 409 },
+        )
+      }
       return NextResponse.json({ error: 'Could not create the new version' }, { status: 500 })
     }
 

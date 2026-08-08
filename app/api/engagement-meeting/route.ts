@@ -7,28 +7,21 @@
 // Service-role route; authenticates the caller and requires manage rights
 // (super_coach or the assigned co-implementer), matching can_manage_client_access.
 // ============================================================
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { boundedText, isTimestamp, isWebUrl } from '@/lib/validate-input'
-import { getBearerToken } from '@/lib/auth/api-authz'
-import { resolveClientAccess } from '@/lib/auth/engagement-access'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 
-function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Supabase admin credentials not configured')
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-}
 
+/**
+ * Manage rights on this engagement, through the one shared helper. A local
+ * copy in every route is how a security fix lands in one place and leaves the
+ * hole in the others.
+ */
 async function requireManager(req: NextRequest, admin: ReturnType<typeof getAdminClient>, clientId: string) {
-  const token = getBearerToken(req)
-  if (!token) return { error: 'Not authenticated', status: 401 as const }
-  const { data: { user }, error } = await admin.auth.getUser(token)
-  if (error || !user) return { error: 'Not authenticated', status: 401 as const }
-  const access = await resolveClientAccess(admin, user.id, clientId)
-  if (!access.canManage) return { error: 'Insufficient permissions', status: 403 as const }
-  return { user }
+  return requireAccess(req, admin, clientId, 'manage', {
+    deniedMessage: 'Only the lead consultant can change the meetings',
+    rateLimit: { key: 'engagement-meeting', max: 60, windowSeconds: 3600 },
+  })
 }
 
 // The gates a meeting can belong to. Anything else is not a gate, so it is
@@ -49,15 +42,8 @@ export async function POST(req: NextRequest) {
 
     const admin = getAdminClient()
     const auth = await requireManager(req, admin, body.clientId)
-    if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+    if (!auth.ok) return refuseAccess(auth)
 
-    const rl = await checkRateLimit(admin, `engagement-meeting:${auth.user.id}`, 60, 3600)
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { error: 'Too many changes recently. Please wait a moment.' },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } },
-      )
-    }
 
     // A meeting link that is not a web address is a way to hand somebody
     // something other than the page they think they are opening, and a date
@@ -90,7 +76,7 @@ export async function POST(req: NextRequest) {
         location: boundedText(body.location, 300),
         meeting_url: meetingUrl,
         status: 'proposed',
-        created_by: auth.user.id,
+        created_by: auth.userId,
       })
       .select('id')
       .single()
@@ -121,7 +107,7 @@ export async function PATCH(req: NextRequest) {
 
     const admin = getAdminClient()
     const auth = await requireManager(req, admin, body.clientId)
-    if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+    if (!auth.ok) return refuseAccess(auth)
 
     const { error } = await admin
       .from('engagement_meetings')

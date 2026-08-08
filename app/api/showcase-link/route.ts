@@ -21,52 +21,27 @@
 // something a viewer should be able to do.
 // ============================================================
 import { randomBytes } from 'crypto'
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { getBearerToken } from '@/lib/auth/api-authz'
-import { resolveClientAccess } from '@/lib/auth/engagement-access'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 import { SHOWCASE_GRANT_TYPE } from '@/lib/showcase-loader'
 
 /** How long a link lasts unless the coach says otherwise. */
 const DEFAULT_DAYS = 90
 const MAX_DAYS = 365
 
-function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('Supabase admin credentials not configured')
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-}
 
 type Admin = ReturnType<typeof getAdminClient>
 
-interface Refused { ok: false; error: string; status: 401 | 403 | 429; retryAfter?: number }
-interface Allowed { ok: true; userId: string }
-
-async function requireManager(req: NextRequest, admin: Admin, clientId: string): Promise<Allowed | Refused> {
-  const token = getBearerToken(req)
-  if (!token) return { ok: false, error: 'Not authenticated', status: 401 }
-  const { data: { user }, error } = await admin.auth.getUser(token)
-  if (error || !user) return { ok: false, error: 'Not authenticated', status: 401 }
-  const access = await resolveClientAccess(admin, user.id, clientId)
-  if (!access.canManage) {
-    return { ok: false, error: 'Only the lead consultant can share this engagement', status: 403 }
-  }
-  const rl = await checkRateLimit(admin, `showcase-link:${user.id}`, 40, 3600)
-  if (!rl.allowed) {
-    return { ok: false, error: 'Too many requests recently. Please wait a moment.', status: 429, retryAfter: rl.retryAfter }
-  }
-  return { ok: true, userId: user.id }
-}
-
-function refuse(r: Refused) {
-  return NextResponse.json(
-    { error: r.error },
-    r.status === 429
-      ? { status: 429, headers: { 'Retry-After': String(r.retryAfter ?? 60) } }
-      : { status: r.status },
-  )
+/**
+ * Manage rights on this engagement, through the one shared helper. This used
+ * to be a local copy in every route, in slightly different shapes, which is
+ * how a fix lands in one place and leaves the hole in six others.
+ */
+async function requireManager(req: NextRequest, admin: Admin, clientId: string) {
+  return requireAccess(req, admin, clientId, 'manage', {
+    deniedMessage: 'Only the lead consultant can share this engagement',
+    rateLimit: { key: 'showcase-link', max: 40, windowSeconds: 3600 },
+  })
 }
 
 export async function GET(req: NextRequest) {
@@ -76,7 +51,7 @@ export async function GET(req: NextRequest) {
 
     const admin = getAdminClient()
     const auth = await requireManager(req, admin, clientId)
-    if (!auth.ok) return refuse(auth)
+    if (!auth.ok) return refuseAccess(auth)
 
     const [{ data: config }, { data: links }] = await Promise.all([
       admin.from('engagement_config')
@@ -106,7 +81,7 @@ export async function POST(req: NextRequest) {
 
     const admin = getAdminClient()
     const auth = await requireManager(req, admin, clientId)
-    if (!auth.ok) return refuse(auth)
+    if (!auth.ok) return refuseAccess(auth)
 
     const now = new Date().toISOString()
 
