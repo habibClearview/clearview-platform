@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   statusLabel, statusColor, canEdit, canViewCoachGuidance, canSignOff,
   canManageTeam, canApproveTimesheets, canSubmitTimesheets,
-  CLIENT_TYPE_LABELS, CLIENT_TYPE_COLORS, CANVAS_TABS,
+  CLIENT_TYPE_LABELS, CLIENT_TYPE_COLORS, CANVAS_TABS, TAB_GROUPS,
   READINESS_QUESTIONS, buildEmptyCanvas,
 } from '@/lib/coach-types'
 import { supabase } from '@/lib/supabase'
@@ -2207,8 +2207,12 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               title={navCollapsed?'Show the tab names':'Collapse to give the content more room'}
               style={{width:'100%',textAlign:navCollapsed?'center':'left',padding:'0.5rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:C.white,color:C.slate,cursor:'pointer',fontFamily:'monospace',fontSize:'0.9rem'}}
             >{navCollapsed?'\u00bb':'\u00ab Collapse'}</button>
-            {visibleTabs.map(tab=>{
+            {visibleTabs.map((tab,i)=>{
               const isActive=activeTab===tab.id
+              // A heading before the first item of each group. Four headings
+              // instead of a flat list you have to read end to end.
+              const firstOfGroup=i===0||visibleTabs[i-1].group!==tab.group
+              const groupDef=firstOfGroup?TAB_GROUPS.find(g=>g.id===tab.group):null
               const dpCanvas=canvas.find(dp=>dp.dp_id===tab.dpId)
               // A block stays shut until the one before it is signed off, for
               // everybody except the coaching team. The consultant sets the
@@ -2218,14 +2222,22 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 ? gateShutBecause(tab.dpId,(g)=>canvas.find(d=>d.dp_id===g)?.status,{isCoachingTeam:canViewCoachGuidance(previewRoleId)})
                 : null
               return(
-                <button key={tab.id} onClick={()=>{if(shutBecause){setFlashLocked(shutBecause);return}setActiveTab(tab.id)}} disabled={!!shutBecause} title={shutBecause||(navCollapsed?`${String(tab.number).padStart(2,'0')} ${tab.label}`:undefined)} style={{width:'100%',textAlign:'left',padding:navCollapsed?'0.6rem 0.3rem':'0.6rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:isActive?'var(--cv-header)':C.white,color:isActive?'var(--cv-on-accent)':(shutBecause?C.slate:C.navy),opacity:shutBecause?0.55:1,cursor:shutBecause?'not-allowed':'pointer',display:'flex',justifyContent:navCollapsed?'center':'space-between',alignItems:'center',gap:navCollapsed?'0.25rem':0,fontSize:'1.01rem',fontFamily:"'Segoe UI',system-ui,sans-serif",fontWeight:isActive?700:400}}>
+                <div key={tab.id}>
+                {groupDef&&!navCollapsed?(
+                  <div style={{padding:'0.75rem 0.85rem 0.3rem',background:'var(--cv-alt)',borderBottom:`1px solid ${C.border}`}}>
+                    <div style={{fontFamily:'monospace',fontSize:'0.66rem',letterSpacing:'.14em',textTransform:'uppercase',color:C.cyan,fontWeight:700}}>{groupDef.label}</div>
+                    <div style={{fontSize:'0.78rem',color:C.slate,marginTop:2,lineHeight:1.35}}>{groupDef.note}</div>
+                  </div>
+                ):null}
+                {groupDef&&navCollapsed?<div style={{height:1,background:C.border,margin:'0.4rem 0'}}/>:null}
+                <button onClick={()=>{if(shutBecause){setFlashLocked(shutBecause);return}setActiveTab(tab.id)}} disabled={!!shutBecause} title={shutBecause||(navCollapsed?`${String(tab.number).padStart(2,'0')} ${tab.label}`:undefined)} style={{width:'100%',textAlign:'left',padding:navCollapsed?'0.6rem 0.3rem':'0.6rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:isActive?'var(--cv-header)':C.white,color:isActive?'var(--cv-on-accent)':(shutBecause?C.slate:C.navy),opacity:shutBecause?0.55:1,cursor:shutBecause?'not-allowed':'pointer',display:'flex',justifyContent:navCollapsed?'center':'space-between',alignItems:'center',gap:navCollapsed?'0.25rem':0,fontSize:'1.01rem',fontFamily:"'Segoe UI',system-ui,sans-serif",fontWeight:isActive?700:400}}>
                   <span>
-                    <span style={{fontFamily:'monospace',fontSize:'0.93rem',color:isActive?C.cyan:C.slate,marginRight:navCollapsed?0:'0.4rem'}}>{String(tab.number).padStart(2,'0')}</span>
-                    {navCollapsed?null:tab.label}
+                    {navCollapsed?<span style={{fontFamily:'monospace',fontSize:'0.93rem',color:isActive?C.cyan:C.slate}}>{String(tab.number).padStart(2,'0')}</span>:tab.label}
                   </span>
                   {dpCanvas&&<DPDot status={dpCanvas.status}/>}
                   {tab.coachOnly&&!navCollapsed&&<span style={{fontSize:'0.93rem',color:isActive?C.cyan:C.amber}}>\ud83d\udc41</span>}
                 </button>
+                </div>
               )
             })}
           </div>
@@ -2261,24 +2273,16 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               // One condition per tab. The same nine keys used to be mapped
               // twice with the same test in both, so every render walked the
               // list twice to decide the same thing.
-              activeTab===dpKey&&<div key={dpKey}><TabDP client={selClient} dp={canvas.find(d=>d.dp_id===dpKey)} userRole={previewRoleId} onUpdateDP={u=>updateDP(selClient.id,dpKey,u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,dpKey,cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId={dpKey} clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/></div></div>
+              activeTab===dpKey&&<div key={dpKey}><TabDP client={selClient} dp={canvas.find(d=>d.dp_id===dpKey)} userRole={previewRoleId} onUpdateDP={u=>updateDP(selClient.id,dpKey,u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,dpKey,cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId={dpKey} clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/></div>
+                {/* The tools belong to the zone that uses them. Interviewing is
+                    how DP02 gets its evidence and observation is how DP07 gets
+                    its, and both used to sit ten and seven places away in a flat
+                    list where you had to know where to look. */}
+                {dpKey==='dp02'&&<div style={{marginTop:26}}><InterviewBriefing/><div style={{height:22}}/><InterviewCaptureForm clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><InterviewReporting clientId={selClient.id}/></div>}
+                {dpKey==='dp07'&&<div style={{marginTop:26}}><TabPilotObservation client={selClient} pilots={pilots} onAdd={async(p)=>{const {data}=await supabase.from('pilot_observations').insert([{...p,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,pilots:[...pilots,data]}}))} } onUpdate={(id,updates)=>optimisticWrite(`pilots:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,pilots:pilots.map(p=>p.id!==id?p:{...p,...updates})}})),()=>supabase.from('pilot_observations').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/></div>}
+              </div>
             ))}
-            {activeTab==='int_brief'&&<><InterviewBriefing/><div style={{height:22}}/><TabInterviewBriefing client={selClient} interviews={interviews} onAdd={async(i)=>{const ref=`INT-${String(interviews.length+1).padStart(3,'0')}`;const {data}=await supabase.from('interviews').insert([{...i,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,interviews:[...interviews,data]}}))}}/></>}
-            {activeTab==='int_capture'&&<><InterviewCaptureForm clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><TabInterviewCapture client={selClient} interviews={interviews}
-              onAdd={async(i)=>{
-                const ref=`INT-${String(interviews.length+1).padStart(3,'0')}`
-                const {data}=await supabase.from('interviews').insert([{...i,client_id:selClient.id,reference:ref}]).select().single()
-                if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,interviews:[...interviews,data]}}))
-              }}
-              onUpdate={(id,updates)=>optimisticWrite(`interviews:${id}`,
-                ()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,interviews:interviews.map(i=>i.id!==id?i:{...i,...updates})}})),
-                ()=>supabase.from('interviews').update({...updates,updated_at:new Date().toISOString()}).eq('id',id),
-              )}
-            /></>}
-            {activeTab==='int_report'&&<><InterviewReporting clientId={selClient.id}/><div style={{height:22}}/></>}
-            {activeTab==='int_report'&&<TabInterviewReporting interviews={interviews}/>}
             {activeTab==='hypothesis'&&<TabHypothesis client={selClient} hypotheses={hypotheses} onAdd={async(h)=>{const ref=`HYP-${String(hypotheses.length+1).padStart(3,'0')}`;const {data}=await supabase.from('hypotheses').insert([{...h,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,hypotheses:[...hypotheses,data]}}))} } onUpdate={(id,updates)=>optimisticWrite(`hypotheses:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,hypotheses:hypotheses.map(h=>h.id!==id?h:{...h,...updates})}})),()=>supabase.from('hypotheses').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
-            {activeTab==='pilot_obs'&&<TabPilotObservation client={selClient} pilots={pilots} onAdd={async(p)=>{const {data}=await supabase.from('pilot_observations').insert([{...p,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,pilots:[...pilots,data]}}))} } onUpdate={(id,updates)=>optimisticWrite(`pilots:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,pilots:pilots.map(p=>p.id!==id?p:{...p,...updates})}})),()=>supabase.from('pilot_observations').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
           </div>
         </div>
       </div>

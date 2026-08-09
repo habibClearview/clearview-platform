@@ -339,42 +339,57 @@ export interface CoachState {
 }
 
 // ─── 25-TAB STRUCTURE ────────────────────────────────────────
+// The four groups the rail is divided into, in the order a coach moves through
+// them. Twenty nine items in one flat list meant reading the list every time;
+// four headings means reading four.
+//
+// The order encodes something true: you set an engagement up, you do the work,
+// the work leaves a record, and your own notes sit beside all of it. It is not
+// a sequence of steps, which is why the items inside carry no running number.
+export const TAB_GROUPS = [
+  { id: 'engagement', label: 'This engagement', note: 'Where you start and what governs it' },
+  { id: 'work', label: 'The work', note: 'The eleven zones, in order' },
+  { id: 'record', label: 'The record', note: 'What you show a funder' },
+  { id: 'notes', label: 'Your notes', note: 'Yours. The client never sees these' },
+] as const
+
+// Deliverables, claims and anything else about the fee are deliberately absent.
+// They are between the consultant and whoever pays, and they live in the
+// business area, which nobody but the lead consultant reaches at all. They used
+// to sit on this list behind a role check, and one check is one mistake away
+// from putting the fee in front of the organisation being coached.
+//
+// The interview tools live inside DP02 and pilot observation inside DP07,
+// rather than as their own entries ten and seven places away from the zone they
+// belong to. A tool belongs where it is used.
 export const CANVAS_TABS = [
-  { id: 'cover',        label: 'Cover',                    number: 1,  phase: 'setup' },
-  { id: 'journey',      label: 'Journey Canvas',            number: 2,  phase: 'any' },
-  { id: 'charter',      label: 'Engagement Charter',        number: 3,  phase: 'any' },
-  { id: 'how_to_start', label: 'How to Start',             number: 4,  phase: 'setup' },
-  { id: 'coach_ref',    label: 'Coach Quick Reference',    number: 5,  phase: 'setup', coachOnly: true },
-  { id: 'ip_framework', label: 'IP Framework Reference',   number: 6,  phase: 'setup' },
-  { id: 'eng_setup',    label: 'Engagement Setup',         number: 7,  phase: 'setup' },
-  { id: 'diagnostic',   label: 'Pre-Engagement Diagnostic',number: 8,  phase: 'setup' },
-  { id: 'sessions',     label: 'Sessions and Rooms',       number: 9,  phase: 'any' },
-  // Deliverables and claims deliberately do NOT appear here. The fee, the
-  // milestones and the claims are between the consultant and whoever pays, and
-  // the organisation being coached has no part in them. They used to sit on
-  // this list behind a role check, and one check is one mistake away from being
-  // wrong. They now live in the business area, which nobody but the lead
-  // consultant reaches at all. The engagement still triggers a claim; what is
-  // claimed is assembled where the money is.
-  { id: 'tracker',      label: 'Engagement Tracker',       number: 11,  phase: 'phase0' },
-  { id: 'decisions',    label: 'Canvas Decision Record',   number: 12,  phase: 'phase0' },
-  { id: 'evidence',     label: 'Evidence Library',         number: 13,  phase: 'phase0' },
-  { id: 'handover',     label: 'Handover Record',          number: 14, phase: 'handover', lockedUntil: 'dp09' },
-  { id: 'phase0',       label: 'Phase 0',                  number: 15, phase: 'phase0', dpId: 'phase_0' },
-  { id: 'dp01',         label: 'DP01 — Service Reality',   number: 16, phase: 'dp01',   dpId: 'dp01' },
-  { id: 'dp02',         label: 'DP02 — Customer Clarity',  number: 17, phase: 'dp02',   dpId: 'dp02' },
-  { id: 'dp03',         label: 'DP03 — Value Proposition', number: 18, phase: 'dp03',   dpId: 'dp03' },
-  { id: 'dp04',         label: 'DP04 — Viability Model',   number: 19, phase: 'dp04',   dpId: 'dp04' },
-  { id: 'dp05',         label: 'DP05 — Market Entry',      number: 20, phase: 'dp05',   dpId: 'dp05' },
-  { id: 'dp06',         label: 'DP06 — Identity & Partners',number: 21, phase: 'dp06',  dpId: 'dp06' },
-  { id: 'dp07',         label: 'DP07 — Pilot Iteration 1', number: 22, phase: 'dp07',   dpId: 'dp07' },
-  { id: 'dp08',         label: 'DP08 — Pilot Iteration 2', number: 23, phase: 'dp08',   dpId: 'dp08' },
-  { id: 'dp09',         label: 'DP09 — Readiness Diagnostic',number: 24,phase: 'dp09',  dpId: 'dp09' },
-  { id: 'int_brief',    label: 'Interview Briefing',       number: 25, phase: 'any' },
-  { id: 'int_capture',  label: 'Interview Capture',        number: 26, phase: 'any' },
-  { id: 'int_report',   label: 'Interview Reporting',      number: 27, phase: 'any' },
-  { id: 'hypothesis',   label: 'Hypothesis Tracker',       number: 28, phase: 'any' },
-  { id: 'pilot_obs',    label: 'Pilot Observation',        number: 29, phase: 'dp07' },
+  { id: 'cover',        label: 'Cover',                     number: 1,  group: 'engagement' },
+  { id: 'journey',      label: 'Journey Canvas',            number: 2,  group: 'engagement' },
+  { id: 'charter',      label: 'Engagement Charter',        number: 3,  group: 'engagement' },
+  { id: 'eng_setup',    label: 'Who is on it, and settings', number: 4, group: 'engagement' },
+  { id: 'sessions',     label: 'Sessions and rooms',        number: 5,  group: 'engagement' },
+
+  { id: 'phase0',       label: 'Clearing the ground',       number: 6,  group: 'work', dpId: 'phase_0' },
+  { id: 'dp01',         label: 'DP01 Service Reality',      number: 7,  group: 'work', dpId: 'dp01' },
+  { id: 'dp02',         label: 'DP02 Customer Clarity',     number: 8,  group: 'work', dpId: 'dp02' },
+  { id: 'dp03',         label: 'DP03 Value Proposition',    number: 9,  group: 'work', dpId: 'dp03' },
+  { id: 'dp04',         label: 'DP04 Viability Model',      number: 10, group: 'work', dpId: 'dp04' },
+  { id: 'dp05',         label: 'DP05 Market Entry',         number: 11, group: 'work', dpId: 'dp05' },
+  { id: 'dp06',         label: 'DP06 Identity and Partners', number: 12, group: 'work', dpId: 'dp06' },
+  { id: 'dp07',         label: 'DP07 Pilot and Learn',      number: 13, group: 'work', dpId: 'dp07' },
+  { id: 'dp08',         label: 'DP08 Scale Pathway',        number: 14, group: 'work', dpId: 'dp08' },
+  { id: 'dp09',         label: 'DP09 Readiness',            number: 15, group: 'work', dpId: 'dp09' },
+  { id: 'handover',     label: 'Handover',                  number: 16, group: 'work', dpId: 'handover' },
+
+  { id: 'tracker',      label: 'Engagement Tracker',        number: 17, group: 'record' },
+  { id: 'decisions',    label: 'Decision Record',           number: 18, group: 'record' },
+  { id: 'evidence',     label: 'Evidence Library',          number: 19, group: 'record' },
+  { id: 'hypothesis',   label: 'Hypothesis Tracker',        number: 20, group: 'record' },
+
+  { id: 'how_to_start', label: 'How to start',              number: 21, group: 'notes' },
+  { id: 'coach_ref',    label: 'Coach Quick Reference',     number: 22, group: 'notes', coachOnly: true },
+  { id: 'ip_framework', label: 'The method, in full',       number: 23, group: 'notes' },
+  { id: 'diagnostic',   label: 'Pre-engagement diagnostic', number: 24, group: 'notes' },
 ]
 
 // ─── READINESS QUESTIONS ─────────────────────────────────────
