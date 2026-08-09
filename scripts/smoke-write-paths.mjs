@@ -371,6 +371,57 @@ async function main() {
       headers: { apikey: ANON, 'Content-Type': 'text/plain' }, body: 'no',
     }), [400, 401, 403])
 
+  // ── the pages a room and a client actually open ──
+  //
+  // Everything above drives the data. None of it opens a page, and a page that
+  // fails to render answers with a server error while every one of those checks
+  // still passes. These are the addresses somebody outside the coaching team is
+  // handed, so they are the ones where a failure happens in front of a client
+  // rather than in front of us.
+  //
+  // It checks the page came back and that the words that belong on it are in
+  // it. A page that answers 200 with an error in the body is still a broken
+  // page, and status alone would call it healthy.
+  function page(what, path, mustContain) {
+    const res = http('GET', `${BASE}${path}`, {})
+    const body = String(res.raw || '')
+    const missing = mustContain.filter((s) => !body.includes(s))
+    // Only what a person would see. The framework ships its own error strings
+    // inside the JavaScript of every page it builds, so testing the whole
+    // document called every healthy page broken, which is the kind of false
+    // alarm that teaches everybody to ignore a red result.
+    const visible = body.replace(/<script[\s\S]*?<\/script>/gi, '')
+    const looksBroken = /Application error|Internal Server Error|This page could not be found/i.test(visible)
+    check(what,
+      res.status === 200 && missing.length === 0 && !looksBroken,
+      res.status !== 200
+        ? `answered ${res.status}`
+        : looksBroken
+          ? 'answered 200 but the page is an error'
+          : `missing from the page: ${JSON.stringify(missing)}`)
+  }
+
+  page('the page where the room types the code opens', '/join',
+    ['Join the session', 'join-code'])
+
+  if (sessionToken) {
+    // The session page fills itself in the browser, so its words are not in
+    // the first response and asking for them here would fail a working page.
+    // What the first response must carry is the shell and no error: if the
+    // route were broken this is where it would show.
+    page('the session page opens for somebody with the link', `/session/${sessionToken}`,
+      ['Working session', 'Opening the session'])
+  }
+
+  // A link that is not a link must say so rather than break.
+  const gone = http('GET', `${BASE}/session/${randomBytes(32).toString('hex')}`, {})
+  check('a session link that does not work says so instead of breaking',
+    gone.status === 200 || gone.status === 404,
+    `answered ${gone.status}`)
+  check('and it does not name any engagement while doing it',
+    !/Ikore|client-/i.test(String(gone.raw || '').slice(0, 20000)),
+    'the refusal page mentions an engagement')
+
   // ── the refusals that matter ──
   expectStatus('an unauthenticated caller is refused',
     http('GET', `${BASE}/api/deliverables?clientId=${CLIENT_ID}`, { headers: { apikey: ANON } }), 401)
