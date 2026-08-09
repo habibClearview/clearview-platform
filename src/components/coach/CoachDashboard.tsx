@@ -13,6 +13,7 @@ import BlockWorkspace from '@/components/gtcv/BlockWorkspace'
 import SessionRoom from '@/components/gtcv/SessionRoom'
 import ViewAsBar from '@/components/coach/ViewAsBar'
 import { mayPreview } from '@/lib/role-preview'
+import { gateIsOpen, gateShutBecause } from '@/lib/gtcv-gates'
 import CurrencyField from '@/components/common/CurrencyField'
 import { formatMoneyShort } from '@/lib/currency'
 import SessionPlanner from '@/components/gtcv/SessionPlanner'
@@ -44,6 +45,7 @@ import BuildStamp from '@/components/BuildStamp'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import TeamPayments from '@/components/coach/TeamPayments'
 import DealsAndFees from '@/components/coach/DealsAndFees'
+import DeliverablesBusinessView from '@/components/coach/DeliverablesBusinessView'
 import {
   outstandingInvoiced, dealWinRate, canvasProgress, healthStatusFromReportText,
   pipelineSnapshot, recentMonthPeriods, monthlyFeeRevenue, monthlyTeamCost,
@@ -1795,6 +1797,11 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // resolve the writer from the session whatever the screen shows. Held here
   // rather than remembered between visits, because a preview left switched on
   // from yesterday is exactly how somebody concludes a screen is broken.
+  // What to say when somebody presses a block that is not open yet. Held as a
+  // message rather than an alert, because a locked block is a normal state of
+  // an engagement in progress, not an error.
+  const [flashLocked,setFlashLocked]=useState(null)
+
   const [viewingAs,setViewingAs]=useState(null)
   const previewRoleId=mayPreview(userRole)&&viewingAs?viewingAs:userRole
 
@@ -2203,8 +2210,15 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             {visibleTabs.map(tab=>{
               const isActive=activeTab===tab.id
               const dpCanvas=canvas.find(dp=>dp.dp_id===tab.dpId)
+              // A block stays shut until the one before it is signed off, for
+              // everybody except the coaching team. The consultant sets the
+              // engagement up and prepares a block before the session that
+              // fills it, so a lock that stopped them would stop the work.
+              const shutBecause=tab.dpId
+                ? gateShutBecause(tab.dpId,(g)=>canvas.find(d=>d.dp_id===g)?.status,{isCoachingTeam:canViewCoachGuidance(previewRoleId)})
+                : null
               return(
-                <button key={tab.id} onClick={()=>setActiveTab(tab.id)} title={navCollapsed?`${String(tab.number).padStart(2,'0')} ${tab.label}`:undefined} style={{width:'100%',textAlign:'left',padding:navCollapsed?'0.6rem 0.3rem':'0.6rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:isActive?'var(--cv-header)':C.white,color:isActive?'var(--cv-on-accent)':C.navy,cursor:'pointer',display:'flex',justifyContent:navCollapsed?'center':'space-between',alignItems:'center',gap:navCollapsed?'0.25rem':0,fontSize:'1.01rem',fontFamily:"'Segoe UI',system-ui,sans-serif",fontWeight:isActive?700:400}}>
+                <button key={tab.id} onClick={()=>{if(shutBecause){setFlashLocked(shutBecause);return}setActiveTab(tab.id)}} disabled={!!shutBecause} title={shutBecause||(navCollapsed?`${String(tab.number).padStart(2,'0')} ${tab.label}`:undefined)} style={{width:'100%',textAlign:'left',padding:navCollapsed?'0.6rem 0.3rem':'0.6rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:isActive?'var(--cv-header)':C.white,color:isActive?'var(--cv-on-accent)':(shutBecause?C.slate:C.navy),opacity:shutBecause?0.55:1,cursor:shutBecause?'not-allowed':'pointer',display:'flex',justifyContent:navCollapsed?'center':'space-between',alignItems:'center',gap:navCollapsed?'0.25rem':0,fontSize:'1.01rem',fontFamily:"'Segoe UI',system-ui,sans-serif",fontWeight:isActive?700:400}}>
                   <span>
                     <span style={{fontFamily:'monospace',fontSize:'0.93rem',color:isActive?C.cyan:C.slate,marginRight:navCollapsed?0:'0.4rem'}}>{String(tab.number).padStart(2,'0')}</span>
                     {navCollapsed?null:tab.label}
@@ -2218,6 +2232,12 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 
           {/* Main content area */}
           <div>
+            {flashLocked?(
+              <div role="status" style={{marginBottom:'1rem',padding:'0.7rem 1rem',borderRadius:10,border:`1px solid ${C.amber}`,background:'var(--cv-alt)',color:C.navy,fontSize:'0.97rem',display:'flex',gap:'0.8rem',alignItems:'center',flexWrap:'wrap'}}>
+                <span>{flashLocked}</span>
+                <button type="button" onClick={()=>setFlashLocked(null)} style={{fontFamily:'monospace',fontSize:'0.85rem',padding:'0.25rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,background:'transparent',color:C.slate,cursor:'pointer'}}>Close</button>
+              </div>
+            ):null}
             {activeTab==='cover'&&<><WhatNeedsYou clientId={selClient.id} canManage={canEdit(previewRoleId)} onGoTo={setActiveTab}/><CoverPanel slug={selClient.slug}/><div style={{height:18}}/>
               <TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/>
               {!selClient.programme_id&&<ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>}
@@ -2230,7 +2250,6 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             {activeTab==='eng_setup'&&<><EngagementPartiesPanel clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><ShowcaseSharing clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><EngagementSettings clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
             {activeTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
             {activeTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={previewRoleId} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
-            {activeTab==='deliverables'&&canEdit(previewRoleId)&&<DeliverablesPanel clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/>}
             {activeTab==='sessions'&&<><SessionRoom clientId={selClient.id} canManage={canEdit(previewRoleId)} sessions={clientSessions}/><div style={{height:22}}/><SessionPlanner clientId={selClient.id} canManage={canEdit(previewRoleId)}/></>}
             {activeTab==='tracker'&&<><GtcvEngagementTracker clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><TabTracker client={selClient} canvas={canvas}/></>}
             {activeTab==='decisions'&&<TabDecisions client={selClient} decisions={decisions} userRole={previewRoleId} userName={userName} onAdd={async(d)=>{const {data}=await supabase.from('canvas_decisions').insert([{...d,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:[...decisions,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`decisions:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:decisions.map(d=>d.id!==id?d:{...d,...updates})}})),()=>supabase.from('canvas_decisions').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
@@ -2484,7 +2503,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // is no longer reachable from here; ProgrammesView below is still
   // defined but unused, in case that capability needs a new home.)
   function ProgrammesHub(){
-    return <DealsAndFees programmes={programmes} setProgrammes={setPrograms} clients={clients} setClients={setClients} onWinDeal={p=>{
+    return <><DeliverablesBusinessView clients={clients.filter(c=>c.engagement_mode==='canvas')}/><DealsAndFees programmes={programmes} setProgrammes={setPrograms} clients={clients} setClients={setClients} onWinDeal={p=>{
       const services=p.deal_services||[]
       const engagementMode=services.includes('canvas')?'canvas':services.includes('financial')?'financial':'canvas'
       // A direct/independent prospect IS the beneficiary -- pre-fill their
@@ -2494,7 +2513,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       const namePrefill=p.type==='donor_programme'?'':p.name
       setNewClientPrefill({programme_id:p.id,name:namePrefill,engagement_mode:engagementMode,notes:`Won via Pipeline · ${p.name}`})
       setView('clients')
-    }}/>
+    }}/></>
   }
   // One unified Team view -- no sub-tabs. Everything for a person lives in
   // their own block (profile, day rate, active toggle, clients, timesheets,

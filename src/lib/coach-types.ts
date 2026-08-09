@@ -349,7 +349,13 @@ export const CANVAS_TABS = [
   { id: 'eng_setup',    label: 'Engagement Setup',         number: 7,  phase: 'setup' },
   { id: 'diagnostic',   label: 'Pre-Engagement Diagnostic',number: 8,  phase: 'setup' },
   { id: 'sessions',     label: 'Sessions and Rooms',       number: 9,  phase: 'any' },
-  { id: 'deliverables', label: 'Deliverables and Claims',  number: 10,  phase: 'any', coachOnly: true },
+  // Deliverables and claims deliberately do NOT appear here. The fee, the
+  // milestones and the claims are between the consultant and whoever pays, and
+  // the organisation being coached has no part in them. They used to sit on
+  // this list behind a role check, and one check is one mistake away from being
+  // wrong. They now live in the business area, which nobody but the lead
+  // consultant reaches at all. The engagement still triggers a claim; what is
+  // claimed is assembled where the money is.
   { id: 'tracker',      label: 'Engagement Tracker',       number: 11,  phase: 'phase0' },
   { id: 'decisions',    label: 'Canvas Decision Record',   number: 12,  phase: 'phase0' },
   { id: 'evidence',     label: 'Evidence Library',         number: 13,  phase: 'phase0' },

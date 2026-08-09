@@ -201,7 +201,7 @@ export default function EngagementSettings({ clientId, canManage }) {
             id="cfg-terminology"
             aria-label="What to call each block"
             style={field}
-            value={c.terminology || 'zone'}
+            value={c.terminology || 'dp'}
             disabled={busy === 'terminology'}
             onChange={(e) => save('terminology', { terminology: e.target.value }, 'Naming changed.')}
           >

@@ -54,3 +54,46 @@ export function gateBefore(id: string): GateDefinition | null {
   const at = GATES.findIndex((g) => g.id === id)
   return at > 0 ? GATES[at - 1] : null
 }
+
+/**
+ * Whether a gate is open to somebody who is not the coaching team.
+ *
+ * The method works the blocks in order and a block is not finished until it has
+ * been signed off, so the organisation cannot start the next one until the one
+ * before it is closed. That is the discipline the whole thing rests on: a block
+ * opened early is a block worked without the decision behind it.
+ *
+ * The consultant is not subject to it. Setting an engagement up, correcting a
+ * record, and preparing a block before the session that will fill it are all
+ * ordinary parts of running one, and a lock that stopped the person running the
+ * engagement would be a lock nobody could use.
+ *
+ * `statusOf` answers with the gate's recorded status. A gate counts as closed
+ * when it is complete. Anything else, including evidence submitted and awaiting
+ * a signature, leaves the next one shut, because the point of the gate is the
+ * signature and not the paperwork before it.
+ */
+export function gateIsOpen(
+  id: string,
+  statusOf: (gateId: string) => string | null | undefined,
+  opts: { isCoachingTeam: boolean },
+): boolean {
+  if (opts.isCoachingTeam) return true
+  const at = GATES.findIndex((g) => g.id === id)
+  if (at <= 0) return true
+  const before = GATES[at - 1]
+  return statusOf(before.id) === 'complete'
+}
+
+/** Why a gate is shut, in words a person can act on, or null when it is open. */
+export function gateShutBecause(
+  id: string,
+  statusOf: (gateId: string) => string | null | undefined,
+  opts: { isCoachingTeam: boolean },
+): string | null {
+  if (gateIsOpen(id, statusOf, opts)) return null
+  const before = gateBefore(id)
+  return before
+    ? `${before.label} has to be signed off before this one opens.`
+    : 'This one is not open yet.'
+}

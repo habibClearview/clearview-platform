@@ -23,6 +23,7 @@ import { loadEngagementView } from '@/lib/engagement-loader'
 import { CANVAS_DP_IDS } from '@/lib/engagement-types'
 import BlockWorkspace, { hasWorkspace } from '@/components/gtcv/BlockWorkspace'
 import { BLOCK } from '@/lib/gtcv-blocks'
+import { gateShutBecause } from '@/lib/gtcv-gates'
 
 // ─── Scoped design CSS (faithful to the approved preview) ────
 // Scoped under .gj so the tokens, pseudo-elements and media queries reproduce
@@ -288,21 +289,33 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
   }
   const fillPct = fillIdx <= 0 ? (doneCount > 0 ? 4 : 0) : (fillIdx / (STOPS.length - 1)) * 100
 
+  // The coaching team, which is who the lock does not apply to. Declared here
+  // rather than inside the drawer, so the canvas and the drawer cannot end up
+  // answering the question differently.
+  const canManage = role === 'super_coach' || role === 'coach'
+
   const box = (dpId) => {
     const b = BLOCK[dpId]
     const s = gs[dpId] || 'not_started'
     const isCurrent = dpId === currentId
     const cls = ['box', b.color, boxStateClass(s, isCurrent)].filter(Boolean).join(' ')
     const label = `${termPrefix} ${dpId.replace('dp', '')}`
+    // A block stays shut until the one before it is signed off. The coaching
+    // team is not subject to it: preparing a block before the session that
+    // fills it is an ordinary part of running an engagement, and a lock that
+    // stopped the consultant would stop the work.
+    const shut = gateShutBecause(dpId, (g) => gs[g], { isCoachingTeam: canManage })
+    const open = () => { if (shut) { setFlash(shut); return } setOpenDp(dpId) }
     return (
       <article
         className={cls}
         role="button"
         tabIndex={0}
-        title="Open this block"
-        style={{ cursor: 'pointer' }}
-        onClick={() => setOpenDp(dpId)}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenDp(dpId) } }}
+        aria-disabled={shut ? 'true' : undefined}
+        title={shut || 'Open this block'}
+        style={{ cursor: shut ? 'not-allowed' : 'pointer', opacity: shut ? 0.55 : 1 }}
+        onClick={open}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
       >
         <div className="tagrow">
           <span className="dptag">{label}</span>
@@ -470,7 +483,6 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
         const previousGate = before
           ? { label: before.lab, status: gs[before.id] || 'not_started' }
           : null
-        const canManage = role === 'super_coach' || role === 'coach'
         // The evidence this gate must produce, from the confirmed mapping.
         const evidence = (view.gate_map || []).filter((m) => m.dp_id === openDp)
         const OPTIONS = [
