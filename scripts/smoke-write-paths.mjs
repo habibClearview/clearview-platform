@@ -307,14 +307,21 @@ async function main() {
       http('GET', `${BASE}/api/session-capture?token=${randomBytes(32).toString('hex')}`, {}), 404)
 
     // ── what the room said, becoming a row in the block ──
-    const said = http('GET', `${SB}/rest/v1/gtcv_session_contributions?select=id,dp_id&client_id=eq.${CLIENT_ID}&order=created_at.desc&limit=1`, { headers: jsonHeaders(SERVICE) })
+    // Chosen by what it says, not by being newest. By this point the room has
+    // two sentences in it, because the forged engagement id above was correctly
+    // written under this engagement rather than the one it claimed, and picking
+    // the newest quietly tested the wrong sentence.
+    const WORDS = 'Typed with no login'
+    const said = http('GET', `${SB}/rest/v1/gtcv_session_contributions?select=id,dp_id,contribution&client_id=eq.${CLIENT_ID}&contribution=eq.${encodeURIComponent(WORDS)}&limit=1`, { headers: jsonHeaders(SERVICE) })
     const contributionId = said.json?.[0]?.id
+    check('the sentence to be moved is the one the room typed', Boolean(contributionId),
+      `looked for ${JSON.stringify(WORDS)} and found ${JSON.stringify(said.json)}`)
     if (contributionId) {
       const promoted = post('/api/session-contributions', { clientId: CLIENT_ID, id: contributionId })
       expectStatus('turn what the room said into a row in the block', promoted, 200)
       const segments = http('GET', `${SB}/rest/v1/gtcv_customer_segments?select=id,problem_in_their_words&client_id=eq.${CLIENT_ID}`, { headers: jsonHeaders(SERVICE) })
       check('the row carries the words that were actually said',
-        (segments.json || []).some((r) => r.problem_in_their_words === 'Typed with no login'),
+        (segments.json || []).some((r) => r.problem_in_their_words === WORDS),
         `the block holds ${JSON.stringify((segments.json || []).map((r) => r.problem_in_their_words))}`)
       expectStatus('the same sentence cannot become a second row',
         post('/api/session-contributions', { clientId: CLIENT_ID, id: contributionId }), 409)
