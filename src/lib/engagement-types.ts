@@ -44,6 +44,11 @@ export interface EngagementConfig {
   momentum_status: MomentumStatus
   validation_min_per_segment: number | null
   independence_test_set: IndependenceTestSet
+  /** What the organisation prices and costs in, as a short code such as NGN.
+   *  Null means not decided, and amounts print without a currency. This is the
+   *  client's working currency, never the consultant's fee currency, which is
+   *  on engagement_clients and does not belong in front of the client. */
+  currency: string | null
   brand_overrides: Record<string, unknown> | null
   showcase_enabled: boolean
   created_at: string

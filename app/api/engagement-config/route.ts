@@ -63,7 +63,12 @@ export async function GET(req: NextRequest) {
 
     const { data } = await admin
       .from('engagement_config')
-      .select('client_id, tor_reference, tor_uploaded, terminology, momentum_status, validation_min_per_segment, independence_test_set, showcase_enabled, showcase_name_client, updated_at')
+      // Named columns rather than *, so a column added later is a deliberate
+      // decision to expose it rather than an accident. The cost of that is
+      // this list: a new setting has to be added here as well as to the PATCH,
+      // and forgetting means it saves and then reads back empty, which looks
+      // like the save failed. That is exactly what happened to currency.
+      .select('client_id, tor_reference, tor_uploaded, terminology, momentum_status, validation_min_per_segment, independence_test_set, currency, showcase_enabled, showcase_name_client, updated_at')
       .eq('client_id', clientId)
       .maybeSingle()
 
