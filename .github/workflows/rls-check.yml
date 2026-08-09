@@ -1,0 +1,54 @@
+name: Row level security gate
+
+# The public anon key ships inside the browser bundle. That is how Supabase is
+# meant to work, and it is only safe because row level security stands behind
+# it. A table created without it is not a slightly weak table, it is a table any
+# stranger can read using a key they can copy out of the page source.
+#
+# It had already happened here, to seventy one tables, and nothing said so. The
+# application looked healthy, every page worked, and the exposure was invisible
+# until somebody asked the database directly. So this asks on every change.
+#
+# The check needs credentials, because the only honest answer comes from the
+# database itself. Where they are absent the job says so loudly rather than
+# passing quietly: a green tick that means "did not look" is worse than no tick
+# at all, since it is the tick a reviewer trusts.
+#
+# The secret is read into the job environment first and the condition tests the
+# environment, because the secrets context is not dependable inside a step
+# level if.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rls-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rls:
+    name: Every table in the public schema must have row level security
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: '20'
+      - name: Check row level security
+        run: |
+          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::warning::Row level security was not checked. Set the SUPABASE_URL repository"
+            echo "::warning::variable and the SUPABASE_SERVICE_ROLE_KEY secret to turn this gate on."
+            echo "Skipped. Without credentials this cannot tell a safe schema from an unchecked one."
+            exit 0
+          fi
+          node scripts/rls-check.mjs
