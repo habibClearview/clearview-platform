@@ -126,6 +126,19 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
+    if (body.currency !== undefined) {
+      // A short code, upper cased, or null to go back to bare numbers. Not
+      // validated against a list of world currencies: an engagement is free to
+      // work in whatever its client actually prices in, and a list would be one
+      // more thing to be out of date. Length is capped so the column cannot be
+      // used as a second notes field.
+      const raw = typeof body.currency === 'string' ? body.currency.trim().toUpperCase() : ''
+      if (raw.length > 8) {
+        return NextResponse.json({ error: 'A currency is a short code, such as NGN or USD' }, { status: 400 })
+      }
+      patch.currency = raw || null
+    }
+
     if (typeof body.torReference === 'string') {
       patch.tor_reference = body.torReference.trim().slice(0, 200) || null
     }

@@ -1767,6 +1767,38 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   if(error)return<div style={{padding:'2rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}><div style={{color:C.red,marginBottom:'1.5rem'}}>Error loading data: {error}</div><p style={{color:C.slate,fontSize:'1.07rem',marginBottom:'1rem'}}>This is usually caused by a stale session. Sign out and sign back in to fix it.</p><button onClick={onSignOut} style={{fontFamily:'monospace',fontSize:'1.07rem',padding:'0.6rem 1.4rem',border:'none',borderRadius:6,background:'var(--cv-header)',color:'var(--cv-on-accent)',cursor:'pointer'}}>Sign Out and Refresh</button></div>
 
   const selClient=clients.find(c=>c.id===selClientId)
+
+  // The engagement's working currency, so every money figure inside a block
+  // prints as money rather than as a bare number. It lives on
+  // engagement_config because it is set per engagement, and it is deliberately
+  // not engagement_clients.fee_currency, which is what the consultant invoices
+  // in and never belongs in front of the organisation. A failed fetch leaves it
+  // undefined, which is exactly the old behaviour: amounts with no currency.
+  // The sidebar collapses to a rail of numbers, because twenty nine tabs at a
+  // fixed 220px take a quarter of the screen away from the block a coach is
+  // actually working in, and blocks hold wide tables. Collapsed it keeps the
+  // number and the status dot, which is what tells you where you are; the
+  // label comes back on hover as a tooltip. The choice is remembered, so it
+  // survives changing tab and reloading, and it never hides a tab: this is a
+  // width control, not a filter.
+  const [navCollapsed,setNavCollapsed]=useState(false)
+  useEffect(()=>{
+    try{setNavCollapsed(window.localStorage.getItem('cv.coachNavCollapsed')==='1')}catch{}
+  },[])
+  useEffect(()=>{
+    try{window.localStorage.setItem('cv.coachNavCollapsed',navCollapsed?'1':'0')}catch{}
+  },[navCollapsed])
+
+  const [engagementCurrency,setEngagementCurrency]=useState(null)
+  useEffect(()=>{
+    let cancelled=false
+    if(!selClient?.id){setEngagementCurrency(null);return}
+    supabase.from('engagement_config').select('currency').eq('client_id',selClient.id).maybeSingle()
+      .then(({data})=>{if(!cancelled)setEngagementCurrency(data?.currency||null)})
+      .catch(()=>{if(!cancelled)setEngagementCurrency(null)})
+    return ()=>{cancelled=true}
+  },[selClient?.id])
+
   const selClientFullData=clientData[selClientId]||{}
 
   // \u2500\u2500 OVERVIEW \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -2124,21 +2156,28 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         {isSuperCoach&&<ClientTeamInvite client={selClient}/>}
 
         {/* Two-column layout: sidebar + content */}
-        <div style={{display:'grid',gridTemplateColumns:'220px 1fr',gap:'1.5rem',alignItems:'start'}}>
+        <div style={{display:'grid',gridTemplateColumns:navCollapsed?'62px 1fr':'220px 1fr',gap:'1.5rem',alignItems:'start'}}>
 
           {/* Sidebar \u2014 25 tabs */}
           <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',position:'sticky',top:'1rem'}}>
+            <button
+              type="button"
+              onClick={()=>setNavCollapsed(v=>!v)}
+              aria-expanded={!navCollapsed}
+              title={navCollapsed?'Show the tab names':'Collapse to give the content more room'}
+              style={{width:'100%',textAlign:navCollapsed?'center':'left',padding:'0.5rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:C.white,color:C.slate,cursor:'pointer',fontFamily:'monospace',fontSize:'0.9rem'}}
+            >{navCollapsed?'\u00bb':'\u00ab Collapse'}</button>
             {visibleTabs.map(tab=>{
               const isActive=activeTab===tab.id
               const dpCanvas=canvas.find(dp=>dp.dp_id===tab.dpId)
               return(
-                <button key={tab.id} onClick={()=>setActiveTab(tab.id)} style={{width:'100%',textAlign:'left',padding:'0.6rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:isActive?'var(--cv-header)':C.white,color:isActive?'var(--cv-on-accent)':C.navy,cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:'1.01rem',fontFamily:"'Segoe UI',system-ui,sans-serif",fontWeight:isActive?700:400}}>
+                <button key={tab.id} onClick={()=>setActiveTab(tab.id)} title={navCollapsed?`${String(tab.number).padStart(2,'0')} ${tab.label}`:undefined} style={{width:'100%',textAlign:'left',padding:navCollapsed?'0.6rem 0.3rem':'0.6rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:isActive?'var(--cv-header)':C.white,color:isActive?'var(--cv-on-accent)':C.navy,cursor:'pointer',display:'flex',justifyContent:navCollapsed?'center':'space-between',alignItems:'center',gap:navCollapsed?'0.25rem':0,fontSize:'1.01rem',fontFamily:"'Segoe UI',system-ui,sans-serif",fontWeight:isActive?700:400}}>
                   <span>
-                    <span style={{fontFamily:'monospace',fontSize:'0.93rem',color:isActive?C.cyan:C.slate,marginRight:'0.4rem'}}>{String(tab.number).padStart(2,'0')}</span>
-                    {tab.label}
+                    <span style={{fontFamily:'monospace',fontSize:'0.93rem',color:isActive?C.cyan:C.slate,marginRight:navCollapsed?0:'0.4rem'}}>{String(tab.number).padStart(2,'0')}</span>
+                    {navCollapsed?null:tab.label}
                   </span>
                   {dpCanvas&&<DPDot status={dpCanvas.status}/>}
-                  {tab.coachOnly&&<span style={{fontSize:'0.93rem',color:isActive?C.cyan:C.amber}}>\ud83d\udc41</span>}
+                  {tab.coachOnly&&!navCollapsed&&<span style={{fontSize:'0.93rem',color:isActive?C.cyan:C.amber}}>\ud83d\udc41</span>}
                 </button>
               )
             })}
@@ -2165,12 +2204,12 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             {activeTab==='evidence'&&<><EvidenceLibraryPanel clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/><TabEvidence client={selClient} evidence={evidence} onAdd={async(e)=>{const ref=`E-${String(evidence.length+1).padStart(3,'0')}`;const {data}=await supabase.from('evidence_library').insert([{...e,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:[...evidence,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`evidence:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:evidence.map(e=>e.id!==id?e:{...e,...updates})}})),()=>supabase.from('evidence_library').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/></>}
             {activeTab==='handover'&&<><HandoverIndependence clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/></>}
             {activeTab==='handover'&&<TabHandover client={selClient} handover={handover} canvas={canvas} userRole={userRole} onUpdate={(id,updates)=>optimisticWrite(`handover:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,handover:handover.map(h=>h.id!==id?h:{...h,...updates})}})),()=>supabase.from('handover_record').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
-            {activeTab==='phase0'&&<><TabDP client={selClient} dp={canvas.find(d=>d.dp_id==='phase_0')} userRole={userRole} onUpdateDP={u=>updateDP(selClient.id,'phase_0',u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,'phase_0',cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId="phase_0" clientId={selClient.id} canManage={canEdit(userRole)}/></div></>}
+            {activeTab==='phase0'&&<><TabDP client={selClient} dp={canvas.find(d=>d.dp_id==='phase_0')} userRole={userRole} onUpdateDP={u=>updateDP(selClient.id,'phase_0',u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,'phase_0',cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId="phase_0" clientId={selClient.id} canManage={canEdit(userRole)} currency={engagementCurrency}/></div></>}
             {['dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09'].map(dpKey=>(
               // One condition per tab. The same nine keys used to be mapped
               // twice with the same test in both, so every render walked the
               // list twice to decide the same thing.
-              activeTab===dpKey&&<div key={dpKey}><TabDP client={selClient} dp={canvas.find(d=>d.dp_id===dpKey)} userRole={userRole} onUpdateDP={u=>updateDP(selClient.id,dpKey,u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,dpKey,cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId={dpKey} clientId={selClient.id} canManage={canEdit(userRole)}/></div></div>
+              activeTab===dpKey&&<div key={dpKey}><TabDP client={selClient} dp={canvas.find(d=>d.dp_id===dpKey)} userRole={userRole} onUpdateDP={u=>updateDP(selClient.id,dpKey,u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,dpKey,cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId={dpKey} clientId={selClient.id} canManage={canEdit(userRole)} currency={engagementCurrency}/></div></div>
             ))}
             {activeTab==='int_brief'&&<><InterviewBriefing/><div style={{height:22}}/><TabInterviewBriefing client={selClient} interviews={interviews} onAdd={async(i)=>{const ref=`INT-${String(interviews.length+1).padStart(3,'0')}`;const {data}=await supabase.from('interviews').insert([{...i,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,interviews:[...interviews,data]}}))}}/></>}
             {activeTab==='int_capture'&&<><InterviewCaptureForm clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/><TabInterviewCapture client={selClient} interviews={interviews}

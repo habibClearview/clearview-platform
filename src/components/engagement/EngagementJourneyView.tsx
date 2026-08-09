@@ -547,7 +547,7 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
               {hasWorkspace(openDp) ? (
                 <div style={{ marginTop: 24 }}>
                   <h3 style={{ fontFamily: 'var(--fm)', fontSize: 10.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--teal)', margin: '0 0 10px' }}>Do the work</h3>
-                  <BlockWorkspace dpId={openDp} clientId={view.client.id} canManage={canManage} />
+                  <BlockWorkspace dpId={openDp} clientId={view.client.id} canManage={canManage} currency={view.config?.currency} />
                 </div>
               ) : null}
 

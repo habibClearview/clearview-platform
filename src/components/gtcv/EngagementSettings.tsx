@@ -64,6 +64,7 @@ export default function EngagementSettings({ clientId, canManage }) {
   const [busy, setBusy] = useState(null)
   const [minDraft, setMinDraft] = useState('')
   const [torDraft, setTorDraft] = useState('')
+  const [currencyDraft, setCurrencyDraft] = useState('')
 
   const load = useCallback(async () => {
     if (!clientId) { setLoading(false); return }
@@ -73,6 +74,7 @@ export default function EngagementSettings({ clientId, canManage }) {
       setConfig(r.config)
       setMinDraft(r.config?.validation_min_per_segment == null ? '' : String(r.config.validation_min_per_segment))
       setTorDraft(r.config?.tor_reference || '')
+      setCurrencyDraft(r.config?.currency || '')
       setErr(null)
     } catch (e) { setErr(e.message) }
     setLoading(false)
@@ -230,6 +232,40 @@ export default function EngagementSettings({ clientId, canManage }) {
           when {CONVERGENCE_MINIMUM} conversations point at the same problem with a real budget
           behind it, and that stays at {CONVERGENCE_MINIMUM} whatever this says. Agreeing to hold
           fewer conversations does not make fewer conversations into proof.
+        </p>
+      </div>
+
+      <div style={{ marginTop: '1.3rem' }}>
+        <label htmlFor="cfg-currency" style={label}>The currency this engagement works in</label>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            id="cfg-currency"
+            aria-label="The currency this engagement works in"
+            style={{ ...field, maxWidth: 140 }}
+            value={currencyDraft}
+            placeholder="NGN"
+            maxLength={8}
+            onChange={(e) => setCurrencyDraft(e.target.value)}
+          />
+          <button
+            type="button"
+            style={{
+              ...mono, fontSize: '0.83rem', padding: '0.36rem 0.8rem',
+              border: `1px solid ${C.slate}`, borderRadius: 7, background: 'transparent',
+              color: C.slate, cursor: 'pointer',
+            }}
+            disabled={busy === 'currency'}
+            onClick={() => save('currency', { currency: currencyDraft }, currencyDraft.trim()
+              ? `Amounts now read in ${currencyDraft.trim().toUpperCase()}.`
+              : 'Amounts now show without a currency.')}
+          >{busy === 'currency' ? 'Saving...' : 'Save'}</button>
+        </div>
+        <p style={{ ...hint, margin: '0.35rem 0 0' }}>
+          What the organisation prices and costs in. Every cost line, price and pipeline figure in the
+          blocks reads in this. Leave it empty and amounts show as plain numbers, which is honest for
+          an engagement that has not decided but is hard to read once there are figures in the tables.{' '}
+          <strong>This is not your fee currency.</strong> What you invoice in is held separately and
+          never appears in front of the organisation.
         </p>
       </div>
 
