@@ -1,0 +1,1880 @@
+{
+  "name": "Agricultural advisory worked example",
+  "summary": "A development organisation that has been delivering extension and advisory services on grant money, working out which of those services a customer would pay for. Every organisation, person, price and quotation below is invented. It exists so that a coach can open any block and show what a filled table looks like, and so that a team can practise on the surfaces before they put their own work into them.",
+  "keys": {
+    "note": "Rows carry an optional _key. Another row points at it with {\"_ref\": \"<key>\"}. The loader turns both into the same stable identifier, so the example can be loaded twice without duplicating anything."
+  },
+  "tables": {
+    "gtcv_service_inventory": [
+      {
+        "_key": "svc_extension",
+        "service_name": "Field extension visits",
+        "what_it_delivers": "An agronomist visits a farm group once a fortnight through the season and advises on spacing, input rates and pest control.",
+        "logic_type": "grant",
+        "has_demand": "unsure",
+        "hidden_delivery_costs": "Vehicle, fuel and per diem carried by the programme budget, never costed against the service. Roughly a third of the true cost.",
+        "delivery_quality_risk": "Quality sits with the individual agronomist. Two visits by two people are not the same service.",
+        "decision": "redesign",
+        "notes": "Farmers value the visit but have never been asked to pay for it. The buyer, if there is one, is more likely the offtaker than the farmer.",
+        "sort_order": 1
+      },
+      {
+        "_key": "svc_soil",
+        "service_name": "Soil testing and fertiliser recommendation",
+        "what_it_delivers": "Sampling, laboratory analysis and a written recommendation per plot.",
+        "logic_type": "market",
+        "has_demand": "yes",
+        "hidden_delivery_costs": "Laboratory turnaround is bought in. Sample transport is the part that has never been priced.",
+        "delivery_quality_risk": "Low. The laboratory result is the same whoever collects the sample, provided collection follows the protocol.",
+        "decision": "keep",
+        "notes": "Three aggregators have asked what it would cost. That is the clearest unprompted demand signal in the inventory.",
+        "sort_order": 2
+      },
+      {
+        "_key": "svc_traceability",
+        "service_name": "Traceability and record keeping setup",
+        "what_it_delivers": "Farmer registration, plot mapping and a harvest record a buyer can audit.",
+        "logic_type": "market",
+        "has_demand": "yes",
+        "hidden_delivery_costs": "Data cleaning after enumeration. Budgeted as nothing, consumes two staff weeks per scheme.",
+        "delivery_quality_risk": "Medium. The record is only worth what the enumeration was worth.",
+        "decision": "keep",
+        "notes": "Processors need this for their own compliance reporting. They have a budget line for it already.",
+        "sort_order": 3
+      },
+      {
+        "_key": "svc_training",
+        "service_name": "Cooperative governance training",
+        "what_it_delivers": "A five day course for cooperative executives on bookkeeping, membership records and meeting discipline.",
+        "logic_type": "grant",
+        "has_demand": "no",
+        "hidden_delivery_costs": "Venue, transport and refreshment, all of which participants expect to be paid for rather than to pay.",
+        "delivery_quality_risk": "Low.",
+        "decision": "stop",
+        "notes": "Attendance collapses the moment the transport allowance is withdrawn. That is the test and it has already been run.",
+        "sort_order": 4
+      },
+      {
+        "_key": "svc_market_link",
+        "service_name": "Market linkage brokering",
+        "what_it_delivers": "Introducing farmer groups to buyers, agreeing volume and price, following the delivery through.",
+        "logic_type": "mixed",
+        "has_demand": "yes",
+        "hidden_delivery_costs": "The follow through. Everyone budgets the introduction and nobody budgets the six weeks after it.",
+        "delivery_quality_risk": "High. A failed delivery damages the relationship on both sides.",
+        "decision": "redesign",
+        "notes": "Buyers would pay for reliable volume. They will not pay for an introduction.",
+        "sort_order": 5
+      },
+      {
+        "_key": "svc_mechanisation",
+        "service_name": "Mechanisation service coordination",
+        "what_it_delivers": "Scheduling tractor and thresher hire across member groups.",
+        "logic_type": "unclear",
+        "has_demand": "unsure",
+        "hidden_delivery_costs": "Coordination time, which is the whole service and is currently unpaid.",
+        "delivery_quality_risk": "Medium. Depends on equipment owners who are outside the organisation.",
+        "decision": "pause",
+        "notes": "Held until the segment work says who the buyer is. Coordinating something you do not own is a thin position.",
+        "sort_order": 6
+      },
+      {
+        "_key": "svc_mande",
+        "service_name": "Monitoring and results reporting for other programmes",
+        "what_it_delivers": "Survey design, enumeration and a results report against a donor logframe.",
+        "logic_type": "market",
+        "has_demand": "yes",
+        "hidden_delivery_costs": "Statistical review before submission. Skilled, scarce and currently absorbed by one person.",
+        "delivery_quality_risk": "Medium. Reputation rests on the numbers holding up under scrutiny.",
+        "decision": "keep",
+        "notes": "Two organisations have bought this already without it being offered. The strongest evidence of a market in the inventory.",
+        "sort_order": 7
+      },
+      {
+        "_key": "svc_inputs",
+        "service_name": "Input aggregation and last mile delivery",
+        "what_it_delivers": "Pooling seed and fertiliser orders across groups and delivering to the ward.",
+        "logic_type": "mixed",
+        "has_demand": "yes",
+        "hidden_delivery_costs": "Working capital. The organisation carries the cost of goods between order and repayment and has never treated that as a cost.",
+        "delivery_quality_risk": "High. Late delivery in a planting window is worse than no delivery.",
+        "decision": "redesign",
+        "notes": "This is trading, not advisory. Different risk, different balance sheet, and it needs a decision at the board rather than in a workshop.",
+        "sort_order": 8
+      }
+    ],
+    "gtcv_customer_segments": [
+      {
+        "_key": "seg_aggregators",
+        "segment_name": "Medium scale grain aggregators",
+        "problem_in_their_words": "I buy on quality I cannot see until it reaches the warehouse, and by then I have paid for it.",
+        "budget_holder_name": "Adaeze Nwankwo",
+        "budget_holder_role": "Managing Director",
+        "problem_urgency": 5,
+        "willing": "yes",
+        "able": "yes",
+        "prioritised": "yes",
+        "conversations_logged": 6,
+        "converging_count": 4,
+        "notes": "Rejection at the processor gate is the cost they can name to the naira. Everything else they treat as noise.",
+        "sort_order": 1
+      },
+      {
+        "_key": "seg_processors",
+        "segment_name": "Processor led outgrower schemes",
+        "problem_in_their_words": "My compliance team cannot evidence where the crop came from, and my export buyer now asks every quarter.",
+        "budget_holder_name": "Tunde Bakare",
+        "budget_holder_role": "Head of Supply Chain",
+        "problem_urgency": 5,
+        "willing": "yes",
+        "able": "yes",
+        "prioritised": "yes",
+        "conversations_logged": 5,
+        "converging_count": 3,
+        "notes": "Already has a budget line called supplier assurance. The money exists and is being spent badly.",
+        "sort_order": 2
+      },
+      {
+        "_key": "seg_agrodealers",
+        "segment_name": "Agro-dealer networks",
+        "problem_in_their_words": "Farmers buy the wrong product, blame me when the yield disappoints, and go elsewhere next season.",
+        "budget_holder_name": "Halima Suleiman",
+        "budget_holder_role": "Network Coordinator",
+        "problem_urgency": 3,
+        "willing": "unsure",
+        "able": "no",
+        "prioritised": "no",
+        "conversations_logged": 4,
+        "converging_count": 1,
+        "notes": "Real problem, no budget. They want the input manufacturer to pay for it, which makes the manufacturer the segment, not them.",
+        "sort_order": 3
+      },
+      {
+        "_key": "seg_programmes",
+        "segment_name": "Development programmes needing results reporting",
+        "problem_in_their_words": "My reporting deadline is fixed and my enumeration capacity is not.",
+        "budget_holder_name": "Grace Achebe",
+        "budget_holder_role": "Programme Manager",
+        "problem_urgency": 4,
+        "willing": "yes",
+        "able": "yes",
+        "prioritised": "yes",
+        "conversations_logged": 5,
+        "converging_count": 3,
+        "notes": "Buys already, without being sold to. The risk here is not demand, it is that the work is grant money wearing a different hat.",
+        "sort_order": 4
+      },
+      {
+        "_key": "seg_state",
+        "segment_name": "State agricultural development agencies",
+        "problem_in_their_words": "We are told to reach a number of farmers and we have no way to show we did.",
+        "budget_holder_name": "Ibrahim Danjuma",
+        "budget_holder_role": "Director of Planning",
+        "problem_urgency": 3,
+        "willing": "unsure",
+        "able": "unsure",
+        "prioritised": "no",
+        "conversations_logged": 3,
+        "converging_count": 0,
+        "notes": "Procurement cycle is twelve to eighteen months and payment is unreliable. Kept on the list, kept out of the pilot.",
+        "sort_order": 5
+      }
+    ],
+    "gtcv_problem_scores": [
+      {
+        "segment_id": {
+          "_ref": "seg_aggregators"
+        },
+        "segment_label": "Medium scale grain aggregators",
+        "problem_statement": "Grain is rejected or discounted at the processor gate because moisture and foreign matter were never measured before purchase.",
+        "urgency_score": 5,
+        "ownership_clarity_score": 5,
+        "willingness_to_pay_score": 4,
+        "access_score": 5,
+        "notes": "The managing director owns the loss and signs the cheque. That is the cleanest ownership in the set.",
+        "sort_order": 1
+      },
+      {
+        "segment_id": {
+          "_ref": "seg_processors"
+        },
+        "segment_label": "Processor led outgrower schemes",
+        "problem_statement": "The scheme cannot evidence origin and volume per farmer, so export compliance queries take weeks to answer.",
+        "urgency_score": 5,
+        "ownership_clarity_score": 4,
+        "willingness_to_pay_score": 5,
+        "access_score": 4,
+        "notes": "Head of supply chain owns it, but the finance director releases the money. Two conversations, not one.",
+        "sort_order": 2
+      },
+      {
+        "segment_id": {
+          "_ref": "seg_programmes"
+        },
+        "segment_label": "Development programmes needing results reporting",
+        "problem_statement": "Reporting deadlines arrive faster than in house enumeration capacity can meet them.",
+        "urgency_score": 4,
+        "ownership_clarity_score": 5,
+        "willingness_to_pay_score": 4,
+        "access_score": 5,
+        "notes": "Urgent four times a year and invisible in between. Revenue will be lumpy.",
+        "sort_order": 3
+      },
+      {
+        "segment_id": {
+          "_ref": "seg_agrodealers"
+        },
+        "segment_label": "Agro-dealer networks",
+        "problem_statement": "Product misapplication by customers damages the dealer's reputation and repeat trade.",
+        "urgency_score": 3,
+        "ownership_clarity_score": 2,
+        "willingness_to_pay_score": 1,
+        "access_score": 4,
+        "notes": "Feels the pain, does not hold the budget, and expects the manufacturer to pay. Scored honestly rather than hopefully.",
+        "sort_order": 4
+      },
+      {
+        "segment_id": {
+          "_ref": "seg_state"
+        },
+        "segment_label": "State agricultural development agencies",
+        "problem_statement": "No verifiable record of farmer reach against the mandate they are measured on.",
+        "urgency_score": 3,
+        "ownership_clarity_score": 2,
+        "willingness_to_pay_score": 2,
+        "access_score": 2,
+        "notes": "Access is the binding constraint. Three conversations in four months and none with a budget holder.",
+        "sort_order": 5
+      }
+    ],
+    "gtcv_hypotheses_shortlist": [
+      {
+        "hypothesis": "Aggregators will pay per lot for pre purchase quality verification because rejection at the gate is a cost they can already quantify.",
+        "urgency": 5,
+        "ownership_clarity": 5,
+        "willingness_to_pay": 4,
+        "access": 5,
+        "advances": true,
+        "notes": "Advanced to A/B testing and to the first pilot round. Highest total and the only one where the buyer named a figure without being prompted.",
+        "sort_order": 1
+      },
+      {
+        "hypothesis": "Processors will pay an annual fee per scheme for a traceability record their compliance team can hand to a buyer.",
+        "urgency": 5,
+        "ownership_clarity": 4,
+        "willingness_to_pay": 5,
+        "access": 4,
+        "advances": true,
+        "notes": "Advanced to A/B testing and to the second pilot round. Budget already exists under supplier assurance, so the sale is a reallocation rather than a new line.",
+        "sort_order": 2
+      },
+      {
+        "hypothesis": "Programmes will pay day rates for enumeration and results reporting at peak reporting periods.",
+        "urgency": 4,
+        "ownership_clarity": 5,
+        "willingness_to_pay": 4,
+        "access": 5,
+        "advances": false,
+        "notes": "Held. Revenue is real but it is donor money reaching us through one more hop, so it does not test independence. Kept visible precisely because it is the comfortable option and would quietly become the whole strategy if unexamined.",
+        "sort_order": 3
+      },
+      {
+        "hypothesis": "Agro-dealers will pay for advisory content that reduces product misapplication.",
+        "urgency": 3,
+        "ownership_clarity": 2,
+        "willingness_to_pay": 1,
+        "access": 4,
+        "advances": false,
+        "notes": "Dropped at DP02. Four conversations, no budget holder found. If it returns it returns as a manufacturer hypothesis.",
+        "sort_order": 4
+      }
+    ],
+    "gtcv_problem_owner_budget": [
+      {
+        "problem": "Grain rejected or discounted at the processor gate",
+        "experienced_by": "Aggregator warehouse manager",
+        "accountable": "Managing Director",
+        "budget_holder": "Managing Director",
+        "cost_of_not_solving": "Two rejected lots in the last season, quoted at roughly 1.8m naira each in discount and re-haulage.",
+        "budget_mechanism": "Operating cost, signed off by the Managing Director without a procurement process.",
+        "sort_order": 1
+      },
+      {
+        "problem": "Cannot evidence crop origin for export compliance",
+        "experienced_by": "Compliance officer",
+        "accountable": "Head of Supply Chain",
+        "budget_holder": "Finance Director",
+        "cost_of_not_solving": "A delayed shipment last quarter and a standing risk to the export licence.",
+        "budget_mechanism": "Existing supplier assurance line, reallocated at budget review in the first quarter.",
+        "sort_order": 2
+      },
+      {
+        "problem": "Enumeration capacity below reporting demand at peak",
+        "experienced_by": "Programme officers",
+        "accountable": "Programme Manager",
+        "budget_holder": "Programme Manager, within an approved budget",
+        "cost_of_not_solving": "Late reporting, which threatens the next tranche.",
+        "budget_mechanism": "Consultancy line inside an already approved programme budget.",
+        "sort_order": 3
+      },
+      {
+        "problem": "Farmers apply the wrong input and blame the dealer",
+        "experienced_by": "Agro-dealer",
+        "accountable": "Nobody clearly",
+        "budget_holder": "None found",
+        "cost_of_not_solving": "Lost repeat trade, felt but not measured.",
+        "budget_mechanism": "None. Four conversations produced no budget holder.",
+        "sort_order": 4
+      }
+    ],
+    "gtcv_interview_captures": [
+      {
+        "interviewer_name": "Lead consultant",
+        "interviewee_name": "Adaeze Nwankwo",
+        "interviewee_role": "Managing Director",
+        "organisation": "Riverbend Commodities",
+        "segment": "Medium scale grain aggregators",
+        "interview_date": "2026-06-11",
+        "role_accountability_score": 5,
+        "role_accountability_verbatim": "If a lot is rejected it comes out of my margin. Nobody else's.",
+        "role_accountability_interpretation": "Owns the loss and the decision. No further approval needed.",
+        "problem_reality_score": 5,
+        "problem_reality_verbatim": "It happened twice last season. I can tell you the dates.",
+        "problem_reality_interpretation": "Specific and recent rather than general and hypothetical.",
+        "consequence_severity_score": 5,
+        "consequence_severity_verbatim": "About 1.8 million naira a lot once you count the re-haulage.",
+        "consequence_severity_interpretation": "Quantified unprompted, which is the marker of a real cost rather than a remembered irritation.",
+        "current_attempts_score": 4,
+        "current_attempts_verbatim": "I send my warehouse man to look at it. He is guessing and we both know it.",
+        "current_attempts_interpretation": "An existing workaround they already distrust. Displacing it is easier than creating a new habit.",
+        "budget_authority_score": 5,
+        "budget_authority_verbatim": "I sign anything under five million myself.",
+        "budget_authority_interpretation": "Budget holder confirmed in the room.",
+        "willingness_to_pay_score": 4,
+        "willingness_to_pay_verbatim": "If it stops one rejection a season I would pay twenty five thousand a lot without arguing.",
+        "willingness_to_pay_interpretation": "A number offered without a price being mentioned first. Strong signal.",
+        "most_important_verbatim": "About 1.8 million naira a lot once you count the re-haulage.",
+        "strongest_purchasing_signal": "Named a per lot price before being asked one.",
+        "budget_signal_strength": "strong",
+        "assumption_confirmed": "Aggregators can name the cost of a rejected lot to the naira.",
+        "assumption_overturned": "",
+        "follow_up_needed": "",
+        "referral_obtained": "Introduction to a neighbouring aggregator, offered unprompted.",
+        "overall_score": 5,
+        "status": "submitted",
+        "sort_order": 1
+      },
+      {
+        "interviewer_name": "Co-implementer",
+        "interviewee_name": "Emeka Obi",
+        "interviewee_role": "Operations Manager",
+        "organisation": "Kaduna Grain Partners",
+        "segment": "Medium scale grain aggregators",
+        "interview_date": "2026-06-12",
+        "role_accountability_score": 4,
+        "role_accountability_verbatim": "I run the buying but the owner decides what we spend on.",
+        "role_accountability_interpretation": "Feels the problem, does not hold the budget. A second conversation is needed.",
+        "problem_reality_score": 5,
+        "problem_reality_verbatim": "Every season. It is the thing that keeps me awake in November.",
+        "problem_reality_interpretation": "Recurring and seasonal, which tells us when the sale can be made.",
+        "consequence_severity_score": 4,
+        "consequence_severity_verbatim": "We took a five per cent discount on a whole truck in December.",
+        "consequence_severity_interpretation": "Quantified as a percentage rather than a figure, so slightly softer than the Riverbend account.",
+        "current_attempts_score": 3,
+        "current_attempts_verbatim": "We buy from people we know. That is the system.",
+        "current_attempts_interpretation": "Relationship as risk control. Cheap, and it fails exactly when volumes grow.",
+        "budget_authority_score": 2,
+        "budget_authority_verbatim": "You would have to speak to the owner.",
+        "budget_authority_interpretation": "Not the budget holder. Referral obtained.",
+        "willingness_to_pay_score": 3,
+        "willingness_to_pay_verbatim": "If it worked, yes, but I cannot tell you what he would pay.",
+        "willingness_to_pay_interpretation": "Endorsement without authority. Counts as a lead, not as a purchasing signal.",
+        "most_important_verbatim": "It is the thing that keeps me awake in November.",
+        "strongest_purchasing_signal": "Offered an introduction to the owner.",
+        "budget_signal_strength": "weak",
+        "assumption_confirmed": "The rejection problem is real and seasonal.",
+        "assumption_overturned": "",
+        "follow_up_needed": "Meet the owner, who holds the budget. Introduction offered.",
+        "referral_obtained": "The owner of Kaduna Grain Partners.",
+        "overall_score": 4,
+        "status": "submitted",
+        "sort_order": 2
+      },
+      {
+        "interviewer_name": "Lead consultant",
+        "interviewee_name": "Fatima Yusuf",
+        "interviewee_role": "Proprietor",
+        "organisation": "Northgate Trading",
+        "segment": "Medium scale grain aggregators",
+        "interview_date": "2026-06-18",
+        "role_accountability_score": 5,
+        "role_accountability_verbatim": "It is my business. Everything is mine.",
+        "role_accountability_interpretation": "Owner operator. Fastest possible decision path.",
+        "problem_reality_score": 4,
+        "problem_reality_verbatim": "It has happened, but not last season.",
+        "problem_reality_interpretation": "Real but not current, which weakens urgency.",
+        "consequence_severity_score": 3,
+        "consequence_severity_verbatim": "It hurt at the time. We recovered.",
+        "consequence_severity_interpretation": "No figure offered. The cost is not carried in the head, which usually means it is not carried in the budget either.",
+        "current_attempts_score": 3,
+        "current_attempts_verbatim": "I changed who I buy from.",
+        "current_attempts_interpretation": "Solved it structurally rather than by measurement.",
+        "budget_authority_score": 5,
+        "budget_authority_verbatim": "I decide.",
+        "budget_authority_interpretation": "Budget holder confirmed.",
+        "willingness_to_pay_score": 2,
+        "willingness_to_pay_verbatim": "Maybe. Come back when you have run it somewhere.",
+        "willingness_to_pay_interpretation": "A polite deferral, recorded as such rather than as interest.",
+        "most_important_verbatim": "Come back when you have run it somewhere.",
+        "strongest_purchasing_signal": "None. Deferred to proof from elsewhere.",
+        "budget_signal_strength": "weak",
+        "assumption_confirmed": "",
+        "assumption_overturned": "",
+        "follow_up_needed": "Return once the service has run at another yard.",
+        "referral_obtained": "",
+        "overall_score": 3,
+        "status": "submitted",
+        "sort_order": 3
+      },
+      {
+        "interviewer_name": "Lead consultant",
+        "interviewee_name": "Tunde Bakare",
+        "interviewee_role": "Head of Supply Chain",
+        "organisation": "Sunrise Foods Processing",
+        "segment": "Processor led outgrower schemes",
+        "interview_date": "2026-06-20",
+        "role_accountability_score": 5,
+        "role_accountability_verbatim": "When the buyer asks where it came from, they ask me.",
+        "role_accountability_interpretation": "Accountable, and named as such by the buyer.",
+        "problem_reality_score": 5,
+        "problem_reality_verbatim": "Last quarter it took us eleven days to answer one question about one consignment.",
+        "problem_reality_interpretation": "Dated, measured, and told without prompting.",
+        "consequence_severity_score": 5,
+        "consequence_severity_verbatim": "A delayed shipment, and a note on our file. The next one puts the licence in play.",
+        "consequence_severity_interpretation": "Consequence is regulatory rather than only financial, which raises urgency above a cost saving.",
+        "current_attempts_score": 4,
+        "current_attempts_verbatim": "We have a spreadsheet. Three people update it and none of them agree.",
+        "current_attempts_interpretation": "A failing internal system. The comparison is against a known cost, not against nothing.",
+        "budget_authority_score": 4,
+        "budget_authority_verbatim": "There is a supplier assurance line. I propose, finance releases.",
+        "budget_authority_interpretation": "Budget exists. Two signatures, both identified.",
+        "willingness_to_pay_score": 5,
+        "willingness_to_pay_verbatim": "We already spend more than that on the spreadsheet, in people's time.",
+        "willingness_to_pay_interpretation": "Frames the price against a cost they already bear. The strongest form of willingness.",
+        "most_important_verbatim": "We already spend more than that on the spreadsheet, in people's time.",
+        "strongest_purchasing_signal": "Compared the price to an existing internal cost and found it favourable.",
+        "budget_signal_strength": "strong",
+        "assumption_confirmed": "Processors carry a compliance cost they can date and measure.",
+        "assumption_overturned": "",
+        "follow_up_needed": "",
+        "referral_obtained": "The Finance Director, who releases the supplier assurance budget.",
+        "overall_score": 5,
+        "status": "submitted",
+        "sort_order": 4
+      },
+      {
+        "interviewer_name": "Co-implementer",
+        "interviewee_name": "Chinelo Eze",
+        "interviewee_role": "Compliance Officer",
+        "organisation": "Sunrise Foods Processing",
+        "segment": "Processor led outgrower schemes",
+        "interview_date": "2026-06-20",
+        "role_accountability_score": 3,
+        "role_accountability_verbatim": "I do the work, I do not choose the system.",
+        "role_accountability_interpretation": "User rather than buyer. Valuable on requirements, silent on price.",
+        "problem_reality_score": 5,
+        "problem_reality_verbatim": "I chase field officers for records that were never written down.",
+        "problem_reality_interpretation": "Confirms the head of supply chain's account from the other end of the process.",
+        "consequence_severity_score": 4,
+        "consequence_severity_verbatim": "It is my weekend, most quarters.",
+        "consequence_severity_interpretation": "Cost falls on a person rather than a budget, which is why it has not been solved.",
+        "current_attempts_score": 4,
+        "current_attempts_verbatim": "The spreadsheet. And phone calls.",
+        "current_attempts_interpretation": "Same workaround, described independently. Corroboration rather than repetition.",
+        "budget_authority_score": 1,
+        "budget_authority_verbatim": "Not me.",
+        "budget_authority_interpretation": "No authority. Recorded so the count of buyers stays honest.",
+        "willingness_to_pay_score": 2,
+        "willingness_to_pay_verbatim": "I would beg for it. I cannot buy it.",
+        "willingness_to_pay_interpretation": "Advocacy, not purchase. Useful internally to the sale.",
+        "most_important_verbatim": "I chase field officers for records that were never written down.",
+        "strongest_purchasing_signal": "None available at this level.",
+        "budget_signal_strength": "none",
+        "assumption_confirmed": "The eleven day query, described independently from the other end of the process.",
+        "assumption_overturned": "",
+        "follow_up_needed": "",
+        "referral_obtained": "",
+        "overall_score": 4,
+        "status": "submitted",
+        "sort_order": 5
+      },
+      {
+        "interviewer_name": "Lead consultant",
+        "interviewee_name": "Segun Adeyemi",
+        "interviewee_role": "Managing Director",
+        "organisation": "Greenline Agro Mills",
+        "segment": "Processor led outgrower schemes",
+        "interview_date": "2026-06-25",
+        "role_accountability_score": 4,
+        "role_accountability_verbatim": "It reaches me when it goes wrong, not before.",
+        "role_accountability_interpretation": "Escalation owner rather than daily owner.",
+        "problem_reality_score": 4,
+        "problem_reality_verbatim": "We have had queries. We answered them, eventually.",
+        "problem_reality_interpretation": "Real, survived so far, which lowers urgency.",
+        "consequence_severity_score": 3,
+        "consequence_severity_verbatim": "Nothing we could not talk our way out of.",
+        "consequence_severity_interpretation": "Consequence absorbed by relationship. That works until it does not.",
+        "current_attempts_score": 2,
+        "current_attempts_verbatim": "Our field team keeps books.",
+        "current_attempts_interpretation": "Believes the current system works. Harder sale than a customer who knows theirs is failing.",
+        "budget_authority_score": 5,
+        "budget_authority_verbatim": "I sign it.",
+        "budget_authority_interpretation": "Budget holder confirmed.",
+        "willingness_to_pay_score": 3,
+        "willingness_to_pay_verbatim": "Show me what Sunrise got and I will look at it properly.",
+        "willingness_to_pay_interpretation": "Conditional on a reference case. A reason to sequence the pilots deliberately.",
+        "most_important_verbatim": "Show me what Sunrise got and I will look at it properly.",
+        "strongest_purchasing_signal": "Asked for a reference customer, which is a buying question rather than a polite one.",
+        "budget_signal_strength": "moderate",
+        "assumption_confirmed": "The compliance problem exists here too.",
+        "assumption_overturned": "",
+        "follow_up_needed": "Return with the Sunrise result once one full query has run.",
+        "referral_obtained": "",
+        "overall_score": 4,
+        "status": "submitted",
+        "sort_order": 6
+      },
+      {
+        "interviewer_name": "Co-implementer",
+        "interviewee_name": "Halima Suleiman",
+        "interviewee_role": "Network Coordinator",
+        "organisation": "Middle Belt Agro-dealer Association",
+        "segment": "Agro-dealer networks",
+        "interview_date": "2026-06-27",
+        "role_accountability_score": 3,
+        "role_accountability_verbatim": "The members complain to me. I have nowhere to take it.",
+        "role_accountability_interpretation": "Carries the complaint, owns neither the problem nor a budget.",
+        "problem_reality_score": 4,
+        "problem_reality_verbatim": "Every planting season somebody blames a dealer for a bad harvest.",
+        "problem_reality_interpretation": "Real and recurring.",
+        "consequence_severity_score": 3,
+        "consequence_severity_verbatim": "A dealer loses customers. Slowly.",
+        "consequence_severity_interpretation": "Diffuse and slow, so it never reaches a budget meeting.",
+        "current_attempts_score": 2,
+        "current_attempts_verbatim": "The manufacturers sometimes send someone.",
+        "current_attempts_interpretation": "Points at who the real buyer might be.",
+        "budget_authority_score": 1,
+        "budget_authority_verbatim": "The association has no budget for this.",
+        "budget_authority_interpretation": "No budget holder in this segment. Decisive.",
+        "willingness_to_pay_score": 1,
+        "willingness_to_pay_verbatim": "The companies should pay for that.",
+        "willingness_to_pay_interpretation": "Names a different payer. The hypothesis is wrong about who the customer is, not about the problem.",
+        "most_important_verbatim": "The companies should pay for that.",
+        "strongest_purchasing_signal": "None.",
+        "budget_signal_strength": "none",
+        "assumption_confirmed": "",
+        "assumption_overturned": "Agro-dealers feel the problem and do not hold the budget. The buyer, if there is one, is the input manufacturer.",
+        "follow_up_needed": "",
+        "referral_obtained": "",
+        "overall_score": 2,
+        "status": "submitted",
+        "sort_order": 7
+      },
+      {
+        "interviewer_name": "Lead consultant",
+        "interviewee_name": "Grace Achebe",
+        "interviewee_role": "Programme Manager",
+        "organisation": "Highland Rural Futures",
+        "segment": "Development programmes needing results reporting",
+        "interview_date": "2026-07-02",
+        "role_accountability_score": 5,
+        "role_accountability_verbatim": "The report has my name on it.",
+        "role_accountability_interpretation": "Owner, and the deadline is externally fixed.",
+        "problem_reality_score": 5,
+        "problem_reality_verbatim": "Four times a year I need thirty enumerators for three weeks and I have six.",
+        "problem_reality_interpretation": "Precise, quantified and predictable, which makes it a schedulable service.",
+        "consequence_severity_score": 4,
+        "consequence_severity_verbatim": "Late reporting puts the next tranche at risk.",
+        "consequence_severity_interpretation": "Severe but only at four points in the year.",
+        "current_attempts_score": 4,
+        "current_attempts_verbatim": "We hire whoever is available and the data quality shows it.",
+        "current_attempts_interpretation": "Already buying, badly. Displacement rather than creation.",
+        "budget_authority_score": 4,
+        "budget_authority_verbatim": "It is in my budget already, under consultancy.",
+        "budget_authority_interpretation": "Budget confirmed and already approved.",
+        "willingness_to_pay_score": 4,
+        "willingness_to_pay_verbatim": "I pay day rates now. I would rather pay yours.",
+        "willingness_to_pay_interpretation": "Already paying a market rate for a worse version.",
+        "most_important_verbatim": "I pay day rates now. I would rather pay yours.",
+        "strongest_purchasing_signal": "Existing spend on a substitute, with a stated preference to switch.",
+        "budget_signal_strength": "strong",
+        "assumption_confirmed": "Programmes already buy enumeration and are dissatisfied with what they get.",
+        "assumption_overturned": "",
+        "follow_up_needed": "",
+        "referral_obtained": "Two other programme managers at the same reporting cycle.",
+        "overall_score": 5,
+        "status": "submitted",
+        "sort_order": 8
+      },
+      {
+        "interviewer_name": "Co-implementer",
+        "interviewee_name": "Ibrahim Danjuma",
+        "interviewee_role": "Director of Planning",
+        "organisation": "State Agricultural Development Agency",
+        "segment": "State agricultural development agencies",
+        "interview_date": "2026-07-08",
+        "role_accountability_score": 4,
+        "role_accountability_verbatim": "Reach figures are my responsibility to report.",
+        "role_accountability_interpretation": "Accountable on paper.",
+        "problem_reality_score": 3,
+        "problem_reality_verbatim": "We report what the field offices send us.",
+        "problem_reality_interpretation": "The problem is known and tolerated, which is not the same as felt.",
+        "consequence_severity_score": 2,
+        "consequence_severity_verbatim": "Nobody has ever queried it.",
+        "consequence_severity_interpretation": "No consequence means no urgency, whatever the mandate says.",
+        "current_attempts_score": 1,
+        "current_attempts_verbatim": "None that I would call a system.",
+        "current_attempts_interpretation": "Nothing to displace and no dissatisfaction to work with.",
+        "budget_authority_score": 2,
+        "budget_authority_verbatim": "Anything like this goes through procurement.",
+        "budget_authority_interpretation": "Long cycle, uncertain payment, no individual authority.",
+        "willingness_to_pay_score": 2,
+        "willingness_to_pay_verbatim": "If it were in next year's plan, perhaps.",
+        "willingness_to_pay_interpretation": "Deferred beyond the horizon of this engagement.",
+        "most_important_verbatim": "Nobody has ever queried it.",
+        "strongest_purchasing_signal": "None.",
+        "budget_signal_strength": "none",
+        "assumption_confirmed": "",
+        "assumption_overturned": "State agencies have the mandate and no consequence attached to it, so there is no urgency to buy.",
+        "follow_up_needed": "",
+        "referral_obtained": "",
+        "overall_score": 2,
+        "status": "submitted",
+        "sort_order": 9
+      }
+    ],
+    "gtcv_signal_story": [
+      {
+        "item": "Aggregators will pay for quality verification",
+        "observed": "One managing director named 25,000 naira a lot unprompted. One operations manager offered an introduction to an owner. One proprietor deferred until it had been run elsewhere.",
+        "believed": "That all aggregators want this because rejection is a universal problem.",
+        "classification": "signal",
+        "source": "Three interviews, June, two organisations with budget authority present.",
+        "sort_order": 1
+      },
+      {
+        "item": "Processors have budget for traceability",
+        "observed": "A named supplier assurance budget line at one processor, and a request for a reference customer at another.",
+        "believed": "That the compliance requirement makes the purchase automatic.",
+        "classification": "signal",
+        "source": "Three interviews, June, including one from inside the finance function.",
+        "sort_order": 2
+      },
+      {
+        "item": "Agro-dealers need advisory support",
+        "observed": "A network coordinator described the problem and then said the manufacturers should pay.",
+        "believed": "That dealers would buy training because they feel the consequence.",
+        "classification": "story",
+        "source": "Four conversations, no budget holder reached in any of them.",
+        "sort_order": 3
+      },
+      {
+        "item": "Farmers value the extension visit",
+        "observed": "High attendance while transport allowances were paid. Attendance fell away when they stopped.",
+        "believed": "That attendance was demand.",
+        "classification": "story",
+        "source": "Programme attendance records over two seasons.",
+        "sort_order": 4
+      },
+      {
+        "item": "Programmes buy enumeration already",
+        "observed": "Two organisations have bought enumeration without it being marketed, and one stated a preference to switch supplier.",
+        "believed": "That this is a commercial market rather than the same grant money at one remove.",
+        "classification": "unclassified",
+        "source": "Two contracts in the last eighteen months, plus one interview.",
+        "sort_order": 5
+      }
+    ],
+    "gtcv_propositions": [
+      {
+        "_key": "prop_quality",
+        "segment_id": {
+          "_ref": "seg_aggregators"
+        },
+        "segment_label": "Medium scale grain aggregators",
+        "capability": "Sampling protocol, calibrated moisture testing and a same day lot certificate",
+        "problem": "Grain bought on appearance is rejected or discounted at the processor gate",
+        "outcome": "Know what a lot is worth before you pay for it",
+        "reason_to_choose": "Testing at the point of purchase rather than at the point of delivery, which is the only moment the result can change the decision",
+        "differentiation_type": "access",
+        "differentiation_statement": "Present in the buying yard on market day, not in a laboratory three days away.",
+        "credibility_signal": "Protocol matched against the processor's own intake standard, so the certificate answers the question the processor will actually ask.",
+        "assembled_statement": "For medium scale grain aggregators who lose margin when a lot is discounted at the processor gate, we test moisture and foreign matter in your yard on market day and issue a lot certificate before you pay. You buy on measurement rather than appearance, and the certificate is written against the standard your processor already uses.",
+        "assembled_is_custom": false,
+        "revision_count": 2,
+        "notes": "Revised twice. The first version led on laboratory accuracy, which nobody asked for. The second led on timing, which is what they buy.",
+        "sort_order": 1
+      },
+      {
+        "_key": "prop_trace",
+        "segment_id": {
+          "_ref": "seg_processors"
+        },
+        "segment_label": "Processor led outgrower schemes",
+        "capability": "Farmer registration, plot mapping, harvest logging and a query ready audit record",
+        "problem": "Compliance queries about crop origin take weeks to answer and put buyer relationships at risk",
+        "outcome": "Answer an origin query the same day it arrives",
+        "reason_to_choose": "The record is built during the season by the people already in the field, rather than reconstructed afterwards from memory",
+        "differentiation_type": "capability",
+        "differentiation_statement": "Field enumeration and audit grade record keeping in one team, so the record does not have to be rebuilt at the end.",
+        "credibility_signal": "Record structure tested against a live export compliance query before it was offered to anyone.",
+        "assembled_statement": "For processor led outgrower schemes that cannot evidence crop origin when an export buyer asks, we register farmers, map plots and log harvest as the season runs, so a compliance query is answered the same day rather than in eleven. The record is built by the field team you already have, not reconstructed afterwards.",
+        "assembled_is_custom": false,
+        "revision_count": 1,
+        "notes": "Revised once, to replace a claim about technology with the eleven day figure the customer gave us.",
+        "sort_order": 2
+      },
+      {
+        "_key": "prop_enum",
+        "segment_id": {
+          "_ref": "seg_programmes"
+        },
+        "segment_label": "Development programmes needing results reporting",
+        "capability": "Trained enumerator pool, survey design and statistical review before submission",
+        "problem": "Reporting deadlines arrive faster than in house enumeration capacity",
+        "outcome": "Meet the reporting deadline with numbers that survive scrutiny",
+        "reason_to_choose": "The enumerators are trained and retained rather than hired at the point of need, so quality does not fall when demand peaks",
+        "differentiation_type": "context",
+        "differentiation_statement": "We work in the same districts all year, so enumeration does not start with finding the villages.",
+        "credibility_signal": "Two completed reporting cycles for other programmes, both submitted on time.",
+        "assembled_statement": "For programme managers whose reporting deadline is fixed while their enumeration capacity is not, we field a trained and retained enumerator team with statistical review before submission, so the deadline is met with numbers that hold up. We are already working in the same districts, so the work starts on day one rather than after mobilisation.",
+        "assembled_is_custom": false,
+        "revision_count": 0,
+        "notes": "Held rather than advanced. It is real revenue, but it does not test independence from donor money, and it would take over the strategy if it were allowed to.",
+        "sort_order": 3
+      }
+    ],
+    "gtcv_proposition_tests": [
+      {
+        "proposition_id": {
+          "_ref": "prop_quality"
+        },
+        "tested_with": "Adaeze Nwankwo",
+        "tested_with_role": "Managing Director",
+        "tested_on": "2026-07-14",
+        "reaction": "Stopped at the phrase before you pay and asked how quickly the result comes back. Then asked what it costs.",
+        "what_changed": "Timing moved to the front of the statement. The laboratory accuracy claim was cut entirely.",
+        "sort_order": 1
+      },
+      {
+        "proposition_id": {
+          "_ref": "prop_quality"
+        },
+        "tested_with": "Emeka Obi",
+        "tested_with_role": "Operations Manager",
+        "tested_on": "2026-07-15",
+        "reaction": "Asked whether the certificate would be accepted by the processor. That is the objection, not the price.",
+        "what_changed": "Added that the certificate is written against the processor's own intake standard.",
+        "sort_order": 2
+      },
+      {
+        "proposition_id": {
+          "_ref": "prop_trace"
+        },
+        "tested_with": "Tunde Bakare",
+        "tested_with_role": "Head of Supply Chain",
+        "tested_on": "2026-07-16",
+        "reaction": "Corrected our wording. Said the point is not the record, it is answering the query the same day.",
+        "what_changed": "The outcome line was rewritten in the customer's words rather than ours.",
+        "sort_order": 3
+      },
+      {
+        "proposition_id": {
+          "_ref": "prop_trace"
+        },
+        "tested_with": "Segun Adeyemi",
+        "tested_with_role": "Managing Director",
+        "tested_on": "2026-07-21",
+        "reaction": "Neutral. Asked to see it working at Sunrise first.",
+        "what_changed": "Nothing in the wording. It changed the sequencing of the pilot rounds instead.",
+        "sort_order": 4
+      }
+    ],
+    "gtcv_pricing_tiers": [
+      {
+        "tier_name": "Lot certificate",
+        "included": "Sampling and moisture and foreign matter testing on one lot in the buyer's yard, with a certificate issued the same day.",
+        "target_client": "Medium scale grain aggregators buying on market days",
+        "price": 25000,
+        "sort_order": 1
+      },
+      {
+        "tier_name": "Season retainer",
+        "included": "Unlimited lot certificates through the buying season for one yard, a monthly quality summary, and a named contact.",
+        "target_client": "Aggregators buying more than forty lots a season",
+        "price": 750000,
+        "sort_order": 2
+      },
+      {
+        "tier_name": "Scheme traceability, annual",
+        "included": "Farmer registration, plot mapping, in season harvest logging and an audit ready origin record for one outgrower scheme up to 500 farmers.",
+        "target_client": "Processor led outgrower schemes with export buyers",
+        "price": 4200000,
+        "sort_order": 3
+      },
+      {
+        "tier_name": "Scheme traceability, query support",
+        "included": "The annual record plus same day response to compliance queries and direct liaison with the buyer's auditor.",
+        "target_client": "Processors whose export licence depends on the answer",
+        "price": 6100000,
+        "sort_order": 4
+      },
+      {
+        "tier_name": "Enumeration round",
+        "included": "Survey design, a fielded enumerator team, data cleaning and statistical review for one reporting round.",
+        "target_client": "Programme managers at quarterly reporting",
+        "price": 3400000,
+        "sort_order": 5
+      }
+    ],
+    "gtcv_cost_lines": [
+      {
+        "category": "direct_labour",
+        "item": "Field technician, sampling and testing",
+        "unit": "day",
+        "qty_per_cycle": 1,
+        "unit_cost": 18000,
+        "annual_deliveries": 120,
+        "notes": "One technician covers roughly four lots in a market day.",
+        "sort_order": 1
+      },
+      {
+        "category": "direct_labour",
+        "item": "Certificate review and issue",
+        "unit": "lot",
+        "qty_per_cycle": 1,
+        "unit_cost": 1500,
+        "annual_deliveries": 480,
+        "notes": "Supervisor time. Small per lot and easy to forget, which is why it is listed.",
+        "sort_order": 2
+      },
+      {
+        "category": "direct_materials",
+        "item": "Sampling consumables and calibration",
+        "unit": "lot",
+        "qty_per_cycle": 1,
+        "unit_cost": 900,
+        "annual_deliveries": 480,
+        "notes": "Calibration is quarterly and has been spread across lots rather than hidden in overhead.",
+        "sort_order": 3
+      },
+      {
+        "category": "travel_logistics",
+        "item": "Vehicle and fuel to buying yards",
+        "unit": "day",
+        "qty_per_cycle": 1,
+        "unit_cost": 12000,
+        "annual_deliveries": 120,
+        "notes": "Previously carried by the programme budget. This is the cost that made the service look free.",
+        "sort_order": 4
+      },
+      {
+        "category": "quality_assurance",
+        "item": "Referee testing on a sample of lots",
+        "unit": "lot",
+        "qty_per_cycle": 1,
+        "unit_cost": 4500,
+        "annual_deliveries": 48,
+        "notes": "One lot in ten sent for independent check. This is what keeps the certificate worth having.",
+        "sort_order": 5
+      },
+      {
+        "category": "direct_labour",
+        "item": "Enumerator, traceability registration",
+        "unit": "day",
+        "qty_per_cycle": 40,
+        "unit_cost": 9000,
+        "annual_deliveries": 4,
+        "notes": "Forty enumerator days registers a 500 farmer scheme.",
+        "sort_order": 6
+      },
+      {
+        "category": "direct_labour",
+        "item": "Data cleaning and record assembly",
+        "unit": "scheme",
+        "qty_per_cycle": 10,
+        "unit_cost": 22000,
+        "annual_deliveries": 4,
+        "notes": "Ten days per scheme. Budgeted as nothing for years and it is the single largest hidden cost found.",
+        "sort_order": 7
+      },
+      {
+        "category": "travel_logistics",
+        "item": "Field movement during registration",
+        "unit": "scheme",
+        "qty_per_cycle": 1,
+        "unit_cost": 380000,
+        "annual_deliveries": 4,
+        "notes": "Fuel, accommodation and per diem for a registration round.",
+        "sort_order": 8
+      },
+      {
+        "category": "quality_assurance",
+        "item": "Statistical review before submission",
+        "unit": "round",
+        "qty_per_cycle": 1,
+        "unit_cost": 165000,
+        "annual_deliveries": 4,
+        "notes": "One skilled person. A single point of failure as well as a cost.",
+        "sort_order": 9
+      },
+      {
+        "category": "overhead",
+        "item": "Share of office, insurance and professional fees",
+        "unit": "month",
+        "qty_per_cycle": 1,
+        "unit_cost": 410000,
+        "annual_deliveries": 12,
+        "notes": "Allocated across services by staff time rather than by revenue, so a small service does not look artificially profitable.",
+        "sort_order": 10
+      }
+    ],
+    "gtcv_fixed_costs": [
+      {
+        "item": "Office rent and utilities",
+        "monthly_amount": 320000,
+        "sort_order": 1
+      },
+      {
+        "item": "Core staff not chargeable to a service",
+        "monthly_amount": 1450000,
+        "sort_order": 2
+      },
+      {
+        "item": "Vehicle maintenance and insurance",
+        "monthly_amount": 185000,
+        "sort_order": 3
+      },
+      {
+        "item": "Testing equipment depreciation and calibration contract",
+        "monthly_amount": 95000,
+        "sort_order": 4
+      },
+      {
+        "item": "Software, connectivity and data",
+        "monthly_amount": 78000,
+        "sort_order": 5
+      },
+      {
+        "item": "Audit, statutory and professional fees",
+        "monthly_amount": 140000,
+        "sort_order": 6
+      }
+    ],
+    "gtcv_market_prices": [
+      {
+        "source": "Commercial inspection company, per lot inspection",
+        "price": 45000,
+        "quality_level": "Higher. Full laboratory panel, three day turnaround.",
+        "source_date": "2026-06-30",
+        "notes": "More thorough and too slow to change a buying decision. That gap is the position.",
+        "sort_order": 1
+      },
+      {
+        "source": "Independent agronomist, informal yard assessment",
+        "price": 8000,
+        "quality_level": "Lower. Visual and handheld meter, no certificate.",
+        "source_date": "2026-07-01",
+        "notes": "The real competitor. Cheap, fast, and not accepted by the processor.",
+        "sort_order": 2
+      },
+      {
+        "source": "Traceability platform licence, per scheme per year",
+        "price": 5800000,
+        "quality_level": "Software only. The customer supplies the field team.",
+        "source_date": "2026-07-03",
+        "notes": "Priced above our annual tier and does not include the work that actually fails.",
+        "sort_order": 3
+      },
+      {
+        "source": "Consultancy day rate for enumeration, regional average",
+        "price": 85000,
+        "quality_level": "Comparable, variable by firm.",
+        "source_date": "2026-07-05",
+        "notes": "Our enumeration round prices out just below this on a per day basis.",
+        "sort_order": 4
+      }
+    ],
+    "gtcv_ab_tests": [
+      {
+        "contact_name": "Adaeze Nwankwo",
+        "organisation": "Riverbend Commodities",
+        "variant": "A",
+        "response": "yes",
+        "response_quality": 5,
+        "key_phrase": "before you pay",
+        "purchasing_signal": "yes",
+        "contact_date": "2026-07-14",
+        "notes": "Variant A leads on timing. She repeated the phrase back.",
+        "sort_order": 1
+      },
+      {
+        "contact_name": "Emeka Obi",
+        "organisation": "Kaduna Grain Partners",
+        "variant": "A",
+        "response": "partial",
+        "response_quality": 4,
+        "key_phrase": "accepted by the processor",
+        "purchasing_signal": "unsure",
+        "contact_date": "2026-07-15",
+        "notes": "Interested, not the budget holder. The objection was acceptance, not price.",
+        "sort_order": 2
+      },
+      {
+        "contact_name": "Fatima Yusuf",
+        "organisation": "Northgate Trading",
+        "variant": "B",
+        "response": "no",
+        "response_quality": 2,
+        "key_phrase": "laboratory standard",
+        "purchasing_signal": "no",
+        "contact_date": "2026-07-15",
+        "notes": "Variant B leads on accuracy. It did not land here or anywhere.",
+        "sort_order": 3
+      },
+      {
+        "contact_name": "Musa Garba",
+        "organisation": "Sahel Produce Company",
+        "variant": "B",
+        "response": "no",
+        "response_quality": 2,
+        "key_phrase": "laboratory standard",
+        "purchasing_signal": "no",
+        "contact_date": "2026-07-17",
+        "notes": "Said he already knows the quality. Accuracy is not the thing he is short of.",
+        "sort_order": 4
+      },
+      {
+        "contact_name": "Tunde Bakare",
+        "organisation": "Sunrise Foods Processing",
+        "variant": "A",
+        "response": "yes",
+        "response_quality": 5,
+        "key_phrase": "same day rather than eleven",
+        "purchasing_signal": "yes",
+        "contact_date": "2026-07-16",
+        "notes": "His own figure quoted back to him. Strongest single response in the round.",
+        "sort_order": 5
+      },
+      {
+        "contact_name": "Segun Adeyemi",
+        "organisation": "Greenline Agro Mills",
+        "variant": "A",
+        "response": "partial",
+        "response_quality": 3,
+        "key_phrase": "audit ready",
+        "purchasing_signal": "unsure",
+        "contact_date": "2026-07-21",
+        "notes": "Wants a reference customer before he engages.",
+        "sort_order": 6
+      },
+      {
+        "contact_name": "Rita Okonjo",
+        "organisation": "Delta Agro Processing",
+        "variant": "B",
+        "response": "partial",
+        "response_quality": 3,
+        "key_phrase": "complete records",
+        "purchasing_signal": "unsure",
+        "contact_date": "2026-07-22",
+        "notes": "Variant B talks about completeness. It reads as effort rather than as relief.",
+        "sort_order": 7
+      },
+      {
+        "contact_name": "Grace Achebe",
+        "organisation": "Highland Rural Futures",
+        "variant": "A",
+        "response": "yes",
+        "response_quality": 4,
+        "key_phrase": "numbers that hold up",
+        "purchasing_signal": "yes",
+        "contact_date": "2026-07-23",
+        "notes": "Already buying a substitute. The signal is switching, not discovery.",
+        "sort_order": 8
+      }
+    ],
+    "gtcv_pipeline": [
+      {
+        "organisation": "Riverbend Commodities",
+        "contact_name": "Adaeze Nwankwo",
+        "contact_role": "Managing Director",
+        "stage": "proposal_sent",
+        "value_estimate": 750000,
+        "value_currency": "NGN",
+        "last_action": "Season retainer proposal sent after the second pilot session.",
+        "next_action": "Follow up call to agree a start date for the buying season.",
+        "next_action_date": "2026-08-18",
+        "owner": "Lead consultant",
+        "notes": "Furthest advanced. Priced as a retainer because she buys weekly, not occasionally.",
+        "sort_order": 1
+      },
+      {
+        "organisation": "Sunrise Foods Processing",
+        "contact_name": "Tunde Bakare",
+        "contact_role": "Head of Supply Chain",
+        "stage": "proposal_sent",
+        "value_estimate": 6100000,
+        "value_currency": "NGN",
+        "last_action": "Query support tier proposed. Finance Director copied at his request.",
+        "next_action": "Meet the Finance Director to confirm the supplier assurance reallocation.",
+        "next_action_date": "2026-08-20",
+        "owner": "Lead consultant",
+        "notes": "The purchase needs two signatures and only one has been in the room so far.",
+        "sort_order": 2
+      },
+      {
+        "organisation": "Kaduna Grain Partners",
+        "contact_name": "Emeka Obi",
+        "contact_role": "Operations Manager",
+        "stage": "met",
+        "value_estimate": 300000,
+        "value_currency": "NGN",
+        "last_action": "Introduction to the owner offered and accepted.",
+        "next_action": "Meeting with the owner, with the Riverbend result as the reference.",
+        "next_action_date": "2026-08-26",
+        "owner": "Co-implementer",
+        "notes": "Do not propose before the owner has been met. The proposal would be read by someone who cannot buy.",
+        "sort_order": 3
+      },
+      {
+        "organisation": "Greenline Agro Mills",
+        "contact_name": "Segun Adeyemi",
+        "contact_role": "Managing Director",
+        "stage": "contacted",
+        "value_estimate": 4200000,
+        "value_currency": "NGN",
+        "last_action": "Asked for a reference case before engaging further.",
+        "next_action": "Return once the Sunrise record has run one full compliance query.",
+        "next_action_date": "2026-09-15",
+        "owner": "Lead consultant",
+        "notes": "Deliberately held. Going back early wastes the one thing he asked for.",
+        "sort_order": 4
+      },
+      {
+        "organisation": "Highland Rural Futures",
+        "contact_name": "Grace Achebe",
+        "contact_role": "Programme Manager",
+        "stage": "met",
+        "value_estimate": 3400000,
+        "value_currency": "NGN",
+        "last_action": "Discussed the next quarterly reporting round.",
+        "next_action": "Decide at the gate whether this line is pursued at all.",
+        "next_action_date": "2026-08-22",
+        "owner": "Lead consultant",
+        "notes": "Easy revenue that does not prove independence. That is a decision for the gate, not for the pipeline.",
+        "sort_order": 5
+      },
+      {
+        "organisation": "Delta Agro Processing",
+        "contact_name": "Rita Okonjo",
+        "contact_role": "Quality Manager",
+        "stage": "contacted",
+        "value_estimate": 4200000,
+        "value_currency": "NGN",
+        "last_action": "Responded to the outreach, no meeting yet.",
+        "next_action": "Offer a first meeting after the Sunrise pilot closes.",
+        "next_action_date": "2026-09-08",
+        "owner": "Co-implementer",
+        "notes": "Quality manager rather than budget holder. Ask early who signs.",
+        "sort_order": 6
+      },
+      {
+        "organisation": "Sahel Produce Company",
+        "contact_name": "Musa Garba",
+        "contact_role": "Managing Director",
+        "stage": "identified",
+        "value_estimate": 750000,
+        "value_currency": "NGN",
+        "last_action": "Declined on the accuracy framing.",
+        "next_action": "Re approach with the timing framing, once.",
+        "next_action_date": "2026-09-22",
+        "owner": "Co-implementer",
+        "notes": "A no to one framing is not a no to the service, but it is one attempt, not three.",
+        "sort_order": 7
+      }
+    ],
+    "gtcv_partner_map": [
+      {
+        "partner_name": "Independent testing laboratory",
+        "partner_type": "co_delivery",
+        "what_they_bring": "Referee testing that makes the certificate defensible when a lot is disputed.",
+        "what_they_need": "Predictable sample volume so their turnaround commitment is worth giving.",
+        "positioning_effect": "strengthens",
+        "action": "Agree a volume based rate and a written turnaround commitment before the buying season.",
+        "notes": "Without a referee, the certificate is an opinion. This is the partner that makes the service saleable.",
+        "sort_order": 1
+      },
+      {
+        "partner_name": "Processor quality departments",
+        "partner_type": "endorsement",
+        "what_they_bring": "Acceptance of the certificate at the intake gate, which is the objection every aggregator raises.",
+        "what_they_need": "Confidence that the protocol matches their own intake standard.",
+        "positioning_effect": "strengthens",
+        "action": "Ask two processors to confirm in writing that the protocol matches their intake standard.",
+        "notes": "Costs nothing and removes the main objection. The highest value action on this page.",
+        "sort_order": 2
+      },
+      {
+        "partner_name": "Traceability software vendor",
+        "partner_type": "conflict",
+        "what_they_bring": "A platform that would save building one.",
+        "what_they_need": "To be the customer relationship rather than a component of ours.",
+        "positioning_effect": "compromises",
+        "action": "Keep the customer relationship. Use the platform only where it is licensed to us and invisible to the customer.",
+        "notes": "They sell to the same processors. A partnership here hands over the position we are trying to build.",
+        "sort_order": 3
+      },
+      {
+        "partner_name": "Agro-dealer association",
+        "partner_type": "referral",
+        "what_they_bring": "Reach into aggregators who buy through their members.",
+        "what_they_need": "Something to offer members that costs the association nothing.",
+        "positioning_effect": "neutral",
+        "action": "Offer a member introduction arrangement with no fee attached in the first season.",
+        "notes": "The segment was dropped as a customer. It is still useful as a route.",
+        "sort_order": 4
+      },
+      {
+        "partner_name": "Current programme funder",
+        "partner_type": "endorsement",
+        "what_they_bring": "Credibility and the runway that pays for the transition.",
+        "what_they_need": "Evidence that the transition is real rather than rebranded grant delivery.",
+        "positioning_effect": "unclear",
+        "action": "Report commercial revenue separately from grant income from the first month, so the distinction is visible in the accounts.",
+        "notes": "Marked unclear on purpose. Their support is real and their expectations shape what we build, which is the risk.",
+        "sort_order": 5
+      }
+    ],
+    "gtcv_pilot_sessions": [
+      {
+        "iteration": 1,
+        "client_number": 1,
+        "pilot_client_label": "Riverbend Commodities",
+        "session_date": "2026-07-28",
+        "session_title": "Lot certificate, first delivery",
+        "hypothesis": "An aggregator will pay per lot for quality verification before purchase.",
+        "price_tier": "Lot certificate at 25,000 naira",
+        "who_leads": "Lead consultant",
+        "who_observes": "Co-implementer",
+        "obs_engagement": "Held the certificate and read it twice. Called the warehouse manager over to look at it.",
+        "obs_language": "Used the word discount, not the word quality. The problem is priced in her head, not described in technical terms.",
+        "obs_resistance": "None on price. One question on how fast it could be done on a busy market day.",
+        "obs_surprise": "Asked whether it could be done for lots she was selling as well as buying. That is a second use we had not offered.",
+        "obs_price_moment": "No pause at the figure. She asked about volume discount, which is a buying question.",
+        "verbatim_responses": "If your man is here on Thursday I will use him on Thursday.",
+        "purchasing_signals": "Asked about a volume rate and about a standing arrangement for the season.",
+        "close_type": "genuine",
+        "viability": 5,
+        "what_surprised_us": "The selling side use case. It doubles the addressable volume per customer and we had not seen it.",
+        "revision_recommended": "Add a season retainer tier. Per lot pricing is wrong for a customer who buys weekly.",
+        "key_learning": "Speed on the day matters more than the depth of the test. Design capacity around market days.",
+        "notes": "The retainer tier in the pricing table came from this session.",
+        "sort_order": 1
+      },
+      {
+        "iteration": 1,
+        "client_number": 2,
+        "pilot_client_label": "Sunrise Foods Processing",
+        "session_date": "2026-07-30",
+        "session_title": "Traceability record, first scheme walkthrough",
+        "hypothesis": "A processor will pay annually for an audit ready origin record.",
+        "price_tier": "Scheme traceability, annual at 4.2m naira",
+        "who_leads": "Co-implementer",
+        "who_observes": "Lead consultant",
+        "obs_engagement": "Brought the compliance officer into the room unprompted, which is a decision behaviour.",
+        "obs_language": "Talked about the auditor, not about farmers. The record is for someone else to read.",
+        "obs_resistance": "Pushed back on the annual price until query support was explained, then moved to the higher tier himself.",
+        "obs_surprise": "Wanted the record to cover the previous season retrospectively. We cannot do that and said so.",
+        "obs_price_moment": "Paused at 4.2m, then argued himself up to 6.1m on the strength of same day query response.",
+        "verbatim_responses": "The record is not the point. Answering the auditor on the day is the point.",
+        "purchasing_signals": "Moved himself to the higher tier and asked what the Finance Director would need to see.",
+        "close_type": "genuine",
+        "viability": 5,
+        "what_surprised_us": "That the customer upgraded himself once the outcome was named properly. The lower tier is priced against the wrong thing.",
+        "revision_recommended": "Lead with query response in the proposition. Consider whether the annual tier should exist at all.",
+        "key_learning": "The buyer is buying an answer under time pressure, not a database.",
+        "notes": "Refusing the retrospective request cost nothing and gained credibility.",
+        "sort_order": 2
+      },
+      {
+        "iteration": 2,
+        "client_number": 1,
+        "pilot_client_label": "Riverbend Commodities",
+        "session_date": "2026-08-04",
+        "session_title": "Lot certificate, revised offer with season retainer",
+        "hypothesis": "A retainer priced on a season, not a lot, closes faster than per lot pricing.",
+        "price_tier": "Season retainer at 750,000 naira",
+        "who_leads": "Co-implementer",
+        "who_observes": "Lead consultant",
+        "obs_engagement": "Went straight to the coverage question. How many yards, how many days.",
+        "obs_language": "Spoke about the season as a unit, which is how the retainer is priced. The framing matched.",
+        "obs_resistance": "Asked what happens if the technician is unavailable on a market day. A delivery risk question, correctly.",
+        "obs_surprise": "Asked for a written service commitment. Nobody in the team had drafted one.",
+        "obs_price_moment": "No hesitation on the retainer figure once coverage was defined.",
+        "verbatim_responses": "Put the days in writing and I will sign it.",
+        "purchasing_signals": "Asked for a written commitment and a start date.",
+        "close_type": "genuine",
+        "viability": 5,
+        "what_surprised_us": "The blocker was not price, it was a delivery guarantee we had not thought to write.",
+        "revision_recommended": "Write a one page service commitment covering days, coverage and what happens when a technician is unavailable.",
+        "key_learning": "Once price is settled the objection moves to reliability, and we were not ready for it.",
+        "notes": "Led directly to the proposal now sitting in the pipeline.",
+        "sort_order": 3
+      },
+      {
+        "iteration": 2,
+        "client_number": 2,
+        "pilot_client_label": "Sunrise Foods Processing",
+        "session_date": "2026-08-06",
+        "session_title": "Traceability, query support tier with the Finance Director present",
+        "hypothesis": "Framing the price against the internal spreadsheet cost carries the finance conversation.",
+        "price_tier": "Scheme traceability, query support at 6.1m naira",
+        "who_leads": "Lead consultant",
+        "who_observes": "Co-implementer",
+        "obs_engagement": "The Finance Director did the arithmetic on paper during the meeting.",
+        "obs_language": "Reallocation, not new spend. That phrasing came from him and we should reuse it.",
+        "obs_resistance": "Asked what happens in year two when the record already exists. A fair question about renewal value.",
+        "obs_surprise": "Asked whether we would carry any liability for a wrong record. We had no answer.",
+        "obs_price_moment": "Compared it directly to three people's part time effort and concluded it was cheaper.",
+        "verbatim_responses": "This is a reallocation, not new money. That I can approve.",
+        "purchasing_signals": "Stated the approval route and asked for the proposal in a specific format.",
+        "close_type": "genuine",
+        "viability": 4,
+        "what_surprised_us": "The liability question. It needs a professional answer before the next processor conversation.",
+        "revision_recommended": "Define the renewal proposition for year two, and take advice on liability wording.",
+        "key_learning": "Price against a cost the customer already carries and the finance conversation runs itself.",
+        "notes": "Two open items carried into the gate rather than smoothed over.",
+        "sort_order": 4
+      }
+    ],
+    "gtcv_channel_logic": [
+      {
+        "segment": "Medium scale grain aggregators",
+        "entry_or_scale": "entry",
+        "channel": "Direct presence in buying yards on market days",
+        "channel_logic": "The decision to test a lot is made in the yard, minutes before the money moves. No other channel reaches that moment.",
+        "independent_of_facilitation": true,
+        "evidence_needed": "Two customers acquired in the yard without any introduction from the programme or the funder.",
+        "first_action": "Work three market days a week in one yard through the first month of the season.",
+        "timeline": "First month of the buying season",
+        "sort_order": 1
+      },
+      {
+        "segment": "Medium scale grain aggregators",
+        "entry_or_scale": "scale",
+        "channel": "Processor referral at the intake gate",
+        "channel_logic": "Processors want cleaner intake. Referring their suppliers to a certificate costs them nothing and saves them rejections.",
+        "independent_of_facilitation": true,
+        "evidence_needed": "One processor referring at least three suppliers without a fee arrangement.",
+        "first_action": "Ask the two processors already endorsing the protocol to refer their five worst performing suppliers.",
+        "timeline": "From month three, after the first season results exist",
+        "sort_order": 2
+      },
+      {
+        "segment": "Processor led outgrower schemes",
+        "entry_or_scale": "entry",
+        "channel": "Direct approach to the head of supply chain, with the compliance officer in the room",
+        "channel_logic": "The person who feels the pain and the person who signs are different people and both have to hear it at once.",
+        "independent_of_facilitation": true,
+        "evidence_needed": "One scheme won from a cold approach with no funder introduction.",
+        "first_action": "Approach four processors directly, naming the eleven day figure.",
+        "timeline": "Months one to three",
+        "sort_order": 3
+      },
+      {
+        "segment": "Processor led outgrower schemes",
+        "entry_or_scale": "scale",
+        "channel": "Reference case published with the first processor's permission",
+        "channel_logic": "The second processor already asked to see the first one working. The reference is the channel.",
+        "independent_of_facilitation": true,
+        "evidence_needed": "A second processor engaging on the strength of the reference alone.",
+        "first_action": "Agree publication wording with the first processor as part of the contract, not afterwards.",
+        "timeline": "From month four",
+        "sort_order": 4
+      },
+      {
+        "segment": "Development programmes needing results reporting",
+        "entry_or_scale": "both",
+        "channel": "Existing relationships across the development sector",
+        "channel_logic": "It works, and that is the difficulty. It is the channel that keeps the organisation inside the grant economy.",
+        "independent_of_facilitation": false,
+        "evidence_needed": "None sought. Marked dependent on purpose so it cannot be counted as evidence of independence.",
+        "first_action": "Cap this line at a fixed share of revenue and review it at the handover gate.",
+        "timeline": "Reviewed at handover",
+        "sort_order": 5
+      }
+    ],
+    "gtcv_assumptions": [
+      {
+        "activity": "Lot certificate in the buying yard",
+        "delivers": "A quality measurement before payment, accepted at the processor gate",
+        "who_pays": "The aggregator's owner or managing director, from operating cost",
+        "assumption": "That a processor will accept our certificate at intake rather than retesting anyway.",
+        "disproof": "Ask two processors to confirm acceptance in writing. If neither will, the service does not work as designed.",
+        "sort_order": 1
+      },
+      {
+        "activity": "Lot certificate in the buying yard",
+        "delivers": "Same day results on market day",
+        "who_pays": "The aggregator",
+        "assumption": "That one technician can cover four lots in a market day at the quality the certificate claims.",
+        "disproof": "Time eight lots across two market days and count how many needed a repeat sample.",
+        "sort_order": 2
+      },
+      {
+        "activity": "Scheme traceability record",
+        "delivers": "Same day answers to compliance queries",
+        "who_pays": "The processor, from the supplier assurance budget",
+        "assumption": "That the record can be built by the customer's existing field team with our supervision, rather than by our own enumerators.",
+        "disproof": "Run one scheme registration with the customer's team and compare the error rate against our own.",
+        "sort_order": 3
+      },
+      {
+        "activity": "Scheme traceability record",
+        "delivers": "Renewal in year two",
+        "who_pays": "The processor",
+        "assumption": "That the record has value in year two once it already exists.",
+        "disproof": "Ask the finance director directly what he would pay in year two. He raised it himself, so the question is already open.",
+        "sort_order": 4
+      },
+      {
+        "activity": "The commercial line as a whole",
+        "delivers": "Revenue not dependent on grant funding",
+        "who_pays": "Commercial customers",
+        "assumption": "That commercial customers acquired during the engagement will still be there when the facilitation ends.",
+        "disproof": "Track how each customer was acquired. Any customer reached through a funder introduction is not evidence of independence.",
+        "sort_order": 5
+      },
+      {
+        "activity": "Enumeration for programmes",
+        "delivers": "Revenue at quarterly peaks",
+        "who_pays": "Programme managers, from consultancy budget lines",
+        "assumption": "That this revenue represents a market rather than the same donor money at one remove.",
+        "disproof": "Trace the funding source of each contract. If every one traces to the same handful of donors, it is concentration, not diversification.",
+        "sort_order": 6
+      }
+    ],
+    "gtcv_continue_pause_kill": [
+      {
+        "activity": "Lot certificate for aggregators",
+        "decision": "continue",
+        "rationale": "Two pilot rounds closed genuinely, a price was named unprompted, and a retainer proposal is out. The strongest line in the portfolio.",
+        "destination_dp": "dp08",
+        "sort_order": 1
+      },
+      {
+        "activity": "Scheme traceability for processors",
+        "decision": "continue",
+        "rationale": "The customer upgraded himself to the higher tier and the finance route is confirmed. Two open items on liability and renewal go with it.",
+        "destination_dp": "dp08",
+        "sort_order": 2
+      },
+      {
+        "activity": "Enumeration and results reporting for programmes",
+        "decision": "pause",
+        "rationale": "Real revenue that does not test independence from donor money. Capped and revisited at handover rather than dropped or expanded.",
+        "destination_dp": "handover",
+        "sort_order": 3
+      },
+      {
+        "activity": "Cooperative governance training",
+        "decision": "kill",
+        "rationale": "Attendance collapses without allowances. The test has already been run and the answer is not ambiguous.",
+        "destination_dp": "dp01",
+        "sort_order": 4
+      },
+      {
+        "activity": "Advisory content for agro-dealers",
+        "decision": "kill",
+        "rationale": "Four conversations, no budget holder. If it returns it returns as a manufacturer hypothesis, which is a different segment entirely.",
+        "destination_dp": "dp02",
+        "sort_order": 5
+      },
+      {
+        "activity": "Input aggregation and last mile delivery",
+        "decision": "pause",
+        "rationale": "Demand is real but this is trading, not advisory. It needs working capital and a board decision, neither of which belongs in this engagement.",
+        "destination_dp": "handover",
+        "sort_order": 6
+      },
+      {
+        "activity": "Mechanisation service coordination",
+        "decision": "pause",
+        "rationale": "No buyer identified and the organisation owns none of the equipment. Held pending a clearer position.",
+        "destination_dp": "dp01",
+        "sort_order": 7
+      }
+    ],
+    "gtcv_readiness_scores": [
+      {
+        "fit_test": "problem_provider",
+        "checkpoint": "baseline",
+        "score": 1,
+        "evidence": "Services were listed by what the organisation could deliver rather than by what anyone had asked for.",
+        "sort_order": 1
+      },
+      {
+        "fit_test": "problem_solution",
+        "checkpoint": "baseline",
+        "score": 1,
+        "evidence": "Solutions existed before problems were stated in a customer's words.",
+        "sort_order": 2
+      },
+      {
+        "fit_test": "solution_customer",
+        "checkpoint": "baseline",
+        "score": 0,
+        "evidence": "No named budget holder for any service in the inventory.",
+        "sort_order": 3
+      },
+      {
+        "fit_test": "solution_pilot",
+        "checkpoint": "baseline",
+        "score": 0,
+        "evidence": "Nothing had been delivered at a stated price to a paying customer.",
+        "sort_order": 4
+      },
+      {
+        "fit_test": "solution_market",
+        "checkpoint": "baseline",
+        "score": 0,
+        "evidence": "No comparison to any alternative the customer could buy instead.",
+        "sort_order": 5
+      },
+      {
+        "fit_test": "solution_scale",
+        "checkpoint": "baseline",
+        "score": 0,
+        "evidence": "Every service required a specific individual. None could be repeated by someone else.",
+        "sort_order": 6
+      },
+      {
+        "fit_test": "problem_provider",
+        "checkpoint": "midpoint",
+        "score": 3,
+        "evidence": "Two problems stated in the customer's own words, each with a named accountable person and a quantified cost.",
+        "sort_order": 7
+      },
+      {
+        "fit_test": "problem_solution",
+        "checkpoint": "midpoint",
+        "score": 2,
+        "evidence": "Propositions rewritten from interview verbatims and revised after testing. Not yet proven at delivery.",
+        "sort_order": 8
+      },
+      {
+        "fit_test": "solution_customer",
+        "checkpoint": "midpoint",
+        "score": 3,
+        "evidence": "Budget holders named and met in both priority segments, with the approval route confirmed in one.",
+        "sort_order": 9
+      },
+      {
+        "fit_test": "solution_pilot",
+        "checkpoint": "midpoint",
+        "score": 2,
+        "evidence": "Four pilot sessions delivered, all closing genuinely, but none yet invoiced and paid.",
+        "sort_order": 10
+      },
+      {
+        "fit_test": "solution_market",
+        "checkpoint": "midpoint",
+        "score": 2,
+        "evidence": "Four alternatives priced and positioned. The informal yard assessment remains the real competitor and is cheaper.",
+        "sort_order": 11
+      },
+      {
+        "fit_test": "solution_scale",
+        "checkpoint": "midpoint",
+        "score": 1,
+        "evidence": "Sampling protocol is written and repeatable. Statistical review still rests on one person.",
+        "sort_order": 12
+      }
+    ],
+    "gtcv_sessions": [
+      {
+        "dp_id": "phase_0",
+        "title": "Clearing the ground",
+        "session_kind": "plenary",
+        "planned_date": "2026-05-19",
+        "held_date": "2026-05-19",
+        "duration_minutes": 180,
+        "status": "held",
+        "purpose": "Agree what the engagement is for, what it is not for, and what would count as evidence.",
+        "notes": "The scope of the assignment was narrowed here. Two service lines were taken out before any work started.",
+        "sort_order": 1
+      },
+      {
+        "dp_id": "dp01",
+        "title": "Service inventory and grant logic review",
+        "session_kind": "client_team_only",
+        "planned_date": "2026-05-27",
+        "held_date": "2026-05-27",
+        "duration_minutes": 240,
+        "status": "held",
+        "purpose": "List every service, classify its logic, and decide what to keep, redesign, pause or stop.",
+        "notes": "Held without the funder present so the team could be honest about which services exist only because they were funded.",
+        "sort_order": 2
+      },
+      {
+        "dp_id": "dp02",
+        "title": "Segments, problems and the evidence to gather",
+        "session_kind": "plenary",
+        "planned_date": "2026-06-05",
+        "held_date": "2026-06-05",
+        "duration_minutes": 240,
+        "status": "held",
+        "purpose": "Score the problems, choose the segments to test, and brief the interview round.",
+        "notes": "Nine interviews commissioned. Two segments were dropped on the evidence rather than on preference.",
+        "sort_order": 3
+      },
+      {
+        "dp_id": "dp02",
+        "title": "Interview debrief and convergence review",
+        "session_kind": "field_team",
+        "planned_date": "2026-07-09",
+        "held_date": "2026-07-09",
+        "duration_minutes": 150,
+        "status": "held",
+        "purpose": "Read the interviews together, separate signal from story, and decide which hypotheses advance.",
+        "notes": "The agro-dealer hypothesis was overturned here, by the field team who had run the interviews.",
+        "sort_order": 4
+      },
+      {
+        "dp_id": "dp03",
+        "title": "Proposition build and first test",
+        "session_kind": "client_team_only",
+        "planned_date": "2026-07-13",
+        "held_date": "2026-07-13",
+        "duration_minutes": 210,
+        "status": "held",
+        "purpose": "Assemble the propositions from the interview language and prepare the A and B framings.",
+        "notes": "Every phrase in the assembled statements traces to a verbatim. Nothing was invented in the room.",
+        "sort_order": 5
+      },
+      {
+        "dp_id": "dp04",
+        "title": "Costing and pricing, restricted",
+        "session_kind": "finance_restricted",
+        "planned_date": "2026-07-24",
+        "held_date": "2026-07-24",
+        "duration_minutes": 180,
+        "status": "held",
+        "purpose": "Build the cost stack including the costs previously carried by the programme budget, then set prices against it.",
+        "notes": "Held restricted because it exposes what the organisation actually spends. The hidden logistics cost surfaced here.",
+        "sort_order": 6
+      },
+      {
+        "dp_id": "dp05",
+        "title": "A and B framing results",
+        "session_kind": "field_team",
+        "planned_date": "2026-07-27",
+        "held_date": "2026-07-27",
+        "duration_minutes": 120,
+        "status": "held",
+        "purpose": "Compare the two framings across eight contacts and choose one.",
+        "notes": "Variant A won on every contact that had budget authority. The decision was not close.",
+        "sort_order": 7
+      },
+      {
+        "dp_id": "dp06",
+        "title": "Partner and positioning review",
+        "session_kind": "client_team_only",
+        "planned_date": "2026-08-11",
+        "duration_minutes": 150,
+        "status": "planned",
+        "purpose": "Decide which partnerships strengthen the position and which quietly give it away.",
+        "notes": "The software vendor conversation is the one to prepare for. It looks like help and behaves like competition.",
+        "sort_order": 8
+      },
+      {
+        "dp_id": "dp07",
+        "title": "Pilot round review and revision",
+        "session_kind": "plenary",
+        "planned_date": "2026-08-14",
+        "duration_minutes": 240,
+        "status": "planned",
+        "purpose": "Read the four pilot sessions, agree the revisions, and decide what continues.",
+        "notes": "Two open items go into this session unresolved: liability wording and the year two renewal proposition.",
+        "sort_order": 9
+      },
+      {
+        "dp_id": "dp08",
+        "title": "Route to market and independence check",
+        "session_kind": "joint_with_funder",
+        "planned_date": "2026-08-28",
+        "duration_minutes": 180,
+        "status": "planned",
+        "purpose": "Agree the entry and scale channels and mark honestly which of them depend on facilitation.",
+        "notes": "Held with the funder present because the honest answer about dependence is one they need to hear directly.",
+        "sort_order": 10
+      },
+      {
+        "dp_id": "dp09",
+        "title": "Readiness scoring at the close",
+        "session_kind": "plenary",
+        "planned_date": "2026-09-10",
+        "duration_minutes": 180,
+        "status": "planned",
+        "purpose": "Score the six fit tests against evidence and agree what the next twelve months have to prove.",
+        "notes": "Scored against evidence in the library, not against how the engagement felt.",
+        "sort_order": 11
+      },
+      {
+        "dp_id": "handover",
+        "title": "Handover and the five independence tests",
+        "session_kind": "joint_with_funder",
+        "planned_date": "2026-09-24",
+        "duration_minutes": 180,
+        "status": "planned",
+        "purpose": "Hand over the tools, name who owns each one, and answer the five independence tests in front of everybody.",
+        "notes": "The paused lines are decided here, not before.",
+        "sort_order": 12
+      }
+    ],
+    "evidence_library": [
+      {
+        "_key": "E-001",
+        "reference": "E-001",
+        "date": "2026-05-19",
+        "dp_id": "phase_0",
+        "type": "minutes",
+        "description": "Clearing the ground session record, including the two service lines removed from scope and the reasons given.",
+        "uploaded_by": "Lead consultant",
+        "status": "accepted",
+        "reliability": "high"
+      },
+      {
+        "_key": "E-002",
+        "reference": "E-002",
+        "date": "2026-05-27",
+        "dp_id": "dp01",
+        "type": "document",
+        "description": "Completed service inventory with logic classification and keep, redesign, pause or stop decision for each of eight services.",
+        "uploaded_by": "Co-implementer",
+        "status": "accepted",
+        "reliability": "high"
+      },
+      {
+        "_key": "E-003",
+        "reference": "E-003",
+        "date": "2026-05-27",
+        "dp_id": "dp01",
+        "type": "analysis",
+        "description": "Attendance records for cooperative governance training across two seasons, showing the fall when transport allowances stopped.",
+        "uploaded_by": "Co-implementer",
+        "status": "accepted",
+        "reliability": "high"
+      },
+      {
+        "_key": "E-004",
+        "reference": "E-004",
+        "date": "2026-06-05",
+        "dp_id": "dp02",
+        "type": "document",
+        "description": "Problem scoring sheet across five segments with urgency, ownership, willingness to pay and access scored and justified.",
+        "uploaded_by": "Lead consultant",
+        "status": "accepted",
+        "reliability": "medium"
+      },
+      {
+        "_key": "E-005",
+        "reference": "E-005",
+        "date": "2026-07-08",
+        "dp_id": "dp02",
+        "type": "interview",
+        "description": "Nine interview records with verbatim quotations, scores per dimension and named budget authority where it exists.",
+        "uploaded_by": "Co-implementer",
+        "status": "accepted",
+        "reliability": "high"
+      },
+      {
+        "_key": "E-006",
+        "reference": "E-006",
+        "date": "2026-07-09",
+        "dp_id": "dp02",
+        "type": "analysis",
+        "description": "Signal and story classification from the interview debrief, showing which beliefs survived contact with evidence.",
+        "uploaded_by": "Lead consultant",
+        "status": "accepted",
+        "reliability": "high"
+      },
+      {
+        "_key": "E-007",
+        "reference": "E-007",
+        "date": "2026-07-21",
+        "dp_id": "dp03",
+        "type": "document",
+        "description": "Three assembled propositions with revision history and the verbatim each phrase came from.",
+        "uploaded_by": "Lead consultant",
+        "status": "accepted",
+        "reliability": "high"
+      },
+      {
+        "_key": "E-008",
+        "reference": "E-008",
+        "date": "2026-07-24",
+        "dp_id": "dp04",
+        "type": "analysis",
+        "description": "Full cost stack including logistics previously carried by the programme budget, with fixed cost allocation by staff time.",
+        "uploaded_by": "Co-implementer",
+        "status": "accepted",
+        "reliability": "high"
+      },
+      {
+        "_key": "E-009",
+        "reference": "E-009",
+        "date": "2026-07-24",
+        "dp_id": "dp04",
+        "type": "analysis",
+        "description": "Market price comparison across four alternatives, with quality level and source date for each.",
+        "uploaded_by": "Co-implementer",
+        "status": "accepted",
+        "reliability": "medium"
+      },
+      {
+        "_key": "E-010",
+        "reference": "E-010",
+        "date": "2026-07-27",
+        "dp_id": "dp05",
+        "type": "analysis",
+        "description": "A and B framing results across eight contacts, with response quality and purchasing signal recorded per contact.",
+        "uploaded_by": "Lead consultant",
+        "status": "accepted",
+        "reliability": "high"
+      },
+      {
+        "_key": "E-011",
+        "reference": "E-011",
+        "date": "2026-08-06",
+        "dp_id": "dp07",
+        "type": "observation",
+        "description": "Four pilot session observation records covering engagement, language, resistance, surprise and the price moment.",
+        "uploaded_by": "Co-implementer",
+        "status": "submitted",
+        "reliability": "high"
+      },
+      {
+        "_key": "E-012",
+        "reference": "E-012",
+        "date": "2026-08-06",
+        "dp_id": "dp07",
+        "type": "document",
+        "description": "Two open items carried out of the pilot rounds: liability wording and the year two renewal proposition.",
+        "uploaded_by": "Lead consultant",
+        "status": "submitted",
+        "reliability": "medium"
+      }
+    ]
+  }
+}
