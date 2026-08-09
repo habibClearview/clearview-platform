@@ -49,6 +49,19 @@ export async function POST(req: NextRequest) {
     }
 
     if (!clientId) return NextResponse.json({ error: 'Missing clientId' }, { status: 400 })
+
+    // Who is asking is settled before anything about what they asked for.
+    // This used to validate the stage, the recipient list and the link first,
+    // so a caller with no login learned the shape of a valid request and which
+    // parts of theirs were wrong. Nothing was ever sent, but answering a
+    // stranger's questions is not the job of a route that refuses them.
+    const token = getBearerToken(req)
+    if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+
+    const admin = getAdminClient()
+    const { data: { user }, error: authErr } = await admin.auth.getUser(token)
+    if (authErr || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+
     if (stage !== 'scope' && stage !== 'triparty') {
       return NextResponse.json({ error: 'Invalid stage' }, { status: 400 })
     }
@@ -60,13 +73,6 @@ export async function POST(req: NextRequest) {
     if (!isWebUrl(journeyUrl)) {
       return NextResponse.json({ error: 'The journey link must be a web address' }, { status: 400 })
     }
-
-    const token = getBearerToken(req)
-    if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-
-    const admin = getAdminClient()
-    const { data: { user }, error: authErr } = await admin.auth.getUser(token)
-    if (authErr || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
     // Authorization goes through resolveClientAccess, the same helper every
     // other route uses. This block used to re-derive the rule by hand, reading
