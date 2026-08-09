@@ -2195,6 +2195,14 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         )}
         {isSuperCoach&&<ClientTeamInvite client={selClient}/>}
 
+        {/* See exactly what each person sees when they sign in.
+            This existed and was only rendered on the financial dashboard, so on
+            a canvas engagement, which is the only kind the method uses, it was
+            not on the screen at all. Being able to look at the co-implementer's
+            view, or the organisation's, before a session is the difference
+            between knowing what a client will see and hoping. */}
+        {mayPreview(userRole)&&<ViewAsBar realRole={userRole} viewingAs={viewingAs||userRole} onChange={v=>setViewingAs(v===userRole?null:v)}/>}
+
         {/* Two-column layout: sidebar + content.
             minmax(0,1fr) rather than 1fr, and minWidth:0 on the content, for a
             reason worth writing down. A grid track written as 1fr will not
@@ -2238,9 +2246,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                   </div>
                 ):null}
                 {groupDef&&navCollapsed?<div style={{height:1,background:C.border,margin:'0.4rem 0'}}/>:null}
-                <button onClick={()=>{if(shutBecause){setFlashLocked(shutBecause);return}setActiveTab(tab.id)}} disabled={!!shutBecause} title={shutBecause||(navCollapsed?`${String(tab.number).padStart(2,'0')} ${tab.label}`:undefined)} style={{width:'100%',textAlign:'left',padding:navCollapsed?'0.6rem 0.3rem':'0.6rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:isActive?'var(--cv-header)':C.white,color:isActive?'var(--cv-on-accent)':(shutBecause?C.slate:C.navy),opacity:shutBecause?0.55:1,cursor:shutBecause?'not-allowed':'pointer',display:'flex',justifyContent:navCollapsed?'center':'space-between',alignItems:'center',gap:navCollapsed?'0.25rem':0,fontSize:'1.01rem',fontFamily:"'Segoe UI',system-ui,sans-serif",fontWeight:isActive?700:400}}>
+                <button onClick={()=>{if(shutBecause){setFlashLocked(shutBecause);return}setActiveTab(tab.id)}} disabled={!!shutBecause} title={shutBecause||(navCollapsed?`${tab.marker} ${tab.label}`:undefined)} style={{width:'100%',textAlign:'left',padding:navCollapsed?'0.6rem 0.3rem':'0.6rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:isActive?'var(--cv-header)':C.white,color:isActive?'var(--cv-on-accent)':(shutBecause?C.slate:C.navy),opacity:shutBecause?0.55:1,cursor:shutBecause?'not-allowed':'pointer',display:'flex',justifyContent:navCollapsed?'center':'space-between',alignItems:'center',gap:navCollapsed?'0.25rem':0,fontSize:'1.01rem',fontFamily:"'Segoe UI',system-ui,sans-serif",fontWeight:isActive?700:400}}>
                   <span>
-                    {navCollapsed?<span style={{fontFamily:'monospace',fontSize:'0.93rem',color:isActive?C.cyan:C.slate}}>{String(tab.number).padStart(2,'0')}</span>:tab.label}
+                    {navCollapsed?<span style={{fontFamily:'monospace',fontSize:'0.93rem',color:isActive?C.cyan:C.slate}}>{tab.marker}</span>:tab.label}
                   </span>
                   {dpCanvas&&<DPDot status={dpCanvas.status}/>}
                   {tab.coachOnly&&!navCollapsed&&<span style={{fontSize:'0.93rem',color:isActive?C.cyan:C.amber}}>\ud83d\udc41</span>}

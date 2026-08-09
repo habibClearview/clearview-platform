@@ -111,7 +111,43 @@ export async function POST(req: NextRequest) {
         console.error('gate-signoff POST: write failed', error)
         return NextResponse.json({ error: 'Could not record the sign-off' }, { status: 500 })
       }
-      return NextResponse.json({ ok: true, id: data.id, dpId, decision })
+
+      // MOVE THE GATE, not just the paperwork about it.
+      //
+      // This is the whole point of the button and it was missing. Authorising
+      // wrote a row saying the lead consultant had authorised, and stopped.
+      // The gate itself stayed exactly where it was, and since a zone opens
+      // only when the one before it is complete, nothing ever opened: the
+      // engagement could be worked, signed and authorised from end to end
+      // without moving a single step. Every call answered 200 while it
+      // happened, which is why nothing noticed.
+      //
+      // Returning a gate puts it back to needing work, for the same reason:
+      // the record of the return is not the same thing as the gate being open
+      // again, and the coach should not have to set the status by hand to
+      // make the screen tell the truth.
+      const nextStatus = decision === 'authorised' ? 'complete'
+        : decision === 'returned' ? 'needs_revisiting'
+        : null
+      if (nextStatus) {
+        const { error: moveError } = await admin
+          .from('canvas_decision_points')
+          .update({ status: nextStatus, updated_at: now })
+          .eq('client_id', clientId)
+          .eq('dp_id', dpId)
+        if (moveError) {
+          // Said out loud rather than swallowed. The sign-off is recorded and
+          // the gate is not, and a coach told everything worked would be
+          // looking at a screen that disagrees with itself.
+          console.error('gate-signoff POST: gate did not move', moveError)
+          return NextResponse.json(
+            { error: 'The decision was recorded but the zone did not move. Refresh and check before continuing.' },
+            { status: 500 },
+          )
+        }
+      }
+
+      return NextResponse.json({ ok: true, id: data.id, dpId, decision, status: nextStatus })
     }
 
     // Signing. The identity comes from the party list, so nobody can sign as

@@ -274,6 +274,55 @@ async function main() {
     `the pack carries ${evidenceInPack} evidence entries, expected at least 1`)
   if (packId) expectStatus('approve the claim', post('/api/invoice-pack', { clientId: CLIENT_ID, packId, action: 'approve' }), 200)
 
+  // ── the document the funder actually receives ──
+  //
+  // Everything above checks the claim in the database. The funder never sees
+  // the database; they get a Word file. Nothing checked that the file is
+  // produced, that it opens, or that what is inside it is this claim, so a
+  // document builder that threw would look identical to one that worked right
+  // up to the moment somebody clicked download in front of a funder.
+  //
+  // A Word file is a zip, so this asks for one, checks it really is a zip
+  // rather than an error page with the wrong label on it, and reads the text
+  // out of it to confirm the deliverable and the evidence are in there.
+  if (packId) {
+    const doc = `/tmp/smoke-${stamp}.docx`
+    const got = execFileSync('curl', [
+      '-sS', '--max-time', '60', '-o', doc, '-w', '%{http_code} %{content_type} %{size_download}',
+      '-H', `Authorization: Bearer ${token}`, '-H', `apikey: ${ANON}`,
+      `${BASE}/api/invoice-pack?packId=${packId}&clientId=${CLIENT_ID}&format=docx`,
+    ], { encoding: 'utf8' }).trim().split(/\s+/)
+    const [status, contentType, size] = [Number(got[0]), got[1] || '', Number(got[2] || 0)]
+    check('the claim downloads as a document', status === 200 && size > 2000,
+      `answered ${status}, ${size} bytes, ${contentType}`)
+    check('it is offered as a Word file',
+      contentType.includes('wordprocessingml'),
+      `content type was ${contentType}`)
+
+    // A zip begins PK. An error page saved under a .docx name does not, and
+    // that is exactly the failure that reaches somebody as "Word cannot open
+    // this file".
+    let opens = false
+    let text = ''
+    try {
+      const head = execFileSync('head', ['-c', '2', doc], { encoding: 'latin1' })
+      opens = head === 'PK'
+      if (opens) {
+        text = execFileSync('sh', ['-c', `unzip -p ${doc} word/document.xml 2>/dev/null | sed 's/<[^>]*>//g'`], {
+          encoding: 'utf8', maxBuffer: 8 * 1024 * 1024,
+        })
+      }
+    } catch { /* handled by the checks below */ }
+
+    check('the document opens as a real Word file', opens,
+      'the file does not begin with a zip header, so Word would refuse it')
+    check('it names the deliverable being claimed for', text.includes('Smoke deliverable'),
+      `the document text does not mention it (${text.length} characters read)`)
+    check('and it carries the evidence behind the claim', text.includes('E-001'),
+      'the evidence reference is not in the document')
+    try { execFileSync('rm', ['-f', doc]) } catch { /* best effort */ }
+  }
+
   // ── the Charter, issued and signed on paper ──
   const charterRow = http('GET', `${SB}/rest/v1/engagement_charters?select=id&client_id=eq.${CLIENT_ID}`, { headers: jsonHeaders(SERVICE) })
   const charterId = charterRow.json?.[0]?.id
@@ -284,6 +333,32 @@ async function main() {
     post('/api/charter-sign', { clientId: CLIENT_ID, charterId, signerRole: 'lsp_ed', onBehalfOfPartyId: partyId }), 409)
   expectStatus('a gate sign off given on paper',
     post('/api/gate-signoff', { clientId: CLIENT_ID, dpId: 'dp01', decision: 'signed', signerRole: 'lsp_ed', onBehalfOfPartyId: partyId }), 200)
+
+  // ── the engagement actually moving forward ──
+  //
+  // This is the check that was missing, and its absence let the method sit
+  // still. Authorising wrote a row saying it had been authorised and left the
+  // gate where it was, so no zone ever opened. Every call answered 200
+  // throughout. Recording a decision and moving the engagement are two
+  // different things, and only the second one is the point.
+  const gateBefore = http('GET', `${SB}/rest/v1/canvas_decision_points?select=status&client_id=eq.${CLIENT_ID}&dp_id=eq.dp01`, { headers: jsonHeaders(SERVICE) })
+  check('the zone is not complete before it is authorised',
+    gateBefore.json?.[0]?.status !== 'complete',
+    `it was already ${JSON.stringify(gateBefore.json?.[0]?.status)}`)
+
+  expectStatus('authorise the next zone',
+    post('/api/gate-signoff', { clientId: CLIENT_ID, dpId: 'dp01', decision: 'authorised' }), 200)
+  const gateAfter = http('GET', `${SB}/rest/v1/canvas_decision_points?select=status&client_id=eq.${CLIENT_ID}&dp_id=eq.dp01`, { headers: jsonHeaders(SERVICE) })
+  check('authorising actually moves the zone, so the next one opens',
+    gateAfter.json?.[0]?.status === 'complete',
+    `the zone is still ${JSON.stringify(gateAfter.json?.[0]?.status)} after being authorised`)
+
+  expectStatus('return a zone for more work',
+    post('/api/gate-signoff', { clientId: CLIENT_ID, dpId: 'dp01', decision: 'returned', note: 'Smoke: needs another look' }), 200)
+  const gateReturned = http('GET', `${SB}/rest/v1/canvas_decision_points?select=status&client_id=eq.${CLIENT_ID}&dp_id=eq.dp01`, { headers: jsonHeaders(SERVICE) })
+  check('returning it puts the zone back to needing work',
+    gateReturned.json?.[0]?.status === 'needs_revisiting',
+    `the zone is ${JSON.stringify(gateReturned.json?.[0]?.status)} after being returned`)
 
   // ── the room, with no login at all ──
   const link = post('/api/session-link', { clientId: CLIENT_ID, dpId: 'dp02', label: 'Smoke room' })
