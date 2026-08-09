@@ -331,6 +331,23 @@ async function main() {
     post('/api/charter-sign', { clientId: CLIENT_ID, charterId, signerRole: 'lsp_ed', onBehalfOfPartyId: partyId }), 200)
   expectStatus('the same party cannot sign twice',
     post('/api/charter-sign', { clientId: CLIENT_ID, charterId, signerRole: 'lsp_ed', onBehalfOfPartyId: partyId }), 409)
+
+  // A signature has to move the agreement, not just leave a row behind. This
+  // engagement has exactly one signatory, so that one signature executes the
+  // Charter. Before the fix, signing wrote the row and left the Charter saying
+  // it was still out for signature, forever.
+  {
+    const after = http('GET',
+      `${SB}/rest/v1/engagement_charters?select=status,signed_at&id=eq.${charterId}`,
+      { headers: jsonHeaders(SERVICE) })
+    const row = after.json?.[0] || {}
+    check('signing the last signature marks the Charter signed',
+      row.status === 'signed',
+      `the Charter still says "${row.status}" after every signatory signed`)
+    check('and it records when it became fully executed',
+      Boolean(row.signed_at),
+      'signed_at is empty on a fully executed Charter')
+  }
   // ── the agreement people can keep ──
   //
   // Three parties sign this and, until it was built, none of them could hold a
@@ -365,8 +382,16 @@ async function main() {
       'the document does not say which version it is')
     check('it names the person who signed', text.includes('Smoke Signatory'),
       'the signatory is not in the document')
-    check('and it says who has not signed yet', /Still to sign|Every named signatory/.test(text),
-      'the document is silent about outstanding signatures, so it reads as complete')
+    // Every signatory on this engagement has signed by now, so the document
+    // must say so plainly rather than leaving it to be inferred, and it must
+    // agree with the Charter's own status. A copy that reads "issued for
+    // signature" on a fully executed agreement is the version that reaches a
+    // funder and raises a question nobody can answer.
+    check('and it states that every signatory has signed',
+      text.includes('Every named signatory has signed'),
+      'the document is silent about outstanding signatures, so it reads as complete without saying it is')
+    check('and its status agrees with the signed Charter', /Signed/.test(text) && !/Issued for signature/.test(text),
+      'the document reports a status the Charter itself no longer has')
     try { execFileSync('rm', ['-f', doc]) } catch { /* best effort */ }
   }
 
