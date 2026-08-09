@@ -11,9 +11,21 @@
 //   WATCH IT      what the room has added, newest first, with who said it.
 //                 Refreshes when asked rather than constantly, so a projected
 //                 screen does not jump while somebody is reading it.
-//   USE IT        mark a sentence once it has become a row in the block. The
-//                 pile shrinks honestly, which is what stops the coach reading
-//                 all forty again and either missing one or using one twice.
+//   USE IT        turn a sentence into a row in the block's own table, in one
+//                 click and in the words it was said in, or mark it used if it
+//                 went in some other way. The pile shrinks honestly, which is
+//                 what stops the coach reading all forty again and either
+//                 missing one or using one twice.
+//
+// WHY THE ONE CLICK MATTERS. Before it, moving a sentence into the block meant
+// reading it here and retyping it there, so it either did not happen or it
+// happened with the words changed. Changed words are the one thing a verbatim
+// record cannot survive: the value of what the room said is that it is what
+// they said, not what the coach remembers afterwards.
+//
+// Four blocks hold numbers or a fixed list rather than sentences, and for those
+// the button is not offered and the reason is said out loud, which is better
+// than a button that quietly files a sentence somewhere nobody chose.
 //
 // The QR code is drawn here rather than fetched, so nothing about the session
 // leaves for a third party to draw it. A link in a URL sent to an image service
@@ -26,6 +38,7 @@ import { useCallback, useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
 import { GATES } from '@/lib/gtcv-gates'
+import { promotionTargetFor } from '@/lib/session-promotion'
 
 const C = {
   white: 'var(--cv-card)', border: 'var(--cv-border)', navy: 'var(--cv-navy)',
@@ -145,9 +158,27 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
   }
 
   async function mark(id, used) {
-    setBusy(`mark:${id}`); setErr(null)
+    setBusy(`mark:${id}`); setErr(null); setNote(null)
     try {
-      await api('/api/session-contributions', 'PATCH', { clientId, id, used })
+      const res = await api('/api/session-contributions', 'PATCH', { clientId, id, used })
+      // Undoing removes the draft row it made, unless somebody has since worked
+      // on it. Saying which happened matters: the coach is about to go looking
+      // for a row that is either there or not.
+      if (used === false && res?.keptRow) {
+        setNote('Put back. The row it became has been edited since, so that has been left in the table.')
+      } else if (used === false) {
+        setNote('Put back on the pile.')
+      }
+      await load()
+    } catch (e) { setErr(e.message) }
+    setBusy(null)
+  }
+
+  async function promote(id) {
+    setBusy(`promote:${id}`); setErr(null); setNote(null)
+    try {
+      const res = await api('/api/session-contributions', 'POST', { clientId, id })
+      setNote(`Added as ${res?.describes || 'a row'}. Open the block to finish it off.`)
       await load()
     } catch (e) { setErr(e.message) }
     setBusy(null)
@@ -290,17 +321,43 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
             </div>
             <p style={{ margin: '0.4rem 0 0', color: C.navy, fontSize: '1rem', whiteSpace: 'pre-wrap' }}>{c.contribution}</p>
             {canManage ? (
-              <button type="button" style={{ ...ghost, marginTop: '0.6rem' }} disabled={busy === `mark:${c.id}`}
-                onClick={() => mark(c.id, !c.promoted_at)}>
-                {busy === `mark:${c.id}` ? 'Saving...' : c.promoted_at ? 'Put it back on the pile' : 'Mark as used'}
-              </button>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginTop: '0.6rem' }}>
+                {!c.promoted_at && promotionTargetFor(c.dp_id) ? (
+                  <button type="button" style={{ ...ghost, borderColor: C.cyan, color: C.cyan }}
+                    disabled={busy === `promote:${c.id}`}
+                    onClick={() => promote(c.id)}>
+                    {busy === `promote:${c.id}`
+                      ? 'Adding...'
+                      : `Add to the block as ${promotionTargetFor(c.dp_id).describes}`}
+                  </button>
+                ) : null}
+                <button type="button" style={ghost} disabled={busy === `mark:${c.id}`}
+                  onClick={() => mark(c.id, !c.promoted_at)}>
+                  {busy === `mark:${c.id}`
+                    ? 'Saving...'
+                    : c.promoted_at ? 'Put it back on the pile' : 'Mark as used'}
+                </button>
+                {c.promoted_to_table ? (
+                  <span style={{ ...hint, fontSize: '0.82rem' }}>In the block already.</span>
+                ) : !c.promoted_at && !promotionTargetFor(c.dp_id) ? (
+                  <span style={{ ...hint, fontSize: '0.82rem' }}>
+                    This block holds numbers rather than sentences, so this one is yours to place.
+                  </span>
+                ) : null}
+              </div>
             ) : null}
           </div>
         ))}
 
         <p style={{ ...hint, marginTop: '0.9rem', maxWidth: '70ch' }}>
+          Adding one to the block puts it in the block&apos;s own table in the words it was said in, with
+          everything else left blank for you to complete. It is a draft, not a finding.
+        </p>
+        <p style={{ ...hint, marginTop: '0.5rem', maxWidth: '70ch' }}>
           Marking one as used does not delete it. It stays here with the name on it, because the reason
           to come back to something somebody said is usually to come back to the person who said it.
+          Putting one back removes the draft it made, unless you have already worked on that draft, in
+          which case your work stays and you are told so.
         </p>
       </div>
     </div>
