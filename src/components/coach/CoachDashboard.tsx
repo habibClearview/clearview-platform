@@ -10,6 +10,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import EngagementJourneyView from '@/components/engagement/EngagementJourneyView'
 import BlockWorkspace from '@/components/gtcv/BlockWorkspace'
+import SessionRoom from '@/components/gtcv/SessionRoom'
 import CurrencyField from '@/components/common/CurrencyField'
 import { formatMoneyShort } from '@/lib/currency'
 import SessionPlanner from '@/components/gtcv/SessionPlanner'
@@ -1787,6 +1788,16 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     try{window.localStorage.setItem('cv.coachNavCollapsed',navCollapsed?'1':'0')}catch{}
   },[navCollapsed])
 
+  const [clientSessions,setClientSessions]=useState([])
+  useEffect(()=>{
+    let cancelled=false
+    if(!selClientId){setClientSessions([]);return}
+    supabase.from('gtcv_sessions').select('id,dp_id,title').eq('client_id',selClientId).order('sort_order')
+      .then(({data})=>{if(!cancelled)setClientSessions(data||[])})
+      .catch(()=>{if(!cancelled)setClientSessions([])})
+    return ()=>{cancelled=true}
+  },[selClientId])
+
   const [engagementCurrency,setEngagementCurrency]=useState(null)
   useEffect(()=>{
     let cancelled=false
@@ -2208,7 +2219,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             {activeTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
             {activeTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={userRole} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
             {activeTab==='deliverables'&&canEdit(userRole)&&<DeliverablesPanel clientId={selClient.id} canManage={canEdit(userRole)} currency={engagementCurrency}/>}
-            {activeTab==='sessions'&&<SessionPlanner clientId={selClient.id} canManage={canEdit(userRole)}/>}
+            {activeTab==='sessions'&&<><SessionRoom clientId={selClient.id} canManage={canEdit(userRole)} sessions={clientSessions}/><div style={{height:22}}/><SessionPlanner clientId={selClient.id} canManage={canEdit(userRole)}/></>}
             {activeTab==='tracker'&&<><GtcvEngagementTracker clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/><TabTracker client={selClient} canvas={canvas}/></>}
             {activeTab==='decisions'&&<TabDecisions client={selClient} decisions={decisions} userRole={userRole} userName={userName} onAdd={async(d)=>{const {data}=await supabase.from('canvas_decisions').insert([{...d,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:[...decisions,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`decisions:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:decisions.map(d=>d.id!==id?d:{...d,...updates})}})),()=>supabase.from('canvas_decisions').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
             {activeTab==='evidence'&&<><EvidenceLibraryPanel clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/><TabEvidence client={selClient} evidence={evidence} onAdd={async(e)=>{const ref=`E-${String(evidence.length+1).padStart(3,'0')}`;const {data}=await supabase.from('evidence_library').insert([{...e,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:[...evidence,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`evidence:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:evidence.map(e=>e.id!==id?e:{...e,...updates})}})),()=>supabase.from('evidence_library').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/></>}
