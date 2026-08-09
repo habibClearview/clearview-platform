@@ -43,6 +43,19 @@ const MOMENTUM = [
   { v: 'red', l: 'Stopped', c: C.red, note: 'A recovery plan is needed before this resumes.' },
 ]
 
+async function setupApi(clientId) {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  const res = await fetch('/api/engagement-setup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ clientId }),
+  })
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(json?.error || `Request failed (${res.status})`)
+  return json
+}
+
 async function api(method, body, query) {
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
@@ -110,6 +123,42 @@ export default function EngagementSettings({ clientId, canManage }) {
         blocks in the same order; what these decide is what they are called, what this engagement
         agreed to do, and how it is going.
       </p>
+
+      <div style={{
+        marginTop: '1rem', border: `1px solid ${C.border}`, borderRadius: 10,
+        background: C.alt, padding: '0.85rem 1rem',
+      }}>
+        <div style={{ ...mono, fontSize: '0.7rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
+          Scaffolding
+        </div>
+        <p style={{ ...hint, margin: '0.35rem 0 0.6rem', maxWidth: '68ch' }}>
+          A new engagement needs three things before anything else works: its own settings, a record
+          for each of the twelve gates, and a Charter to edit and issue. This creates whichever of
+          them are missing and touches nothing that is already there, so pressing it twice is safe.
+          It does not invent parties: a name on a signature has to be a real one, so add those
+          yourself above.
+        </p>
+        <button
+          type="button"
+          style={{
+            ...mono, fontSize: '0.83rem', padding: '0.4rem 0.9rem',
+            border: `1px solid ${C.slate}`, borderRadius: 7, background: 'transparent',
+            color: C.slate, cursor: 'pointer',
+          }}
+          disabled={busy === 'scaffold'}
+          onClick={async () => {
+            setBusy('scaffold'); setNote(null); setErr(null)
+            try {
+              const r = await setupApi(clientId)
+              const made = (r.created || []).join(', ')
+              const had = (r.alreadyThere || []).join(', ')
+              setNote(made ? `Created ${made}.${had ? ` ${had} was already there.` : ''}` : 'Everything was already in place.')
+              await load()
+            } catch (e) { setErr(e.message) }
+            setBusy(null)
+          }}
+        >{busy === 'scaffold' ? 'Setting up...' : 'Set this engagement up'}</button>
+      </div>
 
       {err ? <div style={{ color: C.red, fontSize: '0.95rem', marginTop: '0.7rem' }}>{err}</div> : null}
       {note ? <div style={{ color: C.green, fontSize: '0.95rem', marginTop: '0.7rem' }}>{note}</div> : null}
