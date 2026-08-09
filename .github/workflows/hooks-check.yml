@@ -1,0 +1,43 @@
+name: React hooks gate
+
+# A hook placed after an early return takes the whole page down with a blank
+# screen and "a client-side exception has occurred". It happened here: five
+# hooks went in below `if (loading) return <Spinner/>` and the coach dashboard
+# died for everyone.
+#
+# Nothing caught it. The production build succeeded, all the tests passed, and
+# the page still answered 200, because the failure only appears when a real
+# browser renders the component twice with different state. A static rule is
+# the only thing that sees it before a person does.
+#
+# The config is deliberately narrow: this enforces the hooks rule and nothing
+# else, so it can be a hard gate today rather than waiting on a repository wide
+# lint cleanup that would have to happen first.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [staging]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hooks-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hooks:
+    name: No hook may be called conditionally
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint:hooks
