@@ -347,7 +347,7 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
           <h1>{beneficiary}&rsquo;s journey from grant-funded to standing on its own.</h1>
           <p>
             A shared, visual picture for everyone involved, <b>{beneficiary}</b>&rsquo;s team walking the path
-            {funder ? <> and <b>{funder}</b> watching it progress</> : null}. The nine blocks are worked in order; each is a decision gate that only opens once the work behind it is real.
+            {funder ? <> and <b>{funder}</b> watching it progress</> : null}. The nine blocks are worked in order, and each one is a decision gate that does not close until the evidence behind it is real and the people who have to sign it have signed.
           </p>
         </section>
 
@@ -393,7 +393,23 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
             <div className="trans-l">Transition row · where the model is tested with real customers, then extended</div>
             <div className="row2">{box('dp07')}{box('dp08')}</div>
 
-            <div className={['spine-box', boxStateClass(spineState, false)].filter(Boolean).join(' ')}>
+            {/*
+              The diagnostic spine is block nine and it opens like the rest.
+              It used to be the one box on the canvas that did nothing when you
+              clicked it, which reads as a fault rather than as a design, and
+              it happens to hold the readiness scoring, the thing the whole
+              engagement is measured by. It is a wide box rather than one of
+              the eight because it runs across the whole journey, not because
+              it is a different kind of thing.
+            */}
+            <div
+              className={['spine-box', boxStateClass(spineState, false)].filter(Boolean).join(' ')}
+              role="button"
+              tabIndex={0}
+              style={{ cursor: 'pointer' }}
+              onClick={() => setOpenDp('dp09')}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenDp('dp09') } }}
+            >
               <div className="spine-head">
                 <div>
                   <span className="dptag">{termPrefix} 09</span>
@@ -433,8 +449,27 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
       </div>
 
       {openDp ? (() => {
-        const b = BLOCK[openDp]
+        // Block nine is the diagnostic spine, which is described by SPINE
+        // rather than by BLOCK because it runs across the whole journey
+        // instead of sitting in one of the three columns. Reading it from
+        // BLOCK gave undefined and the drawer threw on the title, which is
+        // why the box was left unclickable rather than fixed.
+        const b = BLOCK[openDp] || (openDp === 'dp09' ? {
+          title: SPINE.title,
+          q: SPINE.q,
+          bullets: SPINE.fits.map((f) => `${f.t}: ${f.d}`),
+          fit: 'Scored at kick-off, mid-point and close, so the movement is the finding, not the score',
+        } : null)
+        if (!b) return null
         const s = gs[openDp] || 'not_started'
+        // The block immediately behind this one in the method's order, so the
+        // drawer can say when the record is about to go out of sequence.
+        // STOPS is that order, including the steps that are not boxes.
+        const here = STOPS.findIndex((stop) => stop.id === openDp)
+        const before = here > 0 ? STOPS[here - 1] : null
+        const previousGate = before
+          ? { label: before.lab, status: gs[before.id] || 'not_started' }
+          : null
         const canManage = role === 'super_coach' || role === 'coach'
         // The evidence this gate must produce, from the confirmed mapping.
         const evidence = (view.gate_map || []).filter((m) => m.dp_id === openDp)
@@ -519,7 +554,24 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
               {canManage ? (
                 <>
                   <h3 style={{ fontFamily: 'var(--fm)', fontSize: 10.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--gold)', margin: '24px 0 8px' }}>Move this gate</h3>
-                  <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--ink-faint)' }}>Moving a gate is the coaching team&apos;s, and /api/gate-status enforces the same rule when it saves. The next block opens once this one is complete.</p>
+                  {/*
+                    This used to say the next block opens once this one is
+                    complete, and that the route enforced it. Neither was true:
+                    every block opens, and the route checks who is asking and
+                    nothing about order. Saying otherwise in front of a client
+                    invites them to click the next block and find it open.
+                    What is true is that the method works the blocks in order,
+                    and that a gate moved out of turn is visible rather than
+                    prevented. So the drawer names the block behind this one
+                    when it is not closed, which is the information a coach
+                    actually needs at the moment of moving a gate.
+                  */}
+                  <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--ink-faint)' }}>Only the coaching team can move a gate. The blocks are worked in order, and the platform records the order rather than enforcing it, so moving one early is a decision you are making, not one it will stop.</p>
+                  {previousGate && previousGate.status !== 'complete' ? (
+                    <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--now)' }}>
+                      {previousGate.label} is {statusWord(previousGate.status).toLowerCase()}. Closing this one first leaves the record out of order.
+                    </p>
+                  ) : null}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {OPTIONS.map(([val, lab]) => (
                       <button
