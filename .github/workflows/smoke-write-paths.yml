@@ -1,0 +1,107 @@
+name: The write paths must actually work
+
+# Every other gate in this repository reads the code. None of them run it.
+#
+# That is not a small gap, it is the gap the last ten faults fell through. A
+# query that names a column the table does not have compiles cleanly, satisfies
+# the types, passes all 919 unit tests and answers 200. A route that writes a
+# value a check constraint refuses looks correct in review. A permission granted
+# to one database role and needed by another is invisible in a diff. In every
+# one of those cases the first person to find out was a person clicking, and the
+# worry is that the person clicking is a client.
+#
+# So this gate signs in and does the work. It creates a throwaway engagement and
+# a throwaway login, sets the engagement up, sets a currency and reads it back,
+# adds a party, moves a gate, adds a deliverable, assembles a claim and checks
+# the evidence is in it, issues and signs a Charter, opens a session to the room
+# and types into it with no login, attaches a file, and confirms the refusals
+# that matter still refuse. Then it deletes everything it made, whether the
+# checks passed or not.
+#
+# It runs against staging, never production, and the script refuses production
+# by name as well.
+#
+# It confirms which build answered before it trusts a single result. A pass
+# against yesterday's deployment is worse than no pass, because it is the pass
+# somebody believes.
+#
+# Where the credentials are absent it says so loudly rather than passing
+# quietly, for the same reason the row level security gate does.
+
+on:
+  push:
+    branches: [staging]
+  pull_request:
+    branches: [main, staging]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-write-paths-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Sign in and drive the real write paths
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+      SMOKE_BASE_URL: ${{ vars.STAGING_BASE_URL }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: '20'
+
+      - name: Check the credentials are here
+        id: creds
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] || [ -z "$SMOKE_BASE_URL" ]; then
+            echo "::warning::The write paths were not driven. Set the STAGING_SUPABASE_URL and"
+            echo "::warning::STAGING_BASE_URL repository variables and the STAGING_SUPABASE_ANON_KEY"
+            echo "::warning::and STAGING_SUPABASE_SERVICE_ROLE_KEY secrets to turn this gate on."
+            echo "ready=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=yes" >> "$GITHUB_OUTPUT"
+          fi
+
+      # On a push to staging the deployment for this commit is still building,
+      # so wait for the site to be serving this commit before asking it
+      # anything. On a pull request there is no staging deployment of the merge
+      # commit, so the checks run against whatever staging is serving: that
+      # still catches a broken write path, it just cannot claim to have tested
+      # this change.
+      - name: Wait for the deployment of this commit
+        if: steps.creds.outputs.ready == 'yes' && github.event_name == 'push'
+        run: |
+          for attempt in $(seq 1 60); do
+            serving=$(curl -sS --max-time 20 "$SMOKE_BASE_URL/api/build-info" | sed -n 's/.*"commit":"\([^"]*\)".*/\1/p')
+            if [ "$serving" = "$GITHUB_SHA" ]; then
+              echo "Serving ${GITHUB_SHA:0:7}. Ready after $attempt checks."
+              exit 0
+            fi
+            echo "Serving ${serving:0:7}, waiting for ${GITHUB_SHA:0:7} (attempt $attempt of 60)."
+            sleep 20
+          done
+          echo "::error::The deployment never started serving ${GITHUB_SHA:0:7}. Not reporting a pass"
+          echo "::error::against a build that is not this change."
+          exit 1
+
+      - name: Drive the write paths
+        if: steps.creds.outputs.ready == 'yes'
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            node scripts/smoke-write-paths.mjs --expect-commit="$GITHUB_SHA"
+          else
+            node scripts/smoke-write-paths.mjs
+          fi
+
+      - name: Say plainly that nothing was checked
+        if: steps.creds.outputs.ready != 'yes'
+        run: echo "Skipped. Without credentials this cannot tell a working deployment from an unchecked one."
