@@ -88,6 +88,54 @@ describe('the worked example loader', () => {
     expect(run(['--client=client-test', '--purge'])).toContain('delete from')
   })
 
+  it('never deletes a table it matches on a natural key', () => {
+    // canvas_decision_points holds the engagement's own gate record, created
+    // long before this example. The upsert replaces the fields the example
+    // sets; deleting the row first would throw away everything else on it.
+    const sql = run(['--client=client-test', '--purge'])
+    expect(sql).not.toContain('delete from public.canvas_decision_points')
+    expect(sql).toContain('on conflict (client_id, dp_id) do update')
+  })
+
+  it('never updates the columns it matched a row on', () => {
+    const sql = run(['--client=client-test'])
+    // dp_id is an ordinary column on the tables keyed by id, so the check has
+    // to be against the statements that actually match on it.
+    const canvasStatements = sql
+      .split('insert into ')
+      .filter((s) => s.startsWith('public.canvas_decision_points'))
+    expect(canvasStatements.length).toBe(12)
+    for (const statement of canvasStatements) {
+      expect(statement).not.toContain('dp_id = excluded.dp_id')
+      expect(statement).not.toContain('client_id = excluded.client_id')
+    }
+  })
+
+  it('keeps the gate statuses consistent with the sessions in the example', () => {
+    // A gate reading "not started" while a session under it is marked held is
+    // exactly the contradiction a client notices first, so the example is
+    // checked for it rather than trusted.
+    const example = JSON.parse(readFileSync(EXAMPLE, 'utf8'))
+    const status = new Map<string, string>(
+      example.tables.canvas_decision_points.map((g: any) => [g.dp_id, g.status])
+    )
+    for (const session of example.tables.gtcv_sessions) {
+      if (session.status !== 'held') continue
+      expect(
+        status.get(session.dp_id),
+        `${session.dp_id} has a session marked held but the gate says ${status.get(session.dp_id)}`
+      ).not.toBe('not_started')
+    }
+  })
+
+  it('gives every gate in the example a status the canvas understands', () => {
+    const example = JSON.parse(readFileSync(EXAMPLE, 'utf8'))
+    const allowed = new Set(['not_started', 'in_progress', 'complete'])
+    for (const gate of example.tables.canvas_decision_points) {
+      expect(allowed.has(gate.status), `${gate.dp_id} has status ${gate.status}`).toBe(true)
+    }
+  })
+
   it('never writes a signature, a gate sign off or a charter row', () => {
     const sql = run(['--client=client-test', '--purge'])
     for (const table of [

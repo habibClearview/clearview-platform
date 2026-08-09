@@ -5,6 +5,84 @@
     "note": "Rows carry an optional _key. Another row points at it with {\"_ref\": \"<key>\"}. The loader turns both into the same stable identifier, so the example can be loaded twice without duplicating anything."
   },
   "tables": {
+    "canvas_decision_points": [
+      {
+        "_key": "setup",
+        "dp_id": "setup",
+        "status": "complete",
+        "evidence_summary": "Engagement set up, parties named, gate map agreed against the deliverables."
+      },
+      {
+        "_key": "phase_0",
+        "dp_id": "phase_0",
+        "status": "complete",
+        "evidence_summary": "Clearing the ground session held 19 May. Two service lines taken out of scope before any work started."
+      },
+      {
+        "_key": "dp01",
+        "dp_id": "dp01",
+        "status": "complete",
+        "evidence_summary": "Eight services inventoried and classified. Two kept, two redesigned, one stopped on evidence, two paused, one sent to the board as a trading decision rather than an advisory one."
+      },
+      {
+        "_key": "dp02",
+        "dp_id": "dp02",
+        "status": "complete",
+        "evidence_summary": "Five segments scored, nine interviews recorded with verbatims and named budget authority. Two segments advanced, two dropped on the evidence, one held for access."
+      },
+      {
+        "_key": "dp03",
+        "dp_id": "dp03",
+        "status": "complete",
+        "evidence_summary": "Three propositions assembled from interview language and tested with six people. Two revised on what they said, one held deliberately."
+      },
+      {
+        "_key": "dp04",
+        "dp_id": "dp04",
+        "status": "complete",
+        "evidence_summary": "Cost stack built including the logistics previously carried by the programme budget. Five tiers priced against four market alternatives."
+      },
+      {
+        "_key": "dp05",
+        "dp_id": "dp05",
+        "status": "complete",
+        "evidence_summary": "Two framings tested across eight contacts. Variant A won on every contact holding budget authority. Seven organisations in the pipeline."
+      },
+      {
+        "_key": "dp06",
+        "dp_id": "dp06",
+        "status": "in_progress",
+        "evidence_summary": "Five partners mapped. The software vendor is marked as a conflict rather than a partner, and the two processor endorsements are the highest value action on the page.",
+        "priority_action": "Ask two processors to confirm in writing that the protocol matches their intake standard. It costs nothing and removes the main objection."
+      },
+      {
+        "_key": "dp07",
+        "dp_id": "dp07",
+        "status": "in_progress",
+        "evidence_summary": "Four pilot sessions delivered across two customers and two iterations, all closing genuinely. Two items are still open.",
+        "priority_action": "Answer the liability question and define the year two renewal proposition before the next processor conversation."
+      },
+      {
+        "_key": "dp08",
+        "dp_id": "dp08",
+        "status": "in_progress",
+        "evidence_summary": "Five channels drafted with entry and scale separated. One is marked as dependent on facilitation, on purpose, so it cannot be counted as evidence of independence.",
+        "priority_action": "Work three market days a week in one buying yard and record how each customer was actually reached."
+      },
+      {
+        "_key": "dp09",
+        "dp_id": "dp09",
+        "status": "in_progress",
+        "evidence_summary": "Six fit tests scored at baseline and again at midpoint. Three moved, two moved a little, one barely moved.",
+        "priority_action": "Solution to scale is the weak one. Statistical review still rests on one person and nothing yet reduces that."
+      },
+      {
+        "_key": "handover",
+        "dp_id": "handover",
+        "status": "not_started",
+        "priority_action": "The five independence tests are answered here, in front of everybody, and the paused service lines are decided here rather than before."
+      }
+    ],
     "gtcv_service_inventory": [
       {
         "_key": "svc_extension",

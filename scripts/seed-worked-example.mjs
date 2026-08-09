@@ -56,11 +56,22 @@ const DEFAULT_EXAMPLE = resolve(HERE, 'worked-examples/agricultural-advisory.jso
 // Tables whose primary key is text rather than uuid. Their identifiers are
 // readable on purpose: an evidence reference is quoted in claims and in funder
 // packs, so it has to be something a person can say out loud.
-const TEXT_KEYED = new Set(['evidence_library'])
+const TEXT_KEYED = new Set(['evidence_library', 'canvas_decision_points'])
+
+// Tables where the row that matters is identified by something other than its
+// primary key. canvas_decision_points already holds a row per gate on any
+// engagement that exists, created long before this example did, so matching on
+// the generated identifier would insert a second row for the same gate and the
+// unique index would refuse it. Matching on (client_id, dp_id) updates the row
+// that is already there and leaves its own identifier alone.
+const CONFLICT_TARGET = {
+  canvas_decision_points: ['client_id', 'dp_id'],
+}
 
 // The order matters. A row that points at another row has to be written after
 // the row it points at, or the foreign key refuses it.
 const WRITE_ORDER = [
+  'canvas_decision_points',
   'gtcv_service_inventory',
   'gtcv_customer_segments',
   'gtcv_problem_scores',
@@ -211,8 +222,12 @@ function main() {
 
   if (args.purge) {
     lines.push('-- --purge was passed: the client\'s existing rows in these tables go first.')
+    lines.push('-- Tables matched on a natural key are left alone: the upsert below already')
+    lines.push('-- replaces the row that is there, and deleting it would take the engagement\'s')
+    lines.push('-- own record with it rather than the example\'s copy of one.')
     // Reverse order, so a child is removed before the parent it points at.
     for (const table of [...present].reverse()) {
+      if (CONFLICT_TARGET[table]) continue
       lines.push(`delete from public.${sqlIdentifier(table)} where client_id = ${sqlLiteral(clientId)};`)
     }
     lines.push('')
@@ -234,16 +249,21 @@ function main() {
         values.push(sqlLiteral(resolved))
       }
 
+      const conflict = CONFLICT_TARGET[table] || ['id']
+
       // client_id is never updated: a row cannot change which engagement it
       // belongs to, and an upsert that allowed it would be a way to move one.
+      // The conflict columns are left out too, because updating the thing the
+      // match was made on is how a row quietly becomes a different row.
+      const untouched = new Set(['id', 'client_id', ...conflict])
       const updates = columns
-        .filter((c) => c !== 'id' && c !== 'client_id')
+        .filter((c) => !untouched.has(c))
         .map((c) => `${c} = excluded.${c}`)
 
       lines.push(
         `insert into public.${sqlIdentifier(table)} (${columns.join(', ')})\n` +
           `  values (${values.join(', ')})\n` +
-          `  on conflict (id) do update set ${updates.join(', ')};`
+          `  on conflict (${conflict.map(sqlIdentifier).join(', ')}) do update set ${updates.join(', ')};`
       )
     })
 
