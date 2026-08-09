@@ -27,6 +27,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 import { isRefusal, resolveSigner } from '@/lib/auth/signing-party'
+import { isCharterFullyExecuted } from '@/lib/engagement-types'
 
 
 export async function POST(req: NextRequest) {
@@ -128,12 +129,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Could not record the signature' }, { status: 500 })
     }
 
+    // A signature that does not move the agreement is only a row in a table.
+    // If this was the last signatory outstanding, the Charter itself becomes
+    // signed here -- otherwise it would stay "issued for signature" forever,
+    // on the screen and in the copy people download and file.
+    const [{ data: parties }, { data: sigs }] = await Promise.all([
+      admin.from('engagement_parties')
+        .select('id, is_signatory').eq('client_id', body.clientId),
+      admin.from('charter_signatures')
+        .select('party_id').eq('charter_id', body.charterId),
+    ])
+
+    let charterStatus = charter.status
+    if (isCharterFullyExecuted(parties || [], sigs || [])) {
+      const now = new Date().toISOString()
+      const { error: statusErr } = await admin
+        .from('engagement_charters')
+        .update({ status: 'signed', signed_at: now, updated_at: now })
+        .eq('id', body.charterId)
+        .eq('status', 'issued')   // never resurrect a superseded version
+      if (statusErr) {
+        // The signature is recorded and that is the part that must not be
+        // lost. Say so plainly rather than failing the whole request.
+        console.error('charter-sign: signature saved but status not moved', statusErr)
+      } else {
+        charterStatus = 'signed'
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       id: data.id,
       signerRole: signer.party.party_role,
       signerName: signer.party.name,
       mode: signer.mode,
+      charterStatus,
+      fullyExecuted: charterStatus === 'signed',
     })
   } catch (e: any) {
     console.error('charter-sign POST: unexpected error', e)

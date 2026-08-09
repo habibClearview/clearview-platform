@@ -345,3 +345,43 @@ export const INDEPENDENCE_TESTS: IndependenceTest[] = [
     step: 'Commercial Identity → Scale',
   },
 ]
+
+// ────────────────────────────────────────────────────────────
+// Is the Charter fully executed?
+//
+// A Charter is a tri-party agreement. It is not "signed" because somebody
+// signed it; it is signed when EVERY party marked as a signatory has signed
+// THIS version. Anything less is still out for signature, however many
+// signatures have come in.
+//
+// This lives here, as one pure rule, because three places need the same
+// answer and must not form separate opinions: the screen (which says
+// "Signed" or "In review"), the downloadable document (which prints the
+// status and lists who is still to sign), and the signing route (which
+// moves engagement_charters.status when the last signature lands).
+//
+// Signatures for other versions must be filtered out before calling this.
+// A signature applies to the wording it was given against, never to a later
+// version of it.
+// ────────────────────────────────────────────────────────────
+export function outstandingSignatories<P extends { id: string; is_signatory?: boolean | null }>(
+  parties: P[],
+  signaturesForThisVersion: { party_id?: string | null }[],
+): P[] {
+  const signed = new Set(
+    signaturesForThisVersion.map((s) => s.party_id).filter(Boolean) as string[],
+  )
+  return parties.filter((p) => p.is_signatory && !signed.has(p.id))
+}
+
+export function isCharterFullyExecuted<P extends { id: string; is_signatory?: boolean | null }>(
+  parties: P[],
+  signaturesForThisVersion: { party_id?: string | null }[],
+): boolean {
+  const signatories = parties.filter((p) => p.is_signatory)
+  // No named signatories is not the same as everyone having signed. An
+  // agreement nobody is required to sign has not been executed by anybody,
+  // and must never report itself as signed.
+  if (signatories.length === 0) return false
+  return outstandingSignatories(parties, signaturesForThisVersion).length === 0
+}

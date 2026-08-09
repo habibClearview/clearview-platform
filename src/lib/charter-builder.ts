@@ -35,6 +35,7 @@ import {
   COMMITMENT, EVIDENCE_CHAIN, EVIDENCE_PRINCIPLE, GROUND_RULES,
   OWNERSHIP, SIGNATURE_MEANING,
 } from '@/lib/charter-copy'
+import { outstandingSignatories } from '@/lib/engagement-types'
 
 const NAVY = '1B2A41'
 const TEAL = '00767A'
@@ -265,8 +266,9 @@ export async function buildCharter(
   children.push(body(SIGNATURE_MEANING))
 
   const signatories = parties.filter((p) => p.is_signatory)
-  const signedFor = new Set(signatures.map((s) => s.party_id).filter(Boolean) as string[])
-  const outstanding = signatories.filter((p) => !signedFor.has(p.id))
+  // Same rule the screen and the signing route use, so the document can
+  // never disagree with them about whether this Charter is executed.
+  const outstanding = outstandingSignatories(parties, signatures)
 
   if (signatures.length === 0) {
     children.push(body('Nobody has signed this Charter yet.', { color: GOLD, bold: true }))

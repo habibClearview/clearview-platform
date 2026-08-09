@@ -632,7 +632,7 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
           <div className="doc-b">
 
             <div className="review-banner">
-              <span className="state-pill">Draft v{version} · {status === 'signed' ? 'Signed' : 'In review'}</span>
+              <span className="state-pill">{statusLabel} v{version}{status === 'issued' ? ' · out for signature' : status === 'draft' ? ' · in review' : ''}</span>
               <span className="rb"><b>Before anyone signs</b>, each party can comment or suggest a change on any section. Only the <b>Lead Consultant</b> edits the wording, so there is one clean version. Signing opens once everyone is content, and <b>signatures apply to the version agreed; if anything is edited afterwards, signing re-opens for all parties.</b></span>
             </div>
 
