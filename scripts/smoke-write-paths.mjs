@@ -331,6 +331,45 @@ async function main() {
     post('/api/charter-sign', { clientId: CLIENT_ID, charterId, signerRole: 'lsp_ed', onBehalfOfPartyId: partyId }), 200)
   expectStatus('the same party cannot sign twice',
     post('/api/charter-sign', { clientId: CLIENT_ID, charterId, signerRole: 'lsp_ed', onBehalfOfPartyId: partyId }), 409)
+  // ── the agreement people can keep ──
+  //
+  // Three parties sign this and, until it was built, none of them could hold a
+  // copy. What matters is not that a file appears: it is that the file is a
+  // real Word document, that it names the version signatures apply to, and that
+  // it says who signed and who has not. A copy that reads as complete when a
+  // signature is missing is worse than no copy.
+  {
+    const doc = `/tmp/smoke-charter-${stamp}.docx`
+    const got = execFileSync('curl', [
+      '-sS', '--max-time', '60', '-o', doc, '-w', '%{http_code} %{content_type}',
+      '-H', `Authorization: Bearer ${token}`, '-H', `apikey: ${ANON}`,
+      `${BASE}/api/charter-document?clientId=${CLIENT_ID}`,
+    ], { encoding: 'utf8' }).trim().split(/\s+/)
+    check('the Charter downloads as a document',
+      Number(got[0]) === 200 && String(got[1] || '').includes('wordprocessingml'),
+      `answered ${got[0]}, ${got[1]}`)
+
+    let text = ''
+    try {
+      const head = execFileSync('head', ['-c', '2', doc], { encoding: 'latin1' })
+      if (head === 'PK') {
+        text = execFileSync('sh', ['-c', `unzip -p ${doc} word/document.xml 2>/dev/null | sed 's/<[^>]*>//g'`], {
+          encoding: 'utf8', maxBuffer: 8 * 1024 * 1024,
+        })
+      }
+    } catch { /* handled below */ }
+
+    check('the Charter opens as a real Word file', text.length > 0,
+      'the file does not begin with a zip header, so Word would refuse it')
+    check('it names the version the signatures apply to', /Version 1/.test(text),
+      'the document does not say which version it is')
+    check('it names the person who signed', text.includes('Smoke Signatory'),
+      'the signatory is not in the document')
+    check('and it says who has not signed yet', /Still to sign|Every named signatory/.test(text),
+      'the document is silent about outstanding signatures, so it reads as complete')
+    try { execFileSync('rm', ['-f', doc]) } catch { /* best effort */ }
+  }
+
   expectStatus('a gate sign off given on paper',
     post('/api/gate-signoff', { clientId: CLIENT_ID, dpId: 'dp01', decision: 'signed', signerRole: 'lsp_ed', onBehalfOfPartyId: partyId }), 200)
 

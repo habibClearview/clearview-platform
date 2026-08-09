@@ -249,6 +249,44 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
 
   // The specifics the Charter says are adjustable per engagement. They live
   // in the charter content so they belong to the version that was agreed.
+  // Take a copy of the agreement away with you.
+  //
+  // Until this existed, three parties signed a Charter and none of them could
+  // hold it: it lived on this screen behind a login. The Executive Director who
+  // signed had nothing to file and the funder had nothing to attach. It is
+  // offered to everybody who can read the Charter, not only the coach, because
+  // a party who cannot obtain the agreement they signed is being asked to take
+  // it on trust.
+  async function downloadCharter() {
+    setBusy('download'); setNotice(null)
+    try {
+      const { data } = await supabase.auth.getSession()
+      const res = await fetch(
+        `/api/charter-document?clientId=${encodeURIComponent(view.client.id)}${charter?.id ? `&charterId=${encodeURIComponent(charter.id)}` : ''}`,
+        { headers: { ...(data.session?.access_token ? { Authorization: `Bearer ${data.session.access_token}` } : {}) } },
+      )
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error || 'Could not produce the Charter document')
+      }
+      const blob = await res.blob()
+      const name = (res.headers.get('content-disposition') || '')
+        .split('filename=')[1]?.replace(/"/g, '') || 'engagement-charter.docx'
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = name
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      setNotice({ tone: 'ok', text: 'Charter downloaded.' })
+    } catch (e: any) {
+      setNotice({ tone: 'warn', text: e.message || 'Could not produce the Charter document' })
+    }
+    setBusy(null)
+  }
+
   async function saveSpecifics(next) {
     const { data } = await supabase.auth.getSession()
     const res = await fetch('/api/charter-version', {
@@ -381,6 +419,20 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
       </header>
 
       <div className="wrap">
+
+        {/* Everybody who can read the Charter can take a copy of it, whatever
+            their role. It is their agreement too. */}
+        <div className="cbar" style={{ justifyContent: 'flex-end' }}>
+          <span className="vu">Version v{version} · {statusLabel}</span>
+          <span className="sp"></span>
+          <button
+            type="button"
+            className="pri"
+            disabled={busy === 'download' || !charter?.id}
+            title={!charter?.id ? 'There is no Charter on this engagement yet' : 'Download a Word copy of this Charter, including who has signed it'}
+            onClick={downloadCharter}
+          >{busy === 'download' ? 'Preparing...' : 'Download a copy'}</button>
+        </div>
 
         {canEdit ? (
           <div className="cbar">
