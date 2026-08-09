@@ -86,8 +86,24 @@ export interface EngagementParty {
 }
 
 // ─── engagement_deliverables ─────────────────────────────────
-export type DeliverableStatus =
-  | 'pending' | 'in_progress' | 'accepted' | 'invoiced' | 'paid'
+// The five statuses a deliverable moves through, on the way to being paid for.
+// Written as a runtime list rather than only a type, because a type disappears
+// at build time and the place this actually went wrong was a route writing a
+// sixth value the database refused. A type could not have caught that; a list
+// the route validates against can.
+//
+// This has to stay in step with the check constraint on
+// engagement_deliverables.status. If a status is added here it needs adding
+// there in a migration, and the other way round.
+export const DELIVERABLE_STATUSES = [
+  'pending', 'in_progress', 'accepted', 'invoiced', 'paid',
+] as const
+
+export type DeliverableStatus = (typeof DELIVERABLE_STATUSES)[number]
+
+export function isDeliverableStatus(value: unknown): value is DeliverableStatus {
+  return typeof value === 'string' && (DELIVERABLE_STATUSES as readonly string[]).includes(value)
+}
 
 export interface EngagementDeliverable {
   id: string

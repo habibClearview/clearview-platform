@@ -31,6 +31,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { CLEARVIEW_STYLE } from '@/lib/ai-style'
 import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
+import { DELIVERABLE_STATUSES, isDeliverableStatus } from '@/lib/engagement-types'
 
 const DP_IDS = [
   'setup', 'phase_0',
@@ -198,11 +199,26 @@ async function propose(admin: Admin, clientId: string, torText: string) {
         payment_currency: typeof d.currency === 'string' && d.currency ? d.currency : 'USD',
         due_window: typeof d.dueWindow === 'string' ? d.dueWindow : null,
         sort_order: order,
-        status: 'proposed',
+        // 'pending', not 'proposed'. What makes a row a proposal is that its
+        // gate mapping carries approved = false and source = 'ai', which is
+        // what the panel reads and what the coach approves. The status column
+        // tracks the deliverable towards payment and only holds the five the
+        // check constraint allows, so 'proposed' was refused on every row.
+        // The loop below swallowed the error, every deliverable was skipped,
+        // and the caller was told the document could not be read. The document
+        // was fine.
+        status: 'pending',
       })
       .select('id')
       .single()
-    if (error || !made) continue
+    if (error || !made) {
+      // Logged rather than passed over in silence. A row that cannot be
+      // written is the difference between "the document said nothing" and
+      // "we could not save what it said", and only one of those is the
+      // coach's problem to solve.
+      console.error('deliverables propose: could not write a deliverable', error)
+      continue
+    }
     addedDeliverables += 1
 
     const gates = Array.isArray(d.gates) ? d.gates : []
@@ -274,7 +290,15 @@ export async function POST(req: NextRequest) {
           payment_currency: typeof body.currency === 'string' && body.currency ? body.currency : 'USD',
           due_window: typeof body.dueWindow === 'string' ? body.dueWindow : null,
           sort_order: order,
-          status: 'agreed',
+          // 'pending' is where a deliverable starts: agreed to exist, not yet
+          // produced. This used to write 'agreed', which is not one of the
+          // five statuses the column allows, so every attempt to add a
+          // deliverable by hand was refused by the check constraint and came
+          // back as "could not add the deliverable" with nothing to say why.
+          // The five are pending, in_progress, accepted, invoiced and paid,
+          // and they track the deliverable through to payment, so the word for
+          // "the coach has decided this one exists" is pending.
+          status: 'pending',
         })
         .select('id').single()
       if (error) {
@@ -372,7 +396,19 @@ export async function PATCH(req: NextRequest) {
     if (body.amount === null || Number.isFinite(body.amount)) patch.payment_amount = body.amount
     if (typeof body.currency === 'string' && body.currency) patch.payment_currency = body.currency
     if (typeof body.dueWindow === 'string') patch.due_window = body.dueWindow
-    if (typeof body.status === 'string') patch.status = body.status
+    if (typeof body.status === 'string') {
+      // Checked here rather than left to the database. An unrecognised status
+      // reached the constraint and came back as "could not save the
+      // deliverable", which tells the coach nothing and reads like a fault in
+      // the platform rather than a value that is not one of the five.
+      if (!isDeliverableStatus(body.status)) {
+        return NextResponse.json(
+          { error: `A deliverable is one of: ${DELIVERABLE_STATUSES.join(', ')}` },
+          { status: 400 },
+        )
+      }
+      patch.status = body.status
+    }
 
     const { error } = await admin.from('engagement_deliverables').update(patch).eq('id', id)
     if (error) {
