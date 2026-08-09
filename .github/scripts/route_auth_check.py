@@ -38,11 +38,10 @@ SERVICE_CLIENT = re.compile(r"SUPABASE_SERVICE_ROLE_KEY|getFieldSupabase|getAdmi
 # Recognised ways a route authenticates/authorizes the caller:
 #   getUser (Supabase JWT) · requesterCanViewClient / resolveFieldAdminActor
 #   (role+tenant helpers) · validateFieldToken (field operator token) ·
-#   bootstrapAuthorised (shared secret, non production only) ·
 #   isGrantActive (access-grant token + OTP) · cronAuthorised (cron secret).
 AUTH = re.compile(
     r"getUser|requesterCanViewClient|resolveFieldAdminActor|"
-    r"validateFieldToken|isGrantActive|cronAuthorised|bootstrapAuthorised|"
+    r"validateFieldToken|isGrantActive|cronAuthorised|"
     # requireAccess is the shared helper every engagement route goes through;
     # it resolves the caller and their rights in one place.
     r"requireAccess|"
