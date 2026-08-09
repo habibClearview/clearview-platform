@@ -124,13 +124,34 @@ async function assemble(admin: Admin, clientId: string, deliverableId: string) {
     admin.from('canvas_decision_points')
       .select('dp_id, label, status, evidence_summary, ceo_signed_off, completed_at')
       .eq('client_id', clientId).in('dp_id', dpIds),
+    // The column names here are the ones evidence_library actually has. They
+    // used to be date_captured and captured_by, which do not exist on it, so
+    // the query failed, the failure was swallowed by `|| []` below, and every
+    // claim pack ever assembled carried zero evidence while looking like it had
+    // simply found none. Only the gates it maps to and their signatures came
+    // through. Found by assembling a real claim on an engagement holding twelve
+    // evidence entries and getting an empty list back.
     admin.from('evidence_library')
-      .select('reference, date_captured, captured_by, type, description, reliability, status, dp_id')
-      .eq('client_id', clientId),
+      .select('reference, date, uploaded_by, type, description, reliability, status, dp_id')
+      .eq('client_id', clientId).in('dp_id', dpIds),
     admin.from('gtcv_gate_signoffs')
       .select('dp_id, signer_role, signer_name, decision, signed_at')
       .eq('client_id', clientId).in('dp_id', dpIds),
   ])
+
+  // A failed read here is not the same as a gate with nothing behind it, and
+  // the difference decides whether the pack reports a gap or hides one. The
+  // three that make up the claim are refused rather than quietly turned into an
+  // empty pack, because a claim that says "no evidence" when the evidence is
+  // there is worse than a claim that will not assemble.
+  const readFailure = gatesRes.error || evidenceRes.error || sigsRes.error
+  if (readFailure) {
+    console.error('invoice-pack assemble: could not read the evidence', readFailure)
+    return NextResponse.json(
+      { error: 'Could not read the evidence behind this claim, so nothing was assembled. Nothing has been saved.' },
+      { status: 500 },
+    )
+  }
 
   const gateRows = gatesRes.data || []
   const evidenceRows = evidenceRes.data || []
@@ -187,7 +208,9 @@ async function assemble(admin: Admin, clientId: string, deliverableId: string) {
       deliverable_id: deliverableId,
       reference,
       amount: deliverable.payment_amount,
-      currency: deliverable.payment_currency || 'USD',
+      // No fallback. A claim whose deliverable has no currency shows the
+      // amount as a plain number, which is what the deliverable itself does.
+      currency: deliverable.payment_currency || null,
       period_label: deliverable.due_window,
       gates,
       evidence: packEvidence,
@@ -344,7 +367,7 @@ export async function POST(req: NextRequest) {
         ...(pack.covering_note
           ? String(pack.covering_note).split(/\n{2,}/).map((p: string) => p.trim()).filter(Boolean)
           : []),
-        raw(`<b>Amount claimed:</b> ${escapeHtml(money(pack.amount, pack.currency || 'USD'))}`),
+        raw(`<b>Amount claimed:</b> ${escapeHtml(money(pack.amount, pack.currency))}`),
         raw('<b>Decision gates evidencing this claim</b>'),
         raw(gates.map((g: any) =>
           `${escapeHtml(g.label)}: ${g.evidence_count} evidence ${g.evidence_count === 1 ? 'entry' : 'entries'}, ${g.signature_count} ${g.signature_count === 1 ? 'signature' : 'signatures'}`,

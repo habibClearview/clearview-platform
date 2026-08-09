@@ -23,6 +23,7 @@ import {
   AlignmentType, Document, HeadingLevel, Packer, Paragraph, Table, TableCell,
   TableRow, TextRun, WidthType, BorderStyle,
 } from 'docx'
+import { formatMoney } from '@/lib/currency'
 
 const NAVY = '1B2A41'
 const TEAL = '00767A'
@@ -53,15 +54,13 @@ export interface ClaimPackContext {
   torReference: string | null
 }
 
+// The code goes in front of the number rather than being turned into a symbol,
+// and no currency means no currency. This used to fall back to US dollars, so a
+// claim whose deliverable had no currency set reached a funder denominated in
+// dollars: a figure they cannot check and cannot see is wrong.
 function money(amount: number | null, currency: string | null): string {
   if (amount === null || amount === undefined) return 'Amount not stated'
-  try {
-    return new Intl.NumberFormat('en-GB', {
-      style: 'currency', currency: currency || 'USD', maximumFractionDigits: 2,
-    }).format(amount)
-  } catch {
-    return `${currency || ''} ${amount}`.trim()
-  }
+  return formatMoney(amount, currency, 2)
 }
 
 function longDate(iso: string | null): string {
@@ -239,7 +238,8 @@ export async function buildClaimPack(
         ...evidence.map((e) => new TableRow({
           children: [
             cell(String(e.reference || '')),
-            cell(e.date_captured ? longDate(e.date_captured) : ''),
+            // The snapshot carries evidence_library's own column, `date`.
+            cell(e.date ? longDate(e.date) : ''),
             cell(String(e.type || '')),
             cell(String(e.description || '')),
             cell(String(e.reliability || '')),

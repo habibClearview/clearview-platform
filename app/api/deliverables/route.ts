@@ -196,7 +196,9 @@ async function propose(admin: Admin, clientId: string, torText: string) {
         milestone_no: Number.isFinite(d.milestoneNo) ? Math.trunc(d.milestoneNo) : null,
         milestone_label: typeof d.milestoneLabel === 'string' ? d.milestoneLabel : null,
         payment_amount: Number.isFinite(d.amount) ? d.amount : null,
-        payment_currency: typeof d.currency === 'string' && d.currency ? d.currency : 'USD',
+        // Null when the document did not say. A milestone denominated in a
+        // currency nobody chose is a figure a funder cannot check.
+        payment_currency: typeof d.currency === 'string' && d.currency ? d.currency.trim().toUpperCase() : null,
         due_window: typeof d.dueWindow === 'string' ? d.dueWindow : null,
         sort_order: order,
         // 'pending', not 'proposed'. What makes a row a proposal is that its
@@ -287,7 +289,7 @@ export async function POST(req: NextRequest) {
           milestone_no: Number.isFinite(body.milestoneNo) ? Math.trunc(body.milestoneNo) : null,
           milestone_label: typeof body.milestoneLabel === 'string' ? body.milestoneLabel : null,
           payment_amount: Number.isFinite(body.amount) ? body.amount : null,
-          payment_currency: typeof body.currency === 'string' && body.currency ? body.currency : 'USD',
+          payment_currency: typeof body.currency === 'string' && body.currency ? body.currency.trim().toUpperCase() : null,
           due_window: typeof body.dueWindow === 'string' ? body.dueWindow : null,
           sort_order: order,
           // 'pending' is where a deliverable starts: agreed to exist, not yet

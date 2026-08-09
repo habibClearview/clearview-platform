@@ -66,7 +66,10 @@ export default function BlockSynthesis({ clientId, dpId, canManage }) {
         .select('dp_id,label,core_question,commitment,output_required,status')
         .eq('client_id', clientId).eq('dp_id', dpId).maybeSingle(),
       supabase.from('evidence_library')
-        .select('reference,date_captured,captured_by,type,description,reliability,status,dp_id')
+        // evidence_library's real column names. These were date_captured and
+        // captured_by, which it does not have, so the read failed and every block
+        // reported no evidence behind it while the library was full.
+        .select('reference,date,uploaded_by,type,description,reliability,status,dp_id')
         .eq('client_id', clientId).order('reference', { ascending: true }),
     ])
     const forGate = (evidence || []).filter((e) => !e.dp_id || e.dp_id === dpId)
