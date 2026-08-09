@@ -31,6 +31,7 @@ import { DEFAULT_VALIDATION_MIN_PER_SEGMENT, PARTY_ROLE_LABELS } from '@/lib/eng
 import {
   addCharterComment, resolveCharterComment, signCharter, sendEngagementEmail,
 } from '@/lib/engagement-actions'
+import { COMMITMENT, EVIDENCE_CHAIN } from '@/lib/charter-copy'
 
 const CSS = `
 .gc{
@@ -189,12 +190,14 @@ const CSS = `
 `
 
 // ─── Method copy (fixed IP, client-agnostic) ────────────────
-const CHAIN = [
-  { c: 'c1', cn: 'Step 1 · Beneficiary', ct: 'Generates the evidence', cd: 'Does the work and produces the real output, the audit, the conversations, the model, the pilots.' },
-  { c: 'c2', cn: 'Step 2 · Coach', ct: 'Guides & holds the standard', cd: 'Facilitates the session, tests the evidence, and authorises the block only when it truly holds.' },
-  { c: 'c3', cn: 'Step 3 · Beneficiary ED', ct: 'Signs it off', cd: 'The Executive Director puts their name to the decision, it is the organisation’s, not the coach’s.' },
-  { c: 'c4', cn: 'Step 4 · Funder', ct: 'Accepts it', cd: 'The funder accepts the evidence as meeting the standard for that deliverable.' },
-]
+// The evidence chain and the commitment table are the method's own fixed words.
+// They live in src/lib/charter-copy.ts because the Charter can now be
+// downloaded as well as read here, and a copy that says something different
+// from the screen somebody signed is worse than no copy at all. One definition,
+// read by the screen and by the document.
+const CHAIN = EVIDENCE_CHAIN.map((c, i) => ({
+  c: `c${i + 1}`, cn: c.step, ct: c.does, cd: c.detail,
+}))
 
 function statusPill(status) {
   if (status === 'accepted') return { cls: 'done-pill', label: 'Accepted' }
@@ -662,11 +665,9 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
               <h2 className="sh">What this asks of {beneficiary}, the commitment <span className="adjustable">adjustable per engagement</span></h2>
               <div className="commit-intro">This is not a workshop the team attends. {beneficiary}&rsquo;s own people do the work, in the room and in the field, over roughly six months. <b>Senior time is required and cannot be delegated away.</b> Please read this section as a genuine resourcing decision before signing.</div>
               <div className="ctable">
-                <div className="crow"><div className="crole">Executive Director</div><div className="cwhat">Attends the opening diagnostic <b>in person</b> (cannot be delegated) and <b>personally signs off all nine blocks</b>. Present at the three readiness reviews. Makes the hard calls the process surfaces, including stopping services that don&rsquo;t pay.</div></div>
-                <div className="crow"><div className="crole">Leadership team</div><div className="cwhat">In the room for the working sessions and <b>writes the outputs themselves</b> (the coach facilitates, it is not a document handed to them to sign). Leads the second pilot round and delivers the final handover unaided.</div></div>
-                <div className="crow"><div className="crole">Finance lead</div><div className="cwhat">Attends <b>every costing session</b> and must be able to <b>run the financial model unaided</b> by the end of the viability block, demonstrated live. Owns the numbers thereafter.</div></div>
-                <div className="crow"><div className="crole">Field / delivery team</div><div className="cwhat">Conducts the <b>real customer conversations</b> and the <b>live pilots</b>. Follows a strict capture discipline (see below). Client-facing practice is central, this is where the model is proven or broken.</div></div>
-                <div className="crow"><div className="crole">Board</div><div className="cwhat">The Chair (or a delegate) attends the opening diagnostic and signs it. The board <b>approves the growth (scale) plan</b> before it is committed.</div></div>
+                {COMMITMENT.map((c) => (
+                  <div className="crow" key={c.role}><div className="crole">{c.role}</div><div className="cwhat">{c.asks}</div></div>
+                ))}
               </div>
               <div className="flags">
                 <span className="flag"><b>~6 months</b>, weekly rhythm</span>
