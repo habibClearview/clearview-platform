@@ -743,6 +743,7 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
             <section>
               <h2 className="sh">Signatures</h2>
               <p className="p" style={{ marginTop: 0 }}>By signing, each party confirms they have read this Charter and commit to the responsibilities and level of participation it sets out. <b>Signatures apply to this agreed version (v{version})</b>, if the Charter is edited afterwards, signing re-opens for everyone.</p>
+              <p className="p" style={{ marginTop: 0 }}>A party with a login signs here themselves. A party who signs on paper in the room is entered by the Lead Consultant, and the record shows both who signed and who entered it, so it never implies somebody signed in when they did not.</p>
               <div className="sig">
                 {signatories.length === 0 ? (
                   <div className="sigcard"><span className="sname">No signatories set</span><span className="srole">Add signatory parties per engagement</span></div>
@@ -757,15 +758,21 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
                       <span className="srole">For {forWho} · {roleLabel}</span>
                       <div className="sigline">
                         {sig ? (
-                          <><span className="signed">{sig.typed_name || sig.signer_name}</span><span className="signdate">{fmtDate(sig.signed_at)}</span></>
-                        ) : (
+                          <>
+                            <span className="signed">{sig.typed_name || sig.signer_name}</span>
+                            <span className="signdate">
+                              {fmtDate(sig.signed_at)}
+                              {sig.signature_method === 'in_room' ? ' · given in the room' : ''}
+                            </span>
+                          </>
+                        ) : isSelf ? (
                           <>
                             <button
                               className="signbtn"
                               type="button"
                               data-action="sign"
-                              disabled={!isSelf || busy === `sign:${p.id}` || !charter?.id}
-                              title={isSelf ? 'Sign this version of the Charter' : 'Only this signatory can sign here'}
+                              disabled={busy === `sign:${p.id}` || !charter?.id}
+                              title="Sign this version of the Charter"
                               onClick={() => run(`sign:${p.id}`, () => signCharter({
                                 clientId: view.client.id,
                                 charterId: charter.id,
@@ -773,6 +780,34 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
                                 signatureMethod: 'click',
                               }), 'Your signature has been recorded on this version.')}
                             >{busy === `sign:${p.id}` ? 'Signing...' : 'Sign here'}</button>
+                            <span className="signdate"></span>
+                          </>
+                        ) : canEdit ? (
+                          <>
+                            <button
+                              className="signbtn"
+                              type="button"
+                              data-action="record-signature"
+                              disabled={busy === `sign:${p.id}` || !charter?.id}
+                              title={`Record the signature ${p.name} gave on paper. The record will show that you entered it.`}
+                              onClick={() => {
+                                if (typeof window !== 'undefined' && !window.confirm(
+                                  `Record the signature given in the room by ${p.name}? The record will show that you entered it, not that ${p.name} signed in.`,
+                                )) return
+                                run(`sign:${p.id}`, () => signCharter({
+                                  clientId: view.client.id,
+                                  charterId: charter.id,
+                                  signerRole: p.party_role,
+                                  onBehalfOfPartyId: p.id,
+                                }), `Recorded. The Charter shows ${p.name} as signed, and shows that you entered it.`)
+                              }}
+                              style={{ background: 'var(--card)', color: 'var(--ink)', border: '1px solid var(--line)' }}
+                            >{busy === `sign:${p.id}` ? 'Recording...' : 'Record signature given in the room'}</button>
+                            <span className="signdate"></span>
+                          </>
+                        ) : (
+                          <>
+                            <button className="signbtn" type="button" disabled title="Only this signatory can sign here">Sign here</button>
                             <span className="signdate"></span>
                           </>
                         )}

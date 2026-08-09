@@ -150,7 +150,12 @@ export interface CharterContent {
   [key: string]: unknown
 }
 
-export type SignatureMethod = 'click' | 'typed'
+// How the signature reached the record. 'click' and 'typed' are the signer
+// doing it themselves. 'in_room' is a signature given on paper in a session
+// and entered afterwards by the lead consultant, which is the only way a
+// signatory without a login is ever recorded. It is kept distinct so the
+// Charter can say which one it was rather than implying everyone signed in.
+export type SignatureMethod = 'click' | 'typed' | 'in_room'
 
 export interface CharterSignature {
   id: string
@@ -163,6 +168,9 @@ export interface CharterSignature {
   signer_user_id: string | null
   signature_method: SignatureMethod
   typed_name: string | null
+  /** The account that entered the signature, which is the signer themselves
+   *  unless it was given on paper and recorded by the lead consultant. */
+  recorded_by_user_id: string | null
   signed_at: string
   created_at: string
 }
