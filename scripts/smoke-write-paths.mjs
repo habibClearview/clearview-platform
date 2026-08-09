@@ -62,6 +62,21 @@ if (/clearview\.habibonifade\.com/.test(BASE)) {
   process.exit(1)
 }
 
+// ─── nothing secret ever reaches the output ──────────────────
+// This runs in continuous integration, where everything printed is kept and
+// readable by everyone with access to the repository. A key that reaches a log
+// is a key that has to be rotated, so no path to the output is trusted: every
+// line goes through here, and long token shaped strings are removed even when
+// they are not one of the keys this run happens to hold.
+function redact(text) {
+  let out = String(text)
+  for (const secret of [SERVICE, ANON].filter(Boolean)) {
+    out = out.split(secret).join('[redacted]')
+  }
+  // Any other JSON web token, whoever it belongs to.
+  return out.replace(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, '[redacted]')
+}
+
 // ─── the smallest possible http client ───────────────────────
 // A dropped connection is not a broken write path, and reporting it as one
 // would teach everybody to ignore this check. So the transport is retried and
@@ -88,7 +103,13 @@ function http(method, url, { headers = {}, body } = {}) {
     } catch (error) {
       // curl could not complete the call at all: no connection, TLS refused,
       // timed out. Worth another go.
-      lastError = error
+      //
+      // The message carries the command that failed, and the command carries
+      // the keys in its headers. Printed as it comes, a single dropped
+      // connection writes the service role key into a build log that anybody
+      // with read access to the repository can open. So it is scrubbed here,
+      // at the only place it can escape.
+      lastError = new Error(redact(String(error?.message || error)))
       continue
     }
     const at = out.lastIndexOf('\n__STATUS__')
@@ -112,8 +133,9 @@ const jsonHeaders = (token) => ({
 // ─── the report ──────────────────────────────────────────────
 const results = []
 function check(what, ok, detail) {
-  results.push({ what, ok, detail })
-  console.log(`${ok ? '  ok  ' : ' FAIL '} ${what}${ok || !detail ? '' : `\n        ${detail}`}`)
+  const safe = detail == null ? null : redact(detail)
+  results.push({ what, ok, detail: safe })
+  console.log(`${ok ? '  ok  ' : ' FAIL '} ${what}${ok || !safe ? '' : `\n        ${safe}`}`)
 }
 function expectStatus(what, res, wanted) {
   const ok = (Array.isArray(wanted) ? wanted : [wanted]).includes(res.status)

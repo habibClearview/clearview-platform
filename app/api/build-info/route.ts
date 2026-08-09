@@ -10,11 +10,21 @@
 // question about the code but about which address is open in the browser.
 // Opening this on any deployment says exactly which commit is serving it.
 //
-// WHAT IT DISCLOSES. The commit, the branch and the Vercel environment name.
-// All three are already public: the repository is the source of the commit and
-// the branch, and the environment is visible in the hostname. It reads no
-// database, holds no key and takes no input, so there is nothing here to
-// authorise.
+// WHAT IT DISCLOSES, AND WHAT IT DELIBERATELY DOES NOT. The commit identifier,
+// the branch and the environment name, and nothing else. Those three are
+// already public: the branch is in the hostname of every preview, the
+// environment is in the hostname too, and a commit identifier is an opaque
+// forty character number that says nothing about what the commit contains.
+//
+// The commit message is NOT returned, and that is the whole point of this note.
+// The first version of this route returned it, which would have published the
+// subject line of every change to this private repository to anybody who typed
+// the address. That is a small hole and it is still a hole, and it was put here
+// by the same reflex that produced the faults this route exists to prevent:
+// adding a field because it was available rather than because it was needed.
+//
+// It reads no database, holds no key, takes no input and writes nothing, so
+// there is nothing here to authorise.
 // ============================================================
 
 import { NextResponse } from 'next/server'
@@ -22,11 +32,11 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  const commit = process.env.VERCEL_GIT_COMMIT_SHA || ''
   return NextResponse.json({
-    commit: process.env.VERCEL_GIT_COMMIT_SHA || 'unknown',
+    commit: commit || 'unknown',
     // The short form is what a person reads and what a log line carries.
-    commitShort: (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || 'unknown',
-    message: process.env.VERCEL_GIT_COMMIT_MESSAGE || '',
+    commitShort: commit.slice(0, 7) || 'unknown',
     branch: process.env.VERCEL_GIT_COMMIT_REF || 'unknown',
     environment: process.env.VERCEL_ENV || 'local',
   })
