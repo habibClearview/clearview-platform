@@ -1763,17 +1763,11 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     )
   }
 
-  if(loading)return<Spinner/>
-  if(error)return<div style={{padding:'2rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}><div style={{color:C.red,marginBottom:'1.5rem'}}>Error loading data: {error}</div><p style={{color:C.slate,fontSize:'1.07rem',marginBottom:'1rem'}}>This is usually caused by a stale session. Sign out and sign back in to fix it.</p><button onClick={onSignOut} style={{fontFamily:'monospace',fontSize:'1.07rem',padding:'0.6rem 1.4rem',border:'none',borderRadius:6,background:'var(--cv-header)',color:'var(--cv-on-accent)',cursor:'pointer'}}>Sign Out and Refresh</button></div>
-
-  const selClient=clients.find(c=>c.id===selClientId)
-
-  // The engagement's working currency, so every money figure inside a block
-  // prints as money rather than as a bare number. It lives on
-  // engagement_config because it is set per engagement, and it is deliberately
-  // not engagement_clients.fee_currency, which is what the consultant invoices
-  // in and never belongs in front of the organisation. A failed fetch leaves it
-  // undefined, which is exactly the old behaviour: amounts with no currency.
+  // These sit above the early returns on purpose. React counts hooks in the
+  // order they run, so a hook placed after `if(loading) return` is skipped on
+  // the first render and runs on the second, and React throws rather than
+  // guessing which is which. That took the whole dashboard down once, which
+  // is why the comment is here rather than in a commit message nobody reads.
   // The sidebar collapses to a rail of numbers, because twenty nine tabs at a
   // fixed 220px take a quarter of the screen away from the block a coach is
   // actually working in, and blocks hold wide tables. Collapsed it keeps the
@@ -1792,12 +1786,24 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   const [engagementCurrency,setEngagementCurrency]=useState(null)
   useEffect(()=>{
     let cancelled=false
-    if(!selClient?.id){setEngagementCurrency(null);return}
+    if(!selClientId){setEngagementCurrency(null);return}
     supabase.from('engagement_config').select('currency').eq('client_id',selClient.id).maybeSingle()
       .then(({data})=>{if(!cancelled)setEngagementCurrency(data?.currency||null)})
       .catch(()=>{if(!cancelled)setEngagementCurrency(null)})
     return ()=>{cancelled=true}
-  },[selClient?.id])
+  },[selClientId])
+
+  if(loading)return<Spinner/>
+  if(error)return<div style={{padding:'2rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}><div style={{color:C.red,marginBottom:'1.5rem'}}>Error loading data: {error}</div><p style={{color:C.slate,fontSize:'1.07rem',marginBottom:'1rem'}}>This is usually caused by a stale session. Sign out and sign back in to fix it.</p><button onClick={onSignOut} style={{fontFamily:'monospace',fontSize:'1.07rem',padding:'0.6rem 1.4rem',border:'none',borderRadius:6,background:'var(--cv-header)',color:'var(--cv-on-accent)',cursor:'pointer'}}>Sign Out and Refresh</button></div>
+
+  const selClient=clients.find(c=>c.id===selClientId)
+
+  // The engagement's working currency, so every money figure inside a block
+  // prints as money rather than as a bare number. It lives on
+  // engagement_config because it is set per engagement, and it is deliberately
+  // not engagement_clients.fee_currency, which is what the consultant invoices
+  // in and never belongs in front of the organisation. A failed fetch leaves it
+  // undefined, which is exactly the old behaviour: amounts with no currency.
 
   const selClientFullData=clientData[selClientId]||{}
 
