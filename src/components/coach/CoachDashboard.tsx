@@ -10,6 +10,8 @@ import {
 import { supabase } from '@/lib/supabase'
 import EngagementJourneyView from '@/components/engagement/EngagementJourneyView'
 import BlockWorkspace from '@/components/gtcv/BlockWorkspace'
+import CurrencyField from '@/components/common/CurrencyField'
+import { formatMoneyShort } from '@/lib/currency'
 import SessionPlanner from '@/components/gtcv/SessionPlanner'
 import DeliverablesPanel from '@/components/gtcv/DeliverablesPanel'
 import HandoverIndependence from '@/components/gtcv/HandoverIndependence'
@@ -79,7 +81,7 @@ function ScoreDonut({label,display,frac,rating,color}){const r=26,circ=2*Math.PI
 // ─── "MY BUSINESS AT A GLANCE" (coach's own commercial numbers) ──────
 // Compact currency formatter matching the approved design ($182k, not
 // "USD 182,000") -- only ever formats real computed values, never invents one.
-function fmtGlance(n,cur){const sym=cur==='USD'?'$':(cur||'')+' ';const abs=Math.abs(n||0);if(abs>=1000)return`${n<0?'-':''}${sym}${(abs/1000).toFixed(abs>=10000?0:1).replace(/\.0$/,'')}k`;return`${sym}${Math.round(n||0)}`}
+const fmtGlance=(n,cur)=>formatMoneyShort(n,cur)
 function Kicker({children,style}){return<div style={{fontFamily:'monospace',fontSize:'1.01rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.75rem',...style}}>{children}</div>}
 function GlanceKPI({label,value,sub,color}){return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem',borderLeft:`4px solid ${color||C.navy}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)'}}><div style={{fontFamily:'monospace',fontSize:'1.01rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.4rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.3rem'}}>{sub}</div>}</div>)}
 function GlanceBar({frac,color}){return<div style={{height:6,borderRadius:3,background:'var(--cv-track)',marginTop:'0.75rem',overflow:'hidden'}}><div style={{height:'100%',width:`${Math.round(Math.max(0,Math.min(1,frac||0))*100)}%`,background:color,borderRadius:3}}/></div>}
@@ -454,7 +456,9 @@ function RevenueCostTrendChart({periods,revenueByPeriod,costByPeriod,cur}){
 
 const MB_PERIOD_LABELS={month:'Month',quarter:'Quarter',ytd:'Year to date',year:'Year'}
 function MyBusinessGlance({clients,programmes,coImplementers}){
-  const feeCur=clients.find(c=>c.fee_currency)?.fee_currency||'USD'
+  // No invented fallback. When no client has a fee currency set, the total
+  // prints as a plain number rather than claiming a currency nobody chose.
+  const feeCur=clients.find(c=>c.fee_currency)?.fee_currency||null
   const outstanding=outstandingInvoiced(clients)
   const awaitingIssue=awaitingInvoice(clients)
   const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
@@ -2203,7 +2207,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             {activeTab==='eng_setup'&&<><EngagementPartiesPanel clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/><ShowcaseSharing clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/><EngagementSettings clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/></>}
             {activeTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
             {activeTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={userRole} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
-            {activeTab==='deliverables'&&canEdit(userRole)&&<DeliverablesPanel clientId={selClient.id} canManage={canEdit(userRole)}/>}
+            {activeTab==='deliverables'&&canEdit(userRole)&&<DeliverablesPanel clientId={selClient.id} canManage={canEdit(userRole)} currency={engagementCurrency}/>}
             {activeTab==='sessions'&&<SessionPlanner clientId={selClient.id} canManage={canEdit(userRole)}/>}
             {activeTab==='tracker'&&<><GtcvEngagementTracker clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/><TabTracker client={selClient} canvas={canvas}/></>}
             {activeTab==='decisions'&&<TabDecisions client={selClient} decisions={decisions} userRole={userRole} userName={userName} onAdd={async(d)=>{const {data}=await supabase.from('canvas_decisions').insert([{...d,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:[...decisions,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`decisions:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:decisions.map(d=>d.id!==id?d:{...d,...updates})}})),()=>supabase.from('canvas_decisions').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
@@ -2701,7 +2705,7 @@ function ServicesSection({payerType,payerId,clients}){
             <div key={r.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.75rem',flexWrap:'wrap',padding:'0.6rem 0.75rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.45rem'}}>
               <div>
                 <div style={{fontWeight:600,fontSize:'1.07rem',color:C.navy}}>{SERVICE_TYPE_LABELS[r.service_type]||r.service_type}</div>
-                <div style={{fontSize:'0.93rem',color:C.slate}}>{beneficiary?`for ${beneficiary.name}`:'no specific beneficiary'}{r.fee?` · ${fmtGlance(r.fee,r.fee_currency||'USD')}`:''}</div>
+                <div style={{fontSize:'0.93rem',color:C.slate}}>{beneficiary?`for ${beneficiary.name}`:'no specific beneficiary'}{r.fee?` · ${fmtGlance(r.fee,r.fee_currency)}`:''}</div>
               </div>
               <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}>
                 <select style={{...inp,width:'auto',padding:'0.25rem 0.4rem',fontSize:'0.93rem'}} value={r.status} onChange={e=>updateService(r.id,{status:e.target.value})}>
@@ -2718,14 +2722,14 @@ function ServicesSection({payerType,payerId,clients}){
   )
 }
 function NewServiceForm({clients,onSave,onCancel}){
-  const [f,setF]=useState({service_type:'advisory',beneficiary_client_id:'',fee:'',fee_currency:'USD',notes:''})
+  const [f,setF]=useState({service_type:'advisory',beneficiary_client_id:'',fee:'',fee_currency:'',notes:''})
   return(
     <div style={{...card,border:`1px solid ${C.cyan}`,marginBottom:'0.75rem'}}>
       <div style={fGrid}>
         <div><label style={lbl}>Service</label><select style={inp} value={f.service_type} onChange={e=>setF(x=>({...x,service_type:e.target.value}))}>{Object.entries(SERVICE_TYPE_LABELS).map(([k,l])=><option key={k} value={k}>{l}</option>)}</select></div>
         <div><label style={lbl}>Beneficiary (optional)</label><select style={inp} value={f.beneficiary_client_id} onChange={e=>setF(x=>({...x,beneficiary_client_id:e.target.value}))}><option value="">No specific beneficiary</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
         <div><label style={lbl}>Fee</label><input type="number" style={inp} value={f.fee} onChange={e=>setF(x=>({...x,fee:e.target.value}))}/></div>
-        <div><label style={lbl}>Currency</label><select style={inp} value={f.fee_currency} onChange={e=>setF(x=>({...x,fee_currency:e.target.value}))}><option>USD</option><option>GBP</option><option>EUR</option><option>UGX</option><option>NGN</option><option>KES</option></select></div>
+        <div><label style={lbl}>Currency</label><CurrencyField hideLabel value={f.fee_currency} onChange={v=>setF(x=>({...x,fee_currency:v}))} style={inp}/></div>
       </div>
       <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
         <button style={solidBtn()} onClick={()=>{if(!f.service_type)return;onSave(f)}}>Add Service</button>
@@ -3470,7 +3474,7 @@ function ClientSetupFields({f,setF,programmes,showStatus}){
 }
 
 function NewClientForm({onSave,onCancel,programmes,initial}){
-  const [f,setF]=useState({name:'',type:'service_lsp',engagement_mode:'canvas',programme_id:null,country:'Uganda',sector:'',contact_name:'',contact_email:'',contact_phone:'',notes:'',...initial})
+  const [f,setF]=useState({name:'',type:'service_lsp',engagement_mode:'canvas',programme_id:null,country:'',sector:'',contact_name:'',contact_email:'',contact_phone:'',notes:'',...initial})
   function doSave(){
     if(!f.name)return
     const slug=f.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'')
@@ -3522,7 +3526,7 @@ function EditClientForm({client,programmes,onSave,onCancel}){
 }
 
 function NewProgrammeForm({onSave,onCancel}){
-  const [f,setF]=useState({name:'',type:'donor_programme',funder:'',country:'Uganda',start_date:'',end_date:'',notes:'',client_ids:[],co_implementer_ids:[],funder_email:'',funder_invited:false})
+  const [f,setF]=useState({name:'',type:'donor_programme',funder:'',country:'',start_date:'',end_date:'',notes:'',client_ids:[],co_implementer_ids:[],funder_email:'',funder_invited:false})
   return(
     <div style={{...card,border:`1px solid ${C.cyan}`,marginBottom:'1.25rem'}}>
       <div style={secH}>New Programme</div>
@@ -3543,7 +3547,7 @@ function NewProgrammeForm({onSave,onCancel}){
 }
 
 function NewCIForm({clients,onSave,onCancel}){
-  const [f,setF]=useState({name:'',email:'',phone:'',country:'Uganda',specialisation:'',rate_per_day:0,currency:'USD',active:true,programme_ids:[],client_ids:[],notes:''})
+  const [f,setF]=useState({name:'',email:'',phone:'',country:'',specialisation:'',rate_per_day:0,currency:'',active:true,programme_ids:[],client_ids:[],notes:''})
   return(
     <div style={{...card,border:`1px solid ${C.cyan}`,marginBottom:'1.25rem'}}>
       <div style={secH}>Add Co-Implementer</div>
@@ -3554,7 +3558,7 @@ function NewCIForm({clients,onSave,onCancel}){
         <div><label style={lbl}>Country</label><input style={inp} value={f.country} onChange={e=>setF(x=>({...x,country:e.target.value}))}/></div>
         <div><label style={lbl}>Specialisation</label><input style={inp} value={f.specialisation} onChange={e=>setF(x=>({...x,specialisation:e.target.value}))}/></div>
         <div><label style={lbl}>Daily Rate</label><input type="number" style={inp} value={f.rate_per_day||''} onChange={e=>setF(x=>({...x,rate_per_day:Number(e.target.value)}))}/></div>
-        <div><label style={lbl}>Currency</label><select style={inp} value={f.currency} onChange={e=>setF(x=>({...x,currency:e.target.value}))}><option>USD</option><option>GBP</option><option>EUR</option><option>UGX</option></select></div>
+        <div><label style={lbl}>Currency</label><CurrencyField hideLabel value={f.currency} onChange={v=>setF(x=>({...x,currency:v}))} style={inp}/></div>
         <div style={{gridColumn:'1/-1'}}><label style={lbl}>Assign to Clients</label><div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginTop:'0.3rem'}}>{clients.map(c=><label key={c.id} style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'1.01rem',cursor:'pointer',padding:'0.3rem 0.5rem',border:`1px solid ${f.client_ids.includes(c.id)?C.cyan:C.border}`,borderRadius:4,background:f.client_ids.includes(c.id)?'var(--cv-tint-actual)':C.white}}><input type="checkbox" checked={f.client_ids.includes(c.id)} onChange={e=>setF(x=>({...x,client_ids:e.target.checked?[...x.client_ids,c.id]:x.client_ids.filter(id=>id!==c.id)}))}/>{c.name}</label>)}</div></div>
       </div>
       <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>

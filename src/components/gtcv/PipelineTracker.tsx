@@ -17,6 +17,7 @@
 // Table: gtcv_pipeline (2026_08_09_gtcv_dp_tables_c.sql).
 // ============================================================
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { formatMoney } from '@/lib/currency'
 import { supabase } from '@/lib/supabase'
 
 const TABLE = 'gtcv_pipeline'
@@ -50,7 +51,7 @@ const btn = (col) => ({ ...mono, fontSize: '0.86rem', fontWeight: 600, padding: 
 
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
 const today = () => new Date().toISOString().split('T')[0]
-const fmtMoney = (n, cur) => `${cur || 'USD'} ${num(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+const fmtMoney = (n, cur) => formatMoney(n, cur, 0)
 
 // Value by currency, so a mixed currency pipeline is reported honestly
 // rather than added up into a number that means nothing.
@@ -59,7 +60,7 @@ function valueByCurrency(list) {
   list.forEach((r) => {
     const v = num(r.value_estimate)
     if (!v) return
-    const cur = r.value_currency || 'USD'
+    const cur = r.value_currency || currency || null
     out[cur] = (out[cur] || 0) + v
   })
   return out
@@ -81,7 +82,7 @@ function StageChip({ stage, count, byCur, share }) {
   )
 }
 
-export default function PipelineTracker({ clientId, canManage }) {
+export default function PipelineTracker({ clientId, canManage , currency }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [save, setSave] = useState(null)
@@ -138,7 +139,7 @@ export default function PipelineTracker({ clientId, canManage }) {
     setBusy(true); setSave({ ok: true, text: 'Saving' })
     const nextOrder = rows.length ? Math.max(...rows.map((r) => Number(r.sort_order) || 0)) + 1 : 0
     const { data, error } = await supabase.from(TABLE).insert({
-      client_id: clientId, sort_order: nextOrder, stage: 'identified', value_currency: 'USD',
+      client_id: clientId, sort_order: nextOrder, stage: 'identified', value_currency: currency || null,
     }).select().single()
     setBusy(false)
     if (error) { setSave({ ok: false, text: `Could not add a prospect. ${error.message}` }); return }
@@ -278,7 +279,7 @@ export default function PipelineTracker({ clientId, canManage }) {
                         <div style={{ display: 'flex', gap: '0.3rem' }}>
                           {canManage
                             ? <>
-                                <input aria-label="Currency" style={{ ...inp, width: 62 }} value={r.value_currency || ''} placeholder="USD"
+                                <input aria-label="Currency" style={{ ...inp, width: 62 }} value={r.value_currency || ''} placeholder={currency || 'Any code'}
                                   onChange={(e) => edit(r.id, 'value_currency', e.target.value)}
                                   onBlur={(e) => commit(r.id, { value_currency: e.target.value || null })} />
                                 <input aria-label="Estimated value" style={inp} type="number" value={r.value_estimate ?? ''} placeholder="0"

@@ -1,6 +1,7 @@
 // @ts-nocheck
 'use client'
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import CurrencyField from '@/components/common/CurrencyField'
 import QRCode from 'qrcode'
 import { mostRecentTokenUse } from '@/lib/field-auth'
 import { supabase } from '@/lib/supabase'
@@ -5548,9 +5549,7 @@ function SettingsTab({config,P,onSave,theme,setThemeMode}) {
           <div style={secH}>General Settings</div>
           <div style={fGrid}>
             <div><label style={lbl}>Business Name</label><input style={inp} value={form.business_name} onChange={e=>setForm(f=>({...f,business_name:e.target.value}))}/></div>
-            <div><label style={lbl}>Currency</label><select style={inp} value={form.currency} onChange={e=>setForm(f=>({...f,currency:e.target.value}))}>
-              {['UGX','KES','NGN','GHS','USD','GBP'].map(c=><option key={c} value={c}>{c}</option>)}
-            </select></div>
+            <div><label style={lbl}>Currency</label><CurrencyField hideLabel value={form.currency} onChange={v=>setForm(f=>({...f,currency:v}))} style={inp}/></div>
             <div><label style={lbl}>Planning Start Month</label><input type="date" style={inp} value={form.start_date} onChange={e=>setForm(f=>({...f,start_date:e.target.value}))}/></div>
             {form.plan_lines.length===0 ? (
               <div><label style={lbl}>Planning Horizon (months)</label><select style={inp} value={form.planning_months} onChange={e=>setForm(f=>({...f,planning_months:Number(e.target.value)}))}>

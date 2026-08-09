@@ -1,6 +1,7 @@
 // @ts-nocheck
 'use client'
 import React, { useState, useEffect, Component } from 'react'
+import CurrencyField from '@/components/common/CurrencyField'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase'
 // Lazy-load the uploader (pulls in the heavy `xlsx` library) so the public
@@ -72,7 +73,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
 
   const [business, setBusiness] = useState({
     business_name:'', contact_name:'', contact_email:'', contact_phone:'',
-    country:'Uganda', sector:'', currency:'UGX',
+    country:'', sector:'', currency:'',
     year_established:'', legal_structure:'', sales_channel:'',
     season_name:'', year_round:'Year-round',
     dso:0, dpo:0,
@@ -395,9 +396,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
               <div><label style={lbl}>Phone</label><input style={inp} value={business.contact_phone} onChange={e=>setBusiness(b=>({...b,contact_phone:e.target.value}))}/></div>
               <div><label style={lbl}>Country</label><input style={inp} value={business.country} onChange={e=>setBusiness(b=>({...b,country:e.target.value}))}/></div>
               <div><label style={lbl}>Sector / Industry</label><input style={inp} placeholder="e.g. Crop Aggregation, Livestock, Input Supply" value={business.sector} onChange={e=>setBusiness(b=>({...b,sector:e.target.value}))}/></div>
-              <div><label style={lbl}>Currency</label><select style={inp} value={business.currency} onChange={e=>setBusiness(b=>({...b,currency:e.target.value}))}>
-                {['UGX','KES','NGN','GHS','USD'].map(c=><option key={c} value={c}>{c}</option>)}
-              </select></div>
+              <div><label style={lbl}>Currency</label><CurrencyField hideLabel value={business.currency} onChange={v=>setBusiness(b=>({...b,currency:v}))} style={inp}/></div>
               <div><label style={lbl}>Year Established</label><input style={inp} placeholder="e.g. 2019" value={business.year_established} onChange={e=>setBusiness(b=>({...b,year_established:e.target.value}))}/></div>
               <div><label style={lbl}>Legal Structure</label><select style={inp} value={business.legal_structure} onChange={e=>setBusiness(b=>({...b,legal_structure:e.target.value}))}>
                 {['','Sole Trader','Partnership','Limited Company','Cooperative','Other'].map(v=><option key={v} value={v}>{v||'Select...'}</option>)}

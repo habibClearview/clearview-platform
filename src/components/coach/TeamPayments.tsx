@@ -21,6 +21,8 @@
 // the legacy `timesheets` table, or the co-implementer roster logic.
 // ============================================================
 import { useEffect, useState, useCallback } from 'react'
+import CurrencyField from '@/components/common/CurrencyField'
+import { formatMoney } from '@/lib/currency'
 import { supabase } from '@/lib/supabase'
 
 const HOURS_PER_DAY = 8
@@ -49,9 +51,9 @@ function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div sty
 // ─── helpers ─────────────────────────────────────────────────
 const num = (v)=>{const n=Number(v);return Number.isFinite(n)?n:0}
 const rateOf = (ci)=>num(ci?.day_rate ?? ci?.rate_per_day)          // new col, fall back to legacy
-const curOf  = (ci)=> ci?.rate_currency || ci?.currency || 'USD'
+const curOf  = (ci)=> ci?.rate_currency || ci?.currency || null
 const daysFromHours = (h)=> num(h)/HOURS_PER_DAY
-const fmtMoney = (n,cur)=>`${cur||'USD'} ${num(n).toLocaleString(undefined,{maximumFractionDigits:2})}`
+const fmtMoney = (n,cur)=>formatMoney(n,cur,2)
 const fmtDays = (d)=> num(d).toLocaleString(undefined,{maximumFractionDigits:2})
 const today = ()=> new Date().toISOString().split('T')[0]
 function addDays(iso,days){const d=new Date(iso+'T00:00:00');d.setDate(d.getDate()+days);return d.toISOString().split('T')[0]}
@@ -444,7 +446,7 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
             <div><label style={lbl}>Phone</label><input style={inp} value={pf.phone} onChange={e=>setPf(f=>({...f,phone:e.target.value}))}/></div>
             <div><label style={lbl}>Country</label><input style={inp} value={pf.country} onChange={e=>setPf(f=>({...f,country:e.target.value}))}/></div>
             <div><label style={lbl}>Specialisation</label><input style={inp} value={pf.specialisation} onChange={e=>setPf(f=>({...f,specialisation:e.target.value}))}/></div>
-            <div><label style={lbl}>Day rate</label><div style={{display:'flex',gap:'0.3rem'}}><input type="number" style={inp} value={pf.day_rate} onChange={e=>setPf(f=>({...f,day_rate:e.target.value}))}/><select style={{...inp,width:80}} value={pf.rate_currency} onChange={e=>setPf(f=>({...f,rate_currency:e.target.value}))}>{['USD','GBP','EUR','UGX','NGN','KES'].map(x=><option key={x}>{x}</option>)}</select></div></div>
+            <div><label style={lbl}>Day rate</label><div style={{display:'flex',gap:'0.3rem'}}><input type="number" style={inp} value={pf.day_rate} onChange={e=>setPf(f=>({...f,day_rate:e.target.value}))}/><CurrencyField hideLabel label="Day rate currency" value={pf.rate_currency} onChange={v=>setPf(f=>({...f,rate_currency:v}))} style={{...inp,width:96}}/></div></div>
           </div>
           <button style={{...solidBtn(),marginTop:'0.75rem'}} onClick={saveProfile}>Save profile</button>
         </div>
@@ -641,7 +643,7 @@ function AdvanceSection({ci,advances,setAdvances,setMsg,canApprove}){
       </div>
       <div style={{...fGrid,alignItems:'end'}}>
         <div><label style={lbl}>Amount</label><input type="number" step="0.01" style={inp} value={f.amount} onChange={e=>setF(x=>({...x,amount:e.target.value}))}/></div>
-        <div><label style={lbl}>Currency</label><select style={inp} value={f.currency} onChange={e=>setF(x=>({...x,currency:e.target.value}))}>{['USD','GBP','EUR','UGX','NGN','KES'].map(x=><option key={x}>{x}</option>)}</select></div>
+        <div><label style={lbl}>Currency</label><CurrencyField hideLabel value={f.currency} onChange={v=>setF(x=>({...x,currency:v}))} style={inp}/></div>
         <div><label style={lbl}>Date</label><input type="date" style={inp} value={f.advance_date} onChange={e=>setF(x=>({...x,advance_date:e.target.value}))}/></div>
         <div><label style={lbl}>Due date</label><input type="date" style={inp} value={f.due_date} onChange={e=>setF(x=>({...x,due_date:e.target.value}))}/></div>
         <div style={{gridColumn:'span 2'}}><label style={lbl}>Reason</label><input style={inp} value={f.reason} onChange={e=>setF(x=>({...x,reason:e.target.value}))}/></div>

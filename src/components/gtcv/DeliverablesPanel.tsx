@@ -23,6 +23,7 @@
 // the hole before the funder does. Nothing is sent until it is approved.
 // ============================================================
 import { useCallback, useEffect, useState } from 'react'
+import { formatMoney } from '@/lib/currency'
 import { supabase } from '@/lib/supabase'
 
 const C = {
@@ -57,7 +58,7 @@ const DP_IDS = Object.keys(DP_LABEL)
 function money(amount, currency) {
   if (amount === null || amount === undefined || amount === '') return 'Not stated'
   try {
-    return new Intl.NumberFormat('en-GB', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 0 }).format(Number(amount))
+    return formatMoney(amount, currency, 0)
   } catch { return `${currency || ''} ${amount}` }
 }
 function fmtDate(iso) {
@@ -79,7 +80,7 @@ async function api(path, method, body) {
   return json
 }
 
-export default function DeliverablesPanel({ clientId, canManage }) {
+export default function DeliverablesPanel({ clientId, canManage , currency: engagementCurrency }) {
   const [state, setState] = useState({ deliverables: [], mappings: [], packs: [] })
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
@@ -89,7 +90,7 @@ export default function DeliverablesPanel({ clientId, canManage }) {
   const [torText, setTorText] = useState('')
   const [torRef, setTorRef] = useState('')
   const [addOpen, setAddOpen] = useState(false)
-  const [draft, setDraft] = useState({ code: '', title: '', description: '', milestoneLabel: '', amount: '', currency: 'USD', dueWindow: '' })
+  const [draft, setDraft] = useState({ code: '', title: '', description: '', milestoneLabel: '', amount: '', currency: '', dueWindow: '' })
   const [openPack, setOpenPack] = useState(null)
 
   const load = useCallback(async () => {
@@ -130,7 +131,9 @@ export default function DeliverablesPanel({ clientId, canManage }) {
   const packsFor = (id) => state.packs.filter((p) => p.deliverable_id === id)
   const pendingCount = state.mappings.filter((m) => !m.approved).length
   const totalValue = state.deliverables.reduce((s, d) => s + (Number(d.payment_amount) || 0), 0)
-  const currency = state.deliverables[0]?.payment_currency || 'USD'
+  // The engagement's own currency, then whatever the first deliverable was
+  // recorded in, then nothing. Never an invented one.
+  const currency = engagementCurrency || state.deliverables[0]?.payment_currency || null
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -219,7 +222,7 @@ export default function DeliverablesPanel({ clientId, canManage }) {
                   amount: draft.amount === '' ? null : Number(draft.amount),
                   currency: draft.currency, dueWindow: draft.dueWindow,
                 })
-                setDraft({ code: '', title: '', description: '', milestoneLabel: '', amount: '', currency: 'USD', dueWindow: '' })
+                setDraft({ code: '', title: '', description: '', milestoneLabel: '', amount: '', currency: '', dueWindow: '' })
                 setAddOpen(false)
               })}
             >{busy === 'add' ? 'Adding...' : 'Add'}</button>

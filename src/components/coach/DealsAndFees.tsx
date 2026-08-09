@@ -17,6 +17,8 @@
 // Existing Programmes/Client views are untouched.
 // ============================================================
 import { useState } from 'react'
+import CurrencyField from '@/components/common/CurrencyField'
+import { formatMoney } from '@/lib/currency'
 import { supabase } from '@/lib/supabase'
 import { clientCountForProgramme } from '@/lib/coach-business-metrics'
 
@@ -41,8 +43,7 @@ function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div sty
 function Badge({text,color}){return<span style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
 
 const num=(v)=>{const n=Number(v);return Number.isFinite(n)?n:0}
-const fmtMoney=(n,cur)=>`${cur||'USD'} ${num(n).toLocaleString(undefined,{maximumFractionDigits:0})}`
-const CURRENCIES=['USD','GBP','EUR','UGX','NGN','KES']
+const fmtMoney=(n,cur)=>formatMoney(n,cur,0)
 
 // deal pipeline
 // Real order: you hear about the opportunity and send a proposal, maybe get
@@ -93,7 +94,7 @@ const DEAL_SERVICE_OPTIONS=[
 // cluttering this form before. Everything else stays editable inline on
 // the prospect's block once created.
 function NewProgrammeForm({onSave,onCancel}){
-  const [f,setF]=useState({name:'',type:'donor_programme',deal_stage:'conversation',deal_services:[],deal_value:'',deal_currency:'USD'})
+  const [f,setF]=useState({name:'',type:'donor_programme',deal_stage:'conversation',deal_services:[],deal_value:'',deal_currency:''})
   function toggleService(key){
     setF(x=>({...x,deal_services:x.deal_services.includes(key)?x.deal_services.filter(s=>s!==key):[...x.deal_services,key]}))
   }
@@ -104,7 +105,7 @@ function NewProgrammeForm({onSave,onCancel}){
         <div><label style={lbl}>Prospect name *</label><input style={inp} value={f.name} onChange={e=>setF(x=>({...x,name:e.target.value}))}/></div>
         <div><label style={lbl}>Type</label><select style={inp} value={f.type} onChange={e=>setF(x=>({...x,type:e.target.value}))}><option value="donor_programme">Donor Programme</option><option value="direct_client">Direct Client</option></select></div>
         <div><label style={lbl}>Stage</label><select style={inp} value={f.deal_stage} onChange={e=>setF(x=>({...x,deal_stage:e.target.value}))}>{DEAL_STAGES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</select></div>
-        <div><label style={lbl}>Deal value</label><div style={{display:'flex',gap:'0.3rem'}}><input type="number" placeholder="0" style={inp} value={f.deal_value} onChange={e=>setF(x=>({...x,deal_value:e.target.value}))}/><select style={{...inp,width:90}} value={f.deal_currency} onChange={e=>setF(x=>({...x,deal_currency:e.target.value}))}>{CURRENCIES.map(x=><option key={x}>{x}</option>)}</select></div></div>
+        <div><label style={lbl}>Deal value</label><div style={{display:'flex',gap:'0.3rem'}}><input type="number" placeholder="0" style={inp} value={f.deal_value} onChange={e=>setF(x=>({...x,deal_value:e.target.value}))}/><CurrencyField hideLabel label="Deal currency" value={f.deal_currency} onChange={v=>setF(x=>({...x,deal_currency:v}))} style={{...inp,width:96}}/></div></div>
       </div>
       <div style={{marginTop:'0.85rem'}}>
         <label style={lbl}>Service(s) on the table</label>
@@ -132,7 +133,7 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
     setShowNew(false)
   }
 
-  const cur=programmes.find(p=>p.deal_currency)?.deal_currency||'USD'
+  const cur=programmes.find(p=>p.deal_currency)?.deal_currency||null
 
   // Every field editable directly on its own block -- no click-to-open a
   // separate form. Updates local state immediately (so the input never
@@ -199,7 +200,7 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
                     <label style={{...lbl,marginBottom:'0.15rem'}}>Value</label>
                     <div style={{display:'flex',gap:'0.25rem'}}>
                       <input type="number" placeholder="0" style={{...inp,width:100,padding:'0.3rem 0.5rem'}} value={p.deal_value??''} onChange={e=>updateDeal(p.id,{deal_value:e.target.value===''?null:num(e.target.value)})}/>
-                      <select style={{...inp,width:75,padding:'0.3rem 0.3rem'}} value={p.deal_currency||cur} onChange={e=>updateDeal(p.id,{deal_currency:e.target.value})}>{CURRENCIES.map(x=><option key={x}>{x}</option>)}</select>
+                      <CurrencyField hideLabel label="Deal currency" value={p.deal_currency||cur||''} onChange={v=>updateDeal(p.id,{deal_currency:v})} style={{...inp,width:84,padding:'0.3rem 0.3rem'}}/>
                     </div>
                   </div>
                   <div>
@@ -236,11 +237,11 @@ function EngagementFees({clients,setClients,programmes}){
   const [msg,setMsg]=useState(null)
   const progName=(id)=>programmes.find(p=>p.id===id)?.name||'—'
 
-  const cur=clients.find(c=>c.fee_currency)?.fee_currency||'USD'
+  const cur=clients.find(c=>c.fee_currency)?.fee_currency||null
   const totalFee=clients.reduce((s,c)=>s+num(c.engagement_fee),0)
   const byStatus=(st)=>clients.filter(c=>c.fee_status===st).reduce((s,c)=>s+num(c.engagement_fee),0)
 
-  function startEdit(c){setForm({engagement_fee:c.engagement_fee??'',fee_currency:c.fee_currency||'USD',fee_status:c.fee_status||'unpaid'});setEditId(c.id)}
+  function startEdit(c){setForm({engagement_fee:c.engagement_fee??'',fee_currency:c.fee_currency||'',fee_status:c.fee_status||'unpaid'});setEditId(c.id)}
   async function save(id){
     const existing=clients.find(c=>c.id===id)
     const today=new Date().toISOString().slice(0,10)
@@ -286,7 +287,7 @@ function EngagementFees({clients,setClients,programmes}){
                   <td style={td}>{c.programme_id?(<>{progName(c.programme_id)} <Badge text="Beneficiary" color={C.purple}/></>):(<Badge text="Paying client" color={C.teal}/>)}</td>
                   {isEdit?(
                     <>
-                      <td style={td}><div style={{display:'flex',gap:'0.3rem'}}><input type="number" style={{...inp,width:100,padding:'0.25rem 0.4rem'}} value={form.engagement_fee} onChange={e=>setForm(f=>({...f,engagement_fee:e.target.value}))}/><select style={{...inp,width:75,padding:'0.25rem 0.3rem'}} value={form.fee_currency} onChange={e=>setForm(f=>({...f,fee_currency:e.target.value}))}>{CURRENCIES.map(x=><option key={x}>{x}</option>)}</select></div></td>
+                      <td style={td}><div style={{display:'flex',gap:'0.3rem'}}><input type="number" style={{...inp,width:100,padding:'0.25rem 0.4rem'}} value={form.engagement_fee} onChange={e=>setForm(f=>({...f,engagement_fee:e.target.value}))}/><CurrencyField hideLabel label="Fee currency" value={form.fee_currency} onChange={v=>setForm(f=>({...f,fee_currency:v}))} style={{...inp,width:84,padding:'0.25rem 0.3rem'}}/></div></td>
                       <td style={td}><select style={{...inp,width:110,padding:'0.25rem 0.4rem'}} value={form.fee_status} onChange={e=>setForm(f=>({...f,fee_status:e.target.value}))}>{FEE_STATUSES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</select></td>
                       <td style={td}><button style={solidBtn(C.cyan,true)} onClick={()=>save(c.id)}>Save</button> <button style={addBtn(true,C.slate)} onClick={()=>{setEditId(null);setMsg(null)}}>Cancel</button></td>
                     </>
