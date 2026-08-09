@@ -29,7 +29,11 @@ ROOT = Path("app/api")
 # Signals that a route acquires a service-role client (RLS bypassed):
 #   SUPABASE_SERVICE_ROLE_KEY — created inline in the route
 #   getFieldSupabase          — the shared helper that returns a service client
-SERVICE_CLIENT = re.compile(r"SUPABASE_SERVICE_ROLE_KEY|getFieldSupabase")
+# getAdminClient is how almost every route written since the shared auth
+# helper landed obtains a service-role client. It was missing here, so 29
+# routes were invisible to this gate: they passed because they were never
+# looked at, which is the failure mode a gate exists to prevent.
+SERVICE_CLIENT = re.compile(r"SUPABASE_SERVICE_ROLE_KEY|getFieldSupabase|getAdminClient")
 
 # Recognised ways a route authenticates/authorizes the caller:
 #   getUser (Supabase JWT) · requesterCanViewClient / resolveFieldAdminActor
@@ -38,7 +42,14 @@ SERVICE_CLIENT = re.compile(r"SUPABASE_SERVICE_ROLE_KEY|getFieldSupabase")
 #   isGrantActive (access-grant token + OTP) · cronAuthorised (cron secret).
 AUTH = re.compile(
     r"getUser|requesterCanViewClient|resolveFieldAdminActor|"
-    r"validateFieldToken|isGrantActive|cronAuthorised|bootstrapAuthorised"
+    r"validateFieldToken|isGrantActive|cronAuthorised|bootstrapAuthorised|"
+    # requireAccess is the shared helper every engagement route goes through;
+    # it resolves the caller and their rights in one place.
+    r"requireAccess|"
+    # loadSessionLink resolves a scoped, expiring session token server side and
+    # returns null for every failure. It is the authorisation for the one route
+    # that accepts writing without a login.
+    r"loadSessionLink|loadShowcaseView"
 )
 
 
