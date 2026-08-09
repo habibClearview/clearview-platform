@@ -279,7 +279,7 @@ export default function CustomerSegmentsTable({ clientId, canManage }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.3rem' }}>
         <div>
           <div style={H('1.2rem')}>Customer profile and adoption test</div>
-          <div style={{ color: C.slate, fontSize: '0.85rem', marginTop: 3, maxWidth: '68ch', lineHeight: 1.5 }}>
+          <div style={{ color: C.slate, fontSize: '0.85rem', marginTop: 3, maxWidth: '92ch', lineHeight: 1.5 }}>
             One row per segment. A customer must be willing, then able, then prioritised, in that
             order. Prioritised is the signal that counts. Each segment needs {MIN_CONVERSATIONS} validation
             conversations, with at least {MIN_CONVERGING} converging on the same problem, budget and

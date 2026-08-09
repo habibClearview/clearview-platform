@@ -241,7 +241,7 @@ export default function ProblemScoringTable({ clientId, canManage }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
           <div style={H('1.2rem')}>Problem prioritisation</div>
-          <div style={{ color: C.slate, fontSize: '0.85rem', marginTop: 3, maxWidth: '68ch', lineHeight: 1.5 }}>
+          <div style={{ color: C.slate, fontSize: '0.85rem', marginTop: 3, maxWidth: '92ch', lineHeight: 1.5 }}>
             Score each candidate problem 1 to 5 on urgency, ownership clarity, willingness to pay and
             access. The total out of {MAX_TOTAL} sorts the list. Only the top {ADVANCING_COUNT} advance to the value
             proposition work. A problem can be urgent and still be worth nothing commercially if

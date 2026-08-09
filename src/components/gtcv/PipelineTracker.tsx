@@ -198,7 +198,7 @@ export default function PipelineTracker({ clientId, canManage , currency }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
             <h3 style={secH}>DP05 pipeline tracker</h3>
-            <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '64ch' }}>
+            <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '92ch' }}>
               One line per prospect. Every prospect sits at one of five stages, in order:
               Identified, Contacted, Met, Proposal Sent, Closed. A prospect with no next action
               and no date is not in the pipeline, it is on a wish list.

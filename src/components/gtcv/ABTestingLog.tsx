@@ -228,7 +228,7 @@ export default function ABTestingLog({ clientId, canManage }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
             <h3 style={secH}>DP05 A/B message testing log</h3>
-            <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '62ch' }}>
+            <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '92ch' }}>
               One line per contact you approached. Record the variant you sent and what came back.
               A reply of any kind, full or partial, counts as a response. The winning message needs
               about 50 percent higher response than the other one before you commit to it.

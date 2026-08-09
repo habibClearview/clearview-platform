@@ -114,8 +114,7 @@ export default function WhatNeedsYou({ clientId, canManage, onGoTo }) {
           key: 'map',
           tone: C.amber,
           what: `${pending.length} proposed gate ${pending.length === 1 ? 'mapping is' : 'mappings are'} waiting on you.`,
-          why: 'A proposal counts towards nothing until you approve, edit or reject it, and a claim cannot be built on one.',
-          goTo: 'deliverables',
+          why: 'A proposal counts towards nothing until you approve, edit or reject it, and a claim cannot be built on one. Deliverables live in your own business area, not on this screen.',
         })
       }
 
@@ -127,8 +126,7 @@ export default function WhatNeedsYou({ clientId, canManage, onGoTo }) {
           key: 'claim',
           tone: C.amber,
           what: `${drafts.length} ${drafts.length === 1 ? 'claim is' : 'claims are'} assembled and unread.`,
-          why: 'Nothing is sent until you read the pack and approve it.',
-          goTo: 'deliverables',
+          why: 'Nothing is sent until you read the pack and approve it. Claims live in your own business area, not on this screen.',
         })
       }
       const approvedUnsent = (packs.data || []).filter((p) => p.status === 'approved')
@@ -137,8 +135,7 @@ export default function WhatNeedsYou({ clientId, canManage, onGoTo }) {
           key: 'send',
           tone: C.teal,
           what: `${approvedUnsent.length} approved ${approvedUnsent.length === 1 ? 'claim has' : 'claims have'} not gone out.`,
-          why: 'Approved and still sitting here.',
-          goTo: 'deliverables',
+          why: 'Approved and still sitting here. Claims live in your own business area, not on this screen.',
         })
       }
 

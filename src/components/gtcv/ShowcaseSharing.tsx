@@ -94,7 +94,7 @@ export default function ShowcaseSharing({ clientId, canManage }) {
       <div style={{ ...mono, fontSize: '0.75rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
         Share the method with a prospect
       </div>
-      <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '68ch' }}>
+      <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '92ch' }}>
         A link anyone can open without an account. It shows the nine blocks, the question each one
         asks, and one line saying how far a live engagement has got. It shows <strong>no</strong>{' '}
         names, no signatures, no evidence, no notes, no fees and nothing this engagement has

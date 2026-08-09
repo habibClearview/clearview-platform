@@ -35,7 +35,7 @@ export default function CoachQuickReference({ showGuidance = true }) {
       <h2 style={{ fontFamily: 'Georgia,serif', fontSize: 22, margin: '0 0 4px', fontWeight: 600 }}>
         Coach Quick Reference
       </h2>
-      <p style={{ margin: '0 0 18px', color: C.soft, fontSize: 14, maxWidth: '70ch' }}>
+      <p style={{ margin: '0 0 18px', color: C.soft, fontSize: 14, maxWidth: '92ch' }}>
         Open this before a session. Each block shows the question it answers, roughly how long it
         takes, and the signal that tells you it is genuinely resolved. A block that is filled in but
         shows no signal is not complete.

@@ -82,13 +82,13 @@ export default function ViewAsBar({ realRole, viewingAs, onChange }) {
       </div>
 
       {role ? (
-        <p style={{ ...hint, margin: '0.6rem 0 0', maxWidth: '76ch' }}>
+        <p style={{ ...hint, margin: '0.6rem 0 0', maxWidth: '92ch' }}>
           <strong style={{ color: C.navy }}>{role.who}</strong> {role.reach}
         </p>
       ) : null}
 
       {role?.unreachable ? (
-        <p style={{ ...hint, margin: '0.45rem 0 0', color: C.amber, maxWidth: '76ch' }}>
+        <p style={{ ...hint, margin: '0.45rem 0 0', color: C.amber, maxWidth: '92ch' }}>
           Nobody can hold this role today, so switching to it shows you what the screen would give
           them if they could log in. What a funder actually gets is the showcase link, on the
           Engagement Setup screen.
@@ -108,7 +108,7 @@ export default function ViewAsBar({ realRole, viewingAs, onChange }) {
       </div>
 
       {previewing ? (
-        <p style={{ ...hint, margin: '0.7rem 0 0', maxWidth: '76ch' }}>
+        <p style={{ ...hint, margin: '0.7rem 0 0', maxWidth: '92ch' }}>
           This is the screen they get. It is not proof of what the database would hand them, because
           what is on this page was loaded with your access. Anything you save while previewing is
           still saved as you.

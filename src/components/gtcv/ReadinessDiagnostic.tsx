@@ -315,7 +315,7 @@ export default function ReadinessDiagnostic({ clientId, canManage }) {
         <div>
           <div style={{ fontFamily: 'monospace', fontSize: '0.78rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: C.teal }}>DP09</div>
           <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.45rem', fontWeight: 700 }}>Commercial Readiness Diagnostic</div>
-          <div style={{ fontSize: '0.95rem', color: C.slate, maxWidth: '68ch', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '0.95rem', color: C.slate, maxWidth: '92ch', marginTop: '0.25rem' }}>
             Six fit tests, each scored 0 to 3, maximum {MAX_TOTAL}. The same six are taken three times, at
             baseline, at the mid point and at close. A score above 1 has to point at evidence, and the movement
             between the three sittings is the real result.

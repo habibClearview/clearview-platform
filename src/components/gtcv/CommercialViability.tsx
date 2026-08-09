@@ -242,7 +242,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
             <h3 style={secH}>DP04 commercial viability</h3>
-            <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '68ch' }}>
+            <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '92ch' }}>
               What one delivery costs, and the price at which the organisation sustains itself.
               Work down the page in order. Cost first, then the market, then price, then break
               even. Done the other way round, the cost estimate quietly bends to fit a price
@@ -282,7 +282,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
           />
         </div>
 
-        <div style={{ ...hint, marginTop: '0.85rem', maxWidth: '72ch' }}>
+        <div style={{ ...hint, marginTop: '0.85rem', maxWidth: '92ch' }}>
           The cost floor is the sum of the five categories below. It is calculated once and used
           by every tier and every break even on this page, so there is only ever one floor in
           play. No price may sit below it.
@@ -291,7 +291,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
         {deficits.map((f, i) => <Flag key={`d${i}`} level="deficit">{f.message}</Flag>)}
         {gaps.map((f, i) => <Flag key={`g${i}`} level="gap">{f.message}</Flag>)}
 
-        <div style={{ ...hint, marginTop: '0.9rem', paddingTop: '0.7rem', borderTop: `1px solid var(--cv-border-soft)`, maxWidth: '72ch' }}>
+        <div style={{ ...hint, marginTop: '0.9rem', paddingTop: '0.7rem', borderTop: `1px solid var(--cv-border-soft)`, maxWidth: '92ch' }}>
           This is the workbook model: cost, price and break even for one service. The full
           financial picture for the organisation, projections, drivers and monthly actuals, lives
           in the ClearView dashboard and is not repeated here. Use this page to set the floor and
@@ -305,7 +305,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
           <h3 style={{ ...secH, fontSize: '1.1rem' }}>Cost model, the full baseline</h3>
           <span style={{ ...mono, fontSize: '0.8rem', color: C.slate }}>{costLines.length} line{costLines.length === 1 ? '' : 's'}</span>
         </div>
-        <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '72ch' }}>
+        <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '92ch' }}>
           Enter every cost of delivering the service once, at the standard a paying client would
           accept. All five categories. An incomplete cost produces a floor the organisation
           cannot survive on.
@@ -326,7 +326,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
                   <span style={{ color: C.slate }}>  |  {money(cat.annualCost)} a year</span>
                 </div>
               </div>
-              <div style={{ ...hint, fontSize: '0.84rem', marginTop: '0.15rem', maxWidth: '78ch' }}>{meta ? meta.hint : ''}</div>
+              <div style={{ ...hint, fontSize: '0.84rem', marginTop: '0.15rem', maxWidth: '92ch' }}>{meta ? meta.hint : ''}</div>
 
               <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
@@ -410,7 +410,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
               </table>
             </div>
 
-            <div style={{ ...hint, marginTop: '0.8rem', maxWidth: '72ch' }}>
+            <div style={{ ...hint, marginTop: '0.8rem', maxWidth: '92ch' }}>
               <b style={{ color: C.navy }}>Overhead check.</b> Overhead is {formatPercent(v.cost.overheadShareOfDirect)} of
               direct costs ({money(v.cost.overhead)} against {money(v.cost.directCosts)}). The
               recommended minimum is 20 percent.
@@ -433,7 +433,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
           <h3 style={{ ...secH, fontSize: '1.1rem' }}>Market price reference</h3>
           {canManage && <button type="button" style={btn(C.cyan)} disabled={busy} onClick={() => addRow(T_MARKET)}>+ Add a source</button>}
         </div>
-        <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '72ch' }}>
+        <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '92ch' }}>
           What comparable providers actually charge, from client research. At least
           {' '}{MINIMUM_MARKET_SOURCES} sources before the range means anything. This is a
           reference, not the price. The floor sets the price.
@@ -519,7 +519,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
           <h3 style={{ ...secH, fontSize: '1.1rem' }}>Pricing tiers</h3>
           {canManage && <button type="button" style={btn(C.cyan)} disabled={busy} onClick={() => addRow(T_TIERS)}>+ Add a tier</button>}
         </div>
-        <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '74ch' }}>
+        <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '92ch' }}>
           Three tiers are required. Entry is the minimum viable version for a first time buyer.
           Standard is the core service and is where break even lives. Premium is the full ongoing
           relationship. Two more may be added once the first three have been validated in the
@@ -604,7 +604,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
           <h3 style={{ ...secH, fontSize: '1.1rem' }}>Fixed costs and break even</h3>
           {canManage && <button type="button" style={btn(C.cyan)} disabled={busy} onClick={() => addRow(T_FIXED)}>+ Add a fixed cost</button>}
         </div>
-        <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '74ch' }}>
+        <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '92ch' }}>
           Fixed costs are what the organisation pays whether it delivers or not: salaries,
           premises, software, marketing. Enter them monthly. Break even is annual fixed costs
           divided by the contribution each delivery makes, and contribution is price minus the
@@ -707,7 +707,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
           </table>
         </div>
 
-        <div style={{ ...hint, marginTop: '0.8rem', maxWidth: '74ch' }}>
+        <div style={{ ...hint, marginTop: '0.8rem', maxWidth: '92ch' }}>
           A tier that shows <b style={{ color: C.red }}>Never</b> does not break even at any
           volume, because its price does not clear the cost floor. Selling more of it makes the
           loss larger, not smaller. That is a pricing decision to reopen, not a sales target to

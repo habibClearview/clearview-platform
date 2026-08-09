@@ -118,7 +118,7 @@ export default function EngagementSettings({ clientId, canManage }) {
       <div style={{ ...mono, fontSize: '0.75rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
         How this engagement runs
       </div>
-      <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '68ch' }}>
+      <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '92ch' }}>
         These shape one engagement without changing the method. Every engagement runs the same nine
         blocks in the same order; what these decide is what they are called, what this engagement
         agreed to do, and how it is going.
@@ -131,7 +131,7 @@ export default function EngagementSettings({ clientId, canManage }) {
         <div style={{ ...mono, fontSize: '0.7rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
           Scaffolding
         </div>
-        <p style={{ ...hint, margin: '0.35rem 0 0.6rem', maxWidth: '68ch' }}>
+        <p style={{ ...hint, margin: '0.35rem 0 0.6rem', maxWidth: '92ch' }}>
           A new engagement needs three things before anything else works: its own settings, a record
           for each of the twelve gates, and a Charter to edit and issue. This creates whichever of
           them are missing and touches nothing that is already there, so pressing it twice is safe.
@@ -273,7 +273,7 @@ export default function EngagementSettings({ clientId, canManage }) {
             >Use the default</button>
           ) : null}
         </div>
-        <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '68ch' }}>
+        <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '92ch' }}>
           Currently <strong>{effectiveMin}</strong>
           {usingDefault ? ' , the method default, because nothing else is set.' : '.'} This is what
           this engagement agreed to do, so it is yours to set.{' '}

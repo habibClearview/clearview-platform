@@ -133,7 +133,7 @@ export default function AssistPanel({
             Assistance
           </div>
           <div style={{ fontWeight: 700, color: C.navy, marginTop: '0.15rem' }}>{title}</div>
-          {description && <div style={{ ...hint, marginTop: '0.2rem', maxWidth: '64ch' }}>{description}</div>}
+          {description && <div style={{ ...hint, marginTop: '0.2rem', maxWidth: '92ch' }}>{description}</div>}
         </div>
         {!draft && (
           <button type="button" style={{ ...btn(C.cyan), opacity: disabled || busy ? 0.55 : 1 }}

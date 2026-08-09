@@ -316,7 +316,7 @@ export default function PropositionBuilder({ clientId, canManage }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
           <div style={H('1.2rem')}>Proposition builder</div>
-          <div style={{ color: C.slate, fontSize: '0.85rem', marginTop: 3, maxWidth: '68ch', lineHeight: 1.5 }}>
+          <div style={{ color: C.slate, fontSize: '0.85rem', marginTop: 3, maxWidth: '92ch', lineHeight: 1.5 }}>
             One proposition per priority segment, built from four parts: capability, problem,
             outcome, reason to choose. Differentiation is capability, context or access, and nothing
             else. The paragraph is assembled from the parts and stays editable. A proposition counts

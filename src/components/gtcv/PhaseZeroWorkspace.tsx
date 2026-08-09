@@ -332,7 +332,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         <div>
           <div style={{ fontFamily: 'monospace', fontSize: '0.78rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: C.teal }}>Phase 0</div>
           <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.45rem', fontWeight: 700 }}>Clear the ground</div>
-          <div style={{ fontSize: '0.95rem', color: C.slate, maxWidth: '68ch', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '0.95rem', color: C.slate, maxWidth: '92ch', marginTop: '0.25rem' }}>
             Five tools, used in order. Strip the activity back to what is actually true, find out who has the
             money, shortlist the few problems worth testing, separate what was observed from what is believed,
             and decide what continues, pauses or stops before any gate work begins.

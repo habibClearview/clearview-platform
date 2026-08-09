@@ -180,7 +180,7 @@ export default function HandoverIndependence({ clientId, canManage }) {
       <div style={{ ...mono, fontSize: '0.75rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
         The five independence tests
       </div>
-      <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '68ch' }}>
+      <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '92ch' }}>
         The leadership team presents unassisted. You and the funder representative are evaluators,
         not helpers. A test you had to prompt them through is not a pass, and recording it as one
         removes the only thing this measures.

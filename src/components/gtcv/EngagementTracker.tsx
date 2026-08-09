@@ -136,7 +136,7 @@ export default function EngagementTracker({ clientId, canManage }) {
       <h2 style={{ fontFamily: 'Georgia,serif', fontSize: 22, margin: '0 0 4px', fontWeight: 600 }}>
         Engagement Tracker
       </h2>
-      <p style={{ margin: '0 0 16px', color: C.soft, fontSize: 14, maxWidth: '72ch' }}>
+      <p style={{ margin: '0 0 16px', color: C.soft, fontSize: 14, maxWidth: '92ch' }}>
         Open this first at every session and update it at the end of every one, even when the status
         has not moved. The priority action is what changes most.
       </p>

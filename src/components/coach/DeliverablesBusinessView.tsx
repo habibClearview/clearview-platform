@@ -41,7 +41,7 @@ export default function DeliverablesBusinessView({ clients = [] }) {
       <div style={{ ...mono, fontSize: '0.75rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
         Deliverables and claims
       </div>
-      <p style={{ ...hint, margin: '0.45rem 0 0', maxWidth: '72ch' }}>
+      <p style={{ ...hint, margin: '0.45rem 0 0', maxWidth: '92ch' }}>
         What was contracted, which decision gates evidence it, and what still has to happen before it
         can be claimed. This sits here rather than on the client screen because the fee is between you
         and whoever pays. Nobody in the organisation being coached can reach this page at all.

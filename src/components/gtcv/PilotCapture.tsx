@@ -425,7 +425,7 @@ export default function PilotCapture({ clientId, canManage }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
             <h3 style={secH}>DP07 pilot capture</h3>
-            <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '66ch' }}>
+            <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '92ch' }}>
               The pilot runs as two iterations with two real paying clients each. Iteration 1 is coach
               led with the organisation observing. Iteration 2 is organisation led with the coach as
               backstop. Every session is captured in three phases: pre-session brief, live observation,

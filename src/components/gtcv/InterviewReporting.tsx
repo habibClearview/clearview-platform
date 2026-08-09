@@ -102,7 +102,7 @@ export default function InterviewReporting({ clientId }) {
         <div style={{ ...mono, fontSize: '0.75rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
           What the conversations add up to
         </div>
-        <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '68ch' }}>
+        <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '92ch' }}>
           Two different questions. <strong>The minimum</strong> is how many conversations this
           engagement agreed to hold per segment, currently {minimum}. That is effort.{' '}
           <strong>Convergence</strong> is {CONVERGENCE_MINIMUM} or more conversations pointing at the

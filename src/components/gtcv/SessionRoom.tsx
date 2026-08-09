@@ -200,7 +200,7 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
       <div style={{ ...mono, fontSize: '0.75rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
         The room
       </div>
-      <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '70ch' }}>
+      <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '92ch' }}>
         Open a block to the room and everybody in it can add what they would have said, from their own
         phone, with no account and no password. They see each other's answers, which is the point: eight
         views of the same question, side by side, instead of one person&rsquo;s memory of them. The link
@@ -362,11 +362,11 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
           </div>
         ))}
 
-        <p style={{ ...hint, marginTop: '0.9rem', maxWidth: '70ch' }}>
+        <p style={{ ...hint, marginTop: '0.9rem', maxWidth: '92ch' }}>
           Adding one to the block puts it in the block&apos;s own table in the words it was said in, with
           everything else left blank for you to complete. It is a draft, not a finding.
         </p>
-        <p style={{ ...hint, marginTop: '0.5rem', maxWidth: '70ch' }}>
+        <p style={{ ...hint, marginTop: '0.5rem', maxWidth: '92ch' }}>
           Marking one as used does not delete it. It stays here with the name on it, because the reason
           to come back to something somebody said is usually to come back to the person who said it.
           Putting one back removes the draft it made, unless you have already worked on that draft, in
