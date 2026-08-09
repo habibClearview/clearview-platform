@@ -11,6 +11,8 @@ import { supabase } from '@/lib/supabase'
 import EngagementJourneyView from '@/components/engagement/EngagementJourneyView'
 import BlockWorkspace from '@/components/gtcv/BlockWorkspace'
 import SessionRoom from '@/components/gtcv/SessionRoom'
+import ViewAsBar from '@/components/coach/ViewAsBar'
+import { mayPreview } from '@/lib/role-preview'
 import CurrencyField from '@/components/common/CurrencyField'
 import { formatMoneyShort } from '@/lib/currency'
 import SessionPlanner from '@/components/gtcv/SessionPlanner'
@@ -1788,6 +1790,14 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     try{window.localStorage.setItem('cv.coachNavCollapsed',navCollapsed?'1':'0')}catch{}
   },[navCollapsed])
 
+  // Whose eyes the client screen is being read through. Only the lead
+  // consultant may change it, and it never changes who is writing: the routes
+  // resolve the writer from the session whatever the screen shows. Held here
+  // rather than remembered between visits, because a preview left switched on
+  // from yesterday is exactly how somebody concludes a screen is broken.
+  const [viewingAs,setViewingAs]=useState(null)
+  const previewRoleId=mayPreview(userRole)&&viewingAs?viewingAs:userRole
+
   const [clientSessions,setClientSessions]=useState([])
   useEffect(()=>{
     let cancelled=false
@@ -2089,7 +2099,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     const notifications=selClientFullData.notifications||{enabled:false,recipients:[]}
 
     const visibleTabs=isCanvas
-      ? CANVAS_TABS.filter(t=>!t.coachOnly||(t.coachOnly&&canViewCoachGuidance(userRole)))
+      ? CANVAS_TABS.filter(t=>!t.coachOnly||(t.coachOnly&&canViewCoachGuidance(previewRoleId)))
       : []
 
     function printSection(){window.print()}
@@ -2137,6 +2147,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 3 — Enter the Plan</div><p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.7,margin:0}}>Go to Planning to add revenue and cost lines. Enter monthly figures for the full planning period.</p></div>
         </div>
         {isSuperCoach&&<ClientTeamInvite client={selClient}/>}
+        {mayPreview(userRole)&&<ViewAsBar realRole={userRole} viewingAs={viewingAs||userRole} onChange={v=>setViewingAs(v===userRole?null:v)}/>}
+
         <div style={card}><TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/></div>
         {!selClient.programme_id&&<ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>}
       </div>
@@ -2206,34 +2218,34 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 
           {/* Main content area */}
           <div>
-            {activeTab==='cover'&&<><WhatNeedsYou clientId={selClient.id} canManage={canEdit(userRole)} onGoTo={setActiveTab}/><CoverPanel slug={selClient.slug}/><div style={{height:18}}/>
+            {activeTab==='cover'&&<><WhatNeedsYou clientId={selClient.id} canManage={canEdit(previewRoleId)} onGoTo={setActiveTab}/><CoverPanel slug={selClient.slug}/><div style={{height:18}}/>
               <TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/>
               {!selClient.programme_id&&<ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>}
             </>}
             {activeTab==='journey'&&<EngagementJourneyView slugOverride={selClient.slug}/>}
             {activeTab==='charter'&&<EngagementCharterView slugOverride={selClient.slug}/>}
             {activeTab==='how_to_start'&&<TabHowToStart client={selClient}/>}
-            {activeTab==='coach_ref'&&canViewCoachGuidance(userRole)&&<CoachQuickReference showGuidance={canViewCoachGuidance(userRole)}/>}
+            {activeTab==='coach_ref'&&canViewCoachGuidance(previewRoleId)&&<CoachQuickReference showGuidance={canViewCoachGuidance(previewRoleId)}/>}
             {activeTab==='ip_framework'&&<TabIPFramework/>}
-            {activeTab==='eng_setup'&&<><EngagementPartiesPanel clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/><ShowcaseSharing clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/><EngagementSettings clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/></>}
+            {activeTab==='eng_setup'&&<><EngagementPartiesPanel clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><ShowcaseSharing clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><EngagementSettings clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
             {activeTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
-            {activeTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={userRole} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
-            {activeTab==='deliverables'&&canEdit(userRole)&&<DeliverablesPanel clientId={selClient.id} canManage={canEdit(userRole)} currency={engagementCurrency}/>}
-            {activeTab==='sessions'&&<><SessionRoom clientId={selClient.id} canManage={canEdit(userRole)} sessions={clientSessions}/><div style={{height:22}}/><SessionPlanner clientId={selClient.id} canManage={canEdit(userRole)}/></>}
-            {activeTab==='tracker'&&<><GtcvEngagementTracker clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/><TabTracker client={selClient} canvas={canvas}/></>}
-            {activeTab==='decisions'&&<TabDecisions client={selClient} decisions={decisions} userRole={userRole} userName={userName} onAdd={async(d)=>{const {data}=await supabase.from('canvas_decisions').insert([{...d,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:[...decisions,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`decisions:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:decisions.map(d=>d.id!==id?d:{...d,...updates})}})),()=>supabase.from('canvas_decisions').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
-            {activeTab==='evidence'&&<><EvidenceLibraryPanel clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/><TabEvidence client={selClient} evidence={evidence} onAdd={async(e)=>{const ref=`E-${String(evidence.length+1).padStart(3,'0')}`;const {data}=await supabase.from('evidence_library').insert([{...e,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:[...evidence,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`evidence:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:evidence.map(e=>e.id!==id?e:{...e,...updates})}})),()=>supabase.from('evidence_library').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/></>}
-            {activeTab==='handover'&&<><HandoverIndependence clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/></>}
-            {activeTab==='handover'&&<TabHandover client={selClient} handover={handover} canvas={canvas} userRole={userRole} onUpdate={(id,updates)=>optimisticWrite(`handover:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,handover:handover.map(h=>h.id!==id?h:{...h,...updates})}})),()=>supabase.from('handover_record').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
-            {activeTab==='phase0'&&<><TabDP client={selClient} dp={canvas.find(d=>d.dp_id==='phase_0')} userRole={userRole} onUpdateDP={u=>updateDP(selClient.id,'phase_0',u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,'phase_0',cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId="phase_0" clientId={selClient.id} canManage={canEdit(userRole)} currency={engagementCurrency}/></div></>}
+            {activeTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={previewRoleId} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
+            {activeTab==='deliverables'&&canEdit(previewRoleId)&&<DeliverablesPanel clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/>}
+            {activeTab==='sessions'&&<><SessionRoom clientId={selClient.id} canManage={canEdit(previewRoleId)} sessions={clientSessions}/><div style={{height:22}}/><SessionPlanner clientId={selClient.id} canManage={canEdit(previewRoleId)}/></>}
+            {activeTab==='tracker'&&<><GtcvEngagementTracker clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><TabTracker client={selClient} canvas={canvas}/></>}
+            {activeTab==='decisions'&&<TabDecisions client={selClient} decisions={decisions} userRole={previewRoleId} userName={userName} onAdd={async(d)=>{const {data}=await supabase.from('canvas_decisions').insert([{...d,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:[...decisions,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`decisions:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:decisions.map(d=>d.id!==id?d:{...d,...updates})}})),()=>supabase.from('canvas_decisions').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
+            {activeTab==='evidence'&&<><EvidenceLibraryPanel clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><TabEvidence client={selClient} evidence={evidence} onAdd={async(e)=>{const ref=`E-${String(evidence.length+1).padStart(3,'0')}`;const {data}=await supabase.from('evidence_library').insert([{...e,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:[...evidence,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`evidence:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:evidence.map(e=>e.id!==id?e:{...e,...updates})}})),()=>supabase.from('evidence_library').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/></>}
+            {activeTab==='handover'&&<><HandoverIndependence clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
+            {activeTab==='handover'&&<TabHandover client={selClient} handover={handover} canvas={canvas} userRole={previewRoleId} onUpdate={(id,updates)=>optimisticWrite(`handover:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,handover:handover.map(h=>h.id!==id?h:{...h,...updates})}})),()=>supabase.from('handover_record').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
+            {activeTab==='phase0'&&<><TabDP client={selClient} dp={canvas.find(d=>d.dp_id==='phase_0')} userRole={previewRoleId} onUpdateDP={u=>updateDP(selClient.id,'phase_0',u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,'phase_0',cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId="phase_0" clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/></div></>}
             {['dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09'].map(dpKey=>(
               // One condition per tab. The same nine keys used to be mapped
               // twice with the same test in both, so every render walked the
               // list twice to decide the same thing.
-              activeTab===dpKey&&<div key={dpKey}><TabDP client={selClient} dp={canvas.find(d=>d.dp_id===dpKey)} userRole={userRole} onUpdateDP={u=>updateDP(selClient.id,dpKey,u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,dpKey,cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId={dpKey} clientId={selClient.id} canManage={canEdit(userRole)} currency={engagementCurrency}/></div></div>
+              activeTab===dpKey&&<div key={dpKey}><TabDP client={selClient} dp={canvas.find(d=>d.dp_id===dpKey)} userRole={previewRoleId} onUpdateDP={u=>updateDP(selClient.id,dpKey,u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,dpKey,cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId={dpKey} clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/></div></div>
             ))}
             {activeTab==='int_brief'&&<><InterviewBriefing/><div style={{height:22}}/><TabInterviewBriefing client={selClient} interviews={interviews} onAdd={async(i)=>{const ref=`INT-${String(interviews.length+1).padStart(3,'0')}`;const {data}=await supabase.from('interviews').insert([{...i,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,interviews:[...interviews,data]}}))}}/></>}
-            {activeTab==='int_capture'&&<><InterviewCaptureForm clientId={selClient.id} canManage={canEdit(userRole)}/><div style={{height:22}}/><TabInterviewCapture client={selClient} interviews={interviews}
+            {activeTab==='int_capture'&&<><InterviewCaptureForm clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><TabInterviewCapture client={selClient} interviews={interviews}
               onAdd={async(i)=>{
                 const ref=`INT-${String(interviews.length+1).padStart(3,'0')}`
                 const {data}=await supabase.from('interviews').insert([{...i,client_id:selClient.id,reference:ref}]).select().single()
