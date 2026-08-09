@@ -20,6 +20,7 @@
 // ============================================================
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import CopyLink from '@/components/common/CopyLink'
 
 const C = {
   card: 'var(--cv-card)', alt: 'var(--cv-alt)', border: 'var(--cv-border)',
@@ -165,7 +166,7 @@ export default function ShowcaseSharing({ clientId, canManage }) {
             const r = await api('POST', { clientId, action: 'issue', label })
             setLabel('')
             return r
-          }, (r) => `Link created. Copy it now: ${origin}/showcase/${r.token}`)}
+          }, 'Link created. It is in the list below with a copy button.')}
         >{busy === 'issue' ? 'Creating...' : 'Create a link'}</button>
       </div>
 
@@ -184,7 +185,7 @@ export default function ShowcaseSharing({ clientId, canManage }) {
                   alignItems: 'center', border: `1px solid ${C.border}`, borderRadius: 9,
                   padding: '0.5rem 0.75rem', opacity: dead ? 0.6 : 1,
                 }}>
-                  <div style={{ minWidth: 0 }}>
+                  <div style={{ minWidth: 0, flex: '1 1 320px' }}>
                     <div style={{ fontSize: '0.97rem', color: C.navy, fontWeight: 600 }}>{l.grantee_name}</div>
                     <div style={{ ...mono, fontSize: '0.76rem', color: C.slate }}>
                       {l.revoked_at
@@ -194,14 +195,14 @@ export default function ShowcaseSharing({ clientId, canManage }) {
                           : `Works until ${fmtDate(l.expires_at)}`}
                       {l.last_accessed_at ? ` · last opened ${fmtDate(l.last_accessed_at)}` : ' · never opened'}
                     </div>
+                    {!dead ? (
+                      <div style={{ marginTop: '0.45rem' }}>
+                        <CopyLink url={`${origin}/showcase/${l.access_token}`} compact />
+                      </div>
+                    ) : null}
                   </div>
                   {!dead ? (
                     <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        style={btn(C.slate)}
-                        onClick={() => setNote(`${origin}/showcase/${l.access_token}`)}
-                      >Show the link</button>
                       <button
                         type="button"
                         style={btn(C.red)}

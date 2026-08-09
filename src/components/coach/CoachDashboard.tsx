@@ -121,7 +121,7 @@ function PiKpiCard({label,value,rev,sub,total,color,deltaBadge}){return(
   </div>
 )}
 function MiniDistBar({segments}){return(<div style={{display:'flex',height:6,borderRadius:3,overflow:'hidden',marginTop:'0.55rem'}}>{segments.map((s,i)=><div key={i} style={{width:`${s.pct}%`,background:s.color}}/>)}</div>)}
-function PiKpiRow({children,cols}){return<div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gap:'0.9rem'}}>{children}</div>}
+function PiKpiRow({children,cols}){return<div style={{display:'grid',gridTemplateColumns:`repeat(${cols},minmax(0,1fr))`,gap:'0.9rem'}}>{children}</div>}
 // Real order: proposal sent, maybe an interview/discussion, then
 // negotiation, then won or lost -- see the matching comment in
 // DealsAndFees.tsx's DEAL_STAGES.
@@ -1516,7 +1516,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
       {/* Methodology */}
       <div style={card}>
         <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.6rem'}}>Methodology — every factor, defined</div>
-        <div style={{display:'grid',gridTemplateColumns:'minmax(150px,190px) 1fr',gap:'0.5rem 1.2rem',fontSize:'0.88rem'}}>
+        <div style={{display:'grid',gridTemplateColumns:'minmax(150px,190px) minmax(0,1fr)',gap:'0.5rem 1.2rem',fontSize:'0.88rem'}}>
           <div style={{fontFamily:'monospace',fontWeight:700,color:C.teal}}>Growth / cost / DSCR / EBITDA</div>
           <div style={{color:C.navy}}>Year-on-year revenue change; total costs ÷ revenue; operating cash ÷ debt due (1.5× = lender comfort line); operating profit ÷ revenue. Medians over the full distribution.</div>
           <div style={{fontFamily:'monospace',fontWeight:700,color:C.teal}}>Readiness &amp; LRS</div>
@@ -2195,8 +2195,16 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         )}
         {isSuperCoach&&<ClientTeamInvite client={selClient}/>}
 
-        {/* Two-column layout: sidebar + content */}
-        <div style={{display:'grid',gridTemplateColumns:navCollapsed?'62px 1fr':'220px 1fr',gap:'1.5rem',alignItems:'start'}}>
+        {/* Two-column layout: sidebar + content.
+            minmax(0,1fr) rather than 1fr, and minWidth:0 on the content, for a
+            reason worth writing down. A grid track written as 1fr will not
+            shrink below the natural width of what is inside it, so a single
+            wide table anywhere in the content pushed this track, and with it
+            the whole page, wider than the window. That is what produced the
+            sideways scrolling and the text running off the right edge, and it
+            was not a matter of taste: the page was genuinely wider than the
+            screen it was being read on. */}
+        <div style={{display:'grid',gridTemplateColumns:navCollapsed?'62px minmax(0,1fr)':'220px minmax(0,1fr)',gap:'1.5rem',alignItems:'start'}}>
 
           {/* Sidebar \u2014 25 tabs */}
           <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',position:'sticky',top:'1rem'}}>
@@ -2242,8 +2250,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             })}
           </div>
 
-          {/* Main content area */}
-          <div>
+          {/* Main content area. minWidth:0 lets it shrink to the track rather
+              than forcing the track to grow to it. */}
+          <div style={{minWidth:0}}>
             {flashLocked?(
               <div role="status" style={{marginBottom:'1rem',padding:'0.7rem 1rem',borderRadius:10,border:`1px solid ${C.amber}`,background:'var(--cv-alt)',color:C.navy,fontSize:'0.97rem',display:'flex',gap:'0.8rem',alignItems:'center',flexWrap:'wrap'}}>
                 <span>{flashLocked}</span>
@@ -2581,7 +2590,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         </div>
       )}
       <header style={{background:'var(--cv-header)',borderBottom:`3px solid ${C.cyan}`}}>
-        <div style={{maxWidth:1600,margin:'0 auto',padding:'1.25rem 1.5rem',display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
+        <div style={{maxWidth:1320,margin:'0 auto',padding:'1.25rem 1.5rem',display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
           <div>
             <div style={{fontFamily:'monospace',fontSize:'0.93rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>CANVAS COACH \u2014 COACH DASHBOARD</div>
             <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0.1rem 0 0.15rem'}}>{userName}</h1>
@@ -2606,11 +2615,11 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         </div>
       </header>
       <nav style={{background:'var(--cv-nav)',borderBottom:`1px solid var(--cv-cyan-dim)`}}>
-        <div style={{maxWidth:1600,margin:'0 auto',padding:'0 1.5rem',display:'flex',flexWrap:'wrap'}}>
+        <div style={{maxWidth:1320,margin:'0 auto',padding:'0 1.5rem',display:'flex',flexWrap:'wrap'}}>
           {mainNavTabs.map(([id,label])=><button key={id} style={navBtn(view===id||(view==='client'&&id==='clients'))} onClick={()=>{if(id!=='client')setSelClientId(null);setView(id)}}>{label}</button>)}
         </div>
       </nav>
-      <main style={{maxWidth:1600,margin:'0 auto',padding:'1.5rem'}}>
+      <main style={{maxWidth:1320,margin:'0 auto',padding:'1.5rem'}}>
         <ErrorBoundary key={view} label={String(view)}>
         {view==='overview'&&<OverviewTab/>}
         {view==='clients'&&<ClientsHub/>}
@@ -2863,7 +2872,7 @@ function TabIPFramework(){
       <div style={card}>
         <h4 style={{fontFamily:'Georgia,serif',color:C.navy,marginTop:0}}>Three-Stage Adoption Test</h4>
         <p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.6}}>Before any service can be sold commercially, three things must be true about the buyer. All three must be present \u2014 one or two is not enough.</p>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'1rem',marginBottom:'1.5rem'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
           {[{n:'01',t:'Willingness',d:'The customer sees the problem as real and worth solving. They want a solution and are open to engaging with a provider.'},{n:'02',t:'Ability',d:'The customer has the financial means to pay for the solution at the price offered. Budget exists and can be accessed.'},{n:'03',t:'Prioritisation',d:'The customer ranks this problem high enough to spend budget on it now, not next quarter or next year.'}].map(s=>(
             <div key={s.n} style={{background:C.cream,padding:16,borderRadius:8,borderTop:`3px solid ${C.cyan}`}}>
               <p style={{fontSize:'0.93rem',color:C.cyan,fontWeight:700,letterSpacing:1,margin:'0 0 4px',textTransform:'uppercase',fontFamily:'monospace'}}>{s.n}</p>
@@ -2874,7 +2883,7 @@ function TabIPFramework(){
         </div>
         <h4 style={{fontFamily:'Georgia,serif',color:C.navy}}>Asset Liquidity Hierarchy</h4>
         <p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.6}}>In agricultural markets, assets serve different financial functions. Understanding this helps diagnose customer budget behaviour.</p>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'1rem',marginBottom:'1.5rem'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
           {[{t:'Poultry',sub:'ATM equivalent',d:'Easily converted to cash. Sold when small amounts are needed quickly.'},{t:'Small ruminants',sub:'Savings equivalent',d:'Converted for planned medium expenses. Goats and sheep are liquid but not instant.'},{t:'Large ruminants',sub:'Fixed asset equivalent',d:'Sold for major planned expenses only. Cattle represent significant stored value.'}].map(a=>(
             <div key={a.t} style={{background:C.cream,padding:16,borderRadius:8,borderTop:`3px solid ${C.teal}`}}>
               <p style={{fontFamily:'Georgia,serif',fontWeight:700,margin:'0 0 2px',fontSize:'1.16rem',color:C.navy}}>{a.t}</p>
@@ -2925,7 +2934,7 @@ function TabEngagementSetup({client,fileLinks,notifications,onUpdate,onUpdateFil
         <div style={secH}>Document Links</div>
         <p style={{fontSize:'1.07rem',color:C.slate,marginBottom:'1rem'}}>Add links to Google Drive, Dropbox, or any URL for key documents.</p>
         {links.map((l,i)=>(
-          <div key={i} style={{display:'grid',gridTemplateColumns:'1fr 2fr auto',gap:'0.75rem',alignItems:'end',marginBottom:'0.75rem'}}>
+          <div key={i} style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,2fr) auto',gap:'0.75rem',alignItems:'end',marginBottom:'0.75rem'}}>
             <div><label style={lbl}>Label</label><input style={inp} value={l.label} onChange={e=>updLink(i,'label',e.target.value)} placeholder="e.g. Engagement Brief"/></div>
             <div><label style={lbl}>URL</label><input style={inp} value={l.url} onChange={e=>updLink(i,'url',e.target.value)} placeholder="https://..."/></div>
             <button onClick={()=>removeLink(i)} style={{...addBtn(true,C.red),alignSelf:'center'}}>Remove</button>
@@ -3203,7 +3212,7 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
       {/* What good looks like */}
       <div style={card}>
         <div style={secH}>What good looks like for this Decision Point</div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginBottom:'1rem'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:'1rem',marginBottom:'1rem'}}>
           <div style={{background:'var(--cv-tint-green)',padding:14,borderRadius:6}}><p style={{fontWeight:700,color:C.green,margin:'0 0 6px',fontSize:'1.01rem'}}>A strong answer</p><p style={{margin:0,fontSize:'1.07rem',color:C.navy}}>{dp.commitment}</p></div>
           <div style={{background:'var(--cv-tint-red)',padding:14,borderRadius:6}}><p style={{fontWeight:700,color:C.red,margin:'0 0 6px',fontSize:'1.01rem'}}>Output required</p><p style={{margin:0,fontSize:'1.07rem',color:C.navy}}>{dp.output_required}</p></div>
         </div>
@@ -3233,7 +3242,7 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
               {expanded&&(
                 <div style={{padding:'1rem',borderTop:`1px solid ${C.border}`,background:C.white}}>
                   {/* Five layers */}
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.75rem',marginBottom:'1rem'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:'0.75rem',marginBottom:'1rem'}}>
                     <div style={{background:'var(--cv-bg-2)',borderRadius:6,padding:'0.75rem'}}><p style={{fontWeight:700,color:C.navy,margin:'0 0 4px',fontSize:'1.01rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>What it is</p><p style={{margin:0,fontSize:'1.07rem',color:C.slate}}>{comp.what_it_is||'Content will be loaded from canvas-types.'}</p></div>
                     <div style={{background:'var(--cv-tint-amber)',borderRadius:6,padding:'0.75rem'}}><p style={{fontWeight:700,color:C.amber,margin:'0 0 4px',fontSize:'1.01rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Why it matters</p><p style={{margin:0,fontSize:'1.07rem',color:C.slate}}>{comp.why_it_matters||'\u2014'}</p></div>
                   </div>
@@ -3244,7 +3253,7 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
                   <div style={{borderTop:`1px solid ${C.border}`,paddingTop:'0.75rem'}}>
                     <label style={{...lbl,color:C.teal}}>Evidence recorded</label>
                     <textarea style={{...inp,minHeight:80,resize:'vertical',background:'var(--cv-tint-actual)',border:`1px solid ${C.teal}`}} placeholder="Describe what was produced or done for this component..." value={comp.evidence_recorded||''} onChange={e=>onUpdateComp(comp.component_number,{evidence_recorded:e.target.value})}/>
-                    <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:'0.75rem',marginTop:'0.5rem'}}>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:'0.75rem',marginTop:'0.5rem'}}>
                       <div><label style={lbl}>Document link</label><input style={inp} value={comp.evidence_url||''} onChange={e=>onUpdateComp(comp.component_number,{evidence_url:e.target.value})} placeholder="https://..."/></div>
                       <div><label style={lbl}>Evidence reference</label><input style={inp} value={comp.evidence_ref||''} onChange={e=>onUpdateComp(comp.component_number,{evidence_ref:e.target.value})} placeholder="e.g. E-003"/></div>
                     </div>
@@ -3368,7 +3377,7 @@ function TabInterviewCapture({client,interviews,onAdd,onUpdate}){
             <div><label style={lbl}>Decision Point</label><select style={inp} value={form.dp_id} onChange={e=>setForm(f=>({...f,dp_id:e.target.value}))}><option value="">\u2014</option>{['dp02','dp03','dp05','dp07','dp08'].map(d=><option key={d} value={d}>{d}</option>)}</select></div>
           </div>
           <div><label style={lbl}>Key Quotes (verbatim)</label><textarea style={{...inp,minHeight:100,resize:'vertical'}} value={form.key_quotes} onChange={e=>setForm(f=>({...f,key_quotes:e.target.value}))} placeholder="Capture exactly what they said. Direct quotes are the most valuable evidence."/></div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.75rem'}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:'0.75rem'}}>
             <div><label style={lbl}>Observations</label><textarea style={{...inp,minHeight:70,resize:'vertical'}} value={form.observations} onChange={e=>setForm(f=>({...f,observations:e.target.value}))} placeholder="What did you notice beyond what was said?"/></div>
             <div><label style={lbl}>Follow-up needed</label><textarea style={{...inp,minHeight:70,resize:'vertical'}} value={form.follow_up} onChange={e=>setForm(f=>({...f,follow_up:e.target.value}))} placeholder="What needs to happen as a result of this conversation?"/></div>
           </div>
@@ -3465,7 +3474,7 @@ function TabPilotObservation({client,pilots,onAdd,onUpdate}){
             <div><label style={lbl}>Evidence reference</label><input style={inp} value={form.evidence_ref} onChange={e=>setForm(f=>({...f,evidence_ref:e.target.value}))} placeholder="e.g. E-012"/></div>
           </div>
           <div><label style={lbl}>Service delivered</label><textarea style={{...inp,minHeight:70,resize:'vertical'}} value={form.service_delivered} onChange={e=>setForm(f=>({...f,service_delivered:e.target.value}))} placeholder="Describe what was delivered in this session"/></div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.75rem'}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:'0.75rem'}}>
             <div><label style={lbl}>What went well</label><textarea style={{...inp,minHeight:70,resize:'vertical'}} value={form.went_well} onChange={e=>setForm(f=>({...f,went_well:e.target.value}))} placeholder="Be specific. What worked and why?"/></div>
             <div><label style={lbl}>What did not work</label><textarea style={{...inp,minHeight:70,resize:'vertical'}} value={form.did_not_work} onChange={e=>setForm(f=>({...f,did_not_work:e.target.value}))} placeholder="Be honest. What needs to change?"/></div>
           </div>
@@ -3482,7 +3491,7 @@ function TabPilotObservation({client,pilots,onAdd,onUpdate}){
           <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.5rem'}}><Badge text={`Iteration ${p.iteration}`} color={p.iteration===1?C.cyan:C.teal}/><span style={{fontSize:'1.01rem',color:C.slate}}>{p.date}</span></div>
           <p style={{fontWeight:600,color:C.navy,margin:'0 0 0.5rem'}}>{p.client_name}</p>
           <p style={{fontSize:'1.07rem',color:C.slate,margin:'0 0 0.75rem'}}>{p.service_delivered}</p>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.75rem',marginBottom:'0.75rem'}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:'0.75rem',marginBottom:'0.75rem'}}>
             <div style={{background:'var(--cv-tint-green)',borderRadius:5,padding:'0.75rem'}}><p style={{fontWeight:600,color:C.green,margin:'0 0 0.4rem',fontSize:'1.01rem'}}>Went well</p><p style={{margin:0,fontSize:'1.07rem',color:C.navy}}>{p.went_well}</p></div>
             <div style={{background:'var(--cv-tint-red)',borderRadius:5,padding:'0.75rem'}}><p style={{fontWeight:600,color:C.red,margin:'0 0 0.4rem',fontSize:'1.01rem'}}>Did not work</p><p style={{margin:0,fontSize:'1.07rem',color:C.navy}}>{p.did_not_work}</p></div>
           </div>

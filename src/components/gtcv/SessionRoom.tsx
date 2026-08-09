@@ -39,6 +39,7 @@ import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
 import { GATES } from '@/lib/gtcv-gates'
 import { promotionTargetFor } from '@/lib/session-promotion'
+import CopyLink from '@/components/common/CopyLink'
 
 const C = {
   white: 'var(--cv-card)', border: 'var(--cv-border)', navy: 'var(--cv-navy)',
@@ -184,12 +185,8 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
     setBusy(null)
   }
 
-  async function copy(token) {
-    try {
-      await navigator.clipboard.writeText(urlFor(token))
-      setNote('Link copied.')
-    } catch { setNote('Could not copy. Select the address below and copy it by hand.') }
-  }
+  // Copying now lives in CopyLink, which every sharing surface uses, so that
+  // getting a link onto a laptop works the same way wherever you are standing.
 
   if (loading) return <p style={hint}>Loading the room...</p>
 
@@ -270,14 +267,12 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
                   {l.expires_at ? ` · closes ${when(l.expires_at)}` : ''}
                   {l.last_accessed_at ? ` · last opened ${when(l.last_accessed_at)}` : ' · not opened yet'}
                 </div>
-                <div style={{
-                  ...mono, fontSize: '0.8rem', marginTop: '0.5rem', wordBreak: 'break-all',
-                  color: C.slate, background: 'var(--cv-bg-2)', border: `1px solid ${C.border}`,
-                  borderRadius: 6, padding: '0.4rem 0.5rem',
-                }}>{urlFor(l.access_token)}</div>
+                <div style={{ marginTop: '0.5rem' }}>
+                  <CopyLink url={urlFor(l.access_token)}
+                    hint="Scanning the code puts this on a phone. Anybody who would rather work on their laptop can copy or type this address instead." />
+                </div>
                 {canManage ? (
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
-                    <button type="button" style={ghost} onClick={() => copy(l.access_token)}>Copy the link</button>
                     <button type="button" style={{ ...ghost, color: C.red }} disabled={busy === `close:${l.id}`}
                       onClick={() => close(l.id)}>{busy === `close:${l.id}` ? 'Closing...' : 'Close it'}</button>
                   </div>
