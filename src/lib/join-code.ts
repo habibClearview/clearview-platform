@@ -70,8 +70,9 @@ export function normaliseJoinCode(input: string | null | undefined): string | nu
   if (typeof input !== 'string') return null
   const cleaned = input.toUpperCase().replace(/[^0-9A-Z]/g, '')
   if (cleaned.length !== JOIN_CODE_LENGTH) return null
-  for (const ch of cleaned) {
-    if (!JOIN_ALPHABET.includes(ch)) return null
+  // Indexed rather than for...of, for the same reason as in makeJoinCode below.
+  for (let i = 0; i < cleaned.length; i++) {
+    if (!JOIN_ALPHABET.includes(cleaned[i])) return null
   }
   return cleaned
 }
@@ -99,7 +100,13 @@ export function makeJoinCode(randomValues: (n: number) => Uint8Array): string {
   while (out.length < JOIN_CODE_LENGTH) {
     if (++guard > 1000) throw new Error('join code: the random source is not returning usable bytes')
     const bytes = randomValues(JOIN_CODE_LENGTH)
-    for (const b of bytes) {
+    // Indexed rather than for...of. This project compiles to a JavaScript
+    // version older than the one where walking a byte array that way became
+    // ordinary, and the build refuses it. Caught by the build rather than by
+    // the tests, because the tests run the source directly and never see the
+    // setting the application is compiled under.
+    for (let i = 0; i < bytes.length; i++) {
+      const b = bytes[i]
       if (b >= limit) continue
       out += JOIN_ALPHABET[b % JOIN_ALPHABET.length]
       if (out.length === JOIN_CODE_LENGTH) break

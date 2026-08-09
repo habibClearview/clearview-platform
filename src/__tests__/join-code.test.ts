@@ -62,7 +62,7 @@ describe('the code the room types', () => {
     for (let i = 0; i < 400; i++) {
       for (const ch of makeJoinCode(everyByte)) counts.set(ch, (counts.get(ch) || 0) + 1)
     }
-    const seen = [...counts.values()]
+    const seen = Array.from(counts.values())
     const most = Math.max(...seen)
     const fewest = Math.min(...seen)
     // Every character appears, and none appears twice as often as another.
