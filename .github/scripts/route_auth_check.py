@@ -48,7 +48,15 @@ AUTH = re.compile(
     # loadSessionLink resolves a scoped, expiring session token server side and
     # returns null for every failure. It is the authorisation for the one route
     # that accepts writing without a login.
-    r"loadSessionLink|loadShowcaseView"
+    #
+    # resolveJoinCode is its sibling, in the same file and written to the same
+    # rule: it turns a short code the room typed into the same grant, checking
+    # shape, type, block, withdrawal and expiry, and answering null for every
+    # failure. It is deliberately weaker on its own than a long token, so the
+    # route that uses it must rate limit before reaching it. That is not
+    # something this gate can see, and it is stated here so the next person to
+    # add a caller knows it is required rather than optional.
+    r"loadSessionLink|resolveJoinCode|loadShowcaseView"
 )
 
 

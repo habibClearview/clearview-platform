@@ -289,6 +289,30 @@ async function main() {
   const link = post('/api/session-link', { clientId: CLIENT_ID, dpId: 'dp02', label: 'Smoke room' })
   expectStatus('open a block to the room', link, 200)
   const sessionToken = link.json?.link?.access_token
+
+  // ── the code somebody types instead of the long address ──
+  const joinCode = link.json?.link?.join_code
+  check('opening a block gives out a code the room can type',
+    typeof joinCode === 'string' && /^[23456789ACDEFHJKMNPQRTUVWXY]{8}$/.test(joinCode),
+    `got ${JSON.stringify(joinCode)}`)
+  if (joinCode) {
+    const joined = http('GET', `${BASE}/api/session-join?code=${joinCode}`, {})
+    check('the code opens the same session as the link',
+      joined.status === 200 && joined.json?.token === sessionToken,
+      `got ${joined.status}, token ${joined.json?.token === sessionToken ? 'matches' : 'does not match'}`)
+    // Case and the dash are noise: a code said out loud is written down with
+    // one and phone keyboards capitalise whatever they like.
+    const messy = `${joinCode.slice(0, 4)}-${joinCode.slice(4)}`.toLowerCase()
+    const joinedMessy = http('GET', `${BASE}/api/session-join?code=${encodeURIComponent(messy)}`, {})
+    check('lower case and a dash still find it',
+      joinedMessy.status === 200 && joinedMessy.json?.token === sessionToken,
+      `got ${joinedMessy.status} for ${messy}`)
+    // A misread character must open nothing rather than something else.
+    expectStatus('a code with a character the alphabet leaves out is refused',
+      http('GET', `${BASE}/api/session-join?code=O${joinCode.slice(1)}`, {}), 404)
+    expectStatus('a made up code is refused',
+      http('GET', `${BASE}/api/session-join?code=ACDEFHJK`, {}), [404, 429])
+  }
   if (sessionToken) {
     const added = http('POST', `${BASE}/api/session-capture`, {
       headers: { 'Content-Type': 'application/json' },

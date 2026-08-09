@@ -24,6 +24,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 import { GATE_IDS } from '@/lib/gtcv-gates'
 import { SESSION_GRANT_TYPE } from '@/lib/session-link'
+import { makeJoinCode } from '@/lib/join-code'
 
 const DEFAULT_HOURS = 12
 const MAX_HOURS = 24 * 7
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
 
     const { data } = await admin
       .from('client_access_grants')
-      .select('id, grantee_name, access_token, scope_dp_id, scope_session_id, created_at, expires_at, revoked_at, last_accessed_at')
+      .select('id, grantee_name, access_token, join_code, scope_dp_id, scope_session_id, created_at, expires_at, revoked_at, last_accessed_at')
       .eq('client_id', clientId)
       .eq('grant_type', SESSION_GRANT_TYPE)
       .order('created_at', { ascending: false })
@@ -91,22 +92,44 @@ export async function POST(req: NextRequest) {
       : DEFAULT_HOURS
     const expiresAt = new Date(Date.now() + hours * 3600 * 1000).toISOString()
 
-    const { data, error } = await admin
-      .from('client_access_grants')
-      .insert({
-        client_id: clientId,
-        grantee_name: (body.label || '').trim().slice(0, 120) || 'Working session',
-        grant_type: SESSION_GRANT_TYPE,
-        access_token: randomBytes(32).toString('hex'),
-        scope_dp_id: body.dpId,
-        scope_session_id: body.sessionId || null,
-        expires_at: expiresAt,
-        granted_by: auth.userId,
-      })
-      .select('id, access_token, expires_at, scope_dp_id, scope_session_id, grantee_name')
-      .single()
+    // A short code alongside the long link, because a QR code only ever puts a
+    // link on a phone and nobody types sixty random characters into a laptop.
+    // The database refuses two open links sharing a code, so a collision is a
+    // failed insert rather than a room landing in the wrong session. Rare
+    // enough that a few tries is the whole handling, and a session that cannot
+    // get a code still opens: the link has always been the way in, and losing
+    // the convenience is not a reason to lose the session.
+    const base = {
+      client_id: clientId,
+      grantee_name: (body.label || '').trim().slice(0, 120) || 'Working session',
+      grant_type: SESSION_GRANT_TYPE,
+      access_token: randomBytes(32).toString('hex'),
+      scope_dp_id: body.dpId,
+      scope_session_id: body.sessionId || null,
+      expires_at: expiresAt,
+      granted_by: auth.userId,
+    }
+    const columns = 'id, access_token, join_code, expires_at, scope_dp_id, scope_session_id, grantee_name'
 
-    if (error) {
+    let data = null
+    let error = null
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const joinCode = attempt < 4
+        ? makeJoinCode((n) => new Uint8Array(randomBytes(n)))
+        : null
+      const result = await admin
+        .from('client_access_grants')
+        .insert({ ...base, join_code: joinCode })
+        .select(columns)
+        .single()
+      if (!result.error) { data = result.data; error = null; break }
+      error = result.error
+      // 23505 is the database refusing a duplicate. Anything else is a real
+      // failure and trying again would only repeat it.
+      if (result.error.code !== '23505') break
+    }
+
+    if (error || !data) {
       console.error('session-link POST: write failed', error)
       return NextResponse.json({ error: 'Could not open the session' }, { status: 500 })
     }

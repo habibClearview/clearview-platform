@@ -40,6 +40,7 @@ import { supabase } from '@/lib/supabase'
 import { GATES } from '@/lib/gtcv-gates'
 import { promotionTargetFor } from '@/lib/session-promotion'
 import CopyLink from '@/components/common/CopyLink'
+import { formatJoinCode } from '@/lib/join-code'
 
 const C = {
   white: 'var(--cv-card)', border: 'var(--cv-border)', navy: 'var(--cv-navy)',
@@ -267,9 +268,26 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
                   {l.expires_at ? ` · closes ${when(l.expires_at)}` : ''}
                   {l.last_accessed_at ? ` · last opened ${when(l.last_accessed_at)}` : ' · not opened yet'}
                 </div>
-                <div style={{ marginTop: '0.5rem' }}>
+                {l.join_code ? (
+                  <div style={{
+                    marginTop: '0.6rem', padding: '0.6rem 0.75rem', borderRadius: 9,
+                    background: 'var(--cv-bg-2)', border: `1px solid ${C.border}`,
+                  }}>
+                    <div style={{ ...label, marginBottom: '0.25rem' }}>Put this on the screen</div>
+                    <div style={{
+                      ...mono, fontSize: '1.45rem', fontWeight: 700, letterSpacing: '.16em',
+                      color: C.navy,
+                    }}>{formatJoinCode(l.join_code)}</div>
+                    <div style={{ ...hint, fontSize: '0.85rem', marginTop: '0.3rem' }}>
+                      They go to <strong style={{ ...mono, color: C.navy }}>{origin.replace(/^https?:\/\//, '')}/join</strong>{' '}
+                      and type it. No account, nothing to install.
+                    </div>
+                  </div>
+                ) : null}
+
+                <div style={{ marginTop: '0.6rem' }}>
                   <CopyLink url={urlFor(l.access_token)}
-                    hint="Scanning the code puts this on a phone. Anybody who would rather work on their laptop can copy or type this address instead." />
+                    hint="The long way in, for sending to somebody who is not in the room." />
                 </div>
                 {canManage ? (
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>

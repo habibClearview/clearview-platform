@@ -22,6 +22,7 @@
 // ============================================================
 import { createClient } from '@supabase/supabase-js'
 import { gateLabel } from '@/lib/gtcv-gates'
+import { normaliseJoinCode } from '@/lib/join-code'
 
 /** The grant type that marks a link as a session capture link. */
 export const SESSION_GRANT_TYPE = 'gtcv_session'
@@ -105,4 +106,49 @@ export async function loadSessionLink(token: string): Promise<SessionLinkView | 
     sessionPurpose: ownSession?.purpose ?? null,
     expiresAt: grant.expires_at ?? null,
   }
+}
+
+/**
+ * Turn a code somebody typed into the session token it stands for.
+ *
+ * WHY THIS SITS HERE rather than in the route. It is the same job as
+ * loadSessionLink: take something a stranger handed us and decide, carefully
+ * and with one answer for every failure, what it opens. Both belong in the one
+ * file that is written to be read that way, so a change to how a session is
+ * resolved cannot be made in one place and forgotten in the other.
+ *
+ * THE CODE IS THE AUTHORISATION, and it is a weak one on its own, so it is
+ * never the whole story. The caller must rate limit before this is reached; a
+ * short code with no ceiling on attempts is a code that gets guessed. The route
+ * that calls this does both, and says so.
+ *
+ * WHAT IT RETURNS. The long token, or null. Never the engagement, never the
+ * block, never the organisation. Somebody who guessed a code should learn
+ * nothing from this answer that they did not already have; what the session
+ * actually is comes from loadSessionLink afterwards, on the page itself.
+ */
+export async function resolveJoinCode(code: string | null | undefined): Promise<string | null> {
+  const clean = normaliseJoinCode(code)
+  if (!clean) return null
+
+  const admin = getAdminClient()
+  const { data: grant, error } = await admin
+    .from('client_access_grants')
+    .select('access_token, grant_type, expires_at, revoked_at, scope_dp_id')
+    .eq('join_code', clean)
+    .is('revoked_at', null)
+    .maybeSingle()
+
+  if (error) {
+    console.error('resolveJoinCode: lookup failed', error)
+    return null
+  }
+  if (!grant) return null
+  if (grant.grant_type !== SESSION_GRANT_TYPE) return null
+  // A session link with no block is not a session link, the same rule the
+  // token path applies.
+  if (!grant.scope_dp_id) return null
+  if (grant.expires_at && new Date(grant.expires_at).getTime() <= Date.now()) return null
+
+  return grant.access_token ?? null
 }
