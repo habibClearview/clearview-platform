@@ -1,23 +1,31 @@
 // ============================================================
 // THE SERVICES, AND WHICH WORK BELONGS TO WHICH
 //
-// WHY THIS EXISTS. An organisation sells several services, and each is a
-// portfolio of activities. DP04 asks whether the numbers hold and DP05 asks
-// how it goes to market, and both of those questions are asked OF A SERVICE.
-// Until now neither screen could say which service a line belonged to, so a
-// break-even was the organisation's break-even rather than the service's.
+// WHY THIS EXISTS. DP04 asks whether the numbers hold and DP05 asks how it
+// goes to market, and both of those questions are asked OF A SERVICE. Neither
+// screen could say which service a line belonged to, so a break-even was the
+// organisation's break-even rather than the service's.
 //
-// THE SPINE IS THE SERVICE INVENTORY. gtcv_service_inventory holds the
-// services in the organisation's own words, which is the earliest point a
-// service exists and the thing a room recognises. A DP03 proposition is what
-// one service becomes for one segment, so it points at a service rather than
-// being one.
+// TWO LISTS OF SERVICES, AND THEY ARE NOT THE SAME LIST.
 //
-// NAMING. A service row can be part-filled, because it is created live in a
-// session. The name falls back through what the organisation called it, then
-// what it delivers, then its position, so a row someone has only just added is
-// still selectable. Every screen derives it here, so the same service cannot
-// appear under two names on two tabs.
+//   The inventory (gtcv_service_inventory) is what the organisation delivers
+//   TODAY, most of it on grant logic. Clearing the ground and DP01 work on
+//   this: the portfolio of activities under each service the programme
+//   currently pays for.
+//
+//   The propositions (gtcv_propositions) are the NEW services. A value
+//   proposition is the commercial offer the organisation intends to sell, and
+//   DP04 builds the financial model for those, not for the inventory. Costing
+//   the inventory would model the thing the engagement exists to move away
+//   from.
+//
+// Both are offered through the same picker, so this module normalises either
+// into one shape and derives the name the same way for both. A screen chooses
+// which list it is working from; it does not choose how a service is named.
+//
+// NAMING. A row can be part-filled, because it is created live in a session.
+// The name falls back through what it was called, then what it delivers, then
+// its position, so a row somebody has only just added is still selectable.
 //
 // SHARED WORK IS NOT A FAILURE TO ANSWER. A cost that genuinely sits across
 // every service, an office or a finance lead, belongs to no single service and
@@ -25,12 +33,49 @@
 // shared, and it is counted separately rather than hidden.
 // ============================================================
 
-/** The fields of a service inventory row this module needs. */
+/** A service, normalised from whichever list it came from. */
 export interface ServiceLike {
   id: string
   service_name?: string | null
   what_it_delivers?: string | null
   sort_order?: number | null
+}
+
+/** A row of gtcv_service_inventory: what is delivered today. */
+export interface InventoryRow {
+  id: string
+  service_name?: string | null
+  what_it_delivers?: string | null
+}
+
+/** A row of gtcv_propositions: a new service the organisation will sell. */
+export interface PropositionRow {
+  id: string
+  segment_label?: string | null
+  capability?: string | null
+  assembled_statement?: string | null
+}
+
+/** The services delivered today, for Phase 0 and DP01. */
+export function servicesFromInventory(rows: InventoryRow[]): ServiceLike[] {
+  return rows.map((r) => ({
+    id: r.id,
+    service_name: r.service_name,
+    what_it_delivers: r.what_it_delivers,
+  }))
+}
+
+/**
+ * The new services, for DP04 and DP05. A proposition has no name of its own,
+ * so the segment it is aimed at is the name a room recognises, and what the
+ * organisation can do is the fallback.
+ */
+export function servicesFromPropositions(rows: PropositionRow[]): ServiceLike[] {
+  return rows.map((r) => ({
+    id: r.id,
+    service_name: r.segment_label,
+    what_it_delivers: r.capability || r.assembled_statement,
+  }))
 }
 
 /** A service, as offered in a picker. */
@@ -92,12 +137,16 @@ export interface ServiceGroup<T> {
 
 /**
  * Rows arranged by the service they belong to, in the order the services are
- * held, with shared work last. Every service appears even when it has no
- * rows yet, because an empty costing for a service that exists is the finding.
+ * held, with shared work last. Every service appears even when it has no rows
+ * yet, because an empty costing for a service that exists is the finding.
+ *
+ * The key is named rather than assumed: DP04 and DP05 rows carry
+ * proposition_id, Phase 0 rows carry service_id, and they are different lists.
  */
-export function groupByService<T extends { service_id?: string | null }>(
+export function groupByService<T extends Record<string, any>>(
   rows: T[],
   services: ServiceLike[],
+  key: string = 'service_id',
 ): ServiceGroup<T>[] {
   const groups: ServiceGroup<T>[] = services.map((s, i) => ({
     id: s.id,
@@ -109,7 +158,7 @@ export function groupByService<T extends { service_id?: string | null }>(
   const orphaned: T[] = []
 
   for (const row of rows) {
-    const id = row.service_id || null
+    const id = row[key] || null
     if (!id) { shared.push(row); continue }
     const group = known.get(id)
     if (group) group.rows.push(row)

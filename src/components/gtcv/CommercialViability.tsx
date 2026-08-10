@@ -38,7 +38,7 @@
 // ============================================================
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { serviceOptions, serviceLabelFor, SHARED_SERVICE_LABEL } from '@/lib/gtcv-services'
+import { serviceOptions, serviceLabelFor, servicesFromPropositions, SHARED_SERVICE_LABEL } from '@/lib/gtcv-services'
 import {
   buildViability,
   formatAmount,
@@ -53,7 +53,7 @@ const T_COST = 'gtcv_cost_lines'
 const T_TIERS = 'gtcv_pricing_tiers'
 const T_MARKET = 'gtcv_market_prices'
 const T_FIXED = 'gtcv_fixed_costs'
-const T_SERVICES = 'gtcv_service_inventory'
+const T_PROPS = 'gtcv_propositions'
 
 // ─── design tokens (mirror the coach dashboard) ──────────────
 const C = {
@@ -110,8 +110,10 @@ export default function CommercialViability({ clientId, canManage, currency }) {
   const [tiers, setTiers] = useState([])
   const [market, setMarket] = useState([])
   const [fixed, setFixed] = useState([])
-  // The services, from the DP01 inventory. Read only here: DP04 costs them, it
-  // does not define them.
+  // The new services, from DP03. A value proposition is the service the
+  // organisation intends to sell, and DP04 builds the financial model for
+  // those rather than for the inventory it is moving away from. Read only
+  // here: DP04 costs them, it does not define them.
   const [servicesRows, setServicesRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [save, setSave] = useState(null)
@@ -135,7 +137,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
         order(supabase.from(T_TIERS).select('*')),
         order(supabase.from(T_MARKET).select('*')),
         order(supabase.from(T_FIXED).select('*')),
-        order(supabase.from(T_SERVICES).select('id, service_name, what_it_delivers, sort_order')),
+        order(supabase.from(T_PROPS).select('id, segment_label, capability, assembled_statement, sort_order')),
       ])
       // A failure to read the services is not a reason to refuse the cost
       // model: the numbers are still right, they just cannot be attributed. It
@@ -215,7 +217,8 @@ export default function CommercialViability({ clientId, canManage, currency }) {
 
   // A text input that edits locally as you type and saves on blur, so typing
   // never lags behind the keyboard.
-  const services = useMemo(() => serviceOptions(servicesRows), [servicesRows])
+  const serviceList = useMemo(() => servicesFromPropositions(servicesRows), [servicesRows])
+  const services = useMemo(() => serviceOptions(serviceList), [serviceList])
 
   const textCell = (table, row, field, placeholder) => (
     canManage
@@ -233,24 +236,24 @@ export default function CommercialViability({ clientId, canManage, currency }) {
       : <span style={mono}>{orDash(row[field], render || money)}</span>
   )
 
-  // Which service this line is for. DP04 asks whether a service sustains the
-  // organisation, and that question cannot be answered by a cost model that
-  // does not know which service a cost belongs to. Blank stays available and
-  // means shared across services, which is the honest answer for an office or
-  // a finance lead rather than a gap to be filled in.
+  // Which new service this line is for. DP04 asks whether a service sustains
+  // the organisation, and that cannot be answered by a cost model that does not
+  // know which service a cost belongs to. Blank stays available and means
+  // shared across services, which is the honest answer for an office or a
+  // finance lead rather than a gap to be filled in.
   const serviceCell = (table, row) => {
     if (!canManage) {
-      return <span style={{ fontSize: '0.86rem' }}>{serviceLabelFor(servicesRows, row.service_id)}</span>
+      return <span style={{ fontSize: '0.86rem' }}>{serviceLabelFor(serviceList, row.proposition_id)}</span>
     }
     return (
       <select
         aria-label="Which service this line is for"
         style={inp}
-        value={row.service_id || ''}
+        value={row.proposition_id || ''}
         onChange={(e) => {
           const v = e.target.value || null
-          edit(table, row.id, 'service_id', v)
-          commit(table, row.id, { service_id: v })
+          edit(table, row.id, 'proposition_id', v)
+          commit(table, row.id, { proposition_id: v })
         }}
       >
         <option value="">{SHARED_SERVICE_LABEL}</option>

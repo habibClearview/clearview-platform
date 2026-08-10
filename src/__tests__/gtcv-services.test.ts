@@ -1,15 +1,16 @@
 // ============================================================
 // Which service does this line belong to?
 //
-// The cases that matter are the awkward ones: a proposition with no segment
-// yet, a cost that is genuinely shared, and a line still pointing at a
-// proposition that has been deleted. The last one is the reason
-// serviceLabelFor does not simply fall back to "shared": a costing attached to
-// something that no longer exists is a finding, not a tidy default.
+// The cases that matter are the awkward ones: a row with no name yet, a cost
+// that is genuinely shared, and a line still pointing at a service that has
+// been removed. The last one is the reason serviceLabelFor does not simply
+// fall back to "shared": a costing attached to something that no longer exists
+// is a finding, not a tidy default.
 // ============================================================
 import { describe, it, expect } from 'vitest'
 import {
   serviceName, serviceOptions, serviceLabelFor, groupByService, SHARED_SERVICE_LABEL,
+  servicesFromInventory, servicesFromPropositions,
 } from '@/lib/gtcv-services'
 
 const props = [
@@ -120,5 +121,41 @@ describe('grouping work by service', () => {
     const groups = groupByService([], props)
     expect(groups.map((g) => g.id)).toEqual(['p1', 'p2', 'p3'])
     expect(groups.every((g) => g.rows.length === 0)).toBe(true)
+  })
+})
+
+describe('the two lists of services', () => {
+  // The inventory is what is delivered today; the propositions are the new
+  // services DP04 costs. Both feed the same picker, so both have to normalise
+  // to the same shape and be named by the same rule.
+  it('normalises an inventory row', () => {
+    const [s] = servicesFromInventory([
+      { id: 'i1', service_name: 'Gender advisory', what_it_delivers: 'Advice to programmes' },
+    ])
+    expect(serviceName(s, 0)).toBe('Gender advisory')
+  })
+
+  it('normalises a proposition, naming it by the segment it is aimed at', () => {
+    const [s] = servicesFromPropositions([
+      { id: 'v1', segment_label: 'Commercial seed companies', capability: 'Agronomy training' },
+    ])
+    expect(serviceName(s, 0)).toBe('Commercial seed companies')
+  })
+
+  it('falls back through capability, then the assembled statement', () => {
+    const [a, b] = servicesFromPropositions([
+      { id: 'v1', segment_label: '', capability: 'Agronomy training' },
+      { id: 'v2', segment_label: '', capability: '', assembled_statement: 'We help seed companies reach smallholders' },
+    ])
+    expect(serviceName(a, 0)).toBe('Agronomy training')
+    expect(serviceName(b, 1)).toBe('We help seed companies reach smallholders')
+  })
+
+  it('groups DP04 rows by proposition, not by inventory service', () => {
+    const services = servicesFromPropositions([{ id: 'v1', segment_label: 'Seed companies' }])
+    const costs = [{ id: 'c1', proposition_id: 'v1' }, { id: 'c2', proposition_id: null }]
+    const groups = groupByService(costs, services, 'proposition_id')
+    expect(groups[0].rows.map((r) => r.id)).toEqual(['c1'])
+    expect(groups[groups.length - 1].label).toBe(SHARED_SERVICE_LABEL)
   })
 })
