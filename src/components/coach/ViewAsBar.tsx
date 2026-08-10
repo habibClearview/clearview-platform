@@ -25,6 +25,7 @@
 // the session whatever the screen is showing, which is why this is safe to
 // leave switched on while you work.
 // ============================================================
+import { useState } from 'react'
 import { PREVIEW_ROLES, capabilitiesFor, previewRole } from '@/lib/role-preview'
 
 const C = {
@@ -36,6 +37,13 @@ const mono = { fontFamily: 'monospace' }
 const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
 
 export default function ViewAsBar({ realRole, viewingAs, onChange }) {
+  // The detail is shut by default. This bar renders above the tab strip, so it
+  // is on every tab: six Yes/No lines and two paragraphs of explanation on
+  // every page is a wall of text in front of the work, and after the first
+  // read it says nothing new. What has to stay visible is the control itself,
+  // and the warning when you are looking through someone else's eyes, because
+  // that changes what you are seeing and what your saves will do.
+  const [open, setOpen] = useState(false)
   const previewing = viewingAs && viewingAs !== realRole
   const role = previewRole(viewingAs || realRole)
   const caps = capabilitiesFor(viewingAs || realRole)
@@ -44,14 +52,9 @@ export default function ViewAsBar({ realRole, viewingAs, onChange }) {
     <div style={{
       border: `1px solid ${previewing ? C.amber : C.border}`,
       borderLeft: `4px solid ${previewing ? C.amber : C.border}`,
-      borderRadius: 12, background: C.card, padding: '0.85rem 1.05rem', marginBottom: '1.1rem',
+      borderRadius: 12, background: C.card, padding: '0.6rem 1.05rem', marginBottom: '1.1rem',
     }}>
-      <div style={{ display: 'flex', gap: '0.9rem', alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{
-          ...mono, fontSize: '0.7rem', letterSpacing: '.12em', textTransform: 'uppercase',
-          color: previewing ? C.amber : C.slate,
-        }}>{previewing ? 'You are looking through someone else’s eyes' : 'Looking through'}</span>
-
+      <div style={{ display: 'flex', gap: '0.7rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <label htmlFor="view-as" style={{ ...mono, fontSize: '0.7rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
           View as
         </label>
@@ -69,50 +72,64 @@ export default function ViewAsBar({ realRole, viewingAs, onChange }) {
           ))}
         </select>
 
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-label={open ? 'Hide what this role can do' : 'What this role can do'}
+          style={{
+            ...mono, width: 18, height: 18, lineHeight: '16px', padding: 0, borderRadius: '50%',
+            border: `1px solid ${C.slate}`, background: open ? C.slate : 'transparent',
+            color: open ? C.card : C.slate, fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >i</button>
+
         {previewing ? (
-          <button
-            type="button"
-            onClick={() => onChange(realRole)}
-            style={{
-              ...mono, fontSize: '0.85rem', fontWeight: 700, padding: '0.35rem 0.9rem', border: 'none',
-              borderRadius: 7, background: C.amber, color: 'var(--cv-on-accent)', cursor: 'pointer',
-            }}
-          >Back to your own view</button>
+          <>
+            <span style={{ ...hint, color: C.amber, fontSize: '0.85rem' }}>
+              You are seeing their screen. Anything you save is still saved as you.
+            </span>
+            <button
+              type="button"
+              onClick={() => onChange(realRole)}
+              style={{
+                ...mono, fontSize: '0.85rem', fontWeight: 700, padding: '0.35rem 0.9rem', border: 'none',
+                borderRadius: 7, background: C.amber, color: 'var(--cv-on-accent)', cursor: 'pointer',
+              }}
+            >Back to your own view</button>
+          </>
         ) : null}
       </div>
 
-      {role ? (
-        <p style={{ ...hint, margin: '0.6rem 0 0', maxWidth: '92ch' }}>
-          <strong style={{ color: C.navy }}>{role.who}</strong> {role.reach}
-        </p>
-      ) : null}
+      {open ? (
+        <>
+          {role ? (
+            <p style={{ ...hint, margin: '0.6rem 0 0', maxWidth: '78ch' }}>
+              <strong style={{ color: C.navy }}>{role.who}</strong> {role.reach}
+            </p>
+          ) : null}
 
-      {role?.unreachable ? (
-        <p style={{ ...hint, margin: '0.45rem 0 0', color: C.amber, maxWidth: '92ch' }}>
-          Nobody can hold this role today, so switching to it shows you what the screen would give
-          them if they could log in. What a funder actually gets is the showcase link, on the
-          Engagement Setup screen.
-        </p>
-      ) : null}
+          {role?.unreachable ? (
+            <p style={{ ...hint, margin: '0.45rem 0 0', color: C.amber, maxWidth: '78ch' }}>
+              Nobody can hold this role today, so switching to it shows you what the screen would give
+              them if they could log in. What a funder actually gets is the showcase link, on the
+              Engagement Setup screen.
+            </p>
+          ) : null}
 
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(230px,1fr))',
-        gap: '0.35rem 1.1rem', marginTop: '0.7rem',
-      }}>
-        {caps.map((c) => (
-          <div key={c.what} style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline', fontSize: '0.9rem' }}>
-            <span style={{ color: c.allowed ? C.green : C.red, fontWeight: 700 }}>{c.allowed ? 'Yes' : 'No'}</span>
-            <span style={{ color: C.slate }}>{c.what}</span>
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(230px,1fr))',
+            gap: '0.35rem 1.1rem', marginTop: '0.6rem',
+          }}>
+            {caps.map((c) => (
+              <div key={c.what} style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline', fontSize: '0.9rem' }}>
+                <span style={{ color: c.allowed ? C.green : C.red, fontWeight: 700 }}>{c.allowed ? 'Yes' : 'No'}</span>
+                <span style={{ color: C.slate }}>{c.what}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-
-      {previewing ? (
-        <p style={{ ...hint, margin: '0.7rem 0 0', maxWidth: '92ch' }}>
-          This is the screen they get. It is not proof of what the database would hand them, because
-          what is on this page was loaded with your access. Anything you save while previewing is
-          still saved as you.
-        </p>
+        </>
       ) : null}
     </div>
   )
