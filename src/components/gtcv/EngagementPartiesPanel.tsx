@@ -33,7 +33,10 @@ const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace
 const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.45 }
 const field = {
   width: '100%', padding: '0.42rem 0.55rem', borderRadius: 7,
-  border: `1px solid ${C.border}`, background: 'transparent', color: 'inherit',
+  // An explicit background, so a box reads as a box. On a transparent fill the
+  // border alone was faint enough that the placeholder looked like body text
+  // and the field looked like a caption rather than something to type in.
+  border: `1px solid ${C.border}`, background: 'var(--cv-card)', color: 'inherit',
   fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: '0.92rem',
 }
 const btn = (col, solid) => ({
@@ -274,15 +277,18 @@ function PartyFields({ value, onChange }) {
       </div>
       <div>
         <label style={lab}>Job title</label>
-        <input aria-label="As it appears on the Charter" style={field} value={value.title || ''} onChange={set('title')} placeholder="As it appears on the Charter" />
+        <input aria-label="Job title" style={field} value={value.title || ''} onChange={set('title')} placeholder="Executive Director" />
       </div>
       <div>
         <label style={lab}>Organisation</label>
         <input aria-label="Organisation" style={field} value={value.organisation || ''} onChange={set('organisation')} />
       </div>
       <div>
+        {/* The placeholder shows the shape of an address. It used to carry the
+            hint instead, which made the field read as a sentence of guidance
+            and left people looking for a box that was already there. */}
         <label style={lab}>Email they log in with</label>
-        <input aria-label="Leave blank if they have no account" style={field} type="email" value={value.email || ''} onChange={set('email')} placeholder="Leave blank if they have no account" />
+        <input aria-label="Email they log in with" style={field} type="email" value={value.email || ''} onChange={set('email')} placeholder="name@organisation.org" />
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 4 }}>
         <label style={{ ...hint, display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer' }}>

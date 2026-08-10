@@ -21,7 +21,6 @@ import DeliverablesPanel from '@/components/gtcv/DeliverablesPanel'
 import HandoverIndependence from '@/components/gtcv/HandoverIndependence'
 import InterviewReporting from '@/components/gtcv/InterviewReporting'
 import EngagementPartiesPanel from '@/components/gtcv/EngagementPartiesPanel'
-import ShowcaseSharing from '@/components/gtcv/ShowcaseSharing'
 import EngagementSettings from '@/components/gtcv/EngagementSettings'
 import WhatNeedsYou from '@/components/gtcv/WhatNeedsYou'
 import EvidenceLibraryPanel from '@/components/gtcv/EvidenceLibraryPanel'
@@ -2193,7 +2192,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             onCancel={()=>setShowEditClient(false)}
           />
         )}
-        {isSuperCoach&&<ClientTeamInvite client={selClient}/>}
+        {/* Client team & logins used to render here, above the tab strip, so it
+            sat at the top of every tab on a canvas engagement. It belongs with
+            the rest of the setup, and now renders inside that tab only. */}
 
         {/* See exactly what each person sees when they sign in.
             This existed and was only rendered on the financial dashboard, so on
@@ -2276,7 +2277,11 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             {activeTab==='how_to_start'&&<TabHowToStart client={selClient}/>}
             {activeTab==='coach_ref'&&canViewCoachGuidance(previewRoleId)&&<CoachQuickReference showGuidance={canViewCoachGuidance(previewRoleId)}/>}
             {activeTab==='ip_framework'&&<TabIPFramework/>}
-            {activeTab==='eng_setup'&&<><EngagementPartiesPanel clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><ShowcaseSharing clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><EngagementSettings clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
+            {/* Setup, in the order it is done: who is on the engagement, their
+                logins, then how the engagement runs. Sharing a canvas with a
+                prospect is selling, not delivery, so it is not on a client's
+                page; it moves to the coach side. */}
+            {activeTab==='eng_setup'&&<><EngagementPartiesPanel clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/>{isSuperCoach&&<><ClientTeamInvite client={selClient}/><div style={{height:22}}/></>}<EngagementSettings clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
             {activeTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
             {activeTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={previewRoleId} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
             {activeTab==='sessions'&&<><SessionRoom clientId={selClient.id} canManage={canEdit(previewRoleId)} sessions={clientSessions}/><div style={{height:22}}/><SessionPlanner clientId={selClient.id} canManage={canEdit(previewRoleId)}/></>}

@@ -278,16 +278,20 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
                       ...mono, fontSize: '1.45rem', fontWeight: 700, letterSpacing: '.16em',
                       color: C.navy,
                     }}>{formatJoinCode(l.join_code)}</div>
+                    {/* Numbered, because the code is the biggest thing on the
+                        card and reads as the address to visit. It is not: the
+                        address is /join, and the code goes in the box there. */}
                     <div style={{ ...hint, fontSize: '0.85rem', marginTop: '0.3rem' }}>
-                      They go to <strong style={{ ...mono, color: C.navy }}>{origin.replace(/^https?:\/\//, '')}/join</strong>{' '}
-                      and type it. No account, nothing to install.
+                      1. Open <strong style={{ ...mono, color: C.navy }}>{origin.replace(/^https?:\/\//, '')}/join</strong> in a browser.
+                      <br />
+                      2. Type the code above into the box on that page.
                     </div>
                   </div>
                 ) : null}
 
                 <div style={{ marginTop: '0.6rem' }}>
                   <CopyLink url={urlFor(l.access_token)}
-                    hint="The long way in, for sending to somebody who is not in the room." />
+                    hint="Send this link to somebody who is not in the room. It opens the same session." />
                 </div>
                 {canManage ? (
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
@@ -304,7 +308,7 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
       <div style={{ marginTop: '1.4rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.8rem', flexWrap: 'wrap' }}>
           <div style={{ ...mono, fontSize: '0.72rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
-            What the rooms have added
+            What people typed in the room
           </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button type="button" style={ghost} onClick={load}>Refresh</button>
@@ -319,8 +323,8 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
         {shown.length === 0 ? (
           <p style={{ ...hint, marginTop: '0.7rem' }}>
             {contributions.length === 0
-              ? 'Nothing yet. Open a block to the room and it will appear here as people type.'
-              : 'Everything the rooms have added has been used.'}
+              ? 'Nothing yet. Open a block to the room, and what people type appears here.'
+              : 'Everything typed in the room has been used.'}
           </p>
         ) : shown.map((c) => (
           <div key={c.id} style={{
@@ -362,16 +366,14 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
           </div>
         ))}
 
-        <p style={{ ...hint, marginTop: '0.9rem', maxWidth: '92ch' }}>
-          Adding one to the block puts it in the block&apos;s own table in the words it was said in, with
-          everything else left blank for you to complete. It is a draft, not a finding.
-        </p>
-        <p style={{ ...hint, marginTop: '0.5rem', maxWidth: '92ch' }}>
-          Marking one as used does not delete it. It stays here with the name on it, because the reason
-          to come back to something somebody said is usually to come back to the person who said it.
-          Putting one back removes the draft it made, unless you have already worked on that draft, in
-          which case your work stays and you are told so.
-        </p>
+        {/* Three lines, one per button, in the order they appear on a card.
+            This was two paragraphs of reasoning that said what each button was
+            not. What a coach needs here is what each button does. */}
+        <div style={{ ...hint, marginTop: '0.9rem', maxWidth: '78ch' }}>
+          <div><strong>Add to the block</strong> copies the sentence into that block&apos;s table, in the words it was said, for you to finish.</div>
+          <div style={{ marginTop: '0.35rem' }}><strong>Mark as used</strong> takes it off the pile and keeps it here with the name on it.</div>
+          <div style={{ marginTop: '0.35rem' }}><strong>Put it back</strong> returns it to the pile. Any work you have already done on the draft it made stays.</div>
+        </div>
       </div>
     </div>
   )

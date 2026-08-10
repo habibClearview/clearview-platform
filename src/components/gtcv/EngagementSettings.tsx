@@ -3,17 +3,16 @@
 // ============================================================
 // HOW THIS ENGAGEMENT RUNS
 //
-// The handful of settings that shape one engagement without changing the
-// method. What the app calls a block, how many conversations a segment agreed
-// to hold, whether the engagement is on track, and which document the
-// deliverables came from.
+// The settings that shape one engagement without changing the method: what the
+// blocks are called, what this engagement agreed to do, what currency it works
+// in, and how it is going.
 //
-// All of it was previously reachable only by writing SQL, which meant the
-// person running the engagement could not adjust their own engagement. That is
-// the opposite of the flexibility this platform exists to provide.
+// LAYOUT. One row per setting: a label, the control, and an "i" that opens a
+// line or two of explanation. The explanation stays shut until it is asked for,
+// so the screen reads as a form to fill rather than a page to study.
 //
-// Each setting says what it actually does, because a coach changing one wants
-// to know what will move on screen, and finding out afterwards is too late.
+// COPY. Each explanation says what the setting is and what it does. It does not
+// list what the setting is not.
 // ============================================================
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -27,21 +26,61 @@ const C = {
 }
 const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
 const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
-const label = {
+const labelText = {
   ...mono, fontSize: '0.68rem', letterSpacing: '.1em', textTransform: 'uppercase',
-  color: C.slate, display: 'block', marginBottom: 5,
+  color: C.slate,
 }
 const field = {
   width: '100%', padding: '0.44rem 0.58rem', borderRadius: 7,
-  border: `1px solid ${C.border}`, background: 'transparent', color: 'inherit',
+  border: `1px solid ${C.border}`, background: 'var(--cv-card)', color: 'inherit',
   fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: '0.93rem',
 }
+const smallBtn = (col, solid) => ({
+  ...mono, fontSize: '0.83rem', fontWeight: 600, padding: '0.36rem 0.85rem',
+  border: `1px solid ${col}`, borderRadius: 7,
+  background: solid ? col : 'transparent',
+  color: solid ? 'var(--cv-on-accent)' : col, cursor: 'pointer',
+})
 
 const MOMENTUM = [
   { v: 'green', l: 'On track', c: C.green, note: 'Continue as planned.' },
   { v: 'amber', l: 'Slipping', c: C.amber, note: 'Catch up within five working days.' },
   { v: 'red', l: 'Stopped', c: C.red, note: 'A recovery plan is needed before this resumes.' },
 ]
+
+// One setting: label, an "i" that opens the explanation, then the control.
+// The explanation is closed by default so the tab reads as a form.
+function Setting({ label, help, htmlFor, children }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ marginTop: '1.25rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: 5 }}>
+        {htmlFor
+          ? <label htmlFor={htmlFor} style={labelText}>{label}</label>
+          : <span style={labelText}>{label}</span>}
+        {help ? (
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            aria-label={open ? `Hide the explanation of ${label}` : `What ${label} means`}
+            style={{
+              ...mono, width: 17, height: 17, lineHeight: '15px', padding: 0,
+              borderRadius: '50%', border: `1px solid ${C.slate}`,
+              background: open ? C.slate : 'transparent',
+              color: open ? 'var(--cv-card)' : C.slate,
+              fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+            }}
+          >i</button>
+        ) : null}
+      </div>
+      {open && help ? (
+        <p style={{ ...hint, margin: '0 0 0.5rem', maxWidth: '78ch' }}>{help}</p>
+      ) : null}
+      {children}
+    </div>
+  )
+}
 
 async function setupApi(clientId) {
   const { data } = await supabase.auth.getSession()
@@ -118,33 +157,21 @@ export default function EngagementSettings({ clientId, canManage }) {
       <div style={{ ...mono, fontSize: '0.75rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
         How this engagement runs
       </div>
-      <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '92ch' }}>
-        These shape one engagement without changing the method. Every engagement runs the same nine
-        blocks in the same order; what these decide is what they are called, what this engagement
-        agreed to do, and how it is going.
+      <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '78ch' }}>
+        Settings for this engagement. The nine blocks and their order are the same everywhere; these
+        decide what they are called, what this engagement agreed to do, and how it is going.
       </p>
 
-      <div style={{
-        marginTop: '1rem', border: `1px solid ${C.border}`, borderRadius: 10,
-        background: C.alt, padding: '0.85rem 1rem',
-      }}>
-        <div style={{ ...mono, fontSize: '0.7rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
-          Scaffolding
-        </div>
-        <p style={{ ...hint, margin: '0.35rem 0 0.6rem', maxWidth: '92ch' }}>
-          A new engagement needs three things before anything else works: its own settings, a record
-          for each of the twelve gates, and a Charter to edit and issue. This creates whichever of
-          them are missing and touches nothing that is already there, so pressing it twice is safe.
-          It does not invent parties: a name on a signature has to be a real one, so add those
-          yourself above.
-        </p>
+      {err ? <div style={{ color: C.red, fontSize: '0.95rem', marginTop: '0.7rem' }}>{err}</div> : null}
+      {note ? <div style={{ color: C.green, fontSize: '0.95rem', marginTop: '0.7rem' }}>{note}</div> : null}
+
+      <Setting
+        label="Set this engagement up"
+        help={`Creates the three things a new engagement needs: its own settings, a record for each of the twelve gates, and a Charter you can edit and issue. It adds only what is missing, so it is safe to press again. Add the people on the engagement yourself, above, so every signature carries a real name.`}
+      >
         <button
           type="button"
-          style={{
-            ...mono, fontSize: '0.83rem', padding: '0.4rem 0.9rem',
-            border: `1px solid ${C.slate}`, borderRadius: 7, background: 'transparent',
-            color: C.slate, cursor: 'pointer',
-          }}
+          style={smallBtn(C.slate)}
           disabled={busy === 'scaffold'}
           onClick={async () => {
             setBusy('scaffold'); setNote(null); setErr(null)
@@ -158,13 +185,12 @@ export default function EngagementSettings({ clientId, canManage }) {
             setBusy(null)
           }}
         >{busy === 'scaffold' ? 'Setting up...' : 'Set this engagement up'}</button>
-      </div>
+      </Setting>
 
-      {err ? <div style={{ color: C.red, fontSize: '0.95rem', marginTop: '0.7rem' }}>{err}</div> : null}
-      {note ? <div style={{ color: C.green, fontSize: '0.95rem', marginTop: '0.7rem' }}>{note}</div> : null}
-
-      <div style={{ marginTop: '1.1rem' }}>
-        <span style={label}>How the engagement is going</span>
+      <Setting
+        label="How the engagement is going"
+        help="Your judgement, recorded. It shows on the cover and on the journey canvas."
+      >
         <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
           {MOMENTUM.map((m) => {
             const on = (c.momentum_status || 'green') === m.v
@@ -187,19 +213,16 @@ export default function EngagementSettings({ clientId, canManage }) {
             )
           })}
         </div>
-        <p style={{ ...hint, margin: '0.4rem 0 0' }}>
-          Your read, not a calculation. A number cannot see a leadership team distracted by a funding
-          round or a signature that is travelling, and those are usually why an engagement slips.
-          This shows on the cover and on the journey canvas.
-        </p>
-      </div>
+      </Setting>
 
-      <div style={{ marginTop: '1.3rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(230px,1fr))', gap: '1rem' }}>
-        <div>
-          <label htmlFor="cfg-terminology" style={label}>What to call each block</label>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '0 1.2rem' }}>
+        <Setting
+          label="What to call each block"
+          htmlFor="cfg-terminology"
+          help="Zone reads plainer to most teams. DP matches the decision point numbering a funder sees in the proposal."
+        >
           <select
             id="cfg-terminology"
-            aria-label="What to call each block"
             style={field}
             value={c.terminology || 'dp'}
             disabled={busy === 'terminology'}
@@ -208,17 +231,15 @@ export default function EngagementSettings({ clientId, canManage }) {
             <option value="zone">Zone 1, Zone 2, and so on</option>
             <option value="dp">DP01, DP02, and so on</option>
           </select>
-          <p style={{ ...hint, margin: '0.35rem 0 0' }}>
-            The same nine blocks either way. Some organisations find Zone plainer; some funders expect
-            the decision point numbering from the proposal.
-          </p>
-        </div>
+        </Setting>
 
-        <div>
-          <label htmlFor="cfg-independence" style={label}>Which independence tests close it</label>
+        <Setting
+          label="Which independence tests close it"
+          htmlFor="cfg-independence"
+          help="A full engagement ends with the five engagement tests done unaided. A tools handover ends with the organisation able to run the tools on its own."
+        >
           <select
             id="cfg-independence"
-            aria-label="Which independence tests close the engagement"
             style={field}
             value={c.independence_test_set || 'engagement'}
             disabled={busy === 'independence'}
@@ -227,19 +248,17 @@ export default function EngagementSettings({ clientId, canManage }) {
             <option value="engagement">The five engagement tests</option>
             <option value="tools">The tools handover tests</option>
           </select>
-          <p style={{ ...hint, margin: '0.35rem 0 0' }}>
-            A full engagement ends with the five tests done unaided. A tools-only piece of work ends
-            with the organisation able to run the tools.
-          </p>
-        </div>
+        </Setting>
       </div>
 
-      <div style={{ marginTop: '1.3rem' }}>
-        <label htmlFor="cfg-min" style={label}>Conversations agreed per segment</label>
+      <Setting
+        label="Conversations agreed per segment"
+        htmlFor="cfg-min"
+        help={`What this engagement agreed to hold, so it is yours to set. Evidence is judged separately: a segment counts as evidenced once ${CONVERGENCE_MINIMUM} conversations point at the same problem with a real budget behind it.`}
+      >
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <input
             id="cfg-min"
-            aria-label="Conversations agreed per segment"
             type="number"
             min={0}
             max={100}
@@ -250,11 +269,7 @@ export default function EngagementSettings({ clientId, canManage }) {
           />
           <button
             type="button"
-            style={{
-              ...mono, fontSize: '0.83rem', fontWeight: 600, padding: '0.36rem 0.85rem',
-              border: `1px solid ${C.teal}`, borderRadius: 7, background: C.teal,
-              color: 'var(--cv-on-accent)', cursor: 'pointer',
-            }}
+            style={smallBtn(C.teal, true)}
             disabled={busy === 'min'}
             onClick={() => save('min', {
               validationMinPerSegment: minDraft.trim() === '' ? null : Number(minDraft),
@@ -263,33 +278,25 @@ export default function EngagementSettings({ clientId, canManage }) {
           {!usingDefault ? (
             <button
               type="button"
-              style={{
-                ...mono, fontSize: '0.83rem', padding: '0.36rem 0.8rem',
-                border: `1px solid ${C.slate}`, borderRadius: 7, background: 'transparent',
-                color: C.slate, cursor: 'pointer',
-              }}
+              style={smallBtn(C.slate)}
               disabled={busy === 'min'}
               onClick={() => { setMinDraft(''); save('min', { validationMinPerSegment: null }, 'Back to the method default.') }}
             >Use the default</button>
           ) : null}
+          <span style={{ ...hint, whiteSpace: 'nowrap' }}>
+            Currently {effectiveMin}{usingDefault ? ' (the method default)' : ''}
+          </span>
         </div>
-        <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '92ch' }}>
-          Currently <strong>{effectiveMin}</strong>
-          {usingDefault ? ' , the method default, because nothing else is set.' : '.'} This is what
-          this engagement agreed to do, so it is yours to set.{' '}
-          <strong>It does not change what counts as evidence.</strong> A segment is only evidenced
-          when {CONVERGENCE_MINIMUM} conversations point at the same problem with a real budget
-          behind it, and that stays at {CONVERGENCE_MINIMUM} whatever this says. Agreeing to hold
-          fewer conversations does not make fewer conversations into proof.
-        </p>
-      </div>
+      </Setting>
 
-      <div style={{ marginTop: '1.3rem' }}>
-        <label htmlFor="cfg-currency" style={label}>The currency this engagement works in</label>
+      <Setting
+        label="The currency this engagement works in"
+        htmlFor="cfg-currency"
+        help="What the organisation prices and costs in. Every cost line, price and pipeline figure in the blocks reads in this. Your fee currency is held separately, on the coach side."
+      >
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <input
             id="cfg-currency"
-            aria-label="The currency this engagement works in"
             style={{ ...field, maxWidth: 140 }}
             value={currencyDraft}
             placeholder="NGN"
@@ -298,53 +305,36 @@ export default function EngagementSettings({ clientId, canManage }) {
           />
           <button
             type="button"
-            style={{
-              ...mono, fontSize: '0.83rem', padding: '0.36rem 0.8rem',
-              border: `1px solid ${C.slate}`, borderRadius: 7, background: 'transparent',
-              color: C.slate, cursor: 'pointer',
-            }}
+            style={smallBtn(C.slate)}
             disabled={busy === 'currency'}
             onClick={() => save('currency', { currency: currencyDraft }, currencyDraft.trim()
               ? `Amounts now read in ${currencyDraft.trim().toUpperCase()}.`
               : 'Amounts now show without a currency.')}
           >{busy === 'currency' ? 'Saving...' : 'Save'}</button>
         </div>
-        <p style={{ ...hint, margin: '0.35rem 0 0' }}>
-          What the organisation prices and costs in. Every cost line, price and pipeline figure in the
-          blocks reads in this. Leave it empty and amounts show as plain numbers, which is honest for
-          an engagement that has not decided but is hard to read once there are figures in the tables.{' '}
-          <strong>This is not your fee currency.</strong> What you invoice in is held separately and
-          never appears in front of the organisation.
-        </p>
-      </div>
+      </Setting>
 
-      <div style={{ marginTop: '1.3rem' }}>
-        <label htmlFor="cfg-tor" style={label}>The document the deliverables came from</label>
+      <Setting
+        label="Contract or Terms of Reference reference"
+        htmlFor="cfg-tor"
+        help="The name or number of the contract this engagement runs under, recorded so a claim can say which contract it is made under. This is a reference you type; there is no document attached to it."
+      >
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <input
             id="cfg-tor"
-            aria-label="The document the deliverables came from"
             style={{ ...field, maxWidth: 380 }}
             value={torDraft}
-            placeholder="Contract or Terms of Reference reference"
+            placeholder="e.g. ToR 2026-04 / Contract 118"
             onChange={(e) => setTorDraft(e.target.value)}
           />
           <button
             type="button"
-            style={{
-              ...mono, fontSize: '0.83rem', padding: '0.36rem 0.8rem',
-              border: `1px solid ${C.slate}`, borderRadius: 7, background: 'transparent',
-              color: C.slate, cursor: 'pointer',
-            }}
+            style={smallBtn(C.slate)}
             disabled={busy === 'tor'}
             onClick={() => save('tor', { torReference: torDraft }, 'Reference saved.')}
           >{busy === 'tor' ? 'Saving...' : 'Save'}</button>
         </div>
-        <p style={{ ...hint, margin: '0.35rem 0 0' }}>
-          Recorded so a claim can say which contract it is made under.
-          {c.tor_uploaded ? ' A document has been read against this engagement.' : ' No document has been read against this engagement yet.'}
-        </p>
-      </div>
+      </Setting>
     </div>
   )
 }
