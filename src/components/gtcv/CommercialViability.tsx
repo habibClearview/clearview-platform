@@ -38,6 +38,7 @@
 // ============================================================
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { serviceOptions, serviceLabelFor, SHARED_SERVICE_LABEL } from '@/lib/gtcv-services'
 import {
   buildViability,
   formatAmount,
@@ -52,6 +53,7 @@ const T_COST = 'gtcv_cost_lines'
 const T_TIERS = 'gtcv_pricing_tiers'
 const T_MARKET = 'gtcv_market_prices'
 const T_FIXED = 'gtcv_fixed_costs'
+const T_SERVICES = 'gtcv_service_inventory'
 
 // ─── design tokens (mirror the coach dashboard) ──────────────
 const C = {
@@ -108,6 +110,9 @@ export default function CommercialViability({ clientId, canManage, currency }) {
   const [tiers, setTiers] = useState([])
   const [market, setMarket] = useState([])
   const [fixed, setFixed] = useState([])
+  // The services, from the DP01 inventory. Read only here: DP04 costs them, it
+  // does not define them.
+  const [servicesRows, setServicesRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [save, setSave] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -121,16 +126,22 @@ export default function CommercialViability({ clientId, canManage, currency }) {
   const money = useCallback((v, digits = 0) => formatAmount(num(v), currency, digits), [currency])
 
   const load = useCallback(async () => {
-    if (!clientId) { setCostLines([]); setTiers([]); setMarket([]); setFixed([]); setLoading(false); return }
+    if (!clientId) { setCostLines([]); setTiers([]); setMarket([]); setFixed([]); setServicesRows([]); setLoading(false); return }
     setLoading(true)
     try {
       const order = (q) => q.eq('client_id', clientId).order('sort_order', { ascending: true }).order('created_at', { ascending: true })
-      const [c, t, m, f] = await Promise.all([
+      const [c, t, m, f, p] = await Promise.all([
         order(supabase.from(T_COST).select('*')),
         order(supabase.from(T_TIERS).select('*')),
         order(supabase.from(T_MARKET).select('*')),
         order(supabase.from(T_FIXED).select('*')),
+        order(supabase.from(T_SERVICES).select('id, service_name, what_it_delivers, sort_order')),
       ])
+      // A failure to read the services is not a reason to refuse the cost
+      // model: the numbers are still right, they just cannot be attributed. It
+      // shows as an empty service list rather than stopping the screen.
+      if (p.error) console.error('CommercialViability: could not read the services', p.error)
+      setServicesRows(p.data || [])
       const err = c.error || t.error || m.error || f.error
       if (err) {
         // A cost model with rows missing produces a cost floor that is simply
@@ -204,6 +215,8 @@ export default function CommercialViability({ clientId, canManage, currency }) {
 
   // A text input that edits locally as you type and saves on blur, so typing
   // never lags behind the keyboard.
+  const services = useMemo(() => serviceOptions(servicesRows), [servicesRows])
+
   const textCell = (table, row, field, placeholder) => (
     canManage
       ? <input aria-label={placeholder || field} style={inp} value={row[field] ?? ''} placeholder={placeholder}
@@ -219,6 +232,32 @@ export default function CommercialViability({ clientId, canManage, currency }) {
           onBlur={(e) => commit(table, row.id, { [field]: e.target.value === '' ? null : Number(e.target.value) })} />
       : <span style={mono}>{orDash(row[field], render || money)}</span>
   )
+
+  // Which service this line is for. DP04 asks whether a service sustains the
+  // organisation, and that question cannot be answered by a cost model that
+  // does not know which service a cost belongs to. Blank stays available and
+  // means shared across services, which is the honest answer for an office or
+  // a finance lead rather than a gap to be filled in.
+  const serviceCell = (table, row) => {
+    if (!canManage) {
+      return <span style={{ fontSize: '0.86rem' }}>{serviceLabelFor(servicesRows, row.service_id)}</span>
+    }
+    return (
+      <select
+        aria-label="Which service this line is for"
+        style={inp}
+        value={row.service_id || ''}
+        onChange={(e) => {
+          const v = e.target.value || null
+          edit(table, row.id, 'service_id', v)
+          commit(table, row.id, { service_id: v })
+        }}
+      >
+        <option value="">{SHARED_SERVICE_LABEL}</option>
+        {services.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+      </select>
+    )
+  }
 
   // ─── the calculation, all of it, from the pure module ──────
   const seededTarget = useMemo(
@@ -333,6 +372,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
                   <thead>
                     <tr>
                       <th style={{ ...th, minWidth: 200 }}>Cost item</th>
+                      <th style={{ ...th, minWidth: 150 }}>Service</th>
                       <th style={{ ...th, width: 110 }}>Unit</th>
                       <th style={{ ...th, width: 100, textAlign: 'right' }}>Qty / cycle</th>
                       <th style={{ ...th, width: 120, textAlign: 'right' }}>Unit cost</th>
@@ -346,7 +386,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
                   <tbody>
                     {cat.lines.length === 0 && (
                       <tr>
-                        <td style={{ ...td, color: C.slate }} colSpan={canManage ? 9 : 8}>
+                        <td style={{ ...td, color: C.slate }} colSpan={canManage ? 10 : 9}>
                           Nothing entered for {cat.label}. A category left empty does not make the
                           cost lower, it makes it incomplete.
                         </td>
@@ -358,6 +398,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
                       return (
                         <tr key={line.id} style={{ borderBottom: '1px solid var(--cv-border-soft)' }}>
                           <td style={td}>{textCell(T_COST, row, 'item', 'What the cost is')}</td>
+                          <td style={td}>{serviceCell(T_COST, row)}</td>
                           <td style={td}>{textCell(T_COST, row, 'unit', 'day, set')}</td>
                           <td style={td}>{numCell(T_COST, row, 'qty_per_cycle', '0', (x) => String(x))}</td>
                           <td style={td}>{numCell(T_COST, row, 'unit_cost', '0')}</td>

@@ -21,6 +21,7 @@ import DeliverablesPanel from '@/components/gtcv/DeliverablesPanel'
 import HandoverIndependence from '@/components/gtcv/HandoverIndependence'
 import InterviewReporting from '@/components/gtcv/InterviewReporting'
 import EngagementPartiesPanel from '@/components/gtcv/EngagementPartiesPanel'
+import ShowcaseSharing from '@/components/gtcv/ShowcaseSharing'
 import EngagementSettings from '@/components/gtcv/EngagementSettings'
 import WhatNeedsYou from '@/components/gtcv/WhatNeedsYou'
 import EvidenceLibraryPanel from '@/components/gtcv/EvidenceLibraryPanel'
@@ -2528,8 +2529,33 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // programme directory -- editing a programme's funder/country/dates --
   // is no longer reachable from here; ProgrammesView below is still
   // defined but unused, in case that capability needs a new home.)
+  // Showing a prospect a real canvas is selling, so it lives on Pipeline,
+  // which is where a prospect is walked towards becoming a client. It needs an
+  // engagement to show, so it asks which one rather than assuming.
+  function ProspectShowcase(){
+    const canvases=clients.filter(c=>c.engagement_mode==='canvas')
+    const [showId,setShowId]=useState('')
+    if(canvases.length===0) return null
+    return(
+      <div style={{...card,marginBottom:'1.25rem'}}>
+        <div style={{fontFamily:'Georgia,serif',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Show a prospect a real engagement</div>
+        <p style={{fontSize:'1.02rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem'}}>
+          Give a prospect a read-only link to one of your live canvases, so they see the method
+          working rather than described. Choose which engagement to show, and whether to name the
+          organisation.
+        </p>
+        <select aria-label="Which engagement to show" value={showId} onChange={e=>setShowId(e.target.value)}
+          style={{padding:'0.42rem 0.6rem',borderRadius:7,border:`1px solid ${C.border}`,background:C.white,color:C.navy,fontSize:'0.95rem',minWidth:260}}>
+          <option value="">Choose an engagement...</option>
+          {canvases.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        {showId?<div style={{marginTop:'1rem'}}><ShowcaseSharing clientId={showId} canManage/></div>:null}
+      </div>
+    )
+  }
+
   function ProgrammesHub(){
-    return <><DeliverablesBusinessView clients={clients.filter(c=>c.engagement_mode==='canvas')}/><DealsAndFees programmes={programmes} setProgrammes={setPrograms} clients={clients} setClients={setClients} onWinDeal={p=>{
+    return <><ProspectShowcase/><DeliverablesBusinessView clients={clients.filter(c=>c.engagement_mode==='canvas')}/><DealsAndFees programmes={programmes} setProgrammes={setPrograms} clients={clients} setClients={setClients} onWinDeal={p=>{
       const services=p.deal_services||[]
       const engagementMode=services.includes('canvas')?'canvas':services.includes('financial')?'financial':'canvas'
       // A direct/independent prospect IS the beneficiary -- pre-fill their
