@@ -27,3 +27,8 @@ coverage/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Source archives made for sharing. A build artifact, not source: it is a copy
+# of the repository and would be committed into the thing it is a copy of.
+gtcv-app.zip
+*.zip
