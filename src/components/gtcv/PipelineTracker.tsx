@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatMoney } from '@/lib/currency'
 import { supabase } from '@/lib/supabase'
+import { serviceOptions, serviceLabelFor, servicesFromPropositions, SHARED_SERVICE_LABEL } from '@/lib/gtcv-services'
 
 const TABLE = 'gtcv_pipeline'
 
@@ -84,6 +85,9 @@ function StageChip({ stage, count, byCur, share }) {
 
 export default function PipelineTracker({ clientId, canManage , currency }) {
   const [rows, setRows] = useState([])
+  // The new services from DP03. Market entry is done FOR a service, so a row
+  // that does not name one cannot be read back per service.
+  const [propRows, setPropRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [save, setSave] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -93,9 +97,17 @@ export default function PipelineTracker({ clientId, canManage , currency }) {
     if (!clientId) { setRows([]); setLoading(false); return }
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from(TABLE).select('*').eq('client_id', clientId)
-        .order('sort_order', { ascending: true }).order('created_at', { ascending: true })
+      const [{ data, error }, props] = await Promise.all([
+        supabase.from(TABLE).select('*').eq('client_id', clientId)
+          .order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
+        supabase.from('gtcv_propositions')
+          .select('id, segment_label, capability, assembled_statement')
+          .eq('client_id', clientId).order('sort_order', { ascending: true }),
+      ])
+      // Losing the service list does not make the pipeline wrong, only
+      // unattributable, so it shows as an empty list rather than an error.
+      if (props.error) console.error('PipelineTracker: could not read the services', props.error)
+      setPropRows(props.data || [])
       if (error) {
         // A failed read leaves what was on screen alone. Blanking the table
         // would say the pipeline is empty, which is a different and much worse
@@ -123,6 +135,22 @@ export default function PipelineTracker({ clientId, canManage , currency }) {
   function edit(id, field, value) {
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, [field]: value } : r)))
   }
+
+  const serviceList = servicesFromPropositions(propRows)
+  const serviceOpts = serviceOptions(serviceList)
+
+  // Which new service this opportunity is for. Blank is allowed and means it
+  // is not tied to one yet, which is common early in DP05.
+  const serviceCell = (row) => (
+    canManage ? (
+      <select aria-label="Which service this opportunity is for" style={inp}
+        value={row.proposition_id || ''}
+        onChange={(e) => commit(row.id, { proposition_id: e.target.value || null })}>
+        <option value="">{SHARED_SERVICE_LABEL}</option>
+        {serviceOpts.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+      </select>
+    ) : <span>{serviceLabelFor(serviceList, row.proposition_id)}</span>
+  )
 
   async function commit(id, patch) {
     if (!canManage) return
@@ -245,6 +273,7 @@ export default function PipelineTracker({ clientId, canManage , currency }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1240 }}>
               <thead>
                 <tr>
+                  <th style={{ ...th, minWidth: 150 }}>Service</th>
                   <th style={{ ...th, minWidth: 150 }}>Organisation</th>
                   <th style={{ ...th, minWidth: 130 }}>Contact</th>
                   <th style={{ ...th, minWidth: 130 }}>Role</th>
@@ -264,6 +293,7 @@ export default function PipelineTracker({ clientId, canManage , currency }) {
                   const stage = STAGES.find((s) => s.value === r.stage) || STAGES[0]
                   return (
                     <tr key={r.id} style={{ borderBottom: '1px solid var(--cv-border-soft)' }}>
+                      <td style={td}>{serviceCell(r)}</td>
                       <td style={td}>{textCell(r, 'organisation', 'Organisation')}</td>
                       <td style={td}>{textCell(r, 'contact_name', 'Name')}</td>
                       <td style={td}>{textCell(r, 'contact_role', 'Their role')}</td>

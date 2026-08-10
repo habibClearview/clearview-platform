@@ -114,6 +114,38 @@ const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
 const blank = (v) => !String(v ?? '').trim()
 
 // ─── Small building blocks ───────────────────────────────────
+// The service an activity sits under. An organisation runs several services
+// and each is a portfolio of activities, so an activity with no service named
+// cannot be read back as "what we do for gender advisory".
+//
+// It types freely rather than picking from a list, because clearing the ground
+// runs before DP01 has necessarily named anything. Where names DO exist, they
+// are offered as suggestions, so the same service is spelled the same way
+// across the table instead of three ways.
+function ServiceCell({ value, onCommit, canManage, suggestions, listId }) {
+  const [local, setLocal] = useState(value ?? '')
+  useEffect(() => { setLocal(value ?? '') }, [value])
+  if (!canManage) {
+    return <div style={{ ...roInput, minHeight: 34 }}>{local || <span style={{ color: C.faint }}>No service named</span>}</div>
+  }
+  return (
+    <>
+      <input
+        aria-label="Which service this activity sits under"
+        style={cellInput}
+        list={listId}
+        placeholder="e.g. Gender advisory"
+        value={local}
+        onChange={(e) => setLocal(e.target.value)}
+        onBlur={() => { if ((value ?? '') !== local) onCommit(local) }}
+      />
+      <datalist id={listId}>
+        {suggestions.map((name) => <option key={name} value={name} />)}
+      </datalist>
+    </>
+  )
+}
+
 function TextCell({ value, onCommit, canManage, placeholder, rows = 2, ariaLabel }) {
   const [local, setLocal] = useState(value ?? '')
   useEffect(() => { setLocal(value ?? '') }, [value])
@@ -181,6 +213,9 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
   const [saveMessage, setSaveMessage] = useState(null)
 
   const [assumptions, setAssumptions] = useState([])
+  // Service names already in use, offered as suggestions so the same service
+  // is spelled one way across the table.
+  const [inventoryNames, setInventoryNames] = useState([])
   const [owners, setOwners] = useState([])
   const [hypotheses, setHypotheses] = useState([])
   const [signals, setSignals] = useState([])
@@ -193,12 +228,13 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
       setLoading(true)
       setSaveState('loading')
       const order = (q) => q.eq('client_id', clientId).order('sort_order', { ascending: true }).order('created_at', { ascending: true })
-      const [a, o, h, s, d] = await Promise.all([
+      const [a, o, h, s, d, inv] = await Promise.all([
         order(supabase.from('gtcv_assumptions').select('*')),
         order(supabase.from('gtcv_problem_owner_budget').select('*')),
         order(supabase.from('gtcv_hypotheses_shortlist').select('*')),
         order(supabase.from('gtcv_signal_story').select('*')),
         order(supabase.from('gtcv_continue_pause_kill').select('*')),
+        supabase.from('gtcv_service_inventory').select('service_name').eq('client_id', clientId),
       ])
       if (cancelled) return
       const firstError = a.error || o.error || h.error || s.error || d.error
@@ -208,6 +244,9 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
       setHypotheses(h.data || [])
       setSignals(s.data || [])
       setDecisions(d.data || [])
+      // Suggestions only. A failed read leaves the field free text, which is
+      // what it is anyway, so it is not worth stopping the screen for.
+      setInventoryNames((inv.data || []).map((r) => r.service_name).filter(Boolean))
       setLoading(false)
       setSaveState('idle')
     }
@@ -259,6 +298,11 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
   const updDecision = makeUpdater('gtcv_continue_pause_kill', setDecisions)
 
   const addAssumption = makeAdder('gtcv_assumptions', assumptions, setAssumptions, {})
+
+  const serviceSuggestions = Array.from(new Set([
+    ...inventoryNames,
+    ...assumptions.map((r) => (r.service_name || '').trim()),
+  ].filter(Boolean))).sort()
   const addOwner = makeAdder('gtcv_problem_owner_budget', owners, setOwners, {})
   const addHypothesis = makeAdder('gtcv_hypotheses_shortlist', hypotheses, setHypotheses, { urgency: 0, ownership_clarity: 0, willingness_to_pay: 0, access: 0, advances: false })
   const addSignal = makeAdder('gtcv_signal_story', signals, setSignals, { classification: 'unclassified' })
@@ -357,7 +401,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         number={1}
         title="Assumption Dump Canvas"
         question="What are we already doing, and what has to be true for it to work?"
-        purposeText="List every activity the organisation runs. For each one, name what it delivers, who pays for it today, the assumption sitting underneath it, and what evidence would prove that assumption wrong."
+        purposeText="List every activity the organisation runs, and the service it sits under. An organisation sells several services and each is a portfolio of activities, so naming the service is what lets this be read back as what we actually do for gender advisory. For each activity, name what it delivers, who pays for it today, the assumption sitting underneath it, and what evidence would prove that assumption wrong."
         right={editable ? <button type="button" style={addButton} onClick={addAssumption}>+ Add activity</button> : null}
       >
         {assumptions.length === 0 ? (
@@ -367,17 +411,19 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             <table style={table}>
               <thead>
                 <tr>
-                  <th style={{ ...th, width: '18%' }}>Activity</th>
-                  <th style={{ ...th, width: '18%' }}>What it delivers</th>
-                  <th style={{ ...th, width: '15%' }}>Who pays</th>
-                  <th style={{ ...th, width: '22%' }}>Assumption underneath</th>
-                  <th style={{ ...th, width: '22%' }}>What would prove it wrong</th>
+                  <th style={{ ...th, width: '14%' }}>Service</th>
+                  <th style={{ ...th, width: '16%' }}>Activity</th>
+                  <th style={{ ...th, width: '16%' }}>What it delivers</th>
+                  <th style={{ ...th, width: '13%' }}>Who pays</th>
+                  <th style={{ ...th, width: '20%' }}>Assumption underneath</th>
+                  <th style={{ ...th, width: '21%' }}>What would prove it wrong</th>
                   {editable && <th style={{ ...th, width: 40 }} />}
                 </tr>
               </thead>
               <tbody>
                 {assumptions.map((r) => (
                   <tr key={r.id}>
+                    <td style={td}><ServiceCell value={r.service_name} canManage={editable} suggestions={serviceSuggestions} listId={`svc-${r.id}`} onCommit={(v) => updAssumption(r.id, { service_name: v || null })} /></td>
                     <td style={td}><TextCell value={r.activity} canManage={editable} placeholder="The activity" onCommit={(v) => updAssumption(r.id, { activity: v })} /></td>
                     <td style={td}><TextCell value={r.delivers} canManage={editable} placeholder="What it actually delivers" onCommit={(v) => updAssumption(r.id, { delivers: v })} /></td>
                     <td style={td}><TextCell value={r.who_pays} canManage={editable} placeholder="Who pays for it now" onCommit={(v) => updAssumption(r.id, { who_pays: v })} /></td>
