@@ -20,6 +20,46 @@
 // for the pilot capture or the costing model they are not looking at.
 // ============================================================
 import dynamic from 'next/dynamic'
+import { zoneBrief } from '@/lib/gtcv-zone-brief'
+
+// What this zone is for, taken from the method reference. Three things, in the
+// order a room needs them: the question, what has to exist before the gate can
+// close, and how you know the answer is real.
+function ZoneBriefPanel({ dpId }) {
+  const brief = zoneBrief(dpId)
+  if (!brief) return null
+  const sans = "'Segoe UI',system-ui,sans-serif"
+  const cap = {
+    fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+    fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', color: '#6B7A8C',
+  }
+  return (
+    <section style={{
+      border: '1px solid rgba(27,42,65,.16)', borderLeft: '3px solid #2A9D8F',
+      borderRadius: 12, padding: '14px 16px', background: '#FBF7EE',
+    }}>
+      <div style={cap}>What this zone settles</div>
+      <p style={{
+        fontFamily: 'Georgia,serif', fontSize: 17, lineHeight: 1.45, color: '#1B2A41',
+        margin: '6px 0 0', maxWidth: '78ch',
+      }}>{brief.question}</p>
+
+      <div style={{ ...cap, marginTop: 14 }}>What has to exist before it closes</div>
+      <ul style={{
+        fontFamily: sans, fontSize: 14, lineHeight: 1.55, color: '#33414F',
+        margin: '6px 0 0', paddingLeft: 18, maxWidth: '78ch',
+      }}>
+        {brief.outputs.map((o) => <li key={o} style={{ marginTop: 3 }}>{o}</li>)}
+      </ul>
+
+      <div style={{ ...cap, marginTop: 14 }}>How you know it is real</div>
+      <p style={{
+        fontFamily: sans, fontSize: 14, lineHeight: 1.55, color: '#33414F',
+        margin: '6px 0 0', maxWidth: '78ch',
+      }}>{brief.signal}</p>
+    </section>
+  )
+}
 
 const loading = () => (
   <p style={{ fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: 13.5, color: '#8B8272', padding: '10px 0' }}>
@@ -123,6 +163,13 @@ export default function BlockWorkspace({ dpId, clientId, canManage, currency }) 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+      {/* What the zone is for, before the tools. A zone used to open straight
+          into its tables, so the question it exists to settle, what has to
+          exist before it closes, and how you know the answer is real were all
+          somewhere else: in the delivery document, or in somebody's memory,
+          in front of the room. */}
+      <ZoneBriefPanel dpId={dpId} />
+
       {own.length === 0 ? (
         <div style={{
           fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: 13.5, color: '#4C5A6B',

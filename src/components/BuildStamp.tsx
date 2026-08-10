@@ -1,21 +1,33 @@
 // ============================================================
 // BUILD STAMP
-// A small, always-visible marker in the bottom corner of the app
-// so anyone can confirm, with their own eyes, exactly which build
-// their live site is serving. When a deploy reaches the browser,
-// this code changes. If it does not change after a deploy, the
-// deploy did not reach this browser (stale cache, or the domain is
-// not pointed at the latest production deployment).
 //
-// Bump BUILD_STAMP on every change you want to be able to verify
-// landed. Keep it short and unmistakable.
+// A small, always-visible marker in the bottom corner so anyone can confirm,
+// with their own eyes, which build their browser is actually serving. If it
+// does not change after a deploy, the deploy did not reach this browser: a
+// stale cache, or the domain is pointed at an older deployment.
+//
+// IT READS THE COMMIT, NOT A NOTE. This used to be a string somebody edited by
+// hand on the way past, which meant it drifted: on 10 August it was still
+// announcing a build from 2 August, on a site running code from the day
+// before. A marker that exists to tell you which build you are on is worse
+// than useless once it is out of date, because it is believed.
+//
+// Vercel puts the commit in NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA at build time,
+// which is the same commit /api/build-info reports from the server. The two
+// agree because they come from the same place. Off Vercel there is no commit
+// to read, so it says so.
 // ============================================================
-export const BUILD_STAMP = 'BUILD 2026-08-02 · CODE R198 (Renamed Figures to Sales, Costs & Profit; Trends combined chart + month-across table; worked-example help)'
+const sha = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA || ''
+const branch = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_REF || ''
+
+export const BUILD_STAMP = sha
+  ? `BUILD ${sha.slice(0, 7)}${branch ? ` · ${branch}` : ''}`
+  : 'BUILD local (not deployed)'
 
 export default function BuildStamp() {
   return (
     <div
-      title="Deployment marker. If this code matches what was just shipped, your live site is up to date."
+      title="Deployment marker. This is the commit your browser is serving. It matches /api/build-info when the page is current."
       style={{
         position: 'fixed',
         bottom: 8,
