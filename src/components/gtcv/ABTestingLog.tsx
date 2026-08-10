@@ -24,6 +24,7 @@
 // ============================================================
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { serviceOptions, serviceLabelFor, servicesFromPropositions, SHARED_SERVICE_LABEL } from '@/lib/gtcv-services'
 
 const TABLE = 'gtcv_ab_tests'
 
@@ -132,6 +133,9 @@ function StatCard({ s, winner }) {
 
 export default function ABTestingLog({ clientId, canManage }) {
   const [rows, setRows] = useState([])
+  // The new services from DP03. A message is tested FOR a service, so a log
+  // that does not name one cannot say which offer the winning line belongs to.
+  const [propRows, setPropRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [save, setSave] = useState(null)   // {ok, text}
   const [busy, setBusy] = useState(false)
@@ -140,9 +144,17 @@ export default function ABTestingLog({ clientId, canManage }) {
     if (!clientId) { setRows([]); setLoading(false); return }
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from(TABLE).select('*').eq('client_id', clientId)
-        .order('sort_order', { ascending: true }).order('created_at', { ascending: true })
+      const [{ data, error }, props] = await Promise.all([
+        supabase.from(TABLE).select('*').eq('client_id', clientId)
+          .order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
+        supabase.from('gtcv_propositions')
+          .select('id, segment_label, capability, assembled_statement')
+          .eq('client_id', clientId).order('sort_order', { ascending: true }),
+      ])
+      // Losing the service list leaves the log correct but unattributable, so
+      // it shows as an empty list rather than stopping the screen.
+      if (props.error) console.error('ABTestingLog: could not read the services', props.error)
+      setPropRows(props.data || [])
       if (error) {
         // Keep what is on screen. Blanking the table would say the log is
         // empty, which is a different and worse claim than the read failing.
@@ -171,6 +183,22 @@ export default function ABTestingLog({ clientId, canManage }) {
   }
 
   // Write one or more fields of one row.
+  const serviceList = servicesFromPropositions(propRows)
+  const serviceOpts = serviceOptions(serviceList)
+
+  // Which new service this message was testing. Blank is allowed and means it
+  // was not tied to one, which happens with a general outreach line.
+  const serviceCell = (row) => (
+    canManage ? (
+      <select aria-label="Which service this message was testing" style={inp}
+        value={row.proposition_id || ''}
+        onChange={(e) => commit(row.id, { proposition_id: e.target.value || null })}>
+        <option value="">{SHARED_SERVICE_LABEL}</option>
+        {serviceOpts.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+      </select>
+    ) : <span>{serviceLabelFor(serviceList, row.proposition_id)}</span>
+  )
+
   async function commit(id, patch) {
     if (!canManage) return
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)))
@@ -267,6 +295,7 @@ export default function ABTestingLog({ clientId, canManage }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1080 }}>
               <thead>
                 <tr>
+                  <th style={{ ...th, minWidth: 150 }}>Service</th>
                   <th style={{ ...th, minWidth: 130 }}>Contact</th>
                   <th style={{ ...th, minWidth: 150 }}>Organisation</th>
                   <th style={{ ...th, width: 80 }}>Variant</th>
@@ -282,6 +311,7 @@ export default function ABTestingLog({ clientId, canManage }) {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id} style={{ borderBottom: '1px solid var(--cv-border-soft)' }}>
+                    <td style={td}>{serviceCell(r)}</td>
                     <td style={td}>{textCell(r, 'contact_name', 'Name')}</td>
                     <td style={td}>{textCell(r, 'organisation', 'Organisation')}</td>
                     <td style={td}>
