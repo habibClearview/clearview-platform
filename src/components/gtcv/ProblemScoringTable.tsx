@@ -34,6 +34,7 @@
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { segmentsAwaitingScore, carriedRow } from '@/lib/gtcv-problem-carryover'
 
 const TABLE = 'gtcv_problem_scores'
 const SEGMENTS_TABLE = 'gtcv_customer_segments'
@@ -130,7 +131,7 @@ export default function ProblemScoringTable({ clientId, canManage }) {
       const [scores, segs] = await Promise.all([
         supabase.from(TABLE).select('*').eq('client_id', clientId)
           .order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
-        supabase.from(SEGMENTS_TABLE).select('id, segment_name').eq('client_id', clientId)
+        supabase.from(SEGMENTS_TABLE).select('id, segment_name, problem_in_their_words').eq('client_id', clientId)
           .order('sort_order', { ascending: true }),
       ])
       if (!alive.current) return
@@ -206,6 +207,24 @@ export default function ProblemScoringTable({ clientId, canManage }) {
     setStatus('saved')
   }
 
+  // Bring a problem across from the segments rather than retyping it. The
+  // wording is the customer's, written one table up, and a retyped problem is
+  // the consultant's paraphrase of it.
+  async function carryAcross(carry) {
+    if (!canManage || !clientId) return
+    setAdding(true); setStatus('saving'); setMsg(null)
+    const { data, error } = await supabase
+      .from(TABLE)
+      .insert(carriedRow(carry, clientId, rows.length))
+      .select()
+      .single()
+    if (!alive.current) return
+    setAdding(false)
+    if (error) { setStatus('error'); setMsg(error.message); return }
+    setRows((prev) => [...prev, data])
+    setStatus('saved')
+  }
+
   async function removeRow(row) {
     if (!canManage) return
     const name = row.problem_statement || 'this problem'
@@ -234,6 +253,7 @@ export default function ProblemScoringTable({ clientId, canManage }) {
 
   const saveWord = status === 'saving' ? 'Saving...' : status === 'saved' ? 'Saved' : status === 'error' ? 'Not saved' : ''
   const saveTone = status === 'error' ? C.red : status === 'saved' ? C.green : C.slate
+  const waiting = segmentsAwaitingScore(segments, rows)
   const segmentName = (id) => (segments.find((s) => s.id === id) || {}).segment_name || ''
 
   return (
@@ -251,12 +271,42 @@ export default function ProblemScoringTable({ clientId, canManage }) {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           {saveWord && <span style={{ ...LABEL, color: saveTone }}>{saveWord}</span>}
           {canManage && (
-            <button type="button" onClick={addRow} disabled={adding} style={btn(C.green, true)}>
-              {adding ? 'Adding...' : 'Add problem'}
+            <button type="button" onClick={addRow} disabled={adding} style={btn(C.green)}>
+              {adding ? 'Adding...' : 'Add a problem by hand'}
             </button>
           )}
         </div>
       </div>
+
+      {/* The problems were written in the customer's own words one table up.
+          Retyping them here loses the wording and costs the room time, so the
+          segments waiting to be scored are offered one click away. */}
+      {canManage && waiting.length > 0 && (
+        <div style={{
+          marginTop: 12, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.green}`,
+          borderRadius: 10, padding: '10px 12px',
+        }}>
+          <div style={LABEL}>
+            {waiting.length === 1
+              ? 'One segment has a problem written down and not yet scored'
+              : `${waiting.length} segments have a problem written down and not yet scored`}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+            {waiting.map((c) => (
+              <button
+                key={c.segmentId}
+                type="button"
+                onClick={() => carryAcross(c)}
+                disabled={adding}
+                title={c.problem}
+                style={{ ...btn(C.green, true), textAlign: 'left', maxWidth: 340 }}
+              >
+                + {c.segmentName}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!canManage && (
         <div style={{ ...LABEL, marginTop: 8 }}>Read only. You can see this work but not change it.</div>
