@@ -429,6 +429,54 @@ present by direct query: gtcv_questions, gtcv_submissions, gtcv_room_state,
 gtcv_room_presence, and the columns agreed_value, agreed_distribution,
 merged_into_row_id, room_size, scale_min and scale_max.
 
+## Eight of the nine checks do not run on a pull request into staging
+
+Found 11 August 2026, while reading the results on pull request 253. Not asked
+about. Raised because it is the same shape of hole as S48, which you made first
+priority: work aimed at staging goes in without being checked.
+
+WHAT WAS EXPECTED. Nine checks, as on pull request 252.
+
+WHAT ACTUALLY RAN on pull request 253. One.
+
+    The write paths must actually work            RAN, passed
+
+WHAT DID NOT RUN, and why. Each of these is triggered by a pull request into
+main and by nothing else, and pull request 253 goes into staging.
+
+    Row level security gate      .github/workflows/rls-check.yml
+    Route auth gate              .github/workflows/route-auth-check.yml
+    React hooks gate             .github/workflows/hooks-check.yml
+    Semgrep                      .github/workflows/semgrep.yml
+    Dependency audit             .github/workflows/dependency-audit.yml
+    Validate migration           .github/workflows/validate-migration.yml
+    AI Code Review               .github/workflows/ai-review.yml
+
+Each says, in its own words:
+
+    on:
+      pull_request:
+        branches: [main]
+
+Only smoke-write-paths.yml lists staging as well, which is why it is the one
+that ran. hooks-check.yml runs on a PUSH to staging, so it catches a merge but
+never the pull request that proposes one.
+
+WHY IT MATTERS. Everything reaches staging through a pull request into staging.
+main is 133 commits behind. So in practice these seven gates are running on a
+branch nothing merges into, and the branch everything merges into has one gate.
+The row level security gate and the route auth gate are exactly the two that
+would catch the kind of fault this stage could introduce.
+
+WHAT I HAVE NOT DONE. Changed them. Adding staging to a trigger is one line in
+each file, but which branches a gate defends is a decision about how the
+platform is protected, not a tidy-up, and Section 4 says I name a file and wait.
+Say the word and it is seven one-line changes.
+
+The lint, the type check and the tests were all run here before every push, so
+the code has been through the same checks by hand. That is not the same as a
+gate, because a gate cannot be forgotten.
+
 ## The nine checks, run 11 August 2026 on pull request 252
 
 Eight passed: row level security gate, route auth gate, validate migration, the
