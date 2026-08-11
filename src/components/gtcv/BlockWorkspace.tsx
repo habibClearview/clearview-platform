@@ -24,6 +24,55 @@ import { zoneBrief } from '@/lib/gtcv-zone-brief'
 // R20. What the room sent, waiting to become rows, drawn under the block's own
 // table rather than in a list somewhere else.
 import PendingRows from '@/components/gtcv/PendingRows'
+// R24. The button at the top of every block, and the sentence that stands
+// beside it on a block Stage 1 gives no questions to (Q8).
+import { BLOCKS_WITH_QUESTIONS, NO_QUESTIONS_YET } from '@/lib/stage1-question-sets'
+
+// ------------------------------------------------------------
+// R24. "Run this with the room", at the top of every block.
+//
+// IT LIVES HERE AND NOT IN THE BLOCK'S HEADER, and that is worth writing down
+// because the first attempt put it in the header and it did not appear.
+//
+// The dark header at the top of a block is drawn by TabDP in CoachDashboard,
+// and TabDP draws nothing but "This Decision Point is not yet loaded" when the
+// engagement has no rows in canvas_decision_points. GtCV Demo Client has none,
+// so on that engagement the header never exists and a button inside it never
+// exists either. Checked by query, not guessed, after it failed to appear.
+//
+// This component, by contrast, is what every block IS. It renders on the coach
+// dashboard and in the engagement journey view, on every engagement, whether
+// or not the canvas rows were ever created. So the button is at the top of
+// every block in the only sense that survives the data being incomplete.
+// ------------------------------------------------------------
+function RunThisWithTheRoom({ dpId, clientId }) {
+  const has = BLOCKS_WITH_QUESTIONS.includes(dpId)
+  const open = () => {
+    window.location.href =
+      `/coach/facilitate?clientId=${encodeURIComponent(clientId)}&gateId=${encodeURIComponent(dpId)}`
+  }
+  const base = {
+    fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+    fontSize: 13, fontWeight: 700, padding: '8px 14px', borderRadius: 8,
+    border: '1px solid #2A9D8F', background: '#2A9D8F', color: '#FFFFFF',
+  }
+  return (
+    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+      <button
+        type="button"
+        disabled={!has}
+        onClick={has ? open : undefined}
+        style={has ? { ...base, cursor: 'pointer' } : { ...base, opacity: 0.4, cursor: 'default' }}
+      >Run this with the room</button>
+      {/* Q8, word for word, on the blocks Stage 1 gives no questions to. */}
+      {!has ? (
+        <span style={{
+          fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: 13.5, color: '#6B7A8C',
+        }}>{NO_QUESTIONS_YET}</span>
+      ) : null}
+    </div>
+  )
+}
 
 // What this zone is for, taken from the method reference. Three things, in the
 // order a room needs them: the question, what has to exist before the gate can
@@ -166,6 +215,9 @@ export default function BlockWorkspace({ dpId, clientId, canManage, currency }) 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+      {/* R24. The first thing in the block, above everything else in it. */}
+      <RunThisWithTheRoom dpId={dpId} clientId={clientId} />
+
       {/* What the zone is for, before the tools. A zone used to open straight
           into its tables, so the question it exists to settle, what has to
           exist before it closes, and how you know the answer is real were all
