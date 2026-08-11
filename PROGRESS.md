@@ -1,114 +1,167 @@
 # Progress
 
-No requirements started.
-
 ## Specification received so far
 
 Part 1: Context, sections 1 to 5. Received 11 August 2026.
+Part 2: Stage 1, requirements R1 to R32. Received 11 August 2026.
 
-The numbered requirements themselves have not been received. Part 1 names them
-by range only (Stage 1 is R1 to R32, Stage 2 is R33 to R39, Stage 3 is R40 to
-R47, Stage 4 is R48 to R64, Stage 5 is R65 to R71, Stage 6 is R72 to R77), and
-gives no text for any individual requirement and no test for any of them.
-
-No stage has been authorised.
+Stage 1 is authorised. No other stage is authorised.
 
 ## Requirement status
 
-None attempted. Nothing can be attempted until the numbered requirements and an
-authorised stage are received.
+R1 to R32: not started. Awaiting approval of the technical approach under
+rule 4, and answers to Q4 to Q10 below.
+
+## Questions answered
+
+### Q1. "rename" is not one of the service decisions the system allows
+Answered 11 August 2026: add 'rename'.
+Not yet built. See "Decisions taken" below for why it has not been built during
+Stage 1.
+
+### Q2. An activity can exist today with no parent service
+Answered 11 August 2026: an activity that has no parent service should be put
+somewhere it can be moved to a service from, but an activity must have a parent
+service.
+Not yet built, for the same reason as Q1.
+
+### Q3. What happens to the existing session page at /session/[token]
+Answered 11 August 2026: keep both, and follow the new instruction as closely
+as possible while flagging what may not work well for the platform.
+
+### Flag carried forward
+The gate message quoted in Section 4 as "0 of 2 meet the 5 and 3 rule" is still
+not found by that wording anywhere in the repository. Answered 11 August 2026:
+it may become clear once all stages are posted; keep flagging if not. Carried
+forward, unresolved.
 
 ## Questions waiting for an answer
 
-Raised 11 August 2026. All three are conflicts between Part 1 and the system as
-it is deployed today, verified against the staging database and the repository
-rather than assumed.
+Raised 11 August 2026 against Stage 1.
 
-### Q1. "rename" is not one of the service decisions the system allows
+### Q4. How does /room know which room it is showing? (blocks R5, R6, R7, R8)
+R5 gives the participant page the address /room, with nothing after it. Section
+4 says the existing /join page and room code mechanism remain unchanged, and
+today /join sends a participant to /session/[token], where the token in the
+address identifies the session.
 
-Section 2 lists five provisional service decisions: keep it, redesign it,
-rename it, pause it, or stop it.
-
-The deployed database allows exactly four. The check constraint on
-gtcv_service_inventory.decision permits 'keep', 'redesign', 'pause', 'stop',
-and nothing else. There is no 'rename'.
-
-Section 4 says not to change any existing dropdown and its options without
-asking. Adding "rename" changes one.
+/room as written carries no such identifier, so a participant opening it cannot
+be told which engagement, block or question they are answering.
 
 Options:
-  (a) Add 'rename' as a fifth decision, which alters the existing constraint
-      and the existing dropdown.
-  (b) Treat renaming as an outcome of 'redesign' rather than a decision of its
-      own, changing nothing.
-  (c) Leave the five in the specification and build against the four that
-      exist, which would mean the screen cannot record what Section 2 asks for.
+  (a) /join keeps its code box and sends the participant to /room, with the
+      session held in the browser after the code is accepted.
+  (b) /room carries the identifier in the address, for example /room?s=TOKEN.
+  (c) /room shows its own code box when it does not yet know the session.
 
-I would choose (a), because Section 2 states the five as the method and (b)
-loses the distinction between changing what a service is and changing what it
-is called. But this is a change to protected existing work, so I am not
-choosing it.
+I would choose (a), because it leaves /join and the code mechanism untouched as
+Section 4 requires, and keeps the address exactly "/room" as R5 requires. I am
+not choosing it.
 
-### Q2. An activity can exist today with no parent service
+### Q5. R25 and R31 contradict each other (blocks R25, R31)
+R25 says the Facilitator View shows only five things: the question, the
+counter, the answers as cards, the timer, and the three buttons. R31 says a
+connection indicator is displayed at all times and visible without scrolling. A
+connection indicator is not one of the five.
 
-Section 2 says never allow an activity to exist without a parent service, and
-never display an activity table without its parent service visible.
-
-Today both columns on gtcv_assumptions that could hold the parent are nullable:
-service_id and service_name. An activity with no service is currently a valid
-row.
-
-Enforcing the rule changes existing behaviour, and there may already be saved
-activities with no service against them.
-
-Questions:
-  (a) Should the rule be enforced on new rows only, or on all rows?
-  (b) What should happen to any activity already saved without a parent
-      service? Options: block the screen until each is assigned; show them
-      under a holding heading until assigned; or leave them and enforce only
-      going forward.
-
-I have not chosen, and I have not inspected any client's saved rows to count
-them, because that is client data and the question can be answered without it.
-
-### Q3. What happens to the existing session page at /session/[token]
-
-Section 3 says the participant page is at /room. Section 4 says the existing
-/join page and room code mechanism remain unchanged.
-
-Neither section mentions /session/[token], which exists today and is the page a
-participant reaches after entering a room code at /join. /room and
-/coach/facilitate do not exist yet.
+R25 also says no build banner. Section 4 separately says not to alter the
+staging banner. Whether hiding the staging banner on one screen counts as
+altering it is not stated.
 
 Options:
-  (a) /room is a new page and /session/[token] stays exactly as it is.
-  (b) /room replaces /session/[token], and /join sends people to /room instead.
+  (a) R31 wins: the connection indicator is a sixth element on the Facilitator
+      View, and the staging banner is hidden there.
+  (b) R25 wins literally: no connection indicator, which fails R31.
+  (c) R31 wins for the connection indicator, and the staging banner stays,
+      which fails R25's "nothing else" test.
 
-I would choose (a), because Section 4 protects the room code mechanism and (b)
-changes where that mechanism sends people. But the specification is silent, so
-I am not choosing.
+I would choose (a). I am not choosing it.
+
+### Q6. What is the agreed value, and which field does it write to? (blocks R2, R23)
+R23 says the agreed value from a score or classify question writes to the table
+field. It does not say what the agreed value is when six people give six
+different answers.
+
+Options for a score question: the median; the mean; the most common value; or a
+value the facilitator types after seeing the distribution.
+
+Options for a classify question: the option with most votes; or the
+facilitator's choice after seeing the split.
+
+I would choose the facilitator typing or choosing it after the reveal, because
+the method treats the distribution as the discussion and the single value as a
+decision the room reaches rather than an arithmetic result. I am not choosing.
+
+### Q7. What counts as "near identical"? (blocks R22)
+R22 groups near identical submissions into one pending row. The test has four
+devices submitting "similar wording" and expects one row with a count of four.
+The specification does not define how alike two answers must be.
+
+Options:
+  (a) Exact match after ignoring case, spacing and punctuation. Predictable,
+      but "farmer training" and "training for farmers" stay separate.
+  (b) A similarity measure with a threshold. Catches more, and will sometimes
+      merge two things the room meant to keep apart.
+  (c) No automatic grouping: the facilitator merges, which R21 already allows.
+
+I would choose (a), because a wrong merge destroys a contribution and the
+facilitator can still merge by hand under R21, whereas an unwanted split costs
+one click. I am not choosing.
+
+### Q8. What does the Facilitator View show for a block with no questions? (blocks R4, R24)
+R24 puts "Run this with the room" at the top of every block. R4 defines
+question sets for two blocks only and says the others must show none without
+error. R25 describes the Facilitator View as showing the current question,
+which will not exist for the other nine blocks.
+
+Options:
+  (a) The button appears on every block; on a block with no questions the
+      Facilitator View opens and says so in a sentence you would need to give
+      me the wording for.
+  (b) The button appears only on the two blocks that have questions, which
+      reads against R24's "every block".
+
+I would choose (a), and would need the exact sentence from you under rule 5. I
+am not choosing.
+
+### Q9. Who sets the timer's length? (blocks R30)
+R30 says the timer can be started, paused and reset. Its test uses a two minute
+timer. It does not say whether two minutes is fixed, whether the facilitator
+types a length, or whether the length is stored on the question.
+
+I would let the facilitator set it at the moment of starting, defaulting to two
+minutes. I am not choosing.
+
+### Q10. Which name shows when scores tie? (blocks R18)
+R18 shows which participant gave the highest and the lowest score on a named
+question. If three people all gave the highest score, the specification does not
+say whether to show all three, the first to answer, or something else.
+
+I would show all of them. I am not choosing.
 
 ## Decisions taken that the specification did not cover
 
-None. No build work has begun.
+None affecting the product.
+
+One point of process, recorded because it affects what gets built and when: the
+answers to Q1 (add 'rename') and Q2 (an activity must have a parent service)
+are approved changes, but neither is among requirements R1 to R32. Rule 1 says
+to build only what the currently authorised stage specifies and not to build
+ahead. So neither has been built during Stage 1. Both are waiting to be told
+which stage they belong to, or to be told explicitly that they are in scope now.
 
 ## Where the protected items live, recorded for the Section 8 regression check
 
-Verified 11 August 2026, so that later sessions can check these by name without
-searching again.
+Verified 11 August 2026.
 
   "Phase 0 is not closed yet"      src/components/gtcv/PhaseZeroWorkspace.tsx:662
   "... with no budget holder"      src/components/gtcv/PhaseZeroWorkspace.tsx:452
   "... has no decision"            src/components/gtcv/PhaseZeroWorkspace.tsx:664
-
-The message Section 4 quotes as "0 of 2 meet the 5 and 3 rule" was not found by
-that wording anywhere in the repository. It may be phrased differently on
-screen. This is not a question blocking any requirement, but the exact current
-wording needs establishing before Section 8 can be honestly reported against.
+  "0 of 2 meet the 5 and 3 rule"   not found by this wording
 
 ## What the next session should pick up first
 
-Read this file and CLAUDE_CODE_STANDING_RULES.md. Then check whether the
-numbered requirements and an authorised stage have been received. Do not begin
-build work until both exist, and until Q1, Q2 and Q3 are answered, since all
-three sit underneath Stage 1.
+Read this file and CLAUDE_CODE_STANDING_RULES.md. Stage 1 is authorised but not
+started. Check whether the technical approach has been approved under rule 4
+and whether Q4 to Q10 have been answered. Do not write code for Stage 1 until
+both are true.
