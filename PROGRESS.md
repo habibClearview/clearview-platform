@@ -229,6 +229,17 @@ something that works today. So the same change added a five second re-read of
 the list only, which replaces what is on screen only where it has actually
 changed, so a coach reading a sentence is not interrupted.
 
+### D9. On a score or classify question the choice IS the submit button
+R9 asks for "an input appropriate to its type, and a submit button". A collect
+question has boxes and a Send button beneath them, which is plainly that. A
+score question has the numbers on the scale as buttons, and pressing one sends
+it; a classify question has the options as buttons the same way.
+
+Taken because on a phone, in a room, one press is the appropriate input for
+choosing one value, and a second press to confirm a choice that R11 lets you
+change freely until the reveal would be a step with nothing behind it. If you
+would rather see an explicit Send on those two, it is a small change.
+
 ### D8. An offline answer to a question that has since closed is refused
 R32 says an answer submitted with no connection is delivered when the
 connection returns, with nothing lost. The three guards say a submission to a
