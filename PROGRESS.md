@@ -164,6 +164,116 @@ Verified 11 August 2026.
   "0 of 2 meet the 5 and 3 rule"   not found by this wording
   Staging banner                   src/components/common/EnvBanner.tsx, drawn by app/layout.tsx
 
+## Before production, not before Stage 1
+
+Moved here 11 August 2026. None of these blocks Stage 1. The instruction to do
+the gate decision triggers now was withdrawn.
+
+  S36, S37, S38, S39. Triggers refusing update and deletion of a signed gate
+  decision; append-only evidence with a superseded marker; reopening recorded.
+  Verified 11 August: gtcv_gate_signoffs has no triggers at all, so a signed
+  decision can currently be edited or deleted. It does record who and when
+  (recorded_by_user_id, signed_at, created_at, signature_method).
+
+  S42. A test pinning the staging banner, so it cannot be removed unnoticed.
+  EnvBanner is drawn by app/layout.tsx on every page and is driven by the
+  environment, so it cannot appear in production today.
+
+  S44. Restore a backup into a scratch project and confirm it works. Never
+  done. An untested backup is a belief.
+
+  S30 to S33. The position on audio storage, reach, consent and retention.
+  Habib writes this; it is not mine to invent. Nothing touching audio is to be
+  built until he does.
+
+## Known unknowns
+
+Things nobody can now establish, recorded so that silence is never mistaken
+for assurance.
+
+  S41. Whether production data was ever copied into staging before 11 August
+  2026 cannot be determined from here. I have never done it. That is the whole
+  of what can be said.
+
+  S24, S21 to S23. What the push channel actually delivers to a browser
+  holding only the public key is STILL UNKNOWN. See the section below.
+
+## The push channel check, which could not be run
+
+Attempted 11 August 2026 and inconclusive. scripts/check-push-channel.mjs
+subscribes holding only the public key, writes a row with the service key, and
+reports anything that arrives.
+
+The public key subscription returned CHANNEL_ERROR, which looks like the
+desired answer and is not one. The control subscription, using the service key
+which is authorised for everything, returned CHANNEL_ERROR too, and the next
+line gave the reason:
+
+    Host not in allowlist: giugeygicxltwqnqlwto.supabase.co.
+    Add this host to your network egress settings to allow access.
+
+Both keys failed for the same reason and it has nothing to do with permissions.
+The script exits with code 3 in this case, distinct from both pass and fail, so
+this can never be read later as a pass.
+
+To resolve, run from a machine that can reach the database host:
+
+    SUPABASE_URL=https://giugeygicxltwqnqlwto.supabase.co \
+    SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... \
+    node scripts/check-push-channel.mjs
+
+Consequence for the build, decided rather than waited on: the Participant Page
+is built so that it never depends on the public key reading these tables. It
+receives everything through the server route holding the elevated key and
+subscribes to nothing directly. That way the unanswered question stops carrying
+any weight.
+
+## Dependencies, recorded 11 August 2026, not to be fixed this stage
+
+Ten advisories, all rated high. Nine have a fix available; one does not.
+
+  xlsx (SheetJS)  NEEDS A REAL DECISION LATER, ON ITS OWN.
+    Prototype pollution, and a pattern that can hang on hostile input. No fix
+    available. Used directly to read client workbooks, so it parses files
+    people send in. That is what makes it different from the other nine.
+    Fixing means leaving the npm copy for SheetJS's own distribution.
+
+  next            Information exposure in the dev server; cache confusion on
+                  the image route. Fix is a framework upgrade, so it touches
+                  everything. Do not attempt during Stage 1.
+  postcss         Cross-site scripting via unescaped output; file read via a
+                  crafted CSS comment. Carried by next.
+  undici          Response desynchronisation and cross-user disclosure via
+                  caching. Carried by next.
+  js-yaml         Crafted input can force very heavy CPU work.
+  nanoid          Can loop indefinitely on a zero or negative size.
+  brace-expansion Crafted input can force very heavy CPU work.
+  glob            Command injection in its command-line tool, which is never
+                  run here.
+  eslint-config-next, @next/eslint-plugin-next
+                  Development only, never shipped to a browser.
+
+Last reviewed 9 August 2026, the last commit touching package.json.
+Do not run npm audit again during Stage 1.
+
+## The state of staging, found 11 August 2026
+
+engagement_clients is EMPTY. There are no engagements on the staging database
+at all. Nothing in Stage 1 can be demonstrated until one is seeded, and the
+first attempt to run the push channel check failed for exactly this reason
+before the network problem was reached.
+
+## The nine checks, run 11 August 2026 on pull request 252
+
+Eight passed: row level security gate, route auth gate, validate migration, the
+write paths must actually work, dependency audit, react hooks gate, semgrep.
+
+One failed: AI Code Review. It needs ANTHROPIC_API_KEY, which is deliberately
+not provided. Treat this check as permanently unavailable. Do not read its log,
+do not fix it, do not raise it again.
+
+staging was 133 commits ahead of main, so main is stale. Recorded, no action.
+
 ## What the next session should pick up first
 
 Read this file and CLAUDE_CODE_STANDING_RULES.md. Stage 1 is authorised, the
