@@ -3,7 +3,7 @@ name: AI Code Review
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    branches: [main]
+    branches: [main, staging]
 
 # Least privilege by default; the review job re-grants only what it needs.
 permissions:

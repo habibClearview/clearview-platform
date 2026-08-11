@@ -14,6 +14,9 @@ import SessionRoom from '@/components/gtcv/SessionRoom'
 import ViewAsBar from '@/components/coach/ViewAsBar'
 import { mayPreview } from '@/lib/role-preview'
 import { gateIsOpen, gateShutBecause } from '@/lib/gtcv-gates'
+// R24. The button at the top of every block, and the sentence that stands
+// beside it on a block Stage 1 gives no questions to (Q8).
+import { BLOCKS_WITH_QUESTIONS, NO_QUESTIONS_YET } from '@/lib/stage1-question-sets'
 import CurrencyField from '@/components/common/CurrencyField'
 import { formatMoneyShort } from '@/lib/currency'
 import SessionPlanner from '@/components/gtcv/SessionPlanner'
@@ -3243,7 +3246,24 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
           <div style={{display:'flex',flexDirection:'column',gap:'0.5rem',alignItems:'flex-end'}}>
             <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}><DPDot status={dp.status}/><span style={{fontSize:'1.01rem',color:'var(--cv-on-accent)'}}>{dp.status}</span></div>
             <p style={{margin:0,fontSize:'1.01rem',color:C.cyan}}>{completedComps}/{totalComps} components</p>
-            <button style={addBtn(true)} onClick={()=>window.print()}>Print</button>
+            {/* R24. At the top of the block, beside the block title. It opens
+                the Facilitator View at /coach/facilitate, carrying which
+                engagement and which block, because a full screen view with no
+                block would have nothing to run.
+                Q8: on a block Stage 1 gives no questions to, the button is
+                present but disabled, with the sentence beside it, word for
+                word, which is how the disabled gate button behaves elsewhere. */}
+            <div style={{display:'flex',gap:'0.4rem',alignItems:'center',flexWrap:'wrap',justifyContent:'flex-end'}}>
+              {!BLOCKS_WITH_QUESTIONS.includes(dp.dp_id)&&(
+                <span style={{fontSize:'0.93rem',color:'var(--cv-wa-60)',maxWidth:'22rem',textAlign:'right'}}>{NO_QUESTIONS_YET}</span>
+              )}
+              <button
+                style={BLOCKS_WITH_QUESTIONS.includes(dp.dp_id)?addBtn(true):{...addBtn(true),opacity:0.45,cursor:'default'}}
+                disabled={!BLOCKS_WITH_QUESTIONS.includes(dp.dp_id)}
+                onClick={()=>{window.location.href=`/coach/facilitate?clientId=${encodeURIComponent(client.id)}&gateId=${encodeURIComponent(dp.dp_id)}`}}
+              >Run this with the room</button>
+              <button style={addBtn(true)} onClick={()=>window.print()}>Print</button>
+            </div>
           </div>
         </div>
       </div>

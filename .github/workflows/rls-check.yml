@@ -20,7 +20,7 @@ name: Row level security gate
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, staging]
 
 permissions:
   contents: read

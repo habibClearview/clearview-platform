@@ -6,7 +6,7 @@ on:
       - '*.sql'
       - 'migrations/**'
       - 'supabase/**'
-    branches: [main]
+    branches: [main, staging]
 
 jobs:
   validate:

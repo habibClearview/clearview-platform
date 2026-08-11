@@ -16,7 +16,7 @@ name: Route auth gate
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, staging]
 
 permissions:
   contents: read

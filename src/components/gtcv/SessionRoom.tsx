@@ -9,8 +9,11 @@
 //                 The room scans it and starts typing. Twelve hours by default,
 //                 because a session is an afternoon.
 //   WATCH IT      what the room has added, newest first, with who said it.
-//                 Refreshes when asked rather than constantly, so a projected
-//                 screen does not jump while somebody is reading it.
+//                 It keeps itself current: R28 removed the Refresh button, and
+//                 R27 says a screen showing what a room is saying must not wait
+//                 to be asked. Only the list is re-read, and only when it has
+//                 changed does anything redraw, so a projected screen does not
+//                 jump while somebody is reading it.
 //   USE IT        turn a sentence into a row in the block's own table, in one
 //                 click and in the words it was said in, or mark it used if it
 //                 went in some other way. The pile shrinks honestly, which is
@@ -119,6 +122,31 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
   }, [clientId])
 
   useEffect(() => { load() }, [load])
+
+  // R28 took the Refresh button away, so this takes its place. It re-reads only
+  // the list of what the room has typed, never the links, and it does not touch
+  // the loading flag, so nothing on screen blinks. The list is replaced only
+  // where it has actually changed, so a coach reading a sentence is not
+  // interrupted by a redraw that changes nothing.
+  useEffect(() => {
+    if (!clientId) return
+    let cancelled = false
+    const tick = async () => {
+      try {
+        const c = await api('/api/session-contributions', 'GET', null, `?clientId=${encodeURIComponent(clientId)}`)
+        if (cancelled) return
+        setContributions((prev) => {
+          const next = c.contributions || []
+          return JSON.stringify(prev) === JSON.stringify(next) ? prev : next
+        })
+      } catch {
+        // A poll that fails changes nothing on screen. The next one will catch
+        // up, and the coach is not shown an error for a moment of bad signal.
+      }
+    }
+    const t = setInterval(tick, 5000)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [clientId])
 
   // Draw a QR for each open link. Done here so the link never leaves for a
   // third party to draw it: a URL sent to an image service is the link, given
@@ -311,7 +339,8 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
             What people typed in the room
           </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button type="button" style={ghost} onClick={load}>Refresh</button>
+            {/* R28. The Refresh button was here. It is gone, and not kept as a
+                fallback: the list re-reads itself above. */}
             {usedCount > 0 ? (
               <button type="button" style={ghost} onClick={() => setShowUsed((v) => !v)}>
                 {showUsed ? `Hide the ${usedCount} already used` : `Show the ${usedCount} already used`}
