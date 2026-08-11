@@ -54,6 +54,24 @@ export async function GET(req: NextRequest) {
     if (!me) return NextResponse.json({ joined: false })
 
     const db = admin()
+
+    // This device is still listening. Recorded here because this is the one
+    // thing every phone in the room does every second and a half, so it is the
+    // only honest evidence of who is still there. It is NEVER folded into the
+    // answer counter: see the comment at the top of the presence migration for
+    // why that separation matters on a projector.
+    await db
+      .from('gtcv_room_presence')
+      .upsert(
+        { client_id: me.clientId, participant_id: me.participantId, last_seen_at: new Date().toISOString() },
+        { onConflict: 'client_id,participant_id' },
+      )
+      .then(({ error }) => {
+        // Never a reason to refuse the page. A participant whose presence was
+        // not recorded can still answer.
+        if (error) console.error('room GET: presence stamp failed', error)
+      })
+
     const { data: state } = await db
       .from('gtcv_room_state')
       .select('open_question_id, revealed, timer_started_at, timer_seconds, timer_paused_with_seconds_left')
