@@ -1,4 +1,4 @@
-Last updated: 11 August 2026, 16:25
-Now working on: nothing — Stage 1 is merged and live on staging, waiting for you to run the written tests
-Built, awaiting their tests: R1 to R32, all of them, live on staging at commit ca69aad
+Last updated: 11 August 2026, 17:20
+Now working on: nothing — waiting for you to run the written tests
+Built, awaiting their tests: R1 to R32, live at your address on commit dce37ff
 Complete, tests passing: none — you are running the tests

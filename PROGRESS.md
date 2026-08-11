@@ -22,6 +22,29 @@ screen including the Facilitator View, because the risk of real client
 information being entered into a staging copy is worse than the visual cost.
 Everything else in R25 stands: no navigation, no sidebar, no other content.
 
+## WHERE THE BUILD HAS TO GO. Read this before pushing anything.
+
+Habib's staging is this address, and no other:
+
+    https://clearview-platform-git-claude-coach-deploy-33cc44-clearview2026.vercel.app
+
+It is served by the branch **claude/coach-deploy-corrections-2kj6q4**. That is
+the address he has open, the one his bookmark points at, and the one every
+screenshot he sends comes from.
+
+SO EVERY PUSH GOES TO BOTH:
+
+    git push -u origin staging
+    git push origin staging:claude/coach-deploy-corrections-2kj6q4
+
+Pushing to staging alone is the same as not shipping. It has now happened
+three times: he opens his address, the work is not there, and the fault looks
+like the feature when it is only the branch. Do not let it happen a fourth
+time. Check what the address is actually serving before saying anything is
+live:
+
+    curl -s <address>/api/build-info
+
 ## Requirement status
 
 R1 to R32: all built. None yet demonstrated on staging against the written
