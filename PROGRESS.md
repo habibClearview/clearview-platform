@@ -24,8 +24,12 @@ Everything else in R25 stands: no navigation, no sidebar, no other content.
 
 ## Requirement status
 
-R1 to R32: not started. The approach is approved. Waiting on agreement to the
-build banner proposal below, which is the last thing outstanding before code.
+R1 to R32: all built. None yet demonstrated on staging against the written
+tests, because the branch has not been merged and deployed. See STATUS.md for
+the live position and the end-of-stage report for what each test needs.
+
+Q11, the build banner, resolved itself: no existing file needed changing. See
+the section below, which is kept because it records what was checked.
 
 ## Questions answered
 
@@ -152,7 +156,87 @@ is read, changed or moved to achieve this. BuildStamp.tsx is not touched.
 
 ## Decisions taken that the specification did not cover
 
-None. No build work has begun.
+Each of these was taken rather than waited on, under the instruction of 11
+August 2026 to finish a requirement and record the concern rather than stop.
+
+### D1. Q4 contradicted itself, and the reading that breaks nothing was taken
+The answer to Q4 said both that "/join keeps its code box and sends people to
+/room" and that "/join itself is untouched". Both cannot be true: /join today
+sends people to /session/[token], so making it send them to /room would be
+touching it.
+
+Taken: /join is left exactly as it is, character for character, and /room
+takes a code itself when the browser has not joined a room. Nothing that works
+today changes, and somebody who types a code at either address gets to a room.
+
+The code is not resolved twice. /room calls resolveJoinCode and
+loadSessionLink, the same two functions /api/session-join uses, so the rules
+about withdrawal, expiry, grant type and block cannot be tightened in one
+place and forgotten in the other. It also shares their rate limit KEYS
+deliberately, so two doors onto one code share one budget rather than giving a
+guesser twice the tries.
+
+### D2. The screens keep themselves current by asking, not by being told
+The approved approach was the database's own push service. It is not used, and
+the reason is in "The push channel, opened and then closed" below: a browser
+holding only the public key was receiving messages from it.
+
+Instead every screen asks the server what has arrived — the Participant Page
+every second and a half, the Facilitator View every second and a half, the
+room feed in the block view every five seconds. No button is pressed and no
+page is reloaded, which is what R8, R27 and R29 require. R27 rules out "a
+refresh button, an automatic timed reload, or a manual reload" by name; this
+is none of the three, because nothing reloads. I record it plainly because it
+is not the mechanism that was approved, and if you want a live socket instead
+it is a stage of its own now that the channel question has an answer.
+
+### D3. Two of the four Clearing the ground questions have no home column
+R23 writes the agreed value to "the table field". gtcv_assumptions has no
+column that "if the grant stopped tomorrow, how likely is it that someone
+would still pay" or "signal or story" belongs in. gtcv_service_inventory does
+have homes for both DP01 judgement questions.
+
+Taken: where a question names a column, the agreed value writes there. Where
+it names none, the value and the full distribution are still stored on the
+question, so nothing is lost and the value can still be pressed to see how the
+room answered. The two Clearing the ground judgement questions are in that
+position. Tell me which columns they should write to and it is a small change.
+
+### D4. Whether a question is named can no longer be changed once it is answered
+R19 says the facilitator can change it "before opening it" and does not say
+what happens afterwards. The route refuses the change once any answer exists,
+because turning an anonymous question into a named one would put names on
+answers people gave on the understanding that there would be none.
+
+### D5. Merging does not overwrite the row it merges into
+R21 says a pending row can be merged into an existing row and does not say
+what happens to the existing wording. The existing row is left as it is, and
+the submissions are marked as merged into it. The count of people who said the
+same thing survives, which is what makes R22's "submitted by 4" mean anything.
+
+### D6. Participant connection is counted, and kept away from the answer counter
+Instructed on 11 August 2026: show participant connection state separately,
+never mixed into the answer counter. A new table, gtcv_room_presence, records
+when each device last asked what was open. The Facilitator View shows "N
+devices in the room" beside the connection indicator, and the counter beside
+the question is only ever answers. A device dropping off the network must not
+read on a projector as a person who has finished answering.
+
+### D7. The Refresh button's removal came with something to replace it
+R28 removes the button. R27 says the screen must keep itself current. Removing
+the button on its own would have left the room feed frozen, which would break
+something that works today. So the same change added a five second re-read of
+the list only, which replaces what is on screen only where it has actually
+changed, so a coach reading a sentence is not interrupted.
+
+### D8. An offline answer to a question that has since closed is refused
+R32 says an answer submitted with no connection is delivered when the
+connection returns, with nothing lost. The three guards say a submission to a
+question that is no longer open is refused. Where a phone is out of signal long
+enough for the room to move on, those two meet, and the guard wins: the answer
+is refused and the participant is told once, plainly, rather than having it
+counted against a question they were not answering. R32's own test passes,
+because in it the question is still open.
 
 ## Where the protected items live, recorded for the Section 8 regression check
 
@@ -198,7 +282,62 @@ for assurance.
   S24, S21 to S23. What the push channel actually delivers to a browser
   holding only the public key is STILL UNKNOWN. See the section below.
 
-## The push channel check, which could not be run
+## The push channel, opened and then closed
+
+THIS IS THE ONE THING IN THIS STAGE YOU SHOULD READ TWICE.
+
+On 11 August 2026 the check finally ran. The container could reach the
+database host this time, where the earlier attempt could not, and the result
+was not the one hoped for.
+
+    subscribing as a visitor holding only the public key...
+      subscription status: SUBSCRIBED
+      control subscription status (service key): SUBSCRIBED
+    control: 3 message(s) reached the service key subscription.
+    RESULT: 3 message(s) REACHED THE PUBLIC KEY.
+      gtcv_questions INSERT: {}
+      gtcv_submissions INSERT: {}
+      gtcv_room_state INSERT: {}
+
+The control worked, so this run proves something. A browser holding only the
+public key — the key that is in every copy of the site — received a message
+for every write to all three room tables.
+
+WHAT DID AND DID NOT LEAK. The contents did not come with them: every payload
+arrived empty, so the words people typed and the scores they gave stayed
+inside. What leaked was that a write happened, to which table, and when. That
+is enough to tell a stranger that a workshop is running and when each answer
+lands. Under Section 9 that is information about real organisations and real
+named individuals, and it should not have left.
+
+WHAT WAS DONE. The three tables were removed from the publication, in
+supabase/migrations/2026_08_11_stage1_close_the_push_channel.sql, and the
+migration was applied to staging. Nothing subscribes to that channel: both new
+screens take everything through a server route holding the elevated key, so
+removing it broke nothing. The publication entries were added by the Stage 1
+migration earlier the same day, in the expectation that the screens would use
+them, and they never did — so this undoes something from this stage rather
+than something that already existed and worked.
+
+Re-running the check afterwards reports nothing arriving at either key. That
+run on its own proves nothing, because with the tables out of the publication
+nobody receives anything and the control is silent for a known reason. The
+proof is the earlier run, which had a working control and showed the leak.
+
+ALSO CHECKED, DIRECTLY, on the same day: the public key is refused outright on
+all four room tables over the ordinary interface, before row level security is
+even reached.
+
+    gtcv_questions      401  permission denied for table gtcv_questions
+    gtcv_submissions    401  permission denied for table gtcv_submissions
+    gtcv_room_state     401  permission denied for table gtcv_room_state
+    gtcv_room_presence  401  permission denied for table gtcv_room_presence
+
+TO RE-OPEN IT LATER. Adding a table back to the publication re-opens exactly
+what was found here, so it should not be done without deciding first what a
+holder of the public key is allowed to learn.
+
+## The push channel check, which could not be run at first
 
 Attempted 11 August 2026 and inconclusive. scripts/check-push-channel.mjs
 subscribes holding only the public key, writes a row with the service key, and
@@ -256,12 +395,28 @@ Ten advisories, all rated high. Nine have a fix available; one does not.
 Last reviewed 9 August 2026, the last commit touching package.json.
 Do not run npm audit again during Stage 1.
 
-## The state of staging, found 11 August 2026
+## The state of staging, corrected 11 August 2026
 
-engagement_clients is EMPTY. There are no engagements on the staging database
-at all. Nothing in Stage 1 can be demonstrated until one is seeded, and the
-first attempt to run the push channel check failed for exactly this reason
-before the network problem was reached.
+The earlier entry here said engagement_clients was EMPTY. THAT WAS WRONG. The
+query had been blocked by the container's network settings and the failure was
+read as an empty result. Three engagements exist:
+
+    11111111-1111-1111-1111-111111111111   Demo Foods Ltd
+    client-ikore                           Ikore
+    client_1786340570857                   GtCV Demo Client
+
+Stage 1 is demonstrated against GtCV Demo Client, as instructed. No further
+test client has been created, and the throwaway engagement made for the earlier
+control test is gone: the list above is the whole of the table.
+
+scripts/check-push-channel.mjs used to create a throwaway engagement of its
+own, on the same mistaken belief. It now writes against GtCV Demo Client and
+removes only what it wrote.
+
+The Stage 1 tables and columns are applied to staging and were confirmed
+present by direct query: gtcv_questions, gtcv_submissions, gtcv_room_state,
+gtcv_room_presence, and the columns agreed_value, agreed_distribution,
+merged_into_row_id, room_size, scale_min and scale_max.
 
 ## The nine checks, run 11 August 2026 on pull request 252
 
@@ -274,9 +429,60 @@ do not fix it, do not raise it again.
 
 staging was 133 commits ahead of main, so main is stale. Recorded, no action.
 
+## The Section 8 regression check, run 11 August 2026
+
+Checked by reading the code, not assumed. Every item found by name.
+
+  The eleven blocks in left navigation, and their tables
+    Clearing the ground        Clearing the ground
+    DP01 Service Reality       Service inventory
+    DP02 Customer Clarity      Customer segments and the adoption test;
+                               Problem prioritisation; Before you go out: the
+                               conversation rules; Customer conversation
+                               capture; What the conversations add up to
+    DP03 Value Proposition     Proposition builder
+    DP04 Viability Model       Cost, break even and pricing
+    DP05 Market Entry          Message testing; Pipeline
+    DP06 Identity and Partners Partner map
+    DP07 Pilot and Learn       Pilot capture
+    DP08 Scale Pathway         Channel logic
+    DP09 Readiness             Commercial readiness
+    Handover                   The five independence tests
+
+  Gate readiness messages and counters
+    "Phase 0 is not closed yet"   PhaseZeroWorkspace.tsx:662, unchanged
+    "... with no budget holder"   PhaseZeroWorkspace.tsx:452, unchanged
+    "... have no decision"        PhaseZeroWorkspace.tsx:664, unchanged
+    "X has to be signed off before this one opens."
+                                  gtcv-gates.ts, gateShutBecause, unchanged
+    "0 of 2 meet the 5 and 3 rule"  STILL not found by this wording. Carried
+                                  forward unresolved, as agreed.
+
+  Evidence Library, and entries associated to gates
+    EvidenceLibraryPanel.tsx filters on dp_id, new entries default to the gate
+    being viewed, and the gate can be changed per row. Unchanged.
+
+  Session Plan, room types and required attendee flags
+    SessionPlanner.tsx still holds the six room kinds with their required
+    roles, and still warns when a required attendee is not ticked. Unchanged.
+
+  Revision tracking on DP03 propositions
+    PropositionBuilder.tsx still carries revision_count, the "Revision N"
+    badge and "Record revision". Unchanged.
+
+  The staging banner
+    EnvBanner, drawn by app/layout.tsx on every page including the two new
+    ones. Unchanged, and the amendment to R25 requires it to stay.
+
 ## What the next session should pick up first
 
-Read this file and CLAUDE_CODE_STANDING_RULES.md. Stage 1 is authorised, the
-approach is approved, and Q4 to Q10 are answered. The only thing outstanding is
-agreement to the build banner proposal recorded as Q11. Once that is agreed,
-build R1 to R32 and report against the tests as written.
+Read this file and CLAUDE_CODE_STANDING_RULES.md, then STATUS.md.
+
+R1 to R32 are built and on the branch claude/stage1-room-capture. Nothing has
+been demonstrated on staging against the written tests, because the branch is
+not merged. Merging it and running the tests on GtCV Demo Client is the next
+piece of work, and the report at the end of the stage says what each test
+needs.
+
+Read "The push channel, opened and then closed" above before touching
+anything to do with live updating.

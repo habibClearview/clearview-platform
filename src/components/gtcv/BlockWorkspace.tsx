@@ -21,6 +21,9 @@
 // ============================================================
 import dynamic from 'next/dynamic'
 import { zoneBrief } from '@/lib/gtcv-zone-brief'
+// R20. What the room sent, waiting to become rows, drawn under the block's own
+// table rather than in a list somewhere else.
+import PendingRows from '@/components/gtcv/PendingRows'
 
 // What this zone is for, taken from the method reference. Three things, in the
 // order a room needs them: the question, what has to exist before the gate can
@@ -188,6 +191,17 @@ export default function BlockWorkspace({ dpId, clientId, canManage, currency }) 
             color: '#1B2A41',
           }}>{title}</h3>
           <Comp clientId={clientId} canManage={canManage} dpId={dpId} currency={currency} />
+          {/* R20. What the room sent, beneath the rows the block already has,
+              and visibly marked as pending. It is drawn under the block's FIRST
+              surface, which is the block's own table, so it reads as the
+              bottom of that table rather than as a separate list somewhere
+              else on the page. It draws nothing at all where there is nothing
+              pending and nothing agreed. */}
+          {key === own[0]?.key ? (
+            <div style={{ marginTop: 12 }}>
+              <PendingRows clientId={clientId} dpId={dpId} canManage={canManage} />
+            </div>
+          ) : null}
         </section>
       ))}
     </div>

@@ -89,13 +89,19 @@ async function main() {
   // participant route will use, so this is the same shape of change a live
   // session produces.
   console.log('writing a row with the service key...')
-  // Its own throwaway engagement, removed at the end. Staging has none, and
-  // borrowing a real one would mean writing test rows against somebody's work.
-  const clientId = `push-check-${Date.now()}`
-  const { error: cErr } = await asServer.from('engagement_clients')
-    .insert({ id: clientId, name: 'Push channel check' })
-  if (cErr) { console.error('could not create a throwaway engagement:', cErr.message); process.exit(2) }
-  const client = { id: clientId }
+  // Written against the demo engagement that exists on staging for exactly
+  // this, rather than a throwaway one. It used to create its own, on the
+  // mistaken belief that staging held no engagements; that was wrong, and
+  // creating further test clients was stopped on 11 August 2026. Everything
+  // this script writes is removed at the end, and it writes nothing outside
+  // the three tables Stage 1 created.
+  const DEMO_ENGAGEMENT = 'GtCV Demo Client'
+  const { data: client, error: cErr } = await asServer.from('engagement_clients')
+    .select('id').eq('name', DEMO_ENGAGEMENT).maybeSingle()
+  if (cErr || !client) {
+    console.error(`could not find the "${DEMO_ENGAGEMENT}" engagement to write against.`)
+    process.exit(2)
+  }
 
   const { data: q, error: qErr } = await asServer.from('gtcv_questions').insert({
     client_id: client.id,
@@ -121,9 +127,11 @@ async function main() {
   await new Promise((r) => setTimeout(r, WAIT_MS))
 
   // Clean up whatever this script made, whichever way the result went.
+  // Only what this script wrote. The engagement is a real one and is left
+  // exactly as it was found; deleting the question takes its submissions with
+  // it, because the submission references it on delete cascade.
   await asServer.from('gtcv_room_state').delete().eq('client_id', client.id)
   await asServer.from('gtcv_questions').delete().eq('id', q.id)
-  await asServer.from('engagement_clients').delete().eq('id', client.id)
 
   console.log('')
   console.log(`control: ${receivedAsServer.length} message(s) reached the service key subscription.`)

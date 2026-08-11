@@ -149,6 +149,46 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // R20. Everything the room has sent to this block that the facilitator has
+    // not yet dealt with, whichever question it came from and whether or not
+    // that question is still open. A pending answer does not stop being pending
+    // because the room moved on.
+    let pending: Submission[] = []
+    if (questions.length > 0) {
+      const { data } = await admin
+        .from('gtcv_submissions')
+        .select('id, question_id, participant_id, participant_name, values, score_value, option_value, submitted_at, disposition')
+        .eq('client_id', clientId)
+        .eq('disposition', 'pending')
+        .in('question_id', questions.map((q) => q.id))
+        .order('submitted_at', { ascending: true })
+        .limit(1000)
+      // Only collect answers become rows. A score or a classify answer becomes
+      // an agreed value through R23, not a row of its own.
+      const collectIds = new Set(questions.filter((q) => q.question_type === 'collect').map((q) => q.id))
+      pending = ((data || []) as Submission[]).filter((s) => collectIds.has(s.question_id))
+    }
+
+    // R21. The rows already in the block's table, so a pending answer can be
+    // merged into one of them. Only the identifier and enough words to
+    // recognise the row by: this list is for choosing, not for reading.
+    let blockRows: { id: string; label: string }[] = []
+    const table = gateId ? BLOCK_TABLE[gateId] : null
+    if (table && pending.length > 0) {
+      const first = (BLOCK_COLUMNS[table] || [])[0]
+      const { data } = await admin
+        .from(table)
+        .select(`id, ${first}`)
+        .eq('client_id', clientId)
+        .order('sort_order', { ascending: true })
+        .limit(500)
+      // The column name is chosen from BLOCK_COLUMNS above rather than from the
+      // request, so it is known to be a real column; the type checker cannot
+      // see that from a name held in a variable, hence the cast.
+      blockRows = ((data || []) as unknown as Record<string, string>[])
+        .map((r) => ({ id: r.id, label: r[first] || '(no name yet)' }))
+    }
+
     // How many phones are still listening. Sent as its own number and never
     // mixed into `answered`: a device dropping off the network must not read
     // as a person who has finished answering.
@@ -163,6 +203,8 @@ export async function GET(req: NextRequest) {
       questions,
       state: state || null,
       answered,
+      pending,
+      blockRows,
       connectedDevices: connected || 0,
       cards,
       distribution,

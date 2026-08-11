@@ -1,4 +1,4 @@
-Last updated: 11 August 2026, 15:25
-Now working on: pending rows in the block view, so an answer becomes a table row in one press (R20 to R23)
-Built, awaiting their tests: R1 to R19, R24 to R32, except R20 to R23
-Complete, tests passing: none demonstrated on staging yet
+Last updated: 11 August 2026, 15:45
+Now working on: nothing — Stage 1 is built and the branch is waiting for you
+Built, awaiting their tests: R1 to R32, all of them, waiting on the branch being merged and deployed to staging
+Complete, tests passing: none — no written test can run until the branch is on staging
