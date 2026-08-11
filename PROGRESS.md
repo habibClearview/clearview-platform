@@ -5,8 +5,15 @@
 Part 1: Context, sections 1 to 5. Received 11 August 2026.
 Part 2: Stage 1, requirements R1 to R32. Received 11 August 2026.
 Amendments to R5 and R25, and answers to Q4 to Q10. Received 11 August 2026.
+Part 3: Stage 2, requirements R33 to R39. Received 11 August 2026.
 
-Stage 1 is authorised. No other stage is authorised.
+Stage 1 is authorised and built. Stage 2 is RECEIVED, NOT YET AUTHORISED: the
+approach and the questions below are with Habib and no Stage 2 code exists.
+
+Noted, not as an objection: Stage 1's own text ends "Do not proceed to Stage 2
+until every requirement above has passed its test." Stage 1's tests have not
+been run yet — Habib is running them. Stage 2 arrived before that. Flagged so
+the order is a decision rather than an oversight.
 
 ## Amendments to the specification, which take precedence over the original wording
 
@@ -180,6 +187,117 @@ deciding what a holder of the public key is allowed to learn.
     depend on. See the proposal below.
 
 ## Questions waiting for an answer
+
+### Q12. R39 reverses a decision R18 required, and it is about consent (blocks R39)
+Raised 11 August 2026. THE MOST IMPORTANT QUESTION IN STAGE 2.
+
+R18 said: "Where anonymous, no names appear anywhere... confirm no name appears
+on any screen OR IN ANY STORED RECORD VISIBLE TO THE FACILITATOR."
+
+Stage 1 was built to the strongest reading of that. On an anonymous question
+the name is not written at all. The comment in the route says why: "there is
+no name in the row, so there is none to leak later."
+
+R39 now says: "Submissions record who made them... regardless of whether the
+question is displayed as anonymous."
+
+Those can be reconciled — stored but never displayed — and that is plainly
+what R39 intends. But it is a real change, not a clarification, and it should
+be made deliberately:
+
+  A room is told a question is anonymous. Under R39 it is not anonymous; it is
+  unattributed on screen. The record knows. Under Section 9 these are real
+  named individuals in Nigeria, Kenya and Uganda, and the question they are
+  answering anonymously is usually the one they would not answer with their
+  name on it.
+
+Whichever way this goes I will build it exactly. What I need is:
+  a) Confirmation that identity is stored on anonymous questions.
+  b) Whether the participant is told. A room told "anonymous" that later
+     learns the record kept their name is a worse outcome than either honest
+     position.
+  c) Who may ever see it, and by what route. "No interface displays it" today
+     is not the same as never, and a database export is an interface.
+
+### Q13. R36 needs an email service and the specification has not named one (blocks half of R36)
+Raised 11 August 2026.
+
+Checked, not assumed: NOTHING in this platform sends email. The only mention
+anywhere is a placeholder button that pops up the words "In production: this
+sends a notification email to the CEO via the Resend API." No mail service is
+installed, configured or called.
+
+So R36's email route means adding an external service and sending it client
+names and their permanent personal links. Rule 9 says: never send data to any
+external service that the specification has not named. Stage 2 does not name
+one.
+
+I need: which service, and your authorisation to send names and links to it.
+Or: build the copy-for-messaging route now and leave email until you have
+decided, in which case R36 fails its own test until then and I will say so.
+
+### Q14. R33 is mostly already built, in a list Section 4 protects
+Raised 11 August 2026.
+
+"Who is on it, and settings" already holds a list of people, in
+engagement_parties, with these boxes on screen today:
+
+    Role · Name · Job title · Organisation · Email they log in with
+
+R33 asks for name, role, organisation, and either an email address or a mobile
+number. Four of the five exist. The only thing missing is the mobile number.
+
+So the honest reading is that R33 is one new box on the list that is already
+there, not a second list. Building a second would put two lists of the same
+people on one page, which is the fault you have already had to point out once.
+
+Two things I will not choose:
+  a) Confirm it extends the existing list rather than creating a new one.
+  b) The existing box says "Email they log in with", which is about a login.
+     Under R34 it becomes the address a personal link is sent to, which is not
+     a login. Changing that wording is changing user-visible wording, which
+     Section 4 protects. Leave it, or change it to what?
+
+### Q15. What does "permanent" mean at the end (blocks R34)
+Raised 11 August 2026. A session link lasts twelve hours because a session is
+an afternoon. A personal link lasts twenty-six weeks by design.
+
+Does it ever stop working on its own? An engagement ends. A link that still
+opens a client's room a year later, sitting in somebody's WhatsApp on a phone
+that has since been sold, is a standing key to their engagement.
+
+My preference, not chosen: it stops when the engagement is closed or archived,
+and revocation stays the immediate route. But you decide, because "permanent"
+is your word and I will not quietly put a limit on it.
+
+### Q16. What is a guest submission called, and where does it show (blocks R38)
+Raised 11 August 2026. R38 says a guest submission arrives "marked as a guest
+submission". Rule 5 says exact words for anything a person sees.
+
+    What is the word on screen? "Guest"? Something else?
+    Where does it appear — on the answer card on the projector, only in the
+    pending rows the facilitator works through, or both?
+
+A word on the projector beside somebody's answer is a public statement that
+they are not on the team, in front of the room.
+
+### Q17. What does the personal link look like (blocks R34)
+Raised 11 August 2026. The amendment to R5 says the link carries an
+identifying value in the address, which is consumed on first opening and
+removed so the address then reads exactly /room.
+
+I need the parameter, because it is visible in the address bar and people will
+read it aloud. My proposal, not chosen: /room?p=... — short, meaningless, and
+gone after the first open.
+
+### Q18. What does a revoked person see (blocks R37)
+Raised 11 August 2026. R37's test is that a revoked device can no longer
+submit. It does not say what that person sees.
+
+Mid-session, in a room, somebody's phone stops working. Silence is cruel and
+"you have been removed from this engagement" on a projector-lit face is worse.
+My preference, not chosen: it returns to the join screen, saying only that the
+link is no longer open. You decide the sentence.
 
 ### Q11. The build banner on the Facilitator View (blocks R25)
 Raised 11 August 2026. Proposal put; awaiting agreement.
