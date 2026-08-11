@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   defaultIsNamed, normaliseForMatch, groupCollectSubmissions, suggestMerges,
-  scoreDistribution, classifySplit, scoreExtremes, formatNames,
+  scoreDistribution, classifySplit, scoreExtremes, formatNames, answerCounter,
   type Submission, type TargetField,
 } from '@/lib/stage1-questions'
 
@@ -141,21 +141,51 @@ describe('R16, the distribution of a score question', () => {
     const rows = scoreDistribution([
       scored('1', 1), scored('2', 1), scored('3', 4),
       scored('4', 4), scored('5', 4), scored('6', 5),
-    ])
+    ], 1, 5)
     expect(rows).toEqual([
       { value: 1, count: 2 },
+      { value: 2, count: 0 },
+      { value: 3, count: 0 },
       { value: 4, count: 3 },
       { value: 5, count: 1 },
     ])
   })
 
-  it('leaves out a value nobody chose', () => {
-    const rows = scoreDistribution([scored('1', 1), scored('2', 5)])
-    expect(rows.map((r) => r.value)).toEqual([1, 5])
+  it('shows a value nobody chose at zero rather than leaving it out', () => {
+    // Nobody scoring this a 2 or a 3 is the finding. A missing column hides it.
+    const rows = scoreDistribution([scored('1', 1), scored('2', 5)], 1, 5)
+    expect(rows.map((r) => r.value)).toEqual([1, 2, 3, 4, 5])
+    expect(rows.map((r) => r.count)).toEqual([1, 0, 0, 0, 1])
   })
 
-  it('returns nothing when nobody has answered', () => {
-    expect(scoreDistribution([])).toEqual([])
+  it('shows the whole empty scale when nobody has answered', () => {
+    const rows = scoreDistribution([], 1, 5)
+    expect(rows).toHaveLength(5)
+    expect(rows.every((r) => r.count === 0)).toBe(true)
+  })
+
+  it('still shows an answer that falls outside the scale', () => {
+    // Only reachable by narrowing a scale after people have answered. Dropping
+    // it would quietly lose a real answer.
+    const rows = scoreDistribution([scored('1', 9)], 1, 5)
+    expect(rows.find((r) => r.value === 9)).toEqual({ value: 9, count: 1 })
+  })
+})
+
+describe('the amendment to R25, the answer counter', () => {
+  it('reads answers of room size when the facilitator has set one', () => {
+    expect(answerCounter(7, 9)).toBe('7 of 9')
+  })
+
+  it('shows the answers alone when no room size is set', () => {
+    // A correct state, not a failure: the facilitator has not said how many
+    // people are in the room yet.
+    expect(answerCounter(7, null)).toBe('7')
+  })
+
+  it('shows nothing odd before anyone has answered', () => {
+    expect(answerCounter(0, 9)).toBe('0 of 9')
+    expect(answerCounter(0, null)).toBe('0')
   })
 })
 
