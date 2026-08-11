@@ -117,6 +117,32 @@ Approved 11 August 2026, with two conditions held to:
   - On the participant side, write to the phone's own storage first and send
     second, so a submission survives the page being closed.
 
+### CHANGE TO THE APPROVED APPROACH, accepted 11 August 2026
+
+The approach as approved named the database's own push service as the way
+every screen would keep itself current. IT IS NOT USED. The reason is the leak
+recorded under "The push channel, opened and then closed" below: a browser
+holding only the public key was receiving a message for every write to all
+three room tables, and the tables were taken out of the publication to stop it.
+
+What replaced it: every screen asks the server what has arrived. The
+Participant Page and the Facilitator View every second and a half, the room
+feed in the block view every five seconds. Nothing reloads and no button is
+pressed, so R8, R27 and R29 are met on behaviour, and R27's three named
+failures — a refresh button, an automatic timed reload, a manual reload — are
+none of them.
+
+Accepted the same day: "Polling instead of push. Accepted. You were right to
+close the leak and right to tell me the mechanism changed. The requirements are
+about behaviour and the behaviour is met."
+
+Both original conditions still hold. The Facilitator View re-reads everything
+before it says connected, because every read is a whole read. The Participant
+Page writes to the phone's storage before it sends.
+
+If a live socket is wanted later it is a stage of its own, and it starts by
+deciding what a holder of the public key is allowed to learn.
+
 ## Approved changes to existing files
 
   src/components/gtcv/SessionRoom.tsx, removing the Refresh button (R28).
@@ -191,16 +217,26 @@ is not the mechanism that was approved, and if you want a live socket instead
 it is a stage of its own now that the channel question has an answer.
 
 ### D3. Two of the four Clearing the ground questions have no home column
+SETTLED 11 August 2026. Leave them where they are.
+
 R23 writes the agreed value to "the table field". gtcv_assumptions has no
 column that "if the grant stopped tomorrow, how likely is it that someone
 would still pay" or "signal or story" belongs in. gtcv_service_inventory does
 have homes for both DP01 judgement questions.
 
-Taken: where a question names a column, the agreed value writes there. Where
-it names none, the value and the full distribution are still stored on the
-question, so nothing is lost and the value can still be pressed to see how the
-room answered. The two Clearing the ground judgement questions are in that
-position. Tell me which columns they should write to and it is a small change.
+Where a question names a column, the agreed value writes there. Where it names
+none, the value and the full distribution are stored on the question itself, so
+nothing is lost and the value can still be pressed to see how the room
+answered.
+
+Decided: "Leave them where they are. Storing the agreed value and distribution
+on the question is fine and nothing is lost. Do not add columns to
+gtcv_assumptions. That table is protected and this is not worth breaching it
+for."
+
+So NO COLUMN IS TO BE ADDED TO gtcv_assumptions FOR THIS. If a later stage
+wants those two judgements in the table, that is a decision to take on its own
+and not a tidy-up of this one.
 
 ### D4. Whether a question is named can no longer be changed once it is answered
 R19 says the facilitator can change it "before opening it" and does not say
@@ -292,6 +328,47 @@ for assurance.
 
   S24, S21 to S23. What the push channel actually delivers to a browser
   holding only the public key is STILL UNKNOWN. See the section below.
+
+## Resolved security findings
+
+A list kept so that anyone reviewing this later can see what was found and what
+was done, without reading the whole file. Nothing is removed from it once it is
+on it.
+
+### SF1. The push channel delivered to the public key
+    Found      11 August 2026
+    Closed     11 August 2026
+    Severity   Real but narrow. What leaked was the fact and timing of every
+               write to the three room tables, never the contents. Under
+               Section 9, when a room is answering is information about real
+               organisations and real named individuals.
+    Cause      The Stage 1 migration added gtcv_questions, gtcv_submissions and
+               gtcv_room_state to the supabase_realtime publication, in the
+               expectation that the screens would subscribe to them. They never
+               did.
+    Proved by  scripts/check-push-channel.mjs, with a working control: the
+               service key subscription received 3 messages and the public key
+               subscription received 3 as well.
+    Fixed by   supabase/migrations/2026_08_11_stage1_close_the_push_channel.sql
+               removing all three from the publication. Applied to staging the
+               same day. Nothing subscribed, so nothing broke.
+    Follow on  The approved technical approach changed as a result. See "CHANGE
+               TO THE APPROVED APPROACH" above.
+    Re-opening Adding any of those tables back to the publication re-opens
+               exactly this. Do not do it without first deciding what a holder
+               of the public key is allowed to learn.
+
+### SF2. rate_limit_counters was granted to the public key with no policy
+    Found      11 August 2026
+    Closed     11 August 2026
+    Severity   Nothing was exposed: row level security with no policy denies
+               everything. But the protection rested entirely on one switch,
+               with select, insert, update, delete and truncate granted
+               beneath it, and emptying the counters removes the limit that
+               stops one device flooding a room.
+    Fixed by   supabase/migrations/2026_08_11_rate_limit_counters_lockdown.sql
+    Verified   The public key is refused with zero grants remaining. The
+               service key still reads it, so the limiter works.
 
 ## The push channel, opened and then closed
 
@@ -468,10 +545,19 @@ branch nothing merges into, and the branch everything merges into has one gate.
 The row level security gate and the route auth gate are exactly the two that
 would catch the kind of fault this stage could introduce.
 
-WHAT I HAVE NOT DONE. Changed them. Adding staging to a trigger is one line in
-each file, but which branches a gate defends is a decision about how the
-platform is protected, not a tidy-up, and Section 4 says I name a file and wait.
-Say the word and it is seven one-line changes.
+RESOLVED 11 August 2026. Authorised: "Add staging to the trigger on all seven
+workflows. Seven gates defending a branch nothing merges into is not
+protection." Done, one line in each of the seven files and nothing else
+touched:
+
+    branches: [main]   became   branches: [main, staging]
+
+hooks-check.yml also has a push trigger on staging. That was left exactly as it
+was; only its pull_request line changed.
+
+AI Code Review now runs on a pull request into staging as well, and it will
+fail there for the reason it always fails: it needs a key that is deliberately
+not provided. That failure is the known one, not a finding.
 
 The lint, the type check and the tests were all run here before every push, so
 the code has been through the same checks by hand. That is not the same as a

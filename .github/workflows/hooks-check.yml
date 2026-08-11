@@ -16,7 +16,7 @@ name: React hooks gate
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, staging]
   push:
     branches: [staging]
 

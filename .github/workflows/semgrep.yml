@@ -13,7 +13,7 @@ name: Semgrep SAST
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, staging]
   schedule:
     - cron: "0 6 * * 1"
 
