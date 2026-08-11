@@ -555,9 +555,61 @@ touched:
 hooks-check.yml also has a push trigger on staging. That was left exactly as it
 was; only its pull_request line changed.
 
-AI Code Review now runs on a pull request into staging as well, and it will
-fail there for the reason it always fails: it needs a key that is deliberately
-not provided. That failure is the known one, not a finding.
+AI Code Review now runs on a pull request into staging as well.
+
+### THREE OF THE GATES ARE GREEN WITHOUT HAVING CHECKED ANYTHING
+
+Found 11 August 2026, on the run this change produced. All ten checks reported
+success. Three of them succeeded by not running.
+
+  Every table in the public schema must have row level security
+      SKIPPED. Its own log: "Row level security was not checked. Set the
+      SUPABASE_URL repository variable and the SUPABASE_SERVICE_ROLE_KEY
+      secret to turn this gate on." then "Skipped. Without credentials this
+      cannot tell a safe schema from an unchecked one." Exit 0.
+
+  Sign in and drive the real write paths
+      SKIPPED, the same way. It needs STAGING_SUPABASE_URL, STAGING_BASE_URL,
+      STAGING_SUPABASE_ANON_KEY and STAGING_SUPABASE_SERVICE_ROLE_KEY. None
+      are set. "Skipped. Without credentials this cannot tell a working
+      deployment from an unchecked one." Exit 0.
+
+  Validate migration
+      RAN AND EXAMINED NOTHING. Its log reads "Found SQL files:" with nothing
+      after it, on a pull request that adds four migration files. Its trigger
+      fired correctly; its own file finding is what came up empty.
+
+Both skips say plainly in their own logs that they are skips, which is better
+than most gates manage. The problem is that a skip and a pass are the same
+green tick from outside, and a green tick is what anyone actually looks at.
+
+WHAT RAN AND GENUINELY CHECKED SOMETHING
+  Every service-role API route must authenticate the caller
+      "OK — every service-role route references an authentication check."
+  No hook may be called conditionally               ran
+  Semgrep scan                                      ran, REPORT ONLY
+  npm audit (high+)                                 ran, REPORT ONLY
+  test (the unit tests, inside the AI review workflow)   ran
+  AI Code Review                                    passed; not investigated
+                                                    further, on instruction
+
+Report-only means those two cannot fail, whatever they find. Worth knowing
+before treating them as gates.
+
+WHAT WAS DONE ABOUT IT, and what was not. The row level security check was run
+BY HAND from here against staging, holding the service key, and it passed:
+"OK — every table in the public schema has row level security enabled." So the
+thing the gate would have checked has been checked, this once, by a person who
+can forget to do it next time.
+
+Nothing else was done. Setting repository variables and secrets is not mine to
+do, and one of the four is a service role key, which is the most dangerous
+value in the platform. Recorded and handed over.
+
+Also noticed while reading ai-review.yml: it builds its diff with
+"git diff origin/main...HEAD". On a pull request into staging that compares
+against main, which is 133 commits behind, so the diff it reviews is not the
+diff being merged. That matters if the key is ever turned on.
 
 The lint, the type check and the tests were all run here before every push, so
 the code has been through the same checks by hand. That is not the same as a

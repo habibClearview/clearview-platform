@@ -1,4 +1,4 @@
-Last updated: 11 August 2026, 16:05
-Now working on: waiting for the nine gates to run on pull request 253, now that they are triggered on staging
-Built, awaiting their tests: R1 to R32, all of them, waiting on the merge to staging
-Complete, tests passing: none — no written test can run until the branch is on staging
+Last updated: 11 August 2026, 16:25
+Now working on: nothing — Stage 1 is merged and live on staging, waiting for you to run the written tests
+Built, awaiting their tests: R1 to R32, all of them, live on staging at commit ca69aad
+Complete, tests passing: none — you are running the tests
