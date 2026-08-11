@@ -73,6 +73,10 @@ function readBody(body: any) {
   if (typeof body.email === 'string') patch.email = body.email.trim() || null
   if (typeof body.organisation === 'string') patch.organisation = body.organisation.trim() || null
   if (typeof body.title === 'string') patch.title = body.title.trim() || null
+  // R33. The mobile number, so a personal link can reach somebody who has no
+  // email address. It is never used to resolve a login: the email is what
+  // connects a person to an account and that is left exactly as it was.
+  if (typeof body.mobile === 'string') patch.mobile = body.mobile.trim() || null
   if (typeof body.isSignatory === 'boolean') patch.is_signatory = body.isSignatory
   if (Number.isFinite(body.sortOrder)) patch.sort_order = Math.trunc(body.sortOrder)
   return patch

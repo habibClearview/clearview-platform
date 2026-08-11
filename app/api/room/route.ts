@@ -32,8 +32,59 @@ import { checkRateLimit, clientIp } from '@/lib/rate-limit'
 import { loadSessionLink, resolveJoinCode } from '@/lib/session-link'
 import { isRefusal, readAnswer, refuseSubmission } from '@/lib/stage1-questions'
 import { ROOM_COOKIE, decodeIdentity, encodeIdentity, newIdentity } from '@/lib/stage1-room-identity'
+import {
+  LINK_CLOSED,
+  PERSONAL_GRANT_TYPE,
+  refusePersonalLink,
+  showsAnonymousNotice,
+  submissionIdentity,
+} from '@/lib/stage2-personal-links'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * R37. Is this person still allowed in?
+ *
+ * CHECKED ON EVERY REQUEST, not only when they first opened their link. A
+ * browser handed a cookie an hour ago cannot be reached to take it back, so
+ * revocation only bites if it is asked about at the moment the answer arrives.
+ * That is the whole of R37 and it is the only expensive part of Stage 2.
+ *
+ * Somebody who came in on the room code has no person to check, and is let
+ * through: R38 says the code path keeps working exactly as it did.
+ */
+async function personStillAllowed(
+  db: ReturnType<typeof admin>,
+  personId: string | null,
+  clientId: string,
+): Promise<boolean> {
+  if (!personId) return true
+
+  const [{ data: grant }, { data: client }] = await Promise.all([
+    db.from('client_access_grants')
+      .select('grant_type, revoked_at, expires_at, party_id, client_id')
+      .eq('party_id', personId)
+      .eq('client_id', clientId)
+      .is('revoked_at', null)
+      .maybeSingle(),
+    db.from('engagement_clients').select('status').eq('id', clientId).maybeSingle(),
+  ])
+
+  const refusal = refusePersonalLink(grant, client?.status ?? null, Date.now())
+  if (refusal) {
+    // Logged with the reason, because a coach asking "why did Grace's link
+    // stop" deserves an answer. The person holding it is told only the one
+    // sentence; the reason never reaches them.
+    console.error('room: personal link refused', { reason: refusal })
+    return false
+  }
+  return true
+}
+
+/** The one sentence a refused person sees, whatever the reason. */
+function linkClosed() {
+  return NextResponse.json({ joined: false, linkClosed: true, error: LINK_CLOSED }, { status: 401 })
+}
 
 function admin() {
   return createClient(
@@ -54,6 +105,10 @@ export async function GET(req: NextRequest) {
     if (!me) return NextResponse.json({ joined: false })
 
     const db = admin()
+
+    // R37, before anything is read. A revoked person is not shown the room and
+    // then refused when they answer; they are refused now.
+    if (!(await personStillAllowed(db, me.personId, me.clientId))) return linkClosed()
 
     // This device is still listening. Recorded here because this is the one
     // thing every phone in the room does every second and a half, so it is the
@@ -119,6 +174,12 @@ export async function GET(req: NextRequest) {
       state,
       mine: mine || [],
       everyones,
+      // The name this browser is known by, so a personal link can say who it
+      // thinks you are. Empty for somebody who came in on the room code.
+      me: { name: me.personName, isGuest: !me.personId },
+      // R39. Whether the consent sentence has to be on screen. Decided on the
+      // server so a page cannot forget to ask.
+      showAnonymousNotice: showsAnonymousNotice(question ? question.is_named : null),
     })
   } catch (e) {
     console.error('room GET: unexpected error', e)
@@ -132,10 +193,80 @@ export async function POST(req: NextRequest) {
       action?: string
       code?: string
       questionId?: string
+      token?: string
       values?: Record<string, unknown>
       score?: unknown
       option?: unknown
       submissionId?: string
+    }
+
+    // ---- opening a personal link (R34, R35) ----------------------------
+    // The link carries a value in the address. It is exchanged here, ONCE, for
+    // the same signed cookie the code path issues, and the page then removes
+    // it from the address so that from then on the address reads exactly
+    // /room. That is the amendment to R5, and the cookie has carried empty
+    // slots for a person since Stage 1 precisely so this needed no re-issue.
+    if (body.action === 'personal') {
+      const db = admin()
+      const token = typeof body.token === 'string' ? body.token : ''
+      // Short enough to be a mistake, long enough to be worth a lookup.
+      if (token.length < 16 || token.length > 200) return linkClosed()
+
+      // Rate limited on the address, because a personal link never expires and
+      // so is worth more to a guesser than a session code that dies at teatime.
+      const limit = await checkRateLimit(db, `room-personal:${clientIp(req)}`, 30, 3600)
+      if (!limit.allowed) {
+        return NextResponse.json(
+          { error: 'Too many tries. Wait a few minutes.' },
+          { status: 429 },
+        )
+      }
+
+      const { data: grant } = await db
+        .from('client_access_grants')
+        .select('grant_type, revoked_at, expires_at, party_id, client_id')
+        .eq('access_token', token)
+        .maybeSingle()
+
+      const { data: client } = grant?.client_id
+        ? await db.from('engagement_clients').select('status').eq('id', grant.client_id).maybeSingle()
+        : { data: null }
+
+      // Every failure looks the same to the person holding it: a link that
+      // never existed, one that was withdrawn, and one whose engagement has
+      // finished all read alike. Telling a stranger which it was tells them
+      // something about a link they do not hold.
+      if (refusePersonalLink(grant, client?.status ?? null, Date.now())) return linkClosed()
+
+      const { data: party } = await db
+        .from('engagement_parties')
+        .select('id, name, client_id')
+        .eq('id', grant!.party_id!)
+        .maybeSingle()
+      // A party on a different engagement from the grant is not this one's,
+      // whatever the grant says. Checked rather than trusted.
+      if (!party || party.client_id !== grant!.client_id) return linkClosed()
+
+      const identity = newIdentity(grant!.client_id!, { id: party.id, name: party.name || '' })
+      const res = NextResponse.json({ joined: true, name: party.name || '' })
+      res.cookies.set(ROOM_COOKIE, encodeIdentity(identity), {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        // R34: it lasts the engagement, not the afternoon. The grant is what
+        // actually decides, and it is re-checked on every request, so a long
+        // cookie is a convenience and never an authority.
+        maxAge: 60 * 60 * 24 * 200,
+      })
+
+      await db
+        .from('client_access_grants')
+        .update({ last_accessed_at: new Date().toISOString() })
+        .eq('access_token', token)
+        .then(({ error }) => { if (error) console.error('room: personal link stamp failed', error) })
+
+      return res
     }
 
     // ---- joining ------------------------------------------------------
@@ -193,6 +324,10 @@ export async function POST(req: NextRequest) {
 
     const db = admin()
 
+    // R37. A revoked person cannot submit, and this is where it matters most:
+    // their browser still holds a valid cookie and will keep trying.
+    if (!(await personStillAllowed(db, me.personId, me.clientId))) return linkClosed()
+
     // GUARD 3 first, because it is the cheapest and the one that protects the
     // other two from being asked ten thousand times.
     const limit = await checkRateLimit(db, `room-submit:${me.participantId}`, 120, 300)
@@ -227,9 +362,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'That question is no longer open' }, { status: 409 })
     }
 
-    // R18: a name is stored ONLY on a named question. On an anonymous one
-    // there is no name in the row at all, so there is none to leak later.
-    const nameToStore = question.is_named ? me.personName : null
+    // R18 AND R39 TOGETHER, and they are different columns on purpose.
+    //
+    // participant_name is what interfaces read, and it stays empty on an
+    // anonymous question exactly as Stage 1 left it, so an interface cannot
+    // show what is not there.
+    //
+    // identity_party_id is recorded ALWAYS, and no route may ever select it.
+    // The room is told this is happening, in plain words, on their own screen
+    // before they answer — see ANONYMOUS_NOTICE. That sentence is the consent
+    // and it is not optional.
+    const who = submissionIdentity(me, Boolean(question.is_named))
 
     // What the answer writes, or the refusal that stops it. Also decided away
     // from the route, for the same reason as the guards above.
@@ -242,7 +385,9 @@ export async function POST(req: NextRequest) {
       client_id: me.clientId,
       question_id: question.id,
       participant_id: me.participantId,
-      participant_name: nameToStore,
+      participant_name: who.displayName,
+      identity_party_id: who.identityPartyId,
+      is_guest: who.isGuest,
       values: answer.values,
       score_value: answer.score_value,
       option_value: answer.option_value,

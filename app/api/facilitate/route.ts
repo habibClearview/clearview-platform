@@ -157,7 +157,7 @@ export async function GET(req: NextRequest) {
     if (questions.length > 0) {
       const { data } = await admin
         .from('gtcv_submissions')
-        .select('id, question_id, participant_id, participant_name, values, score_value, option_value, submitted_at, disposition')
+        .select('id, question_id, participant_id, participant_name, values, score_value, option_value, submitted_at, disposition, is_guest')
         .eq('client_id', clientId)
         .eq('disposition', 'pending')
         .in('question_id', questions.map((q) => q.id))

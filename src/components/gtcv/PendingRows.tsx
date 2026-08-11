@@ -23,6 +23,7 @@
 // ============================================================
 import { useCallback, useEffect, useState } from 'react'
 import { authedFetch } from '@/lib/authed-fetch'
+import { GUEST_LABEL } from '@/lib/stage2-personal-links'
 import {
   groupCollectSubmissions,
   suggestMerges,
@@ -213,6 +214,17 @@ function PendingRow({
           <div style={{ fontSize: 12.5, color: C.slate, marginTop: 4 }}>
             {headline ? `${headline}, submitted by ${group.count}` : `Submitted by ${group.count}`}
             {group.contributors.length > 0 ? ` — ${group.contributors.join(', ')}` : ''}
+            {/* R38. "Guest" appears HERE AND NOWHERE ELSE. Never on the
+                projector: a word beside somebody's answer in front of the room
+                is a public statement that they are not one of us. It says a
+                visitor sent this and never which visitor, so it cannot become
+                a name on an anonymous question. */}
+            {group.submissions.some((s) => s.is_guest) ? (
+              <span style={{
+                marginLeft: 6, padding: '1px 6px', borderRadius: 4,
+                border: `1px solid ${C.border}`, fontSize: 11, color: C.slate,
+              }}>{GUEST_LABEL}</span>
+            ) : null}
           </div>
           {suggestion ? (
             <div style={{ fontSize: 12.5, color: C.amber, marginTop: 4 }}>

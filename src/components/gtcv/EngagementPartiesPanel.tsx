@@ -23,6 +23,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { PARTY_ROLE_LABELS } from '@/lib/engagement-types'
+// R34, R36, R37. One person's permanent link, beside the person it belongs to.
+import PersonalLinkControls from '@/components/gtcv/PersonalLinkControls'
 
 const C = {
   card: 'var(--cv-card)', border: 'var(--cv-border)', slate: 'var(--cv-slate)',
@@ -54,7 +56,7 @@ const ROLE_KEYS = Object.keys(PARTY_ROLE_LABELS)
 const USUALLY_SIGNS = ['lsp_ed', 'funder_rep', 'lsp_board', 'lead_consultant', 'client_funder']
 
 const BLANK = {
-  party_role: 'lsp_ed', name: '', email: '', organisation: '', title: '', is_signatory: true,
+  party_role: 'lsp_ed', name: '', email: '', mobile: '', organisation: '', title: '', is_signatory: true,
 }
 
 async function call(method, body) {
@@ -84,7 +86,7 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
     setLoading(true)
     const { data, error } = await supabase
       .from('engagement_parties')
-      .select('id, party_role, name, email, organisation, title, is_signatory, user_id, sort_order')
+      .select('id, party_role, name, email, mobile, organisation, title, is_signatory, user_id, sort_order')
       .eq('client_id', clientId)
       .order('sort_order', { ascending: true })
     if (error) setErr('Could not load the parties: ' + error.message)
@@ -110,6 +112,7 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
         partyRole: draft.party_role,
         name: draft.name,
         email: draft.email,
+        mobile: draft.mobile,
         organisation: draft.organisation,
         title: draft.title,
         isSignatory: draft.is_signatory,
@@ -127,6 +130,7 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
         partyRole: e.party_role,
         name: e.name,
         email: e.email || '',
+        mobile: e.mobile || '',
         organisation: e.organisation || '',
         title: e.title || '',
         isSignatory: !!e.is_signatory,
@@ -222,6 +226,7 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
                   {PARTY_ROLE_LABELS[r.party_role] || r.party_role}
                   {r.organisation ? ` · ${r.organisation}` : ''}
                   {r.email ? ` · ${r.email}` : ''}
+                  {r.mobile ? ` · ${r.mobile}` : ''}
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
@@ -235,6 +240,7 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
                 </span>
                 {canManage ? (
                   <>
+                    <PersonalLinkControls clientId={clientId} partyId={r.id} canManage={canManage} />
                     <button type="button" style={btn(C.slate)} onClick={() => setEditing({ ...r })}>Edit</button>
                     <button type="button" style={btn(C.red)} onClick={() => remove(r)} disabled={busy === `del:${r.id}`}>
                       {busy === `del:${r.id}` ? 'Removing...' : 'Remove'}
@@ -289,6 +295,15 @@ function PartyFields({ value, onChange }) {
             and left people looking for a box that was already there. */}
         <label style={lab}>Email they log in with</label>
         <input aria-label="Email they log in with" style={field} type="email" value={value.email || ''} onChange={set('email')} placeholder="name@organisation.org" />
+      </div>
+      <div>
+        {/* R33. The one box Stage 2 adds. The wording of the email box beside
+            it is deliberately left exactly as it was: it still says what it
+            says about a login, and Section 4 protects it. Instructed 11 August
+            2026: "One new box on the list that already exists... Leave the
+            existing email wording exactly as it is." */}
+        <label style={lab}>Mobile</label>
+        <input aria-label="Mobile" style={field} type="tel" value={value.mobile || ''} onChange={set('mobile')} placeholder="+234 800 000 0000" />
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 4 }}>
         <label style={{ ...hint, display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer' }}>

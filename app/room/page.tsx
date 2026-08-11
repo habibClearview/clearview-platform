@@ -34,6 +34,11 @@ import {
   type QuestionType,
   type TargetField,
 } from '@/lib/stage1-questions'
+import {
+  ANONYMOUS_NOTICE,
+  LINK_CLOSED,
+  PERSONAL_LINK_PARAM,
+} from '@/lib/stage2-personal-links'
 
 // The exact sentence R7 requires, kept as a constant so it cannot drift.
 const NOTHING_OPEN = 'Nothing open yet. Your facilitator will open a question shortly.'
@@ -123,6 +128,13 @@ export default function RoomPage() {
   const [queued, setQueued] = useState(0)
   const [note, setNote] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
+  const [myName, setMyName] = useState<string | null>(null)
+  const [showNotice, setShowNotice] = useState(false)
+  const [closed, setClosed] = useState(false)
+  // Until the link in the address has been exchanged, nothing else should run:
+  // a personal link that raced the first read would show the code box for a
+  // moment to somebody who never needs to see one.
+  const [exchanging, setExchanging] = useState<boolean | null>(null)
 
   // Which question the boxes on screen belong to, so moving to a new question
   // clears them rather than carrying somebody's last answer forward.
@@ -132,23 +144,71 @@ export default function RoomPage() {
   const load = useCallback(async () => {
     try {
       const res = await fetch('/api/room', { cache: 'no-store' })
+      if (res.status === 401) {
+        // R37. The link was withdrawn, or the engagement has finished. One
+        // sentence, nothing else, and no removal language.
+        setClosed(true)
+        setJoined(false)
+        return
+      }
       if (!res.ok) return
       const json = await res.json()
+      setClosed(false)
       setJoined(Boolean(json.joined))
       setQuestion(json.question || null)
       setState(json.state || null)
       setMine(json.mine || [])
       setEveryones(json.everyones || [])
+      setMyName(json.me?.name || null)
+      setShowNotice(Boolean(json.showAnonymousNotice))
     } catch {
       /* No connection. Keep what is on screen; the next try will catch up. */
     }
   }, [])
 
+  // R34 and the amendment to R5. A personal link carries a value in the
+  // address. It is exchanged once for the cookie, and then REMOVED from the
+  // address, so that from then on the address reads exactly /room and the link
+  // is not sitting there to be screenshotted.
   useEffect(() => {
+    const url = new URL(window.location.href)
+    const token = url.searchParams.get(PERSONAL_LINK_PARAM)
+    if (!token) { setExchanging(false); return }
+
+    setExchanging(true)
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/room', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'personal', token }),
+        })
+        if (cancelled) return
+        if (res.status === 401) setClosed(true)
+      } catch {
+        // No connection on first opening. The link stays in the address so the
+        // next attempt can still use it, and the page falls back to the code
+        // box rather than pretending to know who this is.
+        if (!cancelled) { setExchanging(false); return }
+      }
+      if (cancelled) return
+      // Taken out of the address whether or not it worked, EXCEPT where there
+      // was no connection at all, handled above. A link that failed is a link
+      // that should not stay on screen.
+      url.searchParams.delete(PERSONAL_LINK_PARAM)
+      window.history.replaceState({}, '', url.pathname + (url.search || '') + url.hash)
+      setExchanging(false)
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    if (exchanging !== false) return
     load()
     const t = setInterval(load, POLL_MS)
     return () => clearInterval(t)
-  }, [load])
+  }, [load, exchanging])
 
   // The clock ticks on its own so the timer moves between reads.
   useEffect(() => {
@@ -275,8 +335,20 @@ export default function RoomPage() {
     boxSizing: 'border-box',
   }
 
-  if (joined === null) {
+  if (exchanging !== false || joined === null) {
     return <main style={page}><div style={card}><p style={{ color: C.slate, margin: 0 }}>Opening...</p></div></main>
+  }
+
+  // ---- R37. The link is no longer open -------------------------------
+  // One sentence and nothing else. Q18, word for word.
+  if (closed) {
+    return (
+      <main style={page}>
+        <div style={card}>
+          <p style={{ margin: 0, fontSize: '1.1rem', lineHeight: 1.5 }}>{LINK_CLOSED}</p>
+        </div>
+      </main>
+    )
   }
 
   // ---- not joined: the code box (see PROGRESS.md, Q4) ------------------
@@ -330,6 +402,11 @@ export default function RoomPage() {
     return (
       <main style={page}>
         <div style={card}>
+          {/* A personal link knows who is holding it, so it says so. R34's own
+              test is that the name is recognised without any code. */}
+          {myName ? (
+            <p style={{ color: C.slate, margin: '0 0 0.6rem', fontSize: '0.9rem' }}>{myName}</p>
+          ) : null}
           <p style={{ margin: 0, fontSize: '1.1rem', lineHeight: 1.5 }}>{NOTHING_OPEN}</p>
           {queued > 0 ? (
             <p style={{ color: C.slate, margin: '0.8rem 0 0', fontSize: '0.9rem' }}>
@@ -357,6 +434,18 @@ export default function RoomPage() {
           fontFamily: 'Georgia,serif', fontSize: '1.35rem', fontWeight: 600,
           lineHeight: 1.3, margin: '0 0 1.1rem',
         }}>{question.question_text}</h1>
+
+        {/* R39 and Q12. THE CONSENT, on the answerer's own screen and not only
+            in something a facilitator says aloud and may forget. It sits ABOVE
+            the boxes, because a notice underneath the Send button is a notice
+            read after the decision it was meant to inform. */}
+        {showNotice ? (
+          <p style={{
+            margin: '0 0 1.1rem', padding: '0.7rem 0.8rem', borderRadius: 8,
+            background: 'var(--cv-bg-2, #FAFAF7)', border: `1px solid ${C.border}`,
+            color: C.slate, fontSize: '0.92rem', lineHeight: 1.5,
+          }}>{ANONYMOUS_NOTICE}</p>
+        ) : null}
 
         {question.question_type === 'collect' ? (
           <CollectInput
