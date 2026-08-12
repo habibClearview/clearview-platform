@@ -32,6 +32,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 // C4. The service anchor, sticky above all five tools.
 import ServiceAnchorBar from '@/components/gtcv/ServiceAnchorBar'
+// C12 to C16. Park, Move to another service, Delete — three named actions
+// where there used to be one button that only destroyed.
+import RowActions from '@/components/gtcv/RowActions'
 
 // ─── Shared style vocabulary (matches the coach dashboard) ───
 const C = {
@@ -222,6 +225,11 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
   const [hypotheses, setHypotheses] = useState([])
   const [signals, setSignals] = useState([])
   const [decisions, setDecisions] = useState([])
+  // C12 to C16. Parking, moving or deleting a row happens through
+  // /api/services, so this re-reads afterwards. Bumping a number rather than
+  // lifting the loader out, so the loader itself is not touched.
+  const [refreshKey, setRefreshKey] = useState(0)
+  const reload = useCallback(() => setRefreshKey((n) => n + 1), [])
 
   useEffect(() => {
     let cancelled = false
@@ -254,7 +262,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     }
     load().catch((e) => { if (!cancelled) { setLoadError(e?.message || 'Could not load Phase 0'); setLoading(false); setSaveState('idle') } })
     return () => { cancelled = true }
-  }, [clientId])
+  }, [clientId, refreshKey])
 
   // One write path for every table, so the save indicator is always honest.
   const persist = useCallback(async (tableName, id, patch) => {
@@ -438,7 +446,20 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                     <td style={td}><TextCell value={r.who_pays} canManage={editable} placeholder="Who pays for it now" onCommit={(v) => updAssumption(r.id, { who_pays: v })} /></td>
                     <td style={td}><TextCell value={r.assumption} canManage={editable} placeholder="What has to be true" onCommit={(v) => updAssumption(r.id, { assumption: v })} /></td>
                     <td style={td}><TextCell value={r.disproof} canManage={editable} placeholder="Evidence that would kill it" onCommit={(v) => updAssumption(r.id, { disproof: v })} /></td>
-                    {editable && <td style={td}><button type="button" style={delButton} title="Delete this row" onClick={() => delAssumption(r.id)}>Delete</button></td>}
+                    {editable && (
+                      <td style={td}>
+                        {/* C12 to C16. Was one button marked Delete, which
+                            deleted. Park is now the press that needs no
+                            thought, and delete is behind one more press and a
+                            confirmation that uses the word. */}
+                        <RowActions
+                          clientId={clientId}
+                          activityId={r.id}
+                          label={r.activity || 'this activity'}
+                          onDone={reload}
+                        />
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

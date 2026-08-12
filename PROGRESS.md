@@ -1103,14 +1103,19 @@ BUILT AND ON YOUR ADDRESS
   C43  The rule and the sentence, in the library with tests. Not yet wired into
        the participant page — that is group 3.
 
-BUILT AS RULES AND AS A ROUTE, NOT YET AS CONTROLS IN THE FIVE TOOLS
-  C9, C10, C11   adding an activity, a problem, a row in each tool
-  C12 to C16     Delete, Move to another service, Park, with park as the
-                 default and delete never it
+C12 TO C16 ARE NOW ON THE SCREEN, on Tool 1.
 
-  /api/services does all of it and refuses everything it should. What is
-  missing is the buttons on each row inside the five tools. That is the next
-  piece of work and it is the rest of group 1.
+  What was there before: ONE button, marked Delete, which deleted. So the only
+  way to get a row off the table was to destroy it, and the room's choice was
+  between keeping a wrong row forever and losing a real one for good.
+
+  What is there now: Park as the press that needs no thought, and behind one
+  more press, Move to another service and Delete. Delete asks first and the
+  question uses the word. C16 is held in the route as well as on the screen: a
+  removal that names no action parks, whatever sends it.
+
+  Tools 2 to 5 still have their original single Delete. They are the next
+  piece of work, along with C9 to C11's add-a-row in each tool.
 
 NOT STARTED
   C6            the service name on the participant page
