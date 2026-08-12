@@ -1079,3 +1079,65 @@ Rule 2. None of these has been touched.
 
 Everything else in Group 1 needs no existing file, which is why it is built
 already.
+
+
+## Correction group 1, where it actually stands, 12 August 2026
+
+BUILT AND ON YOUR ADDRESS
+  C1   Service record, with current / redesigned / new.
+  C2   An orphan activity is refused, in the rules and in the route.
+  C3   A problem belongs to one activity. Zero problems is a valid answer.
+  C4   The service is at the top of all five tools, through scrolling, from ONE
+       sticky bar rather than five headings that each stop working when
+       somebody scrolls.
+  C5   The selector. Changing it changes what every tool below shows.
+  C7   The parked bucket, visible in the block with its own area.
+  C8   A service added at any time.
+  C17  A service can start empty and be filled afterwards.
+  C18  Activities pulled into a service from anywhere, including the bucket.
+  C19  The state changeable at any time.
+  C30  The five figures for the service.
+  C31  The same five for every service in this engagement, from the same rows
+       so they cannot disagree. Never across engagements.
+  C32  They move on their own, no reload.
+  C43  The rule and the sentence, in the library with tests. Not yet wired into
+       the participant page — that is group 3.
+
+BUILT AS RULES AND AS A ROUTE, NOT YET AS CONTROLS IN THE FIVE TOOLS
+  C9, C10, C11   adding an activity, a problem, a row in each tool
+  C12 to C16     Delete, Move to another service, Park, with park as the
+                 default and delete never it
+
+  /api/services does all of it and refuses everything it should. What is
+  missing is the buttons on each row inside the five tools. That is the next
+  piece of work and it is the rest of group 1.
+
+NOT STARTED
+  C6            the service name on the participant page
+  Group 2       C20 to C29, the problem column and the carry forward
+
+## The three gate readiness messages, confirmed by name after touching the file
+
+Checked 12 August 2026, after the only change made to PhaseZeroWorkspace.tsx.
+
+  "Phase 0 is not closed yet."        present, unchanged
+  "... with no budget holder"         present, unchanged
+  "... have no decision."             present, unchanged
+
+The change to that file was NINE LINES ADDED and nothing removed or altered:
+one import, one comment, one component. The diff is in the commit and can be
+read in full in under a minute.
+
+## Part O, checked 12 August 2026 after group 1
+
+  C82  personal links                 untouched
+  C83  withdrawn link sentence        present, word for word
+  C84  consent sentence               present, word for word
+  C85  identity column unreadable     its test still passes, 22 of them
+  C86  Guest in the pending list only untouched
+  C87  join page, code, QR, token     untouched
+  C88  no refresh control             none found anywhere in the room or
+                                      facilitation interface
+  C88  push channel still closed      0 of the three room tables are in the
+                                      publication, confirmed by query
+  C89  offline queue                  untouched

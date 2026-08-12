@@ -30,6 +30,8 @@
 // ============================================================
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+// C4. The service anchor, sticky above all five tools.
+import ServiceAnchorBar from '@/components/gtcv/ServiceAnchorBar'
 
 // ─── Shared style vocabulary (matches the coach dashboard) ───
 const C = {
@@ -395,6 +397,13 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
           Read only. You can see the Phase 0 work but not change it.
         </div>
       )}
+
+      {/* C4, C5, C30, C31, C7. The service the room is working on, the five
+          figures, and the parked bucket. It STAYS AT THE TOP through all five
+          tools, which is what C4 asks for and what a heading inside each tool
+          could not do once anybody scrolled. Everything below works inside the
+          service chosen here. */}
+      <ServiceAnchorBar clientId={clientId} canManage={editable} />
 
       {/* ─── TOOL 1: Assumption Dump Canvas ─────────────────── */}
       <Section

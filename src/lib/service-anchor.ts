@@ -16,8 +16,31 @@
 /** C1. What a service IS, as opposed to what the room decided about it. */
 export type ServiceState = 'current' | 'redesigned' | 'new'
 
-/** C29. What the room decided at Tool 5. */
-export type ItemDecision = 'carry' | 'kill' | 'pause'
+/**
+ * C29 as amended, 12 August 2026. What the room decided at Tool 5.
+ *
+ * THE SAME FOUR WORDS AT EVERY LEVEL. The platform already had a decision
+ * vocabulary on gtcv_service_inventory.decision, and the instruction was to use
+ * it rather than introduce carry, kill and pause as separate words. A platform
+ * where an activity is "killed" and a service is "stopped" is one where two
+ * words mean one thing, and somebody eventually writes a report that counts
+ * them separately.
+ *
+ * The counter still SAYS killed, paused and carried forward, because those are
+ * the words C30 puts on screen and they are the right words for a room. See
+ * COUNTER_LABELS: what is displayed and what is stored are different things,
+ * and only one of them has to match the rest of the platform.
+ */
+export type ItemDecision = 'keep' | 'redesign' | 'pause' | 'stop'
+
+/** C30's words for the room, over the four values above. */
+export const COUNTER_LABELS = {
+  startedWith: 'Activities started with',
+  noProblemStated: 'No problem stated',
+  killed: 'Killed',
+  paused: 'Paused',
+  carriedForward: 'Carried forward',
+}
 
 /** C12. The three removal actions, and they are three, not one. */
 export type RemovalAction = 'delete' | 'move' | 'park'
@@ -49,6 +72,39 @@ export function deleteConfirmation(what: string): string {
 
 /** C22. The state, and the words for it. Not an empty cell. */
 export const NO_PROBLEM_STATED = 'No problem stated'
+
+/**
+ * C43, with the addition made on 12 August 2026. What a participant is told
+ * when a late answer could not be counted.
+ *
+ * NEVER FAIL SILENTLY. In Habib's words: "A person who typed an answer and
+ * watched it disappear will assume the system is broken and stop
+ * contributing." That is the real cost — not the lost answer, the lost person,
+ * for the rest of the session.
+ */
+export const LATE_ANSWER_REFUSED = 'That question has closed. Your answer was not recorded.'
+
+/**
+ * C43. Whether a late answer is still accepted.
+ *
+ * The rule, approved 12 August 2026: accepted only where the participant had
+ * that question on screen when it closed, and NEVER after a reveal. A reveal is
+ * the moment the room reads the numbers off the wall, and an answer arriving
+ * after that would change what everybody has already seen.
+ *
+ * This replaces the Stage 1 guard for the immediately previous question only.
+ * Everything else that guard refused, it still refuses: a question from another
+ * block, one never opened, one two questions ago.
+ */
+export function acceptsLateAnswer(
+  answeringQuestionId: string | null | undefined,
+  previousQuestionId: string | null | undefined,
+  previousWasRevealed: boolean,
+): boolean {
+  if (!answeringQuestionId || !previousQuestionId) return false
+  if (answeringQuestionId !== previousQuestionId) return false
+  return !previousWasRevealed
+}
 
 export interface Problem {
   id: string
@@ -156,9 +212,12 @@ export function counterFor(activities: Activity[], problems: Problem[]): Counter
   return {
     startedWith: live.length,
     noProblemStated: live.filter((a) => hasNoProblemStated(a.id, problems)).length,
-    killed: live.filter((a) => a.decision === 'kill').length,
+    // Stored in the platform's words, counted into the room's words. A
+    // redesigned activity is one that carries forward: it survives the gate,
+    // in a different shape.
+    killed: live.filter((a) => a.decision === 'stop').length,
     paused: live.filter((a) => a.decision === 'pause').length,
-    carriedForward: live.filter((a) => a.decision === 'carry').length,
+    carriedForward: live.filter((a) => a.decision === 'keep' || a.decision === 'redesign').length,
   }
 }
 

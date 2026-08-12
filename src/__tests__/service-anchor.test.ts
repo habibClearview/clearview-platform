@@ -13,6 +13,8 @@ import {
   parkedActivities,
   problemsOfActivity,
   refuseOrphanActivity,
+  LATE_ANSWER_REFUSED,
+  acceptsLateAnswer,
   type Activity,
   type Problem,
 } from '../lib/service-anchor'
@@ -152,7 +154,7 @@ describe('C14 and C18. Moving carries everything', () => {
 
   it('C14. Problems and what is recorded against them survive the move', () => {
     const problems = [problem('p1', 'a1'), problem('p2', 'a1')]
-    moveIntoService(S2, ['a1'], [activity('a1', { decision: 'carry' })])
+    moveIntoService(S2, ['a1'], [activity('a1', { decision: 'keep' })])
     // The problems reference the activity, not the service, so a move cannot
     // strand them. This is the reason the join is where it is.
     expect(problemsOfActivity('a1', problems)).toHaveLength(2)
@@ -161,11 +163,11 @@ describe('C14 and C18. Moving carries everything', () => {
 
 describe('Part D. The counter (C30, C31)', () => {
   const activities = [
-    activity('a1', { decision: 'carry' }),
-    activity('a2', { decision: 'kill' }),
+    activity('a1', { decision: 'keep' }),
+    activity('a2', { decision: 'stop' }),
     activity('a3', { decision: 'pause' }),
     activity('a4'),
-    activity('b1', { service_id: S2, decision: 'kill' }),
+    activity('b1', { service_id: S2, decision: 'stop' }),
     activity('b2', { service_id: S2 }),
     activity('gone', { service_id: null, parked_at: '2026-08-12T09:00:00Z' }),
   ]
@@ -187,6 +189,14 @@ describe('Part D. The counter (C30, C31)', () => {
     expect(c.startedWith).toBe(4)
   })
 
+  it('a redesigned activity counts as carried forward', () => {
+    // It survives the gate, in a different shape. Counting it anywhere else
+    // would make the five figures fail to add up to the activities that exist.
+    const c = counterForService(S1, [activity('r1', { decision: 'redesign' })], [])
+    expect(c.carriedForward).toBe(1)
+    expect(c.killed).toBe(0)
+  })
+
   it('C31. The portfolio figures equal the sum of the service figures', () => {
     const s1 = counterForService(S1, activities, problems)
     const s2 = counterForService(S2, activities, problems)
@@ -203,5 +213,29 @@ describe('Part D. The counter (C30, C31)', () => {
     // 6 live, not 7. Counting a parked row under a service it has left would
     // make the figures disagree with the screen above them.
     expect(all.startedWith).toBe(6)
+  })
+})
+
+
+describe('C43. Finishing an answer after the facilitator has moved on', () => {
+  it('accepts the answer to the question that just closed', () => {
+    expect(acceptsLateAnswer('q1', 'q1', false)).toBe(true)
+  })
+
+  it('refuses it once that question was revealed', () => {
+    // A reveal is the moment the room reads the numbers off the wall. An
+    // answer after that changes what everybody has already seen.
+    expect(acceptsLateAnswer('q1', 'q1', true)).toBe(false)
+  })
+
+  it('refuses an answer to any question other than the one that just closed', () => {
+    expect(acceptsLateAnswer('q0', 'q1', false)).toBe(false)
+    expect(acceptsLateAnswer('q1', null, false)).toBe(false)
+    expect(acceptsLateAnswer(null, 'q1', false)).toBe(false)
+    expect(acceptsLateAnswer(undefined, undefined, false)).toBe(false)
+  })
+
+  it('tells the person, in the words agreed, rather than failing silently', () => {
+    expect(LATE_ANSWER_REFUSED).toBe('That question has closed. Your answer was not recorded.')
   })
 })
