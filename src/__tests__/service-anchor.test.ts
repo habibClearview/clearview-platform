@@ -15,6 +15,8 @@ import {
   refuseOrphanActivity,
   LATE_ANSWER_REFUSED,
   acceptsLateAnswer,
+  identityLine,
+  questionPosition,
   type Activity,
   type Problem,
 } from '../lib/service-anchor'
@@ -275,5 +277,23 @@ describe('C25 to C27. The carry forward is one row, not two copies', () => {
   it('C21 with C23. An activity with two problems is in Tool 2; one with none is not', () => {
     const shown = activitiesForToolTwo(activities, [problems[0], problems[1]])
     expect(shown.map((a) => a.id)).toEqual(['a1'])
+  })
+})
+
+describe('Part E. Who the participant is, and where they are (C34, C38)', () => {
+  it('C34. Organisation, then name, then role', () => {
+    expect(identityLine('Ikore', 'Grace Achieng', 'Field officer'))
+      .toBe('Ikore, Grace Achieng, Field officer')
+  })
+
+  it('drops what is missing rather than leaving stray commas', () => {
+    expect(identityLine(null, 'Grace Achieng', 'Field officer')).toBe('Grace Achieng, Field officer')
+    expect(identityLine('Ikore', 'Grace Achieng', '')).toBe('Ikore, Grace Achieng')
+    expect(identityLine(null, null, null)).toBe('')
+  })
+
+  it('C38. Reads as a position in the set, counting from one', () => {
+    expect(questionPosition(1, 4)).toBe('Question 2 of 4')
+    expect(questionPosition(0, 1)).toBe('Question 1 of 1')
   })
 })

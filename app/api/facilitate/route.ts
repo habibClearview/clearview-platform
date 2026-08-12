@@ -270,7 +270,16 @@ export async function POST(req: NextRequest) {
       case 'open': {
         const q = await ownQuestion(body.questionId)
         if (!q) return NextResponse.json({ error: 'That question is not on this engagement' }, { status: 404 })
+        // C43. Remember what the room is leaving, and whether it had been
+        // revealed, so somebody part way through an answer can still finish.
+        const { data: leaving } = await admin
+          .from('gtcv_room_state')
+          .select('open_question_id, revealed')
+          .eq('client_id', clientId)
+          .maybeSingle()
         await setState({
+          previous_question_id: leaving?.open_question_id || null,
+          previous_revealed: Boolean(leaving?.revealed),
           open_question_id: q.id,
           revealed: false,
           timer_started_at: null,

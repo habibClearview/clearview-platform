@@ -37,6 +37,10 @@ export interface RoomIdentity {
   personId: string | null
   /** The name to show, where a personal link carried one. Stage 2 fills this. */
   personName: string | null
+  /** C33, C34. Entered ONCE by a guest, or carried by a personal link. The
+   *  line reads organisation, then name, then role. */
+  personRole?: string | null
+  personOrg?: string | null
 }
 
 function secret(): string {
@@ -53,12 +57,17 @@ function sign(payload: string): string {
 }
 
 /** A new identity for a browser that has just joined a room. */
-export function newIdentity(clientId: string, person?: { id: string; name: string } | null): RoomIdentity {
+export function newIdentity(
+  clientId: string,
+  person?: { id: string; name: string; role?: string | null; org?: string | null } | null,
+): RoomIdentity {
   return {
     clientId,
     participantId: randomUUID(),
     personId: person?.id ?? null,
     personName: person?.name ?? null,
+    personRole: person?.role ?? null,
+    personOrg: person?.org ?? null,
   }
 }
 
@@ -103,6 +112,8 @@ export function decodeIdentity(cookieValue: string | undefined | null): RoomIden
       participantId: parsed.participantId,
       personId: typeof parsed.personId === 'string' ? parsed.personId : null,
       personName: typeof parsed.personName === 'string' ? parsed.personName : null,
+      personRole: typeof parsed.personRole === 'string' ? parsed.personRole : null,
+      personOrg: typeof parsed.personOrg === 'string' ? parsed.personOrg : null,
     }
   } catch {
     return null

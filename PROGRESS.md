@@ -1192,3 +1192,48 @@ does not describe.
 So the three actions are on the two tools that hold the hierarchy, and the
 other three keep the button they had. If you want Park on those as well, say
 so and it is a small change plus three columns.
+
+
+## Q22. A C26 replacement was referred to but never arrived
+Raised 12 August 2026. The instruction said "including the C26 replacement I
+just sent". Nothing came with it and nothing since. So C26 is built to the
+original wording in the correction document: Tool 2 shows the parent Service
+and the parent Activity beside every Problem row. If the replacement said
+something else, send it and it is a small change to one column.
+
+## New order of work, 12 August 2026
+
+The correction's Part M had the participant page as group 3 and the block as
+group 4. Both were brought forward, on the reasoning that the hierarchy and
+the two screens are what Habib can judge and everything else he has to take on
+trust.
+
+  Now       Parts A and C, controls in all five tools, service in tools 3 to 5
+  Then      Part E the participant page, Part F the block as the single place
+  After     Part H, Part I, Part D, Part J, Part K
+
+## Two lists at the end of every report, from 12 August 2026
+
+Instructed after a session was spent testing screens that were not built. The
+fault was mine: it was in the report, buried in prose, where it was missed.
+Every message now ends with two separate lists, last, where they cannot be
+missed:
+
+    Ready to test now, with what to do and what to see.
+    Not built yet, do not test, with a one line reason.
+
+## What I got wrong about tools 3, 4 and 5
+
+I decided they kept their single Delete, reasoning from C12's test naming an
+activity and C7's bucket naming activities and problems. That was too narrow:
+C28 already said those tools "operate on activities and problems within a
+Service, with the Service visible throughout", and I read past it. Corrected
+12 August 2026 — all five tools now Park, Move and Delete the same way.
+
+## A regression I made and caught in the same hour
+
+C45 removes the room opening controls from "Sessions and rooms". Doing only
+that would have left NO way for anybody to join a room at all, because the
+code and the QR lived nowhere else. C44 says they belong in the block, so they
+moved there in the same change. Recorded because a half-applied C45 would have
+broken joining completely and looked like C44 failing.

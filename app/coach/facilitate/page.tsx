@@ -334,39 +334,10 @@ function Room() {
             </form>
           ) : null}
 
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginTop: '2rem' }}>
-            <button
-              type="button"
-              onClick={() => send({ action: 'reveal' })}
-              disabled={Boolean(state?.revealed)}
-              style={btn(state?.revealed ? 'transparent' : C.teal)}
-            >Reveal</button>
-
-            <button
-              type="button"
-              onClick={() => {
-                const next = questions.find((q) => q.sort_order > open.sort_order)
-                if (next) send({ action: 'open', questionId: next.id })
-                else send({ action: 'close' })
-              }}
-              style={btn('transparent')}
-            >Next question</button>
-
-            <button type="button" onClick={backToTheTable} style={btn('transparent')}>
-              Back to the table
-            </button>
-
-            <Timer
-              minutes={minutes}
-              setMinutes={setMinutes}
-              running={secondsLeft !== null && state?.timer_paused_with_seconds_left === null}
-              onStart={() => send({ action: 'timerStart', seconds: Math.round(Number(minutes || 0) * 60) })}
-              onPause={() => send({ action: 'timerPause', seconds: secondsLeft ?? 0 })}
-              onReset={() => send({ action: 'timerReset' })}
-            />
-
-            <RoomSize size={size} setSize={setSize} onSet={(n) => send({ action: 'roomSize', roomSize: n })} />
-          </div>
+          {/* C52 AMENDS R25. R25 made this the working screen with three
+              buttons on it. It is now a DISPLAY: the block is where a question
+              is run from, and this carries no controls at all. C52's test is
+              that no buttons appear here. */}
         </div>
       )}
     </main>

@@ -32,6 +32,8 @@ import { checkRateLimit, clientIp } from '@/lib/rate-limit'
 import { loadSessionLink, resolveJoinCode } from '@/lib/session-link'
 import { isRefusal, readAnswer, refuseSubmission } from '@/lib/stage1-questions'
 import { ROOM_COOKIE, decodeIdentity, encodeIdentity, newIdentity } from '@/lib/stage1-room-identity'
+import { gateLabel } from '@/lib/gtcv-gates'
+import { LATE_ANSWER_REFUSED, acceptsLateAnswer, identityLine, questionPosition } from '@/lib/service-anchor'
 import {
   LINK_CLOSED,
   PERSONAL_GRANT_TYPE,
@@ -129,7 +131,7 @@ export async function GET(req: NextRequest) {
 
     const { data: state } = await db
       .from('gtcv_room_state')
-      .select('open_question_id, revealed, timer_started_at, timer_seconds, timer_paused_with_seconds_left')
+      .select('open_question_id, revealed, timer_started_at, timer_seconds, timer_paused_with_seconds_left, current_service_id')
       .eq('client_id', me.clientId)
       .maybeSingle()
 
@@ -139,10 +141,38 @@ export async function GET(req: NextRequest) {
 
     const { data: question } = await db
       .from('gtcv_questions')
-      .select('id, question_text, question_type, is_named, target_fields, options, scale_min, scale_max')
+      .select('id, gate_id, sort_order, question_text, question_type, is_named, target_fields, options, scale_min, scale_max')
       .eq('id', state.open_question_id)
       .eq('client_id', me.clientId)
       .maybeSingle()
+
+    // C37 and C38. A question with nothing to say which block it belongs to or
+    // where it sits in the set is the fault this whole correction opens with.
+    // Worked out here so a page cannot forget to ask.
+    let context: Record<string, unknown> = {}
+    if (question) {
+      const { data: siblings } = await db
+        .from('gtcv_questions')
+        .select('id, sort_order')
+        .eq('client_id', me.clientId)
+        .eq('gate_id', question.gate_id)
+        .order('sort_order', { ascending: true })
+      const list = siblings || []
+      const at = list.findIndex((q) => q.id === question.id)
+
+      // C6, C37. The service the room is working inside.
+      const { data: svc } = state.current_service_id
+        ? await db.from('gtcv_service_inventory')
+            .select('service_name').eq('id', state.current_service_id).maybeSingle()
+        : { data: null }
+
+      context = {
+        blockName: gateLabel(question.gate_id),
+        canvasNumber: question.gate_id === 'phase_0' ? 'Phase 0' : question.gate_id.toUpperCase(),
+        serviceName: svc?.service_name || null,
+        position: at >= 0 && list.length > 0 ? questionPosition(at, list.length) : null,
+      }
+    }
 
     // This browser's own answers only. R14 hides other people's answers to a
     // score or classify question until reveal, and the simplest way to be sure
@@ -176,7 +206,16 @@ export async function GET(req: NextRequest) {
       everyones,
       // The name this browser is known by, so a personal link can say who it
       // thinks you are. Empty for somebody who came in on the room code.
-      me: { name: me.personName, isGuest: !me.personId },
+      // C33, C34, C35. Who this browser is, as ONE LINE, worked out on the
+      // server so every screen says it the same way. Empty until a guest has
+      // given it once; a personal link fills it before they ever see a box.
+      me: {
+        name: me.personName,
+        line: identityLine(me.personOrg, me.personName, me.personRole),
+        knowsWho: Boolean((me.personName || '').trim()),
+        isGuest: !me.personId,
+      },
+      context,
       // R39. Whether the consent sentence has to be on screen. Decided on the
       // server so a page cannot forget to ask.
       showAnonymousNotice: showsAnonymousNotice(question ? question.is_named : null),
@@ -194,6 +233,9 @@ export async function POST(req: NextRequest) {
       code?: string
       questionId?: string
       token?: string
+      name?: string
+      role?: string
+      organisation?: string
       values?: Record<string, unknown>
       score?: unknown
       option?: unknown
@@ -318,6 +360,35 @@ export async function POST(req: NextRequest) {
       return res
     }
 
+    // ---- C33. Who a guest is, given once and never asked again ---------
+    // Kept in the same signed cookie as everything else, so it survives the
+    // page being closed and is never re-asked. C36: there is no route here for
+    // changing it afterwards — identity is corrected on the coach dashboard,
+    // so nobody becomes somebody else halfway through a session.
+    if (body.action === 'whoAmI') {
+      const me0 = decodeIdentity(req.cookies.get(ROOM_COOKIE)?.value)
+      if (!me0) return NextResponse.json({ error: 'This device has not joined a room' }, { status: 401 })
+      const name = (body.name || '').slice(0, 120).trim()
+      const role = (body.role || '').slice(0, 120).trim()
+      const org = (body.organisation || '').slice(0, 160).trim()
+      if (!name) return NextResponse.json({ error: 'Enter your name' }, { status: 400 })
+
+      const res = NextResponse.json({ ok: true })
+      res.cookies.set(ROOM_COOKIE, encodeIdentity({
+        ...me0,
+        personName: name,
+        personRole: role || null,
+        personOrg: org || null,
+      }), {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 200,
+      })
+      return res
+    }
+
     // ---- submitting ---------------------------------------------------
     const me = decodeIdentity(req.cookies.get(ROOM_COOKIE)?.value)
     if (!me) return NextResponse.json({ error: 'This device has not joined a room' }, { status: 401 })
@@ -340,22 +411,33 @@ export async function POST(req: NextRequest) {
 
     const { data: state } = await db
       .from('gtcv_room_state')
-      .select('open_question_id, revealed')
+      .select('open_question_id, revealed, previous_question_id, previous_revealed')
       .eq('client_id', me.clientId)
       .maybeSingle()
 
     // GUARDS 1 AND 2, both decided in src/lib/stage1-questions.ts so they can
     // be exercised by a test without a server and a database standing behind
     // it. The route's job is to fetch the state and answer with the verdict.
+    //
+    // C43 SOFTENS GUARD 1 BY EXACTLY ONE QUESTION. Somebody part way through an
+    // answer when the facilitator moves on is allowed to finish, and their
+    // answer counts against the question they were answering. Never after that
+    // question was revealed: a reveal is the moment the room reads the numbers
+    // off the wall.
     const refused = refuseSubmission(state, body.questionId)
-    if (refused) {
-      return NextResponse.json({ error: refused.error }, { status: refused.status })
+    const late = refused
+      ? acceptsLateAnswer(body.questionId, state?.previous_question_id, Boolean(state?.previous_revealed))
+      : false
+    if (refused && !late) {
+      // C43's addition: it SAYS SO. Never fail silently.
+      const message = state?.open_question_id ? LATE_ANSWER_REFUSED : refused.error
+      return NextResponse.json({ error: message }, { status: refused.status })
     }
 
     const { data: question } = await db
       .from('gtcv_questions')
       .select('id, question_type, is_named, target_fields, options, scale_min, scale_max')
-      .eq('id', state!.open_question_id)
+      .eq('id', late ? body.questionId! : state!.open_question_id)
       .eq('client_id', me.clientId)
       .maybeSingle()
     if (!question) {

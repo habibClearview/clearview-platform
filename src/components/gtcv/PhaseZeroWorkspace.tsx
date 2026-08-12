@@ -668,7 +668,13 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                         </label>
                       </td>
                       <td style={td}><TextCell value={r.notes} canManage={editable} placeholder="Why this score" onCommit={(v) => updHypothesis(r.id, { notes: v })} /></td>
-                      {editable && <td style={td}><button type="button" style={delButton} title="Delete this row" onClick={() => delHypothesis(r.id)}>Delete</button></td>}
+                      {editable && (
+                        <td style={td}>
+                          {/* C11, C12 to C16. The same three actions as Tools 1
+                              and 2, so Park means one thing across the block. */}
+                          <RowActions clientId={clientId} problemId={r.id} table="gtcv_hypotheses_shortlist" label="this hypothesis" onDone={reload} />
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
@@ -724,7 +730,13 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                         )}
                       </td>
                       <td style={td}><TextCell value={r.source} canManage={editable} placeholder="Who said it, where" onCommit={(v) => updSignal(r.id, { source: v })} /></td>
-                      {editable && <td style={td}><button type="button" style={delButton} title="Delete this row" onClick={() => delSignal(r.id)}>Delete</button></td>}
+                      {editable && (
+                        <td style={td}>
+                          {/* C11, C12 to C16. The same three actions as Tools 1
+                              and 2, so Park means one thing across the block. */}
+                          <RowActions clientId={clientId} problemId={r.id} table="gtcv_signal_story" label="this row" onDone={reload} />
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
@@ -813,7 +825,13 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                           <div style={{ marginTop: '0.3rem', fontSize: '0.8rem', color: C.amber, fontWeight: 600 }}>Name the gate this travels to.</div>
                         )}
                       </td>
-                      {editable && <td style={td}><button type="button" style={delButton} title="Delete this row" onClick={() => delDecision(r.id)}>Delete</button></td>}
+                      {editable && (
+                        <td style={td}>
+                          {/* C11, C12 to C16. The same three actions as Tools 1
+                              and 2, so Park means one thing across the block. */}
+                          <RowActions clientId={clientId} problemId={r.id} table="gtcv_continue_pause_kill" label="this row" onDone={reload} />
+                        </td>
+                      )}
                     </tr>
                   )
                 })}

@@ -91,6 +91,7 @@ export async function POST(req: NextRequest) {
       field?: string
       value?: string
       activityIds?: string[]
+      table?: string
       removal?: RemovalAction
     }
     const clientId = body.clientId
@@ -227,7 +228,15 @@ export async function POST(req: NextRequest) {
 
       // C12 to C16. THE THREE REMOVALS, and the one that runs when nobody said.
       case 'remove': {
-        const table = body.activityId ? 'gtcv_assumptions' : 'gtcv_problem_owner_budget'
+        // C11 and C28. All five tools, so Park means the same thing everywhere
+        // and nothing has to be destroyed to get it off a table.
+        const ROW_TABLES = [
+          'gtcv_assumptions', 'gtcv_problem_owner_budget',
+          'gtcv_hypotheses_shortlist', 'gtcv_signal_story', 'gtcv_continue_pause_kill',
+        ]
+        const table = body.activityId
+          ? 'gtcv_assumptions'
+          : (body.table && ROW_TABLES.includes(body.table) ? body.table : 'gtcv_problem_owner_budget')
         const id = body.activityId || body.id
         if (!id || !(await owns(table, id))) {
           return NextResponse.json({ error: 'That is not on this engagement' }, { status: 404 })

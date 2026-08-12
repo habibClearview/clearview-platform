@@ -32,9 +32,12 @@ const C = {
 const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
 
 export default function RowActions({
-  clientId, activityId, problemId, label, onDone,
+  clientId, activityId, problemId, table, label, onDone,
 }: {
   clientId: string
+  /** Which table the row is in, for the three tools that are neither an
+   *  activity nor a problem. Park means the same thing in all five. */
+  table?: string
   /** Exactly one of these two. An activity moves between services; a problem
    *  does not, because it belongs to an activity and travels with it. */
   activityId?: string
@@ -67,7 +70,7 @@ export default function RowActions({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clientId, action: 'remove',
-          ...(activityId ? { activityId } : { id: problemId }),
+          ...(activityId ? { activityId } : { id: problemId, table }),
           ...payload,
         }),
       })

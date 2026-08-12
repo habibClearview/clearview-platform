@@ -34,6 +34,7 @@ import {
   type QuestionType,
   type TargetField,
 } from '@/lib/stage1-questions'
+import { LATE_ANSWER_REFUSED } from '@/lib/service-anchor'
 import {
   ANONYMOUS_NOTICE,
   LINK_CLOSED,
@@ -135,6 +136,15 @@ export default function RoomPage() {
   // a personal link that raced the first read would show the code box for a
   // moment to somebody who never needs to see one.
   const [exchanging, setExchanging] = useState<boolean | null>(null)
+  // C33, C34. Given once. After that it is a line, never boxes again.
+  const [meLine, setMeLine] = useState('')
+  const [knowsWho, setKnowsWho] = useState(false)
+  const [ctx, setCtx] = useState<{ blockName?: string; canvasNumber?: string; serviceName?: string | null; position?: string | null }>({})
+  const [whoName, setWhoName] = useState('')
+  const [whoRole, setWhoRole] = useState('')
+  const [whoOrg, setWhoOrg] = useState('')
+  // C39. What was just submitted, kept on screen rather than cleared.
+  const [confirmed, setConfirmed] = useState<string | null>(null)
 
   // Which question the boxes on screen belong to, so moving to a new question
   // clears them rather than carrying somebody's last answer forward.
@@ -160,6 +170,9 @@ export default function RoomPage() {
       setMine(json.mine || [])
       setEveryones(json.everyones || [])
       setMyName(json.me?.name || null)
+      setMeLine(json.me?.line || '')
+      setKnowsWho(Boolean(json.me?.knowsWho))
+      setCtx(json.context || {})
       setShowNotice(Boolean(json.showAnonymousNotice))
     } catch {
       /* No connection. Keep what is on screen; the next try will catch up. */
@@ -224,6 +237,7 @@ export default function RoomPage() {
     setDraft({})
     setNote(null)
     setChosen(null)
+    setConfirmed(null)
   }, [question?.id])
 
   // The answer already given, so a score or classify question shows what this
@@ -256,7 +270,9 @@ export default function RoomPage() {
           // was out of signal, which is a thing the participant should be told
           // once rather than left to wonder about.
           const json = await res.json().catch(() => ({}))
-          setNote(json?.error || 'That answer could not be counted.')
+          // C43. Never fail silently. Somebody who typed an answer and watched
+          // it disappear assumes the system is broken and stops contributing.
+          setNote(json?.error || LATE_ANSWER_REFUSED)
           continue
         }
         // A limit, or the server having a bad moment. Keep it and try later.
@@ -397,6 +413,71 @@ export default function RoomPage() {
 
   const secondsLeft = timerRemaining(state, now)
 
+  // ---- C33. Who are you? Asked once, and then never again --------------
+  // A personal link has already answered this, so somebody arriving that way
+  // never sees this screen at all (C35).
+  if (!knowsWho) {
+    return (
+      <main style={page}>
+        <div style={card}>
+          <h1 style={{ fontFamily: 'Georgia,serif', fontSize: '1.3rem', margin: '0 0 0.5rem' }}>
+            Before we start
+          </h1>
+          <p style={{ color: C.slate, margin: '0 0 1.1rem', lineHeight: 1.5 }}>
+            Just once. You will not be asked again.
+          </p>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (!whoName.trim()) return
+              await fetch('/api/room', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  action: 'whoAmI', name: whoName, role: whoRole, organisation: whoOrg,
+                }),
+              }).catch(() => {})
+              load()
+            }}
+          >
+            {[
+              { label: 'Your name', value: whoName, set: setWhoName },
+              { label: 'Your role', value: whoRole, set: setWhoRole },
+              { label: 'Your organisation', value: whoOrg, set: setWhoOrg },
+            ].map((f) => (
+              <label key={f.label} style={{ display: 'block', marginBottom: '0.8rem' }}>
+                <span style={{
+                  display: 'block', fontSize: '0.75rem', letterSpacing: '.08em',
+                  textTransform: 'uppercase', color: C.slate, marginBottom: '0.25rem',
+                }}>{f.label}</span>
+                <input
+                  value={f.value}
+                  onChange={(e) => f.set(e.target.value)}
+                  style={{
+                    width: '100%', boxSizing: 'border-box', fontSize: '1rem',
+                    padding: '0.6rem', borderRadius: 8, border: `1px solid ${C.border}`,
+                    background: 'var(--cv-bg-2, #FAFAF7)', color: C.navy,
+                  }}
+                />
+              </label>
+            ))}
+            <button
+              type="submit"
+              disabled={!whoName.trim()}
+              style={{
+                width: '100%', marginTop: '0.4rem', padding: '0.75rem', fontSize: '1rem',
+                fontWeight: 700, border: 'none', borderRadius: 10,
+                background: whoName.trim() ? C.teal : C.border,
+                color: whoName.trim() ? 'var(--cv-on-accent, #FFFFFF)' : C.slate,
+                cursor: whoName.trim() ? 'pointer' : 'default',
+              }}
+            >Continue</button>
+          </form>
+        </div>
+      </main>
+    )
+  }
+
   // ---- joined, nothing open (R7) ---------------------------------------
   if (!question) {
     return (
@@ -430,6 +511,30 @@ export default function RoomPage() {
           }}>{formatTimer(secondsLeft)}</div>
         ) : null}
 
+        {/* C37, C38. Which block, which canvas number, which service, and
+            where this question sits in the set. All of it above the question
+            and none of it needing a scroll. The fault this replaces was a
+            question floating with nothing to say what it belonged to. */}
+        <div style={{
+          fontFamily: 'monospace', fontSize: '0.72rem', letterSpacing: '.06em',
+          textTransform: 'uppercase', color: C.slate, marginBottom: '0.5rem',
+          lineHeight: 1.6,
+        }}>
+          {[ctx.canvasNumber, ctx.blockName].filter(Boolean).join(' · ')}
+          {ctx.serviceName ? <div style={{ color: C.navy }}>{ctx.serviceName}</div> : null}
+          {ctx.position ? <div>{ctx.position}</div> : null}
+        </div>
+
+        {/* C34, C36. A LINE, never boxes, and no way to edit it here.
+            Identity is corrected on the coach dashboard, so nobody becomes
+            somebody else halfway through a session. */}
+        {meLine ? (
+          <div style={{
+            fontSize: '0.85rem', color: C.slate, marginBottom: '0.8rem',
+            paddingBottom: '0.5rem', borderBottom: `1px solid ${C.border}`,
+          }}>{meLine}</div>
+        ) : null}
+
         <h1 style={{
           fontFamily: 'Georgia,serif', fontSize: '1.35rem', fontWeight: 600,
           lineHeight: 1.3, margin: '0 0 1.1rem',
@@ -454,6 +559,14 @@ export default function RoomPage() {
             setDraft={setDraft}
             onSend={() => {
               send({ questionId: question.id, values: draft })
+              // C39. Kept on screen, saying what was sent, rather than the
+              // boxes simply emptying and leaving somebody wondering.
+              setConfirmed(
+                (question.target_fields || [])
+                  .map((f) => draft[f.column])
+                  .filter(Boolean)
+                  .join(' — '),
+              )
               setDraft({})
             }}
           />
@@ -482,6 +595,23 @@ export default function RoomPage() {
           <p style={{ color: C.slate, margin: '0.9rem 0 0' }}>
             The answers have been revealed. This can no longer be changed.
           </p>
+        ) : null}
+
+        {/* C39. It stays. The screen clearing with no acknowledgement is what
+            makes a person wonder whether it went. */}
+        {confirmed ? (
+          <div style={{
+            marginTop: '0.9rem', padding: '0.7rem 0.8rem', borderRadius: 8,
+            border: `1px solid ${C.teal}`, background: 'var(--cv-bg-2, #FAFAF7)',
+          }}>
+            <div style={{ fontSize: '0.8rem', color: C.teal, fontWeight: 700 }}>Sent</div>
+            <div style={{ fontSize: '0.95rem', color: C.navy, marginTop: 2 }}>{confirmed}</div>
+            {question.question_type === 'collect' ? (
+              <div style={{ fontSize: '0.85rem', color: C.slate, marginTop: 4 }}>
+                You can add another below.
+              </div>
+            ) : null}
+          </div>
         ) : null}
 
         {note ? <p role="alert" style={{ color: C.red, margin: '0.9rem 0 0' }}>{note}</p> : null}
@@ -558,7 +688,7 @@ function CollectInput({
           color: ready ? 'var(--cv-on-accent, #FFFFFF)' : C.slate,
           cursor: ready ? 'pointer' : 'default',
         }}
-      >Send</button>
+      >Submit</button>
     </form>
   )
 }

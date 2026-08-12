@@ -275,3 +275,35 @@ export function moveIntoService(
     // it to arrive complete.
     .map((a) => ({ ...a, service_id: serviceId, parked_at: null }))
 }
+
+// ------------------------------------------------------------
+// PART E. WHO THE PARTICIPANT IS, ON SCREEN  (C33, C34)
+// ------------------------------------------------------------
+
+/**
+ * C34. The line a participant sees on every question after the first.
+ *
+ * Organisation, then name, then role, in that order, because in a room with
+ * three organisations in it the organisation is what tells you which of the
+ * three Graces this is.
+ *
+ * C33: it is a LINE, never boxes. Asking for a name on every question is the
+ * fault this replaces.
+ * C36: there is no edit control beside it. Identity is corrected on the coach
+ * dashboard, so a person cannot become somebody else halfway through a session.
+ */
+export function identityLine(
+  organisation: string | null | undefined,
+  name: string | null | undefined,
+  role: string | null | undefined,
+): string {
+  return [organisation, name, role]
+    .map((p) => (p || '').trim())
+    .filter(Boolean)
+    .join(', ')
+}
+
+/** C38. Where this question sits in the set the room is working through. */
+export function questionPosition(index: number, total: number): string {
+  return `Question ${index + 1} of ${total}`
+}
