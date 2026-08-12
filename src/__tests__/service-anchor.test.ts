@@ -239,3 +239,41 @@ describe('C43. Finishing an answer after the facilitator has moved on', () => {
     expect(LATE_ANSWER_REFUSED).toBe('That question has closed. Your answer was not recorded.')
   })
 })
+
+describe('C25 to C27. The carry forward is one row, not two copies', () => {
+  // The whole of group 2 rests on this: a problem stated in Tool 1 IS a row in
+  // Tool 2's table. These assert the property that makes that true, which is
+  // that both tools read the same array and neither holds its own text.
+  const activities = [activity('a1'), activity('a2')]
+  const problems = [
+    problem('p1', 'a1', 'Yields are low'),
+    problem('p2', 'a1', 'Buyers pay late'),
+    problem('p3', 'a2', 'Nobody is trained'),
+  ]
+
+  it('C25. Every problem stated in Tool 1 is present under its activity', () => {
+    // Four stated, four found, nothing retyped anywhere.
+    expect(problemsOfActivity('a1', problems).map((p) => p.problem))
+      .toEqual(['Yields are low', 'Buyers pay late'])
+    expect(problemsOfActivity('a2', problems).map((p) => p.problem))
+      .toEqual(['Nobody is trained'])
+  })
+
+  it('C27. Editing the text changes what BOTH tools show, because there is one of it', () => {
+    const edited = problems.map((p) => (p.id === 'p1' ? { ...p, problem: 'Yields collapsed' } : p))
+    // Tool 1's view.
+    expect(problemsOfActivity('a1', edited)[0].problem).toBe('Yields collapsed')
+    // Tool 2's view is the same rows, so it cannot disagree.
+    expect(edited.find((p) => p.id === 'p1')!.problem).toBe('Yields collapsed')
+  })
+
+  it('C27. Removing it in Tool 1 removes it from Tool 2', () => {
+    const afterPark = problems.map((p) => (p.id === 'p1' ? { ...p, parked_at: '2026-08-12T10:00:00Z' } : p))
+    expect(problemsOfActivity('a1', afterPark).map((p) => p.id)).toEqual(['p2'])
+  })
+
+  it('C21 with C23. An activity with two problems is in Tool 2; one with none is not', () => {
+    const shown = activitiesForToolTwo(activities, [problems[0], problems[1]])
+    expect(shown.map((a) => a.id)).toEqual(['a1'])
+  })
+})

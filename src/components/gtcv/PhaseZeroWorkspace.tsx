@@ -35,6 +35,10 @@ import ServiceAnchorBar from '@/components/gtcv/ServiceAnchorBar'
 // C12 to C16. Park, Move to another service, Delete — three named actions
 // where there used to be one button that only destroyed.
 import RowActions from '@/components/gtcv/RowActions'
+// C20, C21, C22, C25, C27. The problem column, which is not a column of text
+// but a view onto Tool 2's own rows.
+import ProblemsCell from '@/components/gtcv/ProblemsCell'
+import { authedFetch } from '@/lib/authed-fetch'
 
 // ─── Shared style vocabulary (matches the coach dashboard) ───
 const C = {
@@ -230,6 +234,20 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
   // lifting the loader out, so the loader itself is not touched.
   const [refreshKey, setRefreshKey] = useState(0)
   const reload = useCallback(() => setRefreshKey((n) => n + 1), [])
+  // C25 to C27. ONE set of problem rows, read here and given to both tools, so
+  // Tool 1 and Tool 2 cannot disagree about what a problem says.
+  const [anchor, setAnchor] = useState({ services: [], activities: [], problems: [] })
+  useEffect(() => {
+    if (!clientId) return
+    let cancelled = false
+    const read = () => authedFetch(`/api/services?clientId=${encodeURIComponent(clientId)}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (!cancelled && j) setAnchor({ services: j.services || [], activities: j.activities || [], problems: j.problems || [] }) })
+      .catch(() => {})
+    read()
+    const t = setInterval(read, 4000)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [clientId, refreshKey])
 
   useEffect(() => {
     let cancelled = false
@@ -431,6 +449,9 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                   <th style={{ ...th, width: '14%' }}>Service</th>
                   <th style={{ ...th, width: '16%' }}>Activity</th>
                   <th style={{ ...th, width: '16%' }}>What it delivers</th>
+                  {/* C20. ADDED beside it, never instead of it. Two different
+                      questions: what the buyer receives, and what it is for. */}
+                  <th style={{ ...th, width: '16%' }}>Problem it solves</th>
                   <th style={{ ...th, width: '13%' }}>Who pays</th>
                   <th style={{ ...th, width: '20%' }}>Assumption underneath</th>
                   <th style={{ ...th, width: '21%' }}>What would prove it wrong</th>
@@ -443,6 +464,15 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                     <td style={td}><ServiceCell value={r.service_name} canManage={editable} suggestions={serviceSuggestions} listId={`svc-${r.id}`} onCommit={(v) => updAssumption(r.id, { service_name: v || null })} /></td>
                     <td style={td}><TextCell value={r.activity} canManage={editable} placeholder="The activity" onCommit={(v) => updAssumption(r.id, { activity: v })} /></td>
                     <td style={td}><TextCell value={r.delivers} canManage={editable} placeholder="What it actually delivers" onCommit={(v) => updAssumption(r.id, { delivers: v })} /></td>
+                    <td style={td}>
+                      <ProblemsCell
+                        clientId={clientId}
+                        activityId={r.id}
+                        problems={anchor.problems}
+                        canManage={editable}
+                        onChanged={reload}
+                      />
+                    </td>
                     <td style={td}><TextCell value={r.who_pays} canManage={editable} placeholder="Who pays for it now" onCommit={(v) => updAssumption(r.id, { who_pays: v })} /></td>
                     <td style={td}><TextCell value={r.assumption} canManage={editable} placeholder="What has to be true" onCommit={(v) => updAssumption(r.id, { assumption: v })} /></td>
                     <td style={td}><TextCell value={r.disproof} canManage={editable} placeholder="Evidence that would kill it" onCommit={(v) => updAssumption(r.id, { disproof: v })} /></td>
@@ -496,6 +526,9 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             <table style={table}>
               <thead>
                 <tr>
+                  {/* C26. What the problem belongs to, so the person filling
+                      this in can see it without going back to Tool 1. */}
+                  <th style={{ ...th, width: '14%' }}>Service and activity</th>
                   <th style={{ ...th, width: '20%' }}>Problem implied</th>
                   <th style={{ ...th, width: '14%' }}>Who experiences it</th>
                   <th style={{ ...th, width: '14%' }}>Who is accountable</th>
@@ -510,6 +543,23 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                   const noHolder = blank(r.budget_holder)
                   return (
                     <tr key={r.id} style={noHolder ? { background: C.tintAmber } : undefined}>
+                      <td style={{ ...td, fontSize: '0.86rem', color: C.slate }}>
+                        {(() => {
+                          const act = anchor.activities.find((a) => a.id === r.activity_id)
+                          const svc = act ? anchor.services.find((x) => x.id === act.service_id) : null
+                          if (!act) {
+                            // Rows written before Tool 1 fed this table. Shown
+                            // plainly rather than hidden or guessed at.
+                            return <span style={{ fontStyle: 'italic' }}>Not yet attached to an activity</span>
+                          }
+                          return (
+                            <>
+                              <div style={{ fontWeight: 600, color: C.navy }}>{svc?.service_name || 'No service'}</div>
+                              <div>{act.activity || 'Unnamed activity'}</div>
+                            </>
+                          )
+                        })()}
+                      </td>
                       <td style={td}><TextCell value={r.problem} canManage={editable} placeholder="The problem" onCommit={(v) => updOwner(r.id, { problem: v })} /></td>
                       <td style={td}><TextCell value={r.experienced_by} canManage={editable} placeholder="Who feels it" onCommit={(v) => updOwner(r.id, { experienced_by: v })} /></td>
                       <td style={td}><TextCell value={r.accountable} canManage={editable} placeholder="Who answers for it" onCommit={(v) => updOwner(r.id, { accountable: v })} /></td>
@@ -523,7 +573,18 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                       </td>
                       <td style={td}><TextCell value={r.cost_of_not_solving} canManage={editable} placeholder="What it costs them to leave it" onCommit={(v) => updOwner(r.id, { cost_of_not_solving: v })} /></td>
                       <td style={td}><TextCell value={r.budget_mechanism} canManage={editable} placeholder="How the money is released" onCommit={(v) => updOwner(r.id, { budget_mechanism: v })} /></td>
-                      {editable && <td style={td}><button type="button" style={delButton} title="Delete this row" onClick={() => delOwner(r.id)}>Delete</button></td>}
+                      {editable && (
+                        <td style={td}>
+                          {/* A problem parks or is deleted. It never moves
+                              between services, because it has none of its own. */}
+                          <RowActions
+                            clientId={clientId}
+                            problemId={r.id}
+                            label={r.problem || 'this problem'}
+                            onDone={reload}
+                          />
+                        </td>
+                      )}
                     </tr>
                   )
                 })}

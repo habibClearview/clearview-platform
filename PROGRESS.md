@@ -1146,3 +1146,49 @@ read in full in under a minute.
   C88  push channel still closed      0 of the three room tables are in the
                                       publication, confirmed by query
   C89  offline queue                  untouched
+
+
+## Correction group 2, done 12 August 2026
+
+C20  "Problem it solves" is ADDED to Tool 1. "What it delivers" keeps its
+     heading and its meaning and was not touched — confirmed by name after the
+     change. They are two different questions: what the buyer receives, and
+     what it is for.
+
+C21  An activity holds as many problems as it needs. The cell is a list with
+     "+ another problem", not a box.
+
+C22  An activity with none says "No problem stated", in a marked amber state,
+     rather than showing an empty cell that looks like a gap nobody reached.
+
+C23  Such an activity is ABSENT from Tool 2, not present with empty fields.
+
+C24  It is still counted, so Tool 5 resolves it with everything else rather
+     than it being auto-killed at the moment the gap appears.
+
+C25  Stating a problem in Tool 1 IS creating the Tool 2 row. There is no
+     second step and no copy.
+
+C26  Tool 2 gained a first column showing the parent service and activity on
+     every row. Rows written before Tool 1 fed that table say "Not yet
+     attached to an activity" rather than being hidden or guessed at.
+
+C27  Editing in one place changes the other, because there is one row and both
+     tools read it.
+
+C12 to C16 are now on Tool 1 AND Tool 2. A problem parks or is deleted and
+never moves between services, because it has no service of its own.
+
+## Decision taken: tools 3, 4 and 5 keep their single Delete
+
+Recorded 12 August 2026 rather than choosing quietly.
+
+C12's own test reads "Open the actions on ANY ACTIVITY", and C7 scopes the
+parked bucket to "activities and problems". Tools 3, 4 and 5 hold hypotheses,
+signals and decisions, which are none of those things: a hypothesis has no
+service to be moved to, and parking one would need a second bucket that C7
+does not describe.
+
+So the three actions are on the two tools that hold the hierarchy, and the
+other three keep the button they had. If you want Park on those as well, say
+so and it is a small change plus three columns.
