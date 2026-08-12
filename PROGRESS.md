@@ -1651,3 +1651,55 @@ using the same remembered folding as the five tools.
 
 Full suite: 61 files, 1172 tests, all passing. next build compiles clean, and
 the hooks lint passes on every new and changed file.
+
+## THE SECTION 8 REGRESSION CHECK, run 12 August 2026 after the seven items
+
+  The eleven blocks in the left navigation and their tables   intact
+      src/lib/coach-types.ts unchanged. CoachDashboard.tsx changed by exactly
+      two things: one import, and the Journey Canvas tab gaining a panel
+      BENEATH the existing drawing, which is untouched.
+  Every gate readiness message and counter                    intact
+      "Phase 0 is not closed yet", "N with no budget holder", "N activities
+      have no decision" all present and unchanged in wording. The five C30
+      counter labels unchanged in service-anchor.ts.
+  The Evidence Library and its association of entries to gates intact
+      EvidenceLibraryPanel.tsx unchanged. The Journey Canvas READS
+      evidence_library by dp_id and writes nothing to it.
+  The Session Plan, room types and required attendee flags     intact
+      SessionPlanner.tsx unchanged.
+  The revision tracking on DP03 propositions                   intact
+      PropositionBuilder.tsx unchanged.
+  The staging banner                                           intact
+      EnvBanner.tsx and app/layout.tsx unchanged.
+  C85, the identity column unreadable by any route or export   intact
+      Its test walks every file under app, src and scripts and passes with the
+      four new files in place.
+
+## DEPLOYED AND CONFIRMED SERVING
+
+  git push to BOTH branches, every time, as the rule near the top requires.
+  Checked what the address is actually serving rather than assuming:
+      curl .../api/build-info  ->  commitShort 51ab297, branch
+      claude/coach-deploy-corrections-2kj6q4, environment preview.
+
+## THE ONE THING THAT NEEDS HABIB, AND IT IS NOT A QUESTION
+
+  RUN THE MIGRATION supabase/migrations/2026_08_12_c26_hypothesis_sources.sql.
+  There is no exec_sql in this project and no migration step in CI, so
+  migrations are applied by hand and I cannot apply this one.
+
+  Nothing breaks without it. The canvas read degrades to an empty list, Tools 1
+  and 2 are unaffected, and the two pickers under "Built from" answer, in so
+  many words, "The link table is not in the database yet. Run the migration
+  2026_08_12_c26_hypothesis_sources.sql, then this works." Everything else in
+  all seven items works with no migration at all.
+
+## WHAT THE NEXT SESSION SHOULD PICK UP FIRST
+
+  1. Whether C23 should survive the C26 replacement. I chose the replacement,
+     which shows an activity with no stated problem instead of hiding it. It is
+     a one line filter either way. See D-N1.
+  2. Whether the fixed Journey Canvas version should be STORED rather than
+     frozen-and-printed. See D-N3. That is a table and a retention rule for a
+     document carrying dissent, which I would not invent unasked.
+  3. Nothing else is outstanding from the seven.
