@@ -45,6 +45,7 @@ import {
   hierarchyForService,
   hypothesisBuild,
   problemLabel,
+  problemsOutsideHierarchy,
   splitRowsByService,
   NO_PROBLEM_STATED,
 } from '@/lib/phase-zero-hierarchy'
@@ -136,38 +137,6 @@ const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
 const blank = (v) => !String(v ?? '').trim()
 
 // ─── Small building blocks ───────────────────────────────────
-// The service an activity sits under. An organisation runs several services
-// and each is a portfolio of activities, so an activity with no service named
-// cannot be read back as "what we do for gender advisory".
-//
-// It types freely rather than picking from a list, because clearing the ground
-// runs before DP01 has necessarily named anything. Where names DO exist, they
-// are offered as suggestions, so the same service is spelled the same way
-// across the table instead of three ways.
-function ServiceCell({ value, onCommit, canManage, suggestions, listId }) {
-  const [local, setLocal] = useState(value ?? '')
-  useEffect(() => { setLocal(value ?? '') }, [value])
-  if (!canManage) {
-    return <div style={{ ...roInput, minHeight: 34 }}>{local || <span style={{ color: C.faint }}>No service named</span>}</div>
-  }
-  return (
-    <>
-      <input
-        aria-label="Which service this activity sits under"
-        style={cellInput}
-        list={listId}
-        placeholder="e.g. Gender advisory"
-        value={local}
-        onChange={(e) => setLocal(e.target.value)}
-        onBlur={() => { if ((value ?? '') !== local) onCommit(local) }}
-      />
-      <datalist id={listId}>
-        {suggestions.map((name) => <option key={name} value={name} />)}
-      </datalist>
-    </>
-  )
-}
-
 function TextCell({ value, onCommit, canManage, placeholder, rows = 2, ariaLabel }) {
   const [local, setLocal] = useState(value ?? '')
   useEffect(() => { setLocal(value ?? '') }, [value])
@@ -310,12 +279,12 @@ function ActivityGroup({ activity, problemCount, noProblemStated, collapsed, onT
 }
 
 /** The Parked area a tool draws under itself. C28: visible, never hidden. */
-function ParkedArea({ count, children }) {
+function ParkedArea({ count, children, label }) {
   if (!count) return null
   return (
     <div style={{ marginTop: '0.9rem', border: `1px dashed ${C.amber}`, borderRadius: 10, padding: '0.6rem 0.75rem', background: C.tintAmber }}>
       <div style={{ ...mono, fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.navy, marginBottom: '0.45rem' }}>
-        Parked — {count} not in any service
+        {label ? `${label} — ${count}` : `Parked — ${count} not in any service`}
       </div>
       {/* C28 as amended: these are here so that NOTHING disappears for lack of
           a service. They are not errors and they are not hidden. */}
@@ -646,12 +615,39 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
   const updSignal = makeUpdater('gtcv_signal_story', setSignals)
   const updDecision = makeUpdater('gtcv_continue_pause_kill', setDecisions)
 
-  const addAssumption = makeAdder('gtcv_assumptions', assumptions, setAssumptions, {})
+  /**
+   * C2. AN ACTIVITY IS CREATED INSIDE THE ANCHORED SERVICE, OR NOT AT ALL.
+   *
+   * This used to insert with no service_id at all, so every activity added
+   * here dropped straight into Parked, the anchored service stayed at zero,
+   * and Tool 2 looked empty. That is the fault this replaces.
+   *
+   * With nothing anchored it creates NOTHING and says so, rather than making a
+   * row that has nowhere to live.
+   */
+  const addActivity = useCallback(async () => {
+    if (!anchoredService) {
+      setSaveState('error')
+      setSaveMessage('Choose a service in the bar above first. An activity belongs to a service, so nothing was created.')
+      return
+    }
+    setSaveState('saving')
+    setSaveMessage(null)
+    const { data, error } = await supabase.from('gtcv_assumptions').insert([{
+      client_id: clientId,
+      sort_order: assumptions.length,
+      service_id: anchoredService.id,
+      // Both are held, as the route does it: the reference is the parent, the
+      // text is what other screens already read.
+      service_name: anchoredService.service_name || null,
+    }]).select().single()
+    if (error) { setSaveState('error'); setSaveMessage(error.message); return }
+    setAssumptions((prev) => [...prev, data])
+    setSaveState('saved')
+    // So it appears under the service in Tool 2 at once, not on the next poll.
+    reload()
+  }, [anchoredService, clientId, assumptions.length, reload])
 
-  const serviceSuggestions = Array.from(new Set([
-    ...inventoryNames,
-    ...assumptions.map((r) => (r.service_name || '').trim()),
-  ].filter(Boolean))).sort()
   const addOwner = makeAdder('gtcv_problem_owner_budget', owners, setOwners, {})
   // C28 as amended. A row added while a service is anchored belongs to it from
   // the start, so the room does not create work in Tool 3 and then find it in
@@ -678,13 +674,33 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     () => hierarchyForService(anchoredService, anchor.activities, anchor.problems),
     [anchoredService, anchor.activities, anchor.problems],
   )
-  // Problems written before Tool 1 fed this table, so they hang off no
-  // activity. They have no place in the hierarchy, so they go where C28 sends
-  // everything else with no home: the Parked area, visible, never hidden.
-  const unparentedProblems = useMemo(
-    () => anchor.problems.filter((p) => !p.parked_at && !anchor.activities.some((a) => a.id === p.activity_id)),
+  /**
+   * EVERY PROBLEM THE HIERARCHY CANNOT SHOW. Nothing is allowed to be invisible.
+   *
+   * A parked problem used to appear in NO list anywhere: problemsOfActivity
+   * drops it, the old unparented filter dropped it, and the anchor bar's bucket
+   * holds only activities. So a problem parked with the × could not be reached,
+   * edited or restored by anybody. Three kinds land here now:
+   *
+   *   parked          parked_at is set
+   *   orphaned        its activity no longer exists
+   *   stranded        its activity itself has no service, so the activity is
+   *                   not drawn under any service and its problems went with it
+   *
+   * A problem under an activity of ANOTHER service is deliberately not here:
+   * switching the anchor above shows it, so it is reachable already.
+   */
+  const strandedProblems = useMemo(
+    () => problemsOutsideHierarchy(anchor.problems, anchor.activities),
     [anchor.problems, anchor.activities],
   )
+
+  /** Writing to a problem in the Parked area, and re-reading so it moves at once. */
+  const updParkedProblem = useCallback(async (id, patch) => {
+    setOwners((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+    const ok = await persist('gtcv_problem_owner_budget', id, patch)
+    if (ok) reload()
+  }, [persist, reload])
 
   // Part J. Folded state, shared by every tool and remembered between them.
   const fold = useCollapse(clientId)
@@ -826,7 +842,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         title="Assumption Dump Canvas"
         question="What are we already doing, and what has to be true for it to work?"
         purposeText="List every activity the organisation runs, and the service it sits under. An organisation sells several services and each is a portfolio of activities, so naming the service is what lets this be read back as what we actually do for gender advisory. For each activity, name what it delivers, who pays for it today, the assumption sitting underneath it, and what evidence would prove that assumption wrong."
-        right={editable ? <button type="button" style={addButton} onClick={addAssumption}>+ Add activity</button> : null}
+        right={editable ? <button type="button" style={addButton} onClick={addActivity}>+ Add activity</button> : null}
       >
         {/* ─── C18. A NEW SERVICE, MADE OF ACTIVITIES THAT ALREADY EXIST ───
             Tick the activities, name the result, and they move. They keep
@@ -918,7 +934,33 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                         />
                       </td>
                     )}
-                    <td style={td}><ServiceCell value={r.service_name} canManage={editable} suggestions={serviceSuggestions} listId={`svc-${r.id}`} onCommit={(v) => updAssumption(r.id, { service_name: v || null })} /></td>
+                    {/* THE PARENT, not a name typed beside it. This used to be
+                        free text writing service_name, which set no parent at
+                        all, so an activity could read "Gender advisory" on
+                        screen and belong to nothing. Choosing here moves the
+                        activity through the same action as "Move to another
+                        service", so there is ONE way an activity gets its
+                        service. */}
+                    <td style={td}>
+                      {editable ? (
+                        <select
+                          aria-label="Which service this activity belongs to"
+                          style={{ ...selectStyle, minWidth: 140 }}
+                          value={r.service_id || ''}
+                          onChange={(e) => { if (e.target.value) hierarchyAction({ action: 'moveMany', serviceId: e.target.value, activityIds: [r.id] }) }}
+                        >
+                          {!r.service_id && <option value="">Not in a service</option>}
+                          {anchor.services.map((s) => (
+                            <option key={s.id} value={s.id}>{s.service_name || 'Unnamed service'}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div style={{ ...roInput, minHeight: 34 }}>
+                          {anchor.services.find((s) => s.id === r.service_id)?.service_name
+                            || <span style={{ color: C.faint }}>Not in a service</span>}
+                        </div>
+                      )}
+                    </td>
                     <td style={td}><TextCell value={r.activity} canManage={editable} placeholder="The activity" onCommit={(v) => updAssumption(r.id, { activity: v })} /></td>
                     <td style={td}><TextCell value={r.delivers} canManage={editable} placeholder="What it actually delivers" onCommit={(v) => updAssumption(r.id, { delivers: v })} /></td>
                     <td style={td}>
@@ -1091,28 +1133,80 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
           </ServiceFrame>
         )}
 
-        {/* C28 as amended. A problem written before Tool 1 fed this table hangs
-            off no activity, so it has no place in the hierarchy. It goes here,
-            visible, rather than disappearing for want of a parent. */}
-        <ParkedArea count={unparentedProblems.length}>
-          {unparentedProblems.map((p) => {
+        {/* PARKED PROBLEMS, AND EVERY OTHER ONE THE HIERARCHY CANNOT SHOW.
+            Reachable, editable in place, and restorable. Nothing here is
+            deleted by being parked, and nothing here is invisible. */}
+        <ParkedArea count={strandedProblems.length} label="Parked problems">
+          {strandedProblems.map((p) => {
             const r = owners.find((o) => o.id === p.id) || p
+            const parent = anchor.activities.find((a) => a.id === r.activity_id) || null
+            const why = r.parked_at
+              ? 'parked'
+              : !parent
+                ? 'not attached to an activity'
+                : 'its activity is not in a service'
             return (
-              <div key={r.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', padding: '0.2rem 0' }}>
-                <span style={{ fontSize: '0.92rem', color: C.navy }}>{problemLabel(r)}</span>
-                <span style={{ ...mono, fontSize: '0.76rem', color: C.slate }}>not attached to an activity</span>
-                {editable && tree.branches.length > 0 ? (
-                  <select
-                    value=""
-                    aria-label={`Attach ${problemLabel(r)} to an activity`}
-                    onChange={(e) => { if (e.target.value) updOwner(r.id, { activity_id: e.target.value }) }}
-                    style={{ ...selectStyle, minWidth: 190, fontSize: '0.82rem' }}
-                  >
-                    <option value="">Attach to an activity...</option>
-                    {tree.branches.map((b) => (
-                      <option key={b.activity.id} value={b.activity.id}>{activityLabel(b.activity)}</option>
-                    ))}
-                  </select>
+              <div
+                key={r.id}
+                style={{
+                  display: 'flex', gap: '0.5rem', alignItems: 'flex-start', flexWrap: 'wrap',
+                  padding: '0.4rem 0', borderTop: `1px solid ${C.borderSoft}`,
+                }}
+              >
+                {/* Editable in place, exactly as everywhere else. */}
+                <div style={{ flex: '1 1 20rem', minWidth: '14rem' }}>
+                  <TextCell
+                    value={r.problem}
+                    canManage={editable}
+                    placeholder="The problem"
+                    ariaLabel="The problem"
+                    onCommit={(v) => updParkedProblem(r.id, { problem: v })}
+                  />
+                  <div style={{ ...mono, fontSize: '0.72rem', color: C.slate, marginTop: '0.15rem' }}>
+                    {why}{parent ? ` · ${activityLabel(parent)}` : ''}
+                  </div>
+                </div>
+
+                {editable ? (
+                  <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Straight back where it came from, where that still exists
+                        and is in a service. One press, no choosing. */}
+                    {r.parked_at && parent && parent.service_id && !parent.parked_at ? (
+                      <button
+                        type="button"
+                        onClick={() => updParkedProblem(r.id, { parked_at: null })}
+                        style={{ ...mono, fontSize: '0.74rem', color: C.teal, background: 'transparent', border: `1px solid ${C.teal}`, borderRadius: 6, padding: '0.2rem 0.55rem', cursor: 'pointer' }}
+                      >
+                        Put back on {activityLabel(parent)}
+                      </button>
+                    ) : null}
+
+                    {/* Onto any activity of the anchored service. This also
+                        un-parks it, because choosing where it goes IS putting
+                        it back. */}
+                    {tree.branches.length > 0 ? (
+                      <select
+                        value=""
+                        aria-label={`Put ${problemLabel(r)} on an activity`}
+                        onChange={(e) => { if (e.target.value) updParkedProblem(r.id, { activity_id: e.target.value, parked_at: null }) }}
+                        style={{ ...selectStyle, minWidth: 190, fontSize: '0.82rem' }}
+                      >
+                        <option value="">Put on an activity...</option>
+                        {tree.branches.map((b) => (
+                          <option key={b.activity.id} value={b.activity.id}>{activityLabel(b.activity)}</option>
+                        ))}
+                      </select>
+                    ) : null}
+
+                    {/* C13. Delete, behind its confirmation, for the ones that
+                        are genuinely finished with. */}
+                    <RowActions
+                      clientId={clientId}
+                      problemId={r.id}
+                      label={r.problem || 'this problem'}
+                      onDone={reload}
+                    />
+                  </div>
                 ) : null}
               </div>
             )

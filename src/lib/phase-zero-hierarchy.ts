@@ -192,6 +192,34 @@ export function hypothesisBuild(
   }
 }
 
+/**
+ * EVERY PROBLEM THE HIERARCHY CANNOT DRAW. Nothing may be invisible.
+ *
+ * A parked problem used to appear in NO list anywhere. problemsOfActivity drops
+ * it, the hierarchy never reaches it, and the anchor bar's bucket holds only
+ * activities — so a problem parked with the × could not be found, edited or
+ * restored by anybody, and the work was gone in every way that matters to a
+ * room. Three kinds belong in the Parked area:
+ *
+ *   parked      parked_at is set
+ *   orphaned    its activity no longer exists
+ *   stranded    its activity has no service, or is itself parked, so the
+ *               activity is drawn under no service and its problems went with it
+ *
+ * A problem under an activity of ANOTHER service is deliberately NOT here.
+ * Switching the anchor shows it, so it is already reachable, and listing it as
+ * parked would say something untrue about it.
+ */
+export function problemsOutsideHierarchy(problems: Problem[], activities: Activity[]): Problem[] {
+  const activityById = new Map(activities.map((a) => [a.id, a]))
+  return problems.filter((p) => {
+    if (p.parked_at) return true
+    const parent = p.activity_id ? activityById.get(p.activity_id) : null
+    if (!parent) return true
+    return Boolean(parent.parked_at) || !parent.service_id
+  })
+}
+
 /** What to call an activity on screen when it has no name yet. */
 export function activityLabel(a: Activity): string {
   return (a.activity || '').trim() || 'Unnamed activity'

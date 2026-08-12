@@ -18,6 +18,7 @@ import {
   hypothesisBuild,
   NO_PROBLEM_STATED,
   problemLabel,
+  problemsOutsideHierarchy,
   splitRowsByService,
   type HypothesisSource,
 } from '@/lib/phase-zero-hierarchy'
@@ -147,6 +148,64 @@ describe('C28 as amended: nothing disappears for lack of a service', () => {
     expect(split.anchored).toHaveLength(0)
     expect(split.elsewhere).toHaveLength(0)
     expect(split.parked).toHaveLength(4)
+  })
+})
+
+describe('nothing is invisible: every problem the hierarchy cannot draw', () => {
+  // A parked problem used to appear in NO list anywhere and could not be
+  // found, edited or restored. These are the four cases, and the one that is
+  // deliberately NOT parked.
+  const activities = [
+    activity('a-live', 'In this service'),
+    activity('a-parked', 'Parked activity', { parked_at: '2026-08-12T10:00:00Z' }),
+    activity('a-noservice', 'No service', { service_id: null }),
+    activity('a-other', 'Another service', { service_id: 'svc-2' }),
+  ]
+  const problems = [
+    problem('p-live', 'a-live', 'Drawn under its activity'),
+    problem('p-parked', 'a-live', 'Parked problem', { parked_at: '2026-08-12T11:00:00Z' }),
+    problem('p-orphan', 'gone', 'Its activity no longer exists'),
+    problem('p-stranded', 'a-noservice', 'Its activity has no service'),
+    problem('p-under-parked', 'a-parked', 'Its activity is parked'),
+    problem('p-other', 'a-other', 'Under another service'),
+  ]
+  const out = problemsOutsideHierarchy(problems, activities)
+  const ids = out.map((p) => p.id)
+
+  it('rescues a PARKED problem, which was reachable from nowhere at all', () => {
+    expect(ids).toContain('p-parked')
+  })
+
+  it('rescues one whose activity no longer exists', () => {
+    expect(ids).toContain('p-orphan')
+  })
+
+  it('rescues one whose activity has no service', () => {
+    // The case that made nineteen problems vanish: the activity was not drawn
+    // under any service, so its problems went with it.
+    expect(ids).toContain('p-stranded')
+  })
+
+  it('rescues one whose activity is itself parked', () => {
+    expect(ids).toContain('p-under-parked')
+  })
+
+  it('leaves a problem that IS drawn where it is', () => {
+    expect(ids).not.toContain('p-live')
+  })
+
+  it('does not call a problem parked when switching the anchor would show it', () => {
+    // Under another service is reachable already. Listing it as parked would
+    // say something untrue about it.
+    expect(ids).not.toContain('p-other')
+  })
+
+  it('accounts for every problem exactly once, drawn or parked', () => {
+    const drawn = hierarchyForService(service, activities, problems)
+      .branches.flatMap((b) => b.problems.map((p) => p.id))
+    const reachableElsewhere = ['p-other']
+    expect([...drawn, ...ids, ...reachableElsewhere].sort())
+      .toEqual(problems.map((p) => p.id).sort())
   })
 })
 

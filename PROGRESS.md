@@ -1703,3 +1703,49 @@ the hooks lint passes on every new and changed file.
      frozen-and-printed. See D-N3. That is a table and a retention rule for a
      document carrying dissent, which I would not invent unasked.
   3. Nothing else is outstanding from the seven.
+
+## THE THREE FAULTS FOUND BY HABIB'S SIX QUESTIONS, 12 August 2026. FIXED.
+
+He asked six questions about the code rather than about the report, and three
+of the answers were faults. This is what they were and what was done.
+
+### 1. "+ Add activity" created an activity with NO SERVICE.
+
+addAssumption inserted with defaults of {} — no service_id. So every activity
+added in Tool 1 dropped straight into Parked, the anchored service stayed at
+zero, and TOOL 2 LOOKED EMPTY ALL DAY. Nineteen problems ended up hanging off
+activities that were in no service, and went invisible with them.
+
+Now: the button creates the activity INSIDE the anchored service and re-reads,
+so it appears in Tool 1 and under the service band in Tool 2 at once. With
+nothing anchored it creates NOTHING and says "Choose a service in the bar above
+first. An activity belongs to a service, so nothing was created."
+
+### 2. The "Service" cell was free text that set no parent.
+
+It wrote service_name only. An activity could read "Gender advisory" on screen
+and belong to nothing, which is how the first fault stayed invisible. The
+free-text ServiceCell is REMOVED. The cell is now a picker of real services and
+choosing one moves the activity through moveMany — the same action as "Move to
+another service", so there is ONE way an activity gets its service.
+
+### 3. A parked problem appeared in NO LIST ANYWHERE.
+
+problemsOfActivity drops parked, the old unparented filter dropped parked, and
+the anchor bar's bucket holds only activities. A problem parked with the ×
+could not be found, edited or restored by anybody.
+
+Now problemsOutsideHierarchy (pure, tested) collects every problem the
+hierarchy cannot draw, in four cases: parked; its activity gone; its activity
+has no service; its activity is itself parked. A problem under ANOTHER
+service is deliberately not listed, because switching the anchor shows it and
+calling it parked would say something untrue.
+
+Each one in the Parked area is now EDITABLE IN PLACE, has "Put back on
+<activity>" where it still has a live parent, a "Put on an activity..." picker
+which also un-parks it, and Delete behind its C13 confirmation. Nothing was
+deleted by me.
+
+Tests added assert the accounting directly: every problem is either drawn, or
+parked, or reachable by switching the anchor — exactly once.
+Full suite: 61 files, 1179 tests. Build compiles clean, hooks lint clean.
