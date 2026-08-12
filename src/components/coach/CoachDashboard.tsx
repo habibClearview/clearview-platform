@@ -9,6 +9,8 @@ import {
 } from '@/lib/coach-types'
 import { supabase } from '@/lib/supabase'
 import EngagementJourneyView from '@/components/engagement/EngagementJourneyView'
+// Part K, C67 to C70. What each gate decided, live, and a dated fixed version.
+import JourneyCanvasPanel from '@/components/gtcv/JourneyCanvasPanel'
 import BlockWorkspace from '@/components/gtcv/BlockWorkspace'
 import SessionRoom from '@/components/gtcv/SessionRoom'
 import ViewAsBar from '@/components/coach/ViewAsBar'
@@ -2273,7 +2275,11 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               <TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/>
               {!selClient.programme_id&&<ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>}
             </>}
-            {activeTab==='journey'&&<EngagementJourneyView slugOverride={selClient.slug}/>}
+            {/* Part K, C67 to C70. The drawing of the canvas is unchanged and
+                sits where it always did; what each gate DECIDED, the evidence,
+                the dissent and the signatures render beneath it, live, with a
+                dated fixed version for printing. */}
+            {activeTab==='journey'&&<><EngagementJourneyView slugOverride={selClient.slug}/><div style={{height:22}}/><JourneyCanvasPanel clientId={selClient.id}/></>}
             {activeTab==='charter'&&<EngagementCharterView slugOverride={selClient.slug}/>}
             {activeTab==='how_to_start'&&<TabHowToStart client={selClient}/>}
             {activeTab==='coach_ref'&&canViewCoachGuidance(previewRoleId)&&<CoachQuickReference showGuidance={canViewCoachGuidance(previewRoleId)}/>}

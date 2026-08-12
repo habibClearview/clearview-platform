@@ -1597,3 +1597,57 @@ src/lib/phase-zero-collapse.ts is pure and tested; the wiring is useCollapse.
 
 Full suite after items 1 to 4: 60 files, 1154 tests, all passing. next build
 compiles clean.
+
+## ITEM 5. PART K, C67 to C70. THE JOURNEY CANVAS. DONE.
+
+Where it lives: the Journey Canvas tab, BENEATH the existing canvas drawing,
+which is untouched. New: src/lib/journey-canvas.ts (pure, tested),
+app/api/journey-canvas/route.ts, src/components/gtcv/JourneyCanvasPanel.tsx.
+One line changed in CoachDashboard.tsx to mount it, plus its import.
+
+Each of the twelve gates renders what was decided, the evidence it rests on,
+who agreed, who dissented and who signed. Every gate appears, including one
+nothing has happened at, because the gaps are what a coach and a funder read
+first. It re-reads every five seconds, so a room watching a decision land sees
+it land.
+
+### C69. The dated fixed version.
+
+"Fix a version for printing" takes a COPY, stamps the moment on it, and stops
+the polling. Printing then prints that copy. A live canvas is the right thing
+in a session and the wrong thing to print: the page can move between the
+preview and the paper, and two undated copies in a room with no way to say
+which is later is exactly what a handover pack must not create.
+
+### D-N3. THE FIXED VERSION IS NOT STORED IN THE DATABASE.
+
+CHOSEN: fixing freezes and dates what is on screen for printing and handover;
+it does not write a snapshot row. The requirement as handed over says "a dated
+fixed version for printing", and freezing plus dating plus printing satisfies
+those words without adding a table nothing asked for. If a fixed version needs
+to be RE-OPENED months later rather than printed on the day, that is a stored
+snapshot and a table, and I would rather you said so than have me invent the
+retention rules for a document that carries dissent.
+
+### C70. Dissent without names, enforced TWICE.
+
+Where authors were hidden the dissent shows with no name, and the sentence in
+its place is "Name not shown, by the promise made in the room".
+
+It is enforced at WRITE (D16 already: no name is written at all) and again at
+RENDER, in journey-canvas.ts, on the way out of the server. That is deliberate.
+The write rule protects rows written after 12 August 2026; the render rule
+protects the screen whatever the row happens to hold — an older row, a
+hand-repaired one, an import. A missing or null flag is read as HIDDEN, never
+as permission. The tests assert this against rows that DO contain a name, since
+the stored-name case is exactly what is being backstopped.
+
+Who agreed is shown by name only where the room allowed names; where it did not
+the canvas shows the COUNT instead, because a count is not identifying and four
+names in a room of five identifies the fifth.
+
+C66 is honoured here too: the agreed answer folds away the answers behind it,
+using the same remembered folding as the five tools.
+
+Full suite: 61 files, 1172 tests, all passing. next build compiles clean, and
+the hooks lint passes on every new and changed file.
