@@ -407,11 +407,25 @@ export async function POST(req: NextRequest) {
         }
         const column = isProblem ? 'problem_id' : 'activity_id'
 
+        // The table arrived with the C26 rebuild on 12 August 2026 and its
+        // migration is applied by hand. Said plainly rather than as "Could not
+        // do that", because the fix is one migration and the message should
+        // name it instead of sending somebody to the logs.
+        const MISSING_TABLE =
+          'The link table is not in the database yet. Run the migration 2026_08_12_c26_hypothesis_sources.sql, then this works.'
+        const tableMissing = (message: string) =>
+          /relation .* does not exist|could not find the table|schema cache/i.test(message)
+
         if (body.action === 'unlinkHypothesisSource') {
           const { error } = await admin.from('gtcv_hypothesis_sources')
             .delete().eq('client_id', clientId)
             .eq('hypothesis_id', body.id).eq(column, targetId)
-          if (error) throw error
+          if (error) {
+            if (tableMissing(error.message || '')) {
+              return NextResponse.json({ error: MISSING_TABLE }, { status: 503 })
+            }
+            throw error
+          }
           return NextResponse.json({ ok: true })
         }
 
@@ -423,7 +437,12 @@ export async function POST(req: NextRequest) {
           hypothesis_id: body.id,
           [column]: targetId,
         })
-        if (error && !String(error.message || '').includes('duplicate')) throw error
+        if (error) {
+          if (tableMissing(error.message || '')) {
+            return NextResponse.json({ error: MISSING_TABLE }, { status: 503 })
+          }
+          if (!String(error.message || '').includes('duplicate')) throw error
+        }
         return NextResponse.json({ ok: true })
       }
 

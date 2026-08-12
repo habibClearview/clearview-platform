@@ -690,17 +690,33 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
   const fold = useCollapse(clientId)
   const activityIds = useMemo(() => tree.branches.map((b) => b.activity.id), [tree])
 
-  /** One path to /api/services, so every tool changes the hierarchy the same way. */
+  /**
+   * One path to /api/services, so every tool changes the hierarchy the same way.
+   *
+   * A refusal is REPORTED, through the same save indicator every other write
+   * uses. A control that appears to do nothing is how somebody presses a button
+   * four times and then decides the screen is broken.
+   */
   const hierarchyAction = useCallback(async (payload) => {
+    setSaveState('saving')
+    setSaveMessage(null)
     try {
-      await authedFetch('/api/services', {
+      const res = await authedFetch('/api/services', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId, ...payload }),
       })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        setSaveState('error')
+        setSaveMessage(json?.error || 'That did not go through.')
+        return
+      }
+      setSaveState('saved')
       reload()
     } catch {
-      /* The next read shows whether it landed. */
+      setSaveState('error')
+      setSaveMessage('Could not reach the server. Nothing was changed.')
     }
   }, [clientId, reload])
 
