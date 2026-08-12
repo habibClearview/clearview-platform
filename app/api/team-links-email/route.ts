@@ -33,7 +33,13 @@ export async function POST(req: NextRequest) {
     })
     if (!auth.ok) return refuseAccess(auth)
 
-    const key = process.env.RESEND_API_KEY
+    // TRIMMED, and it matters. The key stored on Vercel on 12 August 2026 began
+    // with two newlines. A newline cannot go in an HTTP header, so the send
+    // threw before it ever reached Resend and this route answered "That did not
+    // send" for a key that was perfectly valid. src/lib/email.ts already
+    // guarded against exactly this; this route did not. Proven 12 August 2026:
+    // untrimmed the provider says "API key is invalid", trimmed it returns 200.
+    const key = (process.env.RESEND_API_KEY || '').trim()
     if (!key) {
       // Said plainly. A button that reports success without sending anything is
       // how somebody turns up to a workshop with no link.

@@ -1452,3 +1452,67 @@ the table is switching tabs.
 
   The code falls back to onboarding@resend.dev when RESEND_FROM is absent, so
   email works without it; adding it only changes the sender shown.
+
+# ============================================================
+# SESSION 12 AUGUST 2026 (later). THE SEVEN ITEMS.
+# ============================================================
+
+Started on the WRONG BRANCH. The session opened on claude/c26-replacement-build-u2sv2l,
+which is level with main and ~156 commits behind the work. PROGRESS.md,
+CLAUDE_CODE_STANDING_RULES.md and src/lib/gtcv-services.ts genuinely do not
+exist there, so the first report said the handover had not held. Habib
+corrected it: the work is on claude/coach-deploy-corrections-2kj6q4. Recorded
+because the next session must not repeat the search — CHECK THE BRANCH FIRST,
+and the initial clone carries a narrow refspec so `git branch -a` shows almost
+nothing until `git fetch origin` has run.
+
+## ITEM 7. C80, the truncation. DONE.
+
+src/lib/gtcv-services.ts. The cut counted UTF-16 code units, so it could land
+inside one visible character. Now cut by grapheme cluster via Intl.Segmenter,
+falling back to Array.from (whole code points) where Segmenter is absent.
+NAME_LIMIT stays 60 and the twenty is now MIN_BEFORE_ELLIPSIS; both now mean
+characters, which is what a reader assumes they meant.
+
+Proven against the OLD code, which failed all three:
+  emoji, offset by one letter   old left a LONE SURROGATE, a broken box on screen
+  Devanagari, offset by one     old ended on a bare consonant, vowel sign stripped
+  fifty e-acutes, decomposed    old CUT a fifty-character name, being 100 units
+
+An ASCII name still cuts exactly where it always did; that is asserted too.
+Full suite after the change: 58 files, 1124 tests, all passing.
+
+## ITEM 6. THE EMAIL ROUTE. TESTED, AND IT WOULD HAVE FAILED.
+
+THE KEY IS VALID. THE ROUTE WAS NOT GOING TO USE IT.
+
+RESEND_API_KEY on Vercel holds 38 characters: a 36 character key with TWO
+LEADING NEWLINES. A newline cannot go in an HTTP header.
+
+  untrimmed  the request throws before it reaches Resend
+             (ValueError: Invalid header value b'Bearer \n\nre_...'),
+             and against the API directly: 400 "API key is invalid"
+  trimmed    200 OK. habibonifade.com is a VERIFIED sending domain.
+
+app/api/team-links-email/route.ts read process.env.RESEND_API_KEY with NO trim,
+unlike src/lib/email.ts which has guarded against exactly this since it was
+written. So "Send by email" would have answered "That did not send. Copy the
+link and send it by message." for a key that was perfectly good. FIXED: the
+route now trims, matching the guard already proven in src/lib/email.ts.
+
+Live send, from onboarding@resend.dev to habib@habibonifade.com, invented test
+person, the route's exact payload shape:
+  HTTP 200  {"id":"055f11eb-160f-4879-8d06-3afccdf08fbd"}
+
+WHAT THIS TEST DOES AND DOES NOT PROVE. It exercised the provider call the
+route makes — same sender, same payload, same key. It did NOT go through the
+button, because that needs a signed-in manage session and a party row with a
+personal link, and this container holds no login. So: the key works, the sender
+works, and the one defect that would have stopped the button is fixed. The
+button's own auth wrapper is unchanged and was already working.
+
+NOTE FOR HABIB: the key's value appeared in a shell error message in this
+session's transcript while proving the newline fault. It is your own key in
+your own session, so the exposure is small, but rotating it costs nothing and
+would close it. Cleaning the stored value on Vercel (removing the two newlines)
+is also worth doing, though the code fix now makes it unnecessary.

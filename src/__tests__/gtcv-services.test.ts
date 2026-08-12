@@ -45,6 +45,51 @@ describe('naming a service', () => {
     expect(serviceName({ id: 'x', service_name: '  District   health  offices ' }, 0))
       .toBe('District health offices')
   })
+
+  // ─── C80. THE CUT LANDS ON A CHARACTER, NEVER INSIDE ONE ───
+  // Each of these names is longer than sixty characters and is written in a
+  // script where one visible character is more than one UTF-16 code unit. The
+  // old cut counted units, so it could take half a character and leave a broken
+  // glyph on screen. What is asserted is not the exact wording of the result
+  // but the thing C80 is about: nothing half-removed survives the cut.
+
+  /** A lone surrogate is half of a character, and is what a bad cut leaves. */
+  const hasBrokenCharacter = (s: string) => /[\uD800-\uDFFF]/.test(
+    s.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, ''),
+  )
+
+  it('does not split an emoji in half', () => {
+    // One letter first, so the sixtieth code unit falls in the MIDDLE of an
+    // emoji rather than neatly between two. That offset is the whole point:
+    // the old cut left a lone surrogate here, which renders as a broken box.
+    const name = serviceName({ id: 'x', service_name: `A${'\u{1F33E}'.repeat(80)}` }, 0)
+    expect(hasBrokenCharacter(name)).toBe(false)
+    expect(name).toBe(`A${'\u{1F33E}'.repeat(59)}...`)
+  })
+
+  it('does not strand a combining mark from the letter it belongs to', () => {
+    // Devanagari: the vowel sign is its own code point but not its own
+    // character. One letter first again, so the cut falls BETWEEN the letter
+    // and its vowel sign — the old cut ended on a bare consonant and put the
+    // floating mark's letter on screen without it.
+    const KI = '\u0915\u093F'
+    const name = serviceName({ id: 'x', service_name: `A${KI.repeat(70)}` }, 0)
+    expect(name).toBe(`A${KI.repeat(59)}...`)
+  })
+
+  it('counts sixty characters, not sixty code units', () => {
+    // Fifty e-acutes written as a letter plus a combining mark: fifty
+    // characters, but a hundred code units. Counting units would cut a name
+    // that is comfortably inside the limit, so it comes back whole.
+    const decomposed = 'e\u0301'.repeat(50)
+    expect(decomposed.length).toBe(100)
+    expect(serviceName({ id: 'x', service_name: decomposed }, 0)).toBe(decomposed)
+  })
+
+  it('still cuts an ASCII name exactly where it always did', () => {
+    const long = { id: 'x', service_name: 'Ministries of agriculture and their district extension offices across the northern corridor' }
+    expect(serviceName(long, 0)).toBe('Ministries of agriculture and their district extension...')
+  })
 })
 
 describe('offering the services', () => {

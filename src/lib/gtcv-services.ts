@@ -90,12 +90,51 @@ export const SHARED_SERVICE_LABEL = 'Shared across services'
 /** How long a derived name runs before it is cut at a word boundary. */
 const NAME_LIMIT = 60
 
+/** How far in the cut must fall before a word boundary is preferred to it. */
+const MIN_BEFORE_ELLIPSIS = 20
+
+/**
+ * The VISIBLE CHARACTERS of a string, in order.
+ *
+ * C80. The cut happens at a character boundary, never at a fixed number of
+ * storage units. JavaScript measures a string in UTF-16 code units, and one
+ * visible character is not reliably one unit: an emoji is two, and in
+ * Devanagari, Arabic, Thai, Hangul and any script that writes a letter with
+ * marks attached to it, one character is several. Cutting at unit sixty can
+ * therefore land INSIDE a character and put half of one on screen — a broken
+ * glyph in a service name, in front of a room.
+ *
+ * Intl.Segmenter groups by grapheme cluster, which is what a reader means by
+ * one character. Where it is unavailable, Array.from at least walks whole code
+ * points, so an emoji survives even where a combining mark would not.
+ */
+function characters(text: string): string[] {
+  const SegmenterCtor = (Intl as { Segmenter?: typeof Intl.Segmenter }).Segmenter
+  if (typeof SegmenterCtor === 'function') {
+    return Array.from(
+      new SegmenterCtor(undefined, { granularity: 'grapheme' }).segment(text),
+      (s) => s.segment,
+    )
+  }
+  return Array.from(text)
+}
+
+/**
+ * A name cut to length, at a word boundary where there is one and at a
+ * character boundary always.
+ *
+ * Counting and slicing both work in characters, so the sixty and the twenty
+ * mean the same thing to a reader as they do to the code. For a name written
+ * only in ASCII this behaves exactly as it did before.
+ */
 function shorten(text: string): string {
   const clean = text.trim().replace(/\s+/g, ' ')
-  if (clean.length <= NAME_LIMIT) return clean
-  const cut = clean.slice(0, NAME_LIMIT)
+  const chars = characters(clean)
+  if (chars.length <= NAME_LIMIT) return clean
+  const cut = chars.slice(0, NAME_LIMIT)
   const lastSpace = cut.lastIndexOf(' ')
-  return `${(lastSpace > 20 ? cut.slice(0, lastSpace) : cut).trimEnd()}...`
+  const kept = lastSpace > MIN_BEFORE_ELLIPSIS ? cut.slice(0, lastSpace) : cut
+  return `${kept.join('').trimEnd()}...`
 }
 
 /** What to call one service on screen. */
