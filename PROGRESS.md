@@ -6,6 +6,11 @@ Part 1: Context, sections 1 to 5. Received 11 August 2026.
 Part 2: Stage 1, requirements R1 to R32. Received 11 August 2026.
 Amendments to R5 and R25, and answers to Q4 to Q10. Received 11 August 2026.
 Part 3: Stage 2, requirements R33 to R39. Received 11 August 2026.
+Stage 1 Correction, requirements C1 to C89. Received 12 August 2026.
+
+The correction WINS wherever it and the original disagree. It is authorised as
+a single body of work, not split into stages, and is built in the seven groups
+Part M sets out, reporting at the end of each group.
 
 Stage 1 is authorised and built. Stage 2 is AUTHORISED and built: Q12 to Q18
 were all answered on 11 August 2026 and the answers are recorded under each
@@ -950,3 +955,127 @@ the test exists before they try to "fix" it.
 
   If you are here because that test is failing, the answer is almost certainly
   not to change the test.
+
+
+## The correction, C1 to C89. Group 1 in progress.
+
+### What was found before writing anything
+
+The hierarchy the correction describes already has tables. What it did not have
+is the joins that make it a hierarchy, or any way to say "removed but not
+destroyed".
+
+    Service    gtcv_service_inventory      already the record C1 describes
+    Activity   gtcv_assumptions            already carries service_id
+    Problem    gtcv_problem_owner_budget   carried nothing at all
+
+So Part A is joining up what exists, not building a second set of tables. That
+matters: new tables would mean either migrating live engagement data, which is
+the riskiest thing anybody could do to a record gathered under donor funding,
+or leaving two versions of the truth.
+
+### Counted before deciding, on staging, 12 August 2026
+
+    8   activities with no service
+    6   problem rows, none of them attached to an activity
+
+Those numbers are why nothing here is enforced with a NOT NULL constraint. A
+constraint would refuse eight rows that already exist, to enforce a rule about
+rows not yet created. C2's refusal of an orphan is enforced where creation
+happens instead, and the eight appear in the parked bucket where they can be
+seen and pulled into a service. Nothing is deleted and nothing is guessed at.
+
+### Group 1, built so far
+
+  Migration applied to staging, seven columns, all nullable, nothing renamed:
+    gtcv_service_inventory.service_state    C1
+    gtcv_assumptions.parked_at              C15
+    gtcv_assumptions.decision               C29, C30
+    gtcv_problem_owner_budget.activity_id   C3, C25, C27
+    gtcv_problem_owner_budget.parked_at     C15
+    gtcv_problem_owner_budget.decision      C29
+    gtcv_room_state.current_service_id      C5
+
+  src/lib/service-anchor.ts, with 22 tests. The hierarchy, the three removal
+  actions, the parked bucket, No problem stated, and the counter.
+
+### The one design decision worth stating plainly
+
+A problem stated in Tool 1 IS a row in gtcv_problem_owner_budget from the
+moment it is typed. Tool 1 shows its parent's children rather than holding its
+own copy of the words.
+
+That is what makes C25 and C27 true rather than approximately true. Two copies
+kept in step is a thing that works until the day it does not, and the day it
+does not is in front of a room.
+
+Likewise, problems hang off the ACTIVITY and carry no service of their own. So
+C14's move carries them by not touching them. A model where they also knew
+their service is a model where a move can strand them.
+
+## Questions waiting for an answer on the correction
+
+### Q19. C43 contradicts a guard you required in Stage 1
+Raised 12 August 2026. Recorded rather than stopped for, under the standing
+instruction of 11 August.
+
+Stage 1, at your instruction, refuses "any submission to a question that is not
+currently open, including one that has been closed or revealed."
+
+C43 says a participant part way through an answer when the facilitator advances
+"is allowed to finish and submit. Their answer is accepted against the question
+they were answering."
+
+The correction wins, so C43 is what gets built. What I need is the LIMIT, and I
+will not choose it: for how long after a question closes is a late answer still
+accepted, and does a revealed question still accept one? A reveal is the moment
+the room reads the numbers off the wall, and an answer arriving after that
+changes a distribution people have already discussed.
+
+Proposal, not chosen: accept against the previous question only while the
+participant had it on screen when it closed, and never after that question was
+revealed. Group 3 work, so there is time.
+
+### Q20. C29's service level decision, against a column that already exists
+Raised 12 August 2026. gtcv_service_inventory.decision already exists with the
+values keep, redesign, pause and stop, and is the DP01 decision. C29 wants a
+service level Tool 5 decision alongside the item level ones, whose values are
+carry, kill and pause.
+
+Are those the same decision under two names, or two decisions? I have not
+written to that column and will not until you say, because it is an existing
+column with existing meaning and Section 4 protects it.
+
+### Q21. C31, portfolio means which portfolio
+Raised 12 August 2026. "across the whole portfolio, all services combined."
+Taken as all services in THIS engagement, because a figure combining several
+clients' services would be meaningless to a room and would put one client's
+count in front of another. Say if you meant across engagements.
+
+## Existing files the correction needs changed, named and awaiting approval
+
+Rule 2. None of these has been touched.
+
+  src/components/gtcv/PhaseZeroWorkspace.tsx
+    C4, C5, C20, C21, C22, C25, C26, C30. The service selector at the top, the
+    service name on all five tools, the "Problem it solves" column, and the
+    counter. This is the file that also holds the three gate readiness messages
+    Section 4 protects; those lines are not being touched and will be confirmed
+    by name afterwards.
+
+  src/components/gtcv/ServiceInventoryTable.tsx
+    C1, C8, C19. Services as records that can be added and given a state.
+
+  src/components/gtcv/ProblemScoringTable.tsx
+    C25, C26. Tool 2 fed by Tool 1, with the parent service and activity beside
+    every row.
+
+  src/components/gtcv/SessionRoom.tsx
+    C45. Removing the room opening controls and the live feed, leaving the
+    Session Plan and attendance.
+
+  app/room/page.tsx and app/api/room/route.ts
+    C33 to C43. Mine from Stage 1, but named here so the list is complete.
+
+Everything else in Group 1 needs no existing file, which is why it is built
+already.
