@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
     const auth = await requireManager(req, admin, clientId)
     if (!auth.ok) return refuseAccess(auth)
 
-    const [{ data: services }, { data: activities }, { data: problems }, { data: state }] =
+    const [{ data: services }, { data: activities }, { data: problems }, { data: state }, sources] =
       await Promise.all([
         admin.from('gtcv_service_inventory')
           .select('id, service_name, what_it_delivers, service_state, decision, sort_order')
@@ -63,12 +63,25 @@ export async function GET(req: NextRequest) {
           .eq('client_id', clientId).order('sort_order', { ascending: true }),
         admin.from('gtcv_room_state').select('current_service_id')
           .eq('client_id', clientId).maybeSingle(),
+        // C26 as replaced. What each hypothesis is built from. Read in the same
+        // request as everything else, for the same reason the other three are:
+        // a screen assembled from separate requests can draw a link to an
+        // activity the next request has not heard of yet.
+        //
+        // The table arrived on 12 August 2026. Until its migration has run this
+        // read fails, and a failure here must not take the whole block down —
+        // Tools 1 and 2 do not depend on it. So it degrades to an empty list.
+        admin.from('gtcv_hypothesis_sources')
+          .select('id, hypothesis_id, activity_id, problem_id')
+          .eq('client_id', clientId)
+          .then((r) => r, () => ({ data: [] as unknown[] })),
       ])
 
     return NextResponse.json({
       services: services || [],
       activities: activities || [],
       problems: problems || [],
+      hypothesisSources: (sources as { data?: unknown[] })?.data || [],
       currentServiceId: state?.current_service_id || null,
     })
   } catch (e) {
@@ -85,6 +98,7 @@ export async function POST(req: NextRequest) {
       id?: string
       serviceId?: string | null
       activityId?: string | null
+      problemId?: string | null
       name?: string
       serviceState?: string
       decision?: string
@@ -310,6 +324,106 @@ export async function POST(req: NextRequest) {
           })
           .in('id', ids).eq('client_id', clientId)
         if (error) throw error
+        return NextResponse.json({ ok: true })
+      }
+
+      // C18. A NEW SERVICE MADE OUT OF ACTIVITIES THAT ALREADY EXIST.
+      //
+      // ONE ACTION, not "add a service" followed by "move these into it". Two
+      // requests can half-succeed, and the half that lands first is a service
+      // with nothing in it and a room wondering where their activities went. A
+      // failure here leaves an empty service at worst, which C17 says is a
+      // legitimate thing to have, and never a moved activity with no parent.
+      case 'createServiceFromActivities': {
+        const ids = (body.activityIds || []).filter((i) => typeof i === 'string').slice(0, 200)
+        if (ids.length === 0) {
+          return NextResponse.json({ error: 'Choose the activities the service is made of' }, { status: 400 })
+        }
+        const name = (body.name || '').trim()
+        if (!name) return NextResponse.json({ error: 'Name the new service' }, { status: 400 })
+
+        const { data: created, error: createError } = await admin.from('gtcv_service_inventory')
+          .insert({
+            client_id: clientId,
+            service_name: name,
+            // C19. The state is changeable afterwards, so this is only a start.
+            service_state: SERVICE_STATES.includes(body.serviceState || '') ? body.serviceState : 'new',
+          })
+          .select('id').single()
+        if (createError) throw createError
+
+        // The items keep their identity and their problems. This is a change of
+        // parent, never a copy: a copy would leave the room looking at the same
+        // activity twice, unable to say which one was real. Parking is cleared
+        // because the activity now has a home.
+        const { error: moveError } = await admin.from('gtcv_assumptions')
+          .update({
+            service_id: created.id,
+            service_name: name,
+            parked_at: null,
+            updated_at: new Date().toISOString(),
+          })
+          .in('id', ids).eq('client_id', clientId)
+        if (moveError) throw moveError
+
+        return NextResponse.json({ ok: true, id: created.id })
+      }
+
+      // C28 as amended. Giving a Tool 3, 4 or 5 row a service, which is how a
+      // row leaves the Parked area. Nothing is hidden for lack of a service, so
+      // this is a way OUT of the bucket, never a condition of being seen.
+      case 'setRowService': {
+        const ANCHORABLE = ['gtcv_hypotheses_shortlist', 'gtcv_signal_story', 'gtcv_continue_pause_kill']
+        const table = body.table && ANCHORABLE.includes(body.table) ? body.table : null
+        if (!table || !body.id || !(await owns(table, body.id))) {
+          return NextResponse.json({ error: 'That row is not on this engagement' }, { status: 404 })
+        }
+        if (body.serviceId && !(await owns('gtcv_service_inventory', body.serviceId))) {
+          return NextResponse.json({ error: 'That service is not on this engagement' }, { status: 404 })
+        }
+        const { error } = await admin.from(table)
+          .update({
+            service_id: body.serviceId || null,
+            parked_at: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', body.id).eq('client_id', clientId)
+        if (error) throw error
+        return NextResponse.json({ ok: true })
+      }
+
+      // C26 as replaced. Naming an activity or a problem a hypothesis is built
+      // from, and taking the name off again.
+      case 'linkHypothesisSource':
+      case 'unlinkHypothesisSource': {
+        if (!body.id || !(await owns('gtcv_hypotheses_shortlist', body.id))) {
+          return NextResponse.json({ error: 'That hypothesis is not on this engagement' }, { status: 404 })
+        }
+        const isProblem = Boolean(body.problemId)
+        const targetId = body.problemId || body.activityId
+        const targetTable = isProblem ? 'gtcv_problem_owner_budget' : 'gtcv_assumptions'
+        if (!targetId || !(await owns(targetTable, targetId))) {
+          return NextResponse.json({ error: 'That is not on this engagement' }, { status: 404 })
+        }
+        const column = isProblem ? 'problem_id' : 'activity_id'
+
+        if (body.action === 'unlinkHypothesisSource') {
+          const { error } = await admin.from('gtcv_hypothesis_sources')
+            .delete().eq('client_id', clientId)
+            .eq('hypothesis_id', body.id).eq(column, targetId)
+          if (error) throw error
+          return NextResponse.json({ ok: true })
+        }
+
+        // Naming the same thing twice is the same fact twice. The unique index
+        // refuses it; this reports it as done rather than as a failure, because
+        // from the room's point of view it already is.
+        const { error } = await admin.from('gtcv_hypothesis_sources').insert({
+          client_id: clientId,
+          hypothesis_id: body.id,
+          [column]: targetId,
+        })
+        if (error && !String(error.message || '').includes('duplicate')) throw error
         return NextResponse.json({ ok: true })
       }
 

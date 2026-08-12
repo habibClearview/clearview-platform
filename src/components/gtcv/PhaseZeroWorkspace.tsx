@@ -38,6 +38,18 @@ import RowActions from '@/components/gtcv/RowActions'
 // C20, C21, C22, C25, C27. The problem column, which is not a column of text
 // but a view onto Tool 2's own rows.
 import ProblemsCell from '@/components/gtcv/ProblemsCell'
+// C26 as replaced. The hierarchy the tools draw, and C28 as amended, which
+// decides what is shown and what is parked rather than what is hidden.
+import {
+  activityLabel,
+  hierarchyForService,
+  hypothesisBuild,
+  problemLabel,
+  splitRowsByService,
+  NO_PROBLEM_STATED,
+} from '@/lib/phase-zero-hierarchy'
+// Part J, C64 to C66. Folding at three levels, remembered between tools.
+import { useCollapse } from '@/components/gtcv/useCollapse'
 import { authedFetch } from '@/lib/authed-fetch'
 
 // ─── Shared style vocabulary (matches the coach dashboard) ───
@@ -52,6 +64,7 @@ const C = {
   disabled: 'var(--cv-disabled)', bg2: 'var(--cv-bg-2)',
 }
 
+const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
 const wrap = { fontFamily: "'Segoe UI',system-ui,-apple-system,sans-serif", color: C.navy }
 const card = { background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: 14, marginBottom: '1.25rem', boxShadow: '0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)', overflow: 'hidden' }
 const cardHead = { background: C.header, color: 'var(--cv-on-accent)', padding: '0.85rem 1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }
@@ -213,6 +226,290 @@ function Section({ number, title, question, purposeText, children, right }) {
   )
 }
 
+// ─── THE HIERARCHY ON SCREEN  (C26 as replaced, C64 and C65) ─
+//
+// Three levels drawn as three levels: a service band, activity groups beneath
+// it, and problems beneath each activity. The service appears ONCE, at the top,
+// ALONE, as the frame. It is never a cell, and no component below it accepts a
+// service name to put in one.
+
+/** The fold marker. One shape, so the three levels read as the same gesture. */
+function Chevron({ open }) {
+  return (
+    <span aria-hidden="true" style={{ ...mono, fontSize: '0.8rem', color: C.slate, display: 'inline-block', width: '0.9rem' }}>
+      {open ? '▾' : '▸'}
+    </span>
+  )
+}
+
+/**
+ * C26. The service, at the top, alone.
+ *
+ * C64. Folding it hides its activities, which is what a room does when it has
+ * finished with a service and wants the next one on screen.
+ */
+function ServiceFrame({ service, summary, collapsed, onToggle, right, children }) {
+  return (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: '0.9rem' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap',
+        background: C.alt, padding: '0.55rem 0.75rem', borderBottom: collapsed ? 'none' : `1px solid ${C.border}`,
+      }}>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={!collapsed}
+          style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+        >
+          <Chevron open={!collapsed} />
+          <span style={{ ...mono, fontSize: '0.7rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>Service</span>
+          <span style={{ fontFamily: 'Georgia,serif', fontSize: '1.05rem', fontWeight: 700, color: C.navy }}>
+            {service?.service_name || 'Unnamed service'}
+          </span>
+        </button>
+        <span style={{ ...mono, fontSize: '0.78rem', color: C.slate }}>{summary}</span>
+        <span style={{ marginLeft: 'auto' }}>{right}</span>
+      </div>
+      {collapsed ? null : <div style={{ padding: '0.5rem 0.55rem 0.7rem' }}>{children}</div>}
+    </div>
+  )
+}
+
+/**
+ * C26. One activity of that service, as its own group.
+ *
+ * C65. Folding it hides its problems. C22's words appear where nothing has been
+ * stated, rather than an empty space that reads as a loading fault.
+ */
+function ActivityGroup({ activity, problemCount, noProblemStated, collapsed, onToggle, actions, children }) {
+  return (
+    <div style={{ borderLeft: `3px solid ${noProblemStated ? C.amber : C.borderSoft}`, paddingLeft: '0.6rem', marginBottom: '0.6rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', padding: '0.25rem 0' }}>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={!collapsed}
+          style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textAlign: 'left' }}
+        >
+          <Chevron open={!collapsed} />
+          <span style={{ ...mono, fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>Activity</span>
+          <span style={{ fontWeight: 600, fontSize: '0.97rem', color: C.navy }}>{activityLabel(activity)}</span>
+        </button>
+        {noProblemStated ? (
+          <span style={pill(C.tintAmber, C.navy)}>{NO_PROBLEM_STATED}</span>
+        ) : (
+          <span style={{ ...mono, fontSize: '0.76rem', color: C.slate }}>
+            {problemCount} problem{problemCount === 1 ? '' : 's'}
+          </span>
+        )}
+        <span style={{ marginLeft: 'auto' }}>{actions}</span>
+      </div>
+      {collapsed ? null : <div style={{ marginTop: '0.2rem' }}>{children}</div>}
+    </div>
+  )
+}
+
+/** The Parked area a tool draws under itself. C28: visible, never hidden. */
+function ParkedArea({ count, children }) {
+  if (!count) return null
+  return (
+    <div style={{ marginTop: '0.9rem', border: `1px dashed ${C.amber}`, borderRadius: 10, padding: '0.6rem 0.75rem', background: C.tintAmber }}>
+      <div style={{ ...mono, fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.navy, marginBottom: '0.45rem' }}>
+        Parked — {count} not in any service
+      </div>
+      {/* C28 as amended: these are here so that NOTHING disappears for lack of
+          a service. They are not errors and they are not hidden. */}
+      {children}
+    </div>
+  )
+}
+
+/**
+ * ONE HYPOTHESIS, AND WHAT IT IS BUILT FROM  (C26 as replaced)
+ *
+ * "A hypothesis is: this service, made up of these specific activities, solves
+ * this problem or set of problems, for this type of client."
+ *
+ * So the scores are not the whole of it. Underneath sits the hierarchy the
+ * hypothesis was drawn from — the activities named, and under each of them the
+ * problems named — which is the part that used to live only in the memory of
+ * whoever typed the sentence.
+ *
+ * The fold uses the 'activity' level keyed by the hypothesis's own identifier.
+ * Identifiers are uuids and do not collide across tables, and this is the same
+ * gesture at the same depth: a group folding away its detail.
+ */
+function HypothesisBlock({
+  row, editable, clientId, tree, build, collapsed, onToggle, onScore, onAction, onDone,
+  parked, anchoredService,
+}) {
+  const standing = !row.inTopFive
+    ? { label: 'Held back', color: C.faint }
+    : row.inTopThree
+      ? { label: `Advances (rank ${row.rank})`, color: C.green }
+      : { label: `Advances if capacity (rank ${row.rank})`, color: C.teal }
+
+  // Only what is under the anchored service can be named, because a hypothesis
+  // is built from THIS service's activities. Anything already named is offered
+  // as a way to take the name off again.
+  const namedActivityIds = new Set(build.activities.map((a) => a.id))
+  const namedProblemIds = new Set(build.problems.map((p) => p.id))
+
+  return (
+    <div style={{
+      border: `1px solid ${C.borderSoft}`, borderRadius: 9, marginBottom: '0.7rem',
+      background: row.inTopFive ? C.tintGreen : C.card,
+    }}>
+      <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start', flexWrap: 'wrap', padding: '0.55rem 0.7rem' }}>
+        <div style={{ flex: '1 1 22rem', minWidth: '16rem' }}>
+          <TextCell value={row.hypothesis} canManage={editable} placeholder="The hypothesis to test" onCommit={(v) => onScore({ hypothesis: v })} />
+        </div>
+        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {SCORE_FIELDS.map((f) => (
+            <label key={f.key} style={{ display: 'inline-flex', flexDirection: 'column', gap: '0.15rem' }}>
+              <span style={{ ...mono, fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: C.slate }}>{f.label}</span>
+              {editable ? (
+                <select
+                  aria-label={f.label}
+                  style={{ ...selectStyle, minWidth: 56, padding: '0.25rem 0.35rem' }}
+                  value={num(row[f.key])}
+                  onChange={(e) => onScore({ [f.key]: num(e.target.value) })}
+                >
+                  <option value={0}>-</option>
+                  {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              ) : (
+                <div style={{ ...roInput, minWidth: 46, textAlign: 'center' }}>{num(row[f.key]) || '-'}</div>
+              )}
+            </label>
+          ))}
+          <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.1rem', fontWeight: 700, color: C.navy, textAlign: 'center' }}>
+            {row.total}
+            <div style={{ ...mono, fontSize: '0.62rem', color: C.faint, fontWeight: 400 }}>of 20</div>
+          </div>
+          <span style={pill(standing.color, 'var(--cv-on-accent)')}>{standing.label}</span>
+          {editable ? (
+            <RowActions clientId={clientId} problemId={row.id} table="gtcv_hypotheses_shortlist" label="this hypothesis" onDone={onDone} />
+          ) : null}
+        </div>
+      </div>
+
+      {/* C28 as amended. The way out of the Parked area, offered here rather
+          than the row being hidden until somebody finds it. */}
+      {parked && editable && anchoredService ? (
+        <div style={{ padding: '0 0.7rem 0.5rem' }}>
+          <button
+            type="button"
+            onClick={() => onAction({ action: 'setRowService', table: 'gtcv_hypotheses_shortlist', id: row.id, serviceId: anchoredService.id })}
+            style={{ ...mono, fontSize: '0.75rem', color: C.teal, background: 'transparent', border: `1px solid ${C.teal}`, borderRadius: 6, padding: '0.22rem 0.55rem', cursor: 'pointer' }}
+          >
+            Put into {anchoredService.service_name || 'this service'}
+          </button>
+        </div>
+      ) : null}
+
+      <div style={{ borderTop: `1px solid ${C.borderSoft}`, padding: '0.45rem 0.7rem 0.6rem' }}>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={!collapsed}
+          style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+        >
+          <Chevron open={!collapsed} />
+          <span style={{ ...mono, fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: C.slate }}>
+            Built from
+          </span>
+          <span style={{ ...mono, fontSize: '0.76rem', color: build.activities.length ? C.navy : C.amber }}>
+            {build.activities.length === 0
+              ? 'nothing named yet'
+              : `${build.activities.length} activit${build.activities.length === 1 ? 'y' : 'ies'}, ${build.problems.length} problem${build.problems.length === 1 ? '' : 's'}`}
+          </span>
+        </button>
+
+        {collapsed ? null : (
+          <div style={{ marginTop: '0.4rem' }}>
+            {build.activities.length === 0 ? (
+              <div style={{ fontSize: '0.88rem', color: C.slate, lineHeight: 1.45 }}>
+                Name the activities and the problems this hypothesis is built from, so the board shows what it rests on
+                rather than the room having to remember.
+              </div>
+            ) : (
+              // The same hierarchy again: activity, then its problems beneath.
+              build.activities.map((a) => (
+                <div key={a.id} style={{ borderLeft: `3px solid ${C.borderSoft}`, paddingLeft: '0.55rem', marginBottom: '0.35rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <span style={{ ...mono, fontSize: '0.64rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: C.slate }}>Activity</span>
+                    <span style={{ fontWeight: 600, fontSize: '0.92rem', color: C.navy }}>{activityLabel(a)}</span>
+                    {editable ? (
+                      <button
+                        type="button"
+                        onClick={() => onAction({ action: 'unlinkHypothesisSource', id: row.id, activityId: a.id })}
+                        style={{ ...mono, fontSize: '0.68rem', color: C.red, background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                      >
+                        remove
+                      </button>
+                    ) : null}
+                  </div>
+                  {build.problems.filter((p) => p.activity_id === a.id).map((p) => (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', paddingLeft: '1rem', flexWrap: 'wrap' }}>
+                      <span style={{ ...mono, fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: C.slate }}>Problem</span>
+                      <span style={{ fontSize: '0.88rem', color: C.navy }}>{problemLabel(p)}</span>
+                      {editable ? (
+                        <button
+                          type="button"
+                          onClick={() => onAction({ action: 'unlinkHypothesisSource', id: row.id, problemId: p.id })}
+                          style={{ ...mono, fontSize: '0.68rem', color: C.red, background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                        >
+                          remove
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ))
+            )}
+
+            {editable && tree.branches.length > 0 ? (
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.45rem' }}>
+                <select
+                  value=""
+                  aria-label="Name an activity this hypothesis is built from"
+                  onChange={(e) => { if (e.target.value) onAction({ action: 'linkHypothesisSource', id: row.id, activityId: e.target.value }) }}
+                  style={{ ...selectStyle, minWidth: 200, fontSize: '0.82rem' }}
+                >
+                  <option value="">Add an activity...</option>
+                  {tree.branches.filter((b) => !namedActivityIds.has(b.activity.id)).map((b) => (
+                    <option key={b.activity.id} value={b.activity.id}>{activityLabel(b.activity)}</option>
+                  ))}
+                </select>
+                <select
+                  value=""
+                  aria-label="Name a problem this hypothesis is built from"
+                  onChange={(e) => { if (e.target.value) onAction({ action: 'linkHypothesisSource', id: row.id, problemId: e.target.value }) }}
+                  style={{ ...selectStyle, minWidth: 220, fontSize: '0.82rem' }}
+                >
+                  <option value="">Add a problem...</option>
+                  {tree.branches.flatMap((b) => b.problems)
+                    .filter((p) => !namedProblemIds.has(p.id))
+                    .map((p) => <option key={p.id} value={p.id}>{problemLabel(p)}</option>)}
+                </select>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: '0 0.7rem 0.6rem' }}>
+        <TextCell value={row.notes} canManage={editable} placeholder="Why this score" onCommit={(v) => onScore({ notes: v })} />
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.35rem', fontSize: '0.82rem', color: C.slate }}>
+          <input type="checkbox" checked={!!row.advances} disabled={!editable} onChange={(e) => onScore({ advances: e.target.checked })} />
+          Confirmed to advance
+        </label>
+      </div>
+    </div>
+  )
+}
+
 // ─── The workspace ───────────────────────────────────────────
 export default function PhaseZeroWorkspace({ clientId, canManage }) {
   const editable = !!canManage
@@ -236,18 +533,42 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
   const reload = useCallback(() => setRefreshKey((n) => n + 1), [])
   // C25 to C27. ONE set of problem rows, read here and given to both tools, so
   // Tool 1 and Tool 2 cannot disagree about what a problem says.
-  const [anchor, setAnchor] = useState({ services: [], activities: [], problems: [] })
+  const [anchor, setAnchor] = useState({ services: [], activities: [], problems: [], hypothesisSources: [], currentServiceId: null })
   useEffect(() => {
     if (!clientId) return
     let cancelled = false
     const read = () => authedFetch(`/api/services?clientId=${encodeURIComponent(clientId)}`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { if (!cancelled && j) setAnchor({ services: j.services || [], activities: j.activities || [], problems: j.problems || [] }) })
+      .then((j) => { if (!cancelled && j) setAnchor({ services: j.services || [], activities: j.activities || [], problems: j.problems || [], hypothesisSources: j.hypothesisSources || [], currentServiceId: j.currentServiceId || null }) })
       .catch(() => {})
     read()
     const t = setInterval(read, 4000)
     return () => { cancelled = true; clearInterval(t) }
   }, [clientId, refreshKey])
+
+  // C18. Which activities the next new service will be made of, and what it
+  // will be called. Held on the screen rather than the server: nothing is
+  // written until the service is named and created, so an abandoned selection
+  // leaves no trace.
+  const [selectedForService, setSelectedForService] = useState(() => new Set())
+  const [newServiceName, setNewServiceName] = useState('')
+  const [creatingService, setCreatingService] = useState(false)
+  const toggleSelected = useCallback((id) => {
+    setSelectedForService((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  // C26. THE SERVICE IS THE FRAME, and it is resolved here, above everything
+  // that needs it: the adders below put a new row into it, and every tool
+  // draws inside it.
+  const anchoredService = useMemo(
+    () => anchor.services.find((s) => s.id === anchor.currentServiceId) || anchor.services[0] || null,
+    [anchor.services, anchor.currentServiceId],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -332,15 +653,56 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     ...assumptions.map((r) => (r.service_name || '').trim()),
   ].filter(Boolean))).sort()
   const addOwner = makeAdder('gtcv_problem_owner_budget', owners, setOwners, {})
-  const addHypothesis = makeAdder('gtcv_hypotheses_shortlist', hypotheses, setHypotheses, { urgency: 0, ownership_clarity: 0, willingness_to_pay: 0, access: 0, advances: false })
-  const addSignal = makeAdder('gtcv_signal_story', signals, setSignals, { classification: 'unclassified' })
-  const addDecision = makeAdder('gtcv_continue_pause_kill', decisions, setDecisions, { decision: 'undecided' })
+  // C28 as amended. A row added while a service is anchored belongs to it from
+  // the start, so the room does not create work in Tool 3 and then find it in
+  // the Parked area. Where nothing is anchored the row simply has no service,
+  // which is a legitimate state and is why the Parked area exists.
+  const inAnchoredService = () => (anchoredService ? { service_id: anchoredService.id } : {})
+  const addHypothesis = makeAdder('gtcv_hypotheses_shortlist', hypotheses, setHypotheses, { urgency: 0, ownership_clarity: 0, willingness_to_pay: 0, access: 0, advances: false, ...inAnchoredService() })
+  const addSignal = makeAdder('gtcv_signal_story', signals, setSignals, { classification: 'unclassified', ...inAnchoredService() })
+  const addDecision = makeAdder('gtcv_continue_pause_kill', decisions, setDecisions, { decision: 'undecided', ...inAnchoredService() })
 
   const delAssumption = makeRemover('gtcv_assumptions', setAssumptions)
   const delOwner = makeRemover('gtcv_problem_owner_budget', setOwners)
   const delHypothesis = makeRemover('gtcv_hypotheses_shortlist', setHypotheses)
   const delSignal = makeRemover('gtcv_signal_story', setSignals)
   const delDecision = makeRemover('gtcv_continue_pause_kill', setDecisions)
+
+  // ─── C26 as replaced. THE HIERARCHY EVERY TOOL DRAWS ───────
+  //
+  // The service is the FRAME. It is held here once, at the top, and passed to
+  // the tools as the thing they sit inside — never as a value for a cell. The
+  // column headed "Service and activity" that used to sit on every Tool 2 row
+  // is gone, and there is nothing here that could rebuild it.
+  const tree = useMemo(
+    () => hierarchyForService(anchoredService, anchor.activities, anchor.problems),
+    [anchoredService, anchor.activities, anchor.problems],
+  )
+  // Problems written before Tool 1 fed this table, so they hang off no
+  // activity. They have no place in the hierarchy, so they go where C28 sends
+  // everything else with no home: the Parked area, visible, never hidden.
+  const unparentedProblems = useMemo(
+    () => anchor.problems.filter((p) => !p.parked_at && !anchor.activities.some((a) => a.id === p.activity_id)),
+    [anchor.problems, anchor.activities],
+  )
+
+  // Part J. Folded state, shared by every tool and remembered between them.
+  const fold = useCollapse(clientId)
+  const activityIds = useMemo(() => tree.branches.map((b) => b.activity.id), [tree])
+
+  /** One path to /api/services, so every tool changes the hierarchy the same way. */
+  const hierarchyAction = useCallback(async (payload) => {
+    try {
+      await authedFetch('/api/services', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId, ...payload }),
+      })
+      reload()
+    } catch {
+      /* The next read shows whether it landed. */
+    }
+  }, [clientId, reload])
 
   // Tool 2: the rule. A problem with no named budget holder is paused.
   const unfundedProblems = useMemo(
@@ -370,6 +732,17 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     })
   }, [hypotheses])
   const shortlistCount = scoredHypotheses.filter((r) => r.inTopFive).length
+
+  // ─── C28 AS AMENDED. WHAT TOOLS 3, 4 AND 5 DRAW ────────────
+  //
+  // The anchored service's rows, and everything with no service in the Parked
+  // area. NOTHING is hidden for lack of a service: on a live engagement no row
+  // has one yet, so a filter would have shown a room an empty screen mid
+  // session and the fault would have looked like lost work.
+  const anchoredId = anchoredService?.id || null
+  const splitHypotheses = useMemo(() => splitRowsByService(scoredHypotheses, anchoredId), [scoredHypotheses, anchoredId])
+  const splitSignals = useMemo(() => splitRowsByService(signals, anchoredId), [signals, anchoredId])
+  const splitDecisions = useMemo(() => splitRowsByService(decisions, anchoredId), [decisions, anchoredId])
 
   // Tool 4: how much of what the room believes is actually observed.
   const signalCount = signals.filter((r) => r.classification === 'signal').length
@@ -439,6 +812,63 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         purposeText="List every activity the organisation runs, and the service it sits under. An organisation sells several services and each is a portfolio of activities, so naming the service is what lets this be read back as what we actually do for gender advisory. For each activity, name what it delivers, who pays for it today, the assumption sitting underneath it, and what evidence would prove that assumption wrong."
         right={editable ? <button type="button" style={addButton} onClick={addAssumption}>+ Add activity</button> : null}
       >
+        {/* ─── C18. A NEW SERVICE, MADE OF ACTIVITIES THAT ALREADY EXIST ───
+            Tick the activities, name the result, and they move. They keep
+            their identity and their problems: this is a change of parent,
+            never a copy, because a copy would leave the room looking at the
+            same activity twice with no way to say which one was real. */}
+        {editable && assumptions.length > 0 ? (
+          <div style={{
+            border: `1px solid ${selectedForService.size > 0 ? C.teal : C.borderSoft}`,
+            background: selectedForService.size > 0 ? C.tintCyan : C.alt,
+            borderRadius: 9, padding: '0.5rem 0.7rem', marginBottom: '0.8rem',
+            display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap',
+          }}>
+            <span style={{ ...mono, fontSize: '0.76rem', color: C.slate }}>
+              {selectedForService.size === 0
+                ? 'Tick activities to make a new service out of them'
+                : `${selectedForService.size} activit${selectedForService.size === 1 ? 'y' : 'ies'} chosen`}
+            </span>
+            {selectedForService.size > 0 ? (
+              <form
+                style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}
+                onSubmit={async (e) => {
+                  e.preventDefault()
+                  const name = newServiceName.trim()
+                  if (!name || creatingService) return
+                  setCreatingService(true)
+                  await hierarchyAction({
+                    action: 'createServiceFromActivities',
+                    name,
+                    activityIds: Array.from(selectedForService),
+                  })
+                  setSelectedForService(new Set())
+                  setNewServiceName('')
+                  setCreatingService(false)
+                }}
+              >
+                <input
+                  value={newServiceName}
+                  onChange={(e) => setNewServiceName(e.target.value)}
+                  placeholder="Name of the new service"
+                  aria-label="Name of the new service"
+                  style={{ ...cellInput, minWidth: 220, width: 'auto' }}
+                />
+                <button type="submit" disabled={!newServiceName.trim() || creatingService} style={addButton}>
+                  {creatingService ? 'Creating...' : 'Create service from selected'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedForService(new Set()); setNewServiceName('') }}
+                  style={{ ...delButton, color: C.slate }}
+                >
+                  Clear
+                </button>
+              </form>
+            ) : null}
+          </div>
+        ) : null}
+
         {assumptions.length === 0 ? (
           <div style={emptyNote}>No activities listed yet.</div>
         ) : (
@@ -446,6 +876,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             <table style={table}>
               <thead>
                 <tr>
+                  {editable && <th style={{ ...th, width: 34 }} aria-label="Choose for a new service" />}
                   <th style={{ ...th, width: '14%' }}>Service</th>
                   <th style={{ ...th, width: '16%' }}>Activity</th>
                   <th style={{ ...th, width: '16%' }}>What it delivers</th>
@@ -460,7 +891,17 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
               </thead>
               <tbody>
                 {assumptions.map((r) => (
-                  <tr key={r.id}>
+                  <tr key={r.id} style={selectedForService.has(r.id) ? { background: C.tintCyan } : undefined}>
+                    {editable && (
+                      <td style={td}>
+                        <input
+                          type="checkbox"
+                          checked={selectedForService.has(r.id)}
+                          onChange={() => toggleSelected(r.id)}
+                          aria-label={`Include ${r.activity || 'this activity'} in a new service`}
+                        />
+                      </td>
+                    )}
                     <td style={td}><ServiceCell value={r.service_name} canManage={editable} suggestions={serviceSuggestions} listId={`svc-${r.id}`} onCommit={(v) => updAssumption(r.id, { service_name: v || null })} /></td>
                     <td style={td}><TextCell value={r.activity} canManage={editable} placeholder="The activity" onCommit={(v) => updAssumption(r.id, { activity: v })} /></td>
                     <td style={td}><TextCell value={r.delivers} canManage={editable} placeholder="What it actually delivers" onCommit={(v) => updAssumption(r.id, { delivers: v })} /></td>
@@ -519,79 +960,148 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             ready to carry into a hypothesis.
           </div>
         )}
-        {owners.length === 0 ? (
-          <div style={emptyNote}>No problems listed yet.</div>
-        ) : (
-          <div style={tableWrap}>
-            <table style={table}>
-              <thead>
-                <tr>
-                  {/* C26. What the problem belongs to, so the person filling
-                      this in can see it without going back to Tool 1. */}
-                  <th style={{ ...th, width: '14%' }}>Service and activity</th>
-                  <th style={{ ...th, width: '20%' }}>Problem implied</th>
-                  <th style={{ ...th, width: '14%' }}>Who experiences it</th>
-                  <th style={{ ...th, width: '14%' }}>Who is accountable</th>
-                  <th style={{ ...th, width: '18%' }}>Who controls the budget</th>
-                  <th style={{ ...th, width: '17%' }}>Cost of not solving it</th>
-                  <th style={{ ...th, width: '17%' }}>Budget mechanism</th>
-                  {editable && <th style={{ ...th, width: 40 }} />}
-                </tr>
-              </thead>
-              <tbody>
-                {owners.map((r) => {
-                  const noHolder = blank(r.budget_holder)
-                  return (
-                    <tr key={r.id} style={noHolder ? { background: C.tintAmber } : undefined}>
-                      <td style={{ ...td, fontSize: '0.86rem', color: C.slate }}>
-                        {(() => {
-                          const act = anchor.activities.find((a) => a.id === r.activity_id)
-                          const svc = act ? anchor.services.find((x) => x.id === act.service_id) : null
-                          if (!act) {
-                            // Rows written before Tool 1 fed this table. Shown
-                            // plainly rather than hidden or guessed at.
-                            return <span style={{ fontStyle: 'italic' }}>Not yet attached to an activity</span>
-                          }
-                          return (
-                            <>
-                              <div style={{ fontWeight: 600, color: C.navy }}>{svc?.service_name || 'No service'}</div>
-                              <div>{act.activity || 'Unnamed activity'}</div>
-                            </>
-                          )
-                        })()}
-                      </td>
-                      <td style={td}><TextCell value={r.problem} canManage={editable} placeholder="The problem" onCommit={(v) => updOwner(r.id, { problem: v })} /></td>
-                      <td style={td}><TextCell value={r.experienced_by} canManage={editable} placeholder="Who feels it" onCommit={(v) => updOwner(r.id, { experienced_by: v })} /></td>
-                      <td style={td}><TextCell value={r.accountable} canManage={editable} placeholder="Who answers for it" onCommit={(v) => updOwner(r.id, { accountable: v })} /></td>
-                      <td style={td}>
-                        <TextCell value={r.budget_holder} canManage={editable} placeholder="Name the budget holder" onCommit={(v) => updOwner(r.id, { budget_holder: v })} />
-                        {noHolder && (
-                          <div style={{ marginTop: '0.35rem', fontSize: '0.82rem', color: C.amber, fontWeight: 600, lineHeight: 1.35 }}>
-                            No budget holder named. Pause this problem until you can say who releases the money.
-                          </div>
-                        )}
-                      </td>
-                      <td style={td}><TextCell value={r.cost_of_not_solving} canManage={editable} placeholder="What it costs them to leave it" onCommit={(v) => updOwner(r.id, { cost_of_not_solving: v })} /></td>
-                      <td style={td}><TextCell value={r.budget_mechanism} canManage={editable} placeholder="How the money is released" onCommit={(v) => updOwner(r.id, { budget_mechanism: v })} /></td>
-                      {editable && (
-                        <td style={td}>
-                          {/* A problem parks or is deleted. It never moves
-                              between services, because it has none of its own. */}
-                          <RowActions
-                            clientId={clientId}
-                            problemId={r.id}
-                            label={r.problem || 'this problem'}
-                            onDone={reload}
-                          />
-                        </td>
-                      )}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+        {/* ─── C26 AS REPLACED. THE HIERARCHY. ───────────────────
+            The service at the top ALONE, every activity of it beneath, each
+            activity's problems under it. There is no "Service and activity"
+            column, here or anywhere: the service is the frame around the whole
+            table and the activity is the heading of the group, so neither can
+            be a cell. An activity with no problems is PRESENT, showing C22's
+            words, because C26's own test requires the third activity to appear. */}
+        {!anchoredService ? (
+          <div style={emptyNote}>
+            No service yet. Add one in the bar above, and its activities and their problems appear here.
           </div>
+        ) : (
+          <ServiceFrame
+            service={anchoredService}
+            collapsed={fold.is('service', anchoredService.id)}
+            onToggle={() => fold.toggle('service', anchoredService.id)}
+            summary={`${tree.branches.length} activit${tree.branches.length === 1 ? 'y' : 'ies'}, ${tree.problemCount} problem${tree.problemCount === 1 ? '' : 's'}`}
+            right={tree.branches.length > 1 ? (
+              // C65 in one press. Ten activities open, one argument: fold the
+              // lot and open the two that matter.
+              <button
+                type="button"
+                onClick={() => fold.setAll('activity', activityIds, !fold.allOf('activity', activityIds))}
+                style={{ ...mono, fontSize: '0.75rem', color: C.slate, background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 6, padding: '0.2rem 0.5rem', cursor: 'pointer' }}
+              >
+                {fold.allOf('activity', activityIds) ? 'Open all activities' : 'Fold all activities'}
+              </button>
+            ) : null}
+          >
+            {tree.branches.length === 0 ? (
+              <div style={emptyNote}>This service has no activities yet. Add them in Tool 1.</div>
+            ) : tree.branches.map((branch) => (
+              <ActivityGroup
+                key={branch.activity.id}
+                activity={branch.activity}
+                problemCount={branch.problems.length}
+                noProblemStated={branch.noProblemStated}
+                collapsed={fold.is('activity', branch.activity.id)}
+                onToggle={() => fold.toggle('activity', branch.activity.id)}
+                actions={editable ? (
+                  <RowActions
+                    clientId={clientId}
+                    activityId={branch.activity.id}
+                    label={activityLabel(branch.activity)}
+                    onDone={reload}
+                  />
+                ) : null}
+              >
+                {branch.problems.length === 0 ? (
+                  <div style={{ ...emptyNote, paddingLeft: '1.3rem' }}>
+                    {/* C22 and C24. Named, not blank, and resolved at Tool 5
+                        rather than killed at the moment the gap appears. */}
+                    No problem stated under this activity. It is carried to Tool 5 to be landed with everything else.
+                  </div>
+                ) : (
+                  <div style={tableWrap}>
+                    <table style={{ ...table, minWidth: 760 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ ...th, width: '22%' }}>Problem implied</th>
+                          <th style={{ ...th, width: '15%' }}>Who experiences it</th>
+                          <th style={{ ...th, width: '15%' }}>Who is accountable</th>
+                          <th style={{ ...th, width: '19%' }}>Who controls the budget</th>
+                          <th style={{ ...th, width: '17%' }}>Cost of not solving it</th>
+                          <th style={{ ...th, width: '17%' }}>Budget mechanism</th>
+                          {editable && <th style={{ ...th, width: 40 }} />}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {branch.problems.map((p) => {
+                          // The row Tool 2 edits is the SAME row Tool 1 states,
+                          // so the local copy is found by id rather than kept
+                          // twice. D13: one row read by two tools.
+                          const r = owners.find((o) => o.id === p.id) || p
+                          const noHolder = blank(r.budget_holder)
+                          return (
+                            <tr key={r.id} style={noHolder ? { background: C.tintAmber } : undefined}>
+                              <td style={td}><TextCell value={r.problem} canManage={editable} placeholder="The problem" onCommit={(v) => updOwner(r.id, { problem: v })} /></td>
+                              <td style={td}><TextCell value={r.experienced_by} canManage={editable} placeholder="Who feels it" onCommit={(v) => updOwner(r.id, { experienced_by: v })} /></td>
+                              <td style={td}><TextCell value={r.accountable} canManage={editable} placeholder="Who answers for it" onCommit={(v) => updOwner(r.id, { accountable: v })} /></td>
+                              <td style={td}>
+                                <TextCell value={r.budget_holder} canManage={editable} placeholder="Name the budget holder" onCommit={(v) => updOwner(r.id, { budget_holder: v })} />
+                                {noHolder && (
+                                  <div style={{ marginTop: '0.35rem', fontSize: '0.82rem', color: C.amber, fontWeight: 600, lineHeight: 1.35 }}>
+                                    No budget holder named. Pause this problem until you can say who releases the money.
+                                  </div>
+                                )}
+                              </td>
+                              <td style={td}><TextCell value={r.cost_of_not_solving} canManage={editable} placeholder="What it costs them to leave it" onCommit={(v) => updOwner(r.id, { cost_of_not_solving: v })} /></td>
+                              <td style={td}><TextCell value={r.budget_mechanism} canManage={editable} placeholder="How the money is released" onCommit={(v) => updOwner(r.id, { budget_mechanism: v })} /></td>
+                              {editable && (
+                                <td style={td}>
+                                  {/* A problem parks or is deleted. It never
+                                      moves between services, because it has
+                                      none of its own. */}
+                                  <RowActions
+                                    clientId={clientId}
+                                    problemId={r.id}
+                                    label={r.problem || 'this problem'}
+                                    onDone={reload}
+                                  />
+                                </td>
+                              )}
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </ActivityGroup>
+            ))}
+          </ServiceFrame>
         )}
+
+        {/* C28 as amended. A problem written before Tool 1 fed this table hangs
+            off no activity, so it has no place in the hierarchy. It goes here,
+            visible, rather than disappearing for want of a parent. */}
+        <ParkedArea count={unparentedProblems.length}>
+          {unparentedProblems.map((p) => {
+            const r = owners.find((o) => o.id === p.id) || p
+            return (
+              <div key={r.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', padding: '0.2rem 0' }}>
+                <span style={{ fontSize: '0.92rem', color: C.navy }}>{problemLabel(r)}</span>
+                <span style={{ ...mono, fontSize: '0.76rem', color: C.slate }}>not attached to an activity</span>
+                {editable && tree.branches.length > 0 ? (
+                  <select
+                    value=""
+                    aria-label={`Attach ${problemLabel(r)} to an activity`}
+                    onChange={(e) => { if (e.target.value) updOwner(r.id, { activity_id: e.target.value }) }}
+                    style={{ ...selectStyle, minWidth: 190, fontSize: '0.82rem' }}
+                  >
+                    <option value="">Attach to an activity...</option>
+                    {tree.branches.map((b) => (
+                      <option key={b.activity.id} value={b.activity.id}>{activityLabel(b.activity)}</option>
+                    ))}
+                  </select>
+                ) : null}
+              </div>
+            )
+          })}
+        </ParkedArea>
       </Section>
 
       {/* ─── TOOL 3: Hypothesis Shortlist Board ─────────────── */}
@@ -609,78 +1119,65 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             <span style={pill(C.tintAmber, C.navy)}>{hypotheses.length - shortlistCount} held back</span>
           )}
         </div>
+        {/* ─── C26 AS REPLACED, AND C28 AS AMENDED. ──────────────
+            Tool 3 follows the same hierarchy: the service at the top alone,
+            and beneath it the hypotheses built inside it. A hypothesis is
+            "this service, made up of these specific activities, solves this
+            problem or set of problems", so each one SHOWS the activities and
+            the problems it is built from, drawn as the hierarchy rather than
+            listed as text. */}
         {hypotheses.length === 0 ? (
           <div style={emptyNote}>No hypotheses on the board yet.</div>
         ) : (
-          <div style={tableWrap}>
-            <table style={table}>
-              <thead>
-                <tr>
-                  <th style={{ ...th, width: '30%' }}>Hypothesis</th>
-                  {SCORE_FIELDS.map((f) => <th key={f.key} style={{ ...th, width: 96 }}>{f.label}</th>)}
-                  <th style={{ ...th, width: 70 }}>Total</th>
-                  <th style={{ ...th, width: 150 }}>Standing</th>
-                  <th style={{ ...th, width: '18%' }}>Notes</th>
-                  {editable && <th style={{ ...th, width: 40 }} />}
-                </tr>
-              </thead>
-              <tbody>
-                {scoredHypotheses.map((r) => {
-                  const standing = !r.inTopFive
-                    ? { label: 'Held back', color: C.faint }
-                    : r.inTopThree
-                      ? { label: `Advances (rank ${r.rank})`, color: C.green }
-                      : { label: `Advances if capacity (rank ${r.rank})`, color: C.teal }
-                  return (
-                    <tr key={r.id} style={r.inTopFive ? { background: C.tintGreen } : undefined}>
-                      <td style={td}><TextCell value={r.hypothesis} canManage={editable} placeholder="The hypothesis to test" onCommit={(v) => updHypothesis(r.id, { hypothesis: v })} /></td>
-                      {SCORE_FIELDS.map((f) => (
-                        <td key={f.key} style={td}>
-                          {editable ? (
-                            <select
-                              aria-label={f.label}
-                              style={{ ...selectStyle, minWidth: 70 }}
-                              value={num(r[f.key])}
-                              onChange={(e) => updHypothesis(r.id, { [f.key]: num(e.target.value) })}
-                            >
-                              <option value={0}>-</option>
-                              {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-                            </select>
-                          ) : (
-                            <div style={{ ...roInput, minWidth: 60, textAlign: 'center' }}>{num(r[f.key]) || '-'}</div>
-                          )}
-                        </td>
-                      ))}
-                      <td style={{ ...td, fontFamily: 'Georgia,serif', fontSize: '1.15rem', fontWeight: 700, textAlign: 'center', color: C.navy }}>
-                        {r.total}
-                        <div style={{ fontFamily: 'monospace', fontSize: '0.7rem', color: C.faint, fontWeight: 400 }}>of 20</div>
-                      </td>
-                      <td style={td}>
-                        <span style={pill(standing.color, 'var(--cv-on-accent)')}>{standing.label}</span>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.4rem', fontSize: '0.82rem', color: C.slate }}>
-                          <input
-                            type="checkbox"
-                            checked={!!r.advances}
-                            disabled={!editable}
-                            onChange={(e) => updHypothesis(r.id, { advances: e.target.checked })}
-                          />
-                          Confirmed to advance
-                        </label>
-                      </td>
-                      <td style={td}><TextCell value={r.notes} canManage={editable} placeholder="Why this score" onCommit={(v) => updHypothesis(r.id, { notes: v })} /></td>
-                      {editable && (
-                        <td style={td}>
-                          {/* C11, C12 to C16. The same three actions as Tools 1
-                              and 2, so Park means one thing across the block. */}
-                          <RowActions clientId={clientId} problemId={r.id} table="gtcv_hypotheses_shortlist" label="this hypothesis" onDone={reload} />
-                        </td>
-                      )}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <ServiceFrame
+              service={anchoredService}
+              collapsed={anchoredService ? fold.is('service', anchoredService.id) : false}
+              onToggle={() => anchoredService && fold.toggle('service', anchoredService.id)}
+              summary={`${splitHypotheses.anchored.length} hypothes${splitHypotheses.anchored.length === 1 ? 'is' : 'es'} in this service`}
+            >
+              {splitHypotheses.anchored.length === 0 ? (
+                <div style={emptyNote}>No hypothesis has been placed in this service yet.</div>
+              ) : (
+                splitHypotheses.anchored.map((r) => (
+                  <HypothesisBlock
+                    key={r.id}
+                    row={r}
+                    editable={editable}
+                    clientId={clientId}
+                    tree={tree}
+                    build={hypothesisBuild(r.id, anchor.hypothesisSources, anchor.activities, anchor.problems)}
+                    collapsed={fold.is('activity', r.id)}
+                    onToggle={() => fold.toggle('activity', r.id)}
+                    onScore={(patch) => updHypothesis(r.id, patch)}
+                    onAction={hierarchyAction}
+                    onDone={reload}
+                  />
+                ))
+              )}
+            </ServiceFrame>
+
+            {/* C28 as amended. A hypothesis with no service is HERE, not gone. */}
+            <ParkedArea count={splitHypotheses.parked.length}>
+              {splitHypotheses.parked.map((r) => (
+                <HypothesisBlock
+                  key={r.id}
+                  row={r}
+                  editable={editable}
+                  clientId={clientId}
+                  tree={tree}
+                  build={hypothesisBuild(r.id, anchor.hypothesisSources, anchor.activities, anchor.problems)}
+                  collapsed={fold.is('activity', r.id)}
+                  onToggle={() => fold.toggle('activity', r.id)}
+                  onScore={(patch) => updHypothesis(r.id, patch)}
+                  onAction={hierarchyAction}
+                  onDone={reload}
+                  parked
+                  anchoredService={anchoredService}
+                />
+              ))}
+            </ParkedArea>
+          </>
         )}
       </Section>
 
@@ -713,7 +1210,9 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                 </tr>
               </thead>
               <tbody>
-                {signals.map((r) => {
+                {/* C28 as amended. This service's rows. Anything with no
+                    service is below, in the Parked area, never hidden. */}
+                {splitSignals.anchored.map((r) => {
                   const meta = classificationMeta(r.classification)
                   return (
                     <tr key={r.id}>
@@ -744,6 +1243,25 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             </table>
           </div>
         )}
+
+        {/* C28 as amended. Nothing disappears for lack of a service. */}
+        <ParkedArea count={splitSignals.parked.length}>
+          {splitSignals.parked.map((r) => (
+            <div key={r.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', padding: '0.2rem 0' }}>
+              <span style={pill(classificationMeta(r.classification).color, 'var(--cv-on-accent)')}>{classificationMeta(r.classification).label}</span>
+              <span style={{ fontSize: '0.92rem', color: C.navy }}>{(r.item || '').trim() || 'Nothing written yet'}</span>
+              {editable && anchoredService ? (
+                <button
+                  type="button"
+                  onClick={() => hierarchyAction({ action: 'setRowService', table: 'gtcv_signal_story', id: r.id, serviceId: anchoredService.id })}
+                  style={{ ...mono, fontSize: '0.72rem', color: C.teal, background: 'transparent', border: `1px solid ${C.teal}`, borderRadius: 6, padding: '0.18rem 0.5rem', cursor: 'pointer' }}
+                >
+                  Put into {anchoredService.service_name || 'this service'}
+                </button>
+              ) : null}
+            </div>
+          ))}
+        </ParkedArea>
       </Section>
 
       {/* ─── TOOL 5: Continue / Pause / Kill Table ──────────── */}
@@ -790,7 +1308,9 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                 </tr>
               </thead>
               <tbody>
-                {decisions.map((r) => {
+                {/* C28 as amended. This service's rows; the rest are parked
+                    below rather than hidden. */}
+                {splitDecisions.anchored.map((r) => {
                   const meta = decisionMeta(r.decision)
                   const isKill = r.decision === 'kill'
                   return (
@@ -839,6 +1359,25 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             </table>
           </div>
         )}
+
+        {/* C28 as amended. Nothing disappears for lack of a service. */}
+        <ParkedArea count={splitDecisions.parked.length}>
+          {splitDecisions.parked.map((r) => (
+            <div key={r.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', padding: '0.2rem 0' }}>
+              <span style={pill(decisionMeta(r.decision).color, 'var(--cv-on-accent)')}>{decisionMeta(r.decision).label}</span>
+              <span style={{ fontSize: '0.92rem', color: C.navy }}>{(r.activity || '').trim() || 'Nothing written yet'}</span>
+              {editable && anchoredService ? (
+                <button
+                  type="button"
+                  onClick={() => hierarchyAction({ action: 'setRowService', table: 'gtcv_continue_pause_kill', id: r.id, serviceId: anchoredService.id })}
+                  style={{ ...mono, fontSize: '0.72rem', color: C.teal, background: 'transparent', border: `1px solid ${C.teal}`, borderRadius: 6, padding: '0.18rem 0.5rem', cursor: 'pointer' }}
+                >
+                  Put into {anchoredService.service_name || 'this service'}
+                </button>
+              ) : null}
+            </div>
+          ))}
+        </ParkedArea>
       </Section>
     </div>
   )

@@ -1516,3 +1516,84 @@ session's transcript while proving the newline fault. It is your own key in
 your own session, so the exposure is small, but rotating it costs nothing and
 would close it. Cleaning the stored value on Vercel (removing the two newlines)
 is also worth doing, though the code fix now makes it unnecessary.
+
+## ITEMS 1 to 4. THE HIERARCHY, C28, C18 AND PART J. DONE.
+
+### Item 1. THE C26 REBUILD. Tools 2 and 3.
+
+The column headed "Service and activity" is GONE, and nothing can rebuild it:
+the service is now the frame drawn around the table and the activity is the
+heading of a group, so neither is a value any cell can hold.
+
+Tool 2 draws: the service ONCE at the top, alone; every activity of it beneath,
+each its own group; each activity's problems under it with the five columns
+C26 names (who experiences it, who is accountable, who controls the budget,
+cost of not solving it, budget mechanism).
+
+Tool 3 follows the same shape and each hypothesis SHOWS what it is built from,
+drawn as the hierarchy — the activities named, and under each the problems
+named — with pickers to add and remove.
+
+New file src/lib/phase-zero-hierarchy.ts holds the shape with no React and no
+database, so it is tested directly. C26's own written test is in
+src/__tests__/phase-zero-hierarchy.test.ts, quoted in the file.
+
+### D-N1. C26 OVERRULES C23, DELIBERATELY.
+
+C23 says an activity with no stated problem is ABSENT from Tool 2, and
+service-anchor.ts still holds that as activitiesForToolTwo. The C26
+replacement's own test contradicts it: "the first has two problems, the second
+one, the third none ... and the third showing no problems". An activity that is
+absent cannot be shown showing no problems. CHOSEN: the replacement wins — it is
+later, more specific, and carries its own test. The third activity appears
+carrying C22's exact words, 'No problem stated'. activitiesForToolTwo is left
+untouched for anything else that reads it. If C23 was meant to survive, say so
+and it is a one line filter.
+
+### D-N2. A JOIN TABLE FOR WHAT A HYPOTHESIS IS BUILT FROM.
+
+Nothing recorded it. A hypothesis held a sentence, four scores and a service;
+the activities and problems behind it lived only in the memory of whoever typed
+it, so Tool 3 could not show what C26 requires. New table
+gtcv_hypothesis_sources, migration 2026_08_12_c26_hypothesis_sources.sql.
+CHOSEN a join table over two array columns because a foreign key with ON DELETE
+CASCADE takes the link with the row, and an array of identifiers does not — an
+array would leave a hypothesis claiming to be built from an activity that no
+longer exists. THE MIGRATION MUST BE RUN; until it is, the read degrades to an
+empty list and Tools 1 and 2 are unaffected.
+
+### Item 2. C28 AS AMENDED. Tools 3, 4 and 5.
+
+Three buckets, not two: the anchored service's rows are drawn, rows with NO
+service go to the Parked area with a press to put them into the anchored
+service, and only a row belonging to a DIFFERENT service leaves the screen —
+switching the anchor brings it back. Nothing is hidden for lack of a service,
+which was the whole point of the amendment: on a live engagement no row has one
+yet, so a filter would have shown a room an empty screen mid-session.
+
+A row added while a service is anchored now belongs to it from the start, so
+the room does not create work in Tool 3 and find it in the Parked area.
+
+### Item 3. C18. A service made from selected activities.
+
+Tick the activities in Tool 1, name the result, press Create. ONE route action
+(createServiceFromActivities), not "add a service" then "move these into it":
+two requests can half-succeed, and the half that lands first is an empty
+service and a room wondering where their activities went. A failure now leaves
+an empty service at worst, which C17 says is legitimate.
+
+### Item 4. PART J, C64 to C66. Collapsing at three levels, remembered.
+
+  C64  service folds away its activities
+  C65  activity folds away its problems
+  C66  agreed answer folds away the submissions behind it
+
+Held in session storage per the handover's note, keyed per engagement.
+Stored is what is CLOSED, never what is open, so an empty store correctly
+describes a fresh screen and an activity created later is open like the rest.
+Session storage is also per-tab, which C52's projection needs: the projected
+second tab must not inherit somebody's folded-up working view.
+src/lib/phase-zero-collapse.ts is pure and tested; the wiring is useCollapse.
+
+Full suite after items 1 to 4: 60 files, 1154 tests, all passing. next build
+compiles clean.
