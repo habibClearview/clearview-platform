@@ -1275,3 +1275,42 @@ C28 filtering  The columns exist on all five tools. No row has a service yet,
 C47            See D-C1.
 Part J, C64 to C66   Collapsing rows. Not started.
 Part K, C67 to C70   The canvas rendering decisions. Not started.
+
+## C26 REPLACEMENT. RECEIVED 12 AUGUST 2026, ON THE THIRD SENDING.
+
+Recorded verbatim because it was lost twice. It replaces C26 entirely.
+
+  Every tool displays a HIERARCHY on screen, not labels on rows. The service is
+  anchored at the top, ALONE, as the frame, and is never a cell in a row.
+  Beneath it sits every activity in that service, each as its own row or group;
+  a service commonly has ten or more. Beneath each activity sit the problems
+  that activity solves; one activity may solve several problems, or none.
+  THERE IS NO COMBINED "SERVICE AND ACTIVITY" COLUMN ANYWHERE.
+
+  Tool 2 shows: the service at the top, then each activity of that service,
+  then under each activity its problems, and for each problem the columns who
+  experiences it, who is accountable, who controls the budget, what it costs
+  them not to solve it, and the release mechanism.
+
+  Test: a service with three activities; the first has two problems, the second
+  one, the third none. Tool 2 shows the service once at the top, all three
+  activities beneath it, two problems under the first, one under the second,
+  and the third showing no problems.
+  Fails if: service and activity appear combined in one column, or the display
+  suggests one activity per service.
+
+  Tool 3 follows the same hierarchy. A hypothesis is: this service, made up of
+  these specific activities, solves this problem or set of problems, for this
+  type of client. Tool 3 shows which activities and which problems each
+  hypothesis is built from.
+
+WHAT I BUILT BEFORE THIS ARRIVED WAS EXACTLY THE FAULT IT NAMES: a first column
+headed "Service and activity" on every Tool 2 row. That is being removed.
+
+C28 as amended 12 August 2026: do NOT hide unassigned rows. Tools 3 to 5 show
+the anchored service and its rows, and any row with no service appears in the
+Parked area exactly as Tools 1 and 2 already do. Nothing disappears for lack of
+a service.
+
+C47 REMOVED 12 August 2026. C52 wins; the projection carries no controls and
+returning to the table is switching tabs.
