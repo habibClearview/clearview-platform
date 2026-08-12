@@ -33,7 +33,7 @@ import { loadSessionLink, resolveJoinCode } from '@/lib/session-link'
 import { isRefusal, readAnswer, refuseSubmission } from '@/lib/stage1-questions'
 import { ROOM_COOKIE, decodeIdentity, encodeIdentity, newIdentity } from '@/lib/stage1-room-identity'
 import { gateLabel } from '@/lib/gtcv-gates'
-import { LATE_ANSWER_REFUSED, acceptsLateAnswer, identityLine, questionPosition } from '@/lib/service-anchor'
+import { LATE_ANSWER_REFUSED, acceptsLateAnswer, identityLine, mayShowAnswers, questionPosition } from '@/lib/service-anchor'
 import {
   LINK_CLOSED,
   PERSONAL_GRANT_TYPE,
@@ -141,7 +141,7 @@ export async function GET(req: NextRequest) {
 
     const { data: question } = await db
       .from('gtcv_questions')
-      .select('id, gate_id, sort_order, question_text, question_type, is_named, target_fields, options, scale_min, scale_max')
+      .select('id, gate_id, sort_order, question_text, question_type, is_named, answers_visible, authors_visible, target_fields, options, scale_min, scale_max')
       .eq('id', state.open_question_id)
       .eq('client_id', me.clientId)
       .maybeSingle()
@@ -186,8 +186,17 @@ export async function GET(req: NextRequest) {
 
     // R12: on a collect question every participant sees all answers as they
     // arrive, so those are sent. On score and classify they are not.
+    // C60 with C56. The ANSWERS switch decides, and a reveal opens it. Not the
+    // question type: a collect question with answers hidden is exactly how a
+    // facilitator stops the first answer anchoring everybody else's.
     let everyones: { values: Record<string, string> }[] = []
-    if (question?.question_type === 'collect') {
+    const showOthers = question
+      ? mayShowAnswers(
+          { answersVisible: !!question.answers_visible, authorsVisible: !!question.authors_visible },
+          Boolean(state.revealed),
+        )
+      : false
+    if (question?.question_type === 'collect' && showOthers) {
       const { data } = await db
         .from('gtcv_submissions')
         .select('values, submitted_at')
@@ -321,7 +330,10 @@ export async function POST(req: NextRequest) {
     // type, the block, the withdrawal and the expiry, answering the same null
     // for every one. Writing a second lookup would mean a rule could be
     // tightened in one place and forgotten in the other.
-    if (body.action === 'join') {
+    // C54. The QR carries everything. Scanning opens /room with the session
+    // already identified, and no code is typed. Same door as the typed code —
+    // the same resolver, the same limits — so it can never open more.
+    if (body.action === 'join' || body.action === 'scan') {
       const db = admin()
 
       // The same two limits as /api/session-join, and DELIBERATELY THE SAME

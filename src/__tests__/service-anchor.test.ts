@@ -17,6 +17,9 @@ import {
   acceptsLateAnswer,
   identityLine,
   questionPosition,
+  defaultVisibility,
+  mayShowAnswers,
+  mayShowNames,
   type Activity,
   type Problem,
 } from '../lib/service-anchor'
@@ -295,5 +298,32 @@ describe('Part E. Who the participant is, and where they are (C34, C38)', () => 
   it('C38. Reads as a position in the set, counting from one', () => {
     expect(questionPosition(1, 4)).toBe('Question 2 of 4')
     expect(questionPosition(0, 1)).toBe('Question 1 of 1')
+  })
+})
+
+describe('Part H. Two switches, not one (C56 to C60)', () => {
+  it('C57. Collect shows both; score and classify hide both', () => {
+    expect(defaultVisibility('collect')).toEqual({ answersVisible: true, authorsVisible: true })
+    expect(defaultVisibility('score')).toEqual({ answersVisible: false, authorsVisible: false })
+    expect(defaultVisibility('classify')).toEqual({ answersVisible: false, authorsVisible: false })
+  })
+
+  it('C56. They are independent — answers visible with authors hidden works', () => {
+    const v = { answersVisible: true, authorsVisible: false }
+    expect(mayShowAnswers(v, false)).toBe(true)
+    expect(mayShowNames(v)).toBe(false)
+  })
+
+  it('and the opposite way round', () => {
+    const v = { answersVisible: false, authorsVisible: true }
+    expect(mayShowAnswers(v, false)).toBe(false)
+    expect(mayShowNames(v)).toBe(true)
+  })
+
+  it('a reveal opens the answers and NEVER the names', () => {
+    // Revealing answers is not revealing people. C58 and C62 both turn on this.
+    const v = { answersVisible: false, authorsVisible: false }
+    expect(mayShowAnswers(v, true)).toBe(true)
+    expect(mayShowNames(v)).toBe(false)
   })
 })

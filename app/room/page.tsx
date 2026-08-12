@@ -186,6 +186,28 @@ export default function RoomPage() {
   useEffect(() => {
     const url = new URL(window.location.href)
     const token = url.searchParams.get(PERSONAL_LINK_PARAM)
+    // C54. A scanned QR carries the room code. Used once and taken out of the
+    // address, the same way a personal link is, so the address reads /room and
+    // a screenshot of it opens nothing.
+    const scanned = url.searchParams.get('c')
+    if (!token && scanned) {
+      setExchanging(true)
+      let stop = false
+      ;(async () => {
+        try {
+          await fetch('/api/room', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'scan', code: scanned }),
+          })
+        } catch { /* no signal; the code stays in the address to try again */ }
+        if (stop) return
+        url.searchParams.delete('c')
+        window.history.replaceState({}, '', url.pathname + (url.search || '') + url.hash)
+        setExchanging(false)
+      })()
+      return () => { stop = true }
+    }
     if (!token) { setExchanging(false); return }
 
     setExchanging(true)

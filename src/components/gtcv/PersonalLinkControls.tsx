@@ -108,6 +108,27 @@ export default function PersonalLinkControls({
             {person?.lastOpened ? 'Link opened' : 'Link not opened yet'}
           </span>
           <button type="button" style={btn(C.teal)} onClick={copy}>Copy link to send</button>
+          {/* R36's other route, built once Resend was named on 12 August 2026.
+              It fails loudly where the key is absent rather than reporting a
+              success that never happened. */}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true); setSaid(null)
+              try {
+                const res = await authedFetch('/api/team-links-email', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ clientId, partyId, origin: window.location.origin }),
+                })
+                const json = await res.json().catch(() => ({}))
+                setSaid(res.ok ? 'Sent by email.' : (json?.error || 'That did not send.'))
+              } catch { setSaid('Could not reach the server.') }
+              setBusy(false)
+            }}
+            style={btn(C.navy)}
+          >Send by email</button>
           {/* R37. Withdrawing one person's link. It bites at once, because the
               participant route re-checks the grant on every request rather
               than only when somebody first opens their link. */}

@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 import { classifySplit, scoreDistribution, type Submission } from '@/lib/stage1-questions'
+import { mayShowAnswers, mayShowNames } from '@/lib/service-anchor'
 import { startingQuestionSet } from '@/lib/stage1-question-sets'
 
 export const dynamic = 'force-dynamic'
@@ -59,7 +60,7 @@ async function requireManager(req: NextRequest, admin: Admin, clientId: string) 
  * here. R4's nine other blocks seed nothing and that is a correct answer.
  */
 async function questionsFor(admin: Admin, clientId: string, gateId: string) {
-  const columns = 'id, gate_id, sort_order, question_text, question_type, is_named, target_fields, options, suggested_minutes, scale_min, scale_max, agreed_value, agreed_column, agreed_row_id, agreed_distribution, agreed_at'
+  const columns = 'id, gate_id, sort_order, question_text, question_type, is_named, answers_visible, authors_visible, target_fields, options, suggested_minutes, scale_min, scale_max, agreed_value, agreed_column, agreed_row_id, agreed_distribution, agreed_at'
 
   const { data: existing } = await admin
     .from('gtcv_questions')
@@ -134,7 +135,11 @@ export async function GET(req: NextRequest) {
         cards = subs.map((s) => ({
           id: s.id,
           values: s.values || {},
-          name: open.is_named ? s.participant_name : null,
+          // C58. The AUTHORS switch decides, not is_named. Where authors are
+          // hidden no name leaves the server, so nothing downstream can show
+          // one by accident.
+          name: mayShowNames({ answersVisible: !!open.answers_visible, authorsVisible: !!open.authors_visible })
+            ? s.participant_name : null,
         }))
       } else if (state?.revealed) {
         // R14. Only after the reveal do any values leave the server.
@@ -145,7 +150,8 @@ export async function GET(req: NextRequest) {
         }
         // R18. Names travel only on a named question; scoreExtremes refuses to
         // return any on an anonymous one, and it is given the rows only here.
-        extremesSource = open.is_named ? subs : []
+        extremesSource = mayShowNames({ answersVisible: !!open.answers_visible, authorsVisible: !!open.authors_visible })
+          ? subs : []
       }
     }
 
@@ -233,8 +239,11 @@ export async function POST(req: NextRequest) {
       agreedValue?: string
       agreedColumn?: string
       agreedRowId?: string
+      dissent?: { note?: string; name?: string }[]
       submissionIds?: string[]
       intoRowId?: string
+      answersVisible?: boolean
+      authorsVisible?: boolean
     }
     const clientId = body.clientId
     if (!clientId) return NextResponse.json({ error: 'Missing clientId' }, { status: 400 })
@@ -257,7 +266,7 @@ export async function POST(req: NextRequest) {
       if (!id) return null
       const { data } = await admin
         .from('gtcv_questions')
-        .select('id, gate_id, sort_order, question_type, is_named, options, scale_min, scale_max, target_fields')
+        .select('id, gate_id, sort_order, question_text, question_type, is_named, answers_visible, authors_visible, options, scale_min, scale_max, target_fields')
         .eq('id', id)
         .eq('client_id', clientId)
         .maybeSingle()
@@ -376,6 +385,27 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
+      // C56, C60. Either switch, before the question opens or while it is
+      // open. Every device sees it on its next read, which is within two
+      // seconds, and none of them has to reload.
+      case 'setVisibility': {
+        const q = await ownQuestion(body.questionId)
+        if (!q) return NextResponse.json({ error: 'That question is not on this engagement' }, { status: 404 })
+        const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
+        if (typeof body.answersVisible === 'boolean') patch.answers_visible = body.answersVisible
+        if (typeof body.authorsVisible === 'boolean') {
+          patch.authors_visible = body.authorsVisible
+          // is_named is what Stage 1 wrote and what the consent sentence keys
+          // off. Kept in step so the two can never disagree about whether a
+          // name may be shown.
+          patch.is_named = body.authorsVisible
+        }
+        const { error } = await admin.from('gtcv_questions')
+          .update(patch).eq('id', q.id).eq('client_id', clientId)
+        if (error) throw error
+        return NextResponse.json({ ok: true })
+      }
+
       // R23. The agreed value, and the distribution kept beside it.
       case 'agree': {
         const q = await ownQuestion(body.questionId)
@@ -418,6 +448,49 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Could not write that into the table' }, { status: 500 })
           }
         }
+
+        // C61 to C63. THE WHOLE PATH, snapshotted at agreement, because a
+        // conclusion without its path cannot be defended to a funder six months
+        // later. C62: where authors were hidden they stay hidden here and in
+        // every export, permanently — so no name is written at all.
+        const authorsVisible = mayShowNames({
+          answersVisible: !!q.answers_visible, authorsVisible: !!q.authors_visible,
+        })
+        await admin.from('gtcv_question_records').insert({
+          client_id: clientId,
+          question_id: q.id,
+          gate_id: q.gate_id,
+          question_text: (q as { question_text?: string }).question_text || null,
+          question_type: q.question_type,
+          submissions: subs.map((s) => ({
+            values: s.values || {},
+            score: s.score_value,
+            option: s.option_value,
+            at: s.submitted_at,
+            // A promise made in the room is not undone by a later report.
+            name: authorsVisible ? s.participant_name : null,
+          })),
+          distribution: snapshot,
+          authors_were_visible: authorsVisible,
+          revealed_at: new Date().toISOString(),
+          agreed_value: value,
+          dissent: (body.dissent || []).slice(0, 50).map((d) => ({
+            note: String(d?.note || '').slice(0, 500),
+            name: authorsVisible ? String(d?.name || '').slice(0, 120) : null,
+          })),
+          locked_by_user_id: auth.userId,
+          locked_by_name: auth.fullName || null,
+        }).then(({ error }) => { if (error) console.error('facilitate: record write failed', error) })
+
+        // C63. Filed against the gate through the mechanism that already
+        // exists, so nothing about the Evidence Library changes.
+        await admin.from('evidence_library').insert({
+          client_id: clientId,
+          dp_id: q.gate_id,
+          title: `Room decision: ${String((q as { question_text?: string }).question_text || '').slice(0, 120)}`,
+          source: 'Workshop room',
+          notes: `Agreed: ${value}`,
+        }).then(({ error }) => { if (error) console.error('facilitate: evidence filing failed', error) })
 
         const { error } = await admin
           .from('gtcv_questions')

@@ -104,7 +104,12 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
   const [showUsed, setShowUsed] = useState(false)
 
   const origin = typeof window === 'undefined' ? '' : window.location.origin
+  // C54. The QR now carries the participant page with the session already
+  // identified, so scanning opens something ready to answer rather than a page
+  // that then asks for a code. The long token link still exists and still
+  // works: /session/[token] is untouched (C87).
   const urlFor = (token) => `${origin}/session/${token}`
+  const roomUrlFor = (l) => (l.join_code ? `${origin}/room?c=${encodeURIComponent(l.join_code)}` : urlFor(l.access_token))
 
   const load = useCallback(async () => {
     if (!clientId) { setLoading(false); return }
@@ -155,7 +160,7 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
     let cancelled = false
     const open = links.filter((l) => !l.revoked_at && (!l.expires_at || new Date(l.expires_at) > new Date()))
     Promise.all(open.map(async (l) => {
-      const data = await QRCode.toDataURL(urlFor(l.access_token), { width: 260, margin: 1 })
+      const data = await QRCode.toDataURL(roomUrlFor(l), { width: 260, margin: 1 })
       return [l.id, data]
     })).then((pairs) => { if (!cancelled) setQr(Object.fromEntries(pairs)) }).catch(() => {})
     return () => { cancelled = true }

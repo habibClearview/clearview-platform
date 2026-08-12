@@ -227,7 +227,9 @@ export default function ServiceAnchorBar({
               {parked.map((a) => (
                 <div key={a.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 14, color: C.navy }}>{a.activity || 'Unnamed activity'}</span>
-                  {/* C15. Pulled into any service, including one made after it
+                  {/* C18 is the same move with a service made first: name it in
+                  "Add a service", then pull the chosen activities in here.
+                  C15. Pulled into any service, including one made after it
                       was parked. It arrives complete, because its problems hang
                       off it and were never separated from it. */}
                   {canManage && services.length > 0 ? (

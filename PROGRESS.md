@@ -1237,3 +1237,41 @@ that would have left NO way for anybody to join a room at all, because the
 code and the QR lived nowhere else. C44 says they belong in the block, so they
 moved there in the same change. Recorded because a half-applied C45 would have
 broken joining completely and looked like C44 failing.
+
+## Decisions taken on Habib's behalf, 12 August 2026
+
+Taken under the instruction to choose rather than stop, and listed for review.
+
+D-C1. C47 against C52. C47 wants "Back to the table" to return to the exact
+block. C52 says the projected view carries NO controls at all, and C52 is the
+later and more specific rule. CHOSEN: the projection carries no controls; it
+opens in a second tab and the block tab stays open behind it, so returning to
+the table is switching tabs. If you want a Back button on the projection, that
+is C52 loosened and I would rather you said so.
+
+D-C2. C26 had a replacement I never received. CHOSEN: built to the original
+wording — Tool 2 shows the parent Service and parent Activity on every row.
+
+D-C3. Resend is now named, so R36's email half is built. It sends ONLY the
+recipient's address, their name and their link, and nothing else. Where
+RESEND_API_KEY is absent it refuses loudly rather than reporting a success that
+did not happen. RESEND_API_KEY and RESEND_FROM are not set on staging, so the
+button will say email is not switched on until you set them.
+
+D-C4. C56 with R18 and R19. authors_visible is the switch that now decides
+whether any name appears, and is_named is kept in step with it rather than
+dropped, because the Stage 2 consent sentence and R18 are built on is_named.
+Two columns, one meaning, never allowed to disagree.
+
+D-C5. C58 and C62 are enforced by NOT WRITING, not by hiding. Where authors
+are hidden, no name is written into the permanent record at all, so no future
+report or export can reveal one.
+
+## Not built, and why. 12 August 2026.
+
+C28 filtering  The columns exist on all five tools. No row has a service yet,
+               so filtering would show an empty screen on a live engagement.
+               Needs a back-fill decision I would not take unasked.
+C47            See D-C1.
+Part J, C64 to C66   Collapsing rows. Not started.
+Part K, C67 to C70   The canvas rendering decisions. Not started.

@@ -307,3 +307,48 @@ export function identityLine(
 export function questionPosition(index: number, total: number): string {
   return `Question ${index + 1} of ${total}`
 }
+
+// ------------------------------------------------------------
+// PART H. THE TWO VISIBILITY SWITCHES  (C56 to C60)
+//
+// They govern different fears and so they are two.
+//   Answers visible  ANCHORING. The first answer seen sets what others write.
+//   Authors visible  SAFETY. Whether a junior person will contradict a senior
+//                    one in front of the room.
+// A single switch forces a room to choose between the two, and the commonest
+// useful setting — answers visible, authors hidden — is exactly the one it
+// cannot express.
+// ------------------------------------------------------------
+export interface Visibility {
+  answersVisible: boolean
+  authorsVisible: boolean
+}
+
+/** C57. Where a new question starts. Changeable before and during (C56). */
+export function defaultVisibility(type: 'collect' | 'score' | 'classify'): Visibility {
+  return type === 'collect'
+    ? { answersVisible: true, authorsVisible: true }
+    : { answersVisible: false, authorsVisible: false }
+}
+
+/**
+ * Whether other people's answers may leave the server yet.
+ *
+ * Enforced by NOT SENDING, the same way R14 was: a screen that never received
+ * a value cannot leak one, and a reveal is the only thing that changes it.
+ */
+export function mayShowAnswers(v: Visibility, revealed: boolean): boolean {
+  return v.answersVisible || revealed
+}
+
+/**
+ * C58 and C62. Whether a name may appear ANYWHERE.
+ *
+ * Not "on this screen". Anywhere: the participant page, the projection, the
+ * block, every export, every report, and at any later date. So this is asked
+ * before a name is put into anything, including the permanent record, and a
+ * reveal does NOT change it. Revealing answers is not revealing people.
+ */
+export function mayShowNames(v: Visibility): boolean {
+  return v.authorsVisible
+}

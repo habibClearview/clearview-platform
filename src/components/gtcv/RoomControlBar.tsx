@@ -160,6 +160,25 @@ export default function RoomControlBar({
         </span>
       </div>
 
+      {/* C56, C60. Two switches, independent, changeable while the question is
+          open. Every device sees the change on its next read. */}
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12 }}>
+        {[
+          { key: 'answersVisible', label: 'Answers visible', on: !!open.answers_visible },
+          { key: 'authorsVisible', label: 'Authors visible', on: !!open.authors_visible },
+        ].map((sw) => (
+          <label key={sw.key} style={{ display: 'inline-flex', gap: 5, alignItems: 'center', cursor: 'pointer', color: C.quiet }}>
+            <input
+              type="checkbox"
+              checked={sw.on}
+              disabled={busy}
+              onChange={(e) => act({ action: 'setVisibility', questionId: open.id, [sw.key]: e.target.checked })}
+            />
+            {sw.label}
+          </label>
+        ))}
+      </div>
+
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button
           type="button"
