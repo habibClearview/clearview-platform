@@ -1314,3 +1314,141 @@ a service.
 
 C47 REMOVED 12 August 2026. C52 wins; the projection carries no controls and
 returning to the table is switching tabs.
+
+# ============================================================
+# HANDOVER. A NEW SESSION NEEDS NOTHING FROM HABIB. 12 August 2026.
+# ============================================================
+
+## 1. The five outstanding items, in build order
+
+  1. C26 REBUILD, Tools 2 and 3. See the C26 replacement recorded above,
+     verbatim, received on its third sending. What is on screen now is exactly
+     the fault it names: a first column headed "Service and activity". Remove
+     that column. Tool 2 becomes a HIERARCHY — the service anchored at the top
+     ALONE, never a cell; every activity of that service beneath it, ten or
+     more being normal; each activity's problems under it, several or none;
+     and for each problem the five existing columns. Tool 3 follows the same
+     shape and shows which activities and which problems each hypothesis is
+     built from.
+  2. C28 AS AMENDED. Tools 3 to 5 show the anchored service and its rows.
+     A row with no service goes to the PARKED area, exactly as Tools 1 and 2
+     already do. NOTHING is hidden for lack of a service. The columns
+     (service_id, parked_at) already exist on all three tables.
+  3. C18. A new service made by selecting activities and naming the result.
+     The route already does the move (action 'moveMany'); what is missing is
+     the selecting on screen.
+  4. PART J, C64 to C66. Collapsing at three levels — service to activities,
+     activity to problems, agreed answer to the submissions behind it — and
+     the collapsed state remembered while moving between tools in a session.
+     Session storage is enough; it does not need a column.
+  5. PART K, C67 to C70. The Journey Canvas rendering each gate's decision,
+     evidence reference, who agreed, who dissented and who signed; updating
+     live; and a dated fixed version for print and handover. Where authors
+     were hidden, the fixed version shows the dissent WITHOUT the name —
+     gtcv_question_records.authors_were_visible is what to read.
+
+C47 IS REMOVED. C52 wins: the projection carries no controls and returning to
+the table is switching tabs.
+
+## 2. Every decision taken on Habib's behalf, with the reasoning
+
+  D1  /join left untouched; /room takes a code itself. Q4 said both "sends
+      people to /room" and "/join is untouched", which cannot both be true.
+      Chose the reading that breaks nothing.
+  D2  Polling replaced the database push service. See section 5.
+  D3  Two Clearing the ground questions have no home column; their agreed
+      value and distribution live on the question. Settled: do NOT add columns
+      to gtcv_assumptions.
+  D4  Named/anonymous cannot be changed once a question has been answered.
+      Turning an anonymous question named afterwards would put names on
+      answers given on the understanding there would be none.
+  D5  Merging does not overwrite the row merged into. The count of people who
+      said the same thing is what makes "submitted by 4" mean anything.
+  D6  Participant connection counted separately from answers, never folded in.
+      A sleeping phone must not read as a person who has finished answering.
+  D7  Removing the Refresh button came with a five second re-read, or the feed
+      would have frozen.
+  D8  An offline answer to a question that has since closed is refused AND the
+      person is told. C43 later softened this by exactly one question.
+  D9  On score and classify the choice IS the submit button. One press is the
+      right input on a phone for choosing one value.
+  D10 "Permanent" means for the life of the engagement. status 'complete'
+      closes links; 'paused' does not, because a pause is a thing that resumes.
+  D11 Item decisions use the platform's four words — keep, redesign, pause,
+      stop — not carry/kill/pause. The counter still SAYS killed, paused and
+      carried forward. Displayed and stored are different things.
+  D12 The service anchor is ONE STICKY BAR, not five headings. A heading inside
+      each tool stops satisfying C4 the moment somebody scrolls.
+  D13 A problem stated in Tool 1 IS the Tool 2 row. One row read by two tools,
+      never two copies kept in step.
+  D14 Problems hang off the ACTIVITY and carry no service, so a move cannot
+      strand them.
+  D15 C47 dropped in favour of C52. APPROVED by Habib 12 August 2026.
+  D16 C58 and C62 enforced by NOT WRITING. Where authors are hidden no name is
+      written into the permanent record at all, so no later export can reveal
+      one. authors_visible decides; is_named is kept in step, not dropped,
+      because the consent sentence and R18 are built on it.
+
+## 3. Part O. The nine that must not break. All last checked 12 August 2026.
+
+  C82 personal links work for the life of the engagement        intact
+  C83 "This link is no longer open. Please speak to your facilitator."  intact
+  C84 "Your name is not shown on screen and is not shown to anyone in this
+      room, but it is recorded in the system."                  intact
+  C85 identity column unreadable by any route or export         intact, and
+      enforced by a test that walks every file under app, src and scripts
+  C86 "Guest" in the facilitator's pending list only            intact
+  C87 join page, room code, QR, /session/[token]                intact
+  C88 no refresh control anywhere                               intact
+  C88 the three room tables OFF the push channel                0 of 3, by query
+  C89 the offline queue                                         intact
+
+  How to re-check the last one:
+    select count(*) from pg_publication_tables
+     where pubname='supabase_realtime'
+       and tablename in ('gtcv_questions','gtcv_submissions','gtcv_room_state');
+  It must return 0.
+
+## 4. Known unknowns
+
+  S41  Whether production data was ever copied into staging before 11 August
+       2026 cannot be established from here. I never did it. That is the whole
+       of what can be said.
+  The push channel check that proved nothing: the FIRST run, in a container
+       that could not reach the database host, returned CHANNEL_ERROR on both
+       keys and proved nothing at all. Only the later run, with a working
+       control, proved the leak. Never cite the first run as evidence.
+  src/lib/gtcv-services.ts line 91, NAME_LIMIT = 60. Service names longer than
+       sixty characters are cut and given an ellipsis. It cuts at the last
+       space after character 20, so it does not split a word, but a long
+       service name IS shortened on screen. Not yet reviewed against C80,
+       which requires characters removed to be named explicitly. Worth a look.
+
+## 5. Standing facts a new session must not rediscover the hard way
+
+  THE PUSH CHANNEL LEAKED and is closed. A browser holding only the public key
+  received a message for every write to all three room tables — contents empty,
+  but the fact and timing left. The tables were removed from the publication.
+  Every screen now POLLS the server instead: participant page and control bar
+  every 1.5s, the block feed every 3 to 5s. Do not put those tables back on the
+  publication without deciding first what a holder of the public key may learn.
+
+  AI CODE REVIEW is permanently unavailable and IS NOT TO BE FIXED. Do not read
+  its log, do not raise it.
+
+  RESEND is the mail service, authorised 12 August 2026. It sends only the
+  recipient's address, their name and their personal link. See section 6 for
+  the key position.
+
+  EVERY PUSH GOES TO BOTH branches. See the section near the top of this file.
+
+## 6. The Resend keys, checked on Vercel 12 August 2026
+
+  RESEND_API_KEY   ALREADY EXISTS, and already covers BOTH preview and
+                   production. It is encrypted, so its value cannot be read
+                   back — but it is present, which means the email button
+                   should already work on staging.
+  RESEND_FROM      DOES NOT EXIST at all, on any environment.
+
+  The code falls back to onboarding@resend.dev when RESEND_FROM is absent, so
+  email works without it; adding it only changes the sender shown.
