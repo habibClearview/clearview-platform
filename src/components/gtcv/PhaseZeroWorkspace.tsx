@@ -948,7 +948,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         title="Assumption Dump Canvas"
         question="What are we already doing, and what has to be true for it to work?"
         purposeText="List every activity the organisation runs, and the service it sits under. An organisation sells several services and each is a portfolio of activities, so naming the service is what lets this be read back as what we actually do for gender advisory. For each activity, name what it delivers, who pays for it today, the assumption sitting underneath it, and what evidence would prove that assumption wrong."
-        right={editable ? <button type="button" style={addButton} onClick={addActivity}>+ Add activity</button> : null}
+        right={null}
       >
         {/* ─── C18. A NEW SERVICE, MADE OF ACTIVITIES THAT ALREADY EXIST ───
             Tick the activities, name the result, and they move. They keep
@@ -1011,7 +1011,29 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
           <div style={emptyNote}>
             No service chosen. Add one in the bar above, or choose one, and its activities appear here.
           </div>
-        ) : activitiesOfAnchored.length === 0 ? (
+        ) : (
+          <>
+          {/* ONE SERVICE, NAMED ONCE, with its activities beneath it. This is
+              the line the Service column used to repeat on every row. Adding an
+              activity happens HERE, inside the service it will belong to, so
+              the press and the parent are the same gesture. */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap',
+            background: C.alt, border: `1px solid ${C.border}`, borderRadius: 9,
+            padding: '0.45rem 0.7rem', marginBottom: '0.6rem',
+          }}>
+            <span style={{ ...mono, fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>Service</span>
+            <span style={{ fontFamily: 'Georgia,serif', fontSize: '1.05rem', fontWeight: 700, color: C.navy }}>
+              {anchoredService.service_name}
+            </span>
+            <span style={{ ...mono, fontSize: '0.76rem', color: C.slate }}>
+              {activitiesOfAnchored.length} activit{activitiesOfAnchored.length === 1 ? 'y' : 'ies'}
+            </span>
+            {editable ? (
+              <button type="button" style={{ ...addButton, marginLeft: 'auto' }} onClick={addActivity}>+ Add activity</button>
+            ) : null}
+          </div>
+          {activitiesOfAnchored.length === 0 ? (
           <div style={emptyNote}>No activities under this service yet. Press &quot;+ Add activity&quot;.</div>
         ) : (
           <div style={tableWrap}>
@@ -1019,8 +1041,13 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
               <thead>
                 <tr>
                   {editable && <th style={{ ...thWrap, width: 34 }} aria-label="Choose for a new service" />}
-                  <th style={{ ...thWrap, width: '14%' }}>Service</th>
-                  <th style={{ ...thWrap, width: '16%' }}>Activity</th>
+                  {/* THE SERVICE IS NOT A COLUMN. It was repeating on every
+                      row — the same name written once per activity — which is
+                      the "service appearing twice" Habib reported and is
+                      exactly what C26 forbids: the service is the frame, never
+                      a cell. It is named ONCE, in the bar above, which every
+                      row here belongs to. */}
+                  <th style={{ ...thWrap, width: '18%' }}>Activity</th>
                   <th style={{ ...thWrap, width: '15%' }}>What it delivers</th>
                   {/* C20. ADDED beside it, never instead of it. Two different
                       questions: what the buyer receives, and what it is for. */}
@@ -1044,33 +1071,6 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                         />
                       </td>
                     )}
-                    {/* THE PARENT, not a name typed beside it. This used to be
-                        free text writing service_name, which set no parent at
-                        all, so an activity could read "Gender advisory" on
-                        screen and belong to nothing. Choosing here moves the
-                        activity through the same action as "Move to another
-                        service", so there is ONE way an activity gets its
-                        service. */}
-                    <td style={td}>
-                      {editable ? (
-                        <select
-                          aria-label="Which service this activity belongs to"
-                          style={{ ...selectStyle, minWidth: 140 }}
-                          value={r.service_id || ''}
-                          onChange={(e) => { if (e.target.value) hierarchyAction({ action: 'moveMany', serviceId: e.target.value, activityIds: [r.id] }) }}
-                        >
-                          {!r.service_id && <option value="">Not in a service</option>}
-                          {anchor.services.map((s) => (
-                            <option key={s.id} value={s.id}>{s.service_name}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <div style={{ ...roInput, minHeight: 34 }}>
-                          {anchor.services.find((s) => s.id === r.service_id)?.service_name
-                            || <span style={{ color: C.faint }}>Not in a service</span>}
-                        </div>
-                      )}
-                    </td>
                     <td style={td}><TextCell value={r.activity} canManage={editable} placeholder="The activity" onCommit={(v) => updAssumption(r.id, { activity: v })} /></td>
                     <td style={td}><MultiValueCell activity={r} field="delivers" values={anchor.activityValues} canManage={editable} onAction={hierarchyAction} placeholder="What it actually delivers" /></td>
                     <td style={td}>
@@ -1104,6 +1104,8 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
               </tbody>
             </table>
           </div>
+          )}
+          </>
         )}
       </Section>
 

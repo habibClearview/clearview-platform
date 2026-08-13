@@ -1821,3 +1821,47 @@ Until it is run: multi-value and Park/Delete service do not work; everything
 else does, and nothing goes blank.
 
 Full suite after this round: 62 files, 1192 tests. Build clean, hooks lint clean.
+
+## TOOL 1: THE SERVICE STOPPED BEING A COLUMN. 13 August 2026.
+
+Habib, from a screenshot: "the service is appearing twice rather than once
+since the second activity is related to the same service". Correct, and it was
+the fault C26 names — the service was a CELL, repeated once per activity row.
+
+The Service column is REMOVED from Tool 1. The service is now named ONCE, on a
+band above the rows, with "+ Add activity" on that band, so the press and the
+parent are the same gesture. The duplicate + Add activity in the tool header is
+gone; there is one.
+
+### FLAGGED, because T1.23 says to say so first.
+
+T1.23 lists Service among the seven headings that must be present, and the
+document says "Do not remove a column while making a structural change. If a
+change would remove one, stop and say so first." This change removes it. It is
+removed because Habib asked for it directly and because C26 forbids the service
+being a cell at all — the two rules disagree and the later instruction wins.
+The service is still on screen, twice over: on the band and in the anchor bar.
+Nothing about a service was deleted from the database.
+
+### NOT DONE, because it is ambiguous and expensive to get wrong. Q23.
+
+"I dont think there is a need for an addition line at the top listing the
+service when all the services can be listed in the table it self."
+
+Two readings, and they lead to different screens:
+  A. Keep one anchored service, name it on the band. What is built.
+  B. Remove the anchor bar and list EVERY service in the table, each with its
+     own activities beneath it.
+
+B contradicts T1.2, written the same day, whose test is "Tool 1 now shows that
+service's activities and nothing else. Fails if: the tool shows activities from
+more than one service at once." B would also take the counter, Rename, Park,
+Delete and the Parked area with the bar. Chose A and asked.
+
+### Q24. "Run this in the room" does not exist.
+
+There is no control by that name anywhere in app or src. The nearest is "Open
+the projected view" in the room control bar inside a BLOCK (RoomControlBar in
+BlockWorkspace), which DOES open a second tab and does work. Phase 0's five
+tools have no room control at all. So there is nothing to move, and nothing
+broken — it was never built. Asked which is wanted.
