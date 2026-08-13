@@ -26,30 +26,40 @@ Confirm what it serves before saying anything is live:
 
     curl -s <address>/api/build-info
 
-## 2. THE OPEN FAULT, 13 August 2026. Start here, fix nothing else first.
+## 2. THE OPEN FAULT, 13 August 2026. NOTHING FLOWS FROM PHONE TO BLOCK.
 
-THE PHONE AND THE BLOCK ARE IN DIFFERENT ROOMS.
+UPDATED after Habib rescanned the QR. THE EARLIER HYPOTHESIS IS DEAD. Do not
+spend time on it.
 
-Evidence, from Habib's own screen: the block's room bar reads "0 connected, 0
-devices in the room" while his phone is joined and displaying a question. The
-block has question 1 open; the phone shows question 4. Submitting does nothing,
-no pending row appears, the count stays 0.
+  BEFORE rescan: phone and block were in different rooms.
+  AFTER rescan:  phone and block ARE IN THE SAME ROOM, and STILL nothing.
+                 No count. Nothing he typed. No pending row. Nothing at all.
 
-This is ONE fault with many symptoms. Do not treat them as separate bugs.
+So this is NOT room addressing. The two screens agree on the room and data
+still does not move between them. The fault is in ONE of exactly three places,
+and the next session's whole job is to find out which, BEFORE writing any code:
 
-LEADING HYPOTHESIS, NOT YET PROVEN: the phone joined a QR or link generated for
-a different engagement (client_id) or a different session than the coach screen
-is on. Everything else follows from that.
+  A. THE WRITE. Does POST from /room actually insert a row into
+     gtcv_submissions? Check the browser network tab on the phone for the
+     submit request and its response status, and query gtcv_submissions for
+     rows with today's timestamp.
 
-HOW TO SETTLE IT, and do this BEFORE writing any code:
-  - Find which client_id the phone's link/token resolves to.
-  - Compare it with the client_id the coach dashboard has selected.
-  - Check gtcv_room_state: which row holds open_question_id, and for which
-    client_id and gate_id.
-  - Check gtcv_submissions for rows arriving under a client_id that is not the
-    one on screen.
+  B. THE READ. Does the block's feed query return those rows? The feed is
+     app/api/facilitate/route.ts GET. Check what it filters on — client_id,
+     gate_id, question_id, disposition — against what the write actually
+     stored. A mismatch on ANY one of those four returns an empty feed and
+     looks exactly like "nothing happened".
 
-If they differ, the fix is about how a room is addressed, not about the tools.
+  C. THE COUNT. "0 connected, 0 devices in the room" while a device is joined
+     means presence is written under a different key from the one being read.
+     That is the same class of bug as B and probably the same cause.
+
+MOST LIKELY, on the evidence: B or C — a key mismatch between what the room
+writes and what the block reads. The count reading 0 with a live device is the
+strongest clue and is the cheapest thing to chase first.
+
+DO NOT start by changing the tools, the questions, or the UI. The capture path
+is built. Something in the middle is not joining up.
 
 ## 3. WHAT IS ACTUALLY BUILT. Do not re-audit this.
 
