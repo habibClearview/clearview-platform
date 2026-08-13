@@ -1,3 +1,7 @@
+> READ START_HERE.md FIRST. It is one page. This file is 80KB of history
+> and reading it end to end has cost a week of tokens. START_HERE.md says
+> which sections of this file you actually need.
+
 # Progress
 
 ## Specification received so far
@@ -1897,3 +1901,43 @@ Tools 2 and 5 have NO questions at all.
 
 NOT BUILT, awaiting a decision. This needs a tool on the question, questions
 written for Tools 2, 3 and 5, and the room to run tool by tool in order.
+
+
+## THE OPEN FAULT, 13 August 2026. THE PHONE AND THE BLOCK ARE IN DIFFERENT ROOMS.
+
+From Habib's own screen: the block's room bar reads "0 connected, 0 devices in
+the room" WHILE his phone is joined and displaying a question. The block has
+question 1 open; the phone shows question 4. Submitting does nothing, no
+pending row appears, the count stays 0, and the service does not appear on
+either the projection or the phone.
+
+ONE FAULT, MANY SYMPTOMS. Do not treat them as separate bugs and do not start
+by changing the tools.
+
+LEADING HYPOTHESIS, NOT PROVEN: the phone joined a QR or link belonging to a
+different engagement (client_id) or session than the coach screen is on. Every
+symptom follows from that single mismatch.
+
+SETTLE IT BEFORE WRITING CODE:
+  - which client_id does the phone's token resolve to
+  - which client_id is selected on the coach dashboard
+  - gtcv_room_state: which row holds open_question_id, for which client_id and
+    gate_id
+  - gtcv_submissions: are rows arriving under a client_id not on screen
+
+## WHAT WAS DONE 13 August 2026, and what it did not fix
+
+  The facilitator view now opens in a SECOND TAB (window.open, not
+  window.location.href), so the block's controls stay reachable. Confirmed live
+  as c121ce1. Habib confirms the new tab opens and Reveal, Next question and
+  Open the projected view are all visible on the block. That part works.
+
+  It did NOT fix the room mismatch above, because that is a different fault.
+
+## Q26. The question dropdown should go.
+
+Habib, 13 August: "there should be no question dropdown, it should be that you
+click on next question, next question shows rather than go back to select the
+question." Not built. Small, but do NOT do it before the room mismatch is
+settled — it changes the control that is currently the only way to prove which
+question is open.
