@@ -54,9 +54,16 @@ import { BLOCKS_WITH_QUESTIONS, NO_QUESTIONS_YET } from '@/lib/stage1-question-s
 // ------------------------------------------------------------
 function RunThisWithTheRoom({ dpId, clientId }) {
   const has = BLOCKS_WITH_QUESTIONS.includes(dpId)
+  // A SECOND TAB, not this one. This used to replace the page, which took the
+  // room controls off screen the moment the projection opened — and the
+  // controls live HERE, on the block, not on the projection. The facilitator
+  // needs both at once: this tab to drive the room, that tab on the wall.
   const open = () => {
-    window.location.href =
-      `/coach/facilitate?clientId=${encodeURIComponent(clientId)}&gateId=${encodeURIComponent(dpId)}`
+    window.open(
+      `/coach/facilitate?clientId=${encodeURIComponent(clientId)}&gateId=${encodeURIComponent(dpId)}`,
+      '_blank',
+      'noopener',
+    )
   }
   const base = {
     fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',

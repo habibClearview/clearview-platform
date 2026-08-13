@@ -1865,3 +1865,35 @@ the projected view" in the room control bar inside a BLOCK (RoomControlBar in
 BlockWorkspace), which DOES open a second tab and does work. Phase 0's five
 tools have no room control at all. So there is nothing to move, and nothing
 broken — it was never built. Asked which is wanted.
+
+## THE FACILITATOR VIEW OPENS IN A SECOND TAB. 13 August 2026.
+
+It used to replace the current page. That took the room controls off screen the
+moment the projection opened, because THE CONTROLS LIVE ON THE BLOCK, not on
+the projection — C52 removed them from the projection deliberately and D15
+approved it. Replacing the page therefore left the facilitator with no way to
+open, reveal or advance a question. Now it opens a second tab and the block tab
+stays behind it, which is what D-C1 always assumed.
+
+## Q25. THE FIVE TOOLS EACH HAVE THEIR OWN QUESTIONS, AND THEY RUN IN ORDER.
+
+Habib, 13 August: "There are five tools in the Clear the Ground tab - each tool
+has its own questions ... These tools are sequential."
+
+WHAT IS BUILT DOES NOT KNOW THIS. gtcv_questions carries gate_id and
+sort_order and NO TOOL. The four phase_0 questions are one flat list for the
+whole block, and they happen to belong to different tools:
+
+  Q1 collect  activity, service, delivers, who pays   Tool 1
+  Q2 collect  assumption, what would prove it wrong   Tool 1
+  Q3 score    would anyone still pay                  Tool 3's kind of question
+  Q4 classify signal or story                         TOOL 4
+
+So opening "the first question" of the block can land the room in Tool 4, which
+is exactly what happened. Nothing is wrong with the dropdown; the model has no
+concept of a tool, so nothing orders or groups by one.
+
+Tools 2 and 5 have NO questions at all.
+
+NOT BUILT, awaiting a decision. This needs a tool on the question, questions
+written for Tools 2, 3 and 5, and the room to run tool by tool in order.
