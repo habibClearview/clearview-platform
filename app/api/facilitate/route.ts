@@ -43,10 +43,40 @@ const BLOCK_COLUMNS: Record<string, string[]> = {
   ],
 }
 
+/**
+ * THE CAP HAS TO BE ARITHMETIC, NOT A ROUND NUMBER. 13 August 2026.
+ *
+ * This route is POLLED, and 600 an hour was set as though it were pressed. The
+ * cost of getting that wrong was a whole session: the room answered, the rows
+ * landed in gtcv_submissions, and the block showed nothing, because every read
+ * after the budget ran out came back 429 and every poller discards a failed
+ * response in silence. Proved from the counter (965 against 600 in one hour)
+ * and from the request log (last read served 09:25:05, the phone submitted at
+ * 09:27:22 into a screen that had stopped asking).
+ *
+ * What one facilitator legitimately spends in an hour, at the intervals the
+ * components actually use:
+ *
+ *   RoomControlBar      every 1500ms   2,400
+ *   PendingRows         every 3000ms   1,200
+ *   the projected view  every 1500ms   2,400   (second tab, C46)
+ *                                      -----
+ *   one block open, projecting          6,000
+ *   a second block tab open            +3,600   9,600
+ *
+ * So anything at or below ten thousand is a cap on WORKING, not on abuse. This
+ * is set at double the two-tab figure: a runaway loop does hundreds a second
+ * and is still stopped, and a facilitator running a room all afternoon never
+ * comes near it.
+ *
+ * IF YOU CHANGE A POLL INTERVAL, COME BACK AND REDO THIS SUM.
+ */
+const FACILITATE_READS_PER_HOUR = 20000
+
 async function requireManager(req: NextRequest, admin: Admin, clientId: string) {
   return requireAccess(req, admin, clientId, 'manage', {
     deniedMessage: 'Only the lead consultant can run a question with the room',
-    rateLimit: { key: 'facilitate', max: 600, windowSeconds: 3600 },
+    rateLimit: { key: 'facilitate', max: FACILITATE_READS_PER_HOUR, windowSeconds: 3600 },
   })
 }
 
