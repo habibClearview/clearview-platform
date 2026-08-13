@@ -273,7 +273,26 @@ export default function RoomPage() {
   }, [mine, question, chosen])
 
   // ---- sending, and keeping trying -----------------------------------
-  const flush = useCallback(async () => {
+  //
+  // ONE FLUSH AT A TIME, AND WHY EVERY ANSWER WAS SAVED TWICE. 13 August 2026.
+  //
+  // send() queues the answer and flushes immediately. A timer also flushes every
+  // three seconds. Both read the queue, and the queue was only written back
+  // AFTER every request in the batch had finished — so a timer firing while the
+  // send's own flush was still waiting on the network read the same answer
+  // again and posted it a second time. Two identical rows, half a second apart.
+  // Every answer Habib's room gave on 13 August is in the database twice: the
+  // count read double and each answer needed accepting twice.
+  //
+  // The guard below is the fix. A flush that arrives while one is running does
+  // not run in parallel and is not dropped either: it sets a flag and the
+  // running flush goes round again, so an answer queued a millisecond ago is
+  // still sent at once. Nothing about R32 changes — storage first, sending
+  // second, and an answer that cannot go stays in the queue.
+  const flushing = useRef(false)
+  const flushAgain = useRef(false)
+
+  const flushOnce = useCallback(async () => {
     const items = readQueue()
     if (items.length === 0) { setQueued(0); return }
 
@@ -309,6 +328,19 @@ export default function RoomPage() {
     setQueued(left.length)
     if (left.length !== items.length) load()
   }, [load])
+
+  const flush = useCallback(async () => {
+    if (flushing.current) { flushAgain.current = true; return }
+    flushing.current = true
+    try {
+      do {
+        flushAgain.current = false
+        await flushOnce()
+      } while (flushAgain.current)
+    } finally {
+      flushing.current = false
+    }
+  }, [flushOnce])
 
   useEffect(() => {
     setQueued(readQueue().length)

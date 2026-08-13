@@ -20,7 +20,7 @@
 // ============================================================
 import { useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ACTIVITY_EVENTS, HEARTBEAT_MS, IDLE_MS, isIdle } from './session-guard'
+import { ACTIVITY_EVENTS, HEARTBEAT_MS, IDLE_MS, isIdle, screenRunsUnattended } from './session-guard'
 
 const LAST_ACTIVITY_KEY = 'cv:last-activity'
 
@@ -30,6 +30,10 @@ export function useSessionGuard(active: boolean) {
 
     let ended = false
     let timer: ReturnType<typeof setInterval> | null = null
+
+    // A screen meant to be left running does not time itself out. Read once,
+    // here, because this tab does not change what it is while it is open.
+    const unattended = screenRunsUnattended(window.location.pathname)
 
     function markActivity() {
       if (ended) return
@@ -60,8 +64,10 @@ export function useSessionGuard(active: boolean) {
 
     timer = setInterval(async () => {
       if (ended) return
-      // 1) Idle timeout, measured across ALL tabs.
-      if (isIdle(Date.now(), lastActivity(), IDLE_MS)) { endSession(); return }
+      // 1) Idle timeout, measured across ALL tabs. Skipped on a screen that is
+      //    meant to be left alone — see UNATTENDED_SCREENS for what that covers
+      //    and, just as importantly, what it does not.
+      if (!unattended && isIdle(Date.now(), lastActivity(), IDLE_MS)) { endSession(); return }
       // 2) Revocation check — only ends the session when it's genuinely gone
       //    (a merely-expired-but-refreshable token does NOT count).
       try {

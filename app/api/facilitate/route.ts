@@ -33,6 +33,28 @@ const BLOCK_TABLE: Record<string, string> = {
   dp01: 'gtcv_service_inventory',
 }
 
+/**
+ * WHICH COLUMN TIES A ROW TO THE ANCHORED SERVICE. 13 August 2026.
+ *
+ * Tool 1 shows the anchored service's activities and NOTHING ELSE: it filters on
+ * service_id (T1.2, PhaseZeroWorkspace). A row written without one is invisible
+ * there under every service — it is not lost, but it cannot be seen, which to
+ * the person who pressed the button is the same thing.
+ *
+ * Accept was writing exactly that row. It copied the question's target fields
+ * and nothing else, so every answer the room agreed would have landed outside
+ * the service the room was discussing. This is the SECOND time this exact
+ * mistake has been made here — see the comment on addActivity in
+ * PhaseZeroWorkspace, which fixed it for the manual button and left this path
+ * alone. Hence a named map rather than a line of code inside the handler.
+ *
+ * A table absent from this map takes no service link, and that is a correct
+ * answer for gtcv_service_inventory: it IS the list of services.
+ */
+const BLOCK_SERVICE_COLUMN: Record<string, string> = {
+  gtcv_assumptions: 'service_id',
+}
+
 /** The columns each of those tables will accept a value into. Named here so a
  *  column name arriving in a request can never reach the database unchecked. */
 const BLOCK_COLUMNS: Record<string, string[]> = {
@@ -572,7 +594,28 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'There is nothing in that answer to accept' }, { status: 400 })
         }
 
-        const { error: iErr } = await admin.from(table).insert({ client_id: clientId, ...values })
+        // The row belongs to the service the room was working inside when the
+        // answer was given. Taken from the room's own state, never from the
+        // request and never from the service NAME a participant typed: two
+        // people type "Workshop" and "Gender Workshop" for the same service, and
+        // a name cannot be matched to a row with any confidence. The anchor is
+        // the only thing that knows which service this actually was.
+        const serviceColumn = BLOCK_SERVICE_COLUMN[table]
+        const link: Record<string, unknown> = {}
+        if (serviceColumn) {
+          const { data: room } = await admin
+            .from('gtcv_room_state')
+            .select('current_service_id')
+            .eq('client_id', clientId)
+            .maybeSingle()
+          // Nothing anchored is left null rather than guessed at. The row is
+          // still written, so the answer is never thrown away, and it is
+          // reachable from the Parked area exactly as an unassigned row always
+          // has been.
+          if (room?.current_service_id) link[serviceColumn] = room.current_service_id
+        }
+
+        const { error: iErr } = await admin.from(table).insert({ client_id: clientId, ...values, ...link })
         if (iErr) {
           console.error('facilitate: accepting into the block table failed', iErr)
           return NextResponse.json({ error: 'Could not add that row' }, { status: 500 })
