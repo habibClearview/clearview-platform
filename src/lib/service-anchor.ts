@@ -127,6 +127,8 @@ export interface Service {
   service_name: string | null
   service_state: ServiceState | null
   decision: string | null
+  /** T1.6. A service can be parked now, and comes back with its activities. */
+  parked_at?: string | null
 }
 
 /**

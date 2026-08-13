@@ -1749,3 +1749,75 @@ deleted by me.
 Tests added assert the accounting directly: every problem is either drawn, or
 parked, or reachable by switching the anchor — exactly once.
 Full suite: 61 files, 1179 tests. Build compiles clean, hooks lint clean.
+
+# ============================================================
+# TOOL 1 SPECIFICATION T1.1 to T1.24. Received 12 August 2026.
+# It replaces everything previously written about Tool 1.
+# ============================================================
+
+THE REVERT WAS DROPPED. Habib: "I think we should build so we are moving
+forward." T1.7, T1.9 and T1.20 are kept — they were the three fixes the revert
+would have deleted and this specification requires all three.
+
+T1.4 REVERSES Q1. On 11 August the instruction was "do not build rename". T1.4
+requires it. Rename is now built. Recorded so the two do not look like a
+contradiction to a later reader.
+
+## THE PROGRESSION, in Habib's words, 12 August 2026
+
+  Tool 1  the services they have now (Gender, Nutrition), the several
+          activities delivered under each, the problems each activity solves,
+          and underneath each activity: who pays, what it delivers, the
+          assumption, what would disprove it — ANY of which may hold more than
+          one value.
+  Tool 2  introduces the columns ON THE PROBLEMS under the anchored service.
+  Tool 3  those become hypotheses, and on to the rest.
+
+Service is the anchor throughout and is never a cell in a row. This is the same
+principle already built for Tools 2 and 3; Tool 1 now obeys it too.
+
+## Built this round
+
+  T1.1  a service cannot be created without a name. The route refused nothing
+        before and wrote "New service"; it now refuses. "Unnamed service" is
+        gone from every screen.
+  T1.2  TOOL 1 NOW SHOWS THE ANCHORED SERVICE'S ACTIVITIES AND NOTHING ELSE.
+        It listed every activity on the engagement, which is T1.2's own failure
+        condition and is why switching service appeared to do nothing.
+  T1.4  rename, in place, beside the service name. Kept in step on every
+        activity of that service, because gtcv_assumptions.service_name is read
+        by screens that never learned about service_id.
+  T1.6  Park service and Delete service, both on the bar. Park takes its
+        activities with it and both come back through "Bring back" in the
+        Parked area. Delete asks using the word and says plainly that the
+        activities are NOT destroyed — they lose their service and are parked.
+  T1.21 who pays, what it delivers, the assumption underneath and what would
+        prove it wrong each hold SEVERAL values.
+  T1.22 removing one value leaves the others exactly as they were.
+  T1.23 the seven headings fit without sideways scrolling: Tool 1's table now
+        sets no minimum width and its headings wrap. NO COLUMN WAS RENAMED OR
+        REMOVED.
+
+### D-N4. A child table, not four array columns.
+
+gtcv_activity_values, one row per value. Each value carries its own identity, so
+"remove the second one" is never an index calculation against a list two people
+are editing at once — which is how the wrong value gets deleted in front of a
+room. T1.22 is exactly that test.
+
+### D-N5. The four original columns are kept and mirrored, not dropped.
+
+T1.23 forbids removing a column, and two other things already write to them:
+src/lib/stage1-question-sets.ts (the room's own questions) and
+app/api/facilitate/route.ts (its allowed-write list). So the FIRST value of each
+field is written back into the original column on every change. Anything reading
+gtcv_assumptions.who_pays keeps working. The migration also backfills what is
+already typed, so nothing entered so far is lost, and a field with no value rows
+falls back to its column — meaning Tool 1 works correctly BEFORE the migration
+is run as well as after.
+
+MIGRATION TO RUN: supabase/migrations/2026_08_12_t1_multi_value_and_service_park.sql
+Until it is run: multi-value and Park/Delete service do not work; everything
+else does, and nothing goes blank.
+
+Full suite after this round: 62 files, 1192 tests. Build clean, hooks lint clean.

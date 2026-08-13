@@ -50,10 +50,10 @@ export async function GET(req: NextRequest) {
     const auth = await requireManager(req, admin, clientId)
     if (!auth.ok) return refuseAccess(auth)
 
-    const [{ data: services }, { data: activities }, { data: problems }, { data: state }, sources] =
+    const [{ data: services }, { data: activities }, { data: problems }, { data: state }, sources, values] =
       await Promise.all([
         admin.from('gtcv_service_inventory')
-          .select('id, service_name, what_it_delivers, service_state, decision, sort_order')
+          .select('id, service_name, what_it_delivers, service_state, decision, sort_order, parked_at')
           .eq('client_id', clientId).order('sort_order', { ascending: true }),
         admin.from('gtcv_assumptions')
           .select('id, service_id, service_name, activity, delivers, who_pays, assumption, disproof, parked_at, decision, sort_order')
@@ -75,6 +75,14 @@ export async function GET(req: NextRequest) {
           .select('id, hypothesis_id, activity_id, problem_id')
           .eq('client_id', clientId)
           .then((r) => r, () => ({ data: [] as unknown[] })),
+        // T1.21. The several values each field holds. Degrades to empty until
+        // its migration has run, so Tool 1 falls back to the four columns and
+        // nothing on screen goes blank meanwhile.
+        admin.from('gtcv_activity_values')
+          .select('id, activity_id, field, value, sort_order')
+          .eq('client_id', clientId)
+          .order('sort_order', { ascending: true })
+          .then((r) => r, () => ({ data: [] as unknown[] })),
       ])
 
     return NextResponse.json({
@@ -82,6 +90,7 @@ export async function GET(req: NextRequest) {
       activities: activities || [],
       problems: problems || [],
       hypothesisSources: (sources as { data?: unknown[] })?.data || [],
+      activityValues: (values as { data?: unknown[] })?.data || [],
       currentServiceId: state?.current_service_id || null,
     })
   } catch (e) {
@@ -122,17 +131,99 @@ export async function POST(req: NextRequest) {
     }
 
     switch (body.action) {
-      // C8, C17. A service can be added at any time, and can start empty.
+      // C8, C17, T1.1. A service can be added at any time and can start empty
+      // of activities — but NEVER empty of a name. T1.1 fails if a service is
+      // created without one, so a blank name is refused here rather than
+      // quietly becoming "New service" and leaving a room with two of them.
       case 'addService': {
+        const name = (body.name || '').trim()
+        if (!name) return NextResponse.json({ error: 'Name the service before adding it' }, { status: 400 })
         const { data, error } = await admin.from('gtcv_service_inventory')
           .insert({
             client_id: clientId,
-            service_name: (body.name || '').trim() || 'New service',
+            service_name: name,
             service_state: SERVICE_STATES.includes(body.serviceState || '') ? body.serviceState : 'current',
           })
           .select('id').single()
         if (error) throw error
         return NextResponse.json({ ok: true, id: data.id })
+      }
+
+      // T1.4. Renaming a service, at any time after it is created.
+      //
+      // The name is kept in step on every activity of the service, because
+      // gtcv_assumptions.service_name is read by screens that never learned
+      // about service_id. Letting the two drift is how one service ends up
+      // reading under two names.
+      case 'renameService': {
+        const name = (body.name || '').trim()
+        if (!body.id || !(await owns('gtcv_service_inventory', body.id))) {
+          return NextResponse.json({ error: 'That service is not on this engagement' }, { status: 404 })
+        }
+        if (!name) return NextResponse.json({ error: 'A service has to have a name' }, { status: 400 })
+        const { error } = await admin.from('gtcv_service_inventory')
+          .update({ service_name: name, updated_at: new Date().toISOString() })
+          .eq('id', body.id).eq('client_id', clientId)
+        if (error) throw error
+        await admin.from('gtcv_assumptions')
+          .update({ service_name: name, updated_at: new Date().toISOString() })
+          .eq('service_id', body.id).eq('client_id', clientId)
+        return NextResponse.json({ ok: true })
+      }
+
+      // T1.6. Removing a SERVICE, which until now could not be removed at all.
+      //
+      // Park takes the service and everything in it out of the way, and both
+      // come back. Delete is behind the caller's confirmation and takes the
+      // service only: its activities are NOT destroyed, they lose their parent
+      // and land in the Parked area, because T1.6 fails if removing a service
+      // silently destroys its activities.
+      case 'removeService': {
+        if (!body.id || !(await owns('gtcv_service_inventory', body.id))) {
+          return NextResponse.json({ error: 'That service is not on this engagement' }, { status: 404 })
+        }
+        const action: RemovalAction = body.removal === 'delete' ? 'delete' : DEFAULT_REMOVAL
+        const stamp = new Date().toISOString()
+
+        if (action === 'delete') {
+          // service_id is ON DELETE SET NULL, so the activities survive with no
+          // parent. Parking them first is what puts them somewhere a person can
+          // find them rather than leaving them to be discovered.
+          await admin.from('gtcv_assumptions')
+            .update({ parked_at: stamp, service_id: null, updated_at: stamp })
+            .eq('service_id', body.id).eq('client_id', clientId)
+          const { error } = await admin.from('gtcv_service_inventory')
+            .delete().eq('id', body.id).eq('client_id', clientId)
+          if (error) throw error
+          return NextResponse.json({ ok: true, did: 'delete' })
+        }
+
+        // Park. The service is kept, and its activities go with it so the
+        // whole thing comes back together.
+        await admin.from('gtcv_assumptions')
+          .update({ parked_at: stamp, updated_at: stamp })
+          .eq('service_id', body.id).eq('client_id', clientId)
+        const { error } = await admin.from('gtcv_service_inventory')
+          .update({ parked_at: stamp, updated_at: stamp })
+          .eq('id', body.id).eq('client_id', clientId)
+        if (error) throw error
+        return NextResponse.json({ ok: true, did: 'park' })
+      }
+
+      // T1.13, T1.6. Bringing a parked service back, with its activities.
+      case 'unparkService': {
+        if (!body.id || !(await owns('gtcv_service_inventory', body.id))) {
+          return NextResponse.json({ error: 'That service is not on this engagement' }, { status: 404 })
+        }
+        const stamp = new Date().toISOString()
+        const { error } = await admin.from('gtcv_service_inventory')
+          .update({ parked_at: null, updated_at: stamp })
+          .eq('id', body.id).eq('client_id', clientId)
+        if (error) throw error
+        await admin.from('gtcv_assumptions')
+          .update({ parked_at: null, updated_at: stamp })
+          .eq('service_id', body.id).eq('client_id', clientId)
+        return NextResponse.json({ ok: true })
       }
 
       // C19. The state is changeable at any time, never fixed at creation.
@@ -443,6 +534,81 @@ export async function POST(req: NextRequest) {
           }
           if (!String(error.message || '').includes('duplicate')) throw error
         }
+        return NextResponse.json({ ok: true })
+      }
+
+      // T1.21, T1.22. THE FIELDS THAT HOLD MORE THAN ONE VALUE.
+      //
+      // Add, edit and remove one value at a time. Removing the second value
+      // leaves the first exactly as it was, which is T1.22's whole test, and is
+      // why each value is a row with its own identity rather than a position in
+      // a list two people might be editing at once.
+      case 'addActivityValue':
+      case 'editActivityValue':
+      case 'removeActivityValue': {
+        const VALUE_FIELDS = ['delivers', 'who_pays', 'assumption', 'disproof']
+
+        /**
+         * The first value goes back into the original column on
+         * gtcv_assumptions. The room's own questions and the facilitate route
+         * both write and read those columns, so they are kept truthful rather
+         * than left to rot behind the child table.
+         */
+        const mirrorFirst = async (activityId: string, field: string) => {
+          const { data } = await admin.from('gtcv_activity_values')
+            .select('value')
+            .eq('activity_id', activityId).eq('field', field)
+            .order('sort_order', { ascending: true })
+            .order('created_at', { ascending: true })
+            .limit(1)
+          await admin.from('gtcv_assumptions')
+            .update({ [field]: data?.[0]?.value ?? null, updated_at: new Date().toISOString() })
+            .eq('id', activityId).eq('client_id', clientId)
+        }
+
+        if (body.action === 'addActivityValue') {
+          if (!body.activityId || !(await owns('gtcv_assumptions', body.activityId))) {
+            return NextResponse.json({ error: 'That activity is not on this engagement' }, { status: 404 })
+          }
+          if (!VALUE_FIELDS.includes(body.field || '')) {
+            return NextResponse.json({ error: 'That is not a field that holds several values' }, { status: 400 })
+          }
+          const { count } = await admin.from('gtcv_activity_values')
+            .select('id', { count: 'exact', head: true })
+            .eq('activity_id', body.activityId).eq('field', body.field!)
+          const { data, error } = await admin.from('gtcv_activity_values')
+            .insert({
+              client_id: clientId,
+              activity_id: body.activityId,
+              field: body.field,
+              value: (body.value || '').slice(0, 4000) || null,
+              sort_order: count || 0,
+            })
+            .select('id').single()
+          if (error) throw error
+          await mirrorFirst(body.activityId, body.field!)
+          return NextResponse.json({ ok: true, id: data.id })
+        }
+
+        // Both of the remaining two are addressed by the VALUE's own id.
+        if (!body.id) return NextResponse.json({ error: 'Which value?' }, { status: 400 })
+        const { data: row } = await admin.from('gtcv_activity_values')
+          .select('id, client_id, activity_id, field').eq('id', body.id).maybeSingle()
+        if (!row || row.client_id !== clientId) {
+          return NextResponse.json({ error: 'That value is not on this engagement' }, { status: 404 })
+        }
+
+        if (body.action === 'removeActivityValue') {
+          const { error } = await admin.from('gtcv_activity_values')
+            .delete().eq('id', body.id).eq('client_id', clientId)
+          if (error) throw error
+        } else {
+          const { error } = await admin.from('gtcv_activity_values')
+            .update({ value: (body.value || '').slice(0, 4000) || null, updated_at: new Date().toISOString() })
+            .eq('id', body.id).eq('client_id', clientId)
+          if (error) throw error
+        }
+        await mirrorFirst(row.activity_id, row.field)
         return NextResponse.json({ ok: true })
       }
 

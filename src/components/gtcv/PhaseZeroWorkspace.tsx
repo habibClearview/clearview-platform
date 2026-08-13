@@ -51,6 +51,8 @@ import {
 } from '@/lib/phase-zero-hierarchy'
 // Part J, C64 to C66. Folding at three levels, remembered between tools.
 import { useCollapse } from '@/components/gtcv/useCollapse'
+// T1.21, T1.22. The four fields that hold more than one value.
+import { needsCarryAcross, valuesFor, VALUE_FIELDS } from '@/lib/activity-values'
 import { authedFetch } from '@/lib/authed-fetch'
 
 // ─── Shared style vocabulary (matches the coach dashboard) ───
@@ -75,9 +77,15 @@ const toolTitle = { fontFamily: 'Georgia,serif', fontSize: '1.12rem', fontWeight
 const purpose = { fontSize: '0.95rem', color: C.slate, lineHeight: 1.45, marginBottom: '0.9rem' }
 const tableWrap = { overflowX: 'auto' }
 const table = { width: '100%', borderCollapse: 'collapse', fontSize: '0.93rem', minWidth: 860 }
+// T1.23. The seven headings must be readable without scrolling sideways at a
+// normal screen width, so Tool 1's table sets no floor and lets its cells wrap.
+// Everything inside it is a box that wraps rather than a fixed-width control.
+const toolOneTable = { width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', tableLayout: 'fixed' }
 const th = { padding: '0.45rem 0.55rem', textAlign: 'left', fontFamily: 'monospace', fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
+/** T1.23. A heading that may wrap rather than force the table wider. */
+const thWrap = { ...th, whiteSpace: 'normal' }
 const td = { padding: '0.4rem 0.4rem', verticalAlign: 'top', borderBottom: `1px solid ${C.borderSoft}` }
-const cellInput = { width: '100%', minWidth: 120, padding: '0.4rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '0.93rem', fontFamily: 'inherit', background: C.bg2, color: C.navy, boxSizing: 'border-box', resize: 'vertical' }
+const cellInput = { width: '100%', minWidth: 0, padding: '0.4rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '0.93rem', fontFamily: 'inherit', background: C.bg2, color: C.navy, boxSizing: 'border-box', resize: 'vertical' }
 const roInput = { ...cellInput, background: C.disabled, cursor: 'default' }
 const selectStyle = { ...cellInput, minWidth: 108 }
 const addButton = { fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: 700, border: 'none', borderRadius: 6, background: 'var(--cv-cyan)', color: 'var(--cv-on-accent)', padding: '0.4rem 0.9rem', cursor: 'pointer' }
@@ -153,6 +161,92 @@ function TextCell({ value, onCommit, canManage, placeholder, rows = 2, ariaLabel
       onChange={(e) => setLocal(e.target.value)}
       onBlur={() => { if ((value ?? '') !== local) onCommit(local) }}
     />
+  )
+}
+
+/**
+ * A FIELD THAT HOLDS MORE THAN ONE VALUE  (T1.21, T1.22)
+ *
+ * A room has two funders for one activity, or three assumptions underneath it.
+ * Each value is its own row with its own identity, so removing the second
+ * leaves the first exactly as it was — which is what T1.22 tests, and why this
+ * is not one box with commas in it.
+ *
+ * Before the migration has run there are no value rows and the original column
+ * still holds what was typed, so that stands in and the first edit carries it
+ * across. Nothing on screen goes blank waiting for a migration.
+ */
+function MultiValueCell({ activity, field, values, canManage, onAction, placeholder }) {
+  const shown = valuesFor(activity, field, values)
+  const carry = needsCarryAcross(activity, field, values)
+
+  if (!canManage) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {shown.length === 0
+          ? <span style={{ color: C.faint, fontSize: '0.88rem' }}>Not filled in</span>
+          : shown.map((v, i) => <span key={v.id || i} style={{ fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>{v.value}</span>)}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {shown.map((v, i) => (
+        <ValueLine
+          key={v.id || `legacy-${i}`}
+          value={v.value}
+          placeholder={placeholder}
+          onCommit={(text) => {
+            // A legacy value has no row yet. Editing it creates one, which also
+            // mirrors the text back into the original column.
+            if (v.id) onAction({ action: 'editActivityValue', id: v.id, value: text })
+            else onAction({ action: 'addActivityValue', activityId: activity.id, field, value: text })
+          }}
+          onRemove={() => {
+            if (v.id) onAction({ action: 'removeActivityValue', id: v.id })
+            else onAction({ action: 'edit', activityId: activity.id, field, value: '' })
+          }}
+        />
+      ))}
+      <button
+        type="button"
+        onClick={async () => {
+          // Carry the column across first, or the answer already there would sit
+          // under a new empty box and be overwritten by the mirror-back.
+          if (carry) await onAction({ action: 'addActivityValue', activityId: activity.id, field, value: activity[field] })
+          await onAction({ action: 'addActivityValue', activityId: activity.id, field, value: '' })
+        }}
+        style={{ ...mono, fontSize: '0.7rem', color: C.slate, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', alignSelf: 'flex-start' }}
+      >
+        {shown.length === 0 ? '+ add' : '+ another'}
+      </button>
+    </div>
+  )
+}
+
+/** One value of one field. Committed on leaving the box, like every other cell. */
+function ValueLine({ value, placeholder, onCommit, onRemove }) {
+  const [text, setText] = useState(value)
+  useEffect(() => { setText(value) }, [value])
+  return (
+    <span style={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
+      <textarea
+        aria-label={placeholder}
+        style={{ ...cellInput, minWidth: 90, minHeight: 30 }}
+        rows={1}
+        placeholder={placeholder}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => { if (text !== value) onCommit(text) }}
+      />
+      <button
+        type="button"
+        onClick={onRemove}
+        title="Remove this value. The others are not touched."
+        style={{ ...mono, fontSize: '0.7rem', color: C.slate, background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px 3px' }}
+      >×</button>
+    </span>
   )
 }
 
@@ -233,7 +327,7 @@ function ServiceFrame({ service, summary, collapsed, onToggle, right, children }
           <Chevron open={!collapsed} />
           <span style={{ ...mono, fontSize: '0.7rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>Service</span>
           <span style={{ fontFamily: 'Georgia,serif', fontSize: '1.05rem', fontWeight: 700, color: C.navy }}>
-            {service?.service_name || 'Unnamed service'}
+            {service?.service_name}
           </span>
         </button>
         <span style={{ ...mono, fontSize: '0.78rem', color: C.slate }}>{summary}</span>
@@ -502,13 +596,13 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
   const reload = useCallback(() => setRefreshKey((n) => n + 1), [])
   // C25 to C27. ONE set of problem rows, read here and given to both tools, so
   // Tool 1 and Tool 2 cannot disagree about what a problem says.
-  const [anchor, setAnchor] = useState({ services: [], activities: [], problems: [], hypothesisSources: [], currentServiceId: null })
+  const [anchor, setAnchor] = useState({ services: [], activities: [], problems: [], hypothesisSources: [], activityValues: [], currentServiceId: null })
   useEffect(() => {
     if (!clientId) return
     let cancelled = false
     const read = () => authedFetch(`/api/services?clientId=${encodeURIComponent(clientId)}`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { if (!cancelled && j) setAnchor({ services: j.services || [], activities: j.activities || [], problems: j.problems || [], hypothesisSources: j.hypothesisSources || [], currentServiceId: j.currentServiceId || null }) })
+      .then((j) => { if (!cancelled && j) setAnchor({ services: j.services || [], activities: j.activities || [], problems: j.problems || [], hypothesisSources: j.hypothesisSources || [], activityValues: j.activityValues || [], currentServiceId: j.currentServiceId || null }) })
       .catch(() => {})
     read()
     const t = setInterval(read, 4000)
@@ -695,6 +789,18 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     [anchor.problems, anchor.activities],
   )
 
+  /**
+   * T1.2. Tool 1 shows the ANCHORED service's activities and nothing else.
+   * It used to list every activity on the engagement, which is T1.2's own
+   * failure condition and is why switching service changed nothing on screen.
+   */
+  const activitiesOfAnchored = useMemo(
+    () => (anchoredService
+      ? assumptions.filter((a) => a.service_id === anchoredService.id && !a.parked_at)
+      : []),
+    [assumptions, anchoredService],
+  )
+
   /** Writing to a problem in the Parked area, and re-reading so it moves at once. */
   const updParkedProblem = useCallback(async (id, patch) => {
     setOwners((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
@@ -849,7 +955,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             their identity and their problems: this is a change of parent,
             never a copy, because a copy would leave the room looking at the
             same activity twice with no way to say which one was real. */}
-        {editable && assumptions.length > 0 ? (
+        {editable && activitiesOfAnchored.length > 0 ? (
           <div style={{
             border: `1px solid ${selectedForService.size > 0 ? C.teal : C.borderSoft}`,
             background: selectedForService.size > 0 ? C.tintCyan : C.alt,
@@ -901,28 +1007,32 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
           </div>
         ) : null}
 
-        {assumptions.length === 0 ? (
-          <div style={emptyNote}>No activities listed yet.</div>
+        {!anchoredService ? (
+          <div style={emptyNote}>
+            No service chosen. Add one in the bar above, or choose one, and its activities appear here.
+          </div>
+        ) : activitiesOfAnchored.length === 0 ? (
+          <div style={emptyNote}>No activities under this service yet. Press &quot;+ Add activity&quot;.</div>
         ) : (
           <div style={tableWrap}>
-            <table style={table}>
+            <table style={toolOneTable}>
               <thead>
                 <tr>
-                  {editable && <th style={{ ...th, width: 34 }} aria-label="Choose for a new service" />}
-                  <th style={{ ...th, width: '14%' }}>Service</th>
-                  <th style={{ ...th, width: '16%' }}>Activity</th>
-                  <th style={{ ...th, width: '16%' }}>What it delivers</th>
+                  {editable && <th style={{ ...thWrap, width: 34 }} aria-label="Choose for a new service" />}
+                  <th style={{ ...thWrap, width: '14%' }}>Service</th>
+                  <th style={{ ...thWrap, width: '16%' }}>Activity</th>
+                  <th style={{ ...thWrap, width: '15%' }}>What it delivers</th>
                   {/* C20. ADDED beside it, never instead of it. Two different
                       questions: what the buyer receives, and what it is for. */}
-                  <th style={{ ...th, width: '16%' }}>Problem it solves</th>
-                  <th style={{ ...th, width: '13%' }}>Who pays</th>
-                  <th style={{ ...th, width: '20%' }}>Assumption underneath</th>
-                  <th style={{ ...th, width: '21%' }}>What would prove it wrong</th>
-                  {editable && <th style={{ ...th, width: 40 }} />}
+                  <th style={{ ...thWrap, width: '16%' }}>Problem it solves</th>
+                  <th style={{ ...thWrap, width: '13%' }}>Who pays</th>
+                  <th style={{ ...thWrap, width: '17%' }}>Assumption underneath</th>
+                  <th style={{ ...thWrap, width: '17%' }}>What would prove it wrong</th>
+                  {editable && <th style={{ ...thWrap, width: 40 }} />}
                 </tr>
               </thead>
               <tbody>
-                {assumptions.map((r) => (
+                {activitiesOfAnchored.map((r) => (
                   <tr key={r.id} style={selectedForService.has(r.id) ? { background: C.tintCyan } : undefined}>
                     {editable && (
                       <td style={td}>
@@ -951,7 +1061,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                         >
                           {!r.service_id && <option value="">Not in a service</option>}
                           {anchor.services.map((s) => (
-                            <option key={s.id} value={s.id}>{s.service_name || 'Unnamed service'}</option>
+                            <option key={s.id} value={s.id}>{s.service_name}</option>
                           ))}
                         </select>
                       ) : (
@@ -962,7 +1072,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                       )}
                     </td>
                     <td style={td}><TextCell value={r.activity} canManage={editable} placeholder="The activity" onCommit={(v) => updAssumption(r.id, { activity: v })} /></td>
-                    <td style={td}><TextCell value={r.delivers} canManage={editable} placeholder="What it actually delivers" onCommit={(v) => updAssumption(r.id, { delivers: v })} /></td>
+                    <td style={td}><MultiValueCell activity={r} field="delivers" values={anchor.activityValues} canManage={editable} onAction={hierarchyAction} placeholder="What it actually delivers" /></td>
                     <td style={td}>
                       <ProblemsCell
                         clientId={clientId}
@@ -972,9 +1082,9 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                         onChanged={reload}
                       />
                     </td>
-                    <td style={td}><TextCell value={r.who_pays} canManage={editable} placeholder="Who pays for it now" onCommit={(v) => updAssumption(r.id, { who_pays: v })} /></td>
-                    <td style={td}><TextCell value={r.assumption} canManage={editable} placeholder="What has to be true" onCommit={(v) => updAssumption(r.id, { assumption: v })} /></td>
-                    <td style={td}><TextCell value={r.disproof} canManage={editable} placeholder="Evidence that would kill it" onCommit={(v) => updAssumption(r.id, { disproof: v })} /></td>
+                    <td style={td}><MultiValueCell activity={r} field="who_pays" values={anchor.activityValues} canManage={editable} onAction={hierarchyAction} placeholder="Who pays for it now" /></td>
+                    <td style={td}><MultiValueCell activity={r} field="assumption" values={anchor.activityValues} canManage={editable} onAction={hierarchyAction} placeholder="What has to be true" /></td>
+                    <td style={td}><MultiValueCell activity={r} field="disproof" values={anchor.activityValues} canManage={editable} onAction={hierarchyAction} placeholder="Evidence that would kill it" /></td>
                     {editable && (
                       <td style={td}>
                         {/* C12 to C16. Was one button marked Delete, which

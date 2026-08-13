@@ -50,6 +50,9 @@ export default function ServiceAnchorBar({
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
   const [showParked, setShowParked] = useState(false)
+  // T1.4. Renaming the anchored service, in place.
+  const [renaming, setRenaming] = useState(false)
+  const [renameTo, setRenameTo] = useState('')
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
@@ -94,12 +97,17 @@ export default function ServiceAnchorBar({
   // C5. The selection the whole block follows. Where nothing has been chosen,
   // the first service stands in, so the tools below are never anchored to
   // nothing on a block that plainly has services.
+  // T1.6. A parked service is not one the room is working on, so it is not
+  // offered as the anchor. It stays in the Parked area until it is brought back.
+  const live = useMemo(() => services.filter((s) => !s.parked_at), [services])
   const current = useMemo(
-    () => services.find((s) => s.id === currentId) || services[0] || null,
-    [services, currentId],
+    () => live.find((s) => s.id === currentId) || live[0] || null,
+    [live, currentId],
   )
 
   const parked = useMemo(() => parkedActivities(activities), [activities])
+  // T1.6. Parked services, recoverable with everything in them.
+  const parkedServices = useMemo(() => services.filter((s) => s.parked_at), [services])
   const counter = useMemo(
     () => (current ? counterForService(current.id, activities, problems)
       : { startedWith: 0, noProblemStated: 0, killed: 0, paused: 0, carriedForward: 0 }),
@@ -122,7 +130,7 @@ export default function ServiceAnchorBar({
           ...mono, fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate,
         }}>Service</span>
 
-        {services.length === 0 ? (
+        {live.length === 0 ? (
           <span style={{ fontSize: 15, color: C.slate }}>
             No service yet. Add one, and the five tools below will work inside it.
           </span>
@@ -140,10 +148,85 @@ export default function ServiceAnchorBar({
                 background: C.card, maxWidth: '26rem',
               }}
             >
-              {services.map((s) => (
-                <option key={s.id} value={s.id}>{s.service_name || 'Unnamed service'}</option>
+              {live.map((s) => (
+                <option key={s.id} value={s.id}>{s.service_name}</option>
               ))}
             </select>
+
+            {/* T1.4. RENAMING, which could not be done at all before: a service
+                was named once at creation and stuck with it. */}
+            {canManage && current ? (
+              renaming ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    const name = renameTo.trim()
+                    if (!name) return
+                    act({ action: 'renameService', id: current.id, name })
+                    setRenaming(false)
+                  }}
+                  style={{ display: 'inline-flex', gap: 6 }}
+                >
+                  <input
+                    value={renameTo}
+                    onChange={(e) => setRenameTo(e.target.value)}
+                    aria-label="New name for this service"
+                    autoFocus
+                    onBlur={() => {
+                      const name = renameTo.trim()
+                      // A blank name is refused, never saved. T1.1's rule holds
+                      // after creation as much as at it.
+                      if (name && name !== current.service_name) act({ action: 'renameService', id: current.id, name })
+                      setRenaming(false)
+                    }}
+                    style={{
+                      fontSize: 15, padding: '4px 8px', borderRadius: 8,
+                      border: `1px solid ${C.border}`, background: C.card, color: C.navy,
+                    }}
+                  />
+                  <button type="submit" disabled={busy || !renameTo.trim()} style={pill(C.teal, true)}>Save</button>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setRenameTo(current.service_name || ''); setRenaming(true) }}
+                  style={pill(C.slate, false)}
+                >
+                  Rename
+                </button>
+              )
+            ) : null}
+
+            {/* T1.6. REMOVING A SERVICE, which was not possible at all. Park is
+                the press that needs no thought and keeps everything; Delete asks
+                first, using the word, and never destroys the activities. */}
+            {canManage && current && !renaming ? (
+              <>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => act({ action: 'removeService', id: current.id, removal: 'park' })}
+                  title="Park this service. It and its activities move to the Parked area and come back complete."
+                  style={pill(C.amber, false)}
+                >
+                  Park service
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    // C13. The question uses the word, and says what survives.
+                    const ok = window.confirm(
+                      `Delete ${current.service_name}? This leaves nothing behind and cannot be undone. Its activities are not destroyed: they lose their service and move to the Parked area.`,
+                    )
+                    if (ok) act({ action: 'removeService', id: current.id, removal: 'delete' })
+                  }}
+                  style={pill('#C0392B', false)}
+                >
+                  Delete service
+                </button>
+              </>
+            ) : null}
 
             {/* C19. Changeable at any time, never fixed at creation. */}
             <select
@@ -183,7 +266,7 @@ export default function ServiceAnchorBar({
                   border: `1px solid ${C.border}`, background: C.card, color: C.navy,
                 }}
               />
-              <button type="submit" disabled={busy} style={pill(C.teal, true)}>Add</button>
+              <button type="submit" disabled={busy || !newName.trim()} style={pill(C.teal, true)}>Add</button>
               <button type="button" onClick={() => setAdding(false)} style={pill(C.slate, false)}>Cancel</button>
             </form>
           ) : (
@@ -210,7 +293,7 @@ export default function ServiceAnchorBar({
       {/* C7. The bucket is visible as its own area, not hidden somewhere else.
           It appears only when it holds something, because an empty bucket on
           every block is noise. */}
-      {parked.length > 0 ? (
+      {parked.length > 0 || parkedServices.length > 0 ? (
         <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
           <button
             type="button"
@@ -220,10 +303,28 @@ export default function ServiceAnchorBar({
               border: 'none', padding: 0, cursor: 'pointer',
             }}
           >
-            {showParked ? '▾' : '▸'} Parked — {parked.length} not in any service
+            {showParked ? '▾' : '▸'} Parked — {parkedServices.length > 0 ? `${parkedServices.length} service${parkedServices.length === 1 ? '' : 's'}, ` : ''}{parked.length} not in any service
           </button>
           {showParked ? (
             <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {/* T1.6. A parked service comes back complete, with its
+                  activities, which were parked with it. */}
+              {parkedServices.map((s) => (
+                <div key={s.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ ...mono, fontSize: 10.5, letterSpacing: '.08em', textTransform: 'uppercase', color: C.slate }}>Service</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: C.navy }}>{s.service_name}</span>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => act({ action: 'unparkService', id: s.id })}
+                      style={pill(C.teal, false)}
+                    >
+                      Bring back
+                    </button>
+                  ) : null}
+                </div>
+              ))}
               {parked.map((a) => (
                 <div key={a.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 14, color: C.navy }}>{a.activity || 'Unnamed activity'}</span>
@@ -232,7 +333,7 @@ export default function ServiceAnchorBar({
                   C15. Pulled into any service, including one made after it
                       was parked. It arrives complete, because its problems hang
                       off it and were never separated from it. */}
-                  {canManage && services.length > 0 ? (
+                  {canManage && live.length > 0 ? (
                     <select
                       value=""
                       disabled={busy}
@@ -241,7 +342,7 @@ export default function ServiceAnchorBar({
                       style={{ ...mono, fontSize: 11.5, padding: '2px 6px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.card }}
                     >
                       <option value="">Pull into a service...</option>
-                      {services.map((s) => <option key={s.id} value={s.id}>{s.service_name || 'Unnamed service'}</option>)}
+                      {live.map((s) => <option key={s.id} value={s.id}>{s.service_name}</option>)}
                     </select>
                   ) : null}
                 </div>
