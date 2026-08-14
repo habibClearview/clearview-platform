@@ -38,6 +38,9 @@ import RowActions from '@/components/gtcv/RowActions'
 // C20, C21, C22, C25, C27. The problem column, which is not a column of text
 // but a view onto Tool 2's own rows.
 import ProblemsCell from '@/components/gtcv/ProblemsCell'
+// R20. Drawn inside Tool 1, under the table the answers become rows of. See the
+// comment at the bottom of Tool 1 for why it is not left to BlockWorkspace.
+import PendingRows from '@/components/gtcv/PendingRows'
 // C26 as replaced. The hierarchy the tools draw, and C28 as amended, which
 // decides what is shown and what is parked rather than what is hidden.
 import {
@@ -1107,6 +1110,29 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
           )}
           </>
         )}
+        {/* ─────────────────────────────────────────────────────────
+            WHAT THE ROOM SENT, DIRECTLY UNDER THE TABLE IT GOES INTO.
+            14 August 2026.
+
+            R20 requires pending answers beneath the block's own table and says
+            in terms that it FAILS if they land in a separate list somewhere
+            else. They were rendered by BlockWorkspace after this whole
+            component — and this component is all five tools, roughly five
+            hundred lines of interface. So the answers, and the Accept button
+            with them, sat at the very bottom of the page, below Tool 5, four
+            tools away from the table they belong to.
+
+            Habib reported it as "there is no accept button anywhere". From
+            where he was working there was not one.
+
+            It belongs here: immediately under Tool 1's table, which is the
+            table every collect answer in this block writes into — the activity
+            and what it delivers, and the assumption and what would disprove
+            it, are all columns of the rows above.
+            ───────────────────────────────────────────────────────── */}
+        <div style={{ marginTop: 12 }}>
+          <PendingRows clientId={clientId} dpId="phase_0" canManage={editable} />
+        </div>
       </Section>
 
       {/* ─── TOOL 2: Problem Owner Budget Matrix ────────────── */}

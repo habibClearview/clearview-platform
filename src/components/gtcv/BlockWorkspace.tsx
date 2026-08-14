@@ -216,6 +216,21 @@ export function hasWorkspace(dpId) {
   return Boolean(dpId)
 }
 
+/**
+ * BLOCKS THAT DRAW THE ROOM'S PENDING ANSWERS THEMSELVES. 14 August 2026.
+ *
+ * Below, pending answers are drawn after the block's first surface. That is
+ * right for a surface which IS one table, and wrong for phase_0, whose single
+ * surface is all five tools — some five hundred lines of interface — so "after
+ * it" put the answers and the Accept button at the very bottom of the page,
+ * four tools below the table they belong to. R20 fails on exactly that: it
+ * requires them beneath the block's own table and not in a list somewhere else.
+ *
+ * PhaseZeroWorkspace now draws them itself, directly under Tool 1's table. This
+ * list stops a second copy appearing at the foot of the page.
+ */
+const BLOCKS_PLACING_PENDING_THEMSELVES = ['phase_0']
+
 /** True when the block has working tables of its own beyond evidence and sign off. */
 export function hasOwnTables(dpId) {
   return Array.isArray(BLOCK_SURFACES[dpId]) && BLOCK_SURFACES[dpId].length > 0
@@ -279,7 +294,7 @@ export default function BlockWorkspace({ dpId, clientId, canManage, currency }) 
               bottom of that table rather than as a separate list somewhere
               else on the page. It draws nothing at all where there is nothing
               pending and nothing agreed. */}
-          {key === own[0]?.key ? (
+          {key === own[0]?.key && !BLOCKS_PLACING_PENDING_THEMSELVES.includes(dpId) ? (
             <div style={{ marginTop: 12 }}>
               {/* C50. Above the pending rows and below the table, so the table
                   is never hidden or frozen while a question runs. */}

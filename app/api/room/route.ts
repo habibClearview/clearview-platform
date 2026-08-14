@@ -360,7 +360,28 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      const identity = newIdentity(link.clientId)
+      // RESCANNING THE QR MUST NOT MAKE YOU A STRANGER. 14 August 2026.
+      //
+      // This minted a brand new identity every time, so every scan of the same
+      // code wiped the name the person had already given and handed the device a
+      // new participant identifier. Habib reported having to "sign in" on the
+      // phone every single time he opened the participant view: that is what he
+      // was seeing — not a login, but C33's name box asked again because the
+      // device had been made anonymous a moment earlier.
+      //
+      // It also cost more than typing. R10 keeps a person's answers together and
+      // R11 lets them change their own; both key off the participant identifier.
+      // A new one on every scan orphans everything they said before it, so the
+      // room's own count of who has answered drifts upward as people rescan.
+      //
+      // So: a device that already holds a cookie FOR THIS SAME ENGAGEMENT keeps
+      // who it is. A cookie for a different engagement is replaced, because that
+      // is a different room and carrying a name across would be wrong. An
+      // unreadable or absent cookie mints a new identity exactly as before.
+      const held = decodeIdentity(req.cookies.get(ROOM_COOKIE)?.value)
+      const identity = held && held.clientId === link.clientId
+        ? held
+        : newIdentity(link.clientId)
       const res = NextResponse.json({ joined: true })
       res.cookies.set(ROOM_COOKIE, encodeIdentity(identity), {
         httpOnly: true,
