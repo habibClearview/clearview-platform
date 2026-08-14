@@ -55,12 +55,26 @@ export async function GET(req: NextRequest) {
         admin.from('gtcv_service_inventory')
           .select('id, service_name, what_it_delivers, service_state, decision, sort_order, parked_at')
           .eq('client_id', clientId).order('sort_order', { ascending: true }),
+        // problem_id is the problem this activity solves. Same fallback as the
+        // problems read below, for the same reason.
         admin.from('gtcv_assumptions')
-          .select('id, service_id, service_name, activity, delivers, who_pays, assumption, disproof, parked_at, decision, sort_order')
-          .eq('client_id', clientId).order('sort_order', { ascending: true }),
+          .select('id, service_id, problem_id, service_name, activity, delivers, who_pays, assumption, disproof, parked_at, decision, sort_order')
+          .eq('client_id', clientId).order('sort_order', { ascending: true })
+          .then((r) => (r.error ? admin.from('gtcv_assumptions')
+            .select('id, service_id, service_name, activity, delivers, who_pays, assumption, disproof, parked_at, decision, sort_order')
+            .eq('client_id', clientId).order('sort_order', { ascending: true }) : r)),
+        // service_id is what Tool 1 and Tool 2 now group by: the problem
+        // belongs to the SERVICE. activity_id is still read because it is
+        // still there and nothing has been dropped. Until the 14 August
+        // migration has run this read fails on the unknown column, and a
+        // failure here must not take the block down — so it falls back to the
+        // old shape and Tool 1 keeps drawing.
         admin.from('gtcv_problem_owner_budget')
-          .select('id, activity_id, problem, experienced_by, accountable, budget_holder, cost_of_not_solving, budget_mechanism, parked_at, decision, sort_order')
-          .eq('client_id', clientId).order('sort_order', { ascending: true }),
+          .select('id, service_id, activity_id, problem, experienced_by, accountable, budget_holder, cost_of_not_solving, budget_mechanism, parked_at, decision, sort_order')
+          .eq('client_id', clientId).order('sort_order', { ascending: true })
+          .then((r) => (r.error ? admin.from('gtcv_problem_owner_budget')
+            .select('id, activity_id, problem, experienced_by, accountable, budget_holder, cost_of_not_solving, budget_mechanism, parked_at, decision, sort_order')
+            .eq('client_id', clientId).order('sort_order', { ascending: true }) : r)),
         admin.from('gtcv_room_state').select('current_service_id')
           .eq('client_id', clientId).maybeSingle(),
         // C26 as replaced. What each hypothesis is built from. Read in the same
@@ -271,34 +285,77 @@ export async function POST(req: NextRequest) {
         }
         const { data: svc } = await admin.from('gtcv_service_inventory')
           .select('service_name').eq('id', body.serviceId!).maybeSingle()
+        // 14 AUGUST. THE ACTIVITY SOLVES A PROBLEM. Where the caller says which
+        // problem, the activity is filed under it; the service is still held
+        // too, so a service's whole list can be read without walking problems.
+        // An activity with no problem named is a legitimate state — it is what
+        // Tool 1 shows as not yet attached to a problem — so this is not
+        // refused, only recorded when it is known.
+        if (body.problemId && !(await owns('gtcv_problem_owner_budget', body.problemId))) {
+          return NextResponse.json({ error: 'That problem is not on this engagement' }, { status: 404 })
+        }
+        const activityRow: Record<string, unknown> = {
+          client_id: clientId,
+          service_id: body.serviceId,
+          // The text name is kept in step because it already exists and other
+          // screens read it. Both are held: the text is what the room said,
+          // the reference is what it was reconciled to.
+          service_name: svc?.service_name || null,
+          activity: (body.name || '').trim() || null,
+        }
+        if (body.problemId) activityRow.problem_id = body.problemId
+
         const { data, error } = await admin.from('gtcv_assumptions')
-          .insert({
-            client_id: clientId,
-            service_id: body.serviceId,
-            // The text name is kept in step because it already exists and other
-            // screens read it. Both are held: the text is what the room said,
-            // the reference is what it was reconciled to.
-            service_name: svc?.service_name || null,
-            activity: (body.name || '').trim() || null,
-          })
+          .insert(activityRow)
           .select('id').single()
         if (error) throw error
         return NextResponse.json({ ok: true, id: data.id })
       }
 
-      // C10, C21, C25. A problem, belonging to an activity. Stating it here IS
-      // stating it in Tool 2: one row, read by both tools, never two copies.
+      // C10, C21, C25. A problem, and stating it here IS stating it in Tool 2:
+      // one row, read by both tools, never two copies.
+      //
+      // 14 AUGUST. A PROBLEM BELONGS TO THE SERVICE, not to an activity. The
+      // session works through what problem each service solves and only then
+      // the activity that solves it, so a problem has to be statable before any
+      // activity exists. Passing serviceId is the way to do that.
+      //
+      // activityId is still accepted, because Tool 1 can also state a problem
+      // from a row it is already looking at, and because every existing caller
+      // sends it. Where both arrive the service is what the problem is filed
+      // under and the activity is recorded as the row it was stated from.
       case 'addProblem': {
-        if (!body.activityId || !(await owns('gtcv_assumptions', body.activityId))) {
+        if (body.activityId && !(await owns('gtcv_assumptions', body.activityId))) {
           return NextResponse.json({ error: 'That activity is not on this engagement' }, { status: 404 })
         }
+        if (body.serviceId && !(await owns('gtcv_service_inventory', body.serviceId))) {
+          return NextResponse.json({ error: 'That service is not on this engagement' }, { status: 404 })
+        }
+        if (!body.activityId && !body.serviceId) {
+          return NextResponse.json(
+            { error: 'A problem belongs to a service. Choose the service first.' },
+            { status: 400 },
+          )
+        }
+
+        // Where only the activity is known, the service is taken from it, so a
+        // problem stated the old way still lands under the right service.
+        let serviceId = body.serviceId || null
+        if (!serviceId && body.activityId) {
+          const { data: act } = await admin.from('gtcv_assumptions')
+            .select('service_id').eq('id', body.activityId).eq('client_id', clientId).maybeSingle()
+          serviceId = act?.service_id || null
+        }
+
+        const row: Record<string, unknown> = {
+          client_id: clientId,
+          problem: (body.name || '').trim() || null,
+        }
+        if (body.activityId) row.activity_id = body.activityId
+        if (serviceId) row.service_id = serviceId
+
         const { data, error } = await admin.from('gtcv_problem_owner_budget')
-          .insert({
-            client_id: clientId,
-            activity_id: body.activityId,
-            problem: (body.name || '').trim() || null,
-          })
-          .select('id').single()
+          .insert(row).select('id').single()
         if (error) throw error
         return NextResponse.json({ ok: true, id: data.id })
       }

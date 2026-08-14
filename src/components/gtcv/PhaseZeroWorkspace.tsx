@@ -37,7 +37,6 @@ import ServiceAnchorBar from '@/components/gtcv/ServiceAnchorBar'
 import RowActions from '@/components/gtcv/RowActions'
 // C20, C21, C22, C25, C27. The problem column, which is not a column of text
 // but a view onto Tool 2's own rows.
-import ProblemsCell from '@/components/gtcv/ProblemsCell'
 // R20. Drawn inside Tool 1, under the table the answers become rows of. See the
 // comment at the bottom of Tool 1 for why it is not left to BlockWorkspace.
 import PendingRows from '@/components/gtcv/PendingRows'
@@ -194,6 +193,85 @@ function TextCell({ value, onCommit, canManage, placeholder, rows = 2, ariaLabel
  * still holds what was typed, so that stands in and the first edit carries it
  * across. Nothing on screen goes blank waiting for a migration.
  */
+/**
+ * THE ACTIVITIES UNDER ONE PROBLEM. 14 August 2026.
+ *
+ * Drawn once and used for every problem band, and for the activities that have
+ * no problem named yet. Defined at module level ON PURPOSE: a component
+ * declared inside the workspace's own render would be a new type on every
+ * keystroke, React would unmount and remount the whole table, and the cell
+ * being typed into would lose focus mid-word. That is worth ten props.
+ *
+ * "Problem it solves" is NOT a column here. The problem is the band above these
+ * rows, the way the service is the band above the problems — named once, never
+ * repeated down a column.
+ */
+function ActivityTable({
+  rows, editable, anchor, clientId, selected, onToggle, onEditActivity, onAction, onReload, onAdd,
+}) {
+  return (
+    <div style={tableWrap}>
+      <table style={toolOneTable}>
+        <thead>
+          <tr>
+            {editable && <th style={{ ...thWrap, width: 34 }} aria-label="Choose for a new service" />}
+            <th style={{ ...thWrap, width: '22%' }}>Activity</th>
+            <th style={{ ...thWrap, width: '19%' }}>What it delivers</th>
+            <th style={{ ...thWrap, width: '17%' }}>Who pays</th>
+            <th style={{ ...thWrap, width: '21%' }}>Assumption underneath</th>
+            <th style={{ ...thWrap, width: '21%' }}>What would prove it wrong</th>
+            {editable && <th style={{ ...thWrap, width: 40 }} />}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id} style={selected.has(r.id) ? { background: C.tintCyan } : undefined}>
+              {editable && (
+                <td style={td}>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(r.id)}
+                    onChange={() => onToggle(r.id)}
+                    aria-label={`Include ${r.activity || 'this activity'} in a new service`}
+                  />
+                </td>
+              )}
+              <td style={td}><TextCell value={r.activity} canManage={editable} placeholder="The activity" onCommit={(v) => onEditActivity(r.id, { activity: v })} /></td>
+              <td style={td}><MultiValueCell activity={r} field="delivers" values={anchor.activityValues} canManage={editable} onAction={onAction} placeholder="What it actually delivers" /></td>
+              <td style={td}><MultiValueCell activity={r} field="who_pays" values={anchor.activityValues} canManage={editable} onAction={onAction} placeholder="Who pays for it now" /></td>
+              <td style={td}><MultiValueCell activity={r} field="assumption" values={anchor.activityValues} canManage={editable} onAction={onAction} placeholder="What has to be true" /></td>
+              <td style={td}><MultiValueCell activity={r} field="disproof" values={anchor.activityValues} canManage={editable} onAction={onAction} placeholder="Evidence that would kill it" /></td>
+              {editable && (
+                <td style={td}>
+                  {/* C12 to C16. Park is the press that needs no thought, and
+                      delete is behind one more press and a confirmation. */}
+                  <RowActions
+                    clientId={clientId}
+                    activityId={r.id}
+                    label={r.activity || 'this activity'}
+                    onDone={onReload}
+                  />
+                </td>
+              )}
+            </tr>
+          ))}
+          {/* Adding an activity sits where every other "+ add" sits: under its
+              own column, in the same shape and the same words. */}
+          {editable ? (
+            <tr>
+              {editable && <td style={td} />}
+              <td style={td}>
+                <button type="button" style={addLine} onClick={onAdd}>+ add</button>
+              </td>
+              <td style={td} colSpan={5} />
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function MultiValueCell({ activity, field, values, canManage, onAction, placeholder }) {
   const shown = valuesFor(activity, field, values)
   const carry = needsCarryAcross(activity, field, values)
@@ -737,7 +815,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
    * With nothing anchored it creates NOTHING and says so, rather than making a
    * row that has nowhere to live.
    */
-  const addActivity = useCallback(async () => {
+  const addActivity = useCallback(async (problemId = null) => {
     if (!anchoredService) {
       setSaveState('error')
       setSaveMessage('Choose a service in the bar above first. An activity belongs to a service, so nothing was created.')
@@ -749,6 +827,10 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
       client_id: clientId,
       sort_order: assumptions.length,
       service_id: anchoredService.id,
+      // 14 August. The activity solves a problem, and is filed under the one
+      // whose "+ add" was pressed. Null is legitimate — it is the row that
+      // appears under "Not under any problem yet".
+      problem_id: problemId,
       // Both are held, as the route does it: the reference is the parent, the
       // text is what other screens already read.
       service_name: anchoredService.service_name || null,
@@ -817,6 +899,38 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
       ? assumptions.filter((a) => a.service_id === anchoredService.id && !a.parked_at)
       : []),
     [assumptions, anchoredService],
+  )
+
+  /**
+   * THE PROBLEMS THIS SERVICE SOLVES. 14 August 2026.
+   *
+   * The session works through what problem each service solves and only then
+   * the activity that solves it, so the problem is a frame inside the service
+   * and not a cell on an activity's row. A problem that names no service is not
+   * shown here: it belongs to no service yet and is reachable in Parked, the
+   * same rule every other row in this workspace follows.
+   */
+  const problemsOfAnchored = useMemo(
+    () => (anchoredService
+      ? (anchor.problems || []).filter((p) => p.service_id === anchoredService.id && !p.parked_at)
+      : []),
+    [anchor.problems, anchoredService],
+  )
+
+  /** The activities that solve one of those problems. */
+  const activitiesForProblem = useCallback(
+    (problemId) => activitiesOfAnchored.filter((a) => a.problem_id === problemId),
+    [activitiesOfAnchored],
+  )
+
+  /**
+   * Activities under the service but under no problem. Shown rather than
+   * hidden: an activity stated before anybody named the problem is real work,
+   * and dropping it out of the table is how the room stops trusting the screen.
+   */
+  const unattachedActivities = useMemo(
+    () => activitiesOfAnchored.filter((a) => !a.problem_id),
+    [activitiesOfAnchored],
   )
 
   /** Writing to a problem in the Parked area, and re-reading so it moves at once. */
@@ -1051,100 +1165,95 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
               {anchoredService.service_name}
             </span>
             <span style={{ ...mono, fontSize: '0.76rem', color: C.slate }}>
+              {problemsOfAnchored.length} problem{problemsOfAnchored.length === 1 ? '' : 's'}
+              {' · '}
               {activitiesOfAnchored.length} activit{activitiesOfAnchored.length === 1 ? 'y' : 'ies'}
             </span>
           </div>
-          {activitiesOfAnchored.length === 0 ? (
-          <div style={emptyNote}>
-            No activities under this service yet. Press &quot;+ add&quot; under the Activity column.
-            {editable ? (
-              <div style={{ marginTop: '0.5rem' }}>
-                <button type="button" style={addLine} onClick={addActivity}>+ add</button>
+
+          {/* ─────────────────────────────────────────────────────
+              THE PROBLEM IS THE FRAME INSIDE THE SERVICE. 14 August 2026.
+
+              The session works through what problem each service solves, and
+              only then the activity that solves it. So a problem is a band
+              with its activities beneath it, exactly as the service is a band
+              with its problems beneath it — and "Problem it solves" is no
+              longer a cell repeated on every row.
+
+              A service with no problem stated yet shows the one control that
+              matters: state the problem. Nothing else can be answered until
+              that exists.
+              ───────────────────────────────────────────────────── */}
+          {problemsOfAnchored.map((p) => (
+            <div key={p.id} style={{ marginBottom: '1.1rem' }}>
+              <div style={{
+                display: 'flex', alignItems: 'baseline', gap: '0.6rem', flexWrap: 'wrap',
+                borderLeft: `3px solid ${C.cyan}`, paddingLeft: '0.6rem',
+                marginBottom: '0.4rem',
+              }}>
+                <span style={{ ...mono, fontSize: '0.66rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>
+                  Problem it solves
+                </span>
+                <div style={{ flex: 1, minWidth: '16rem' }}>
+                  <TextCell
+                    value={p.problem}
+                    canManage={editable}
+                    placeholder="State the problem this service solves"
+                    onCommit={(v) => hierarchyAction({ action: 'edit', id: p.id, field: 'problem', value: v })}
+                  />
+                </div>
+                <span style={{ ...mono, fontSize: '0.72rem', color: C.slate }}>
+                  {activitiesForProblem(p.id).length} activit{activitiesForProblem(p.id).length === 1 ? 'y' : 'ies'}
+                </span>
               </div>
-            ) : null}
-          </div>
-        ) : (
-          <div style={tableWrap}>
-            <table style={toolOneTable}>
-              <thead>
-                <tr>
-                  {editable && <th style={{ ...thWrap, width: 34 }} aria-label="Choose for a new service" />}
-                  {/* THE SERVICE IS NOT A COLUMN. It was repeating on every
-                      row — the same name written once per activity — which is
-                      the "service appearing twice" Habib reported and is
-                      exactly what C26 forbids: the service is the frame, never
-                      a cell. It is named ONCE, in the bar above, which every
-                      row here belongs to. */}
-                  <th style={{ ...thWrap, width: '18%' }}>Activity</th>
-                  <th style={{ ...thWrap, width: '15%' }}>What it delivers</th>
-                  {/* C20. ADDED beside it, never instead of it. Two different
-                      questions: what the buyer receives, and what it is for. */}
-                  <th style={{ ...thWrap, width: '16%' }}>Problem it solves</th>
-                  <th style={{ ...thWrap, width: '13%' }}>Who pays</th>
-                  <th style={{ ...thWrap, width: '17%' }}>Assumption underneath</th>
-                  <th style={{ ...thWrap, width: '17%' }}>What would prove it wrong</th>
-                  {editable && <th style={{ ...thWrap, width: 40 }} />}
-                </tr>
-              </thead>
-              <tbody>
-                {activitiesOfAnchored.map((r) => (
-                  <tr key={r.id} style={selectedForService.has(r.id) ? { background: C.tintCyan } : undefined}>
-                    {editable && (
-                      <td style={td}>
-                        <input
-                          type="checkbox"
-                          checked={selectedForService.has(r.id)}
-                          onChange={() => toggleSelected(r.id)}
-                          aria-label={`Include ${r.activity || 'this activity'} in a new service`}
-                        />
-                      </td>
-                    )}
-                    <td style={td}><TextCell value={r.activity} canManage={editable} placeholder="The activity" onCommit={(v) => updAssumption(r.id, { activity: v })} /></td>
-                    <td style={td}><MultiValueCell activity={r} field="delivers" values={anchor.activityValues} canManage={editable} onAction={hierarchyAction} placeholder="What it actually delivers" /></td>
-                    <td style={td}>
-                      <ProblemsCell
-                        clientId={clientId}
-                        activityId={r.id}
-                        problems={anchor.problems}
-                        canManage={editable}
-                        onChanged={reload}
-                      />
-                    </td>
-                    <td style={td}><MultiValueCell activity={r} field="who_pays" values={anchor.activityValues} canManage={editable} onAction={hierarchyAction} placeholder="Who pays for it now" /></td>
-                    <td style={td}><MultiValueCell activity={r} field="assumption" values={anchor.activityValues} canManage={editable} onAction={hierarchyAction} placeholder="What has to be true" /></td>
-                    <td style={td}><MultiValueCell activity={r} field="disproof" values={anchor.activityValues} canManage={editable} onAction={hierarchyAction} placeholder="Evidence that would kill it" /></td>
-                    {editable && (
-                      <td style={td}>
-                        {/* C12 to C16. Was one button marked Delete, which
-                            deleted. Park is now the press that needs no
-                            thought, and delete is behind one more press and a
-                            confirmation that uses the word. */}
-                        <RowActions
-                          clientId={clientId}
-                          activityId={r.id}
-                          label={r.activity || 'this activity'}
-                          onDone={reload}
-                        />
-                      </td>
-                    )}
-                  </tr>
-                ))}
-                {/* Adding an activity sits where every other "+ add" sits:
-                    under its own column, in the same shape and the same words.
-                    See addLine above for why it moved out of the service band. */}
-                {editable ? (
-                  <tr>
-                    <td style={td} />
-                    <td style={td}>
-                      <button type="button" style={addLine} onClick={addActivity}>+ add</button>
-                    </td>
-                    <td style={td} colSpan={5} />
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+              <ActivityTable
+                rows={activitiesForProblem(p.id)}
+                editable={editable}
+                anchor={anchor}
+                clientId={clientId}
+                selected={selectedForService}
+                onToggle={toggleSelected}
+                onEditActivity={updAssumption}
+                onAction={hierarchyAction}
+                onReload={reload}
+                onAdd={() => addActivity(p.id)}
+              />
+            </div>
+          ))}
+
+          {editable ? (
+            <div style={{ margin: '0 0 1rem' }}>
+              <button
+                type="button"
+                style={addLine}
+                onClick={() => hierarchyAction({ action: 'addProblem', serviceId: anchoredService.id })}
+              >{problemsOfAnchored.length === 0 ? '+ add a problem this service solves' : '+ another problem'}</button>
+            </div>
+          ) : null}
+
+          {/* Activities stated before a problem was named. Not hidden and not
+              thrown away: they are shown here so they can be read and moved,
+              which is the same reason the Parked area exists. */}
+          {unattachedActivities.length === 0 ? null : (
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{ ...mono, fontSize: '0.66rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.amber, marginBottom: '0.35rem' }}>
+              Not under any problem yet — {unattachedActivities.length}
+            </div>
+            <ActivityTable
+              rows={unattachedActivities}
+              editable={editable}
+              anchor={anchor}
+              clientId={clientId}
+              selected={selectedForService}
+              onToggle={toggleSelected}
+              onEditActivity={updAssumption}
+              onAction={hierarchyAction}
+              onReload={reload}
+              onAdd={() => addActivity(null)}
+            />
           </div>
           )}
+
           </>
         )}
         {/* ─────────────────────────────────────────────────────────
