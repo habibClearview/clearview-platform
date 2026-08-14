@@ -28,7 +28,7 @@
 //
 // Client agnostic: the only client input is the clientId prop.
 // ============================================================
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 // C4. The service anchor, sticky above all five tools.
 import ServiceAnchorBar from '@/components/gtcv/ServiceAnchorBar'
@@ -106,6 +106,16 @@ const runWithRoomButton = {
   fontSize: '0.78rem', fontWeight: 700, padding: '0.4rem 0.8rem', borderRadius: 8,
   border: '1px solid var(--cv-teal)', background: 'var(--cv-teal)', color: '#FFFFFF',
   cursor: 'pointer', whiteSpace: 'nowrap',
+}
+
+/** Last row of its problem, so the activity add follows it. */
+function endOfProblem(rows, i) {
+  return i === rows.length - 1 || rows[i + 1].problem_id !== rows[i].problem_id
+}
+
+/** Last row of its service, so the problem add follows it. */
+function endOfService(rows, i) {
+  return i === rows.length - 1 || rows[i + 1].service_id !== rows[i].service_id
 }
 
 /** True when the row above already names this row's service, so it is not repeated. */
@@ -248,7 +258,7 @@ function TextCell({ value, onCommit, canManage, placeholder, rows = 2, ariaLabel
  */
 function ActivityTable({
   rows, editable, anchor, clientId, selected, onToggle, onEditActivity, onEditProblem,
-  serviceNameFor, problemTextFor, onAction, onReload, onAdd, onLeaveRow, onSetService,
+  serviceNameFor, problemTextFor, onAction, onReload, onAdd, onAddProblem, onLeaveRow, onSetService,
 }) {
   return (
     <div style={tableWrap}>
@@ -268,8 +278,8 @@ function ActivityTable({
         </thead>
         <tbody>
           {rows.map((r, i) => (
+            <React.Fragment key={r.id}>
             <tr
-              key={r.id}
               style={selected.has(r.id) ? { background: C.tintCyan } : undefined}
               onBlur={(e) => {
                 // Only when focus has actually left the row, never when moving
@@ -388,25 +398,41 @@ function ActivityTable({
                 </td>
               )}
             </tr>
+            {/* ─────────────────────────────────────────────────────
+                THE ADD BELONGS TO THE GROUP IT ADDS TO. 14 August 2026.
+
+                One "+ add" at the foot of the whole table could only ever add
+                to whatever happened to be last. To add a problem to a service
+                sitting at the TOP of a long list you had to scroll past every
+                other service to reach a button that then added to the wrong
+                one, and the page jumped to the bottom doing it.
+
+                So each group closes with its own adds, in its own columns: the
+                end of a PROBLEM's activities offers "+ add" under Activity and
+                adds to THAT problem, and the end of a SERVICE's rows offers
+                "+ add" under Problem and adds to THAT service. Neither moves
+                the page.
+                ───────────────────────────────────────────────────── */}
+            {editable && r.problem_id && endOfProblem(rows, i) ? (
+              <tr key={`${r.id}-a`}>
+                <td style={td} colSpan={3} />
+                <td style={td}>
+                  <button type="button" style={addLine} onClick={() => onAdd(r.problem_id, r.service_id)}>+ add</button>
+                </td>
+                <td style={td} colSpan={4} />
+              </tr>
+            ) : null}
+            {editable && r.service_id && endOfService(rows, i) ? (
+              <tr key={`${r.id}-p`}>
+                <td style={td} colSpan={2} />
+                <td style={td}>
+                  <button type="button" style={addLine} onClick={() => onAddProblem(r.service_id)}>+ add</button>
+                </td>
+                <td style={td} colSpan={5} />
+              </tr>
+            ) : null}
+            </React.Fragment>
           ))}
-          {/* Adding an activity sits where every other "+ add" sits: under its
-              own column, in the same shape and the same words. */}
-          {editable ? (
-            <tr>
-              {editable && <td style={td} />}
-              <td style={td} colSpan={2} />
-              <td style={td}>
-                {/* Adding another PROBLEM was the control Habib went looking
-                    for and could not find. A problem needs a row to live on, so
-                    this makes the row and leaves the problem cell ready. */}
-                <button type="button" style={addLine} onClick={onAdd}>+ add another problem</button>
-              </td>
-              <td style={td}>
-                <button type="button" style={addLine} onClick={onAdd}>+ add</button>
-              </td>
-              <td style={td} colSpan={4} />
-            </tr>
-          ) : null}
         </tbody>
       </table>
     </div>
@@ -1032,7 +1058,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
    * With nothing anchored it creates NOTHING and says so, rather than making a
    * row that has nowhere to live.
    */
-  const addActivity = useCallback(async (problemId = null) => {
+  const addActivity = useCallback(async (problemId = null, serviceId = null) => {
     if (!anchoredService) {
       setSaveState('error')
       setSaveMessage('Choose a service in the bar above first. An activity belongs to a service, so nothing was created.')
@@ -1043,7 +1069,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     const { data, error } = await supabase.from('gtcv_assumptions').insert([{
       client_id: clientId,
       sort_order: assumptions.length,
-      service_id: anchoredService.id,
+      service_id: serviceId || anchoredService.id,
       // 14 August. The activity solves a problem, and is filed under the one
       // whose "+ add" was pressed. Null is legitimate — it is the row that
       // appears under "Not under any problem yet".
@@ -1542,6 +1568,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             onAdd={() => addActivity(null)}
             onLeaveRow={dropIfBlank}
             onSetService={setRowService}
+            onAddProblem={(serviceId) => addActivity(null, serviceId)}
           />
         )}
         {/* ─────────────────────────────────────────────────────────
