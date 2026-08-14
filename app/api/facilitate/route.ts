@@ -53,12 +53,16 @@ const BLOCK_TABLE: Record<string, string> = {
  */
 const BLOCK_SERVICE_COLUMN: Record<string, string> = {
   gtcv_assumptions: 'service_id',
+  // 14 August. A problem belongs to the service the room was anchored on when
+  // the room named it — the same rule, one level up.
+  gtcv_problem_owner_budget: 'service_id',
 }
 
 /** The columns each of those tables will accept a value into. Named here so a
  *  column name arriving in a request can never reach the database unchecked. */
 const BLOCK_COLUMNS: Record<string, string[]> = {
   gtcv_assumptions: ['service_name', 'activity', 'delivers', 'who_pays', 'assumption', 'disproof'],
+  gtcv_problem_owner_budget: ['problem'],
   gtcv_service_inventory: [
     'service_name', 'what_it_delivers', 'logic_type', 'has_demand',
     'hidden_delivery_costs', 'delivery_quality_risk', 'decision', 'notes',
@@ -577,15 +581,26 @@ export async function POST(req: NextRequest) {
         }
 
         const q = await ownQuestion(rows[0].question_id)
-        const table = q ? BLOCK_TABLE[q.gate_id] : null
-        if (!q || !table) return NextResponse.json({ error: 'That block does not take answers yet' }, { status: 400 })
+        if (!q) return NextResponse.json({ error: 'That block does not take answers yet' }, { status: 400 })
+
+        // WHICH TABLE THIS ANSWER BELONGS IN. 14 August 2026.
+        //
+        // Tool 1 asks six questions, one variable each, and they do not all
+        // land in the same place: the problem a service solves is a row of the
+        // problem table, and the other five are columns of an activity. The
+        // question's own target field decides, so a question added later needs
+        // nothing changed here.
+        const fields = (q.target_fields || []) as { column: string }[]
+        const wantsProblem = fields.some((f) => f.column === 'problem')
+        const table = wantsProblem ? 'gtcv_problem_owner_budget' : BLOCK_TABLE[q.gate_id]
+        if (!table) return NextResponse.json({ error: 'That block does not take answers yet' }, { status: 400 })
 
         // Every submission in the group is the same answer, so one row is
         // written, not one per person. The people are already recorded on the
         // submissions themselves.
         const allowed = BLOCK_COLUMNS[table] || []
         const values: Record<string, string> = {}
-        for (const f of (q.target_fields || []) as { column: string }[]) {
+        for (const f of fields) {
           if (!allowed.includes(f.column)) continue
           const v = (rows[0].values || {})[f.column]
           if (typeof v === 'string' && v.trim()) values[f.column] = v

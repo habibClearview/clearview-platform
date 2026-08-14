@@ -49,49 +49,98 @@ function q(seed: Partial<QuestionSeed> & {
   }
 }
 
-// Clearing the ground writes into gtcv_assumptions, whose columns are
-// service_name, activity, delivers, who_pays, assumption and disproof.
+// ============================================================
+// TOOL 1's QUESTIONS, AND ONLY TOOL 1's. 14 August 2026.
+//
+// WHAT WAS WRONG, and it cost most of a week. This was one flat list of four
+// questions spanning three different tools. Question 3 ranks grant dependency
+// and question 4 is "signal, or story?" — which is Tool 4's board, by name, on
+// the same screen. So pressing "next question" in Tool 1 walked the room
+// straight into Tool 4's question, and Habib said so repeatedly before anyone
+// looked at this file.
+//
+// AND THE FIRST TWO COMBINED SEVERAL ANSWERS INTO ONE SUBMISSION. One
+// submission carries one set of values, so a room could never give two things
+// an activity delivers, or two people who pay for it. Splitting one variable
+// per question is not a matter of wording: it is the only way the multiplicity
+// Habib has asked for repeatedly can exist at all. Send "Skills", send
+// "Knowledge" — two answers, both attached, "+ add" arriving from the room
+// instead of being typed into the block afterwards.
+//
+// THE ORDER IS THE SESSION'S OWN ORDER. The problem the service solves, then
+// the activity that solves it, then what that activity delivers, who pays, the
+// assumption held, and what would prove that assumption wrong.
+//
+// THE SERVICE IS NEVER ASKED. The room is anchored to one service, its name is
+// on every phone above the question, and asking people to type it produced
+// "Workshop" for a service anchored as "Gender Workshop" — two names for one
+// thing, joined by nothing.
+//
+// Tool 1 writes into gtcv_assumptions, whose columns are activity, delivers,
+// who_pays, assumption and disproof. The problem writes to the problem table
+// instead, which is why it carries the problem column and is handled apart in
+// the facilitate route.
+// ============================================================
 const CLEARING_THE_GROUND: QuestionSeed[] = [
   q({
     gate_id: 'phase_0',
     sort_order: 1,
-    question_text: 'What does this organisation actually do? Name one activity, and the service it sits under.',
+    question_text: 'What problem does this service solve?',
     question_type: 'collect',
-    suggested_minutes: 8,
+    suggested_minutes: 6,
     target_fields: [
-      { column: 'service_name', heading: 'Service' },
-      { column: 'activity', heading: 'Activity' },
-      { column: 'delivers', heading: 'What it delivers' },
-      { column: 'who_pays', heading: 'Who pays for it today' },
+      { column: 'problem', heading: 'The problem' },
     ],
   }),
   q({
     gate_id: 'phase_0',
     sort_order: 2,
-    question_text: 'What are we assuming is true about this activity, that we have never actually checked?',
+    question_text: 'Name one activity that solves that problem.',
     question_type: 'collect',
     suggested_minutes: 6,
     target_fields: [
-      { column: 'assumption', heading: 'The assumption underneath it' },
-      { column: 'disproof', heading: 'What would prove it wrong' },
+      { column: 'activity', heading: 'The activity' },
     ],
   }),
   q({
     gate_id: 'phase_0',
     sort_order: 3,
-    question_text: 'If the grant stopped tomorrow, how likely is it that someone would still pay for this activity?',
-    question_type: 'score',
-    suggested_minutes: 3,
-    scale_min: 1,
-    scale_max: 5,
+    question_text: 'What does that activity deliver?',
+    question_type: 'collect',
+    suggested_minutes: 5,
+    target_fields: [
+      { column: 'delivers', heading: 'What it delivers' },
+    ],
   }),
   q({
     gate_id: 'phase_0',
     sort_order: 4,
-    question_text: 'Is what we have just heard a signal, or a story?',
-    question_type: 'classify',
+    question_text: 'Who pays for it today?',
+    question_type: 'collect',
     suggested_minutes: 4,
-    options: ['Signal', 'Story'],
+    target_fields: [
+      { column: 'who_pays', heading: 'Who pays' },
+    ],
+  }),
+  q({
+    gate_id: 'phase_0',
+    sort_order: 5,
+    question_text: 'What has to be true for this to work?',
+    question_type: 'collect',
+    suggested_minutes: 5,
+    target_fields: [
+      { column: 'assumption', heading: 'The assumption underneath' },
+    ],
+  }),
+  q({
+    gate_id: 'phase_0',
+    sort_order: 6,
+    question_text: 'What would prove that wrong?',
+    question_type: 'collect',
+    suggested_minutes: 5,
+    target_fields: [
+      { column: 'disproof', heading: 'What would prove it wrong' },
+    ],
   }),
 ]
 
