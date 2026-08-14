@@ -94,6 +94,21 @@ const selectStyle = { ...cellInput, minWidth: 108 }
 const addButton = { fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: 700, border: 'none', borderRadius: 6, background: 'var(--cv-cyan)', color: 'var(--cv-on-accent)', padding: '0.4rem 0.9rem', cursor: 'pointer' }
 const delButton = { fontFamily: 'monospace', fontSize: '0.85rem', border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.red, padding: '0.28rem 0.55rem', cursor: 'pointer' }
 const emptyNote = { fontSize: '0.93rem', color: C.faint, padding: '0.7rem 0' }
+/**
+ * THE ONE WAY TO ADD ANOTHER OF ANYTHING. 14 August 2026.
+ *
+ * Every multi-value cell already offers "+ add" / "+ another" as a quiet line
+ * under the values it belongs to. Adding an ACTIVITY was a filled teal button
+ * up in the service band instead — a different shape, a different colour and a
+ * different corner of the screen for the same idea. Habib asked for one place
+ * and one shape: an activity is added under the Activity column exactly as a
+ * second "who pays" is added under Who pays.
+ */
+const addLine = {
+  fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+  fontSize: '0.7rem', color: C.slate, background: 'transparent',
+  border: 'none', padding: 0, cursor: 'pointer',
+}
 const strip = { display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.85rem' }
 
 function pill(bg, fg) {
@@ -1025,19 +1040,29 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             background: C.alt, border: `1px solid ${C.border}`, borderRadius: 9,
             padding: '0.45rem 0.7rem', marginBottom: '0.6rem',
           }}>
-            <span style={{ ...mono, fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>Service</span>
-            <span style={{ fontFamily: 'Georgia,serif', fontSize: '1.05rem', fontWeight: 700, color: C.navy }}>
+            {/* WHICH SERVICE IS ON SCREEN, SAID PLAINLY. An engagement has many
+                services and this table shows exactly one of them, so the name
+                has to be unmissable rather than a caption. Everything below
+                belongs to the service named here. */}
+            <span style={{ ...mono, fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>
+              You are working on
+            </span>
+            <span style={{ fontFamily: 'Georgia,serif', fontSize: '1.35rem', fontWeight: 700, color: C.navy }}>
               {anchoredService.service_name}
             </span>
             <span style={{ ...mono, fontSize: '0.76rem', color: C.slate }}>
               {activitiesOfAnchored.length} activit{activitiesOfAnchored.length === 1 ? 'y' : 'ies'}
             </span>
-            {editable ? (
-              <button type="button" style={{ ...addButton, marginLeft: 'auto' }} onClick={addActivity}>+ Add activity</button>
-            ) : null}
           </div>
           {activitiesOfAnchored.length === 0 ? (
-          <div style={emptyNote}>No activities under this service yet. Press &quot;+ Add activity&quot;.</div>
+          <div style={emptyNote}>
+            No activities under this service yet. Press &quot;+ add&quot; under the Activity column.
+            {editable ? (
+              <div style={{ marginTop: '0.5rem' }}>
+                <button type="button" style={addLine} onClick={addActivity}>+ add</button>
+              </div>
+            ) : null}
+          </div>
         ) : (
           <div style={tableWrap}>
             <table style={toolOneTable}>
@@ -1104,6 +1129,18 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                     )}
                   </tr>
                 ))}
+                {/* Adding an activity sits where every other "+ add" sits:
+                    under its own column, in the same shape and the same words.
+                    See addLine above for why it moved out of the service band. */}
+                {editable ? (
+                  <tr>
+                    <td style={td} />
+                    <td style={td}>
+                      <button type="button" style={addLine} onClick={addActivity}>+ add</button>
+                    </td>
+                    <td style={td} colSpan={5} />
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
