@@ -225,7 +225,7 @@ function TextCell({ value, onCommit, canManage, placeholder, rows = 2, ariaLabel
  */
 function ActivityTable({
   rows, editable, anchor, clientId, selected, onToggle, onEditActivity, onEditProblem,
-  serviceNameFor, problemTextFor, onAction, onReload, onAdd,
+  serviceNameFor, problemTextFor, onAction, onReload, onAdd, onLeaveRow,
 }) {
   return (
     <div style={tableWrap}>
@@ -245,7 +245,16 @@ function ActivityTable({
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.id} style={selected.has(r.id) ? { background: C.tintCyan } : undefined}>
+            <tr
+              key={r.id}
+              style={selected.has(r.id) ? { background: C.tintCyan } : undefined}
+              onBlur={(e) => {
+                // Only when focus has actually left the row, never when moving
+                // between two cells of it — otherwise tabbing from Activity to
+                // What it delivers would delete the row underneath you.
+                if (!e.currentTarget.contains(e.relatedTarget)) onLeaveRow(r)
+              }}
+            >
               {editable && (
                 <td style={td}>
                   <input
@@ -401,24 +410,60 @@ function SaveIndicator({ state, message }) {
   )
 }
 
-function Section({ number, title, question, purposeText, children, right }) {
+/**
+ * A TOOL, WITH ITS OWN COUNT, THAT FOLDS AWAY. 14 August 2026.
+ *
+ * TWO THINGS CHANGED HERE, both to cut what a facilitator has to hold in their
+ * head while a room is waiting.
+ *
+ * THE COUNT IS PER TOOL. There was one strip above all five tools, mixing
+ * Tool 1's activities with Tool 5's decisions. That is not what the counter is
+ * for: it exists so the facilitator can compare what is on this tool's screen
+ * with what the room has just sent to this tool's question. Mixed together it
+ * can answer neither. Each tool now carries its own count on its own heading.
+ *
+ * THE TOOLS FOLD. All five drew at once, so Tool 1's work sat above four
+ * hundred lines of tools that are not in play. A tool you are not running folds
+ * to its heading. The fold is remembered per engagement through useCollapse,
+ * the same mechanism every other group on this page already uses, so it
+ * survives the reload that a timed-out session forces.
+ *
+ * OPEN IS THE DEFAULT. Nothing hides itself the first time somebody looks.
+ */
+function Section({ number, title, question, purposeText, children, right, count, collapsed, onToggle }) {
   return (
     <section style={card}>
       <div style={cardHead}>
-        <div>
-          <div style={toolNo}>Tool {number}</div>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={!collapsed}
+          style={{
+            background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
+            textAlign: 'left', color: 'inherit', font: 'inherit', flex: 1, minWidth: 0,
+          }}
+        >
+          <div style={toolNo}>
+            Tool {number}
+            <span style={{ marginLeft: '0.5rem' }}>{collapsed ? '▸' : '▾'}</span>
+          </div>
           <div style={toolTitle}>{title}</div>
-        </div>
+          {count ? (
+            <div style={{ ...toolNo, marginTop: '0.25rem', opacity: 0.85 }}>{count}</div>
+          ) : null}
+        </button>
         {right || null}
       </div>
-      <div style={cardBody}>
-        <div style={purpose}>
-          <em style={{ color: C.navy }}>{question}</em>
-          <br />
-          {purposeText}
+      {collapsed ? null : (
+        <div style={cardBody}>
+          <div style={purpose}>
+            <em style={{ color: C.navy }}>{question}</em>
+            <br />
+            {purposeText}
+          </div>
+          {children}
         </div>
-        {children}
-      </div>
+      )}
     </section>
   )
 }
@@ -844,6 +889,46 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
   const updDecision = makeUpdater('gtcv_continue_pause_kill', setDecisions)
 
   /**
+   * A ROW STILL COMPLETELY EMPTY WHEN YOU LEAVE IT REMOVES ITSELF.
+   * 14 August 2026.
+   *
+   * Pressing "+ add" and then thinking better of it left a row behind. Repeated
+   * over a week that produced 18 empty problems, 2 empty services and an empty
+   * activity on staging, every one of them counted in the totals above the
+   * tools — which is how a counter that is supposed to be compared against the
+   * room stops meaning anything.
+   *
+   * THE RULE, as agreed:
+   *   - A blank row is legitimate for a few seconds. You press add, then type.
+   *     Deleting on creation would make adding impossible.
+   *   - It is never legitimate once you have moved on, so leaving a row with
+   *     every column still empty removes it. No warning and no confirmation: it
+   *     was never anything, and asking about nothing is its own kind of noise.
+   *   - A row with SOME columns filled is work in progress, not a blank. It
+   *     stays. This is the exception that stops the rule eating real typing.
+   *
+   * Checked against the values table too, so an activity whose only content is
+   * a second "who pays" is not mistaken for empty.
+   */
+  const ACTIVITY_TEXT_FIELDS = ['activity', 'delivers', 'who_pays', 'assumption', 'disproof']
+
+  const dropIfBlank = useCallback(async (row) => {
+    if (!row?.id) return
+    const hasText = ACTIVITY_TEXT_FIELDS.some((f) => String(row[f] || '').trim() !== '')
+    if (hasText) return
+    const hasValue = (anchor.activityValues || [])
+      .some((v) => v.activity_id === row.id && String(v.value || '').trim() !== '')
+    if (hasValue) return
+    // A row that is under a problem is still nothing if it says nothing; the
+    // parent is not content, it is only where the empty row was created.
+    const { error } = await supabase.from('gtcv_assumptions')
+      .delete().eq('id', row.id).eq('client_id', clientId)
+    if (error) return
+    setAssumptions((prev) => prev.filter((a) => a.id !== row.id))
+    reload()
+  }, [anchor.activityValues, clientId, reload])
+
+  /**
    * C2. AN ACTIVITY IS CREATED INSIDE THE ANCHORED SERVICE, OR NOT AT ALL.
    *
    * This used to insert with no service_id at all, so every activity added
@@ -1215,6 +1300,9 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
       {/* ─── TOOL 1: Assumption Dump Canvas ─────────────────── */}
       <Section
         number={1}
+        count={`${allActivities.length} activit${allActivities.length === 1 ? 'y' : 'ies'} · ${(anchor.problems || []).length} problem${(anchor.problems || []).length === 1 ? '' : 's'}`}
+        collapsed={fold.is('tool', 'tool1')}
+        onToggle={() => fold.toggle('tool', 'tool1')}
         title="Assumption Dump Canvas"
         question="What are we already doing, and what has to be true for it to work?"
         purposeText="List every activity the organisation runs, and the service it sits under. An organisation sells several services and each is a portfolio of activities, so naming the service is what lets this be read back as what we actually do for gender advisory. For each activity, name what it delivers, who pays for it today, the assumption sitting underneath it, and what evidence would prove that assumption wrong."
@@ -1319,6 +1407,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             onAction={hierarchyAction}
             onReload={reload}
             onAdd={() => addActivity(null)}
+            onLeaveRow={dropIfBlank}
           />
         )}
         {/* ─────────────────────────────────────────────────────────
@@ -1349,6 +1438,9 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
       {/* ─── TOOL 2: Problem Owner Budget Matrix ────────────── */}
       <Section
         number={2}
+        count={`${owners.length} problem${owners.length === 1 ? '' : 's'}`}
+        collapsed={fold.is('tool', 'tool2')}
+        onToggle={() => fold.toggle('tool', 'tool2')}
         title="Problem Owner Budget Matrix"
         question="Who has this problem, and who controls the money to fix it?"
         purposeText="For each problem implied by the activity above, name who experiences it, who is accountable for it, who controls the budget, what it costs them not to solve it, and the mechanism through which money would actually be released."
@@ -1566,6 +1658,9 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
       {/* ─── TOOL 3: Hypothesis Shortlist Board ─────────────── */}
       <Section
         number={3}
+        count={`${hypotheses.length} hypothes${hypotheses.length === 1 ? 'is' : 'es'}`}
+        collapsed={fold.is('tool', 'tool3')}
+        onToggle={() => fold.toggle('tool', 'tool3')}
         title="Hypothesis Shortlist Board"
         question="Which of these are worth testing, and which are we carrying out of habit?"
         purposeText="Score each emerging hypothesis 1 to 5 on Urgency, Ownership clarity, Willingness to pay and Access. The total is out of 20. Only the top 3 to 5 advance out of Phase 0."
@@ -1643,6 +1738,9 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
       {/* ─── TOOL 4: Signal vs Story Board ──────────────────── */}
       <Section
         number={4}
+        count={`${signals.length} statement${signals.length === 1 ? '' : 's'}`}
+        collapsed={fold.is('tool', 'tool4')}
+        onToggle={() => fold.toggle('tool', 'tool4')}
         title="Signal vs Story Board"
         question="What did we actually see, and what are we telling ourselves?"
         purposeText="Split each statement in two. A signal is something observed: a behaviour, a payment, a refusal, a document. A story is believed but not observed. Only signals may carry weight in a hypothesis."
@@ -1726,6 +1824,9 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
       {/* ─── TOOL 5: Continue / Pause / Kill Table ──────────── */}
       <Section
         number={5}
+        count={`${decisions.length} activit${decisions.length === 1 ? 'y' : 'ies'}`}
+        collapsed={fold.is('tool', 'tool5')}
+        onToggle={() => fold.toggle('tool', 'tool5')}
         title="Continue / Pause / Kill Table"
         question="What continues, what pauses, and what stops here?"
         purposeText="Every activity must land somewhere. Give each one a decision, a one sentence rationale, and the decision point it travels to next. An activity with no landing is unfinished Phase 0 work."

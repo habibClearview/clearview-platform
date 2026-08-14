@@ -26,7 +26,13 @@
 // ============================================================
 
 /** C64 to C66. The three things that collapse, and they are three. */
-export type CollapseLevel = 'service' | 'activity' | 'answer'
+/**
+ * 'tool' added 14 August 2026. All five tools drew at once, so Tool 1's work sat
+ * above four hundred lines of tools not in play. A folded tool is remembered
+ * exactly like a folded service or activity, through the same store, so the
+ * reload a timed-out session forces does not unfold everything again.
+ */
+export type CollapseLevel = 'service' | 'activity' | 'answer' | 'tool'
 
 /** Where one engagement's collapsed set lives for the length of a session. */
 export function storageKey(clientId: string): string {

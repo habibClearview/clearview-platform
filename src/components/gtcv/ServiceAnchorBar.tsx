@@ -49,7 +49,15 @@ export default function ServiceAnchorBar({
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
-  const [showParked, setShowParked] = useState(false)
+  // OPEN, WHEN THERE IS SOMETHING IN IT. 14 August 2026.
+  //
+  // The parked area folded itself away by default, so all it showed was a count
+  // and a triangle. Habib read that as "there is no way to clear the parked
+  // items or do anything with them" — and from the outside that is exactly what
+  // it looked like, because every control it has was behind a fold nobody had a
+  // reason to open. The controls were always there: bring a service back, pull
+  // an activity into a service. They are now visible without a press.
+  const [showParked, setShowParked] = useState(true)
   // T1.4. Renaming the anchored service, in place.
   const [renaming, setRenaming] = useState(false)
   const [renameTo, setRenameTo] = useState('')
