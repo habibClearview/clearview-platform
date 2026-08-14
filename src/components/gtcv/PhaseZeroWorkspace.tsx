@@ -108,6 +108,11 @@ const runWithRoomButton = {
   cursor: 'pointer', whiteSpace: 'nowrap',
 }
 
+/** True when the row above already names this row's service, so it is not repeated. */
+function sameServiceAsAbove(rows, i) {
+  return i > 0 && rows[i - 1].service_id && rows[i - 1].service_id === rows[i].service_id
+}
+
 /** A cell that cannot be answered yet, saying what is missing rather than sitting dead. */
 function Locked({ need }) {
   return <span style={{ fontSize: '0.8rem', color: C.faint, fontStyle: 'italic' }}>Name {need} first</span>
@@ -262,7 +267,7 @@ function ActivityTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {rows.map((r, i) => (
             <tr
               key={r.id}
               style={selected.has(r.id) ? { background: C.tintCyan } : undefined}
@@ -312,24 +317,32 @@ function ActivityTable({
                   there dead, because a greyed box with no reason is the same
                   bug wearing a different coat.
                   ───────────────────────────────────────────────────── */}
-              <td style={td}>
-                {editable ? (
+              {/* THE SERVICE IS WRITTEN ONCE PER SERVICE, NOT ONCE PER ROW.
+                  14 August 2026. A chooser on every row repeated "Gender
+                  Workshop" five times down the column and read as five
+                  services. It is a column so that scrolling reveals the next
+                  service and everything hanging off it — which needs the name
+                  stated at the top of its group and nowhere else inside it.
+
+                  The chooser survives in one place only: a row with NO service.
+                  That is the row that cannot be worked on until it is given
+                  one, and the only row that needs moving. */}
+              <td style={{ ...td, ...(r.service_id && sameServiceAsAbove(rows, i) ? { borderTop: 'none' } : {}) }}>
+                {!r.service_id && editable ? (
                   <select
-                    value={r.service_id || ''}
+                    value=""
                     onChange={(e) => onSetService(r, e.target.value || null)}
                     aria-label="The service this belongs to"
                     style={anchorSelect}
                   >
                     <option value="">Choose a service...</option>
                     {(anchor.services || [])
-                      .filter((sv) => !sv.parked_at || sv.id === r.service_id)
+                      .filter((sv) => !sv.parked_at)
                       .map((sv) => (
-                        <option key={sv.id} value={sv.id}>
-                          {sv.service_name || 'Unnamed service'}{sv.parked_at ? ' (parked)' : ''}
-                        </option>
+                        <option key={sv.id} value={sv.id}>{sv.service_name || 'Unnamed service'}</option>
                       ))}
                   </select>
-                ) : (
+                ) : sameServiceAsAbove(rows, i) ? null : (
                   <span style={serviceCell}>{serviceNameFor(r) || '—'}</span>
                 )}
               </td>
@@ -383,9 +396,15 @@ function ActivityTable({
               {editable && <td style={td} />}
               <td style={td} colSpan={2} />
               <td style={td}>
+                {/* Adding another PROBLEM was the control Habib went looking
+                    for and could not find. A problem needs a row to live on, so
+                    this makes the row and leaves the problem cell ready. */}
+                <button type="button" style={addLine} onClick={onAdd}>+ add another problem</button>
+              </td>
+              <td style={td}>
                 <button type="button" style={addLine} onClick={onAdd}>+ add</button>
               </td>
-              <td style={td} colSpan={5} />
+              <td style={td} colSpan={4} />
             </tr>
           ) : null}
         </tbody>
@@ -1197,8 +1216,10 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
       .update(patch).eq('id', row.id).eq('client_id', clientId)
     if (error) { setSaveState('error'); setSaveMessage(error.message); return }
     setSaveState('saved')
-    reload()
-  }, [anchor.services, clientId, reload])
+    // Applied in place for the same reason as above: the row moves into its
+    // service and the Problem cell beside it opens, with nothing else redrawn.
+    setAssumptions((prev) => prev.map((a) => (a.id === row.id ? { ...a, ...patch } : a)))
+  }, [anchor.services, clientId])
 
   /** The service a row belongs to, by name. Read only: renaming happens above. */
   const serviceNameFor = useCallback(
@@ -1290,7 +1311,19 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         .eq('id', row.id).eq('client_id', clientId)
       if (error) { setSaveState('error'); setSaveMessage(error.message); return }
       setSaveState('saved')
-      reload()
+
+      // NO FULL RELOAD HERE. 14 August 2026. reload() re-reads the whole
+      // engagement and remounts every tool, which on screen is the page closing
+      // and reopening — Habib's word for it was jarring, and he is right: you
+      // type a problem and the screen you were reading is thrown away and
+      // rebuilt. The two things that changed are known exactly, so they are
+      // applied in place and the Activity cell beside the one you just typed in
+      // unlocks without anything else moving.
+      setAnchor((prev) => ({
+        ...prev,
+        problems: [...(prev.problems || []), { id: json.id, problem: text, service_id: row.service_id }],
+      }))
+      setAssumptions((prev) => prev.map((a) => (a.id === row.id ? { ...a, problem_id: json.id } : a)))
     } catch {
       setSaveState('error')
       setSaveMessage('Could not reach the server. Nothing was changed.')
