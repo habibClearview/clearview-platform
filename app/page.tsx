@@ -2,6 +2,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { DEFAULT_LANDING, RETURN_TO_KEY, isSafeReturnPath } from '@/lib/auth/session-guard'
 
 const C = {
   navy:'#1B2A4A', cyan:'#00B4D8', cream:'#F8F4EE', white:'#FFFFFF',
@@ -15,13 +16,28 @@ export default function LoginPage() {
   const [checking, setChecking] = useState(true)
   const [error, setError] = useState('')
 
+  /**
+   * Back to the page the session ended on, once. Read and REMOVED in the same
+   * breath, so a sign-in tomorrow opens the dashboard rather than a block from
+   * this afternoon. Anything that is not a plain same-origin path is discarded
+   * rather than followed — see isSafeReturnPath.
+   */
+  function landingPage() {
+    try {
+      const saved = localStorage.getItem(RETURN_TO_KEY)
+      localStorage.removeItem(RETURN_TO_KEY)
+      if (isSafeReturnPath(saved)) return saved as string
+    } catch { /* storage refused; the default is always safe */ }
+    return DEFAULT_LANDING
+  }
+
   useEffect(() => {
     // Timeout after 3 seconds -- if session check hangs, just show login form
     const timeout = setTimeout(() => setChecking(false), 3000)
     supabase.auth.getSession().then(({ data: { session } }) => {
       clearTimeout(timeout)
       if (session) {
-        window.location.href = '/coach'
+        window.location.href = landingPage()
       } else {
         setChecking(false)
       }
@@ -49,7 +65,7 @@ export default function LoginPage() {
       setError('The email or password you entered is incorrect.')
       setLoading(false)
     } else {
-      window.location.href = '/coach'
+      window.location.href = landingPage()
     }
   }
 

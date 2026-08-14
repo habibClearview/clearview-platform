@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isIdle, IDLE_MS, HEARTBEAT_MS, screenRunsUnattended } from '@/lib/auth/session-guard'
+import { isIdle, IDLE_MS, HEARTBEAT_MS, screenRunsUnattended, isSafeReturnPath } from '@/lib/auth/session-guard'
 
 describe('isIdle', () => {
   const now = 1_000_000_000_000
@@ -59,5 +59,28 @@ describe('screenRunsUnattended', () => {
     expect(screenRunsUnattended(null)).toBe(false)
     expect(screenRunsUnattended(undefined)).toBe(false)
     expect(screenRunsUnattended('')).toBe(false)
+  })
+})
+
+describe('isSafeReturnPath', () => {
+  it('accepts an ordinary same-origin path, with or without a query', () => {
+    expect(isSafeReturnPath('/coach')).toBe(true)
+    expect(isSafeReturnPath('/coach/facilitate?clientId=abc&gateId=phase_0')).toBe(true)
+  })
+
+  it('refuses anything that could leave this site', () => {
+    // The whole point of the check: a stored value is not trusted just because
+    // this code normally writes it.
+    expect(isSafeReturnPath('//evil.example')).toBe(false)
+    expect(isSafeReturnPath('https://evil.example')).toBe(false)
+    expect(isSafeReturnPath('http://evil.example')).toBe(false)
+    expect(isSafeReturnPath('/\\evil.example')).toBe(false)
+    expect(isSafeReturnPath('coach')).toBe(false)
+  })
+
+  it('refuses nothing at all, so the default landing is used', () => {
+    expect(isSafeReturnPath(null)).toBe(false)
+    expect(isSafeReturnPath(undefined)).toBe(false)
+    expect(isSafeReturnPath('')).toBe(false)
   })
 })

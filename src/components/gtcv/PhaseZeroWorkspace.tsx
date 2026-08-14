@@ -97,6 +97,17 @@ const selectStyle = { ...cellInput, minWidth: 108 }
 const addButton = { fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: 700, border: 'none', borderRadius: 6, background: 'var(--cv-cyan)', color: 'var(--cv-on-accent)', padding: '0.4rem 0.9rem', cursor: 'pointer' }
 const delButton = { fontFamily: 'monospace', fontSize: '0.85rem', border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.red, padding: '0.28rem 0.55rem', cursor: 'pointer' }
 const emptyNote = { fontSize: '0.93rem', color: C.faint, padding: '0.7rem 0' }
+/** Two controls on one heading, without either wrapping under the other. */
+function HeadingControls({ children }) {
+  return <span style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>{children}</span>
+}
+const runWithRoomButton = {
+  fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+  fontSize: '0.78rem', fontWeight: 700, padding: '0.4rem 0.8rem', borderRadius: 8,
+  border: '1px solid var(--cv-teal)', background: 'var(--cv-teal)', color: '#FFFFFF',
+  cursor: 'pointer', whiteSpace: 'nowrap',
+}
+
 /** The service name reads as the frame it is, not as another editable cell. */
 const serviceCell = { fontWeight: 700, color: C.navy, fontSize: '0.9rem' }
 /**
@@ -984,6 +995,26 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
       })
   }, [assumptions, anchor.services])
 
+  /**
+   * "RUN THIS WITH THE ROOM", ON EVERY TOOL HEADING. 14 August 2026.
+   *
+   * It opens the projected view for the question being run, and a question
+   * always belongs to a tool. On Tool 1 alone it read as if only Tool 1 could
+   * be run with a room, which is the opposite of true — every tool is run with
+   * the room, in order. One element, built once, placed on all five.
+   */
+  const runWithRoom = useMemo(() => (
+    <button
+      type="button"
+      onClick={() => window.open(
+        `/coach/facilitate?clientId=${encodeURIComponent(clientId)}&gateId=phase_0`,
+        '_blank',
+        'noopener',
+      )}
+      style={runWithRoomButton}
+    >Run this with the room</button>
+  ), [clientId])
+
   /** The service a row belongs to, by name. Read only: renaming happens above. */
   const serviceNameFor = useCallback(
     (row) => (anchor.services || []).find((s) => s.id === row.service_id)?.service_name || '',
@@ -1187,20 +1218,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         title="Assumption Dump Canvas"
         question="What are we already doing, and what has to be true for it to work?"
         purposeText="List every activity the organisation runs, and the service it sits under. An organisation sells several services and each is a portfolio of activities, so naming the service is what lets this be read back as what we actually do for gender advisory. For each activity, name what it delivers, who pays for it today, the assumption sitting underneath it, and what evidence would prove that assumption wrong."
-        right={(
-          /* "Run this with the room" belongs to the TOOL, not to the block. It
-             opens the projected view for the question this tool is running, so
-             a copy floating above all five said nothing about which. */
-          <button
-            type="button"
-            onClick={() => window.open(
-              `/coach/facilitate?clientId=${encodeURIComponent(clientId)}&gateId=phase_0`,
-              '_blank',
-              'noopener',
-            )}
-            style={{ ...mono, fontSize: '0.78rem', fontWeight: 700, padding: '0.4rem 0.8rem', borderRadius: 8, border: `1px solid ${C.teal}`, background: C.teal, color: '#FFFFFF', cursor: 'pointer' }}
-          >Run this with the room</button>
-        )}
+        right={runWithRoom}
       >
         {/* THE ROOM CONTROLS, AGAINST THE TOOL THEY RUN. 14 August 2026.
             They used to float above the whole block, which said nothing about
@@ -1334,7 +1352,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         title="Problem Owner Budget Matrix"
         question="Who has this problem, and who controls the money to fix it?"
         purposeText="For each problem implied by the activity above, name who experiences it, who is accountable for it, who controls the budget, what it costs them not to solve it, and the mechanism through which money would actually be released."
-        right={editable ? <button type="button" style={addButton} onClick={addOwner}>+ Add problem</button> : null}
+        right={<HeadingControls>{editable ? <button type="button" style={addButton} onClick={addOwner}>+ Add problem</button> : null}{runWithRoom}</HeadingControls>}
       >
         <div style={strip}>
           <span style={pill(C.tintCyan, C.navy)}>{owners.length} problem{owners.length === 1 ? '' : 's'}</span>
@@ -1551,7 +1569,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         title="Hypothesis Shortlist Board"
         question="Which of these are worth testing, and which are we carrying out of habit?"
         purposeText="Score each emerging hypothesis 1 to 5 on Urgency, Ownership clarity, Willingness to pay and Access. The total is out of 20. Only the top 3 to 5 advance out of Phase 0."
-        right={editable ? <button type="button" style={addButton} onClick={addHypothesis}>+ Add hypothesis</button> : null}
+        right={<HeadingControls>{editable ? <button type="button" style={addButton} onClick={addHypothesis}>+ Add hypothesis</button> : null}{runWithRoom}</HeadingControls>}
       >
         <div style={strip}>
           <span style={pill(C.tintCyan, C.navy)}>{hypotheses.length} on the board</span>
@@ -1628,7 +1646,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         title="Signal vs Story Board"
         question="What did we actually see, and what are we telling ourselves?"
         purposeText="Split each statement in two. A signal is something observed: a behaviour, a payment, a refusal, a document. A story is believed but not observed. Only signals may carry weight in a hypothesis."
-        right={editable ? <button type="button" style={addButton} onClick={addSignal}>+ Add item</button> : null}
+        right={<HeadingControls>{editable ? <button type="button" style={addButton} onClick={addSignal}>+ Add item</button> : null}{runWithRoom}</HeadingControls>}
       >
         <div style={strip}>
           <span style={pill(C.green, 'var(--cv-on-accent)')}>{signalCount} signal{signalCount === 1 ? '' : 's'}</span>
@@ -1711,7 +1729,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         title="Continue / Pause / Kill Table"
         question="What continues, what pauses, and what stops here?"
         purposeText="Every activity must land somewhere. Give each one a decision, a one sentence rationale, and the decision point it travels to next. An activity with no landing is unfinished Phase 0 work."
-        right={editable ? <button type="button" style={addButton} onClick={addDecision}>+ Add activity</button> : null}
+        right={<HeadingControls>{editable ? <button type="button" style={addButton} onClick={addDecision}>+ Add activity</button> : null}{runWithRoom}</HeadingControls>}
       >
         <div style={strip}>
           <span style={pill(C.green, 'var(--cv-on-accent)')}>{decisionSummary.counts.continue} continue</span>

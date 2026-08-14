@@ -20,7 +20,7 @@
 // ============================================================
 import { useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ACTIVITY_EVENTS, HEARTBEAT_MS, IDLE_MS, isIdle, screenRunsUnattended } from './session-guard'
+import { ACTIVITY_EVENTS, HEARTBEAT_MS, IDLE_MS, RETURN_TO_KEY, isIdle, isSafeReturnPath, screenRunsUnattended } from './session-guard'
 
 const LAST_ACTIVITY_KEY = 'cv:last-activity'
 
@@ -52,6 +52,13 @@ export function useSessionGuard(active: boolean) {
     async function endSession() {
       if (ended) return
       ended = true
+      // Remember the page, so signing back in returns here instead of the
+      // dashboard. Written before the sign-out, because the redirect follows
+      // immediately and there is no second chance.
+      try {
+        const here = window.location.pathname + window.location.search
+        if (isSafeReturnPath(here) && here !== '/') localStorage.setItem(RETURN_TO_KEY, here)
+      } catch { /* a browser refusing storage is not a reason to stay signed in */ }
       try {
         await supabase.auth.signOut({ scope: 'local' })
       } catch { /* even if sign-out fails, still leave the authenticated area */ }

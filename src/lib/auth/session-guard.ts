@@ -69,3 +69,35 @@ export function isIdle(nowMs: number, lastActivityMs: number | null | undefined,
   if (!lastActivityMs || !Number.isFinite(lastActivityMs)) return false
   return nowMs - lastActivityMs >= idleMs
 }
+
+/**
+ * WHERE YOU WERE WHEN THE SESSION ENDED. 14 August 2026.
+ *
+ * Being signed out mid-session already costs the password. It should not also
+ * cost the four clicks back to the block, the zone and the service you were
+ * working in — Habib named that as one of the most wearing parts of a day's
+ * testing.
+ *
+ * Stored on the way out and consumed ONCE on the way back in, so a later visit
+ * to the sign-in page opens the dashboard normally rather than a page from some
+ * forgotten afternoon.
+ *
+ * Only same-origin paths are ever returned. A stored value is written by this
+ * code, but localStorage is readable and writable by anything else running on
+ * the page, so it is treated as untrusted: anything that is not a plain path
+ * beginning with a single slash is discarded rather than followed. That refusal
+ * is what stops a crafted value turning the sign-in form into an open redirect.
+ */
+export const RETURN_TO_KEY = 'cv:return-to'
+
+export function isSafeReturnPath(path: string | null | undefined): boolean {
+  if (!path) return false
+  // A single leading slash, and no scheme or host. "//evil.com" and
+  // "https://evil.com" are both rejected by the second character test.
+  if (!path.startsWith('/') || path.startsWith('//')) return false
+  if (path.includes('\\')) return false
+  return true
+}
+
+/** The landing page when there is nothing safe to go back to. */
+export const DEFAULT_LANDING = '/coach'
