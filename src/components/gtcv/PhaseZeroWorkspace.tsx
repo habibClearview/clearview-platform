@@ -108,6 +108,24 @@ const runWithRoomButton = {
   cursor: 'pointer', whiteSpace: 'nowrap',
 }
 
+/** A cell that cannot be answered yet, saying what is missing rather than sitting dead. */
+function Locked({ need }) {
+  return <span style={{ fontSize: '0.8rem', color: C.faint, fontStyle: 'italic' }}>Name {need} first</span>
+}
+
+const PLACEHOLDERS = {
+  delivers: 'What it actually delivers',
+  who_pays: 'Who pays for it now',
+  assumption: 'What has to be true',
+  disproof: 'Evidence that would kill it',
+}
+
+const anchorSelect = {
+  fontSize: '0.86rem', padding: '0.3rem 0.4rem', borderRadius: 6,
+  border: '1px solid rgba(27,42,65,.22)', background: 'var(--cv-bg-2, #FAFAF7)',
+  maxWidth: '100%',
+}
+
 /** The service name reads as the frame it is, not as another editable cell. */
 const serviceCell = { fontWeight: 700, color: C.navy, fontSize: '0.9rem' }
 /**
@@ -225,7 +243,7 @@ function TextCell({ value, onCommit, canManage, placeholder, rows = 2, ariaLabel
  */
 function ActivityTable({
   rows, editable, anchor, clientId, selected, onToggle, onEditActivity, onEditProblem,
-  serviceNameFor, problemTextFor, onAction, onReload, onAdd, onLeaveRow,
+  serviceNameFor, problemTextFor, onAction, onReload, onAdd, onLeaveRow, onSetService,
 }) {
   return (
     <div style={tableWrap}>
@@ -273,20 +291,77 @@ function ActivityTable({
                   the name, not an editor: a service is renamed in the bar
                   above, and having two places to rename it is how two names for
                   one service appear. */}
-              <td style={{ ...td, ...serviceCell }}>{serviceNameFor(r) || <span style={{ color: C.faint }}>No service</span>}</td>
+              {/* ─────────────────────────────────────────────────────
+                  NOTHING IS ANSWERABLE UNTIL ITS ANCHOR EXISTS.
+                  14 August 2026.
+
+                  Habib's rule, and his data proved the need for it: three rows
+                  carried "what it delivers" and "who pays" with NO SERVICE at
+                  all, and not one row of six had a problem. An attribute with
+                  no anchor is not a half-finished thought, it is a value about
+                  nothing — it cannot be read back, rolled up, or carried into
+                  Tool 2.
+
+                  So the chain is enforced where it is typed. Each cell opens
+                  only once the one to its left holds something:
+
+                    service → problem → activity → delivers, who pays,
+                                                   assumption, disproof
+
+                  A closed cell says which anchor is missing rather than sitting
+                  there dead, because a greyed box with no reason is the same
+                  bug wearing a different coat.
+                  ───────────────────────────────────────────────────── */}
               <td style={td}>
-                <TextCell
-                  value={problemTextFor(r)}
-                  canManage={editable}
-                  placeholder="The problem this service solves"
-                  onCommit={(v) => onEditProblem(r, v)}
-                />
+                {editable ? (
+                  <select
+                    value={r.service_id || ''}
+                    onChange={(e) => onSetService(r, e.target.value || null)}
+                    aria-label="The service this belongs to"
+                    style={anchorSelect}
+                  >
+                    <option value="">Choose a service...</option>
+                    {(anchor.services || [])
+                      .filter((sv) => !sv.parked_at || sv.id === r.service_id)
+                      .map((sv) => (
+                        <option key={sv.id} value={sv.id}>
+                          {sv.service_name || 'Unnamed service'}{sv.parked_at ? ' (parked)' : ''}
+                        </option>
+                      ))}
+                  </select>
+                ) : (
+                  <span style={serviceCell}>{serviceNameFor(r) || '—'}</span>
+                )}
               </td>
-              <td style={td}><TextCell value={r.activity} canManage={editable} placeholder="The activity" onCommit={(v) => onEditActivity(r.id, { activity: v })} /></td>
-              <td style={td}><MultiValueCell activity={r} field="delivers" values={anchor.activityValues} canManage={editable} onAction={onAction} placeholder="What it actually delivers" /></td>
-              <td style={td}><MultiValueCell activity={r} field="who_pays" values={anchor.activityValues} canManage={editable} onAction={onAction} placeholder="Who pays for it now" /></td>
-              <td style={td}><MultiValueCell activity={r} field="assumption" values={anchor.activityValues} canManage={editable} onAction={onAction} placeholder="What has to be true" /></td>
-              <td style={td}><MultiValueCell activity={r} field="disproof" values={anchor.activityValues} canManage={editable} onAction={onAction} placeholder="Evidence that would kill it" /></td>
+              <td style={td}>
+                {r.service_id ? (
+                  <TextCell
+                    value={problemTextFor(r)}
+                    canManage={editable}
+                    placeholder="The problem this service solves"
+                    onCommit={(v) => onEditProblem(r, v)}
+                  />
+                ) : <Locked need="a service" />}
+              </td>
+              <td style={td}>
+                {r.problem_id ? (
+                  <TextCell value={r.activity} canManage={editable} placeholder="The activity" onCommit={(v) => onEditActivity(r.id, { activity: v })} />
+                ) : <Locked need="a problem" />}
+              </td>
+              {['delivers', 'who_pays', 'assumption', 'disproof'].map((field) => (
+                <td key={field} style={td}>
+                  {String(r.activity || '').trim() ? (
+                    <MultiValueCell
+                      activity={r}
+                      field={field}
+                      values={anchor.activityValues}
+                      canManage={editable}
+                      onAction={onAction}
+                      placeholder={PLACEHOLDERS[field]}
+                    />
+                  ) : <Locked need="an activity" />}
+                </td>
+              ))}
               {editable && (
                 <td style={td}>
                   {/* C12 to C16. Park is the press that needs no thought, and
@@ -1100,6 +1175,31 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     >Run this with the room</button>
   ), [clientId])
 
+  /**
+   * Putting a row into a service, from the row itself. Habib's report was that
+   * the Service column could not be edited while rows sat there with no service
+   * at all and no way to give them one — the column named the anchor and
+   * offered no way to set it. Changing the service clears the problem, because
+   * a problem belongs to a service and carrying it across would attach this row
+   * to a problem of a service it is no longer in.
+   */
+  const setRowService = useCallback(async (row, serviceId) => {
+    setSaveState('saving')
+    setSaveMessage(null)
+    const svc = (anchor.services || []).find((x) => x.id === serviceId) || null
+    const patch = {
+      service_id: serviceId,
+      service_name: svc?.service_name || null,
+      problem_id: serviceId === row.service_id ? row.problem_id : null,
+      updated_at: new Date().toISOString(),
+    }
+    const { error } = await supabase.from('gtcv_assumptions')
+      .update(patch).eq('id', row.id).eq('client_id', clientId)
+    if (error) { setSaveState('error'); setSaveMessage(error.message); return }
+    setSaveState('saved')
+    reload()
+  }, [anchor.services, clientId, reload])
+
   /** The service a row belongs to, by name. Read only: renaming happens above. */
   const serviceNameFor = useCallback(
     (row) => (anchor.services || []).find((s) => s.id === row.service_id)?.service_name || '',
@@ -1408,6 +1508,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             onReload={reload}
             onAdd={() => addActivity(null)}
             onLeaveRow={dropIfBlank}
+            onSetService={setRowService}
           />
         )}
         {/* ─────────────────────────────────────────────────────────
