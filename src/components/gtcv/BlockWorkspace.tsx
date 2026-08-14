@@ -27,10 +27,6 @@ import PendingRows from '@/components/gtcv/PendingRows'
 // C44, C49, C50. Running a question from inside the block, so nothing about a
 // session needs the "Sessions and rooms" page.
 import RoomControlBar from '@/components/gtcv/RoomControlBar'
-// C44. Opening the room, the code and the QR. Moved here from "Sessions and
-// rooms" so that everything needed to run a session is in one place — and so
-// that C45 removing it from there does not leave the room with no way in.
-const SessionRoom = lazyRoom()
 // R24. The button at the top of every block, and the sentence that stands
 // beside it on a block Stage 1 gives no questions to (Q8).
 import { BLOCKS_WITH_QUESTIONS, NO_QUESTIONS_YET } from '@/lib/stage1-question-sets'
@@ -125,12 +121,6 @@ function ZoneBriefPanel({ dpId }) {
       }}>{brief.signal}</p>
     </section>
   )
-}
-
-function lazyRoom() {
-  // Loaded on demand like every other surface, so a coach reading a block does
-  // not pay for the QR drawing code until they open the room.
-  return dynamic(() => import('./SessionRoom'), { ssr: false, loading: () => null })
 }
 
 const loading = () => (
@@ -277,15 +267,20 @@ export default function BlockWorkspace({ dpId, clientId, canManage, currency }) 
             fontFamily: 'Georgia,serif', fontSize: 17, fontWeight: 600, margin: '0 0 10px',
             color: '#1B2A41',
           }}>{title}</h3>
-          {/* C44, C49. Everything needed to run a question, in the block. */}
-          {key === own[0]?.key ? (
-            <>
-              <RoomControlBar clientId={clientId} dpId={dpId} canManage={canManage} />
-              {/* C44. The code and the QR, in the block. */}
-              <div style={{ marginBottom: 12 }}>
-                <SessionRoom clientId={clientId} canManage={canManage} sessions={[]} />
-              </div>
-            </>
+          {/* C44, C49 as amended, 14 August 2026.
+              THE QR AND THE CODE ARE NOT REPEATED IN EVERY BLOCK. A participant
+              scans once and that one scan carries them through all five tools,
+              so a QR panel at the top of every block is a large picture of
+              something already done. It lives in "Sessions and rooms", which is
+              where somebody goes to open a room, and nowhere else.
+
+              THE ROOM CONTROLS MOVED TO THE TOOL. The question being run
+              belongs to a tool, and a bar floating above the whole block said
+              nothing about which. Blocks listed below draw it against their own
+              tool heading; the rest keep it here, at the top of their single
+              table, where it still reads correctly. */}
+          {key === own[0]?.key && !BLOCKS_PLACING_PENDING_THEMSELVES.includes(dpId) ? (
+            <RoomControlBar clientId={clientId} dpId={dpId} canManage={canManage} />
           ) : null}
           <Comp clientId={clientId} canManage={canManage} dpId={dpId} currency={currency} />
           {/* R20. What the room sent, beneath the rows the block already has,

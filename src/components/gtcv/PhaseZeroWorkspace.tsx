@@ -40,6 +40,10 @@ import RowActions from '@/components/gtcv/RowActions'
 // R20. Drawn inside Tool 1, under the table the answers become rows of. See the
 // comment at the bottom of Tool 1 for why it is not left to BlockWorkspace.
 import PendingRows from '@/components/gtcv/PendingRows'
+// The room controls belong to the TOOL whose question is being run, not to the
+// block as a whole. Drawn against Tool 1's own heading so the question on the
+// wall and the table it fills are plainly the same piece of work.
+import RoomControlBar from '@/components/gtcv/RoomControlBar'
 // C26 as replaced. The hierarchy the tools draw, and C28 as amended, which
 // decides what is shown and what is parked rather than what is hidden.
 import {
@@ -93,6 +97,8 @@ const selectStyle = { ...cellInput, minWidth: 108 }
 const addButton = { fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: 700, border: 'none', borderRadius: 6, background: 'var(--cv-cyan)', color: 'var(--cv-on-accent)', padding: '0.4rem 0.9rem', cursor: 'pointer' }
 const delButton = { fontFamily: 'monospace', fontSize: '0.85rem', border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.red, padding: '0.28rem 0.55rem', cursor: 'pointer' }
 const emptyNote = { fontSize: '0.93rem', color: C.faint, padding: '0.7rem 0' }
+/** The service name reads as the frame it is, not as another editable cell. */
+const serviceCell = { fontWeight: 700, color: C.navy, fontSize: '0.9rem' }
 /**
  * THE ONE WAY TO ADD ANOTHER OF ANYTHING. 14 August 2026.
  *
@@ -207,7 +213,8 @@ function TextCell({ value, onCommit, canManage, placeholder, rows = 2, ariaLabel
  * repeated down a column.
  */
 function ActivityTable({
-  rows, editable, anchor, clientId, selected, onToggle, onEditActivity, onAction, onReload, onAdd,
+  rows, editable, anchor, clientId, selected, onToggle, onEditActivity, onEditProblem,
+  serviceNameFor, problemTextFor, onAction, onReload, onAdd,
 }) {
   return (
     <div style={tableWrap}>
@@ -215,11 +222,13 @@ function ActivityTable({
         <thead>
           <tr>
             {editable && <th style={{ ...thWrap, width: 34 }} aria-label="Choose for a new service" />}
-            <th style={{ ...thWrap, width: '22%' }}>Activity</th>
-            <th style={{ ...thWrap, width: '19%' }}>What it delivers</th>
-            <th style={{ ...thWrap, width: '17%' }}>Who pays</th>
-            <th style={{ ...thWrap, width: '21%' }}>Assumption underneath</th>
-            <th style={{ ...thWrap, width: '21%' }}>What would prove it wrong</th>
+            <th style={{ ...thWrap, width: '13%' }}>Service</th>
+            <th style={{ ...thWrap, width: '16%' }}>Problem it solves</th>
+            <th style={{ ...thWrap, width: '15%' }}>Activity</th>
+            <th style={{ ...thWrap, width: '14%' }}>What it delivers</th>
+            <th style={{ ...thWrap, width: '12%' }}>Who pays</th>
+            <th style={{ ...thWrap, width: '15%' }}>Assumption underneath</th>
+            <th style={{ ...thWrap, width: '15%' }}>What would prove it wrong</th>
             {editable && <th style={{ ...thWrap, width: 40 }} />}
           </tr>
         </thead>
@@ -236,6 +245,23 @@ function ActivityTable({
                   />
                 </td>
               )}
+              {/* THE SERVICE AND THE PROBLEM ARE COLUMNS. 14 August 2026.
+                  Drawn as bands above the rows they governed, they pushed the
+                  work down the page and you could not scroll one table and read
+                  every service. They are columns now, like everything else, so
+                  the whole engagement reads in one list. The service cell is
+                  the name, not an editor: a service is renamed in the bar
+                  above, and having two places to rename it is how two names for
+                  one service appear. */}
+              <td style={{ ...td, ...serviceCell }}>{serviceNameFor(r) || <span style={{ color: C.faint }}>No service</span>}</td>
+              <td style={td}>
+                <TextCell
+                  value={problemTextFor(r)}
+                  canManage={editable}
+                  placeholder="The problem this service solves"
+                  onCommit={(v) => onEditProblem(r, v)}
+                />
+              </td>
               <td style={td}><TextCell value={r.activity} canManage={editable} placeholder="The activity" onCommit={(v) => onEditActivity(r.id, { activity: v })} /></td>
               <td style={td}><MultiValueCell activity={r} field="delivers" values={anchor.activityValues} canManage={editable} onAction={onAction} placeholder="What it actually delivers" /></td>
               <td style={td}><MultiValueCell activity={r} field="who_pays" values={anchor.activityValues} canManage={editable} onAction={onAction} placeholder="Who pays for it now" /></td>
@@ -260,6 +286,7 @@ function ActivityTable({
           {editable ? (
             <tr>
               {editable && <td style={td} />}
+              <td style={td} colSpan={2} />
               <td style={td}>
                 <button type="button" style={addLine} onClick={onAdd}>+ add</button>
               </td>
@@ -933,6 +960,43 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     [activitiesOfAnchored],
   )
 
+  /**
+   * EVERY ACTIVITY ON THE ENGAGEMENT, ordered so the table reads as a list of
+   * services. An organisation has many services and the session works through
+   * all of them, so Tool 1 shows all of them and you scroll rather than switch.
+   * Parked rows stay out: they have their own area and their own reason.
+   */
+  const allActivities = useMemo(() => {
+    const order = new Map((anchor.services || []).map((s, i) => [s.id, i]))
+    return assumptions
+      .filter((a) => !a.parked_at)
+      .slice()
+      .sort((a, b) => {
+        const sa = order.has(a.service_id) ? order.get(a.service_id) : 9999
+        const sb = order.has(b.service_id) ? order.get(b.service_id) : 9999
+        if (sa !== sb) return sa - sb
+        // Activities solving the same problem sit together, so the problem
+        // column reads as one block rather than repeating in and out.
+        const pa = a.problem_id || ''
+        const pb = b.problem_id || ''
+        if (pa !== pb) return pa < pb ? -1 : 1
+        return (a.sort_order ?? 0) - (b.sort_order ?? 0)
+      })
+  }, [assumptions, anchor.services])
+
+  /** The service a row belongs to, by name. Read only: renaming happens above. */
+  const serviceNameFor = useCallback(
+    (row) => (anchor.services || []).find((s) => s.id === row.service_id)?.service_name || '',
+    [anchor.services],
+  )
+
+  /** The problem a row solves, as text. Empty where none has been stated. */
+  const problemTextFor = useCallback(
+    (row) => (anchor.problems || []).find((p) => p.id === row.problem_id)?.problem || '',
+    [anchor.problems],
+  )
+
+
   /** Writing to a problem in the Parked area, and re-reading so it moves at once. */
   const updParkedProblem = useCallback(async (id, patch) => {
     setOwners((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
@@ -973,6 +1037,49 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
       setSaveMessage('Could not reach the server. Nothing was changed.')
     }
   }, [clientId, reload])
+
+  /**
+   * Typing in the Problem column. Where the row already solves a problem the
+   * text of THAT problem changes — one row, read by Tool 1 and Tool 2, never
+   * two copies. Where it does not, a problem is created under the row's service
+   * and the row is attached to it in the same press, because asking somebody to
+   * create a problem and then attach it is two steps for one thought.
+   */
+  const setProblemText = useCallback(async (row, text) => {
+    setSaveState('saving')
+    setSaveMessage(null)
+    if (row.problem_id) {
+      await hierarchyAction({ action: 'edit', id: row.problem_id, field: 'problem', value: text })
+      return
+    }
+    if (!row.service_id) {
+      setSaveState('error')
+      setSaveMessage('This activity has no service yet, and a problem belongs to a service. Nothing was created.')
+      return
+    }
+    try {
+      const res = await authedFetch('/api/services', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId, action: 'addProblem', serviceId: row.service_id, name: text }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json?.id) {
+        setSaveState('error')
+        setSaveMessage(json?.error || 'That did not go through.')
+        return
+      }
+      const { error } = await supabase.from('gtcv_assumptions')
+        .update({ problem_id: json.id, updated_at: new Date().toISOString() })
+        .eq('id', row.id).eq('client_id', clientId)
+      if (error) { setSaveState('error'); setSaveMessage(error.message); return }
+      setSaveState('saved')
+      reload()
+    } catch {
+      setSaveState('error')
+      setSaveMessage('Could not reach the server. Nothing was changed.')
+    }
+  }, [clientId, hierarchyAction, reload])
 
   // Tool 2: the rule. A problem with no named budget holder is paused.
   const unfundedProblems = useMemo(
@@ -1082,6 +1189,14 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         purposeText="List every activity the organisation runs, and the service it sits under. An organisation sells several services and each is a portfolio of activities, so naming the service is what lets this be read back as what we actually do for gender advisory. For each activity, name what it delivers, who pays for it today, the assumption sitting underneath it, and what evidence would prove that assumption wrong."
         right={null}
       >
+        {/* THE ROOM CONTROLS, AGAINST THE TOOL THEY RUN. 14 August 2026.
+            They used to float above the whole block, which said nothing about
+            which tool the open question belonged to — and the question is
+            always a question of one tool. Here, directly under Tool 1's
+            heading, the question on the wall and the table it fills are
+            visibly the same piece of work. */}
+        <RoomControlBar clientId={clientId} dpId="phase_0" canManage={editable} />
+
         {/* ─── C18. A NEW SERVICE, MADE OF ACTIVITIES THAT ALREADY EXIST ───
             Tick the activities, name the result, and they move. They keep
             their identity and their problems: this is a change of parent,
@@ -1139,122 +1254,41 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
           </div>
         ) : null}
 
-        {!anchoredService ? (
+        {/* ─────────────────────────────────────────────────────
+            ONE TABLE, EVERY SERVICE, SCROLLABLE. 14 August 2026.
+
+            The service and the problem were bands above the rows they
+            governed. Habib's words for it: confusing, cluttered, and you
+            could not scroll one table and read every service with everything
+            related to it. So they are COLUMNS, like every other field, and
+            this table now lists the whole engagement rather than the one
+            anchored service — an organisation has many services and the
+            session works through all of them.
+
+            The anchored service is still marked, because the room's question
+            is asked about one service at a time, but it no longer decides
+            what you can see.
+            ───────────────────────────────────────────────────── */}
+        {allActivities.length === 0 && (anchor.services || []).length === 0 ? (
           <div style={emptyNote}>
-            No service chosen. Add one in the bar above, or choose one, and its activities appear here.
+            No services yet. Add one in the bar above, and its problems and activities appear here.
           </div>
         ) : (
-          <>
-          {/* ONE SERVICE, NAMED ONCE, with its activities beneath it. This is
-              the line the Service column used to repeat on every row. Adding an
-              activity happens HERE, inside the service it will belong to, so
-              the press and the parent are the same gesture. */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap',
-            background: C.alt, border: `1px solid ${C.border}`, borderRadius: 9,
-            padding: '0.45rem 0.7rem', marginBottom: '0.6rem',
-          }}>
-            {/* WHICH SERVICE IS ON SCREEN, SAID PLAINLY. An engagement has many
-                services and this table shows exactly one of them, so the name
-                has to be unmissable rather than a caption. Everything below
-                belongs to the service named here. */}
-            <span style={{ ...mono, fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>
-              You are working on
-            </span>
-            <span style={{ fontFamily: 'Georgia,serif', fontSize: '1.35rem', fontWeight: 700, color: C.navy }}>
-              {anchoredService.service_name}
-            </span>
-            <span style={{ ...mono, fontSize: '0.76rem', color: C.slate }}>
-              {problemsOfAnchored.length} problem{problemsOfAnchored.length === 1 ? '' : 's'}
-              {' · '}
-              {activitiesOfAnchored.length} activit{activitiesOfAnchored.length === 1 ? 'y' : 'ies'}
-            </span>
-          </div>
-
-          {/* ─────────────────────────────────────────────────────
-              THE PROBLEM IS THE FRAME INSIDE THE SERVICE. 14 August 2026.
-
-              The session works through what problem each service solves, and
-              only then the activity that solves it. So a problem is a band
-              with its activities beneath it, exactly as the service is a band
-              with its problems beneath it — and "Problem it solves" is no
-              longer a cell repeated on every row.
-
-              A service with no problem stated yet shows the one control that
-              matters: state the problem. Nothing else can be answered until
-              that exists.
-              ───────────────────────────────────────────────────── */}
-          {problemsOfAnchored.map((p) => (
-            <div key={p.id} style={{ marginBottom: '1.1rem' }}>
-              <div style={{
-                display: 'flex', alignItems: 'baseline', gap: '0.6rem', flexWrap: 'wrap',
-                borderLeft: `3px solid ${C.cyan}`, paddingLeft: '0.6rem',
-                marginBottom: '0.4rem',
-              }}>
-                <span style={{ ...mono, fontSize: '0.66rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>
-                  Problem it solves
-                </span>
-                <div style={{ flex: 1, minWidth: '16rem' }}>
-                  <TextCell
-                    value={p.problem}
-                    canManage={editable}
-                    placeholder="State the problem this service solves"
-                    onCommit={(v) => hierarchyAction({ action: 'edit', id: p.id, field: 'problem', value: v })}
-                  />
-                </div>
-                <span style={{ ...mono, fontSize: '0.72rem', color: C.slate }}>
-                  {activitiesForProblem(p.id).length} activit{activitiesForProblem(p.id).length === 1 ? 'y' : 'ies'}
-                </span>
-              </div>
-              <ActivityTable
-                rows={activitiesForProblem(p.id)}
-                editable={editable}
-                anchor={anchor}
-                clientId={clientId}
-                selected={selectedForService}
-                onToggle={toggleSelected}
-                onEditActivity={updAssumption}
-                onAction={hierarchyAction}
-                onReload={reload}
-                onAdd={() => addActivity(p.id)}
-              />
-            </div>
-          ))}
-
-          {editable ? (
-            <div style={{ margin: '0 0 1rem' }}>
-              <button
-                type="button"
-                style={addLine}
-                onClick={() => hierarchyAction({ action: 'addProblem', serviceId: anchoredService.id })}
-              >{problemsOfAnchored.length === 0 ? '+ add a problem this service solves' : '+ another problem'}</button>
-            </div>
-          ) : null}
-
-          {/* Activities stated before a problem was named. Not hidden and not
-              thrown away: they are shown here so they can be read and moved,
-              which is the same reason the Parked area exists. */}
-          {unattachedActivities.length === 0 ? null : (
-          <div style={{ marginBottom: '1rem' }}>
-            <div style={{ ...mono, fontSize: '0.66rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.amber, marginBottom: '0.35rem' }}>
-              Not under any problem yet — {unattachedActivities.length}
-            </div>
-            <ActivityTable
-              rows={unattachedActivities}
-              editable={editable}
-              anchor={anchor}
-              clientId={clientId}
-              selected={selectedForService}
-              onToggle={toggleSelected}
-              onEditActivity={updAssumption}
-              onAction={hierarchyAction}
-              onReload={reload}
-              onAdd={() => addActivity(null)}
-            />
-          </div>
-          )}
-
-          </>
+          <ActivityTable
+            rows={allActivities}
+            editable={editable}
+            anchor={anchor}
+            clientId={clientId}
+            selected={selectedForService}
+            onToggle={toggleSelected}
+            onEditActivity={updAssumption}
+            onEditProblem={setProblemText}
+            serviceNameFor={serviceNameFor}
+            problemTextFor={problemTextFor}
+            onAction={hierarchyAction}
+            onReload={reload}
+            onAdd={() => addActivity(null)}
+          />
         )}
         {/* ─────────────────────────────────────────────────────────
             WHAT THE ROOM SENT, DIRECTLY UNDER THE TABLE IT GOES INTO.
