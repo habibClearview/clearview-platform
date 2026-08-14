@@ -1187,7 +1187,20 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         title="Assumption Dump Canvas"
         question="What are we already doing, and what has to be true for it to work?"
         purposeText="List every activity the organisation runs, and the service it sits under. An organisation sells several services and each is a portfolio of activities, so naming the service is what lets this be read back as what we actually do for gender advisory. For each activity, name what it delivers, who pays for it today, the assumption sitting underneath it, and what evidence would prove that assumption wrong."
-        right={null}
+        right={(
+          /* "Run this with the room" belongs to the TOOL, not to the block. It
+             opens the projected view for the question this tool is running, so
+             a copy floating above all five said nothing about which. */
+          <button
+            type="button"
+            onClick={() => window.open(
+              `/coach/facilitate?clientId=${encodeURIComponent(clientId)}&gateId=phase_0`,
+              '_blank',
+              'noopener',
+            )}
+            style={{ ...mono, fontSize: '0.78rem', fontWeight: 700, padding: '0.4rem 0.8rem', borderRadius: 8, border: `1px solid ${C.teal}`, background: C.teal, color: '#FFFFFF', cursor: 'pointer' }}
+          >Run this with the room</button>
+        )}
       >
         {/* THE ROOM CONTROLS, AGAINST THE TOOL THEY RUN. 14 August 2026.
             They used to float above the whole block, which said nothing about

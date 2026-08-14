@@ -240,15 +240,23 @@ export default function BlockWorkspace({ dpId, clientId, canManage, currency }) 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-      {/* R24. The first thing in the block, above everything else in it. */}
-      <RunThisWithTheRoom dpId={dpId} clientId={clientId} />
+      {/* NOTHING ABOVE THE FIRST TOOL. 14 August 2026.
+          R24 put "Run this with the room" here and the zone brief under it, and
+          between them they restated what the tools already say on their own
+          headings: the zone's outputs ARE Tool 2's and Tool 5's purpose lines,
+          and the zone question is a summary of the five below it. Read top to
+          bottom it was the same paragraph twice before any work appeared.
 
-      {/* What the zone is for, before the tools. A zone used to open straight
-          into its tables, so the question it exists to settle, what has to
-          exist before it closes, and how you know the answer is real were all
-          somewhere else: in the delivery document, or in somebody's memory,
-          in front of the room. */}
-      <ZoneBriefPanel dpId={dpId} />
+          The button now sits on the tool heading it belongs to, because it runs
+          that tool's question and nothing else. Blocks that place their own
+          controls are listed below; every other block still gets both here,
+          where they are not yet duplicated. */}
+      {BLOCKS_PLACING_PENDING_THEMSELVES.includes(dpId) ? null : (
+        <>
+          <RunThisWithTheRoom dpId={dpId} clientId={clientId} />
+          <ZoneBriefPanel dpId={dpId} />
+        </>
+      )}
 
       {own.length === 0 ? (
         <div style={{
