@@ -922,7 +922,32 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     let cancelled = false
     const read = () => authedFetch(`/api/services?clientId=${encodeURIComponent(clientId)}`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { if (!cancelled && j) setAnchor({ services: j.services || [], activities: j.activities || [], problems: j.problems || [], hypothesisSources: j.hypothesisSources || [], activityValues: j.activityValues || [], currentServiceId: j.currentServiceId || null }) })
+      .then((j) => {
+        if (cancelled || !j) return
+        const next = {
+          services: j.services || [], activities: j.activities || [], problems: j.problems || [],
+          hypothesisSources: j.hypothesisSources || [], activityValues: j.activityValues || [],
+          currentServiceId: j.currentServiceId || null,
+        }
+        // ─────────────────────────────────────────────────────
+        // ONLY WHEN SOMETHING ACTUALLY CHANGED. 14 August 2026.
+        //
+        // This poll runs every four seconds and used to hand back a brand new
+        // object every time, unchanged data included. Every array was a new
+        // array, so every memo recomputed, the whole table rebuilt, and each
+        // multi-value cell was replaced — four times a minute, while somebody
+        // was reading or typing in it. A row could move under the pointer
+        // between deciding to press "+ add" and pressing it.
+        //
+        // It also silently undid work: an edit applied in place was overwritten
+        // by whatever this read happened to return next, so a problem just
+        // typed could vanish and re-lock the row beside it.
+        //
+        // Comparing before setting keeps the same objects when nothing has
+        // changed, so the page holds still between real changes.
+        // ─────────────────────────────────────────────────────
+        setAnchor((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next))
+      })
       .catch(() => {})
     read()
     const t = setInterval(read, 4000)
