@@ -532,6 +532,117 @@ function ValueLine({ value, placeholder, onCommit, onRemove }) {
   )
 }
 
+/**
+ * TOOL 2, AND WHAT IT INHERITS. 15 August 2026.
+ *
+ * WHAT WAS WRONG. Tool 2 drew problems under ACTIVITIES: service, then every
+ * activity, then that activity's problems. The model is the other way round —
+ * a service has problems, and an activity is what solves one — so Tool 2 was
+ * reading a parent that had stopped being the parent on 14 August, and it
+ * inherited nothing from Tool 1 that a room could recognise.
+ *
+ * IT IS THE SAME TABLE AS TOOL 1, ONE LEVEL IN. Service written once per group,
+ * the problems it solves beneath it, and Tool 2's own five columns across. The
+ * problem cell is the SAME ROW Tool 1 states, read by id, so nothing is
+ * retyped and editing it in either tool changes the one row.
+ *
+ * The add is per service, in the Problem column, at the end of that service's
+ * own group. An add at the foot of the table can only add to whatever is last.
+ */
+function ProblemMatrixTable({ groups, editable, clientId, onEdit, onAddProblem, onReload }) {
+  return (
+    <div style={tableWrap}>
+      <table style={toolOneTable}>
+        <thead>
+          <tr>
+            <th style={{ ...thWrap, width: '13%' }}>Service</th>
+            <th style={{ ...thWrap, width: '18%' }}>Problem it solves</th>
+            <th style={{ ...thWrap, width: '13%' }}>Who experiences it</th>
+            <th style={{ ...thWrap, width: '13%' }}>Who is accountable</th>
+            <th style={{ ...thWrap, width: '14%' }}>Who controls the budget</th>
+            <th style={{ ...thWrap, width: '14%' }}>Cost of not solving it</th>
+            <th style={{ ...thWrap, width: '15%' }}>Budget mechanism</th>
+            {editable && <th style={{ ...thWrap, width: 40 }} />}
+          </tr>
+        </thead>
+        <tbody>
+          {groups.map((g) => (
+            <React.Fragment key={g.key}>
+              {g.problems.length === 0 ? (
+                <tr>
+                  <td style={td}><span style={serviceCell}>{g.serviceName || '—'}</span></td>
+                  <td style={td} colSpan={editable ? 7 : 6}>
+                    <span style={{ fontSize: '0.85rem', color: C.faint, fontStyle: 'italic' }}>
+                      No problem stated for this service yet. State it here or in Tool 1 — it is the same row.
+                    </span>
+                  </td>
+                </tr>
+              ) : g.problems.map((r, i) => {
+                const noHolder = blank(r.budget_holder)
+                return (
+                  <tr key={r.id} style={noHolder ? { background: C.tintAmber } : undefined}>
+                    <td style={{ ...td, ...(i > 0 ? { borderTop: 'none' } : {}) }}>
+                      {/* Written once per group, exactly as in Tool 1. */}
+                      {i === 0 ? <span style={serviceCell}>{g.serviceName || '—'}</span> : null}
+                    </td>
+                    <td style={td}>
+                      <TextCell
+                        value={r.problem}
+                        canManage={editable}
+                        placeholder="The problem this service solves"
+                        ariaLabel="The problem this service solves"
+                        onCommit={(v) => onEdit(r.id, { problem: v })}
+                      />
+                    </td>
+                    <td style={td}>
+                      <TextCell value={r.experienced_by} canManage={editable} placeholder="Who feels it" onCommit={(v) => onEdit(r.id, { experienced_by: v })} />
+                    </td>
+                    <td style={td}>
+                      <TextCell value={r.accountable} canManage={editable} placeholder="Who answers for it" onCommit={(v) => onEdit(r.id, { accountable: v })} />
+                    </td>
+                    <td style={td}>
+                      <TextCell value={r.budget_holder} canManage={editable} placeholder="Name the budget holder" onCommit={(v) => onEdit(r.id, { budget_holder: v })} />
+                      {noHolder && (
+                        <div style={{ marginTop: '0.35rem', fontSize: '0.78rem', color: C.amber, fontWeight: 600, lineHeight: 1.35 }}>
+                          No budget holder. Pause this problem until you can say who releases the money.
+                        </div>
+                      )}
+                    </td>
+                    <td style={td}>
+                      <TextCell value={r.cost_of_not_solving} canManage={editable} placeholder="What it costs them to leave it" onCommit={(v) => onEdit(r.id, { cost_of_not_solving: v })} />
+                    </td>
+                    <td style={td}>
+                      <TextCell value={r.budget_mechanism} canManage={editable} placeholder="How the money is released" onCommit={(v) => onEdit(r.id, { budget_mechanism: v })} />
+                    </td>
+                    {editable && (
+                      <td style={td}>
+                        <RowActions clientId={clientId} problemId={r.id} label={r.problem || 'this problem'} onDone={onReload} />
+                      </td>
+                    )}
+                  </tr>
+                )
+              })}
+              {/* The add belongs to THIS service, in the Problem column, at the
+                  end of THIS group. */}
+              {editable && g.serviceId ? (
+                <tr>
+                  <td style={{ ...td, borderTop: 'none' }} />
+                  <td style={{ ...td, borderTop: 'none' }}>
+                    <button type="button" style={addLine} onClick={() => onAddProblem(g.serviceId)}>
+                      + add a problem
+                    </button>
+                  </td>
+                  <td style={{ ...td, borderTop: 'none' }} colSpan={editable ? 6 : 5} />
+                </tr>
+              ) : null}
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function SaveIndicator({ state, message }) {
   const map = {
     idle: { text: 'All changes saved', color: C.faint },
@@ -1206,7 +1317,8 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     setSaveState('saved')
   }, [clientId, anchor.services, assumptions.length])
 
-  const addOwner = makeAdder('gtcv_problem_owner_budget', owners, setOwners, {})
+  // addOwner is gone. A problem with no service is a row neither tool can draw;
+  // Tool 2 adds inside a service group instead (addProblemToService).
   // C28 as amended. A row added while a service is anchored belongs to it from
   // the start, so the room does not create work in Tool 3 and then find it in
   // the Parked area. Where nothing is anchored the row simply has no service,
@@ -1249,8 +1361,8 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
    * switching the anchor above shows it, so it is reachable already.
    */
   const strandedProblems = useMemo(
-    () => problemsOutsideHierarchy(anchor.problems, anchor.activities),
-    [anchor.problems, anchor.activities],
+    () => problemsOutsideHierarchy(anchor.problems, anchor.activities, anchor.services),
+    [anchor.problems, anchor.activities, anchor.services],
   )
 
   /**
@@ -1320,6 +1432,67 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         return (a.sort_order ?? 0) - (b.sort_order ?? 0)
       })
   }, [assumptions, anchor.services])
+
+  /**
+   * WHAT TOOL 2 INHERITS: TOOL 1'S PROBLEMS, BY SERVICE. 15 August 2026.
+   *
+   * The same rows Tool 1 states, grouped by the service they belong to, in the
+   * service order Tool 1 uses so the two tables read down the page the same
+   * way. Nothing is retyped and nothing is copied — Tool 2 edits the row Tool 1
+   * wrote, which is what makes editing in one show in the other.
+   *
+   * A service with no problems yet still gets its group, because that is where
+   * its "+ add a problem" lives, and a service that cannot be added to is a
+   * service the room cannot work on.
+   *
+   * A problem with no service is not drawn here and is not lost: it is in the
+   * Parked area below with everything else that has no home, which is where a
+   * row with no anchor lives everywhere else in this workspace. Drawing it in
+   * both places would be the same row twice with two states.
+   */
+  const problemGroups = useMemo(() => {
+    const live = (anchor.services || []).filter((s) => !s.parked_at)
+    const mine = owners.filter((p) => !p.parked_at)
+    const byService = new Map(live.map((s) => [s.id, []]))
+    mine.forEach((p) => {
+      if (p.service_id && byService.has(p.service_id)) byService.get(p.service_id).push(p)
+    })
+    const order = (rows) => rows.slice().sort((a, b) => {
+      const d = (a.sort_order ?? 0) - (b.sort_order ?? 0)
+      return d !== 0 ? d : String(a.created_at || '').localeCompare(String(b.created_at || ''))
+    })
+    return live.map((s) => ({
+      key: s.id,
+      serviceId: s.id,
+      serviceName: s.service_name || '',
+      problems: order(byService.get(s.id)),
+    }))
+  }, [anchor.services, owners])
+
+  const problemsInMatrix = useMemo(
+    () => problemGroups.reduce((n, g) => n + g.problems.length, 0),
+    [problemGroups],
+  )
+
+  /**
+   * A problem stated from Tool 2, under the service whose group it was pressed
+   * in. Applied in place: reload() re-reads the whole engagement and throws the
+   * page around, which is the trap this workspace has already paid for twice.
+   */
+  const addProblemToService = useCallback(async (serviceId) => {
+    if (!serviceId) return
+    setSaveState('saving')
+    setSaveMessage(null)
+    const { data, error } = await supabase.from('gtcv_problem_owner_budget')
+      .insert([{ client_id: clientId, service_id: serviceId, sort_order: owners.length }])
+      .select().single()
+    if (error) { setSaveState('error'); setSaveMessage(error.message); return }
+    setOwners((prev) => [...prev, data])
+    // Tool 1 reads problems from the anchor, so it is told too and the new row
+    // appears in both tables without a re-read.
+    setAnchor((prev) => ({ ...prev, problems: [...(prev.problems || []), data] }))
+    setSaveState('saved')
+  }, [clientId, owners.length])
 
   /**
    * "RUN THIS WITH THE ROOM", ON EVERY TOOL HEADING. 14 August 2026.
@@ -1478,9 +1651,14 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
   }, [clientId, hierarchyAction, reload])
 
   // Tool 2: the rule. A problem with no named budget holder is paused.
+  // The rule counts the problems Tool 2 actually shows. Counting every row of
+  // the table included parked and homeless ones, so the warning above the tool
+  // named a number that could not be found in it.
   const unfundedProblems = useMemo(
-    () => owners.filter((r) => blank(r.budget_holder)).length,
-    [owners],
+    () => problemGroups.reduce(
+      (n, g) => n + g.problems.filter((r) => blank(r.budget_holder)).length, 0,
+    ),
+    [problemGroups],
   )
 
   // Tool 3: auto total, and the rank that decides who advances.
@@ -1594,7 +1772,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             always a question of one tool. Here, directly under Tool 1's
             heading, the question on the wall and the table it fills are
             visibly the same piece of work. */}
-        <RoomControlBar clientId={clientId} dpId="phase_0" canManage={editable} />
+        <RoomControlBar clientId={clientId} dpId="phase_0" canManage={editable} tool={1} />
 
         {/* ─── C18. A NEW SERVICE, MADE OF ACTIVITIES THAT ALREADY EXIST ───
             Tick the activities, name the result, and they move. They keep
@@ -1715,23 +1893,33 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             it, are all columns of the rows above.
             ───────────────────────────────────────────────────────── */}
         <div style={{ marginTop: 12 }}>
-          <PendingRows clientId={clientId} dpId="phase_0" canManage={editable} />
+          <PendingRows clientId={clientId} dpId="phase_0" canManage={editable} tool={1} />
         </div>
       </Section>
 
       {/* ─── TOOL 2: Problem Owner Budget Matrix ────────────── */}
       <Section
         number={2}
-        count={`${owners.length} problem${owners.length === 1 ? '' : 's'}`}
+        count={`${problemsInMatrix} problem${problemsInMatrix === 1 ? '' : 's'} carried from Tool 1`}
         collapsed={fold.is('tool', 'tool2')}
         onToggle={() => fold.toggle('tool', 'tool2')}
         title="Problem Owner Budget Matrix"
         question="Who has this problem, and who controls the money to fix it?"
-        purposeText="For each problem implied by the activity above, name who experiences it, who is accountable for it, who controls the budget, what it costs them not to solve it, and the mechanism through which money would actually be released."
-        right={<HeadingControls>{editable ? <button type="button" style={addButton} onClick={addOwner}>+ Add problem</button> : null}{runWithRoom}</HeadingControls>}
+        purposeText="Every problem stated in Tool 1 is already here, under the same service, with nothing retyped. For each one, name who experiences it, who is accountable for it, who controls the budget, what it costs them not to solve it, and the mechanism through which money would actually be released."
+        /* NO "+ ADD PROBLEM" ON THE HEADING. 15 August 2026. It created a
+           problem belonging to no service, which lands in Parked and appears in
+           neither tool's table — a button whose only effect is invisible. The
+           add is in the Problem column at the end of each service's own group,
+           where it can say which service it is adding to. */
+        right={<HeadingControls>{runWithRoom}</HeadingControls>}
       >
+        {/* Tool 2's OWN questions, against Tool 2's heading. Tool 1's five
+            answers do not belong under this table and this tool's do not belong
+            under Tool 1's. */}
+        <RoomControlBar clientId={clientId} dpId="phase_0" canManage={editable} tool={2} />
+
         <div style={strip}>
-          <span style={pill(C.tintCyan, C.navy)}>{owners.length} problem{owners.length === 1 ? '' : 's'}</span>
+          <span style={pill(C.tintCyan, C.navy)}>{problemsInMatrix} problem{problemsInMatrix === 1 ? '' : 's'}</span>
           {unfundedProblems > 0 && (
             <span style={pill(C.amber, 'var(--cv-on-accent)')}>{unfundedProblems} with no budget holder</span>
           )}
@@ -1743,120 +1931,43 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             ready to carry into a hypothesis.
           </div>
         )}
-        {/* ─── C26 AS REPLACED. THE HIERARCHY. ───────────────────
-            The service at the top ALONE, every activity of it beneath, each
-            activity's problems under it. There is no "Service and activity"
-            column, here or anywhere: the service is the frame around the whole
-            table and the activity is the heading of the group, so neither can
-            be a cell. An activity with no problems is PRESENT, showing C22's
-            words, because C26's own test requires the third activity to appear. */}
-        {!anchoredService ? (
+        {/* ─────────────────────────────────────────────────────
+            THE PROBLEMS TOOL 1 ALREADY STATED, BY SERVICE.
+            15 August 2026.
+
+            This drew problems under ACTIVITIES, which stopped being their
+            parent on 14 August. The model is: a service has problems, and an
+            activity is what solves one. So Tool 2 opens with Tool 1's problems
+            already filled in, grouped by the same service, in the same order,
+            and adds its own five columns across — who feels it, who answers
+            for it, who holds the money, what leaving it costs, and how the
+            money is actually released.
+
+            It shows the WHOLE engagement rather than the anchored service
+            alone, exactly as Tool 1 does: the session works through every
+            service and you scroll rather than switch.
+            ───────────────────────────────────────────────────── */}
+        {problemGroups.length === 0 ? (
           <div style={emptyNote}>
-            No service yet. Add one in the bar above, and its activities and their problems appear here.
+            No services yet. Add one in the bar above, state what it solves in Tool 1, and it appears here.
           </div>
         ) : (
-          <ServiceFrame
-            service={anchoredService}
-            collapsed={fold.is('service', anchoredService.id)}
-            onToggle={() => fold.toggle('service', anchoredService.id)}
-            summary={`${tree.branches.length} activit${tree.branches.length === 1 ? 'y' : 'ies'}, ${tree.problemCount} problem${tree.problemCount === 1 ? '' : 's'}`}
-            right={tree.branches.length > 1 ? (
-              // C65 in one press. Ten activities open, one argument: fold the
-              // lot and open the two that matter.
-              <button
-                type="button"
-                onClick={() => fold.setAll('activity', activityIds, !fold.allOf('activity', activityIds))}
-                style={{ ...mono, fontSize: '0.75rem', color: C.slate, background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 6, padding: '0.2rem 0.5rem', cursor: 'pointer' }}
-              >
-                {fold.allOf('activity', activityIds) ? 'Open all activities' : 'Fold all activities'}
-              </button>
-            ) : null}
-          >
-            {tree.branches.length === 0 ? (
-              <div style={emptyNote}>This service has no activities yet. Add them in Tool 1.</div>
-            ) : tree.branches.map((branch) => (
-              <ActivityGroup
-                key={branch.activity.id}
-                activity={branch.activity}
-                problemCount={branch.problems.length}
-                noProblemStated={branch.noProblemStated}
-                collapsed={fold.is('activity', branch.activity.id)}
-                onToggle={() => fold.toggle('activity', branch.activity.id)}
-                actions={editable ? (
-                  <RowActions
-                    clientId={clientId}
-                    activityId={branch.activity.id}
-                    label={activityLabel(branch.activity)}
-                    onDone={reload}
-                  />
-                ) : null}
-              >
-                {branch.problems.length === 0 ? (
-                  <div style={{ ...emptyNote, paddingLeft: '1.3rem' }}>
-                    {/* C22 and C24. Named, not blank, and resolved at Tool 5
-                        rather than killed at the moment the gap appears. */}
-                    No problem stated under this activity. It is carried to Tool 5 to be landed with everything else.
-                  </div>
-                ) : (
-                  <div style={tableWrap}>
-                    <table style={{ ...table, minWidth: 760 }}>
-                      <thead>
-                        <tr>
-                          <th style={{ ...th, width: '22%' }}>Problem implied</th>
-                          <th style={{ ...th, width: '15%' }}>Who experiences it</th>
-                          <th style={{ ...th, width: '15%' }}>Who is accountable</th>
-                          <th style={{ ...th, width: '19%' }}>Who controls the budget</th>
-                          <th style={{ ...th, width: '17%' }}>Cost of not solving it</th>
-                          <th style={{ ...th, width: '17%' }}>Budget mechanism</th>
-                          {editable && <th style={{ ...th, width: 40 }} />}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {branch.problems.map((p) => {
-                          // The row Tool 2 edits is the SAME row Tool 1 states,
-                          // so the local copy is found by id rather than kept
-                          // twice. D13: one row read by two tools.
-                          const r = owners.find((o) => o.id === p.id) || p
-                          const noHolder = blank(r.budget_holder)
-                          return (
-                            <tr key={r.id} style={noHolder ? { background: C.tintAmber } : undefined}>
-                              <td style={td}><TextCell value={r.problem} canManage={editable} placeholder="The problem" onCommit={(v) => updOwner(r.id, { problem: v })} /></td>
-                              <td style={td}><TextCell value={r.experienced_by} canManage={editable} placeholder="Who feels it" onCommit={(v) => updOwner(r.id, { experienced_by: v })} /></td>
-                              <td style={td}><TextCell value={r.accountable} canManage={editable} placeholder="Who answers for it" onCommit={(v) => updOwner(r.id, { accountable: v })} /></td>
-                              <td style={td}>
-                                <TextCell value={r.budget_holder} canManage={editable} placeholder="Name the budget holder" onCommit={(v) => updOwner(r.id, { budget_holder: v })} />
-                                {noHolder && (
-                                  <div style={{ marginTop: '0.35rem', fontSize: '0.82rem', color: C.amber, fontWeight: 600, lineHeight: 1.35 }}>
-                                    No budget holder named. Pause this problem until you can say who releases the money.
-                                  </div>
-                                )}
-                              </td>
-                              <td style={td}><TextCell value={r.cost_of_not_solving} canManage={editable} placeholder="What it costs them to leave it" onCommit={(v) => updOwner(r.id, { cost_of_not_solving: v })} /></td>
-                              <td style={td}><TextCell value={r.budget_mechanism} canManage={editable} placeholder="How the money is released" onCommit={(v) => updOwner(r.id, { budget_mechanism: v })} /></td>
-                              {editable && (
-                                <td style={td}>
-                                  {/* A problem parks or is deleted. It never
-                                      moves between services, because it has
-                                      none of its own. */}
-                                  <RowActions
-                                    clientId={clientId}
-                                    problemId={r.id}
-                                    label={r.problem || 'this problem'}
-                                    onDone={reload}
-                                  />
-                                </td>
-                              )}
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </ActivityGroup>
-            ))}
-          </ServiceFrame>
+          <ProblemMatrixTable
+            groups={problemGroups}
+            editable={editable}
+            clientId={clientId}
+            onEdit={updOwner}
+            onAddProblem={addProblemToService}
+            onReload={reload}
+          />
         )}
+
+        {/* What the room sent to TOOL 2's questions, under Tool 2's table.
+            Accepting one fills the problem it is about; it does not make a
+            second copy of a problem Tool 1 already stated. */}
+        <div style={{ marginTop: 12 }}>
+          <PendingRows clientId={clientId} dpId="phase_0" canManage={editable} tool={2} />
+        </div>
 
         {/* PARKED PROBLEMS, AND EVERY OTHER ONE THE HIERARCHY CANNOT SHOW.
             Reachable, editable in place, and restorable. Nothing here is

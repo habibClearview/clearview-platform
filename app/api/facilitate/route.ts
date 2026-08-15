@@ -21,7 +21,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 import { classifySplit, scoreDistribution, type Submission } from '@/lib/stage1-questions'
 import { mayShowAnswers, mayShowNames } from '@/lib/service-anchor'
-import { startingQuestionSet } from '@/lib/stage1-question-sets'
+import { startingQuestionSetForTool, toolsWithQuestions } from '@/lib/stage1-question-sets'
 // Where an accepted answer goes: a new row for the two questions that NAME
 // something, the row already named for every question that describes it.
 import { isRefusal, planAccept } from '@/lib/stage1-accept'
@@ -91,21 +91,33 @@ const BLOCK_COLUMNS: Record<string, string[]> = {
  * What one facilitator legitimately spends in an hour, at the intervals the
  * components actually use:
  *
- *   RoomControlBar      every 1500ms   2,400
- *   PendingRows         every 3000ms   1,200
+ *   RoomControlBar      every 1500ms   2,400   PER TOOL THAT DRAWS ONE
+ *   PendingRows         every 3000ms   1,200   PER TOOL THAT DRAWS ONE
  *   the projected view  every 1500ms   2,400   (second tab, C46)
- *                                      -----
- *   one block open, projecting          6,000
- *   a second block tab open            +3,600   9,600
  *
- * So anything at or below ten thousand is a cap on WORKING, not on abuse. This
- * is set at double the two-tab figure: a runaway loop does hundreds a second
- * and is still stopped, and a facilitator running a room all afternoon never
- * comes near it.
+ * 15 AUGUST 2026. REDONE, BECAUSE TOOL 2 NOW HAS ITS OWN QUESTIONS.
  *
- * IF YOU CHANGE A POLL INTERVAL, COME BACK AND REDO THIS SUM.
+ * Phase 0 draws a bar and a pending list PER TOOL, not per block, so a coach
+ * with Tools 1 and 2 both unfolded runs four pollers where there used to be
+ * two. Folding a tool unmounts its pollers — Section renders no children when
+ * collapsed — so this is the worst case, not the usual one:
+ *
+ *   Tools 1 and 2 open        (2,400 + 1,200) x 2   7,200
+ *   projecting                                      2,400
+ *                                                   -----
+ *   one block open, projecting                      9,600
+ *   a second block tab open                +7,200  16,800
+ *
+ * The old cap of 20,000 left 3,200 of headroom on that, and Tools 3 to 5 will
+ * each add 3,600 the day they get questions of their own — which would have
+ * put a working afternoon over the line and killed the feed mid-session for
+ * the second time. Set at 40,000: comfortably over five tools projecting in
+ * two tabs, and still nowhere near a runaway loop, which does hundreds a
+ * second.
+ *
+ * IF YOU ADD A POLLER OR CHANGE AN INTERVAL, COME BACK AND REDO THIS SUM.
  */
-const FACILITATE_READS_PER_HOUR = 20000
+const FACILITATE_READS_PER_HOUR = 40000
 
 async function requireManager(req: NextRequest, admin: Admin, clientId: string) {
   return requireAccess(req, admin, clientId, 'manage', {
@@ -124,7 +136,7 @@ async function requireManager(req: NextRequest, admin: Admin, clientId: string) 
  * here. R4's nine other blocks seed nothing and that is a correct answer.
  */
 async function questionsFor(admin: Admin, clientId: string, gateId: string) {
-  const columns = 'id, gate_id, sort_order, question_text, question_type, is_named, answers_visible, authors_visible, target_fields, options, suggested_minutes, scale_min, scale_max, agreed_value, agreed_column, agreed_row_id, agreed_distribution, agreed_at'
+  const columns = 'id, gate_id, tool, sort_order, question_text, question_type, is_named, answers_visible, authors_visible, target_fields, options, suggested_minutes, scale_min, scale_max, agreed_value, agreed_column, agreed_row_id, agreed_distribution, agreed_at'
 
   const { data: existing } = await admin
     .from('gtcv_questions')
@@ -133,23 +145,38 @@ async function questionsFor(admin: Admin, clientId: string, gateId: string) {
     .eq('gate_id', gateId)
     .order('sort_order', { ascending: true })
 
-  if (existing && existing.length > 0) return existing
+  const rows = existing || []
 
-  const seeds = startingQuestionSet(gateId)
-  if (seeds.length === 0) return []
+  // ─────────────────────────────────────────────────────────
+  // SEEDED PER TOOL, NOT PER BLOCK. 15 August 2026.
+  //
+  // This seeded a block only when it was completely EMPTY, which was right
+  // while Phase 0's questions all belonged to Tool 1. Tool 2 has its own five
+  // from today, and every engagement that has already opened Phase 0 would
+  // have been left without them for ever — the questions exist in the code and
+  // never become rows, which is the trap that was already written down:
+  // changing the seed does not change existing rows.
+  //
+  // So each tool is seeded on its own. A tool with rows is left exactly as it
+  // is, however they have been edited.
+  // ─────────────────────────────────────────────────────────
+  const missing = toolsWithQuestions(gateId)
+    .filter((tool) => !rows.some((r) => (r.tool ?? 1) === tool))
+    .flatMap((tool) => startingQuestionSetForTool(gateId, tool))
+  if (missing.length === 0) return rows
 
   // Written once. A second facilitator opening the same block a moment later
   // finds the rows already there and adds nothing, because the read above runs
-  // first and this only ever runs on an empty block.
+  // first and this only ever runs for a tool that has none.
   const { data: created, error } = await admin
     .from('gtcv_questions')
-    .insert(seeds.map((s) => ({ ...s, client_id: clientId })))
+    .insert(missing.map((s) => ({ ...s, client_id: clientId })))
     .select(columns)
   if (error) {
     console.error('facilitate: seeding the question set failed', error)
-    return []
+    return rows
   }
-  return (created || []).sort((a, b) => a.sort_order - b.sort_order)
+  return [...rows, ...(created || [])].sort((a, b) => a.sort_order - b.sort_order)
 }
 
 export async function GET(req: NextRequest) {

@@ -48,11 +48,27 @@ describe('R2, every question carries its five properties', () => {
     }
   })
 
-  it('numbers them in order within each block, with no gaps or repeats', () => {
+  // 15 August 2026. This asked for 1..n across the whole block, which was the
+  // same thing while every question on a block belonged to one tool. Phase 0 is
+  // five tools, each with its own list and its own bar, so the order that has
+  // to hold is: no repeats anywhere on the block, and each TOOL's questions
+  // ascending in the order that tool asks them. A gap between two tools' blocks
+  // of numbers is deliberate — it is room for a sixth question in Tool 1
+  // without renumbering Tool 2 underneath it.
+  it('numbers them with no repeats, and in order within each tool', () => {
     for (const gate of BLOCKS_WITH_QUESTIONS) {
-      const orders = startingQuestionSet(gate).map((q) => q.sort_order)
-      expect(orders).toEqual(orders.map((_, i) => i + 1))
+      const set = startingQuestionSet(gate)
+      const orders = set.map((q) => q.sort_order)
+      expect(new Set(orders).size, `${gate} repeats a sort_order`).toBe(orders.length)
+      for (const tool of Array.from(new Set(set.map((q) => q.tool)))) {
+        const ofTool = set.filter((q) => q.tool === tool).map((q) => q.sort_order)
+        expect(ofTool, `${gate} tool ${tool} is out of order`).toEqual([...ofTool].sort((a, b) => a - b))
+      }
     }
+  })
+
+  it('gives every question a tool, because a block can be five of them', () => {
+    for (const q of all) expect(q.tool, q.question_text).toBeGreaterThanOrEqual(1)
   })
 })
 

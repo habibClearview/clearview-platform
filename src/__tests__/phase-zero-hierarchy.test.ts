@@ -200,6 +200,34 @@ describe('nothing is invisible: every problem the hierarchy cannot draw', () => 
     expect(ids).not.toContain('p-other')
   })
 
+  // ── 15 August 2026. THE PARENT IS THE SERVICE. ──────────────
+  //
+  // A problem stated the new way belongs to a service and has no activity at
+  // all — that is the ordinary state between Tool 1's first question and its
+  // second. This function asked only about activities, so every one of those
+  // correct rows was reported as parked and shown in the bin.
+  describe('a problem parented by its SERVICE', () => {
+    const services = [{ id: 'svc-1' }, { id: 'svc-2', parked_at: '2026-08-12T10:00:00Z' }]
+
+    it('is drawn, not parked, when no activity solves it yet', () => {
+      const p = { ...problem('p-new', null as unknown as string, 'Stated in Tool 1'), service_id: 'svc-1' }
+      expect(problemsOutsideHierarchy([p], activities, services).map((x) => x.id)).toEqual([])
+    })
+
+    it('is still parked when its service is parked', () => {
+      const p = { ...problem('p-svc-parked', null as unknown as string, 'Its service is parked'), service_id: 'svc-2' }
+      expect(problemsOutsideHierarchy([p], activities, services).map((x) => x.id)).toEqual(['p-svc-parked'])
+    })
+
+    it('is still parked when parked itself, whatever its service says', () => {
+      const p = {
+        ...problem('p-both', null as unknown as string, 'Parked', { parked_at: '2026-08-12T11:00:00Z' }),
+        service_id: 'svc-1',
+      }
+      expect(problemsOutsideHierarchy([p], activities, services).map((x) => x.id)).toEqual(['p-both'])
+    })
+  })
+
   it('accounts for every problem exactly once, drawn or parked', () => {
     const drawn = hierarchyForService(service, activities, problems)
       .branches.flatMap((b) => b.problems.map((p) => p.id))

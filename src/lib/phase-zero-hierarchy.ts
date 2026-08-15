@@ -209,11 +209,32 @@ export function hypothesisBuild(
  * A problem under an activity of ANOTHER service is deliberately NOT here.
  * Switching the anchor shows it, so it is already reachable, and listing it as
  * parked would say something untrue about it.
+ *
+ * 15 AUGUST 2026. THE PARENT IS THE SERVICE NOW.
+ *
+ * This asked one question — does it hang from a live activity — and on
+ * 14 August the problem stopped hanging from an activity at all. So every
+ * problem stated the new way, correctly filed under a service, was reported as
+ * "not attached to an activity" and shown in Parked. Correct work, in the bin
+ * marked broken, which is the third time this shape of mistake has cost a
+ * round.
+ *
+ * A problem with a live service is IN the hierarchy, whether or not any
+ * activity solves it yet — that is the ordinary state between Tool 1's first
+ * question and its second. The activity rule is kept for problems written
+ * before the migration, which have an activity and no service.
  */
-export function problemsOutsideHierarchy(problems: Problem[], activities: Activity[]): Problem[] {
+export function problemsOutsideHierarchy(
+  problems: Problem[],
+  activities: Activity[],
+  services: { id: string; parked_at?: string | null }[] = [],
+): Problem[] {
   const activityById = new Map(activities.map((a) => [a.id, a]))
+  const liveService = new Set(services.filter((s) => !s.parked_at).map((s) => s.id))
   return problems.filter((p) => {
     if (p.parked_at) return true
+    // The service is the parent. Where one is named, it decides on its own.
+    if (p.service_id) return services.length > 0 && !liveService.has(p.service_id)
     const parent = p.activity_id ? activityById.get(p.activity_id) : null
     if (!parent) return true
     return Boolean(parent.parked_at) || !parent.service_id

@@ -58,8 +58,8 @@ const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace
 const sans = "'Segoe UI',system-ui,sans-serif"
 
 export default function PendingRows({
-  clientId, dpId, canManage,
-}: { clientId: string; dpId: string; canManage: boolean }) {
+  clientId, dpId, canManage, tool = null,
+}: { clientId: string; dpId: string; canManage: boolean; tool?: number | null }) {
   const [questions, setQuestions] = useState<Question[]>([])
   const [pending, setPending] = useState<Submission[]>([])
   const [rows, setRows] = useState<{ id: string; label: string }[]>([])
@@ -118,9 +118,16 @@ export default function PendingRows({
 
   if (!canManage) return null
 
-  const collect = questions.filter((q) => q.question_type === 'collect')
-  const decided = questions.filter((q) => q.question_type !== 'collect' && q.agreed_value)
-  const anyPending = pending.length > 0
+  // The answers to THIS tool's questions, under this tool's table. A block
+  // with one surface passes no tool and gets all of them, which is right for
+  // every block that is not Phase 0.
+  const myQuestions = tool === null
+    ? questions
+    : questions.filter((q) => ((q as { tool?: number }).tool ?? 1) === tool)
+  const collect = myQuestions.filter((q) => q.question_type === 'collect')
+  const decided = myQuestions.filter((q) => q.question_type !== 'collect' && q.agreed_value)
+  const askedHere = new Set(myQuestions.map((q) => q.id))
+  const anyPending = pending.some((s) => askedHere.has(s.question_id))
 
   if (!anyPending && decided.length === 0) return null
 

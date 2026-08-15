@@ -109,6 +109,10 @@ export function acceptsLateAnswer(
 export interface Problem {
   id: string
   activity_id: string | null
+  /** 14 August 2026. THE PARENT. A problem belongs to the service it is a
+   *  problem for; activity_id is what it used to hang from and is kept so rows
+   *  written before that still read. */
+  service_id?: string | null
   problem: string | null
   parked_at: string | null
   decision: ItemDecision | null

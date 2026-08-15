@@ -38,8 +38,8 @@ const POLL_MS = 1500
 const STALE_MS = 4000
 
 export default function RoomControlBar({
-  clientId, dpId, canManage,
-}: { clientId: string; dpId: string; canManage: boolean }) {
+  clientId, dpId, canManage, tool = 1,
+}: { clientId: string; dpId: string; canManage: boolean; tool?: number }) {
   const [feed, setFeed] = useState<any>(null)
   const [live, setLive] = useState(true)
   const [now, setNow] = useState(() => Date.now())
@@ -94,7 +94,16 @@ export default function RoomControlBar({
 
   if (!canManage) return null
 
-  const questions = feed?.questions || []
+  // ─────────────────────────────────────────────────────────
+  // THIS TOOL'S QUESTIONS, AND ONLY THIS TOOL'S. 15 August 2026.
+  //
+  // Phase 0 is five tools on one block. A bar drawn against Tool 2's heading
+  // that offers Tool 1's questions is the fault that already cost a week in
+  // another form: "signal, or story?" is Tool 4's question and was being asked
+  // from Tool 1. Rows written before the tool column default to 1, so nothing
+  // that already exists changes tool.
+  // ─────────────────────────────────────────────────────────
+  const questions = (feed?.questions || []).filter((q: any) => (q.tool ?? 1) === tool)
   const state = feed?.state || null
   const open = questions.find((q: any) => q.id === state?.open_question_id) || null
   const secondsLeft = timerRemaining(state, now)
