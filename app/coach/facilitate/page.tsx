@@ -45,6 +45,16 @@ import {
   type TargetField,
 } from '@/lib/stage1-questions'
 import { NO_QUESTIONS_YET } from '@/lib/stage1-question-sets'
+import QRCode from 'qrcode'
+// The name of the tool on the wall, so the room and the facilitator can both
+// see which piece of work this question belongs to.
+import { TOOL_NAMES } from '@/lib/stage1-question-sets'
+
+/** What each block is called on the wall. */
+const BLOCK_NAMES: Record<string, string> = {
+  phase_0: 'Clearing the ground',
+  dp01: 'DP01 Service Reality Audit',
+}
 
 const POLL_MS = 1500
 /** R31's test allows five seconds. Four leaves room for one poll to be slow
@@ -142,6 +152,10 @@ function Shell({ children }: { children: React.ReactNode }) {
 function Room() {
   const [clientId, setClientId] = useState<string | null>(null)
   const [gateId, setGateId] = useState<string | null>(null)
+  // WHICH TOOL. A block can be five of them — Phase 0 is — and each has its own
+  // questions. Without this the wall offered all eleven of Phase 0's with
+  // nothing saying which tool any of them belonged to.
+  const [tool, setTool] = useState<number | null>(null)
   const [feed, setFeed] = useState<Feed | null>(null)
   const [live, setLive] = useState(true)
   const [now, setNow] = useState(() => Date.now())
@@ -156,6 +170,8 @@ function Room() {
     const p = new URLSearchParams(window.location.search)
     setClientId(p.get('clientId'))
     setGateId(p.get('gateId'))
+    const t = Number(p.get('tool'))
+    setTool(Number.isFinite(t) && t > 0 ? t : null)
   }, [])
 
   const load = useCallback(async () => {
@@ -208,7 +224,10 @@ function Room() {
     }
   }, [clientId, gateId, load])
 
-  const questions = feed?.questions || []
+  const all = feed?.questions || []
+  const questions = tool === null
+    ? all
+    : all.filter((q) => ((q as unknown as { tool?: number }).tool ?? 1) === tool)
   const state = feed?.state || null
   const open = questions.find((q) => q.id === state?.open_question_id) || null
   const secondsLeft = timerRemaining(state, now)
@@ -248,6 +267,8 @@ function Room() {
         // what is offered here is a list of single questions and there is no
         // control anywhere that opens more than one.
         <div style={{ maxWidth: 900, margin: '3rem auto 0' }}>
+          <BlockHeading gateId={gateId} tool={tool} />
+          <JoinPanel clientId={clientId} gateId={gateId} />
           <RoomSize size={size} setSize={setSize} onSet={(n) => send({ action: 'roomSize', roomSize: n })} />
           {questions.length === 0 ? (
             <p style={{ fontSize: '1.4rem', color: C.quiet, marginTop: '2rem' }}>{NO_QUESTIONS_YET}</p>
@@ -287,6 +308,10 @@ function Room() {
         </div>
       ) : (
         <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+          <BlockHeading gateId={gateId} tool={tool} />
+          {/* The code stays up while a question runs: somebody always arrives
+              late, and a room they cannot join is the same as no room. */}
+          <JoinPanel clientId={clientId} gateId={gateId} />
           {/* R26. Never below forty pixels, whatever the screen. */}
           <h1 style={{
             fontFamily: 'Georgia,serif', fontWeight: 600, lineHeight: 1.15,
@@ -352,6 +377,142 @@ function Room() {
  * second into the answer counter would let a network problem read as a room
  * that had finished answering.
  */
+/**
+ * HOW THE ROOM GETS IN. 15 August 2026.
+ *
+ * There was no way to scan anything from here. The QR lived on the "Sessions
+ * and rooms" page on the ground that a participant scans once — true, but the
+ * scanning happens in the room, looking at the screen at the front of it, and
+ * this IS that screen. So a facilitator could open a question to a room that
+ * had no way to answer it, which is what Habib hit: nothing to test with,
+ * because nobody could get in.
+ *
+ * It shows the open room link for this engagement, and opens one in a press if
+ * there is none. The QR is drawn here, in the page, so the link is never sent
+ * to an image service — sending a URL to a third party to draw is giving the
+ * link away.
+ */
+/** Which block and which tool this question belongs to, said on the wall. */
+function BlockHeading({ gateId, tool }: { gateId: string | null; tool: number | null }) {
+  const blockName = (gateId && BLOCK_NAMES[gateId]) || gateId || ''
+  const toolName = tool ? TOOL_NAMES[tool] : null
+  if (!blockName && !toolName) return null
+  return (
+    <div style={{ color: C.quiet, fontSize: '0.95rem', letterSpacing: '.06em', textTransform: 'uppercase' }}>
+      {blockName}{toolName ? ` · Tool ${tool} — ${toolName}` : ''}
+    </div>
+  )
+}
+
+function JoinPanel({ clientId, gateId }: { clientId: string; gateId: string | null }) {
+  const [link, setLink] = useState<{ join_code: string | null; access_token: string } | null>(null)
+  const [qr, setQr] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [hidden, setHidden] = useState(false)
+
+  const origin = typeof window === 'undefined' ? '' : window.location.origin
+  const url = link
+    ? (link.join_code ? `${origin}/room?c=${encodeURIComponent(link.join_code)}` : `${origin}/session/${link.access_token}`)
+    : null
+
+  const load = useCallback(async () => {
+    try {
+      const res = await authedFetch(`/api/session-link?clientId=${encodeURIComponent(clientId)}`, { cache: 'no-store' })
+      if (!res.ok) return
+      const json = await res.json()
+      const now = Date.now()
+      const live = (json.links || []).find((l: { revoked_at: string | null; expires_at: string | null }) =>
+        !l.revoked_at && (!l.expires_at || new Date(l.expires_at).getTime() > now))
+      setLink(live || null)
+    } catch {
+      /* The next press will say. */
+    }
+  }, [clientId])
+
+  useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (!url) { setQr(null); return }
+    let cancelled = false
+    QRCode.toDataURL(url, { width: 320, margin: 1 })
+      .then((d) => { if (!cancelled) setQr(d) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [url])
+
+  const openRoom = async () => {
+    setBusy(true); setErr(null)
+    try {
+      const res = await authedFetch('/api/session-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId, dpId: gateId || undefined, hours: 12 }),
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        setErr(j?.error || 'That did not go through.')
+      } else {
+        await load()
+      }
+    } catch {
+      setErr('Could not reach the server. Nothing was changed.')
+    }
+    setBusy(false)
+  }
+
+  if (hidden) {
+    return (
+      <button type="button" onClick={() => setHidden(false)} style={{ ...btn('transparent'), marginTop: '1rem' }}>
+        Show the join code
+      </button>
+    )
+  }
+
+  return (
+    <section style={{
+      border: `1px solid ${C.border}`, borderRadius: 14, background: C.card,
+      padding: '1rem 1.2rem', display: 'flex', gap: '1.4rem', alignItems: 'center',
+      flexWrap: 'wrap', marginTop: '1rem',
+    }}>
+      {qr ? (
+        /* A data: URL drawn in this page, so next/image would have nothing to
+           optimise and could not load it anyway. */
+        <img src={qr} alt="Scan to join this room" width={160} height={160}
+          style={{ background: '#FFFFFF', borderRadius: 10, padding: 6 }} />
+      ) : null}
+      <div>
+        <div style={{ color: C.quiet, fontSize: '0.85rem', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+          Scan to answer
+        </div>
+        {link ? (
+          <>
+            {link.join_code ? (
+              <div style={{ fontFamily: 'monospace', fontSize: 'clamp(28px, 3vw, 46px)', letterSpacing: '.12em' }}>
+                {link.join_code}
+              </div>
+            ) : null}
+            <div style={{ color: C.quiet, fontSize: '0.9rem', wordBreak: 'break-all', maxWidth: '32rem' }}>{url}</div>
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: '1.05rem', margin: '0.3rem 0 0.6rem' }}>
+              No room is open, so nobody can answer yet.
+            </p>
+            <button type="button" onClick={openRoom} disabled={busy} style={btn(C.teal)}>
+              {busy ? 'Opening...' : 'Open the room'}
+            </button>
+          </>
+        )}
+        {err ? <p role="alert" style={{ color: C.red, fontSize: '0.9rem' }}>{err}</p> : null}
+      </div>
+      <button type="button" onClick={() => setHidden(true)} style={{ ...btn('transparent'), marginLeft: 'auto' }}>
+        Hide
+      </button>
+    </section>
+  )
+}
+
 function ConnectionIndicator({ live, devices }: { live: boolean; devices: number }) {
   return (
     <div style={{

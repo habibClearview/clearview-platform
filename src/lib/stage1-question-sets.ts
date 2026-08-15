@@ -311,6 +311,21 @@ export function toolsWithQuestions(gateId: string): number[] {
   return Array.from(new Set(startingQuestionSet(gateId).map((s) => s.tool))).sort((a, b) => a - b)
 }
 
+/**
+ * What each tool is called, for the screen at the front of the room.
+ *
+ * The wall showed the question and nothing else, so nobody in the room could
+ * tell which tool it belonged to — and with Phase 0's eleven questions on one
+ * block, neither could the facilitator choosing one.
+ */
+export const TOOL_NAMES: Record<number, string> = {
+  1: 'Assumption Dump Canvas',
+  2: 'Problem Owner Budget Matrix',
+  3: 'Hypothesis Shortlist',
+  4: 'Signal vs Story',
+  5: 'Continue / Pause / Kill',
+}
+
 /** The blocks Stage 1 gives questions to. */
 export const BLOCKS_WITH_QUESTIONS = ['phase_0', 'dp01']
 

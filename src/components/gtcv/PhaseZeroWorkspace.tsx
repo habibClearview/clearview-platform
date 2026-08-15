@@ -52,6 +52,7 @@ import {
   hypothesisBuild,
   problemLabel,
   problemsOutsideHierarchy,
+  orderActivitiesForTable,
   splitRowsByService,
   NO_PROBLEM_STATED,
 } from '@/lib/phase-zero-hierarchy'
@@ -653,7 +654,12 @@ function SaveIndicator({ state, message }) {
   }
   const m = map[state] || map.idle
   return (
-    <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: m.color, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+    // FIXED WIDTH ON PURPOSE. 15 August 2026. "Saving" and "All changes saved"
+    // are different lengths, this sits in a wrapping flex row above the table,
+    // and on a narrow screen the longer one wrapped onto its own line — so the
+    // header grew a line and the whole page moved, on every write. It now
+    // occupies the same space whatever it says.
+    <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: m.color, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', minWidth: '11.5rem', whiteSpace: 'nowrap' }}>
       <span style={{ width: 8, height: 8, borderRadius: '50%', background: m.color, display: 'inline-block' }} />
       {m.text}
     </span>
@@ -1024,10 +1030,51 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
   // /api/services, so this re-reads afterwards. Bumping a number rather than
   // lifting the loader out, so the loader itself is not touched.
   const [refreshKey, setRefreshKey] = useState(0)
+  // ─────────────────────────────────────────────────────────────
+  // THE THIRD PAGE-JUMP CAUSE, AND THE REASON IT KEPT COMING BACK.
+  // 15 August 2026.
+  //
+  // Two rounds removed reload() from two HANDLERS — addActivity and
+  // setProblemText — and left it in hierarchyAction, which is the path every
+  // other control goes through: every Park, Move, Delete, every edit of a
+  // problem that already exists, every "create service from selected". So a
+  // handler was fixed and the shared path underneath it was not, and the jump
+  // came straight back through the next control anybody pressed.
+  //
+  // What reload() does: bumps refreshKey, which re-runs the load effect, which
+  // re-reads five tables and REPLACES every array with a new one. Every memo
+  // recomputes, all five tools re-render, and the save indicator's text changes
+  // twice on the way through — which on a narrow screen re-wraps the header
+  // above the table and moves everything under it.
+  //
+  // refreshAnchor is what those controls want. It re-reads the ONE endpoint the
+  // hierarchy lives in, sets state only where something actually changed, and
+  // never touches the loader or the save indicator. Nothing that is unchanged
+  // re-renders, so nothing moves.
+  //
+  // reload() survives for the two things that genuinely need the five tables
+  // back: unparking, and the first load. Do not put it back on a control.
+  // ─────────────────────────────────────────────────────────────
   const reload = useCallback(() => setRefreshKey((n) => n + 1), [])
   // C25 to C27. ONE set of problem rows, read here and given to both tools, so
   // Tool 1 and Tool 2 cannot disagree about what a problem says.
   const [anchor, setAnchor] = useState({ services: [], activities: [], problems: [], hypothesisSources: [], activityValues: [], currentServiceId: null })
+  const refreshAnchor = useCallback(() => {
+    if (!clientId) return Promise.resolve()
+    return authedFetch(`/api/services?clientId=${encodeURIComponent(clientId)}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!j) return
+        const next = {
+          services: j.services || [], activities: j.activities || [], problems: j.problems || [],
+          hypothesisSources: j.hypothesisSources || [], activityValues: j.activityValues || [],
+          currentServiceId: j.currentServiceId || null,
+        }
+        setAnchor((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next))
+      })
+      .catch(() => {})
+  }, [clientId])
+
   useEffect(() => {
     if (!clientId) return
     let cancelled = false
@@ -1113,7 +1160,20 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
       // save indicator still says a write is in flight — that is what it is for.
       // ─────────────────────────────────────────────────────────
       if (!loadedOnce.current) setLoading(true)
-      setSaveState('loading')
+      // ─────────────────────────────────────────────────────────
+      // A REFRESH DOES NOT TOUCH THE SAVE INDICATOR. 15 August 2026.
+      //
+      // This set 'loading' and then 'idle' on every refresh, so the indicator
+      // ran "Saving" -> "Loading" -> "All changes saved" on every control
+      // press. It sits in a wrapping flex row at the top of the workspace, and
+      // those three strings are different lengths: on a narrow screen the
+      // longest wraps onto its own line, the header grows by a line, and
+      // everything below it moves. On a phone that is most presses.
+      //
+      // The indicator is for WRITES. A background re-read is not a write and
+      // has nothing to say about whether the last one saved.
+      // ─────────────────────────────────────────────────────────
+      if (!loadedOnce.current) setSaveState('loading')
       const order = (q) => q.eq('client_id', clientId).order('sort_order', { ascending: true }).order('created_at', { ascending: true })
       const [a, o, h, s, d, inv] = await Promise.all([
         order(supabase.from('gtcv_assumptions').select('*')),
@@ -1126,17 +1186,35 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
       if (cancelled) return
       const firstError = a.error || o.error || h.error || s.error || d.error
       if (firstError) setLoadError(firstError.message)
-      setAssumptions(a.data || [])
-      setOwners(o.data || [])
-      setHypotheses(h.data || [])
-      setSignals(s.data || [])
-      setDecisions(d.data || [])
+      // ─────────────────────────────────────────────────────────
+      // SET NOTHING THAT HAS NOT CHANGED. 15 August 2026.
+      //
+      // The anchor poll was given this on 14 August and this, the bigger read
+      // of the two, was left without it. Every refresh handed back five brand
+      // new arrays, unchanged rows included, so every memo recomputed and all
+      // five tools re-rendered — and every control goes through here.
+      //
+      // With this, a refresh after a write that changed one row changes one
+      // array, re-renders one table, and leaves the rest of the page — and the
+      // scroll position — exactly where it was.
+      // ─────────────────────────────────────────────────────────
+      const settle = (setter, rows) => setter((prev) => (
+        JSON.stringify(prev) === JSON.stringify(rows || []) ? prev : (rows || [])
+      ))
+      settle(setAssumptions, a.data)
+      settle(setOwners, o.data)
+      settle(setHypotheses, h.data)
+      settle(setSignals, s.data)
+      settle(setDecisions, d.data)
       // Suggestions only. A failed read leaves the field free text, which is
       // what it is anyway, so it is not worth stopping the screen for.
       setInventoryNames((inv.data || []).map((r) => r.service_name).filter(Boolean))
       loadedOnce.current = true
       setLoading(false)
-      setSaveState('idle')
+      // Only the FIRST load clears the indicator. A refresh that follows a save
+      // must leave "Saved" on screen — it is the only confirmation there is
+      // that the write landed.
+      setSaveState((prev) => (prev === 'loading' ? 'idle' : prev))
     }
     load().catch((e) => { if (!cancelled) { setLoadError(e?.message || 'Could not load Phase 0'); setLoading(false); setSaveState('idle') } })
     return () => { cancelled = true }
@@ -1227,9 +1305,12 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     const { error } = await supabase.from('gtcv_assumptions')
       .delete().eq('id', row.id).eq('client_id', clientId)
     if (error) return
+    // The row is already gone from what is on screen, so there is nothing left
+    // for a re-read to tell us. It used to call reload() here as well, which
+    // rebuilt all five tools every time focus left an empty row — that is,
+    // every time you pressed "+ add" and then clicked anything else.
     setAssumptions((prev) => prev.filter((a) => a.id !== row.id))
-    reload()
-  }, [anchor.activityValues, assumptions, clientId, reload])
+  }, [anchor.activityValues, assumptions, clientId])
 
   /**
    * C2. AN ACTIVITY IS CREATED INSIDE THE ANCHORED SERVICE, OR NOT AT ALL.
@@ -1415,23 +1496,13 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
    * all of them, so Tool 1 shows all of them and you scroll rather than switch.
    * Parked rows stay out: they have their own area and their own reason.
    */
-  const allActivities = useMemo(() => {
-    const order = new Map((anchor.services || []).map((s, i) => [s.id, i]))
-    return assumptions
-      .filter((a) => !a.parked_at)
-      .slice()
-      .sort((a, b) => {
-        const sa = order.has(a.service_id) ? order.get(a.service_id) : 9999
-        const sb = order.has(b.service_id) ? order.get(b.service_id) : 9999
-        if (sa !== sb) return sa - sb
-        // Activities solving the same problem sit together, so the problem
-        // column reads as one block rather than repeating in and out.
-        const pa = a.problem_id || ''
-        const pb = b.problem_id || ''
-        if (pa !== pb) return pa < pb ? -1 : 1
-        return (a.sort_order ?? 0) - (b.sort_order ?? 0)
-      })
-  }, [assumptions, anchor.services])
+  const allActivities = useMemo(
+    // The name is written once per group, which only works if the rows of one
+    // service are adjacent. orderActivitiesForTable guarantees that from the
+    // rows themselves — see the comment there for the fault it replaces.
+    () => orderActivitiesForTable(assumptions.filter((a) => !a.parked_at), anchor.services || []),
+    [assumptions, anchor.services],
+  )
 
   /**
    * WHAT TOOL 2 INHERITS: TOOL 1'S PROBLEMS, BY SERVICE. 15 August 2026.
@@ -1502,11 +1573,15 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
    * be run with a room, which is the opposite of true — every tool is run with
    * the room, in order. One element, built once, placed on all five.
    */
-  const runWithRoom = useMemo(() => (
+  // IT CARRIES THE TOOL. 15 August 2026. Every tool's button opened the same
+  // address, so the screen at the front of the room offered all eleven of
+  // Phase 0's questions with nothing saying which tool any of them was — and
+  // pressing it on Tool 2 put Tool 1's list on the wall.
+  const runWithRoomFor = useCallback((tool) => (
     <button
       type="button"
       onClick={() => window.open(
-        `/coach/facilitate?clientId=${encodeURIComponent(clientId)}&gateId=phase_0`,
+        `/coach/facilitate?clientId=${encodeURIComponent(clientId)}&gateId=phase_0&tool=${tool}`,
         '_blank',
         'noopener',
       )}
@@ -1588,12 +1663,17 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         return
       }
       setSaveState('saved')
+      // A refresh cannot move the page any more — see the load effect below,
+      // which sets nothing that has not changed and no longer touches the save
+      // indicator. This is the shared path every control goes through, so it
+      // had to become cheap rather than be removed from one handler at a time.
       reload()
+      refreshAnchor()
     } catch {
       setSaveState('error')
       setSaveMessage('Could not reach the server. Nothing was changed.')
     }
-  }, [clientId, reload])
+  }, [clientId, reload, refreshAnchor])
 
   /**
    * Typing in the Problem column. Where the row already solves a problem the
@@ -1764,7 +1844,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         title="Assumption Dump Canvas"
         question="What are we already doing, and what has to be true for it to work?"
         purposeText="List every activity the organisation runs, and the service it sits under. An organisation sells several services and each is a portfolio of activities, so naming the service is what lets this be read back as what we actually do for gender advisory. For each activity, name what it delivers, who pays for it today, the assumption sitting underneath it, and what evidence would prove that assumption wrong."
-        right={runWithRoom}
+        right={runWithRoomFor(1)}
       >
         {/* THE ROOM CONTROLS, AGAINST THE TOOL THEY RUN. 14 August 2026.
             They used to float above the whole block, which said nothing about
@@ -1911,7 +1991,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
            neither tool's table — a button whose only effect is invisible. The
            add is in the Problem column at the end of each service's own group,
            where it can say which service it is adding to. */
-        right={<HeadingControls>{runWithRoom}</HeadingControls>}
+        right={<HeadingControls>{runWithRoomFor(2)}</HeadingControls>}
       >
         {/* Tool 2's OWN questions, against Tool 2's heading. Tool 1's five
             answers do not belong under this table and this tool's do not belong
@@ -2059,7 +2139,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         title="Hypothesis Shortlist Board"
         question="Which of these are worth testing, and which are we carrying out of habit?"
         purposeText="Score each emerging hypothesis 1 to 5 on Urgency, Ownership clarity, Willingness to pay and Access. The total is out of 20. Only the top 3 to 5 advance out of Phase 0."
-        right={<HeadingControls>{editable ? <button type="button" style={addButton} onClick={addHypothesis}>+ Add hypothesis</button> : null}{runWithRoom}</HeadingControls>}
+        right={<HeadingControls>{editable ? <button type="button" style={addButton} onClick={addHypothesis}>+ Add hypothesis</button> : null}{runWithRoomFor(3)}</HeadingControls>}
       >
         <div style={strip}>
           <span style={pill(C.tintCyan, C.navy)}>{hypotheses.length} on the board</span>
@@ -2139,7 +2219,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         title="Signal vs Story Board"
         question="What did we actually see, and what are we telling ourselves?"
         purposeText="Split each statement in two. A signal is something observed: a behaviour, a payment, a refusal, a document. A story is believed but not observed. Only signals may carry weight in a hypothesis."
-        right={<HeadingControls>{editable ? <button type="button" style={addButton} onClick={addSignal}>+ Add item</button> : null}{runWithRoom}</HeadingControls>}
+        right={<HeadingControls>{editable ? <button type="button" style={addButton} onClick={addSignal}>+ Add item</button> : null}{runWithRoomFor(4)}</HeadingControls>}
       >
         <div style={strip}>
           <span style={pill(C.green, 'var(--cv-on-accent)')}>{signalCount} signal{signalCount === 1 ? '' : 's'}</span>
@@ -2225,7 +2305,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         title="Continue / Pause / Kill Table"
         question="What continues, what pauses, and what stops here?"
         purposeText="Every activity must land somewhere. Give each one a decision, a one sentence rationale, and the decision point it travels to next. An activity with no landing is unfinished Phase 0 work."
-        right={<HeadingControls>{editable ? <button type="button" style={addButton} onClick={addDecision}>+ Add activity</button> : null}{runWithRoom}</HeadingControls>}
+        right={<HeadingControls>{editable ? <button type="button" style={addButton} onClick={addDecision}>+ Add activity</button> : null}{runWithRoomFor(5)}</HeadingControls>}
       >
         <div style={strip}>
           <span style={pill(C.green, 'var(--cv-on-accent)')}>{decisionSummary.counts.continue} continue</span>

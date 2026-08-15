@@ -19,6 +19,7 @@ import {
   NO_PROBLEM_STATED,
   problemLabel,
   problemsOutsideHierarchy,
+  orderActivitiesForTable,
   splitRowsByService,
   type HypothesisSource,
 } from '@/lib/phase-zero-hierarchy'
@@ -266,5 +267,52 @@ describe('what a hypothesis is built from', () => {
     const built = hypothesisBuild('h-none', sources, activities, problems)
     expect(built.activities).toEqual([])
     expect(built.problems).toEqual([])
+  })
+})
+
+// ============================================================
+// THE SERVICE NAME REPEATING ON EVERY ROW.
+//
+// Tool 1 writes the service name once per group by comparing each row with the
+// one above it, so it is only correct while the rows of one service are
+// adjacent. The order used to be looked up in a list that arrives in a separate
+// request; before it landed, two services interleaved and the name repeated
+// down the whole column.
+// ============================================================
+describe('Tool 1 keeps the rows of one service together', () => {
+  const rows = [
+    { id: '1', service_id: 'svc-b', problem_id: 'p2', sort_order: 0 },
+    { id: '2', service_id: 'svc-a', problem_id: 'p1', sort_order: 0 },
+    { id: '3', service_id: 'svc-b', problem_id: 'p1', sort_order: 1 },
+    { id: '4', service_id: 'svc-a', problem_id: 'p3', sort_order: 1 },
+  ]
+
+  /** How the table decides whether to write the name again. */
+  const repeats = (ordered: { service_id: string | null }[]) =>
+    ordered.filter((r, i) => i > 0 && r.service_id !== ordered[i - 1].service_id).length
+
+  it('groups them even when the services list has not arrived yet', () => {
+    // The empty list is the first paint, every time.
+    const out = orderActivitiesForTable(rows, [])
+    expect(repeats(out)).toBe(1) // one change of service, not three
+  })
+
+  it('groups them once the services list has arrived', () => {
+    const out = orderActivitiesForTable(rows, [{ id: 'svc-a' }, { id: 'svc-b' }])
+    expect(out.map((r) => r.service_id)).toEqual(['svc-a', 'svc-a', 'svc-b', 'svc-b'])
+  })
+
+  it('puts rows with no service at the end, together', () => {
+    const withOrphans = [...rows, { id: '5', service_id: null, problem_id: null, sort_order: 0 }]
+    const out = orderActivitiesForTable(withOrphans, [{ id: 'svc-a' }, { id: 'svc-b' }])
+    expect(out[out.length - 1].service_id).toBe(null)
+  })
+
+  it('does not reorder the groups when the list arrives, only refines them', () => {
+    // Same rows, ranked two ways: adjacency holds in both, which is what the
+    // name-once rule depends on.
+    for (const services of [[], [{ id: 'svc-a' }, { id: 'svc-b' }], [{ id: 'svc-b' }, { id: 'svc-a' }]]) {
+      expect(repeats(orderActivitiesForTable(rows, services))).toBe(1)
+    }
   })
 })

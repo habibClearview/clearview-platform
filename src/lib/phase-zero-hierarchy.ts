@@ -250,3 +250,47 @@ export function activityLabel(a: Activity): string {
 export function problemLabel(p: Problem): string {
   return (p.problem || '').trim() || NO_PROBLEM_STATED
 }
+
+
+/**
+ * THE ORDER TOOL 1'S ONE FLAT TABLE IS DRAWN IN.
+ *
+ * The service name is written once per group, and "once" is decided by
+ * comparing each row with the one above it — so it is only correct if the rows
+ * of one service are ADJACENT. That is this function's whole job, and it is
+ * here rather than inside the component so it can be proved without standing a
+ * screen up.
+ *
+ * 15 August 2026. It used to rank a row by looking its service up in a list
+ * loaded by a DIFFERENT request. Until that request landed every row scored the
+ * same, the sort fell through to the problem, two services interleaved, and the
+ * name repeated on every row — then it all re-sorted a moment later. Adjacency
+ * now comes from the rows themselves; the other list only refines the order the
+ * groups appear in.
+ */
+export function orderActivitiesForTable<
+  T extends { service_id?: string | null; problem_id?: string | null; sort_order?: number | null },
+>(rows: T[], services: { id: string }[] = []): T[] {
+  const known = new Map(services.map((s, i) => [s.id, i]))
+  const seen = new Map<string, number>()
+  rows.forEach((a) => {
+    const key = a.service_id || ''
+    if (!seen.has(key)) seen.set(key, seen.size)
+  })
+  const rank = (id: string | null | undefined) => {
+    if (!id) return 1e9
+    return known.has(id) ? (known.get(id) as number) : 1e6 + (seen.get(id) ?? 0)
+  }
+  return rows.slice().sort((a, b) => {
+    const sa = rank(a.service_id)
+    const sb = rank(b.service_id)
+    if (sa !== sb) return sa - sb
+    if ((a.service_id || '') !== (b.service_id || '')) {
+      return (a.service_id || '') < (b.service_id || '') ? -1 : 1
+    }
+    const pa = a.problem_id || ''
+    const pb = b.problem_id || ''
+    if (pa !== pb) return pa < pb ? -1 : 1
+    return (a.sort_order ?? 0) - (b.sort_order ?? 0)
+  })
+}
