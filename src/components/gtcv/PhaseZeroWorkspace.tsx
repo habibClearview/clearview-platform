@@ -1413,10 +1413,26 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     setSaveState('saved')
   }, [clientId])
 
-  // The old blank-service add is gone. It inserted a service with no name and
-  // an empty activity row to hang under it, which is where three unnamed
-  // services on one engagement came from. nameService above writes one only
-  // when it has a name.
+  /**
+   * A SERVICE IS WRITTEN WHEN IT HAS A NAME, NOT WHEN THE BUTTON IS PRESSED.
+   *
+   * The old add inserted a service with no name and an empty activity row to
+   * hang under it, which is where three unnamed services on one engagement came
+   * from. The table offers a draft row instead and this writes it, once.
+   */
+  const nameService = useCallback(async (text, draftKey) => {
+    const name = String(text || '').trim()
+    if (!name) return
+    setSaveState('saving')
+    setSaveMessage(null)
+    const { data, error } = await supabase.from('gtcv_service_inventory')
+      .insert([{ client_id: clientId, service_name: name, sort_order: (anchor.services || []).length }])
+      .select().single()
+    if (error) { setSaveState('error'); setSaveMessage(error.message); return }
+    setAnchor((prev) => ({ ...prev, services: [...(prev.services || []), data] }))
+    if (draftKey) dropDraft(draftKey)
+    setSaveState('saved')
+  }, [clientId, anchor.services, dropDraft])
 
   // addOwner is gone. A problem with no service is a row neither tool can draw;
   // Tool 2 adds inside a service group instead (addProblemToService).

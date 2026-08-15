@@ -56,12 +56,17 @@ const fmtMoney = (n, cur) => formatMoney(n, cur, 0)
 
 // Value by currency, so a mixed currency pipeline is reported honestly
 // rather than added up into a number that means nothing.
-function valueByCurrency(list) {
+// `fallback` is the engagement's currency, PASSED IN. It used to read a
+// `currency` that exists only as a prop inside the component below, so at
+// module level it was simply undefined — a ReferenceError on the first row
+// that carried no currency of its own, which took the whole block down. Found
+// by no-undef on 15 August 2026.
+function valueByCurrency(list, fallback) {
   const out = {}
   list.forEach((r) => {
     const v = num(r.value_estimate)
     if (!v) return
-    const cur = r.value_currency || currency || null
+    const cur = r.value_currency || fallback || null
     out[cur] = (out[cur] || 0) + v
   })
   return out
@@ -200,10 +205,10 @@ export default function PipelineTracker({ clientId, canManage , currency }) {
     return {
       stage: s,
       count: list.length,
-      byCur: valueByCurrency(list),
+      byCur: valueByCurrency(list, currency),
       share: rows.length ? Math.round((list.length / rows.length) * 100) : 0,
     }
-  }), [rows])
+  }), [rows, currency])
 
   const overdue = useMemo(
     () => rows.filter((r) => r.next_action_date && r.next_action_date < today() && r.stage !== 'closed').length,
@@ -243,7 +248,7 @@ export default function PipelineTracker({ clientId, canManage , currency }) {
 
         <div style={{ ...hint, marginTop: '0.75rem', display: 'flex', gap: '1.2rem', flexWrap: 'wrap' }}>
           <span><b style={{ color: C.navy }}>{rows.length}</b> prospects in total</span>
-          <span>Whole pipeline worth <b style={{ color: C.navy }}>{moneyLine(valueByCurrency(rows))}</b></span>
+          <span>Whole pipeline worth <b style={{ color: C.navy }}>{moneyLine(valueByCurrency(rows, currency))}</b></span>
           {overdue > 0 && <span style={{ color: C.amber, fontWeight: 700 }}>{overdue} next action{overdue === 1 ? '' : 's'} past due</span>}
         </div>
       </div>

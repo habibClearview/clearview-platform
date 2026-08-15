@@ -4,10 +4,27 @@
   "parserOptions": {
     "ecmaVersion": 2022,
     "sourceType": "module",
-    "ecmaFeatures": { "jsx": true }
+    "ecmaFeatures": {
+      "jsx": true
+    }
   },
-  "plugins": ["react-hooks"],
+  "env": {
+    "browser": true,
+    "es2022": true,
+    "node": true
+  },
+  "plugins": [
+    "react-hooks"
+  ],
+  "globals": {
+    "React": "readonly",
+    "RequestInit": "readonly",
+    "RequestCredentials": "readonly",
+    "JSX": "readonly",
+    "NodeJS": "readonly"
+  },
   "rules": {
-    "react-hooks/rules-of-hooks": "error"
+    "react-hooks/rules-of-hooks": "error",
+    "no-undef": "error"
   }
 }
