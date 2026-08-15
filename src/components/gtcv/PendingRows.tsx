@@ -31,6 +31,18 @@ import {
   type Question,
   type Submission,
 } from '@/lib/stage1-questions'
+// Which row this answer fills, and therefore which list the facilitator picks
+// from when it is the wrong one.
+import { chooserFor } from '@/lib/stage1-accept'
+
+/** The chain the room is working through, as the route reports it. */
+interface Chain {
+  serviceId: string | null
+  problemId: string | null
+  activityId: string | null
+  problems: { id: string; label: string }[]
+  activities: { id: string; label: string; problemId: string | null }[]
+}
 
 const C = {
   navy: '#1B2A41',
@@ -51,6 +63,7 @@ export default function PendingRows({
   const [questions, setQuestions] = useState<Question[]>([])
   const [pending, setPending] = useState<Submission[]>([])
   const [rows, setRows] = useState<{ id: string; label: string }[]>([])
+  const [chain, setChain] = useState<Chain | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [openDistribution, setOpenDistribution] = useState<string | null>(null)
@@ -67,6 +80,10 @@ export default function PendingRows({
       setQuestions(json.questions || [])
       setPending(json.pending || [])
       setRows(json.blockRows || [])
+      // Compared before setting. This reads every three seconds, and handing
+      // back a new object each time reset the chooser under the facilitator's
+      // hand between deciding and pressing.
+      setChain((prev) => (JSON.stringify(prev) === JSON.stringify(json.chain ?? null) ? prev : (json.chain ?? null)))
     } catch {
       // Nothing arrives, nothing changes on screen. R29: this window and the
       // Facilitator View each keep themselves current, so neither stops
@@ -130,11 +147,16 @@ export default function PendingRows({
                     group={g}
                     question={q}
                     rows={rows}
+                    chain={chain}
                     busy={busy}
                     suggestion={suggestions.find((s) => s.mergeIndex === i)
                       ? groups[suggestions.find((s) => s.mergeIndex === i)!.keepIndex]
                       : null}
-                    onAccept={() => act({ action: 'accept', submissionIds: g.submissions.map((s) => s.id) })}
+                    onAccept={(targetRowId) => act({
+                      action: 'accept',
+                      submissionIds: g.submissions.map((s) => s.id),
+                      ...(targetRowId ? { targetRowId } : {}),
+                    })}
                     onMerge={(into) => act({ action: 'merge', submissionIds: g.submissions.map((s) => s.id), intoRowId: into })}
                     onDiscard={() => act({ action: 'discard', submissionIds: g.submissions.map((s) => s.id) })}
                   />
@@ -174,20 +196,52 @@ export default function PendingRows({
 }
 
 function PendingRow({
-  group, question, rows, busy, suggestion, onAccept, onMerge, onDiscard,
+  group, question, rows, chain, busy, suggestion, onAccept, onMerge, onDiscard,
 }: {
   group: GroupedSubmission
   question: Question
   rows: { id: string; label: string }[]
+  chain: Chain | null
   busy: boolean
   suggestion: GroupedSubmission | null
-  onAccept: () => void
+  onAccept: (targetRowId: string | null) => void
   onMerge: (into: string) => void
   onDiscard: () => void
 }) {
   const [mergeInto, setMergeInto] = useState('')
+  // Empty means "wherever the room is", which is what the facilitator wants
+  // almost every time. It is only touched when this answer belongs somewhere
+  // else, so it is not a required choice before every press.
+  const [target, setTarget] = useState('')
   const first = (question.target_fields || [])[0]
   const headline = first ? (group.display?.[first.column] || '') : ''
+
+  // ─────────────────────────────────────────────────────────────
+  // WHERE THIS ANSWER LANDS, SAID BEFORE IT IS PRESSED. 15 August 2026.
+  //
+  // Accept fills the row the answer is about. "What does that activity
+  // deliver?" fills the activity the room is on — so which activity that is
+  // has to be on the screen beside the button, not discovered afterwards by
+  // scrolling the table looking for the change.
+  // ─────────────────────────────────────────────────────────────
+  const kind = chooserFor((question.target_fields || []).map((f) => f.column))
+  const options = kind === 'problem' ? (chain?.problems || [])
+    : kind === 'activity' ? (chain?.activities || [])
+    : []
+  const anchored = kind === 'problem' ? chain?.problemId
+    : kind === 'activity' ? chain?.activityId
+    : null
+  const chosen = target || anchored || ''
+  const landingLabel = options.find((o) => o.id === chosen)?.label || null
+  const verb = kind === 'activity' ? 'Fills' : kind === 'problem' ? 'Goes under' : null
+  // What accept will say if it is pressed with nothing to land on. Said here
+  // instead, before the press, because a refusal in front of a room is worse
+  // than a sentence that stops it happening.
+  const missing = kind && !chosen
+    ? (kind === 'activity'
+      ? 'No activity yet. Accept an activity first, then this.'
+      : 'No problem yet. Accept a problem first, then this.')
+    : null
 
   return (
     <div style={{
@@ -231,10 +285,49 @@ function PendingRow({
               Looks close to &ldquo;{first ? suggestion.display?.[first.column] : ''}&rdquo;. Merge only if they are the same thing.
             </div>
           ) : null}
+
+          {/* Where it lands, and the way to send it somewhere else. Drawn only
+              on the questions that describe something already named: the two
+              that NAME a problem or an activity have nothing to choose. */}
+          {kind ? (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 6 }}>
+              <span style={{ ...mono, fontSize: 10.5, letterSpacing: '.08em', textTransform: 'uppercase', color: C.slate }}>
+                {verb}
+              </span>
+              {options.length > 0 ? (
+                <select
+                  value={chosen}
+                  disabled={busy}
+                  onChange={(e) => setTarget(e.target.value)}
+                  aria-label={kind === 'activity' ? 'Which activity this fills' : 'Which problem this goes under'}
+                  style={{
+                    fontFamily: sans, fontSize: 13, color: C.navy, background: '#FFFFFF',
+                    border: `1px solid ${C.border}`, borderRadius: 6, padding: '3px 6px', maxWidth: '22rem',
+                  }}
+                >
+                  {/* Nothing anchored: the facilitator says which, rather than
+                      the browser showing the first one and the answer landing
+                      on a row nobody chose. */}
+                  {!chosen ? <option value="">Choose one...</option> : null}
+                  {options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+              ) : (
+                <span style={{ fontSize: 12.5, color: C.amber }}>{missing}</span>
+              )}
+              {options.length > 0 && missing ? (
+                <span style={{ fontSize: 12.5, color: C.amber }}>{missing}</span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <button type="button" disabled={busy} onClick={onAccept} style={btn(C.teal)}>Accept</button>
+          <button
+            type="button"
+            disabled={busy || Boolean(missing)}
+            onClick={() => onAccept(target || null)}
+            style={missing ? { ...btn(C.slate), opacity: 0.45, cursor: 'default' } : btn(C.teal)}
+          >Accept</button>
           <select
             value={mergeInto}
             onChange={(e) => { setMergeInto(e.target.value); if (e.target.value) onMerge(e.target.value) }}

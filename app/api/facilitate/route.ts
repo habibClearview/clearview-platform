@@ -22,6 +22,9 @@ import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-auth
 import { classifySplit, scoreDistribution, type Submission } from '@/lib/stage1-questions'
 import { mayShowAnswers, mayShowNames } from '@/lib/service-anchor'
 import { startingQuestionSet } from '@/lib/stage1-question-sets'
+// Where an accepted answer goes: a new row for the two questions that NAME
+// something, the row already named for every question that describes it.
+import { isRefusal, planAccept } from '@/lib/stage1-accept'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,7 +65,12 @@ const BLOCK_SERVICE_COLUMN: Record<string, string> = {
  *  column name arriving in a request can never reach the database unchecked. */
 const BLOCK_COLUMNS: Record<string, string[]> = {
   gtcv_assumptions: ['service_name', 'activity', 'delivers', 'who_pays', 'assumption', 'disproof'],
-  gtcv_problem_owner_budget: ['problem'],
+  // 15 August. Tool 2's own five, so its questions can fill the problem Tool 1
+  // already stated instead of making a second copy of it.
+  gtcv_problem_owner_budget: [
+    'problem', 'experienced_by', 'accountable', 'budget_holder',
+    'cost_of_not_solving', 'budget_mechanism',
+  ],
   gtcv_service_inventory: [
     'service_name', 'what_it_delivers', 'logic_type', 'has_demand',
     'hidden_delivery_costs', 'delivery_quality_risk', 'decision', 'notes',
@@ -158,7 +166,7 @@ export async function GET(req: NextRequest) {
 
     const { data: state } = await admin
       .from('gtcv_room_state')
-      .select('open_question_id, revealed, timer_started_at, timer_seconds, timer_paused_with_seconds_left, room_size')
+      .select('open_question_id, revealed, timer_started_at, timer_seconds, timer_paused_with_seconds_left, room_size, current_service_id, current_problem_id, current_activity_id')
       .eq('client_id', clientId)
       .maybeSingle()
 
@@ -231,13 +239,63 @@ export async function GET(req: NextRequest) {
       pending = ((data || []) as Submission[]).filter((s) => collectIds.has(s.question_id))
     }
 
+    // ─────────────────────────────────────────────────────────
+    // WHAT A PENDING ANSWER WILL FILL, AND WHAT ELSE IT COULD FILL.
+    // 15 August 2026.
+    //
+    // Accept now fills the row an answer is about. The facilitator has to be
+    // able to see WHICH row before pressing, and to point the answer somewhere
+    // else when the room named three activities and this one is about the
+    // second. Both lists are the chain the room is working through, so the
+    // chooser beside an answer offers real rows and never free text.
+    // ─────────────────────────────────────────────────────────
+    let chain: {
+      serviceId: string | null
+      problemId: string | null
+      activityId: string | null
+      problems: { id: string; label: string }[]
+      activities: { id: string; label: string; problemId: string | null }[]
+    } | null = null
+    if (gateId === 'phase_0' && pending.length > 0) {
+      const serviceId = state?.current_service_id || null
+      // Only the anchored service's rows: the question was asked about one
+      // service, and a chooser listing the whole engagement would make it easy
+      // to file an answer under the service nobody was talking about.
+      const [{ data: probs }, { data: acts }] = await Promise.all([
+        admin.from('gtcv_problem_owner_budget')
+          .select('id, problem, service_id, parked_at')
+          .eq('client_id', clientId).order('created_at', { ascending: true }).limit(500),
+        admin.from('gtcv_assumptions')
+          .select('id, activity, service_id, problem_id, parked_at')
+          .eq('client_id', clientId).order('created_at', { ascending: true }).limit(500),
+      ])
+      const mine = <T extends { service_id?: string | null; parked_at?: string | null }>(r: T) =>
+        !r.parked_at && (!serviceId || r.service_id === serviceId)
+      chain = {
+        serviceId,
+        problemId: state?.current_problem_id || null,
+        activityId: state?.current_activity_id || null,
+        problems: (probs || []).filter(mine)
+          .map((p) => ({ id: p.id, label: (p.problem || '').trim() || 'Problem with no words yet' })),
+        activities: (acts || []).filter(mine)
+          .map((a) => ({
+            id: a.id,
+            label: (a.activity || '').trim() || 'Activity with no words yet',
+            problemId: a.problem_id || null,
+          })),
+      }
+    }
+
     // R21. The rows already in the block's table, so a pending answer can be
     // merged into one of them. Only the identifier and enough words to
     // recognise the row by: this list is for choosing, not for reading.
     let blockRows: { id: string; label: string }[] = []
     const table = gateId ? BLOCK_TABLE[gateId] : null
     if (table && pending.length > 0) {
-      const first = (BLOCK_COLUMNS[table] || [])[0]
+      // The column that NAMES the row, which is not always the first one this
+      // table accepts: gtcv_assumptions takes service_name first, so every row
+      // in the list read as the service and they were impossible to tell apart.
+      const first = table === 'gtcv_assumptions' ? 'activity' : (BLOCK_COLUMNS[table] || [])[0]
       const { data } = await admin
         .from(table)
         .select(`id, ${first}`)
@@ -267,6 +325,7 @@ export async function GET(req: NextRequest) {
       answered,
       pending,
       blockRows,
+      chain,
       connectedDevices: connected || 0,
       cards,
       distribution,
@@ -298,6 +357,8 @@ export async function POST(req: NextRequest) {
       dissent?: { note?: string; name?: string }[]
       submissionIds?: string[]
       intoRowId?: string
+      /** The row the facilitator pointed this answer at, overriding the anchor. */
+      targetRowId?: string
       answersVisible?: boolean
       authorsVisible?: boolean
     }
@@ -564,8 +625,19 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
-      // R21. Accept, merge, discard. Accepting converts a pending answer into a
-      // normal row of the block's own table in one press, with no retyping.
+      // R21. Accept, merge, discard.
+      //
+      // ACCEPT FILLS THE ROW THE ANSWER IS ABOUT. 15 August 2026.
+      //
+      // It used to insert, always, whatever the question asked. Six questions
+      // answered gave six rows with one cell each and nothing joining them,
+      // which is what Habib saw and reported. The rule is in
+      // src/lib/stage1-accept.ts: naming a problem or an activity makes a row,
+      // and everything else FILLS the row already named.
+      //
+      // Nothing is thrown away when the chain is not there yet. A refusal
+      // leaves the answer PENDING and says which press is missing, so the
+      // facilitator accepts the activity and then comes back to this.
       case 'accept': {
         const ids = (body.submissionIds || []).filter((s) => typeof s === 'string').slice(0, 200)
         if (ids.length === 0) return NextResponse.json({ error: 'Nothing to accept' }, { status: 400 })
@@ -583,22 +655,40 @@ export async function POST(req: NextRequest) {
         const q = await ownQuestion(rows[0].question_id)
         if (!q) return NextResponse.json({ error: 'That block does not take answers yet' }, { status: 400 })
 
-        // WHICH TABLE THIS ANSWER BELONGS IN. 14 August 2026.
-        //
-        // Tool 1 asks six questions, one variable each, and they do not all
-        // land in the same place: the problem a service solves is a row of the
-        // problem table, and the other five are columns of an activity. The
-        // question's own target field decides, so a question added later needs
-        // nothing changed here.
         const fields = (q.target_fields || []) as { column: string }[]
-        const wantsProblem = fields.some((f) => f.column === 'problem')
-        const table = wantsProblem ? 'gtcv_problem_owner_budget' : BLOCK_TABLE[q.gate_id]
-        if (!table) return NextResponse.json({ error: 'That block does not take answers yet' }, { status: 400 })
 
-        // Every submission in the group is the same answer, so one row is
+        // What the room is working through. The service has always been here;
+        // the problem and the activity are what accept was missing.
+        const { data: room } = await admin
+          .from('gtcv_room_state')
+          .select('current_service_id, current_problem_id, current_activity_id')
+          .eq('client_id', clientId)
+          .maybeSingle()
+
+        // The facilitator may point one answer at a different row before
+        // pressing Accept — the room named three activities and this "who pays"
+        // belongs to the second. Checked against this engagement below, never
+        // trusted from the request.
+        const targetRowId = typeof body.targetRowId === 'string' && body.targetRowId ? body.targetRowId : null
+
+        const plan = planAccept(
+          fields.map((f) => f.column),
+          {
+            serviceId: room?.current_service_id || null,
+            problemId: room?.current_problem_id || null,
+            activityId: room?.current_activity_id || null,
+          },
+          BLOCK_TABLE[q.gate_id] || null,
+          targetRowId,
+        )
+        if (isRefusal(plan)) {
+          return NextResponse.json({ error: plan.refusal }, { status: 409 })
+        }
+
+        // Every submission in the group is the same answer, so one value is
         // written, not one per person. The people are already recorded on the
         // submissions themselves.
-        const allowed = BLOCK_COLUMNS[table] || []
+        const allowed = BLOCK_COLUMNS[plan.table] || []
         const values: Record<string, string> = {}
         for (const f of fields) {
           if (!allowed.includes(f.column)) continue
@@ -609,36 +699,149 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'There is nothing in that answer to accept' }, { status: 400 })
         }
 
-        // The row belongs to the service the room was working inside when the
-        // answer was given. Taken from the room's own state, never from the
-        // request and never from the service NAME a participant typed: two
-        // people type "Workshop" and "Gender Workshop" for the same service, and
-        // a name cannot be matched to a row with any confidence. The anchor is
-        // the only thing that knows which service this actually was.
-        const serviceColumn = BLOCK_SERVICE_COLUMN[table]
-        const link: Record<string, unknown> = {}
-        if (serviceColumn) {
-          const { data: room } = await admin
-            .from('gtcv_room_state')
-            .select('current_service_id')
-            .eq('client_id', clientId)
-            .maybeSingle()
-          // Nothing anchored is left null rather than guessed at. The row is
-          // still written, so the answer is never thrown away, and it is
-          // reachable from the Parked area exactly as an unassigned row always
-          // has been.
-          if (room?.current_service_id) link[serviceColumn] = room.current_service_id
+        /** A row named in the request has to be on this engagement. */
+        const ownsRow = async (table: string, id: string) => {
+          const { data } = await admin.from(table)
+            .select('id').eq('id', id).eq('client_id', clientId).maybeSingle()
+          return Boolean(data)
         }
 
-        const { error: iErr } = await admin.from(table).insert({ client_id: clientId, ...values, ...link })
-        if (iErr) {
-          console.error('facilitate: accepting into the block table failed', iErr)
-          return NextResponse.json({ error: 'Could not add that row' }, { status: 500 })
+        const stamp = new Date().toISOString()
+        // What the room moves on to once this lands, so the next question's
+        // answer has somewhere to go without anybody choosing anything.
+        const nextAnchor: Record<string, unknown> = {}
+
+        if (plan.mode === 'fillActivityValue' || plan.mode === 'fillProblemColumn') {
+          const table = plan.mode === 'fillActivityValue' ? 'gtcv_assumptions' : 'gtcv_problem_owner_budget'
+          if (!(await ownsRow(table, plan.rowId!))) {
+            // The row was parked or deleted between the answer and the press.
+            return NextResponse.json({
+              error: 'The row this was going to fill is no longer there. Choose another beside the answer.',
+            }, { status: 409 })
+          }
+        }
+
+        if (plan.mode === 'fillActivityValue') {
+          // T1.21. THE FOUR FIELDS HOLD MORE THAN ONE VALUE, so a second
+          // "who pays" from the room is a second value, not a replacement. A
+          // second funder is a fact about the activity, and overwriting the
+          // first would delete what the room already agreed.
+          const field = plan.field!
+          const value = values[field]
+          const { data: existing } = await admin.from('gtcv_activity_values')
+            .select('id').eq('activity_id', plan.rowId!).eq('field', field)
+            .order('sort_order', { ascending: true })
+
+          // THE CARRY-ACROSS. Where a field has no value rows yet, the original
+          // column still holds what somebody typed into the table by hand. The
+          // moment a value row exists that column stops being read, so the typed
+          // answer has to come across as the first value or the room's answer
+          // would silently erase it.
+          let nextSort = (existing || []).length
+          if (nextSort === 0) {
+            const { data: act } = await admin.from('gtcv_assumptions')
+              .select(field).eq('id', plan.rowId!).eq('client_id', clientId).maybeSingle()
+            const typed = String((act as Record<string, unknown> | null)?.[field] ?? '').trim()
+            if (typed && typed !== value.trim()) {
+              const { error: cErr } = await admin.from('gtcv_activity_values').insert({
+                client_id: clientId, activity_id: plan.rowId, field, value: typed, sort_order: 0,
+              })
+              if (cErr) throw cErr
+              nextSort = 1
+            }
+          }
+
+          const { error: vErr } = await admin.from('gtcv_activity_values').insert({
+            client_id: clientId, activity_id: plan.rowId, field, value, sort_order: nextSort,
+          })
+          if (vErr) {
+            console.error('facilitate: filling the activity failed', vErr)
+            return NextResponse.json({ error: 'Could not fill that row' }, { status: 500 })
+          }
+          // The first value is mirrored back into the original column, which is
+          // what the table, the exports and this route all still read.
+          if (nextSort === 0) {
+            await admin.from('gtcv_assumptions')
+              .update({ [field]: value, updated_at: stamp })
+              .eq('id', plan.rowId!).eq('client_id', clientId)
+          }
+        } else if (plan.mode === 'fillProblemColumn') {
+          // Tool 2's columns hold one answer each — one budget holder, one
+          // mechanism — so these fill the column itself.
+          const { error: uErr } = await admin.from('gtcv_problem_owner_budget')
+            .update({ [plan.field!]: values[plan.field!], updated_at: stamp })
+            .eq('id', plan.rowId!).eq('client_id', clientId)
+          if (uErr) {
+            console.error('facilitate: filling the problem failed', uErr)
+            return NextResponse.json({ error: 'Could not fill that row' }, { status: 500 })
+          }
+        } else if (plan.mode === 'createProblem') {
+          const { data: made, error: iErr } = await admin.from('gtcv_problem_owner_budget')
+            .insert({ client_id: clientId, ...values, service_id: plan.serviceId })
+            .select('id').single()
+          if (iErr) {
+            console.error('facilitate: accepting the problem failed', iErr)
+            return NextResponse.json({ error: 'Could not add that row' }, { status: 500 })
+          }
+          // The room has just named the problem it is working through, so the
+          // activity that answers the next question hangs off this one.
+          nextAnchor.current_problem_id = made.id
+          nextAnchor.current_activity_id = null
+        } else if (plan.mode === 'createActivity') {
+          if (!(await ownsRow('gtcv_problem_owner_budget', plan.problemId!))) {
+            return NextResponse.json({
+              error: 'That problem is no longer there. Choose another beside the answer.',
+            }, { status: 409 })
+          }
+          // The service is taken from the problem the activity solves, so the
+          // two can never disagree about which service this row is in.
+          const { data: parent } = await admin.from('gtcv_problem_owner_budget')
+            .select('service_id').eq('id', plan.problemId!).maybeSingle()
+          const serviceId = parent?.service_id || plan.serviceId || null
+          const { data: svc } = serviceId
+            ? await admin.from('gtcv_service_inventory').select('service_name').eq('id', serviceId).maybeSingle()
+            : { data: null }
+          const { data: made, error: iErr } = await admin.from('gtcv_assumptions')
+            .insert({
+              client_id: clientId, ...values,
+              service_id: serviceId, service_name: svc?.service_name || null,
+              problem_id: plan.problemId,
+            })
+            .select('id').single()
+          if (iErr) {
+            console.error('facilitate: accepting the activity failed', iErr)
+            return NextResponse.json({ error: 'Could not add that row' }, { status: 500 })
+          }
+          // The next four questions are about THIS activity.
+          nextAnchor.current_activity_id = made.id
+          nextAnchor.current_problem_id = plan.problemId
+        } else {
+          // Every other block. The answer is a row of that block's own table,
+          // carrying the anchored service where the table has one.
+          const serviceColumn = BLOCK_SERVICE_COLUMN[plan.table]
+          const link: Record<string, unknown> = {}
+          if (serviceColumn && room?.current_service_id) link[serviceColumn] = room.current_service_id
+          const { error: iErr } = await admin.from(plan.table).insert({ client_id: clientId, ...values, ...link })
+          if (iErr) {
+            console.error('facilitate: accepting into the block table failed', iErr)
+            return NextResponse.json({ error: 'Could not add that row' }, { status: 500 })
+          }
+        }
+
+        // A filled row the facilitator pointed at becomes what the room is on,
+        // so the questions after it follow the answer rather than the anchor it
+        // was redirected away from.
+        if (targetRowId && plan.mode === 'fillActivityValue') nextAnchor.current_activity_id = targetRowId
+        if (targetRowId && plan.mode === 'fillProblemColumn') nextAnchor.current_problem_id = targetRowId
+
+        if (Object.keys(nextAnchor).length > 0) {
+          await admin.from('gtcv_room_state')
+            .upsert({ client_id: clientId, ...nextAnchor, updated_at: stamp }, { onConflict: 'client_id' })
         }
 
         const { error } = await admin
           .from('gtcv_submissions')
-          .update({ disposition: 'accepted', updated_at: new Date().toISOString() })
+          .update({ disposition: 'accepted', updated_at: stamp })
           .in('id', rows.map((r) => r.id))
           .eq('client_id', clientId)
         if (error) throw error
