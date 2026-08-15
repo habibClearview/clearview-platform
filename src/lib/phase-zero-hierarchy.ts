@@ -334,7 +334,7 @@ export interface Tool1Draft {
   serviceId: string | null
   /** Set on a draft activity: the problem it will solve. Null on a draft problem. */
   problemId: string | null
-  kind: 'activity' | 'problem'
+  kind: 'activity' | 'problem' | 'service'
 }
 
 export interface Tool1Row {
@@ -434,6 +434,15 @@ export function buildTool1Rows(
   }
 
   live.forEach((s) => drawService(s.id))
+  // A service being named. Nothing is written until it has a name, so pressing
+  // "+ add a service" three times and walking away leaves nothing behind — which
+  // is where three unnamed services came from.
+  drafts.filter((d) => d.kind === 'service').forEach((d) => out.push({
+    key: d.key,
+    serviceId: null, firstOfService: true, lastOfService: true,
+    problemId: null, firstOfProblem: true, lastOfProblem: true,
+    activityId: null, draft: d,
+  }))
   // Anything with no service at all, so nothing on the engagement is invisible.
   const homeless = liveActivities.filter((a) => !a.service_id || !live.some((s) => s.id === a.service_id))
   const homelessProblems = liveProblems.filter((p) => !p.service_id || !live.some((s) => s.id === p.service_id))

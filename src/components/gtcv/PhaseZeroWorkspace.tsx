@@ -245,7 +245,8 @@ function TextCell({ value, onCommit, canManage, placeholder, rows = 2, ariaLabel
 function ActivityTable({
   rows, editable, anchor, clientId, selected, onToggle, onEditActivity, onEditProblem,
   serviceNameFor, activityById, problemById, onAction, onReload,
-  onAddActivity, onAddProblem, onAddService, onNameActivity, onNameProblem, onRenameService,
+  onAddActivity, onAddProblem, onAddService, onNameActivity, onNameProblem, onNameService,
+  onRenameService,
 }) {
   return (
     <div style={tableWrap}>
@@ -286,7 +287,15 @@ function ActivityTable({
                   the first row of its group and nowhere else, because a chooser
                   on every row read as five services. */}
               <td style={{ ...td, ...(r.firstOfService ? {} : { borderTop: 'none' }) }}>
-                {!r.firstOfService ? null : !r.serviceId ? (
+                {!r.firstOfService ? null : r.draft?.kind === 'service' ? (
+                  <TextCell
+                    value=""
+                    canManage={editable}
+                    placeholder="Name the service"
+                    ariaLabel="Name the service"
+                    onCommit={(v) => onNameService(v, r.draft.key)}
+                  />
+                ) : !r.serviceId ? (
                   <span style={{ fontSize: '0.8rem', color: C.faint, fontStyle: 'italic' }}>Not in a service</span>
                 ) : editable ? (
                   <TextCell
@@ -1404,33 +1413,10 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     setSaveState('saved')
   }, [clientId])
 
-  /**
-   * A SERVICE IS ADDED FROM THE TABLE, LIKE EVERYTHING ELSE. 14 August 2026.
-   *
-   * There was a separate "Add a service" button above the table, and a service
-   * created there did not appear in the table at all — the table was built from
-   * ACTIVITIES, so a service with none had no row to be seen on. A control that
-   * adds something invisible is worse than no control.
-   *
-   * So: "+ add" under the Service column, the same shape and the same gesture
-   * as every other add, and the new service arrives carrying one empty row so
-   * there is somewhere to state its first problem.
-   */
-  const addService = useCallback(async () => {
-    setSaveState('saving')
-    setSaveMessage(null)
-    const { data: svc, error } = await supabase.from('gtcv_service_inventory')
-      .insert([{ client_id: clientId, sort_order: (anchor.services || []).length }])
-      .select().single()
-    if (error) { setSaveState('error'); setSaveMessage(error.message); return }
-    const { data: row, error: rErr } = await supabase.from('gtcv_assumptions')
-      .insert([{ client_id: clientId, service_id: svc.id, sort_order: assumptions.length }])
-      .select().single()
-    if (rErr) { setSaveState('error'); setSaveMessage(rErr.message); return }
-    setAnchor((prev) => ({ ...prev, services: [...(prev.services || []), svc] }))
-    setAssumptions((prev) => [...prev, row])
-    setSaveState('saved')
-  }, [clientId, anchor.services, assumptions.length])
+  // The old blank-service add is gone. It inserted a service with no name and
+  // an empty activity row to hang under it, which is where three unnamed
+  // services on one engagement came from. nameService above writes one only
+  // when it has a name.
 
   // addOwner is gone. A problem with no service is a row neither tool can draw;
   // Tool 2 adds inside a service group instead (addProblemToService).
@@ -1922,7 +1908,8 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             onAddProblem={(serviceId) => addDraft('problem', serviceId)}
             onNameActivity={nameActivity}
             onNameProblem={nameProblem}
-            onAddService={addService}
+            onAddService={() => addDraft('service', null)}
+            onNameService={nameService}
             onRenameService={renameService}
           />
         )}

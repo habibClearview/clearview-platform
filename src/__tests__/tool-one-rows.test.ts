@@ -154,3 +154,26 @@ describe('adding does not write an empty row', () => {
     expect(rows).toHaveLength(1)
   })
 })
+
+describe('a service is written when it has a name, not when the button is pressed', () => {
+  it('draws a draft service as a row of its own with nothing under it', () => {
+    const rows = buildTool1Rows(
+      [svc('s1')], [prob('p1', 's1')], [act('a1', 's1', 'p1')],
+      [{ key: 'd9', kind: 'service' as const, serviceId: null, problemId: null }],
+    )
+    const last = rows[rows.length - 1]
+    expect(last.draft?.kind).toBe('service')
+    expect(last.serviceId).toBe(null)
+    expect(last.firstOfService).toBe(true)
+    // The real service is untouched above it.
+    expect(rows[0].serviceId).toBe('s1')
+  })
+
+  it('leaves nothing behind when the draft is abandoned', () => {
+    // Three presses, nothing typed: three rows on screen, no services anywhere.
+    const drafts = ['d1', 'd2', 'd3'].map((key) => ({ key, kind: 'service' as const, serviceId: null, problemId: null }))
+    const rows = buildTool1Rows([], [], [], drafts)
+    expect(rows).toHaveLength(3)
+    expect(rows.every((r) => r.draft && r.serviceId === null)).toBe(true)
+  })
+})
