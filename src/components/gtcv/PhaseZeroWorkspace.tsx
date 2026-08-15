@@ -28,7 +28,7 @@
 //
 // Client agnostic: the only client input is the clientId prop.
 // ============================================================
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 // C4. The service anchor, sticky above all five tools.
 import ServiceAnchorBar from '@/components/gtcv/ServiceAnchorBar'
@@ -895,6 +895,8 @@ function HypothesisBlock({
 export default function PhaseZeroWorkspace({ clientId, canManage }) {
   const editable = !!canManage
   const [loading, setLoading] = useState(true)
+  // True once the workspace has drawn at all, so a later refresh never blanks it.
+  const loadedOnce = useRef(false)
   const [loadError, setLoadError] = useState(null)
   const [saveState, setSaveState] = useState('loading')
   const [saveMessage, setSaveMessage] = useState(null)
@@ -955,7 +957,26 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     let cancelled = false
     async function load() {
       if (!clientId) { setLoading(false); return }
-      setLoading(true)
+      // ─────────────────────────────────────────────────────────
+      // THE ONE CAUSE OF THE PAGE JUMPING TO THE BOTTOM.
+      // 14 August 2026.
+      //
+      // Every refresh set loading, and loading REPLACES THE WHOLE WORKSPACE
+      // with one line of text. So the page collapsed from several thousand
+      // pixels to about twenty, the browser clamped the scroll position to what
+      // was left, and when the tables came back a moment later you were at the
+      // bottom of the page. Every control that refreshes did this: adding a
+      // value, removing one, parking a row, pulling an activity into a service.
+      //
+      // Chasing it button by button was never going to work, and I tried that
+      // twice. It is one line, here.
+      //
+      // The full-page message belongs to the FIRST load, when there is genuinely
+      // nothing to show. A refresh keeps what is on screen and swaps the data in
+      // underneath, so the row being worked on stays exactly where it is. The
+      // save indicator still says a write is in flight — that is what it is for.
+      // ─────────────────────────────────────────────────────────
+      if (!loadedOnce.current) setLoading(true)
       setSaveState('loading')
       const order = (q) => q.eq('client_id', clientId).order('sort_order', { ascending: true }).order('created_at', { ascending: true })
       const [a, o, h, s, d, inv] = await Promise.all([
@@ -977,6 +998,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
       // Suggestions only. A failed read leaves the field free text, which is
       // what it is anyway, so it is not worth stopping the screen for.
       setInventoryNames((inv.data || []).map((r) => r.service_name).filter(Boolean))
+      loadedOnce.current = true
       setLoading(false)
       setSaveState('idle')
     }
