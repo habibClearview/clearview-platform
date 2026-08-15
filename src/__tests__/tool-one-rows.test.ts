@@ -1,0 +1,107 @@
+// ============================================================
+// TOOL 1's ROWS: WHAT ACCEPT PUTS ON THE TABLE.
+//
+// The fault these are written against, in Habib's words: "when you click on
+// accept, it doesn't show up on the table", and "the +add button on the
+// problem, activity and others is still not working — I should be able to add
+// more than one problem, more than one activity, more than one of all the
+// attributes per service row".
+//
+// Both came from the same place: the rows WERE the activities. A problem with
+// no activity had no row, so an accepted problem was invisible, and the add
+// that was supposed to make a problem made an activity instead.
+// ============================================================
+import { describe, expect, it } from 'vitest'
+import { buildTool1Rows } from '@/lib/phase-zero-hierarchy'
+
+const svc = (id: string, sort = 0) => ({ id, sort_order: sort })
+const prob = (id: string, service_id: string | null, sort = 0) => ({ id, service_id, sort_order: sort })
+const act = (id: string, service_id: string | null, problem_id: string | null, sort = 0) =>
+  ({ id, service_id, problem_id, sort_order: sort })
+
+describe('a problem the room accepted appears, before anything solves it', () => {
+  it('gives a problem with no activity a row of its own', () => {
+    const rows = buildTool1Rows([svc('s1')], [prob('p1', 's1')], [])
+    expect(rows).toHaveLength(1)
+    expect(rows[0].problemId).toBe('p1')
+    expect(rows[0].activityId).toBe(null)
+    // And it is where the activity gets added from.
+    expect(rows[0].lastOfProblem).toBe(true)
+  })
+
+  it('shows every problem of a service, not just the ones with activities', () => {
+    const rows = buildTool1Rows(
+      [svc('s1')],
+      [prob('p1', 's1', 0), prob('p2', 's1', 1), prob('p3', 's1', 2)],
+      [act('a1', 's1', 'p2')],
+    )
+    expect(rows.map((r) => r.problemId)).toEqual(['p1', 'p2', 'p3'])
+  })
+
+  it('puts several activities under one problem, each on its own row', () => {
+    const rows = buildTool1Rows(
+      [svc('s1')],
+      [prob('p1', 's1')],
+      [act('a1', 's1', 'p1', 0), act('a2', 's1', 'p1', 1), act('a3', 's1', 'p1', 2)],
+    )
+    expect(rows.map((r) => r.activityId)).toEqual(['a1', 'a2', 'a3'])
+    // The problem is written once, on the first of them.
+    expect(rows.map((r) => r.firstOfProblem)).toEqual([true, false, false])
+    // The activity add sits at the end of the group, so it adds to THIS problem.
+    expect(rows.map((r) => r.lastOfProblem)).toEqual([false, false, true])
+  })
+})
+
+describe('the service is written once, and the adds belong to their group', () => {
+  const rows = buildTool1Rows(
+    [svc('s1', 0), svc('s2', 1)],
+    [prob('p1', 's1'), prob('p2', 's1'), prob('p3', 's2')],
+    [act('a1', 's1', 'p1'), act('a2', 's2', 'p3')],
+  )
+
+  it('marks the first row of each service, and only the first', () => {
+    expect(rows.filter((r) => r.firstOfService).map((r) => r.serviceId)).toEqual(['s1', 's2'])
+  })
+
+  it('keeps a service\'s rows together', () => {
+    expect(rows.map((r) => r.serviceId)).toEqual(['s1', 's1', 's2'])
+  })
+
+  it('puts the problem add at the end of the SERVICE, not the table', () => {
+    const last = rows.filter((r) => r.lastOfService)
+    expect(last.map((r) => r.serviceId)).toEqual(['s1', 's2'])
+    // s1's add sits on its own last row, not below s2.
+    expect(last[0].problemId).toBe('p2')
+  })
+})
+
+describe('nothing is invisible', () => {
+  it('gives an empty service a row, so it can be added to', () => {
+    const rows = buildTool1Rows([svc('s1')], [], [])
+    expect(rows).toHaveLength(1)
+    expect(rows[0].serviceId).toBe('s1')
+    expect(rows[0].firstOfService).toBe(true)
+    expect(rows[0].lastOfService).toBe(true)
+  })
+
+  it('keeps activities stated before anybody named the problem', () => {
+    const rows = buildTool1Rows([svc('s1')], [prob('p1', 's1')], [act('a1', 's1', null)])
+    expect(rows.map((r) => r.activityId)).toContain('a1')
+    expect(rows.find((r) => r.activityId === 'a1')?.problemId).toBe(null)
+  })
+
+  it('draws rows that belong to no service at all', () => {
+    const rows = buildTool1Rows([svc('s1')], [], [act('a1', null, null)])
+    expect(rows.some((r) => r.serviceId === null && r.activityId === 'a1')).toBe(true)
+  })
+
+  it('leaves parked rows out, and only those', () => {
+    const rows = buildTool1Rows(
+      [svc('s1')],
+      [{ ...prob('p1', 's1'), parked_at: '2026-08-15T10:00:00Z' }, prob('p2', 's1')],
+      [{ ...act('a1', 's1', 'p2'), parked_at: '2026-08-15T10:00:00Z' }, act('a2', 's1', 'p2')],
+    )
+    expect(rows.map((r) => r.problemId)).toEqual(['p2'])
+    expect(rows.map((r) => r.activityId)).toEqual(['a2'])
+  })
+})

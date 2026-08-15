@@ -52,7 +52,7 @@ import {
   hypothesisBuild,
   problemLabel,
   problemsOutsideHierarchy,
-  orderActivitiesForTable,
+  buildTool1Rows,
   splitRowsByService,
   NO_PROBLEM_STATED,
 } from '@/lib/phase-zero-hierarchy'
@@ -107,21 +107,6 @@ const runWithRoomButton = {
   fontSize: '0.78rem', fontWeight: 700, padding: '0.4rem 0.8rem', borderRadius: 8,
   border: '1px solid var(--cv-teal)', background: 'var(--cv-teal)', color: '#FFFFFF',
   cursor: 'pointer', whiteSpace: 'nowrap',
-}
-
-/** Last row of its problem, so the activity add follows it. */
-function endOfProblem(rows, i) {
-  return i === rows.length - 1 || rows[i + 1].problem_id !== rows[i].problem_id
-}
-
-/** Last row of its service, so the problem add follows it. */
-function endOfService(rows, i) {
-  return i === rows.length - 1 || rows[i + 1].service_id !== rows[i].service_id
-}
-
-/** True when the row above already names this row's service, so it is not repeated. */
-function sameServiceAsAbove(rows, i) {
-  return i > 0 && rows[i - 1].service_id && rows[i - 1].service_id === rows[i].service_id
 }
 
 /** A cell that cannot be answered yet, saying what is missing rather than sitting dead. */
@@ -259,7 +244,8 @@ function TextCell({ value, onCommit, canManage, placeholder, rows = 2, ariaLabel
  */
 function ActivityTable({
   rows, editable, anchor, clientId, selected, onToggle, onEditActivity, onEditProblem,
-  serviceNameFor, problemTextFor, onAction, onReload, onAdd, onAddProblem, onAddService, onLeaveRow, onSetService, onRenameService,
+  serviceNameFor, activityById, problemById, onAction, onReload,
+  onAddActivity, onAddProblem, onAddService, onNameActivity, onSetService, onRenameService,
 }) {
   return (
     <div style={tableWrap}>
@@ -278,115 +264,102 @@ function ActivityTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
-            <React.Fragment key={r.id}>
-            <tr
-              style={selected.has(r.id) ? { background: C.tintCyan } : undefined}
-              onBlur={(e) => {
-                // Only when focus has actually left the row, never when moving
-                // between two cells of it — otherwise tabbing from Activity to
-                // What it delivers would delete the row underneath you.
-                if (!e.currentTarget.contains(e.relatedTarget)) onLeaveRow(r)
-              }}
-            >
+          {rows.map((r) => {
+            const activity = r.activityId ? activityById(r.activityId) : null
+            const problem = r.problemId ? problemById(r.problemId) : null
+            return (
+            <React.Fragment key={r.key}>
+            <tr style={activity && selected.has(activity.id) ? { background: C.tintCyan } : undefined}>
               {editable && (
                 <td style={td}>
-                  <input
-                    type="checkbox"
-                    checked={selected.has(r.id)}
-                    onChange={() => onToggle(r.id)}
-                    aria-label={`Include ${r.activity || 'this activity'} in a new service`}
-                  />
+                  {activity ? (
+                    <input
+                      type="checkbox"
+                      checked={selected.has(activity.id)}
+                      onChange={() => onToggle(activity.id)}
+                      aria-label={`Include ${activity.activity || 'this activity'} in a new service`}
+                    />
+                  ) : null}
                 </td>
               )}
-              {/* THE SERVICE AND THE PROBLEM ARE COLUMNS. 14 August 2026.
-                  Drawn as bands above the rows they governed, they pushed the
-                  work down the page and you could not scroll one table and read
-                  every service. They are columns now, like everything else, so
-                  the whole engagement reads in one list. The service cell is
-                  the name, not an editor: a service is renamed in the bar
-                  above, and having two places to rename it is how two names for
-                  one service appear. */}
-              {/* ─────────────────────────────────────────────────────
-                  NOTHING IS ANSWERABLE UNTIL ITS ANCHOR EXISTS.
-                  14 August 2026.
-
-                  Habib's rule, and his data proved the need for it: three rows
-                  carried "what it delivers" and "who pays" with NO SERVICE at
-                  all, and not one row of six had a problem. An attribute with
-                  no anchor is not a half-finished thought, it is a value about
-                  nothing — it cannot be read back, rolled up, or carried into
-                  Tool 2.
-
-                  So the chain is enforced where it is typed. Each cell opens
-                  only once the one to its left holds something:
-
-                    service → problem → activity → delivers, who pays,
-                                                   assumption, disproof
-
-                  A closed cell says which anchor is missing rather than sitting
-                  there dead, because a greyed box with no reason is the same
-                  bug wearing a different coat.
-                  ───────────────────────────────────────────────────── */}
-              {/* THE SERVICE IS WRITTEN ONCE PER SERVICE, NOT ONCE PER ROW.
-                  14 August 2026. A chooser on every row repeated "Gender
-                  Workshop" five times down the column and read as five
-                  services. It is a column so that scrolling reveals the next
-                  service and everything hanging off it — which needs the name
-                  stated at the top of its group and nowhere else inside it.
-
-                  The chooser survives in one place only: a row with NO service.
-                  That is the row that cannot be worked on until it is given
-                  one, and the only row that needs moving. */}
-              <td style={{ ...td, ...(r.service_id && sameServiceAsAbove(rows, i) ? { borderTop: 'none' } : {}) }}>
-                {!r.service_id && editable ? (
-                  <select
-                    value=""
-                    onChange={(e) => onSetService(r, e.target.value || null)}
-                    aria-label="The service this belongs to"
-                    style={anchorSelect}
-                  >
-                    <option value="">Choose a service...</option>
-                    {(anchor.services || [])
-                      .filter((sv) => !sv.parked_at)
-                      .map((sv) => (
-                        <option key={sv.id} value={sv.id}>{sv.service_name || 'Unnamed service'}</option>
-                      ))}
-                  </select>
-                ) : sameServiceAsAbove(rows, i) ? null : editable ? (
-                  /* The name is typed HERE, on the first row of its group. A
-                     service added from this table starts unnamed, and a cell
-                     that only displays a name gives no way to give it one. */
+              {/* THE SERVICE IS WRITTEN ONCE PER SERVICE. The name is typed on
+                  the first row of its group and nowhere else, because a chooser
+                  on every row read as five services. */}
+              <td style={{ ...td, ...(r.firstOfService ? {} : { borderTop: 'none' }) }}>
+                {!r.firstOfService ? null : !r.serviceId ? (
+                  <span style={{ fontSize: '0.8rem', color: C.faint, fontStyle: 'italic' }}>Not in a service</span>
+                ) : editable ? (
                   <TextCell
-                    value={serviceNameFor(r)}
+                    value={serviceNameFor(r.serviceId)}
                     canManage={editable}
                     placeholder="Name the service"
-                    onCommit={(v) => onRenameService(r.service_id, v)}
+                    ariaLabel="Name the service"
+                    onCommit={(v) => onRenameService(r.serviceId, v)}
                   />
                 ) : (
-                  <span style={serviceCell}>{serviceNameFor(r) || '—'}</span>
+                  <span style={serviceCell}>{serviceNameFor(r.serviceId) || '—'}</span>
                 )}
               </td>
-              <td style={td}>
-                {r.service_id ? (
+
+              {/* ─────────────────────────────────────────────────────
+                  THE PROBLEM IS A ROW OF ITS OWN TABLE, NOT A CELL ON AN
+                  ACTIVITY. 15 August 2026.
+
+                  These rows used to BE the activities, so a problem with no
+                  activity under it had no row at all — and Tool 1's first
+                  question makes exactly that. Accept wrote a correct problem
+                  into the database and the table could not draw it, which from
+                  where Habib was sitting was "Accept does nothing".
+
+                  A problem now gets its own row whether or not anything solves
+                  it yet, and the activity that solves it is added FROM that
+                  row.
+                  ───────────────────────────────────────────────────── */}
+              <td style={{ ...td, ...(r.firstOfProblem ? {} : { borderTop: 'none' }) }}>
+                {!r.firstOfProblem ? null : !r.serviceId ? (
+                  <Locked need="a service" />
+                ) : problem ? (
                   <TextCell
-                    value={problemTextFor(r)}
+                    value={problem.problem}
                     canManage={editable}
                     placeholder="The problem this service solves"
-                    onCommit={(v) => onEditProblem(r, v)}
+                    ariaLabel="The problem this service solves"
+                    onCommit={(v) => onEditProblem(problem.id, v)}
                   />
-                ) : <Locked need="a service" />}
+                ) : (
+                  <span style={{ fontSize: '0.8rem', color: C.faint, fontStyle: 'italic' }}>
+                    No problem stated
+                  </span>
+                )}
               </td>
+
+              {/* The activity. Where the problem has none yet, typing here
+                  makes one — one gesture, not "add" and then "type". */}
               <td style={td}>
-                {r.problem_id ? (
-                  <TextCell value={r.activity} canManage={editable} placeholder="The activity" onCommit={(v) => onEditActivity(r.id, { activity: v })} />
+                {!r.serviceId ? <Locked need="a service" /> : activity ? (
+                  <TextCell
+                    value={activity.activity}
+                    canManage={editable}
+                    placeholder="The activity"
+                    ariaLabel="The activity"
+                    onCommit={(v) => onEditActivity(activity.id, { activity: v })}
+                  />
+                ) : r.problemId ? (
+                  <TextCell
+                    value=""
+                    canManage={editable}
+                    placeholder="Name the activity that solves it"
+                    ariaLabel="Name the activity that solves it"
+                    onCommit={(v) => onNameActivity(r.problemId, r.serviceId, v)}
+                  />
                 ) : <Locked need="a problem" />}
               </td>
+
               {['delivers', 'who_pays', 'assumption', 'disproof'].map((field) => (
                 <td key={field} style={td}>
-                  {String(r.activity || '').trim() ? (
+                  {activity && String(activity.activity || '').trim() ? (
                     <MultiValueCell
-                      activity={r}
+                      activity={activity}
                       field={field}
                       values={anchor.activityValues}
                       canManage={editable}
@@ -396,61 +369,66 @@ function ActivityTable({
                   ) : <Locked need="an activity" />}
                 </td>
               ))}
+
               {editable && (
                 <td style={td}>
-                  {/* C12 to C16. Park is the press that needs no thought, and
-                      delete is behind one more press and a confirmation. */}
-                  <RowActions
-                    clientId={clientId}
-                    activityId={r.id}
-                    label={r.activity || 'this activity'}
-                    onDone={onReload}
-                  />
+                  {/* Park is the press that needs no thought; delete is behind
+                      one more press and a confirmation. A row that is only a
+                      problem parks the problem. */}
+                  {activity ? (
+                    <RowActions clientId={clientId} activityId={activity.id} label={activity.activity || 'this activity'} onDone={onReload} />
+                  ) : problem ? (
+                    <RowActions clientId={clientId} problemId={problem.id} label={problem.problem || 'this problem'} onDone={onReload} />
+                  ) : null}
                 </td>
               )}
             </tr>
+
             {/* ─────────────────────────────────────────────────────
-                THE ADD BELONGS TO THE GROUP IT ADDS TO. 14 August 2026.
+                EACH ADD IN ITS OWN COLUMN, AT THE END OF ITS OWN GROUP,
+                DOING WHAT IT SAYS. 15 August 2026.
 
-                One "+ add" at the foot of the whole table could only ever add
-                to whatever happened to be last. To add a problem to a service
-                sitting at the TOP of a long list you had to scroll past every
-                other service to reach a button that then added to the wrong
-                one, and the page jumped to the bottom doing it.
-
-                So each group closes with its own adds, in its own columns: the
-                end of a PROBLEM's activities offers "+ add" under Activity and
-                adds to THAT problem, and the end of a SERVICE's rows offers
-                "+ add" under Problem and adds to THAT service. Neither moves
-                the page.
+                "+ add a problem" called addActivity. It made a blank ACTIVITY,
+                which then deleted itself the moment focus left it, so the
+                button did nothing you could see — and adding a second problem
+                was impossible. This is the second time this exact wiring has
+                shipped, so the two adds are now named apart and each says what
+                it adds.
                 ───────────────────────────────────────────────────── */}
-            {editable && r.problem_id && endOfProblem(rows, i) ? (
-              <tr key={`${r.id}-a`}>
-                <td style={td} colSpan={3} />
-                <td style={td}>
-                  <button type="button" style={addLine} onClick={() => onAdd(r.problem_id, r.service_id)}>+ add</button>
+            {editable && r.lastOfProblem && r.problemId && r.serviceId ? (
+              <tr>
+                {editable && <td style={{ ...td, borderTop: 'none' }} />}
+                <td style={{ ...td, borderTop: 'none' }} colSpan={2} />
+                <td style={{ ...td, borderTop: 'none' }}>
+                  <button type="button" style={addLine} onClick={() => onAddActivity(r.problemId, r.serviceId)}>
+                    + add another activity
+                  </button>
                 </td>
-                <td style={td} colSpan={4} />
+                <td style={{ ...td, borderTop: 'none' }} colSpan={5} />
               </tr>
             ) : null}
-            {editable && r.service_id && endOfService(rows, i) ? (
-              <tr key={`${r.id}-p`}>
-                <td style={td} colSpan={2} />
-                <td style={td}>
-                  <button type="button" style={addLine} onClick={() => onAddProblem(r.service_id)}>+ add</button>
+            {editable && r.lastOfService && r.serviceId ? (
+              <tr>
+                {editable && <td style={{ ...td, borderTop: 'none' }} />}
+                <td style={{ ...td, borderTop: 'none' }} />
+                <td style={{ ...td, borderTop: 'none' }}>
+                  <button type="button" style={addLine} onClick={() => onAddProblem(r.serviceId)}>
+                    + add another problem
+                  </button>
                 </td>
-                <td style={td} colSpan={5} />
+                <td style={{ ...td, borderTop: 'none' }} colSpan={6} />
               </tr>
             ) : null}
             </React.Fragment>
-          ))}
+            )
+          })}
           {editable ? (
             <tr>
               <td style={td} />
               <td style={td}>
-                <button type="button" style={addLine} onClick={onAddService}>+ add</button>
+                <button type="button" style={addLine} onClick={onAddService}>+ add a service</button>
               </td>
-              <td style={td} colSpan={6} />
+              <td style={td} colSpan={7} />
             </tr>
           ) : null}
         </tbody>
@@ -1264,53 +1242,21 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
   const updDecision = makeUpdater('gtcv_continue_pause_kill', setDecisions)
 
   /**
-   * A ROW STILL COMPLETELY EMPTY WHEN YOU LEAVE IT REMOVES ITSELF.
-   * 14 August 2026.
+   * THE ROW THAT DELETED ITSELF IS GONE. 15 August 2026.
    *
-   * Pressing "+ add" and then thinking better of it left a row behind. Repeated
-   * over a week that produced 18 empty problems, 2 empty services and an empty
-   * activity on staging, every one of them counted in the totals above the
-   * tools — which is how a counter that is supposed to be compared against the
-   * room stops meaning anything.
+   * The rule was: a row still completely empty when focus leaves it removes
+   * itself, so an abandoned "+ add" leaves nothing behind. What it actually did
+   * was make adding impossible. Press "+ add another problem", then press
+   * anything else — the blank row you just made loses focus and is deleted. So
+   * you could never have two empty rows at once, which is exactly "I should be
+   * able to add more than one problem and more than one activity" and exactly
+   * what the button appeared to fail at.
    *
-   * THE RULE, as agreed:
-   *   - A blank row is legitimate for a few seconds. You press add, then type.
-   *     Deleting on creation would make adding impossible.
-   *   - It is never legitimate once you have moved on, so leaving a row with
-   *     every column still empty removes it. No warning and no confirmation: it
-   *     was never anything, and asking about nothing is its own kind of noise.
-   *   - A row with SOME columns filled is work in progress, not a blank. It
-   *     stays. This is the exception that stops the rule eating real typing.
-   *
-   * Checked against the values table too, so an activity whose only content is
-   * a second "who pays" is not mistaken for empty.
+   * Empty rows are no longer counted instead: allActivities counts activities
+   * with something typed in them, which is what a room compares against. The
+   * counter stays honest and the add works. An empty row is removed the way
+   * everything else is — with Park or Delete on the row itself.
    */
-  const ACTIVITY_TEXT_FIELDS = ['activity', 'delivers', 'who_pays', 'assumption', 'disproof']
-
-  const dropIfBlank = useCallback(async (row) => {
-    if (!row?.id) return
-    const hasText = ACTIVITY_TEXT_FIELDS.some((f) => String(row[f] || '').trim() !== '')
-    if (hasText) return
-    const hasValue = (anchor.activityValues || [])
-      .some((v) => v.activity_id === row.id && String(v.value || '').trim() !== '')
-    if (hasValue) return
-    // The only row of a service is what makes that service visible at all, so
-    // it stays even when empty. Removing it would hide the service and the
-    // "+ add" that belongs to it.
-    const onlyRowOfItsService = row.service_id
-      && assumptions.filter((a) => a.service_id === row.service_id).length <= 1
-    if (onlyRowOfItsService) return
-    // A row that is under a problem is still nothing if it says nothing; the
-    // parent is not content, it is only where the empty row was created.
-    const { error } = await supabase.from('gtcv_assumptions')
-      .delete().eq('id', row.id).eq('client_id', clientId)
-    if (error) return
-    // The row is already gone from what is on screen, so there is nothing left
-    // for a re-read to tell us. It used to call reload() here as well, which
-    // rebuilt all five tools every time focus left an empty row — that is,
-    // every time you pressed "+ add" and then clicked anything else.
-    setAssumptions((prev) => prev.filter((a) => a.id !== row.id))
-  }, [anchor.activityValues, assumptions, clientId])
 
   /**
    * C2. AN ACTIVITY IS CREATED INSIDE THE ANCHORED SERVICE, OR NOT AT ALL.
@@ -1353,6 +1299,19 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     setSaveState('saved')
     return data
   }, [anchoredService, anchor.services, clientId, assumptions.length])
+
+  /**
+   * Typing the activity into a problem's row makes it. One gesture: the room
+   * says what solves the problem and it is there, rather than "add" and then
+   * "type into the thing that appeared".
+   */
+  const nameActivity = useCallback(async (problemId, serviceId, text) => {
+    if (!String(text || '').trim()) return
+    const made = await addActivity(problemId, serviceId)
+    if (!made) return
+    setAssumptions((prev) => prev.map((a) => (a.id === made.id ? { ...a, activity: text } : a)))
+    await persist('gtcv_assumptions', made.id, { activity: text })
+  }, [addActivity, persist])
 
   /** Naming a service from its own row, applied in place so nothing redraws. */
   const renameService = useCallback(async (serviceId, name) => {
@@ -1496,12 +1455,20 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
    * all of them, so Tool 1 shows all of them and you scroll rather than switch.
    * Parked rows stay out: they have their own area and their own reason.
    */
+  // Tool 1's rows: service -> problem -> activity, with a row for a problem
+  // nothing solves yet. See buildTool1Rows for why the rows are no longer the
+  // activities themselves.
+  const tableRows = useMemo(
+    () => buildTool1Rows(anchor.services || [], owners, assumptions),
+    [anchor.services, owners, assumptions],
+  )
+  const activityById = useCallback((id) => assumptions.find((a) => a.id === id) || null, [assumptions])
+  const problemById = useCallback((id) => owners.find((p) => p.id === id) || null, [owners])
+  // Kept as the count of real work, which is what a room compares against: a
+  // row with nothing typed in it is not an activity yet.
   const allActivities = useMemo(
-    // The name is written once per group, which only works if the rows of one
-    // service are adjacent. orderActivitiesForTable guarantees that from the
-    // rows themselves — see the comment there for the fault it replaces.
-    () => orderActivitiesForTable(assumptions.filter((a) => !a.parked_at), anchor.services || []),
-    [assumptions, anchor.services],
+    () => assumptions.filter((a) => !a.parked_at && String(a.activity || '').trim()),
+    [assumptions],
   )
 
   /**
@@ -1589,44 +1556,13 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     >Run this with the room</button>
   ), [clientId])
 
-  /**
-   * Putting a row into a service, from the row itself. Habib's report was that
-   * the Service column could not be edited while rows sat there with no service
-   * at all and no way to give them one — the column named the anchor and
-   * offered no way to set it. Changing the service clears the problem, because
-   * a problem belongs to a service and carrying it across would attach this row
-   * to a problem of a service it is no longer in.
-   */
-  const setRowService = useCallback(async (row, serviceId) => {
-    setSaveState('saving')
-    setSaveMessage(null)
-    const svc = (anchor.services || []).find((x) => x.id === serviceId) || null
-    const patch = {
-      service_id: serviceId,
-      service_name: svc?.service_name || null,
-      problem_id: serviceId === row.service_id ? row.problem_id : null,
-      updated_at: new Date().toISOString(),
-    }
-    const { error } = await supabase.from('gtcv_assumptions')
-      .update(patch).eq('id', row.id).eq('client_id', clientId)
-    if (error) { setSaveState('error'); setSaveMessage(error.message); return }
-    setSaveState('saved')
-    // Applied in place for the same reason as above: the row moves into its
-    // service and the Problem cell beside it opens, with nothing else redrawn.
-    setAssumptions((prev) => prev.map((a) => (a.id === row.id ? { ...a, ...patch } : a)))
-  }, [anchor.services, clientId])
 
   /** The service a row belongs to, by name. Read only: renaming happens above. */
   const serviceNameFor = useCallback(
-    (row) => (anchor.services || []).find((s) => s.id === row.service_id)?.service_name || '',
+    (serviceId) => (anchor.services || []).find((s) => s.id === serviceId)?.service_name || '',
     [anchor.services],
   )
 
-  /** The problem a row solves, as text. Empty where none has been stated. */
-  const problemTextFor = useCallback(
-    (row) => (anchor.problems || []).find((p) => p.id === row.problem_id)?.problem || '',
-    [anchor.problems],
-  )
 
 
   /** Writing to a problem in the Parked area, and re-reading so it moves at once. */
@@ -1682,53 +1618,19 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
    * and the row is attached to it in the same press, because asking somebody to
    * create a problem and then attach it is two steps for one thought.
    */
-  const setProblemText = useCallback(async (row, text) => {
+  const setProblemText = useCallback(async (problemId, text) => {
     setSaveState('saving')
     setSaveMessage(null)
-    if (row.problem_id) {
-      await hierarchyAction({ action: 'edit', id: row.problem_id, field: 'problem', value: text })
-      return
-    }
-    if (!row.service_id) {
-      setSaveState('error')
-      setSaveMessage('This activity has no service yet, and a problem belongs to a service. Nothing was created.')
-      return
-    }
-    try {
-      const res = await authedFetch('/api/services', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId, action: 'addProblem', serviceId: row.service_id, name: text }),
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok || !json?.id) {
-        setSaveState('error')
-        setSaveMessage(json?.error || 'That did not go through.')
-        return
-      }
-      const { error } = await supabase.from('gtcv_assumptions')
-        .update({ problem_id: json.id, updated_at: new Date().toISOString() })
-        .eq('id', row.id).eq('client_id', clientId)
-      if (error) { setSaveState('error'); setSaveMessage(error.message); return }
-      setSaveState('saved')
+    // Applied in place first, so the words you typed stay on screen while the
+    // write goes out and the refresh that follows changes nothing.
+    setOwners((prev) => prev.map((p) => (p.id === problemId ? { ...p, problem: text } : p)))
+    setAnchor((prev) => ({
+      ...prev,
+      problems: (prev.problems || []).map((p) => (p.id === problemId ? { ...p, problem: text } : p)),
+    }))
+    await hierarchyAction({ action: 'edit', id: problemId, field: 'problem', value: text })
+  }, [hierarchyAction])
 
-      // NO FULL RELOAD HERE. 14 August 2026. reload() re-reads the whole
-      // engagement and remounts every tool, which on screen is the page closing
-      // and reopening — Habib's word for it was jarring, and he is right: you
-      // type a problem and the screen you were reading is thrown away and
-      // rebuilt. The two things that changed are known exactly, so they are
-      // applied in place and the Activity cell beside the one you just typed in
-      // unlocks without anything else moving.
-      setAnchor((prev) => ({
-        ...prev,
-        problems: [...(prev.problems || []), { id: json.id, problem: text, service_id: row.service_id }],
-      }))
-      setAssumptions((prev) => prev.map((a) => (a.id === row.id ? { ...a, problem_id: json.id } : a)))
-    } catch {
-      setSaveState('error')
-      setSaveMessage('Could not reach the server. Nothing was changed.')
-    }
-  }, [clientId, hierarchyAction, reload])
 
   // Tool 2: the rule. A problem with no named budget holder is paused.
   // The rule counts the problems Tool 2 actually shows. Counting every row of
@@ -1926,13 +1828,13 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             is asked about one service at a time, but it no longer decides
             what you can see.
             ───────────────────────────────────────────────────── */}
-        {allActivities.length === 0 && (anchor.services || []).length === 0 ? (
+        {tableRows.length === 0 ? (
           <div style={emptyNote}>
-            No services yet. Add one in the bar above, and its problems and activities appear here.
+            No services yet. Add one below, and its problems and activities appear here.
           </div>
         ) : (
           <ActivityTable
-            rows={allActivities}
+            rows={tableRows}
             editable={editable}
             anchor={anchor}
             clientId={clientId}
@@ -1941,13 +1843,16 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             onEditActivity={updAssumption}
             onEditProblem={setProblemText}
             serviceNameFor={serviceNameFor}
-            problemTextFor={problemTextFor}
+            activityById={activityById}
+            problemById={problemById}
             onAction={hierarchyAction}
             onReload={reload}
-            onAdd={() => addActivity(null)}
-            onLeaveRow={dropIfBlank}
-            onSetService={setRowService}
-            onAddProblem={(serviceId) => addActivity(null, serviceId)}
+            /* NAMED APART SO THEY CANNOT BE CROSSED AGAIN. The problem add adds
+               a PROBLEM; the activity add adds an ACTIVITY to the problem whose
+               group it sits in. */
+            onAddActivity={(problemId, serviceId) => addActivity(problemId, serviceId)}
+            onAddProblem={addProblemToService}
+            onNameActivity={nameActivity}
             onAddService={addService}
             onRenameService={renameService}
           />

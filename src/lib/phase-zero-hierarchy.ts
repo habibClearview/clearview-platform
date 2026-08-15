@@ -294,3 +294,97 @@ export function orderActivitiesForTable<
     return (a.sort_order ?? 0) - (b.sort_order ?? 0)
   })
 }
+
+// ============================================================
+// TOOL 1's ROWS.  15 August 2026.
+//
+// THE FAULT THIS REPLACES, and it is the one that made Accept look broken:
+// the table's rows WERE THE ACTIVITIES. So a problem with no activity under it
+// had no row anywhere, and since Tool 1's first question makes exactly that —
+// a problem, stated before any activity exists — accepting an answer wrote a
+// correct row into the database that the table could not draw. From the
+// outside: "I press Accept and nothing appears."
+//
+// The model is service -> problems -> activities, and the table has to be the
+// model. A row is one ACTIVITY, but a problem with none still gets a row of its
+// own, so what the room has stated is always on the screen and always has
+// somewhere to add the activity that solves it.
+//
+// Everything is drawn. A service with nothing under it gets one row, so it can
+// be added to. Activities under a service but under no problem keep their rows
+// in a group of their own — they are real work stated before anybody named the
+// problem, and dropping them is how a room stops trusting the screen.
+// ============================================================
+
+export interface Tool1Row {
+  key: string
+  serviceId: string | null
+  /** True on the first row of a service, which is where the name is written. */
+  firstOfService: boolean
+  /** True on the last row of a service, which is where "+ add a problem" sits. */
+  lastOfService: boolean
+  problemId: string | null
+  /** True on the first row of a problem, which is where the problem is written. */
+  firstOfProblem: boolean
+  /** True on the last row of a problem, where "+ add an activity" sits. */
+  lastOfProblem: boolean
+  /** The activity this row draws, or null where the problem has none yet. */
+  activityId: string | null
+}
+
+interface RowActivity { id: string; service_id?: string | null; problem_id?: string | null; parked_at?: string | null; sort_order?: number | null }
+interface RowProblem { id: string; service_id?: string | null; parked_at?: string | null; sort_order?: number | null }
+
+const bySort = <T extends { sort_order?: number | null }>(a: T, b: T) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+
+export function buildTool1Rows(
+  services: { id: string; parked_at?: string | null; sort_order?: number | null }[],
+  problems: RowProblem[],
+  activities: RowActivity[],
+): Tool1Row[] {
+  const live = services.filter((s) => !s.parked_at).slice().sort(bySort)
+  const liveProblems = problems.filter((p) => !p.parked_at)
+  const liveActivities = activities.filter((a) => !a.parked_at)
+  const out: Tool1Row[] = []
+
+  const pushGroup = (serviceId: string | null, problemId: string | null, acts: RowActivity[]) => {
+    if (acts.length === 0) {
+      out.push({
+        key: `${serviceId || 'none'}:${problemId || 'none'}:empty`,
+        serviceId, firstOfService: false, lastOfService: false,
+        problemId, firstOfProblem: true, lastOfProblem: true, activityId: null,
+      })
+      return
+    }
+    acts.forEach((a, i) => out.push({
+      key: a.id,
+      serviceId, firstOfService: false, lastOfService: false,
+      problemId, firstOfProblem: i === 0, lastOfProblem: i === acts.length - 1,
+      activityId: a.id,
+    }))
+  }
+
+  const drawService = (serviceId: string | null) => {
+    const startedAt = out.length
+    const mine = liveProblems.filter((p) => (p.service_id || null) === serviceId).slice().sort(bySort)
+    const ofService = liveActivities.filter((a) => (a.service_id || null) === serviceId)
+    for (const p of mine) {
+      pushGroup(serviceId, p.id, ofService.filter((a) => a.problem_id === p.id).slice().sort(bySort))
+    }
+    // Activities stated before anybody named the problem. Present, in a group of
+    // their own, never dropped.
+    const loose = ofService.filter((a) => !a.problem_id || !mine.some((p) => p.id === a.problem_id))
+    if (loose.length > 0) pushGroup(serviceId, null, loose.slice().sort(bySort))
+    // A service with nothing at all still needs one row to be seen and added to.
+    if (out.length === startedAt) pushGroup(serviceId, null, [])
+    out[startedAt].firstOfService = true
+    out[out.length - 1].lastOfService = true
+  }
+
+  live.forEach((s) => drawService(s.id))
+  // Anything with no service at all, so nothing on the engagement is invisible.
+  const homeless = liveActivities.filter((a) => !a.service_id || !live.some((s) => s.id === a.service_id))
+  const homelessProblems = liveProblems.filter((p) => !p.service_id || !live.some((s) => s.id === p.service_id))
+  if (homeless.length > 0 || homelessProblems.length > 0) drawService(null)
+  return out
+}
