@@ -258,7 +258,7 @@ function TextCell({ value, onCommit, canManage, placeholder, rows = 2, ariaLabel
  */
 function ActivityTable({
   rows, editable, anchor, clientId, selected, onToggle, onEditActivity, onEditProblem,
-  serviceNameFor, problemTextFor, onAction, onReload, onAdd, onAddProblem, onLeaveRow, onSetService,
+  serviceNameFor, problemTextFor, onAction, onReload, onAdd, onAddProblem, onAddService, onLeaveRow, onSetService, onRenameService,
 }) {
   return (
     <div style={tableWrap}>
@@ -352,7 +352,17 @@ function ActivityTable({
                         <option key={sv.id} value={sv.id}>{sv.service_name || 'Unnamed service'}</option>
                       ))}
                   </select>
-                ) : sameServiceAsAbove(rows, i) ? null : (
+                ) : sameServiceAsAbove(rows, i) ? null : editable ? (
+                  /* The name is typed HERE, on the first row of its group. A
+                     service added from this table starts unnamed, and a cell
+                     that only displays a name gives no way to give it one. */
+                  <TextCell
+                    value={serviceNameFor(r)}
+                    canManage={editable}
+                    placeholder="Name the service"
+                    onCommit={(v) => onRenameService(r.service_id, v)}
+                  />
+                ) : (
                   <span style={serviceCell}>{serviceNameFor(r) || '—'}</span>
                 )}
               </td>
@@ -433,6 +443,15 @@ function ActivityTable({
             ) : null}
             </React.Fragment>
           ))}
+          {editable ? (
+            <tr>
+              <td style={td} />
+              <td style={td}>
+                <button type="button" style={addLine} onClick={onAddService}>+ add</button>
+              </td>
+              <td style={td} colSpan={6} />
+            </tr>
+          ) : null}
         </tbody>
       </table>
     </div>
@@ -1039,6 +1058,12 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     const hasValue = (anchor.activityValues || [])
       .some((v) => v.activity_id === row.id && String(v.value || '').trim() !== '')
     if (hasValue) return
+    // The only row of a service is what makes that service visible at all, so
+    // it stays even when empty. Removing it would hide the service and the
+    // "+ add" that belongs to it.
+    const onlyRowOfItsService = row.service_id
+      && assumptions.filter((a) => a.service_id === row.service_id).length <= 1
+    if (onlyRowOfItsService) return
     // A row that is under a problem is still nothing if it says nothing; the
     // parent is not content, it is only where the empty row was created.
     const { error } = await supabase.from('gtcv_assumptions')
@@ -1046,7 +1071,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     if (error) return
     setAssumptions((prev) => prev.filter((a) => a.id !== row.id))
     reload()
-  }, [anchor.activityValues, clientId, reload])
+  }, [anchor.activityValues, assumptions, clientId, reload])
 
   /**
    * C2. AN ACTIVITY IS CREATED INSIDE THE ANCHORED SERVICE, OR NOT AT ALL.
@@ -1059,31 +1084,80 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
    * row that has nowhere to live.
    */
   const addActivity = useCallback(async (problemId = null, serviceId = null) => {
-    if (!anchoredService) {
+    const target = serviceId
+      || anchoredService?.id
+      || null
+    if (!target) {
       setSaveState('error')
-      setSaveMessage('Choose a service in the bar above first. An activity belongs to a service, so nothing was created.')
+      setSaveMessage('Add a service first. An activity belongs to a service, so nothing was created.')
       return
     }
     setSaveState('saving')
     setSaveMessage(null)
+    const svc = (anchor.services || []).find((x) => x.id === target) || null
     const { data, error } = await supabase.from('gtcv_assumptions').insert([{
       client_id: clientId,
       sort_order: assumptions.length,
-      service_id: serviceId || anchoredService.id,
+      service_id: target,
       // 14 August. The activity solves a problem, and is filed under the one
-      // whose "+ add" was pressed. Null is legitimate — it is the row that
-      // appears under "Not under any problem yet".
+      // whose "+ add" was pressed.
       problem_id: problemId,
-      // Both are held, as the route does it: the reference is the parent, the
-      // text is what other screens already read.
-      service_name: anchoredService.service_name || null,
+      service_name: svc?.service_name || null,
     }]).select().single()
     if (error) { setSaveState('error'); setSaveMessage(error.message); return }
+    // NO reload() HERE. 14 August 2026. It re-read the whole engagement and
+    // remounted all five tools, so pressing "+ add" threw the page around —
+    // worse than the refresh it replaced, which is exactly how Habib described
+    // it. The one new row is known, so it is added in place and nothing else
+    // on the page moves.
     setAssumptions((prev) => [...prev, data])
     setSaveState('saved')
-    // So it appears under the service in Tool 2 at once, not on the next poll.
-    reload()
-  }, [anchoredService, clientId, assumptions.length, reload])
+    return data
+  }, [anchoredService, anchor.services, clientId, assumptions.length])
+
+  /** Naming a service from its own row, applied in place so nothing redraws. */
+  const renameService = useCallback(async (serviceId, name) => {
+    if (!serviceId) return
+    setSaveState('saving')
+    const { error } = await supabase.from('gtcv_service_inventory')
+      .update({ service_name: name, updated_at: new Date().toISOString() })
+      .eq('id', serviceId).eq('client_id', clientId)
+    if (error) { setSaveState('error'); setSaveMessage(error.message); return }
+    setAnchor((prev) => ({
+      ...prev,
+      services: (prev.services || []).map((x) => (x.id === serviceId ? { ...x, service_name: name } : x)),
+    }))
+    setAssumptions((prev) => prev.map((a) => (a.service_id === serviceId ? { ...a, service_name: name } : a)))
+    setSaveState('saved')
+  }, [clientId])
+
+  /**
+   * A SERVICE IS ADDED FROM THE TABLE, LIKE EVERYTHING ELSE. 14 August 2026.
+   *
+   * There was a separate "Add a service" button above the table, and a service
+   * created there did not appear in the table at all — the table was built from
+   * ACTIVITIES, so a service with none had no row to be seen on. A control that
+   * adds something invisible is worse than no control.
+   *
+   * So: "+ add" under the Service column, the same shape and the same gesture
+   * as every other add, and the new service arrives carrying one empty row so
+   * there is somewhere to state its first problem.
+   */
+  const addService = useCallback(async () => {
+    setSaveState('saving')
+    setSaveMessage(null)
+    const { data: svc, error } = await supabase.from('gtcv_service_inventory')
+      .insert([{ client_id: clientId, sort_order: (anchor.services || []).length }])
+      .select().single()
+    if (error) { setSaveState('error'); setSaveMessage(error.message); return }
+    const { data: row, error: rErr } = await supabase.from('gtcv_assumptions')
+      .insert([{ client_id: clientId, service_id: svc.id, sort_order: assumptions.length }])
+      .select().single()
+    if (rErr) { setSaveState('error'); setSaveMessage(rErr.message); return }
+    setAnchor((prev) => ({ ...prev, services: [...(prev.services || []), svc] }))
+    setAssumptions((prev) => [...prev, row])
+    setSaveState('saved')
+  }, [clientId, anchor.services, assumptions.length])
 
   const addOwner = makeAdder('gtcv_problem_owner_budget', owners, setOwners, {})
   // C28 as amended. A row added while a service is anchored belongs to it from
@@ -1569,6 +1643,8 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             onLeaveRow={dropIfBlank}
             onSetService={setRowService}
             onAddProblem={(serviceId) => addActivity(null, serviceId)}
+            onAddService={addService}
+            onRenameService={renameService}
           />
         )}
         {/* ─────────────────────────────────────────────────────────
