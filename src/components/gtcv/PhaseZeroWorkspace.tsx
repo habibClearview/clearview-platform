@@ -1267,6 +1267,63 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
    * everything else is — with Park or Delete on the row itself.
    */
 
+  // ─────────────────────────────────────────────────────────────
+  // DECLARED ABOVE EVERYTHING THAT NAMES THEM. 15 August 2026.
+  //
+  // These sat below nameActivity and nameProblem, which name them in their
+  // dependency lists. A useCallback naming a const declared further down throws
+  // ReferenceError on the FIRST render and takes the whole workspace with it —
+  // the error boundary's "This section couldn't load" is what that looks like.
+  // It is written down as a trap that has already cost a round, and it cost
+  // another one here. Anything the handlers below name belongs above them.
+  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // AN ADD PUTS A ROW ON THE SCREEN, NOT IN THE DATABASE.
+  // 15 August 2026.
+  //
+  // "+ add" inserted a blank row and left it there until somebody typed. Nine
+  // of them built up on one engagement in a morning and crowded the room's real
+  // answers off the table — Habib's screenshot is nine empty rows around four
+  // real ones. The rule written to clean them up deleted a blank row when focus
+  // left it, which is what made adding a second one impossible.
+  //
+  // A draft is held here, on the screen. Type into it and it is written; leave
+  // it and it was never anything. Nothing to clean up, and you can open as many
+  // as you like.
+  // ─────────────────────────────────────────────────────────────
+  const [drafts, setDrafts] = useState([])
+  const draftSeq = useRef(0)
+  const addDraft = useCallback((kind, serviceId, problemId = null) => {
+    draftSeq.current += 1
+    setDrafts((prev) => [...prev, { key: `draft-${draftSeq.current}`, kind, serviceId, problemId }])
+  }, [])
+  const dropDraft = useCallback((key) => {
+    setDrafts((prev) => prev.filter((d) => d.key !== key))
+  }, [])
+
+  /**
+   * A problem stated from Tool 2, under the service whose group it was pressed
+   * in. Applied in place: reload() re-reads the whole engagement and throws the
+   * page around, which is the trap this workspace has already paid for twice.
+   */
+  const addProblemToService = useCallback(async (serviceId, problem = null) => {
+    if (!serviceId) return null
+    setSaveState('saving')
+    setSaveMessage(null)
+    const row = { client_id: clientId, service_id: serviceId, sort_order: owners.length }
+    if (problem) row.problem = problem
+    const { data, error } = await supabase.from('gtcv_problem_owner_budget')
+      .insert([row])
+      .select().single()
+    if (error) { setSaveState('error'); setSaveMessage(error.message); return null }
+    setOwners((prev) => [...prev, data])
+    // Tool 1 reads problems from the anchor, so it is told too and the new row
+    // appears in both tables without a re-read.
+    setAnchor((prev) => ({ ...prev, problems: [...(prev.problems || []), data] }))
+    setSaveState('saved')
+    return data
+  }, [clientId, owners.length])
+
   /**
    * C2. AN ACTIVITY IS CREATED INSIDE THE ANCHORED SERVICE, OR NOT AT ALL.
    *
@@ -1476,29 +1533,6 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
   // Tool 1's rows: service -> problem -> activity, with a row for a problem
   // nothing solves yet. See buildTool1Rows for why the rows are no longer the
   // activities themselves.
-  // ─────────────────────────────────────────────────────────────
-  // AN ADD PUTS A ROW ON THE SCREEN, NOT IN THE DATABASE.
-  // 15 August 2026.
-  //
-  // "+ add" inserted a blank row and left it there until somebody typed. Nine
-  // of them built up on one engagement in a morning and crowded the room's real
-  // answers off the table — Habib's screenshot is nine empty rows around four
-  // real ones. The rule written to clean them up deleted a blank row when focus
-  // left it, which is what made adding a second one impossible.
-  //
-  // A draft is held here, on the screen. Type into it and it is written; leave
-  // it and it was never anything. Nothing to clean up, and you can open as many
-  // as you like.
-  // ─────────────────────────────────────────────────────────────
-  const [drafts, setDrafts] = useState([])
-  const draftSeq = useRef(0)
-  const addDraft = useCallback((kind, serviceId, problemId = null) => {
-    draftSeq.current += 1
-    setDrafts((prev) => [...prev, { key: `draft-${draftSeq.current}`, kind, serviceId, problemId }])
-  }, [])
-  const dropDraft = useCallback((key) => {
-    setDrafts((prev) => prev.filter((d) => d.key !== key))
-  }, [])
 
   /**
    * A row with nothing anywhere is not drawn. Rows like this exist on
@@ -1565,28 +1599,6 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     [problemGroups],
   )
 
-  /**
-   * A problem stated from Tool 2, under the service whose group it was pressed
-   * in. Applied in place: reload() re-reads the whole engagement and throws the
-   * page around, which is the trap this workspace has already paid for twice.
-   */
-  const addProblemToService = useCallback(async (serviceId, problem = null) => {
-    if (!serviceId) return null
-    setSaveState('saving')
-    setSaveMessage(null)
-    const row = { client_id: clientId, service_id: serviceId, sort_order: owners.length }
-    if (problem) row.problem = problem
-    const { data, error } = await supabase.from('gtcv_problem_owner_budget')
-      .insert([row])
-      .select().single()
-    if (error) { setSaveState('error'); setSaveMessage(error.message); return null }
-    setOwners((prev) => [...prev, data])
-    // Tool 1 reads problems from the anchor, so it is told too and the new row
-    // appears in both tables without a re-read.
-    setAnchor((prev) => ({ ...prev, problems: [...(prev.problems || []), data] }))
-    setSaveState('saved')
-    return data
-  }, [clientId, owners.length])
 
   /**
    * "RUN THIS WITH THE ROOM", ON EVERY TOOL HEADING. 14 August 2026.
