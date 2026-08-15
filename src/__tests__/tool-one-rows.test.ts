@@ -105,3 +105,52 @@ describe('nothing is invisible', () => {
     expect(rows.map((r) => r.activityId)).toEqual(['a2'])
   })
 })
+
+// ============================================================
+// A DRAFT IS A ROW ON THE SCREEN, NOT IN THE DATABASE.
+//
+// "all it does is show empty rows, with no data". Nine blank rows had been
+// inserted by "+ add" and left there. A draft cannot do that: it exists only
+// until the page is left, and becomes a row the moment it is typed into.
+// ============================================================
+describe('adding does not write an empty row', () => {
+  const draft = (key: string, kind: 'activity' | 'problem', serviceId: string, problemId: string | null = null) =>
+    ({ key, kind, serviceId, problemId })
+
+  it('opens a draft activity at the end of the problem it will solve', () => {
+    const rows = buildTool1Rows(
+      [svc('s1')], [prob('p1', 's1')], [act('a1', 's1', 'p1')],
+      [draft('d1', 'activity', 's1', 'p1')],
+    )
+    expect(rows.map((r) => r.activityId)).toEqual(['a1', null])
+    expect(rows[1].draft?.key).toBe('d1')
+    expect(rows[1].problemId).toBe('p1')
+  })
+
+  it('lets several drafts be open at once — the thing that was impossible', () => {
+    const rows = buildTool1Rows(
+      [svc('s1')], [prob('p1', 's1')], [],
+      [draft('d1', 'activity', 's1', 'p1'), draft('d2', 'activity', 's1', 'p1')],
+    )
+    expect(rows.filter((r) => r.draft).length).toBe(2)
+  })
+
+  it('opens a draft problem as its own group under the service', () => {
+    const rows = buildTool1Rows(
+      [svc('s1')], [prob('p1', 's1')], [act('a1', 's1', 'p1')],
+      [draft('d1', 'problem', 's1')],
+    )
+    const last = rows[rows.length - 1]
+    expect(last.draft?.kind).toBe('problem')
+    expect(last.problemId).toBe(null)
+    expect(last.firstOfProblem).toBe(true)
+    // The service's add still sits at the end of the service.
+    expect(last.lastOfService).toBe(true)
+  })
+
+  it('draws nothing extra when there are no drafts', () => {
+    const rows = buildTool1Rows([svc('s1')], [prob('p1', 's1')], [act('a1', 's1', 'p1')])
+    expect(rows.every((r) => r.draft === null)).toBe(true)
+    expect(rows).toHaveLength(1)
+  })
+})

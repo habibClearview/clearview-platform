@@ -245,7 +245,7 @@ function TextCell({ value, onCommit, canManage, placeholder, rows = 2, ariaLabel
 function ActivityTable({
   rows, editable, anchor, clientId, selected, onToggle, onEditActivity, onEditProblem,
   serviceNameFor, activityById, problemById, onAction, onReload,
-  onAddActivity, onAddProblem, onAddService, onNameActivity, onSetService, onRenameService,
+  onAddActivity, onAddProblem, onAddService, onNameActivity, onNameProblem, onRenameService,
 }) {
   return (
     <div style={tableWrap}>
@@ -326,6 +326,15 @@ function ActivityTable({
                     ariaLabel="The problem this service solves"
                     onCommit={(v) => onEditProblem(problem.id, v)}
                   />
+                ) : r.draft?.kind === 'problem' ? (
+                  // Nothing is written until this has words in it.
+                  <TextCell
+                    value=""
+                    canManage={editable}
+                    placeholder="The problem this service solves"
+                    ariaLabel="The problem this service solves"
+                    onCommit={(v) => onNameProblem(r.serviceId, v, r.draft.key)}
+                  />
                 ) : (
                   <span style={{ fontSize: '0.8rem', color: C.faint, fontStyle: 'italic' }}>
                     No problem stated
@@ -350,7 +359,7 @@ function ActivityTable({
                     canManage={editable}
                     placeholder="Name the activity that solves it"
                     ariaLabel="Name the activity that solves it"
-                    onCommit={(v) => onNameActivity(r.problemId, r.serviceId, v)}
+                    onCommit={(v) => onNameActivity(r.problemId, r.serviceId, v, r.draft?.key)}
                   />
                 ) : <Locked need="a problem" />}
               </td>
@@ -1305,13 +1314,22 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
    * says what solves the problem and it is there, rather than "add" and then
    * "type into the thing that appeared".
    */
-  const nameActivity = useCallback(async (problemId, serviceId, text) => {
+  const nameActivity = useCallback(async (problemId, serviceId, text, draftKey) => {
     if (!String(text || '').trim()) return
     const made = await addActivity(problemId, serviceId)
     if (!made) return
     setAssumptions((prev) => prev.map((a) => (a.id === made.id ? { ...a, activity: text } : a)))
+    if (draftKey) dropDraft(draftKey)
     await persist('gtcv_assumptions', made.id, { activity: text })
-  }, [addActivity, persist])
+  }, [addActivity, persist, dropDraft])
+
+  /** A draft problem becomes real the moment it has words in it. */
+  const nameProblem = useCallback(async (serviceId, text, draftKey) => {
+    if (!String(text || '').trim()) return
+    const made = await addProblemToService(serviceId, text)
+    if (!made) return
+    if (draftKey) dropDraft(draftKey)
+  }, [addProblemToService, dropDraft])
 
   /** Naming a service from its own row, applied in place so nothing redraws. */
   const renameService = useCallback(async (serviceId, name) => {
@@ -1458,9 +1476,44 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
   // Tool 1's rows: service -> problem -> activity, with a row for a problem
   // nothing solves yet. See buildTool1Rows for why the rows are no longer the
   // activities themselves.
+  // ─────────────────────────────────────────────────────────────
+  // AN ADD PUTS A ROW ON THE SCREEN, NOT IN THE DATABASE.
+  // 15 August 2026.
+  //
+  // "+ add" inserted a blank row and left it there until somebody typed. Nine
+  // of them built up on one engagement in a morning and crowded the room's real
+  // answers off the table — Habib's screenshot is nine empty rows around four
+  // real ones. The rule written to clean them up deleted a blank row when focus
+  // left it, which is what made adding a second one impossible.
+  //
+  // A draft is held here, on the screen. Type into it and it is written; leave
+  // it and it was never anything. Nothing to clean up, and you can open as many
+  // as you like.
+  // ─────────────────────────────────────────────────────────────
+  const [drafts, setDrafts] = useState([])
+  const draftSeq = useRef(0)
+  const addDraft = useCallback((kind, serviceId, problemId = null) => {
+    draftSeq.current += 1
+    setDrafts((prev) => [...prev, { key: `draft-${draftSeq.current}`, kind, serviceId, problemId }])
+  }, [])
+  const dropDraft = useCallback((key) => {
+    setDrafts((prev) => prev.filter((d) => d.key !== key))
+  }, [])
+
+  /**
+   * A row with nothing anywhere is not drawn. Rows like this exist on
+   * engagements worked before today, and they are what the table looked full of
+   * while the room's actual answers sat between them.
+   */
+  const liveActivities = useMemo(() => assumptions.filter((a) => (
+    ['activity', 'delivers', 'who_pays', 'assumption', 'disproof']
+      .some((f) => String(a[f] || '').trim())
+    || (anchor.activityValues || []).some((v) => v.activity_id === a.id && String(v.value || '').trim())
+  )), [assumptions, anchor.activityValues])
+
   const tableRows = useMemo(
-    () => buildTool1Rows(anchor.services || [], owners, assumptions),
-    [anchor.services, owners, assumptions],
+    () => buildTool1Rows(anchor.services || [], owners, liveActivities, drafts),
+    [anchor.services, owners, liveActivities, drafts],
   )
   const activityById = useCallback((id) => assumptions.find((a) => a.id === id) || null, [assumptions])
   const problemById = useCallback((id) => owners.find((p) => p.id === id) || null, [owners])
@@ -1517,19 +1570,22 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
    * in. Applied in place: reload() re-reads the whole engagement and throws the
    * page around, which is the trap this workspace has already paid for twice.
    */
-  const addProblemToService = useCallback(async (serviceId) => {
-    if (!serviceId) return
+  const addProblemToService = useCallback(async (serviceId, problem = null) => {
+    if (!serviceId) return null
     setSaveState('saving')
     setSaveMessage(null)
+    const row = { client_id: clientId, service_id: serviceId, sort_order: owners.length }
+    if (problem) row.problem = problem
     const { data, error } = await supabase.from('gtcv_problem_owner_budget')
-      .insert([{ client_id: clientId, service_id: serviceId, sort_order: owners.length }])
+      .insert([row])
       .select().single()
-    if (error) { setSaveState('error'); setSaveMessage(error.message); return }
+    if (error) { setSaveState('error'); setSaveMessage(error.message); return null }
     setOwners((prev) => [...prev, data])
     // Tool 1 reads problems from the anchor, so it is told too and the new row
     // appears in both tables without a re-read.
     setAnchor((prev) => ({ ...prev, problems: [...(prev.problems || []), data] }))
     setSaveState('saved')
+    return data
   }, [clientId, owners.length])
 
   /**
@@ -1850,9 +1906,10 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             /* NAMED APART SO THEY CANNOT BE CROSSED AGAIN. The problem add adds
                a PROBLEM; the activity add adds an ACTIVITY to the problem whose
                group it sits in. */
-            onAddActivity={(problemId, serviceId) => addActivity(problemId, serviceId)}
-            onAddProblem={addProblemToService}
+            onAddActivity={(problemId, serviceId) => addDraft('activity', serviceId, problemId)}
+            onAddProblem={(serviceId) => addDraft('problem', serviceId)}
             onNameActivity={nameActivity}
+            onNameProblem={nameProblem}
             onAddService={addService}
             onRenameService={renameService}
           />

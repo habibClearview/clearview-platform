@@ -316,6 +316,27 @@ export function orderActivitiesForTable<
 // problem, and dropping them is how a room stops trusting the screen.
 // ============================================================
 
+/**
+ * A row the facilitator has asked for but not yet typed into.
+ *
+ * 15 August 2026. "+ add" used to INSERT a row and leave it blank until
+ * somebody typed. Nine of those accumulated on one engagement in a morning,
+ * they crowded the room's real answers off the screen, and the rule written to
+ * clean them up — delete a blank row when focus leaves it — made adding a
+ * second one impossible.
+ *
+ * A draft is the same row on screen with nothing written anywhere. Type into
+ * it and it becomes real; leave it and it was never anything. There is no
+ * clean-up rule because there is nothing to clean up.
+ */
+export interface Tool1Draft {
+  key: string
+  serviceId: string | null
+  /** Set on a draft activity: the problem it will solve. Null on a draft problem. */
+  problemId: string | null
+  kind: 'activity' | 'problem'
+}
+
 export interface Tool1Row {
   key: string
   serviceId: string | null
@@ -330,6 +351,8 @@ export interface Tool1Row {
   lastOfProblem: boolean
   /** The activity this row draws, or null where the problem has none yet. */
   activityId: string | null
+  /** Set where this row is a draft: nothing is written until it is typed into. */
+  draft: Tool1Draft | null
 }
 
 interface RowActivity { id: string; service_id?: string | null; problem_id?: string | null; parked_at?: string | null; sort_order?: number | null }
@@ -341,6 +364,7 @@ export function buildTool1Rows(
   services: { id: string; parked_at?: string | null; sort_order?: number | null }[],
   problems: RowProblem[],
   activities: RowActivity[],
+  drafts: Tool1Draft[] = [],
 ): Tool1Row[] {
   const live = services.filter((s) => !s.parked_at).slice().sort(bySort)
   const liveProblems = problems.filter((p) => !p.parked_at)
@@ -353,15 +377,34 @@ export function buildTool1Rows(
         key: `${serviceId || 'none'}:${problemId || 'none'}:empty`,
         serviceId, firstOfService: false, lastOfService: false,
         problemId, firstOfProblem: true, lastOfProblem: true, activityId: null,
+        draft: null,
       })
-      return
+    } else {
+      acts.forEach((a, i) => out.push({
+        key: a.id,
+        serviceId, firstOfService: false, lastOfService: false,
+        problemId, firstOfProblem: i === 0, lastOfProblem: i === acts.length - 1,
+        activityId: a.id, draft: null,
+      }))
     }
-    acts.forEach((a, i) => out.push({
-      key: a.id,
+    // Activity drafts sit at the end of the problem they will solve.
+    const mine = drafts.filter((d) => d.kind === 'activity' && d.problemId === problemId)
+    mine.forEach((d) => out.push({
+      key: d.key,
       serviceId, firstOfService: false, lastOfService: false,
-      problemId, firstOfProblem: i === 0, lastOfProblem: i === acts.length - 1,
-      activityId: a.id,
+      problemId, firstOfProblem: false, lastOfProblem: false,
+      activityId: null, draft: d,
     }))
+    if (out.length > 0) {
+      // Whichever row ended up last carries the "+ add another activity".
+      const last = out[out.length - 1]
+      if (last.problemId === problemId) last.lastOfProblem = true
+      if (mine.length > 0) {
+        for (const r of out) {
+          if (r.problemId === problemId && r !== last) r.lastOfProblem = false
+        }
+      }
+    }
   }
 
   const drawService = (serviceId: string | null) => {
@@ -375,6 +418,15 @@ export function buildTool1Rows(
     // their own, never dropped.
     const loose = ofService.filter((a) => !a.problem_id || !mine.some((p) => p.id === a.problem_id))
     if (loose.length > 0) pushGroup(serviceId, null, loose.slice().sort(bySort))
+    // Problem drafts: a group of their own, at the end of the service.
+    drafts
+      .filter((d) => d.kind === 'problem' && d.serviceId === serviceId)
+      .forEach((d) => out.push({
+        key: d.key,
+        serviceId, firstOfService: false, lastOfService: false,
+        problemId: null, firstOfProblem: true, lastOfProblem: true,
+        activityId: null, draft: d,
+      }))
     // A service with nothing at all still needs one row to be seen and added to.
     if (out.length === startedAt) pushGroup(serviceId, null, [])
     out[startedAt].firstOfService = true
