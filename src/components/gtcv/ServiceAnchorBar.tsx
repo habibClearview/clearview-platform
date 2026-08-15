@@ -69,9 +69,19 @@ export default function ServiceAnchorBar({
       const res = await authedFetch(`/api/services?clientId=${encodeURIComponent(clientId)}`, { cache: 'no-store' })
       if (!res.ok) return
       const json = await res.json()
-      setServices(json.services || [])
-      setActivities(json.activities || [])
-      setProblems(json.problems || [])
+      // ─────────────────────────────────────────────────────
+      // ONLY WHEN SOMETHING ACTUALLY CHANGED. 15 August 2026.
+      //
+      // The same fix the workspace's own poll got on 14 August, which this was
+      // left out of. This read runs every three seconds and handed back brand
+      // new arrays every time, unchanged data included, so every memo below
+      // recomputed and this bar — which is sticky at the top, above all five
+      // tools — rebuilt twenty times a minute while somebody was reading it.
+      // ─────────────────────────────────────────────────────
+      const same = (prev: unknown, next: unknown) => JSON.stringify(prev) === JSON.stringify(next)
+      setServices((prev) => (same(prev, json.services || []) ? prev : (json.services || [])))
+      setActivities((prev) => (same(prev, json.activities || []) ? prev : (json.activities || [])))
+      setProblems((prev) => (same(prev, json.problems || []) ? prev : (json.problems || [])))
       setCurrentId(json.currentServiceId || null)
     } catch {
       /* Nothing arrives, nothing changes on screen. */

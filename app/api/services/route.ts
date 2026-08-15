@@ -26,10 +26,45 @@ const SERVICE_STATES = ['current', 'redesigned', 'new']
 /** C29 as amended: the platform's four words, at every level. */
 const DECISIONS = ['keep', 'redesign', 'pause', 'stop']
 
+/**
+ * THE SAME CAP MISTAKE AS /api/facilitate, STILL LIVE. 15 August 2026.
+ *
+ * This route is POLLED, and 600 an hour was set as though it were pressed. The
+ * counter on staging proves it has already been exceeded: 830 in one hour
+ * against a cap of 600. Everything after the 600th — every read AND every
+ * write — came back 429, and every caller here discards a failed response in
+ * silence (`if (!res.ok) return`, and ServiceAnchorBar and ProblemsCell do not
+ * look at the response at all). So the table stops updating, a control does
+ * nothing when pressed, and nothing anywhere says why.
+ *
+ * What one coach with Phase 0 open spends in an hour, doing nothing:
+ *
+ *   ServiceAnchorBar        every 3000ms   1,200
+ *   the workspace's anchor  every 4000ms     900
+ *                                          -----
+ *   sitting still, one tab                  2,100
+ *
+ * Which is over 600 in about seventeen minutes, before a single row is typed.
+ * Add the writes — a cell edit, an add, a park are all this route — and a
+ * working hour is nearer 2,400, and a second tab doubles it.
+ *
+ * Set at 20,000, the same order as /api/facilitate and for the same reason: a
+ * runaway loop does hundreds a second and is still stopped, and a coach working
+ * all afternoon never comes near it.
+ *
+ * STILL TO DO, and deliberately not done in the same change: ServiceAnchorBar
+ * and the workspace poll THIS SAME URL for the SAME payload, three seconds and
+ * four seconds apart. One shared read would halve this and stop the two copies
+ * ever disagreeing.
+ *
+ * IF YOU ADD A POLLER OR CHANGE AN INTERVAL, COME BACK AND REDO THIS SUM.
+ */
+const SERVICES_REQUESTS_PER_HOUR = 20000
+
 async function requireManager(req: NextRequest, admin: Admin, clientId: string) {
   return requireAccess(req, admin, clientId, 'manage', {
     deniedMessage: 'Only the lead consultant can change the services',
-    rateLimit: { key: 'services', max: 600, windowSeconds: 3600 },
+    rateLimit: { key: 'services', max: SERVICES_REQUESTS_PER_HOUR, windowSeconds: 3600 },
   })
 }
 
