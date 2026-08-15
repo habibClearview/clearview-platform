@@ -131,29 +131,66 @@ RULES THAT COME FROM THAT MODEL:
 - Duplicate submissions fixed (a flush race sent every answer twice).
 - Pending answers and their Accept buttons render directly under Tool 1's table.
 
+15 August:
+
+- ACCEPT FILLS THE ROW THE ANSWER IS ABOUT. The column the question targets
+  decides: `problem` makes a problem under the anchored service, `activity`
+  makes an activity under the problem just accepted, and delivers / who pays /
+  assumption / disproof FILL that activity. Tool 2's five fill the problem.
+  The rule is in `src/lib/stage1-accept.ts`, on its own, with tests.
+- The four multi-value fields fill through `gtcv_activity_values`, so a second
+  "who pays" is a second funder. Text typed by hand is carried across as the
+  first value before the room's answer goes underneath it.
+- `gtcv_room_state` holds the whole chain: `current_problem_id` and
+  `current_activity_id` alongside the service. Applied to staging 15 Aug.
+- Where the chain is not there yet, Accept REFUSES and the answer stays
+  pending, saying which press is missing. Beside every pending answer: which
+  row it will fill, and a chooser to send it to another.
+- TOOL 2 READS PROBLEMS BY SERVICE. Same table shape as Tool 1, one level in:
+  service written once per group, its problems beneath, then who experiences
+  it / who is accountable / who controls the budget / cost of not solving /
+  budget mechanism. The problem cell is the row Tool 1 states, by id.
+- Tool 2 has five questions, one variable each. The problem is never asked —
+  the room is working through one and it is on the wall.
+- A QUESTION BELONGS TO A TOOL (`gtcv_questions.tool`, default 1). Each tool
+  draws its own bar and its own pending list. Questions seed PER TOOL, so an
+  engagement that opened Phase 0 before today still gets Tool 2's.
+- A problem parented by its service is no longer reported as parked. That check
+  only asked about activities, so every problem stated the new way was in the
+  bin marked broken.
+- `/api/services` was capped at 600/hr and is polled 2,100/hr. Proved from the
+  counter: 830 in one hour. Now 20,000, arithmetic in the file. `/api/facilitate`
+  is 40,000 because Phase 0 draws a bar and a pending list PER TOOL.
+
 ---
 
 ## 5. WHAT IS NOT BUILT. Do not claim any of it works.
 
-1. ACCEPT STILL CREATES A NEW ROW PER ANSWER instead of filling an existing one.
-   Answer all six questions and you get six rows, each with one cell filled.
-   THIS IS THE NEXT THING TO BUILD and Tool 2 should not start before it.
-2. THE PAGE MAY STILL JUMP when a control is clicked. Two causes were found and
+1. THE PAGE MAY STILL JUMP when a control is clicked. Two causes were found and
    fixed (the loader blanking the whole workspace; a 4-second poll rebuilding
-   the table). Habib reported it still moving. If it does, find the THIRD cause
-   by reading, not by patching buttons — the last two were both single lines and
-   two rounds were wasted patching symptoms.
+   the table). A third was found on 15 Aug and is the strongest candidate for
+   what was left: /api/services refusing everything past 600 an hour while two
+   pollers spent 2,100, silently — a control pressed after that did nothing,
+   and the screen caught up in a lump when the window rolled over. NOT
+   CONFIRMED AS THE JUMP. It could not be reproduced in a browser this session:
+   minting a staging login was blocked. If it still moves, the next thing to
+   read is what changes HEIGHT above the table on a click — the anchor bar's
+   Rename swapping a button for a wider form, and the save indicator's error
+   line wrapping.
+2. The anchor bar and the workspace poll the SAME URL for the SAME payload,
+   three and four seconds apart. One shared read would halve the traffic and
+   stop the two copies disagreeing. Named in the comment on /api/services.
 3. Park / Rename / Delete are still in the bar above the table, not in it. The
    bar cannot be removed until they have homes.
 4. Discard for parked items (Bring back and Pull into a service exist).
 5. THE BLOCK IS NOT IN THE URL. The address is `/coach` whatever zone you are
    in, so "return to where you were" after a timeout can only return to the
    dashboard. Needs `/coach?zone=phase_0` before re-login can work.
-6. Tool 2 does not read problems by service, and has no questions written.
-7. The projected view timeout: unknown whether it sends him to the login page or
+6. The projected view timeout: unknown whether it sends him to the login page or
    just goes blank. ASK HIM WHICH, once, before building anything for it.
-8. The room control bar on Tools 2-5 runs phase_0's question — correct for now
-   because only Tool 1 has questions, but wrong once Tool 2 gets its own.
+7. The room control bar on Tools 3, 4 and 5 still runs Tool 1's list. Tools 1
+   and 2 now each draw their own; 3 to 5 have no questions of their own yet, so
+   they show Tool 1's until they do. Give them `tool: 3/4/5` seeds.
 
 ---
 
@@ -207,7 +244,9 @@ RULES THAT COME FROM THAT MODEL:
 
 Do not re-audit. Do not ask him to re-explain. Start here:
 
-1. Ask him one question only: does the page still jump, and on which control.
-2. Build Accept filling an existing row rather than creating a new one.
-3. Then Tool 2: problems inherited from Tool 1 by service, then its questions,
-   one variable each.
+1. Accept and Tool 2 are built and live. What has NOT been seen working is a
+   real room: six questions run on phones, six answers accepted, one problem
+   and one activity carrying four values. Watch that once before building more.
+2. Tools 3, 4 and 5 have no questions. They are the next sets to write, one
+   variable each, seeded with their own `tool` number.
+3. Park / Rename / Delete still live in the bar above the table, not in it.
