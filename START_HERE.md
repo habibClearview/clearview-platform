@@ -1,5 +1,10 @@
 # START HERE. Read this file first, then stop and follow it.
 
+> **14 August 2026 — READ `NEXT_SESSION.md` INSTEAD.** It supersedes sections 2
+> to 8 below: it carries the model, what is built, what is not built, the traps
+> that cost a week, and the first thing to do. Section 1 below (the branch) is
+> still correct and is repeated there.
+
 Written 13 August 2026 because a week has been lost to sessions re-reading
 73KB of PROGRESS.md and re-discovering the same facts. This file is short on
 purpose. Read it fully. Do NOT read all of PROGRESS.md unless this file sends
