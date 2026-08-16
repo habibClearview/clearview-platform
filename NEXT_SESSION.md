@@ -180,12 +180,13 @@ RULES THAT COME FROM THAT MODEL:
 2. The anchor bar and the workspace poll the SAME URL for the SAME payload,
    three and four seconds apart. One shared read would halve the traffic and
    stop the two copies disagreeing. Named in the comment on /api/services.
-3. Park / Rename / Delete are still in the bar above the table, not in it. The
-   bar cannot be removed until they have homes.
+3. Park / Rename / Delete are IN THE TABLE (15 Aug). The name is typed in the
+   service's own cell; Park and Delete are in that row's actions marked
+   "Service". The bar now only chooses which service the room is on.
 4. Discard for parked items (Bring back and Pull into a service exist).
-5. THE BLOCK IS NOT IN THE URL. The address is `/coach` whatever zone you are
-   in, so "return to where you were" after a timeout can only return to the
-   dashboard. Needs `/coach?zone=phase_0` before re-login can work.
+5. THE BLOCK IS IN THE URL (15 Aug): `/coach?client=...&zone=phase_0`, written
+   with replaceState. The return-to machinery already carried the path across a
+   sign-out, so a timeout now returns to the block.
 6. The projected view timeout: unknown whether it sends him to the login page or
    just goes blank. ASK HIM WHICH, once, before building anything for it.
 7. The room control bar on Tools 3, 4 and 5 still runs Tool 1's list. Tools 1
@@ -214,7 +215,10 @@ RULES THAT COME FROM THAT MODEL:
   completion message that is not true.
 - READ HIS SCREENSHOTS PROPERLY. Several wrong diagnoses came from skimming one.
 - VERIFY BEFORE CLAIMING. `npx tsc --noEmit`, `npm test`, `npm run lint:hooks`,
-  `npm run build`. Four test files have PRE-EXISTING type errors
+  `npm run build`. `lint:hooks` now carries no-undef, which is the ONLY thing
+  checking the 55 files that carry @ts-nocheck — two crashes shipped in one day
+  through that hole. src/__tests__/phase-zero-renders.test.tsx renders the
+  workspace with rows in it; if you change the table, run it. Four test files have PRE-EXISTING type errors
   (generic-engine, role-preview, seed-worked-example, working-capital) — ignore
   those, they are not yours.
 
