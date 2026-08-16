@@ -1622,6 +1622,43 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   const [clientData,setClientData]=useState({})
   const [clientLoading,setClientLoading]=useState(false)
   const [activeTab,setActiveTab]=useState('cover')
+  // ──────────────────────────────────────────────────────────────
+  // THE BLOCK IS IN THE ADDRESS. 15 August 2026.
+  //
+  // The address was /coach whatever you had open, so being signed out after
+  // five idle minutes could only ever return you to the dashboard, and getting
+  // back to the block, the zone and the engagement was four clicks every time.
+  // The return-to machinery already stores the path and the query and hands
+  // them back after sign-in (src/lib/auth/session-guard.ts) — it had nothing to
+  // store, because nothing about where you were was ever in the address.
+  //
+  // Read once on arrival, written on every change, with replaceState so the
+  // back button still walks the pages you actually visited rather than every
+  // tab you clicked.
+  // ──────────────────────────────────────────────────────────────
+  const urlRead=useRef(false)
+  useEffect(()=>{
+    if(urlRead.current)return
+    urlRead.current=true
+    try{
+      const p=new URLSearchParams(window.location.search)
+      const client=p.get('client')
+      const zone=p.get('zone')
+      if(client){setSelClientId(client);setView('clients')}
+      if(zone)setActiveTab(zone)
+    }catch{/* an address that cannot be parsed is not a reason to fail to load */}
+  },[])
+
+  useEffect(()=>{
+    if(!urlRead.current)return
+    try{
+      const p=new URLSearchParams(window.location.search)
+      if(selClientId)p.set('client',selClientId);else p.delete('client')
+      if(selClientId&&activeTab)p.set('zone',activeTab);else p.delete('zone')
+      const q=p.toString()
+      window.history.replaceState(null,'',q?`${window.location.pathname}?${q}`:window.location.pathname)
+    }catch{/* the screen is still correct even where the address cannot be written */}
+  },[selClientId,activeTab])
   // Lifted up from the tab components below rather than kept as their own
   // useState: those (ClientsHub/ClientsView/ProgrammesHub/TeamHub) are
   // defined as nested functions inside this component's own render body,
@@ -1831,6 +1868,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   if(error)return<div style={{padding:'2rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}><div style={{color:C.red,marginBottom:'1.5rem'}}>Error loading data: {error}</div><p style={{color:C.slate,fontSize:'1.07rem',marginBottom:'1rem'}}>This is usually caused by a stale session. Sign out and sign back in to fix it.</p><button onClick={onSignOut} style={{fontFamily:'monospace',fontSize:'1.07rem',padding:'0.6rem 1.4rem',border:'none',borderRadius:6,background:'var(--cv-header)',color:'var(--cv-on-accent)',cursor:'pointer'}}>Sign Out and Refresh</button></div>
 
   const selClient=clients.find(c=>c.id===selClientId)
+
 
   // The engagement's working currency, so every money figure inside a block
   // prints as money rather than as a bare number. It lives on

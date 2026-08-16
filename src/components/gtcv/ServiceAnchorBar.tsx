@@ -58,9 +58,6 @@ export default function ServiceAnchorBar({
   // reason to open. The controls were always there: bring a service back, pull
   // an activity into a service. They are now visible without a press.
   const [showParked, setShowParked] = useState(true)
-  // T1.4. Renaming the anchored service, in place.
-  const [renaming, setRenaming] = useState(false)
-  const [renameTo, setRenameTo] = useState('')
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
@@ -171,80 +168,17 @@ export default function ServiceAnchorBar({
               ))}
             </select>
 
-            {/* T1.4. RENAMING, which could not be done at all before: a service
-                was named once at creation and stuck with it. */}
-            {canManage && current ? (
-              renaming ? (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    const name = renameTo.trim()
-                    if (!name) return
-                    act({ action: 'renameService', id: current.id, name })
-                    setRenaming(false)
-                  }}
-                  style={{ display: 'inline-flex', gap: 6 }}
-                >
-                  <input
-                    value={renameTo}
-                    onChange={(e) => setRenameTo(e.target.value)}
-                    aria-label="New name for this service"
-                    autoFocus
-                    onBlur={() => {
-                      const name = renameTo.trim()
-                      // A blank name is refused, never saved. T1.1's rule holds
-                      // after creation as much as at it.
-                      if (name && name !== current.service_name) act({ action: 'renameService', id: current.id, name })
-                      setRenaming(false)
-                    }}
-                    style={{
-                      fontSize: 15, padding: '4px 8px', borderRadius: 8,
-                      border: `1px solid ${C.border}`, background: C.card, color: C.navy,
-                    }}
-                  />
-                  <button type="submit" disabled={busy || !renameTo.trim()} style={pill(C.teal, true)}>Save</button>
-                </form>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => { setRenameTo(current.service_name || ''); setRenaming(true) }}
-                  style={pill(C.slate, false)}
-                >
-                  Rename
-                </button>
-              )
-            ) : null}
+            {/* ─────────────────────────────────────────────────────
+                RENAME, PARK AND DELETE LIVE IN THE TABLE NOW. 15 August 2026.
 
-            {/* T1.6. REMOVING A SERVICE, which was not possible at all. Park is
-                the press that needs no thought and keeps everything; Delete asks
-                first, using the word, and never destroys the activities. */}
-            {canManage && current && !renaming ? (
-              <>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => act({ action: 'removeService', id: current.id, removal: 'park' })}
-                  title="Park this service. It and its activities move to the Parked area and come back complete."
-                  style={pill(C.amber, false)}
-                >
-                  Park service
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => {
-                    // C13. The question uses the word, and says what survives.
-                    const ok = window.confirm(
-                      `Delete ${current.service_name}? This leaves nothing behind and cannot be undone. Its activities are not destroyed: they lose their service and move to the Parked area.`,
-                    )
-                    if (ok) act({ action: 'removeService', id: current.id, removal: 'delete' })
-                  }}
-                  style={pill('#C0392B', false)}
-                >
-                  Delete service
-                </button>
-              </>
-            ) : null}
+                All three acted on whichever service this chooser happened to be
+                pointing at, which is not the service you are looking at when
+                you are scrolled to the fourth one. They are on the service's own
+                row in Tool 1: the name is typed in its cell, and Park and Delete
+                sit in that row's actions marked "Service". Nothing in this bar
+                acts on a service any more except choosing which one the ROOM is
+                working on, which is what an anchor is for.
+                ───────────────────────────────────────────────────── */}
 
             {/* C19. Changeable at any time, never fixed at creation. */}
             <select

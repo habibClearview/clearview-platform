@@ -32,16 +32,26 @@ const C = {
 const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
 
 export default function RowActions({
-  clientId, activityId, problemId, table, label, onDone,
+  clientId, activityId, problemId, serviceId, table, label, onDone,
 }: {
   clientId: string
   /** Which table the row is in, for the three tools that are neither an
    *  activity nor a problem. Park means the same thing in all five. */
   table?: string
-  /** Exactly one of these two. An activity moves between services; a problem
-   *  does not, because it belongs to an activity and travels with it. */
+  /** Exactly one of these three. An activity moves between services; a problem
+   *  does not, because it belongs to an activity and travels with it; and a
+   *  service has nowhere to move TO. */
   activityId?: string
   problemId?: string
+  /**
+   * A SERVICE PARKS AND DELETES FROM ITS OWN ROW. 15 August 2026.
+   *
+   * These two were controls in the bar above the table, which is the last
+   * reason that bar existed. Park takes the service and everything in it out of
+   * the way and both come back; Delete takes the service only and parks its
+   * activities rather than destroying them, which the route already does.
+   */
+  serviceId?: string
   /** What this row is called, so the confirmation can name it. */
   label: string
   onDone: () => void
@@ -69,8 +79,13 @@ export default function RowActions({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clientId, action: 'remove',
-          ...(activityId ? { activityId } : { id: problemId, table }),
+          clientId,
+          ...(serviceId
+            ? { action: 'removeService', id: serviceId }
+            : {
+              action: 'remove',
+              ...(activityId ? { activityId } : { id: problemId, table }),
+            }),
           ...payload,
         }),
       })
@@ -97,7 +112,9 @@ export default function RowActions({
         type="button"
         disabled={busy}
         onClick={park}
-        title="Out of this service, into the parked bucket. Nothing is lost and it can be pulled back into any service later."
+        title={serviceId
+          ? 'The service and everything in it, out of the way. Both come back.'
+          : 'Out of this service, into the parked bucket. Nothing is lost and it can be pulled back into any service later.'}
         style={btn(C.amber)}
       >{REMOVAL_LABELS.park}</button>
 
@@ -144,7 +161,9 @@ export default function RowActions({
             {REMOVAL_LABELS.delete}
           </button>
           <span style={{ fontSize: 11, color: C.slate, lineHeight: 1.35 }}>
-            Deleting leaves nothing behind. Park it instead if there is any chance it comes back.
+            {serviceId
+              ? 'Deleting removes the service. Its activities are parked, not destroyed, so nothing the room said is lost.'
+              : 'Deleting leaves nothing behind. Park it instead if there is any chance it comes back.'}
           </span>
         </span>
       ) : null}

@@ -392,12 +392,31 @@ function ActivityTable({
                 <td style={td}>
                   {/* Park is the press that needs no thought; delete is behind
                       one more press and a confirmation. A row that is only a
-                      problem parks the problem. */}
-                  {activity ? (
-                    <RowActions clientId={clientId} activityId={activity.id} label={activity.activity || 'this activity'} onDone={onReload} />
-                  ) : problem ? (
-                    <RowActions clientId={clientId} problemId={problem.id} label={problem.problem || 'this problem'} onDone={onReload} />
-                  ) : null}
+                      problem parks the problem.
+
+                      THE SERVICE'S OWN PARK AND DELETE LIVE HERE, on its first
+                      row, next to the name. They were the last reason the bar
+                      above the table existed. */}
+                  <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                    {activity ? (
+                      <RowActions clientId={clientId} activityId={activity.id} label={activity.activity || 'this activity'} onDone={onReload} />
+                    ) : problem ? (
+                      <RowActions clientId={clientId} problemId={problem.id} label={problem.problem || 'this problem'} onDone={onReload} />
+                    ) : null}
+                    {r.firstOfService && r.serviceId ? (
+                      <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                        <span style={{ ...mono, fontSize: '0.62rem', letterSpacing: '.06em', textTransform: 'uppercase', color: C.faint }}>
+                          Service
+                        </span>
+                        <RowActions
+                          clientId={clientId}
+                          serviceId={r.serviceId}
+                          label={serviceNameFor(r.serviceId) || 'this service'}
+                          onDone={onReload}
+                        />
+                      </span>
+                    ) : null}
+                  </span>
                 </td>
               )}
             </tr>
