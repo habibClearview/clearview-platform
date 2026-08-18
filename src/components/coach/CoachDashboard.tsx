@@ -1858,7 +1858,19 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   useEffect(()=>{
     let cancelled=false
     if(!selClientId){setEngagementCurrency(null);return}
-    supabase.from('engagement_config').select('currency').eq('client_id',selClient.id).maybeSingle()
+    // selClientId, NOT selClient.id. 18 August 2026. They are the same value,
+    // but `selClient` is declared BELOW the `if(loading) return <Spinner/>`
+    // above — so on the renders where the dashboard is still loading, that
+    // binding is never initialised, while this effect still runs after the
+    // commit. Reading it there throws "Cannot access 'selClient' before
+    // initialization", and there is no error boundary above this component:
+    // Next shows "Application error: a client-side exception has occurred" and
+    // the screen is white.
+    //
+    // It sat here harmlessly for as long as selClientId was null on the first
+    // render, which it always was until the block went into the address and a
+    // client id started arriving with the page. Latent, then reachable.
+    supabase.from('engagement_config').select('currency').eq('client_id',selClientId).maybeSingle()
       .then(({data})=>{if(!cancelled)setEngagementCurrency(data?.currency||null)})
       .catch(()=>{if(!cancelled)setEngagementCurrency(null)})
     return ()=>{cancelled=true}
