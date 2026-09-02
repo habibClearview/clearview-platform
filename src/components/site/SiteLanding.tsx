@@ -25,8 +25,18 @@
 import { useState } from 'react'
 import { BLOCK, dpLabel, dpNumber, CANVAS_BLOCK_IDS } from '@/lib/gtcv-blocks'
 
-const LINKEDIN = (process.env.NEXT_PUBLIC_LINKEDIN_NEWSLETTER_URL || '').trim()
-const YOUTUBE = (process.env.NEXT_PUBLIC_YOUTUBE_URL || '').trim()
+// The newsletter and the channel. These are public addresses rather than
+// secrets, so they live here where they can be read and corrected, with an
+// environment variable able to override either without a deploy.
+//
+// The channel's handle reads DevTVorg and the channel itself displays as
+// HabibOnifade, so a visitor who clicks through lands on a page with the right
+// name on it. The button says where it goes either way: a link whose
+// destination is a surprise is a link people stop trusting.
+const LINKEDIN = (process.env.NEXT_PUBLIC_LINKEDIN_NEWSLETTER_URL
+  || 'https://www.linkedin.com/newsletters/viable-by-design-7280979699525120000/').trim()
+const YOUTUBE = (process.env.NEXT_PUBLIC_YOUTUBE_URL
+  || 'https://www.youtube.com/@DevTVorg').trim()
 
 const IN_ORDER = [...CANVAS_BLOCK_IDS].sort((a, b) => (dpNumber(a) || 0) - (dpNumber(b) || 0))
 
@@ -362,22 +372,23 @@ export default function SiteLanding({ questions }) {
             <div className="social">
               {LINKEDIN ? (
                 <div className="soc">
-                  <h3>The newsletter, on LinkedIn</h3>
+                  <h3>Viable by Design</h3>
                   <p>
-                    What is actually working, what is not, and the decisions organisations get
-                    wrong on the way from grant funding to earned revenue.
+                    The newsletter, on LinkedIn. What is actually working, what is not, and the
+                    decisions organisations get wrong on the way from grant funding to earned
+                    revenue.
                   </p>
                   <a className="btn primary" href={LINKEDIN} target="_blank" rel="noopener noreferrer">
-                    Subscribe on LinkedIn
+                    Subscribe to Viable by Design
                   </a>
                 </div>
               ) : null}
               {YOUTUBE ? (
                 <div className="soc">
-                  <h3>Walkthroughs on video</h3>
+                  <h3>On video</h3>
                   <p>
-                    The canvas explained one decision at a time, with the questions each one asks
-                    and what a good answer looks like.
+                    The same thinking, talked through rather than written down, on Habib&rsquo;s
+                    YouTube channel.
                   </p>
                   <a className="btn ghost" href={YOUTUBE} target="_blank" rel="noopener noreferrer">
                     Watch on YouTube

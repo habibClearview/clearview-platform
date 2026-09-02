@@ -72,13 +72,20 @@ describe('the public site', () => {
     expect(host.querySelector('.q .yn button.y')?.getAttribute('aria-pressed')).toBe('true')
   })
 
-  it('renders no social button while no address is configured', () => {
-    // NEXT_PUBLIC_LINKEDIN_NEWSLETTER_URL and NEXT_PUBLIC_YOUTUBE_URL are unset
-    // in the test environment, which is the state the site ships in until the
-    // two links are given. A dead button is worse than no button.
+  it('sends people to the real newsletter and the real channel, and says so on the button', () => {
+    // A link whose destination is a surprise is a link people stop trusting,
+    // so the button names where it goes. These addresses were checked live
+    // before they were put on a public page.
     const host = render()
-    expect(host.textContent).not.toContain('Subscribe on LinkedIn')
-    expect(host.textContent).not.toContain('Watch on YouTube')
+    const links = Array.from(host.querySelectorAll('.soc a')) as HTMLAnchorElement[]
+    expect(links).toHaveLength(2)
+    expect(links[0].getAttribute('href'))
+      .toBe('https://www.linkedin.com/newsletters/viable-by-design-7280979699525120000/')
+    expect(links[0].textContent).toContain('Viable by Design')
+    expect(links[1].getAttribute('href')).toBe('https://www.youtube.com/@DevTVorg')
+    // Opening in a new tab without this is a way to hand the new page control
+    // of the one it came from.
+    for (const a of links) expect(a.getAttribute('rel')).toContain('noopener')
   })
 
   it('says plainly what happens to the address', () => {
