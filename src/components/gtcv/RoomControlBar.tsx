@@ -37,6 +37,67 @@ const mono = { fontFamily: 'var(--cv-font-mono)' }
 const POLL_MS = 1500
 const STALE_MS = 4000
 
+/**
+ * WHERE THE ROOM'S ANSWERS ARE FILED. 2 September 2026.
+ *
+ * This chooser used to be a sticky bar at the top of the whole block. It made
+ * sense when Tool 1 showed ONE service at a time and this switched between
+ * them — but in August the table changed to show every service at once, and
+ * the chooser stopped filtering anything. It carried on sitting above a table
+ * it no longer controlled, which is why Habib looked at it three times and
+ * could not work out what it was for. He was right: its appearance advertised
+ * a job it had stopped doing.
+ *
+ * What it still decides is narrow and real: when the room answers a question
+ * and the facilitator presses Accept, WHICH SERVICE the answer is filed under.
+ * So it belongs here, on the room controls, saying exactly that.
+ */
+function AnswersGoTo({ clientId, canManage }: { clientId: string; canManage: boolean }) {
+  const [services, setServices] = useState<{ id: string; service_name: string | null; parked_at?: string | null }[]>([])
+  const [current, setCurrent] = useState<string>('')
+  const [saving, setSaving] = useState(false)
+
+  const read = useCallback(async () => {
+    try {
+      const res = await authedFetch(`/api/services?clientId=${encodeURIComponent(clientId)}`, { cache: 'no-store' })
+      if (!res.ok) return
+      const j = await res.json()
+      const live = (j.services || []).filter((s: { parked_at?: string | null }) => !s.parked_at)
+      setServices((prev) => (JSON.stringify(prev) === JSON.stringify(live) ? prev : live))
+      setCurrent(j.currentServiceId || live[0]?.id || '')
+    } catch { /* the next read says */ }
+  }, [clientId])
+
+  useEffect(() => { read() }, [read])
+
+  const choose = async (id: string) => {
+    setCurrent(id); setSaving(true)
+    try {
+      await authedFetch('/api/services', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId, action: 'setCurrentService', serviceId: id }),
+      })
+    } catch { /* the next read says */ }
+    setSaving(false)
+  }
+
+  if (services.length === 0) return null
+  return (
+    <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 12.5, color: C.quiet }}>Answers from the room go to</span>
+      <select
+        value={current}
+        disabled={!canManage || saving}
+        onChange={(e) => choose(e.target.value)}
+        aria-label="Which service the room's answers are filed under"
+        style={{ ...select, fontWeight: 600 }}
+      >
+        {services.map((s) => <option key={s.id} value={s.id}>{s.service_name || 'Unnamed service'}</option>)}
+      </select>
+    </span>
+  )
+}
+
 export default function RoomControlBar({
   clientId, dpId, canManage, tool = 1,
 }: { clientId: string; dpId: string; canManage: boolean; tool?: number }) {
@@ -128,6 +189,7 @@ export default function RoomControlBar({
         <span style={{ ...mono, fontSize: 12.5, letterSpacing: '.1em', textTransform: 'uppercase', color: C.quiet }}>
           Run this with the room
         </span>
+        <AnswersGoTo clientId={clientId} canManage={canManage} />
         <select
           value=""
           disabled={busy}
@@ -146,6 +208,7 @@ export default function RoomControlBar({
 
   return (
     <div style={{ ...bar, alignItems: 'flex-start', flexDirection: 'column', gap: 8 }}>
+      <AnswersGoTo clientId={clientId} canManage={canManage} />
       <div style={{ fontFamily: 'var(--cv-font)', fontSize: 18, lineHeight: 1.3 }}>
         {open.question_text}
       </div>

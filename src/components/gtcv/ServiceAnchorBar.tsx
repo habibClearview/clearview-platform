@@ -40,6 +40,17 @@ const STATES: { value: string; label: string }[] = [
   { value: 'new', label: 'New' },
 ]
 
+/**
+ * 2 September 2026. This was a STICKY bar at the top of the block whose main
+ * control — the service chooser — no longer controlled the table beneath it.
+ * The chooser has moved to the room controls, where the answers it files
+ * actually arrive (see AnswersGoTo in RoomControlBar).
+ *
+ * What is left is a reading: the five figures for the service, and the parked
+ * items with the one control that can re-home them. Neither is a thing you
+ * press while working, so neither needs to float over the table. It sits below
+ * the table now, still, as a panel.
+ */
 export default function ServiceAnchorBar({
   clientId, canManage,
 }: { clientId: string; canManage: boolean }) {
@@ -133,53 +144,20 @@ export default function ServiceAnchorBar({
 
   return (
     <div style={{
-      // C4. Stays at the top through all five tools. This is the whole reason
-      // the bar exists rather than five headings.
-      position: 'sticky', top: 0, zIndex: 20,
       background: C.tint, border: `1px solid ${C.border}`, borderRadius: 12,
-      padding: '10px 14px', fontFamily: sans,
-      boxShadow: '0 2px 10px rgba(27,42,65,.06)',
+      padding: '10px 14px', fontFamily: sans, marginTop: 14,
     }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{
           fontSize: 12.5, fontWeight: 600, letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate,
-        }}>The service this decision point is working on</span>
+        }}>Where this decision point stands{current?.service_name ? ` · ${current.service_name}` : ''}</span>
 
         {live.length === 0 ? (
           <span style={{ fontSize: 15, color: C.slate }}>
-            No service yet. Add one, and the five tools below will work inside it.
+            No service yet. Add one in the table above.
           </span>
         ) : (
           <>
-            {/* C5. Changing this changes what every tool below shows. */}
-            <select
-              value={current?.id || ''}
-              disabled={!canManage}
-              onChange={(e) => { setCurrentId(e.target.value); act({ action: 'setCurrentService', serviceId: e.target.value }) }}
-              aria-label="Which service the room is working on"
-              style={{
-                fontFamily: 'var(--cv-font)', fontSize: 18, fontWeight: 600, color: C.navy,
-                border: `1px solid ${C.border}`, borderRadius: 8, padding: '4px 8px',
-                background: C.card, maxWidth: '26rem',
-              }}
-            >
-              {live.map((s) => (
-                <option key={s.id} value={s.id}>{s.service_name}</option>
-              ))}
-            </select>
-
-            {/* ─────────────────────────────────────────────────────
-                RENAME, PARK AND DELETE LIVE IN THE TABLE NOW. 15 August 2026.
-
-                All three acted on whichever service this chooser happened to be
-                pointing at, which is not the service you are looking at when
-                you are scrolled to the fourth one. They are on the service's own
-                row in Tool 1: the name is typed in its cell, and Park and Delete
-                sit in that row's actions marked "Service". Nothing in this bar
-                acts on a service any more except choosing which one the ROOM is
-                working on, which is what an anchor is for.
-                ───────────────────────────────────────────────────── */}
-
             {/* C19. Changeable at any time, never fixed at creation. */}
             <select
               value={current?.service_state || 'current'}

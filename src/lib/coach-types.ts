@@ -398,17 +398,15 @@ export const CANVAS_TABS = [
   { id: 'cover',        label: 'Cover',                     marker: '1',  group: 'engagement' },
   { id: 'journey',      label: 'Journey Canvas',            marker: '2',  group: 'engagement' },
   { id: 'charter',      label: 'Engagement Charter',        marker: '3',  group: 'engagement' },
-  { id: 'eng_setup',    label: 'Who is on it, and settings', marker: '4', group: 'engagement', teamOnly: true },
-  { id: 'sessions',     label: 'Sessions and rooms',        marker: '5',  group: 'engagement', teamOnly: true },
-  // WHERE THE METHOD PUTS IT. 2 September 2026. This sat at the very bottom of
-  // a twenty-five item menu, under "Your notes", where Habib could not find it
-  // and reasonably concluded it did not exist. The Delivery Guide runs it in
-  // SETUP: the three questions are asked of the Executive Director with all
-  // parties present, everyone signs before leaving, and weak answers mean the
-  // first decision point does not open. So it is the last thing in "This
-  // engagement" — after the Charter and the people, immediately before the
-  // work it gates.
-  { id: 'diagnostic',   label: 'Pre-engagement diagnostic', marker: '6',  group: 'engagement' },
+  // STRAIGHT AFTER THE CHARTER. 2 September 2026. It was at the bottom of a
+  // twenty-five item menu, where Habib could not find it and reasonably
+  // concluded it did not exist. Then I put it after Sessions and rooms, which
+  // is still wrong: the three questions are asked and signed BEFORE any
+  // session is opened, and weak answers mean the first decision point does not
+  // open at all. It follows the Charter, which is the document it belongs to.
+  { id: 'diagnostic',   label: 'Pre-engagement diagnostic', marker: '4',  group: 'engagement' },
+  { id: 'eng_setup',    label: 'Who is on it, and settings', marker: '5', group: 'engagement', teamOnly: true },
+  { id: 'sessions',     label: 'Sessions and rooms',        marker: '6',  group: 'engagement', teamOnly: true },
 
   { id: 'phase0',       label: 'Clearing the ground',       marker: 'P0', group: 'work', dpId: 'phase_0' },
   { id: 'dp01',         label: 'Decision Point 1 · Service Reality',      marker: '1',  group: 'work', dpId: 'dp01' },

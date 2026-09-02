@@ -1819,12 +1819,6 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         </div>
       )}
 
-      {/* C4, C5, C30, C31, C7. The service the room is working on, the five
-          figures, and the parked bucket. It STAYS AT THE TOP through all five
-          tools, which is what C4 asks for and what a heading inside each tool
-          could not do once anybody scrolled. Everything below works inside the
-          service chosen here. */}
-      <ServiceAnchorBar clientId={clientId} canManage={editable} />
 
       {/* ─── TOOL 1: Assumption Dump Canvas ─────────────────── */}
       <Section
@@ -1971,6 +1965,15 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
         <div style={{ marginTop: 12 }}>
           <PendingRows clientId={clientId} dpId="phase_0" canManage={editable} tool={1} />
         </div>
+
+        {/* WHERE THIS DECISION POINT STANDS. 2 September 2026.
+            The five figures and the parked items. This was a sticky bar at the
+            very top whose chooser no longer controlled the table under it —
+            that chooser has moved to the room controls, where the answers it
+            files actually arrive. What is left is a reading, not a control you
+            press while working, so it sits under the table rather than
+            floating over it. */}
+        <ServiceAnchorBar clientId={clientId} canManage={editable} />
       </Section>
 
       {/* ─── TOOL 2: Problem Owner Budget Matrix ────────────── */}
