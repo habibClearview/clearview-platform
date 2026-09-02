@@ -228,6 +228,8 @@ export function dpLabel(id: string): string {
 // it was the part the link did not show.
 export interface JourneyStep {
   id: string
+  /** The small line above the name, saying where in the arc this sits. */
+  eyebrow: string
   label: string
   what: string
   signedBy: string | null
@@ -236,24 +238,28 @@ export interface JourneyStep {
 export const BEFORE_THE_CANVAS: JourneyStep[] = [
   {
     id: 'charter',
+    eyebrow: 'Before the first decision point',
     label: 'Engagement Charter',
     what: 'What each side is committing to, in writing, before any work starts: the scope, who sits in the room, what the organisation has to bring, and what closing each decision point will require of them.',
     signedBy: 'Signed by the organisation and the coach',
   },
   {
     id: 'diagnostic',
+    eyebrow: 'Before the first decision point',
     label: 'Pre-engagement diagnostic',
     what: 'Three questions asked of the Executive Director out loud, with all parties present, and recorded in their own words: what commercial success looks like in eighteen months, what is stopping them earning revenue now, and what would have to be true to stop needing grant funding. A readiness self-assessment is scored beside them.',
     signedBy: 'Signed by the CEO, confirmed by the coach',
   },
   {
     id: 'gate',
+    eyebrow: 'Before the first decision point',
     label: 'Both signed, or nothing opens',
     what: 'Weak answers or a readiness score below the threshold mean Decision Point 1 does not open until there has been a further conversation with the funder present. The engagement can be stopped here, and that is a result rather than a failure.',
     signedBy: null,
   },
   {
     id: 'phase_0',
+    eyebrow: 'Before the first decision point',
     label: 'Clearing the ground',
     what: 'Every service the organisation actually runs is written down before any of it is judged: the problems each one solves, the activities that solve them, what each delivers, who pays, and the assumption underneath it.',
     signedBy: null,
@@ -263,12 +269,14 @@ export const BEFORE_THE_CANVAS: JourneyStep[] = [
 export const RUNS_UNDERNEATH: JourneyStep[] = [
   {
     id: 'evidence',
+    eyebrow: 'Runs underneath all of it',
     label: 'Evidence library',
     what: 'Every decision point closes on evidence, and every piece of it is filed against the decision it supports: interview records, cost figures, pricing tests, pilot results, client verbatim. A decision without evidence behind it does not close, and the library is what the organisation keeps at the end.',
     signedBy: null,
   },
   {
     id: 'handover',
+    eyebrow: 'How it ends',
     label: 'Handover',
     what: 'Five independence tests done unaided. The organisation runs the tools without the coach in the room, or the engagement does not close.',
     signedBy: 'Signed at close',

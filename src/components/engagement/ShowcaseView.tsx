@@ -219,7 +219,7 @@ function Box({ id }) {
 function Step({ step, underneath }) {
   return (
     <div className={underneath ? 'step underneath' : 'step'}>
-      <p className="k">{underneath ? 'Runs underneath' : 'Before the first decision point'}</p>
+      <p className="k">{step.eyebrow}</p>
       <h3>{step.label}</h3>
       <p>{step.what}</p>
       {step.signedBy ? <span className="sig">{step.signedBy}</span> : null}
