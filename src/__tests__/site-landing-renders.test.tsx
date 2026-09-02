@@ -41,15 +41,21 @@ describe('the public site', () => {
     const host = render()
     const text = host.textContent || ''
     for (const q of QUESTIONS) expect(text, `missing: ${q.question}`).toContain(q.question)
-    expect(host.querySelectorAll('.q').length).toBe(10)
+    expect(host.querySelectorAll('.qrow').length).toBe(10)
     expect(host.querySelectorAll('.yn button').length).toBe(20)
   })
 
-  it('shows all nine decision points, in worked order', () => {
+  it('draws the real canvas, the same one the prospect link shows', () => {
+    // Not a list of nine cards: the canvas as the method lays it out, from the
+    // one CanvasDrawing both this page and the showcase link use.
     const host = render()
-    const tags = Array.from(host.querySelectorAll('.dp .n')).map((e) => e.textContent)
+    expect(host.querySelectorAll('.cvx').length).toBe(1)
+    expect(host.querySelectorAll('.cvx .box').length).toBe(8)
+    expect(host.querySelectorAll('.cvx .spine-box').length).toBe(1)
+    expect(host.querySelectorAll('.cvx .headbars .hb').length).toBe(3)
+    const tags = Array.from(host.querySelectorAll('.cvx .dptag')).map((e) => e.textContent)
     expect(tags).toEqual(
-      ['dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09'].map(dpLabel),
+      ['dp01','dp02','dp03','dp04','dp06','dp05','dp07','dp08','dp09'].map(dpLabel),
     )
     const text = host.textContent || ''
     for (const id of CANVAS_BLOCK_IDS) expect(text).toContain(BLOCK[id].title)
@@ -66,10 +72,10 @@ describe('the public site', () => {
 
   it('records an answer when a button is pressed', () => {
     const host = render()
-    const yes = host.querySelector('.q .yn button.y') as HTMLButtonElement
+    const yes = host.querySelector('.qrow .yn button.y') as HTMLButtonElement
     act(() => { yes.click() })
     expect(host.textContent).toContain('1 of 10 answered')
-    expect(host.querySelector('.q .yn button.y')?.getAttribute('aria-pressed')).toBe('true')
+    expect(host.querySelector('.qrow .yn button.y')?.getAttribute('aria-pressed')).toBe('true')
   })
 
   it('sends people to the real newsletter and the real channel, and says so on the button', () => {

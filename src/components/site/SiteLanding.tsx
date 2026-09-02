@@ -23,7 +23,8 @@
 // is set.
 // ============================================================
 import { useState } from 'react'
-import { BLOCK, dpLabel, dpNumber, CANVAS_BLOCK_IDS } from '@/lib/gtcv-blocks'
+import { BLOCK, dpNumber, CANVAS_BLOCK_IDS } from '@/lib/gtcv-blocks'
+import CanvasDrawing, { CANVAS_CSS } from '@/components/gtcv/CanvasDrawing'
 
 // The newsletter and the channel. These are public addresses rather than
 // secrets, so they live here where they can be read and corrected, with an
@@ -47,6 +48,18 @@ const CSS = `
   --line:rgba(27,42,65,.16);
   --gold:#B7791F; --navy:#22344F; --teal:#00767A; --purple:#6B4A8B;
   --good:#2E7D32; --red:#C0392B;
+  --box:#FFFDF8; --line-soft:rgba(27,42,65,.09);
+  --spine:#1B2A41; --spine-ink:#EFEADD;
+  --shadow:0 1px 2px rgba(27,42,65,.05), 0 10px 30px rgba(27,42,65,.09);
+  /* Handed to CanvasDrawing, which reads these names and nothing else about
+     this page. The dark palette below redefines the sources, so the drawing
+     follows without knowing dark mode exists. */
+  --cvx-card:var(--card); --cvx-box:var(--box); --cvx-ink:var(--ink);
+  --cvx-ink-soft:var(--ink-soft); --cvx-ink-faint:var(--ink-faint);
+  --cvx-line:var(--line); --cvx-line-soft:var(--line-soft);
+  --cvx-gold:var(--gold); --cvx-navy:var(--navy); --cvx-teal:var(--teal);
+  --cvx-purple:var(--purple); --cvx-spine:var(--spine); --cvx-spine-ink:var(--spine-ink);
+  --cvx-shadow:var(--shadow); --cvx-fd:var(--cv-font); --cvx-fm:var(--cv-font);
   --fd:var(--cv-font); --fb:var(--cv-font); --fm:var(--cv-font);
   background:var(--paper); color:var(--ink); font-family:var(--fb);
   line-height:1.6; min-height:100vh; -webkit-font-smoothing:antialiased;
@@ -58,6 +71,9 @@ const CSS = `
     --line:rgba(255,255,255,.16);
     --gold:#E0B15A; --navy:#3E5C8A; --teal:#2AEBEB; --purple:#B79AD6;
     --good:#6FBF73; --red:#E77C6E;
+    --box:#16243A; --line-soft:rgba(255,255,255,.08);
+    --spine:#0A1422; --spine-ink:#EDF2F8;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 12px 34px rgba(0,0,0,.4);
   }
 }
 .hs *{box-sizing:border-box}
@@ -91,18 +107,11 @@ const CSS = `
 .hs .truth p{margin:0 0 12px;font-size:16.5px}
 .hs .truth p:last-child{margin:0}
 
-.hs .dpgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:12px}
-.hs .dp{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--edge,var(--navy));border-radius:11px;padding:15px 16px}
-.hs .dp.c-gold{--edge:var(--gold)} .hs .dp.c-navy{--edge:var(--navy)}
-.hs .dp.c-teal{--edge:var(--teal)} .hs .dp.c-purple{--edge:var(--purple)}
-.hs .dp .n{font-family:var(--fm);font-size:11.5px;font-weight:700;letter-spacing:.06em;color:#fff;background:var(--edge);border-radius:4px;padding:2px 7px;display:inline-block}
-.hs .dp h3{font-family:var(--fd);font-size:16.5px;font-weight:600;margin:9px 0 0;line-height:1.2}
-.hs .dp p{margin:7px 0 0;font-size:14px;color:var(--ink-soft);font-style:italic;line-height:1.45}
 
 .hs .quiz{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px}
-.hs .q{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-bottom:1px solid var(--line)}
-.hs .q:last-of-type{border-bottom:none}
-.hs .q .qt{flex:1;font-size:15.5px;line-height:1.45}
+.hs .qrow{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-bottom:1px solid var(--line)}
+.hs .qrow:last-of-type{border-bottom:none}
+.hs .qrow .qt{flex:1;font-size:15.5px;line-height:1.45}
 .hs .yn{display:flex;gap:6px;flex-shrink:0}
 .hs .yn button{
   font-family:var(--fb);font-size:14px;font-weight:600;border-radius:8px;padding:7px 16px;
@@ -141,7 +150,7 @@ const CSS = `
 .hs .foot p{margin:0 0 6px}
 
 @media (max-width:560px){
-  .hs .q{flex-direction:column;gap:10px}
+  .hs .qrow{flex-direction:column;gap:10px}
   .hs .yn{width:100%}
   .hs .yn button{flex:1}
   .hs .btn{width:100%;text-align:center}
@@ -230,7 +239,7 @@ export default function SiteLanding({ questions }) {
 
   return (
     <div className="hs">
-      <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: CSS + CANVAS_CSS }} />
 
       <header className="top">
         <div className="top-in">
@@ -281,15 +290,7 @@ export default function SiteLanding({ questions }) {
             there is evidence behind it and a signature on it. No decision opens until the one
             before it has closed — and the engagement can be stopped at any of them.
           </p>
-          <div className="dpgrid">
-            {IN_ORDER.map((id) => (
-              <div className={`dp ${BLOCK[id].color}`} key={id}>
-                <span className="n">{dpLabel(id)}</span>
-                <h3>{BLOCK[id].title}</h3>
-                <p>&ldquo;{BLOCK[id].q}&rdquo;</p>
-              </div>
-            ))}
-          </div>
+          <CanvasDrawing strap="Nine decisions, in order, each closed on evidence and signed before the next one opens" />
         </section>
 
         <section id="assessment">
@@ -306,7 +307,7 @@ export default function SiteLanding({ questions }) {
             <form className="quiz" onSubmit={submit}>
               <p className="counter">{answered} of {QUESTIONS.length} answered</p>
               {QUESTIONS.map((q) => (
-                <div className="q" key={q.id}>
+                <div className="qrow" key={q.id}>
                   <span className="qt">{q.question}</span>
                   <span className="yn">
                     <button

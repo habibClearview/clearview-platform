@@ -37,9 +37,9 @@
 // token they do not hold.
 // ============================================================
 import {
-  BLOCK, SPINE, CANVAS_COLUMNS, CANVAS_ROWS, TRANSITION_ROW, TRANSITION_LABEL,
-  SPINE_BLOCK_ID, CANVAS_BLOCK_IDS, BEFORE_THE_CANVAS, RUNS_UNDERNEATH, dpLabel, dpNumber,
+  BLOCK, CANVAS_BLOCK_IDS, BEFORE_THE_CANVAS, RUNS_UNDERNEATH, dpNumber,
 } from '@/lib/gtcv-blocks'
+import CanvasDrawing, { CANVAS_CSS } from '@/components/gtcv/CanvasDrawing'
 
 // The whole arc, in order, for the path across the top. The steps before the
 // first decision point are named here because the point of showing the path is
@@ -66,6 +66,14 @@ const CSS = `
   --idle:#BDB4A0;
   --spine:#1B2A41; --spine-ink:#EFEADD;
   --shadow:0 1px 2px rgba(27,42,65,.05), 0 10px 30px rgba(27,42,65,.09);
+  /* The canvas drawing reads these names, so it takes this page's colours
+     including the dark ones below, without knowing anything about the page. */
+  --cvx-card:var(--card); --cvx-box:var(--box); --cvx-ink:var(--ink);
+  --cvx-ink-soft:var(--ink-soft); --cvx-ink-faint:var(--ink-faint);
+  --cvx-line:var(--line); --cvx-line-soft:var(--line-soft);
+  --cvx-gold:var(--gold); --cvx-navy:var(--navy); --cvx-teal:var(--teal);
+  --cvx-purple:var(--purple); --cvx-spine:var(--spine); --cvx-spine-ink:var(--spine-ink);
+  --cvx-shadow:var(--shadow); --cvx-fd:var(--cv-font); --cvx-fm:var(--cv-font);
   --fd:var(--cv-font);
   --fb:var(--cv-font);
   --fm:var(--cv-font);
@@ -132,45 +140,8 @@ const CSS = `
 .sc .step p{margin:8px 0 0;font-size:13.7px;color:var(--ink-soft);line-height:1.5}
 .sc .sig{display:inline-block;margin-top:10px;font-family:var(--fm);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--teal);border:1px solid var(--teal);border-radius:999px;padding:3px 9px}
 
-/* The canvas, drawn the way the client's own page draws it. */
-.sc .canvas-scroll{overflow-x:auto;padding-bottom:8px}
-.sc .bmc{min-width:960px;background:var(--card);border:1.5px solid var(--ink);border-radius:14px;box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:10px}
-.sc .bmc-title{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;padding-bottom:4px;border-bottom:1px solid var(--line-soft)}
-.sc .bmc-title .t{font-family:var(--fd);font-size:22px;font-weight:600}
-.sc .bmc-title .s{font-size:12.5px;color:var(--ink-soft);margin-top:2px}
-.sc .bmc-title .meta{font-family:var(--fm);font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);text-align:right}
-.sc .headbars{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-.sc .hb{padding:8px;text-align:center;font-family:var(--fm);font-size:12.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#fff;border-radius:7px}
-.sc .hb.internal{background:var(--gold)} .sc .hb.connect{background:var(--navy)} .sc .hb.external{background:var(--teal)}
-.sc .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-.sc .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.sc .box{--edge:var(--navy);background:var(--box);border:1px solid var(--line);border-top:3px solid var(--edge);border-radius:9px;padding:11px 12px 12px;display:flex;flex-direction:column}
-.sc .c-gold{--edge:var(--gold)} .sc .c-navy{--edge:var(--navy)} .sc .c-teal{--edge:var(--teal)} .sc .c-purple{--edge:var(--purple)}
-.sc .tagrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.sc .dptag{font-family:var(--fm);font-size:12px;font-weight:700;letter-spacing:.05em;color:#fff;background:var(--edge);border-radius:4px;padding:2px 7px}
-.sc .sublab{font-family:var(--fm);font-size:12px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint)}
-.sc .box h4{font-family:var(--fd);font-weight:600;font-size:14.5px;margin:9px 0 0;line-height:1.15}
-.sc .box .q{font-style:italic;font-size:12.5px;color:var(--ink-soft);margin:6px 0 0;line-height:1.35}
-.sc .box ul{margin:9px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
-.sc .box li{position:relative;padding-left:13px;font-size:12.5px;color:var(--ink-soft);line-height:1.35}
-.sc .box li::before{content:"-";position:absolute;left:0;color:var(--edge);font-weight:700}
-.sc .fit{margin-top:11px;font-family:var(--fm);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:var(--edge);border-radius:4px;padding:4px 8px;align-self:flex-start}
-.sc .trans-l{font-family:var(--fm);font-size:12.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);text-align:center;padding:6px 0 0}
-.sc .spine-box{background:var(--spine);color:var(--spine-ink);border-radius:10px;padding:14px 16px;border:1px solid var(--line)}
-.sc .spine-head .dptag{background:var(--teal);color:#04222a}
-.sc .spine-lab{font-family:var(--fm);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:rgba(239,234,221,.7)}
-.sc .spine-box h4{font-family:var(--fd);font-size:16px;margin:8px 0 0}
-.sc .spine-box .q{font-style:italic;font-size:12.5px;color:rgba(239,234,221,.85);margin:5px 0 0}
-.sc .stages{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}
-.sc .stage{font-family:var(--fm);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border-radius:4px;padding:4px 9px}
-.sc .stage.s1{background:var(--gold);color:#2a1c04} .sc .stage.s2{background:#3E6E72;color:#eafcff}
-.sc .stage.s3{background:var(--teal);color:#04222a} .sc .stage.s4{background:#2E7D32;color:#eafce9}
-.sc .fits{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:12px}
-.sc .fitc{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:7px;padding:9px}
-.sc .fitc .fn{font-family:var(--fm);font-size:12px;letter-spacing:.06em;color:var(--teal)}
-.sc .fitc .ft{font-family:var(--fd);font-size:12.5px;margin:3px 0 4px}
-.sc .fitc .fdz{font-size:12px;color:rgba(239,234,221,.72);line-height:1.35}
-@media (max-width:720px){ .sc .fits{grid-template-columns:repeat(2,1fr)} }
+/* The canvas itself is drawn by CanvasDrawing, which carries its own styles.
+   Its palette is taken from this page through the --cvx- names mapped above. */
 
 .sc .foot{
   margin-top:44px; padding-top:22px; border-top:1px solid var(--line);
@@ -185,41 +156,17 @@ const CSS = `
 .sc .gone p{color:var(--ink-soft); margin:0;}
 
 /* ── NARROW SCREENS ─────────────────────────────────────────
-   The canvas is a three column drawing and needs about 960px to be read at
-   all, so on a phone it was a 960px picture inside a scrolling box: legible
-   only by panning it, which is not legible. Below 860px it stops pretending
-   to be a drawing and becomes what is underneath it — nine decisions in the
-   order they are worked, one under the other.
-
-   The rows dissolve rather than the boxes being re-ordered in the markup
-   (display:contents makes each box a direct child of the canvas), and each
-   box carries its own number as its order, so the phone reads 1 to 9 while
-   the wide screen keeps the canvas positions, where six sits above five
-   because of the column it belongs to.
-
-   The three column headers go. A single column has no left and no right, and
-   every box already names which column it came from. */
+   The canvas does its own stacking; these are the page's own pieces. The path
+   wraps into rows of chips instead of scrolling sideways, so the line that
+   joins them would cut across the gaps and is hidden. */
 @media (max-width:860px){
-  .sc .canvas-scroll{overflow-x:visible}
-  .sc .bmc{min-width:0;padding:12px;border-radius:12px}
-  .sc .headbars{display:none}
-  .sc .row3,.sc .row2{display:contents}
-  .sc .box{order:var(--n,50)}
-  .sc .trans-l{order:65;text-align:left;padding:12px 0 0;line-height:1.4}
-  .sc .spine-box{order:90}
-  .sc .box h4{font-size:16px}
-  .sc .box .q,.sc .box li,.sc .box .sublab{font-size:13.5px}
-  .sc .bmc-title .meta{text-align:left}
   .sc .band{margin:0 -20px 24px;padding:26px 18px 24px;border-radius:0 0 14px 14px}
-  /* The path wraps into rows of chips instead of scrolling sideways, so the
-     line that joins them would cut across the gaps. */
   .sc .path-scroll{overflow-x:visible}
   .sc .path{min-width:0;flex-wrap:wrap;justify-content:flex-start;gap:12px 4px}
   .sc .path::before{display:none}
   .sc .stop{flex:0 0 auto;width:66px}
 }
 @media (max-width:520px){
-  .sc .fits{grid-template-columns:1fr}
   .sc .pre-grid{grid-template-columns:1fr}
 }
 `
@@ -237,24 +184,6 @@ function progressLine(view) {
   return `A live engagement is under way, with ${view.gatesComplete} of ${view.gatesTotal} gates closed on evidence.`
 }
 
-// One box, drawn exactly as the client's own journey page draws it, so a
-// prospect who signs recognises the page they are handed on day one.
-function Box({ id }) {
-  const b = BLOCK[id]
-  return (
-    <article className={`box ${b.color}`} style={{ '--n': (dpNumber(id) || 0) * 10 }}>
-      <div className="tagrow">
-        <span className="dptag">{dpLabel(id)}</span>
-        <span className="sublab">{b.sublab}</span>
-      </div>
-      <h4>{b.title}</h4>
-      <p className="q">&ldquo;{b.q}&rdquo;</p>
-      <ul>{b.bullets.map((li, i) => <li key={i}>{li}</li>)}</ul>
-      <span className="fit">{b.fit}</span>
-    </article>
-  )
-}
-
 function Step({ step, underneath }) {
   return (
     <div className={underneath ? 'step underneath' : 'step'}>
@@ -270,7 +199,7 @@ export default function ShowcaseView({ view }) {
   if (!view) {
     return (
       <div className="sc">
-        <style dangerouslySetInnerHTML={{ __html: CSS }} />
+        <style dangerouslySetInnerHTML={{ __html: CSS + CANVAS_CSS }} />
         <div className="gone">
           <h1>This link is not open</h1>
           <p>
@@ -287,7 +216,7 @@ export default function ShowcaseView({ view }) {
 
   return (
     <div className="sc">
-      <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: CSS + CANVAS_CSS }} />
       <div className="wrap">
 
         <div className="band">
@@ -347,53 +276,7 @@ export default function ShowcaseView({ view }) {
           it, and what the evidence turns out to say.
         </p>
 
-        <div className="canvas-scroll">
-          <div className="bmc">
-
-            <div className="bmc-title">
-              <div>
-                <div className="t">Grant-to-Commercial Viability Canvas&trade;</div>
-                <div className="s">A structured route from grant-funded organisation to commercial sustainability</div>
-              </div>
-              <div className="meta">{named || 'The method'}<br />The Canvas Coach · habibonifade.com</div>
-            </div>
-
-            <div className="headbars">
-              {CANVAS_COLUMNS.map((c) => (
-                <div className={`hb ${c.key}`} key={c.key}>{c.label}</div>
-              ))}
-            </div>
-
-            {CANVAS_ROWS.map((row, i) => (
-              <div className="row3" key={i}>{row.map((id) => <Box key={id} id={id} />)}</div>
-            ))}
-
-            <div className="trans-l">{TRANSITION_LABEL}</div>
-            <div className="row2">{TRANSITION_ROW.map((id) => <Box key={id} id={id} />)}</div>
-
-            <div className="spine-box" style={{ '--n': 90 }}>
-              <div className="spine-head">
-                <span className="dptag">{dpLabel(SPINE_BLOCK_ID)}</span>
-                <span className="spine-lab">&nbsp;Diagnostic spine · full width · kick-off · mid-point · close</span>
-                <h4>{SPINE.title}</h4>
-                <p className="q">&ldquo;{SPINE.q}&rdquo;</p>
-              </div>
-              <div className="stages">
-                {SPINE.stages.map((s) => <span className={`stage ${s.c}`} key={s.c}>{s.label}</span>)}
-              </div>
-              <div className="fits">
-                {SPINE.fits.map((f) => (
-                  <div className="fitc" key={f.n}>
-                    <div className="fn">{f.n}</div>
-                    <div className="ft">{f.t}</div>
-                    <div className="fdz">{f.d}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </div>
-        </div>
+        <CanvasDrawing meta={named} />
 
         <div className="st">
           <h2>What runs underneath, and what you keep</h2>
