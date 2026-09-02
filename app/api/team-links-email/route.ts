@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 import { PERSONAL_GRANT_TYPE, personalLinkMessage, personalLinkUrl } from '@/lib/stage2-personal-links'
+import { FROM_ADDRESS } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -75,7 +76,16 @@ export async function POST(req: NextRequest) {
     const { Resend } = await import('resend')
     const resend = new Resend(key)
     const sent = await resend.emails.send({
-      from: process.env.RESEND_FROM || 'onboarding@resend.dev',
+      // ONE FROM-ADDRESS FOR THE WHOLE PLATFORM. 2 September 2026.
+      //
+      // This route was the only one not using it. It read an environment
+      // variable nobody had set and fell back to onboarding@resend.dev —
+      // Resend's shared test address. Mail from it does send, but it arrives
+      // from a domain that is not Habib's, cannot be replied to, and is far
+      // more likely to be filtered: the worst kind of failure, because it looks
+      // like it worked. FROM_ADDRESS is the address every other email already
+      // comes from, on the verified domain, so there is nothing to configure.
+      from: FROM_ADDRESS,
       to: party.email,
       subject: 'Your link for the sessions',
       text: message,

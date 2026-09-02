@@ -23,7 +23,8 @@ export function emailAvailable(): boolean {
   return !!resendApiKey()
 }
 
-const FROM_ADDRESS = 'Canvas Coach <notifications@habibonifade.com>'
+/** The one address every email from this platform comes from. */
+export const FROM_ADDRESS = 'Canvas Coach <notifications@habibonifade.com>'
 
 export interface SendEmailInput {
   to: string | string[]
