@@ -2785,7 +2785,7 @@ function TabCover({client,prog,programmes,onUpdate}){
   const [form,setForm]=useState({...client})
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>{client.engagement_mode==='canvas'?'Tab 1 — Cover':'Cover'}</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn(true)} onClick={()=>{setForm({...client});setEditing(!editing)}}>{editing?'Cancel':'Edit'}</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>{client.engagement_mode==='canvas'?'Cover':'Cover'}</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn(true)} onClick={()=>{setForm({...client});setEditing(!editing)}}>{editing?'Cancel':'Edit'}</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       {editing?(
         <div style={card}>
           <div style={fGrid}>
@@ -2938,7 +2938,7 @@ function NewServiceForm({clients,onSave,onCancel}){
 function TabHowToStart({client}){
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 2 — How to Start</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>How to Start</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       <div style={card}>
         <h3 style={{fontFamily:'var(--cv-font)',color:C.navy,marginTop:0}}>Welcome to your Canvas Coach engagement platform</h3>
         <p style={{fontSize:'1.13rem',lineHeight:1.7,color:C.slate}}>This platform is where the work of your engagement lives. It tracks every decision you make, every piece of evidence you produce, and every milestone you reach on your journey to commercial independence.</p>
@@ -2973,7 +2973,7 @@ function TabHowToStart({client}){
 function TabCoachRef(){
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 3 — Coach Quick Reference</h3><div style={{display:'flex',gap:'0.5rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.amber,border:`1px solid ${C.amber}`,borderRadius:4,padding:'0.2rem 0.5rem'}}>Coach only — not visible to client</span><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Coach Quick Reference</h3><div style={{display:'flex',gap:'0.5rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.amber,border:`1px solid ${C.amber}`,borderRadius:4,padding:'0.2rem 0.5rem'}}>Coach only — not visible to client</span><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       <div style={{...card,background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`}}>
         <h4 style={{fontFamily:'var(--cv-font)',color:C.navy,marginTop:0}}>Delivery Rhythm</h4>
         <ul style={{fontSize:'1.07rem',lineHeight:1.8,color:C.navy}}>
@@ -3009,7 +3009,7 @@ function TabCoachRef(){
 function TabIPFramework(){
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 4 — IP Framework Reference</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>IP Framework Reference</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       <div style={card}>
         <h4 style={{fontFamily:'var(--cv-font)',color:C.navy,marginTop:0}}>Three-Stage Adoption Test</h4>
         <p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.6}}>Before any service can be sold commercially, three things must be true about the buyer. All three must be present — one or two is not enough.</p>
@@ -3061,7 +3061,7 @@ function TabEngagementSetup({client,fileLinks,notifications,onUpdate,onUpdateFil
   async function save(){setSaving(true);await onUpdateFileLinks(links);await onUpdateNotifications(notif);setSaving(false)}
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 5 — Engagement Setup</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={solidBtn('var(--cv-header)',true)} disabled={saving} onClick={save}>{saving?'Saving…':'Save'}</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Engagement Setup</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={solidBtn('var(--cv-header)',true)} disabled={saving} onClick={save}>{saving?'Saving…':'Save'}</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       <div style={card}>
         <div style={secH}>Engagement Team</div>
         <div style={fGrid}>
@@ -3117,7 +3117,7 @@ function TabDiagnostic({client,diagnostic,userRole,userName,onUpdate}){
   const score=answers.filter(a=>a.answer===true).length
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 6 — Pre-Engagement Diagnostic</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Pre-Engagement Diagnostic</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       {locked&&<div style={{background:'var(--cv-tint-green)',padding:14,borderRadius:8,marginBottom:16,fontWeight:600,color:C.green}}>Signed and locked. CEO: {d.ceo_signed_name} on {d.ceo_signed_at?.split('T')[0]}. Coach confirmed {d.coach_signed_at?.split('T')[0]}.</div>}
       <div style={card}>
         <div style={secH}>Three Questions</div>
@@ -3184,7 +3184,7 @@ function TabTracker({client,canvas}){
   const dpLabels={'phase_0':'Phase 0','dp01':'DP01','dp02':'DP02','dp03':'DP03','dp04':'DP04','dp05':'DP05','dp06':'DP06','dp07':'DP07','dp08':'DP08','dp09':'DP09'}
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 7 — Engagement Tracker</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Engagement Tracker</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       <div style={{overflowX:'auto'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.07rem',fontFamily:"var(--cv-font)"}}>
           <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Phase','Zone / Decision Point','Core Question','Status','Components','CEO Sign-Off'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left',fontWeight:600,whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
@@ -3216,7 +3216,7 @@ function TabDecisions({client,decisions,userRole,userName,onAdd,onUpdate}){
   const [adding,setAdding]=useState(false)
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 8 — Canvas Decision Record</h3><div style={{display:'flex',gap:'0.5rem'}}>{canEdit(userRole)&&<button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Record Decision</button>}<button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Canvas Decision Record</h3><div style={{display:'flex',gap:'0.5rem'}}>{canEdit(userRole)&&<button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Record Decision</button>}<button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       {adding&&(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>
           <div style={fGrid}>
@@ -3257,7 +3257,7 @@ function TabEvidence({client,evidence,onAdd,onUpdate}){
   const [form,setForm]=useState({date:new Date().toISOString().split('T')[0],dp_id:'',type:'document',description:'',url:'',uploaded_by:'',status:'submitted'})
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 9 — Evidence Library</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Add Evidence</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Evidence Library</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Add Evidence</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       {adding&&(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>
           <div style={fGrid}>
@@ -3299,7 +3299,7 @@ function TabHandover({client,handover,canvas,userRole,onUpdate}){
   const locked=!dp09?.ceo_signed_off
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 10 — Handover Record</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Handover Record</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       {locked&&<div style={{background:'var(--cv-tint-amber-2)',padding:14,borderRadius:8,marginBottom:16,color:C.amber,fontWeight:600}}>This tab unlocks when DP09 CEO sign-off is complete.</div>}
       {handover.map(test=>(
         <div key={test.id} style={{...card,opacity:locked?0.6:1}}>
@@ -3471,7 +3471,7 @@ function TabInterviewBriefing({client,interviews,onAdd}){
   const [adding,setAdding]=useState(false)
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 21 — Interview Briefing</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ New Briefing</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Interview Briefing</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ New Briefing</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       <div style={{...card,background:C.cream,fontSize:'1.07rem',color:C.slate,lineHeight:1.7}}>An interview briefing is prepared before each customer validation visit. It sets the objective, target respondent profile, and key questions for the interviewer.</div>
       {adding&&(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>
@@ -3506,7 +3506,7 @@ function TabInterviewCapture({client,interviews,onAdd,onUpdate}){
   const [form,setForm]=useState({date:new Date().toISOString().split('T')[0],dp_id:'',respondent:'',role:'',organisation:'',interviewer:'',key_quotes:'',observations:'',follow_up:'',evidence_ref:''})
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 22 — Interview Capture</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Record Interview</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Interview Capture</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Record Interview</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       {adding&&(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>
           <div style={fGrid}>
@@ -3547,7 +3547,7 @@ function TabInterviewReporting({interviews}){
   const byDP=['dp02','dp03','dp05','dp07','dp08'].map(dp=>({dp,items:interviews.filter(i=>i.dp_id===dp)})).filter(g=>g.items.length>0)
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 23 — Interview Reporting</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Interview Reporting</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       <div style={{...card,background:C.cream,fontSize:'1.07rem',color:C.slate,lineHeight:1.7}}>Interview reports summarise what was heard across all interviews for a given Decision Point: what we heard, what it means, and what we do next.</div>
       {byDP.length===0&&<div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No interviews recorded yet.</div>}
       {byDP.map(({dp,items})=>(
@@ -3566,7 +3566,7 @@ function TabHypothesis({client,hypotheses,onAdd,onUpdate}){
   const [form,setForm]=useState({dp_id:'',date_formed:new Date().toISOString().split('T')[0],hypothesis:'',evidence_for:'',evidence_against:'',status:'holding',decision_made:''})
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 24 — Hypothesis Tracker</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Add Hypothesis</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Hypothesis Tracker</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Add Hypothesis</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       {adding&&(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>
           <div style={fGrid}>
@@ -3604,7 +3604,7 @@ function TabPilotObservation({client,pilots,onAdd,onUpdate}){
   const [form,setForm]=useState({date:new Date().toISOString().split('T')[0],client_name:'',service_delivered:'',went_well:'',did_not_work:'',client_feedback:'',adjustments_made:'',evidence_ref:''})
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 25 — Pilot Observation</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Record Observation</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Pilot Observation</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Record Observation</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       <div style={{...card,background:C.cream,fontSize:'1.07rem',color:C.slate,lineHeight:1.7}}>One form per pilot delivery. Completed by the lead consultant during or immediately after the visit.</div>
       {adding&&(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>

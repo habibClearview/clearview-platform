@@ -62,8 +62,8 @@ export const PREVIEW_ROLES: PreviewRole[] = [
   },
   {
     id: 'ceo',
-    label: 'The organisation being coached',
-    who: 'The Executive Director or leadership of the organisation doing the work.',
+    label: 'The client',
+    who: 'The Executive Director or leadership of the client organisation doing the work.',
     reach: 'Their own engagement only. They can edit the working tables and sign off blocks. They never see the coaching guidance or anything about the fee.',
   },
   {
