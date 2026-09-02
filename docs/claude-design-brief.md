@@ -390,16 +390,37 @@ So: brand the site in navy / cyan / gold / cream. Leave the canvas's column
 colours alone. If the two need reconciling, move the canvas's navy and gold
 toward the brand values rather than the reverse.
 
-### The logos
+### The logos, and which is which
 
-- **Viable by Design** — the LinkedIn newsletter. Wordmark in a rule box, the
-  A of VIABLE replaced by a cyan triangle or dot. Two versions exist: white on
-  charcoal, and navy on white. The cyan is process cyan.
-- **The Canvas Coach / Habib Onifade personal mark** — Habib has this. It has
-  not been supplied yet and is needed.
+Three marks exist. They compete unless the hierarchy is stated, so it is
+stated here.
 
-The newsletter logo is for the newsletter section only. It is not the site's
-logo, and the two should not compete in the header.
+**1. Canvas Coach — the site's mark.** An isometric open-cube monogram beside
+the words "Canvas Coach", set on two lines. Two lockups exist: mixed case and
+all caps.
+
+> **Use the mixed-case lockup on the site.** All-caps wordmarks lose
+> legibility at header size and badly on a phone, which is most of this
+> audience. The all-caps version is for print and slide decks.
+
+The mark as supplied is pure black or pure white. **A navy `#0D1B3E` version
+is wanted for the cream background** — black on cream reads harsh and
+slightly unfinished. White stays for dark bands.
+
+**The header is a lockup, not a choice between two things.** The domain is
+habibonifade.com, so a visitor seeing only "Canvas Coach" wonders if they are
+on the right site; a personal name alone does not signal there is a system
+behind it. The mark, then "Canvas Coach", then "Habib Onifade" in smaller type
+underneath. The live site already does this in plain text and the relationship
+is correct — it only needs the real mark.
+
+**2. Viable by Design — the newsletter, and nothing else.** Wordmark in a rule
+box, the A of VIABLE replaced by a cyan triangle or dot. White on charcoal and
+navy on white versions exist; the cyan is process cyan. It appears in the
+newsletter section only and never in the header.
+
+**3. Verido UK Limited — the contracting entity.** Footer only, small, beside
+the copyright line. It is not a consumer-facing brand.
 
 ### Typeface
 
