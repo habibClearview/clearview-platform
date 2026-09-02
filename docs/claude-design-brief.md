@@ -5,7 +5,7 @@ Paste this whole file into Claude Design as the opening message.
 Everything in it was taken from Habib's own materials — the platform's code,
 the method reference, and the Drive folders he supplied. Nothing is invented.
 
-**Two things to settle before pasting:**
+**Three things that are already decided, and are not gaps to fill:**
 
 1. **No prices and no durations anywhere.** This is Habib's decision, not an
    omission. No pricing table, no "from £X", no package comparison.
