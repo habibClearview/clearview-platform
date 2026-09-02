@@ -27,7 +27,7 @@ const C = {
 const mono = { fontFamily: 'var(--cv-font-mono)' }
 const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
 const labelText = {
-  ...mono, fontSize: '0.68rem', letterSpacing: '.1em', textTransform: 'uppercase',
+  ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase',
   color: C.slate,
 }
 const field = {
@@ -69,7 +69,7 @@ function Setting({ label, help, htmlFor, children }) {
               borderRadius: '50%', border: `1px solid ${C.slate}`,
               background: open ? C.slate : 'transparent',
               color: open ? 'var(--cv-card)' : C.slate,
-              fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+              fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', flexShrink: 0,
             }}
           >i</button>
         ) : null}
@@ -154,7 +154,7 @@ export default function EngagementSettings({ clientId, canManage }) {
 
   return (
     <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '1rem 1.1rem', background: C.card }}>
-      <div style={{ ...mono, fontSize: '0.75rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
+      <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
         How this engagement runs
       </div>
       <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '78ch' }}>

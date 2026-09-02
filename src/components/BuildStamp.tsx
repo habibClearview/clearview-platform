@@ -34,7 +34,7 @@ export default function BuildStamp() {
         right: 10,
         zIndex: 9999,
         fontFamily: 'var(--cv-font-mono)',
-        fontSize: '0.6rem',
+        fontSize: '0.78rem',
         letterSpacing: '0.05em',
         color: '#0B1F33',
         background: 'rgba(255,255,255,0.82)',

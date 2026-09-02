@@ -165,7 +165,7 @@ export default function EngagementTracker({ clientId, canManage }) {
             <tr>
               {['Block', 'Status', 'Evidence so far', 'Priority action for the next session'].map((h, i) => (
                 <th key={h} style={{
-                  textAlign: 'left', fontFamily: 'var(--cv-font-mono)', fontSize: 9.5,
+                  textAlign: 'left', fontFamily: 'var(--cv-font-mono)', fontSize: 12.5,
                   letterSpacing: '.12em', textTransform: 'uppercase', color: C.faint,
                   padding: '11px', borderBottom: `1px solid ${C.line}`, background: C.box,
                   width: i === 0 ? '22%' : i === 1 ? '16%' : '31%',
@@ -179,7 +179,7 @@ export default function EngagementTracker({ clientId, canManage }) {
                 <td style={cell}>
                   <span style={{ fontWeight: 600 }}>{LABEL[r.dp_id]}</span>
                   {r.last_reviewed_at ? (
-                    <span style={{ display: 'block', fontSize: 11, color: C.faint, marginTop: 3 }}>
+                    <span style={{ display: 'block', fontSize: 12.5, color: C.faint, marginTop: 3 }}>
                       reviewed {new Date(r.last_reviewed_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                     </span>
                   ) : null}

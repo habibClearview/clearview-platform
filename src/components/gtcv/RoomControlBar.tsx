@@ -125,7 +125,7 @@ export default function RoomControlBar({
   if (!open) {
     return (
       <div style={bar}>
-        <span style={{ ...mono, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', color: C.quiet }}>
+        <span style={{ ...mono, fontSize: 12.5, letterSpacing: '.1em', textTransform: 'uppercase', color: C.quiet }}>
           Run this with the room
         </span>
         <select
@@ -161,17 +161,17 @@ export default function RoomControlBar({
             {formatTimer(secondsLeft)}
           </span>
         ) : null}
-        <span style={{ ...mono, fontSize: 12, color: live ? C.teal : C.amber }}>
+        <span style={{ ...mono, fontSize: 12.5, color: live ? C.teal : C.amber }}>
           {live ? 'connected' : 'reconnecting'}
         </span>
-        <span style={{ ...mono, fontSize: 12, color: C.quiet }}>
+        <span style={{ ...mono, fontSize: 12.5, color: C.quiet }}>
           {(feed?.connectedDevices ?? 0) === 1 ? '1 device in the room' : `${feed?.connectedDevices ?? 0} devices in the room`}
         </span>
       </div>
 
       {/* C56, C60. Two switches, independent, changeable while the question is
           open. Every device sees the change on its next read. */}
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12 }}>
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12.5 }}>
         {[
           { key: 'answersVisible', label: 'Answers visible', on: !!open.answers_visible },
           { key: 'authorsVisible', label: 'Authors visible', on: !!open.authors_visible },

@@ -76,18 +76,18 @@ const CSS = `
 .gc .top{background:var(--spine);color:var(--spine-ink)}
 .gc .top-in{max-width:940px;margin:0 auto;padding:13px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .gc .brand{display:flex;flex-direction:column;line-height:1.1}
-.gc .brand .k{font-family:var(--fm);font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--gold)}
+.gc .brand .k{font-family:var(--fm);font-size:12.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--gold)}
 .gc .brand .w{font-family:var(--fd);font-size:21px}
-.gc .tag{font-family:var(--fm);font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;border:1px dashed rgba(239,234,221,.4);border-radius:999px;padding:4px 10px}
+.gc .tag{font-family:var(--fm);font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;border:1px dashed rgba(239,234,221,.4);border-radius:999px;padding:4px 10px}
 .gc .doc{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);margin-top:26px;overflow:hidden}
 .gc .doc-h{background:var(--spine);color:var(--spine-ink);padding:28px}
-.gc .doc-h .eyebrow{font-family:var(--fm);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin:0 0 8px}
+.gc .doc-h .eyebrow{font-family:var(--fm);font-size:12.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin:0 0 8px}
 .gc .doc-h h1{font-family:var(--fd);font-weight:600;font-size:clamp(25px,4.4vw,36px);margin:0;line-height:1.1;text-wrap:balance}
 .gc .doc-h .meta{margin:14px 0 0;font-size:13.5px;color:rgba(239,234,221,.82)}
 .gc .doc-h .meta b{color:#fff}
 .gc .doc-b{padding:26px 28px}
 .gc section+section{margin-top:30px}
-.gc .sh{font-family:var(--fm);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--teal);display:flex;align-items:center;gap:10px;margin:0 0 12px}
+.gc .sh{font-family:var(--fm);font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--teal);display:flex;align-items:center;gap:10px;margin:0 0 12px}
 .gc .sh::after{content:"";flex:1;height:1px;background:var(--line-soft)}
 .gc .lead{font-size:15.5px;color:var(--ink-soft);margin:0}
 .gc .lead b{color:var(--ink)}
@@ -97,9 +97,9 @@ const CSS = `
 .gc .evidence .big{font-family:var(--fd);font-size:19px;color:var(--ink);margin:0 0 4px;line-height:1.25}
 .gc .chain{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin:14px 0 4px}
 .gc .clink{flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-top:3px solid var(--edge);border-radius:10px;padding:10px 12px}
-.gc .clink .cn{font-family:var(--fm);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--edge);font-weight:700}
+.gc .clink .cn{font-family:var(--fm);font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--edge);font-weight:700}
 .gc .clink .ct{font-family:var(--fd);font-size:14px;margin:3px 0 3px}
-.gc .clink .cd{font-size:11.5px;color:var(--ink-soft);line-height:1.4}
+.gc .clink .cd{font-size:12.5px;color:var(--ink-soft);line-height:1.4}
 .gc .c1{--edge:var(--teal)} .gc .c2{--edge:var(--gold)} .gc .c3{--edge:var(--navy)} .gc .c4{--edge:var(--purple)}
 .gc .chevron{align-self:center;color:var(--ink-faint);font-size:18px;flex:none}
 .gc .evnote{font-size:13px;color:var(--ink-soft);margin:12px 0 0;padding-left:14px;border-left:3px solid var(--teal)}
@@ -113,15 +113,15 @@ const CSS = `
 .gc .cwhat{padding:12px 14px;font-size:13px;color:var(--ink-soft)}
 .gc .cwhat b{color:var(--ink);font-weight:600}
 .gc .flags{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
-.gc .flag{font-size:12px;color:var(--ink-soft);background:var(--box);border:1px solid var(--line);border-radius:999px;padding:5px 11px}
+.gc .flag{font-size:12.5px;color:var(--ink-soft);background:var(--box);border:1px solid var(--line);border-radius:999px;padding:5px 11px}
 .gc .flag b{color:var(--ink)}
 .gc .party{border:1px solid var(--line);border-left:4px solid var(--edge);border-radius:12px;padding:15px 17px;background:var(--box);margin-top:12px;--edge:var(--navy)}
 .gc .party.p-client{--edge:var(--navy)} .gc .party.p-lsp{--edge:var(--teal)} .gc .party.p-lead{--edge:var(--gold)} .gc .party.p-co{--edge:var(--purple)}
 .gc .party .pr{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.gc .party .role{font-family:var(--fm);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--edge);font-weight:700}
+.gc .party .role{font-family:var(--fm);font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--edge);font-weight:700}
 .gc .party .who{font-family:var(--fd);font-size:18px}
-.gc .party .cfg{font-family:var(--fm);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);border:1px solid var(--line);border-radius:999px;padding:2px 7px}
-.gc .subrole{font-family:var(--fm);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--edge);margin:12px 0 4px;font-weight:700}
+.gc .party .cfg{font-family:var(--fm);font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);border:1px solid var(--line);border-radius:999px;padding:2px 7px}
+.gc .subrole{font-family:var(--fm);font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--edge);margin:12px 0 4px;font-weight:700}
 .gc .party ul{margin:8px 0 0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:6px}
 .gc .party li{position:relative;padding-left:17px;font-size:13.5px;color:var(--ink-soft);line-height:1.5}
 .gc .party li::before{content:"";position:absolute;left:2px;top:9px;width:6px;height:6px;border-radius:50%;background:var(--edge)}
@@ -133,56 +133,56 @@ const CSS = `
 .gc .gcard p{margin:0;font-size:13px;color:var(--ink-soft)}
 .gc .moments{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 .gc .moment{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--ink-soft)}
-.gc .mchip{font-family:var(--fm);font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border-radius:999px;padding:3px 9px;white-space:nowrap;flex:none;margin-top:1px}
+.gc .mchip{font-family:var(--fm);font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border-radius:999px;padding:3px 9px;white-space:nowrap;flex:none;margin-top:1px}
 .gc .m-green{background:var(--good-wash);color:var(--good)} .gc .m-amber{background:var(--amber-wash);color:var(--amber)} .gc .m-red{background:var(--crit-wash);color:var(--crit)}
 .gc .ip{background:var(--box);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:13.5px;color:var(--ink-soft)}
 .gc .ip b{color:var(--ink)}
 .gc .sig{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
 .gc .sigcard{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--box);display:flex;flex-direction:column;gap:2px}
 .gc .sigcard .sname{font-family:var(--fd);font-size:16px}
-.gc .sigcard .srole{font-family:var(--fm);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint)}
+.gc .sigcard .srole{font-family:var(--fm);font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint)}
 .gc .sigline{margin-top:12px;border-top:1.5px solid var(--line);padding-top:8px;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .gc .signed{font-family:var(--fd);font-style:italic;font-size:18px;color:var(--teal)}
-.gc .signdate{font-family:var(--fm);font-size:10px;color:var(--ink-faint)}
-.gc .signbtn{font-family:var(--fb);font-size:12px;font-weight:600;color:#fff;background:var(--teal);border:none;border-radius:8px;padding:8px 14px;cursor:pointer}
+.gc .signdate{font-family:var(--fm);font-size:12.5px;color:var(--ink-faint)}
+.gc .signbtn{font-family:var(--fb);font-size:12.5px;font-weight:600;color:#fff;background:var(--teal);border:none;border-radius:8px;padding:8px 14px;cursor:pointer}
 .gc .signbtn[disabled]{opacity:.5;cursor:not-allowed}
-.gc .status-sm{font-family:var(--fm);font-size:9px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;border-radius:999px;padding:3px 8px;align-self:flex-start;margin-top:2px}
+.gc .status-sm{font-family:var(--fm);font-size:12.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;border-radius:999px;padding:3px 8px;align-self:flex-start;margin-top:2px}
 .gc .st-signed{background:var(--good-wash);color:var(--good)} .gc .st-await{background:var(--amber-wash);color:var(--amber)}
 .gc .ack{margin-top:16px;font-size:13px;color:var(--ink-soft);background:var(--box);border:1px dashed var(--line);border-radius:10px;padding:12px 14px}
 .gc .review-banner{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;background:var(--amber-wash);border:1px solid rgba(158,107,16,.32);border-radius:12px;padding:13px 16px;margin-bottom:24px}
-.gc .state-pill{font-family:var(--fm);font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:var(--amber);color:#2a1c04;border-radius:999px;padding:4px 10px;white-space:nowrap;flex:none}
+.gc .state-pill{font-family:var(--fm);font-size:12.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:var(--amber);color:#2a1c04;border-radius:999px;padding:4px 10px;white-space:nowrap;flex:none}
 .gc .review-banner .rb{font-size:13px;color:var(--ink-soft);flex:1;min-width:220px}
 .gc .review-banner .rb b{color:var(--ink)}
-.gc .adjustable{font-family:var(--fm);font-size:8.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--teal);border:1px solid var(--teal);border-radius:999px;padding:2px 7px;font-weight:700;vertical-align:middle}
+.gc .adjustable{font-family:var(--fm);font-size:12.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--teal);border:1px solid var(--teal);border-radius:999px;padding:2px 7px;font-weight:700;vertical-align:middle}
 .gc .adj-note{font-size:12.5px;color:var(--ink-faint);margin:10px 0 0;font-style:italic}
 .gc .comments{margin-top:16px;border:1px dashed var(--line);border-radius:12px;padding:12px 15px;background:var(--box)}
-.gc .comments .ch{font-family:var(--fm);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 8px;display:flex;align-items:center;gap:8px}
+.gc .comments .ch{font-family:var(--fm);font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 8px;display:flex;align-items:center;gap:8px}
 .gc .cmt{display:flex;gap:11px;padding:11px 0;border-top:1px solid var(--line-soft)}
 .gc .cmt:first-of-type{border-top:none}
 .gc .av{width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;font-family:var(--fd);font-size:13px;color:#fff;background:var(--navy)}
 .gc .cmt .body{flex:1}
-.gc .cwho{font-size:12.5px}.gc .cwho b{color:var(--ink)}.gc .cwho .cr{color:var(--ink-faint);font-size:11px}
-.gc .sugg-pill{font-family:var(--fm);font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border-radius:999px;padding:2px 7px;background:var(--amber-wash);color:var(--amber);margin-left:6px}
+.gc .cwho{font-size:12.5px}.gc .cwho b{color:var(--ink)}.gc .cwho .cr{color:var(--ink-faint);font-size:12.5px}
+.gc .sugg-pill{font-family:var(--fm);font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border-radius:999px;padding:2px 7px;background:var(--amber-wash);color:var(--amber);margin-left:6px}
 .gc .done-pill{background:var(--good-wash);color:var(--good)}
 .gc .decl-pill{background:var(--crit-wash);color:var(--crit)}
 .gc .ctext{font-size:13px;color:var(--ink-soft);margin:3px 0 0}
 .gc .cact{margin-top:7px;display:flex;gap:7px;flex-wrap:wrap}
-.gc .mini{font-family:var(--fb);font-size:11px;font-weight:600;border-radius:7px;padding:5px 10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.gc .mini{font-family:var(--fb);font-size:12.5px;font-weight:600;border-radius:7px;padding:5px 10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
 .gc .mini.pri{background:var(--teal);color:#fff;border-color:var(--teal)}
 .gc .mini[disabled]{opacity:.5;cursor:not-allowed}
 .gc .addcmt{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
 .gc .addcmt input{flex:1;min-width:180px;border:1px solid var(--line);border-radius:8px;padding:9px 11px;background:var(--card);color:var(--ink);font-family:var(--fb);font-size:12.5px}
-.gc .consult-tag{font-family:var(--fm);font-size:8.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:999px;padding:2px 7px}
+.gc .consult-tag{font-family:var(--fm);font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:999px;padding:2px 7px}
 .gc .cbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);border:1px solid var(--gold);border-left:4px solid var(--gold);border-radius:12px;padding:11px 15px;margin-top:26px;box-shadow:var(--shadow)}
-.gc .cbar .vu{font-family:var(--fm);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint)}
+.gc .cbar .vu{font-family:var(--fm);font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint)}
 .gc .cbar .vu b{color:var(--gold)}
 .gc .cbar .sp{flex:1;min-width:8px}
-.gc .cbar .ver{font-family:var(--fm);font-size:10px;color:var(--ink-faint)}
-.gc .cbar button{font-family:var(--fb);font-size:12px;font-weight:600;border-radius:8px;padding:7px 12px;border:1px solid var(--line);background:var(--box);color:var(--ink);cursor:pointer}
+.gc .cbar .ver{font-family:var(--fm);font-size:12.5px;color:var(--ink-faint)}
+.gc .cbar button{font-family:var(--fb);font-size:12.5px;font-weight:600;border-radius:8px;padding:7px 12px;border:1px solid var(--line);background:var(--box);color:var(--ink);cursor:pointer}
 .gc .cbar button.pri{background:var(--teal);color:#fff;border-color:var(--teal)}
 .gc .cbar button[disabled]{opacity:.5;cursor:not-allowed}
-.gc .cbar .hint{width:100%;font-size:11.5px;color:var(--ink-faint);margin-top:2px}
-.gc .foot{margin-top:22px;text-align:center;color:var(--ink-faint);font-size:12px}
+.gc .cbar .hint{width:100%;font-size:12.5px;color:var(--ink-faint);margin-top:2px}
+.gc .foot{margin-top:22px;text-align:center;color:var(--ink-faint);font-size:12.5px}
 .gc .foot .tm{font-family:var(--fd);color:var(--ink-soft)}
 .gc .msg{font-size:12.5px;margin:8px 0 0}
 .gc .msg.ok{color:var(--good)} .gc .msg.err{color:var(--crit)}
@@ -520,7 +520,7 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
             background: 'var(--box)', padding: '14px 16px',
           }}>
             <p style={{
-              fontFamily: 'var(--fm)', fontSize: 10, letterSpacing: '.13em', textTransform: 'uppercase',
+              fontFamily: 'var(--fm)', fontSize: 12.5, letterSpacing: '.13em', textTransform: 'uppercase',
               color: 'var(--ink-faint)', margin: '0 0 10px',
             }}>Versions</p>
             {versions.length === 0 ? (
@@ -532,7 +532,7 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
               }}>
                 <b style={{ fontFamily: 'var(--fd)' }}>Version {v.version}</b>
                 <span style={{ color: 'var(--ink-soft)' }}>{v.status}</span>
-                <span style={{ marginLeft: 'auto', color: 'var(--ink-faint)', fontSize: 12 }}>
+                <span style={{ marginLeft: 'auto', color: 'var(--ink-faint)', fontSize: 12.5 }}>
                   {v.issued_at ? 'issued ' + fmtDate(v.issued_at) : 'created ' + fmtDate(v.created_at)}
                 </span>
               </div>
@@ -561,7 +561,7 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
               borderRadius: 12, background: 'var(--box)', padding: '15px 17px',
             }}>
               <p style={{
-                fontFamily: 'var(--fm)', fontSize: 10, letterSpacing: '.13em', textTransform: 'uppercase',
+                fontFamily: 'var(--fm)', fontSize: 12.5, letterSpacing: '.13em', textTransform: 'uppercase',
                 color: 'var(--gold)', margin: '0 0 4px',
               }}>Adjustable specifics</p>
               <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--ink-soft)' }}>
@@ -824,8 +824,8 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
                               className="signbtn"
                               type="button"
                               data-action="sign"
-                              disabled={busy === `sign:${p.id}` || !charter?.id}
-                              title="Sign this version of the Charter"
+                              disabled={busy === `sign:${p.id}` || !charter?.id || status === 'draft'}
+                              title={status === 'draft' ? 'The Charter has to be issued for signature first' : 'Sign this version of the Charter'}
                               onClick={() => run(`sign:${p.id}`, () => signCharter({
                                 clientId: view.client.id,
                                 charterId: charter.id,
@@ -833,7 +833,11 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
                                 signatureMethod: 'click',
                               }), 'Your signature has been recorded on this version.')}
                             >{busy === `sign:${p.id}` ? 'Signing...' : 'Sign here'}</button>
-                            <span className="signdate"></span>
+                            <span className="signdate">
+                              {status === 'draft'
+                                ? 'This version is still a draft. It has to be issued for signature before anyone can sign.'
+                                : ''}
+                            </span>
                           </>
                         ) : canEdit ? (
                           <>
@@ -861,7 +865,7 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
                         ) : (
                           <>
                             <button className="signbtn" type="button" disabled title="Only this signatory can sign here">Sign here</button>
-                            <span className="signdate"></span>
+                            <span className="signdate">Only {p.name || 'this signatory'} can sign this line.</span>
                           </>
                         )}
                       </div>

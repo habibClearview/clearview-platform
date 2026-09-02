@@ -93,7 +93,7 @@ function ZoneBriefPanel({ dpId }) {
   const sans = "var(--cv-font)"
   const cap = {
     fontFamily: 'var(--cv-font-mono)',
-    fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', color: '#6B7A8C',
+    fontSize: 12.5, letterSpacing: '.1em', textTransform: 'uppercase', color: '#6B7A8C',
   }
   return (
     <section style={{

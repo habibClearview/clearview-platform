@@ -61,7 +61,7 @@ const H = (size = '1.15rem') => ({
   fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: size,
 })
 const LABEL = {
-  fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em',
+  fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.04em',
   textTransform: 'uppercase', color: C.slate,
 }
 const inputStyle = {
@@ -123,7 +123,7 @@ function gateCheck(row) {
 
 function Pill({ text, tone }) {
   return (
-    <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap', display: 'inline-block' }}>
+    <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap', display: 'inline-block' }}>
       {text}
     </span>
   )

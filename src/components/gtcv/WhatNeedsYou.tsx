@@ -203,7 +203,7 @@ export default function WhatNeedsYou({ clientId, canManage, onGoTo }) {
       border: `1px solid ${items.length ? C.amber : C.border}`, borderRadius: 12,
       padding: '0.95rem 1.1rem', background: C.card, marginBottom: '1.1rem',
     }}>
-      <div style={{ ...mono, fontSize: '0.75rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
+      <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
         What needs you
       </div>
 

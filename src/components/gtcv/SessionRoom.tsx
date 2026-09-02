@@ -53,7 +53,7 @@ const C = {
 const mono = { fontFamily: 'var(--cv-font-mono)' }
 const hint = { fontSize: '0.9rem', color: C.slate, lineHeight: 1.5 }
 const label = {
-  ...mono, fontSize: '0.68rem', letterSpacing: '.1em', textTransform: 'uppercase',
+  ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase',
   color: C.slate, display: 'block', marginBottom: '0.3rem',
 }
 const field = {
@@ -230,7 +230,7 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
 
   return (
     <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '1rem 1.1rem', background: C.white }}>
-      <div style={{ ...mono, fontSize: '0.75rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
+      <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
         The room
       </div>
       <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '92ch' }}>
@@ -282,7 +282,7 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
 
       {live.length > 0 ? (
         <div style={{ marginTop: '1.2rem' }}>
-          <div style={{ ...mono, fontSize: '0.72rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
+          <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
             Open now
           </div>
           {live.map((l) => (
@@ -340,7 +340,7 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
 
       <div style={{ marginTop: '1.4rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.8rem', flexWrap: 'wrap' }}>
-          <div style={{ ...mono, fontSize: '0.72rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
+          <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
             What people typed in the room
           </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -365,7 +365,7 @@ export default function SessionRoom({ clientId, canManage, sessions = [] }) {
             marginTop: '0.7rem', border: `1px solid ${C.border}`, borderRadius: 10,
             padding: '0.8rem 0.95rem', opacity: c.promoted_at ? 0.6 : 1,
           }}>
-            <div style={{ ...hint, ...mono, fontSize: '0.75rem', letterSpacing: '.06em', textTransform: 'uppercase' }}>
+            <div style={{ ...hint, ...mono, fontSize: '0.78rem', letterSpacing: '.06em', textTransform: 'uppercase' }}>
               {c.contributor_name}{c.contributor_role ? ` · ${c.contributor_role}` : ''}
               {' · '}{GATES.find((g) => g.id === c.dp_id)?.label || c.dp_id}
               {' · '}{when(c.created_at)}

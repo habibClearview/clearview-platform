@@ -155,7 +155,7 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div>
-          <div style={{ ...mono, fontSize: '0.75rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
+          <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
             Who is on this engagement
           </div>
           <div style={{ ...hint, marginTop: '0.3rem', maxWidth: 640 }}>
@@ -268,7 +268,7 @@ function PartyFields({ value, onChange }) {
     if (k === 'is_signatory') next.touchedSignatory = true
     onChange(next)
   }
-  const lab = { ...mono, fontSize: '0.72rem', letterSpacing: '.08em', textTransform: 'uppercase', color: C.slate, display: 'block', marginBottom: 4 }
+  const lab = { ...mono, fontSize: '0.78rem', letterSpacing: '.08em', textTransform: 'uppercase', color: C.slate, display: 'block', marginBottom: 4 }
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: '0.6rem' }}>
       <div>

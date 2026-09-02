@@ -172,14 +172,14 @@ export default function JourneyCanvasPanel({ clientId }: { clientId: string }) {
             }}
           >
             <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap', background: C.alt, padding: '0.5rem 0.8rem', borderBottom: gate.empty ? 'none' : `1px solid ${C.borderSoft}` }}>
-              <span style={{ ...mono, fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>
+              <span style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>
                 {gate.isBlock ? 'Block' : 'Step'}
               </span>
               <span style={{ fontFamily: 'var(--cv-font)', fontSize: '1.02rem', fontWeight: 700 }}>{gate.label}</span>
               {gate.empty ? (
-                <span style={{ ...mono, fontSize: '0.74rem', color: C.faint }}>nothing yet</span>
+                <span style={{ ...mono, fontSize: '0.78rem', color: C.faint }}>nothing yet</span>
               ) : (
-                <span style={{ ...mono, fontSize: '0.74rem', color: C.slate }}>
+                <span style={{ ...mono, fontSize: '0.78rem', color: C.slate }}>
                   {gate.decisions.length} decision{gate.decisions.length === 1 ? '' : 's'}
                   {gate.evidence.length ? `, ${gate.evidence.length} evidence` : ''}
                   {gate.signoffs.length ? `, ${gate.signoffs.length} signed` : ''}
@@ -198,7 +198,7 @@ export default function JourneyCanvasPanel({ clientId }: { clientId: string }) {
                       <div style={{ fontSize: '1rem', fontWeight: 600, color: C.navy, marginTop: '0.1rem' }}>
                         {d.agreed || <span style={{ color: C.amber, fontWeight: 400 }}>Discussed, nothing agreed</span>}
                       </div>
-                      <div style={{ ...mono, fontSize: '0.72rem', color: C.faint, marginTop: '0.12rem' }}>
+                      <div style={{ ...mono, fontSize: '0.78rem', color: C.faint, marginTop: '0.12rem' }}>
                         {d.at ? `Agreed ${when(d.at)}` : 'Not yet agreed'}
                         {d.recordedBy ? ` · recorded by ${d.recordedBy}` : ''}
                       </div>
@@ -209,7 +209,7 @@ export default function JourneyCanvasPanel({ clientId }: { clientId: string }) {
                         className="journey-no-print"
                         onClick={() => fold.toggle('answer', d.id)}
                         aria-expanded={open}
-                        style={{ ...mono, fontSize: '0.72rem', color: C.slate, background: 'transparent', border: 'none', padding: '0.2rem 0 0', cursor: 'pointer' }}
+                        style={{ ...mono, fontSize: '0.78rem', color: C.slate, background: 'transparent', border: 'none', padding: '0.2rem 0 0', cursor: 'pointer' }}
                       >
                         {open ? '▾' : '▸'} {d.submissionCount} answer{d.submissionCount === 1 ? '' : 's'} behind it
                       </button>
@@ -236,13 +236,13 @@ export default function JourneyCanvasPanel({ clientId }: { clientId: string }) {
                       {/* ─── WHO DISSENTED. C70 lives here. ─── */}
                       {d.dissent.length ? (
                         <div style={{ marginTop: '0.35rem', border: `1px solid ${C.amber}`, background: C.tintAmber, borderRadius: 7, padding: '0.4rem 0.6rem' }}>
-                          <div style={{ ...mono, fontSize: '0.68rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: C.navy }}>
+                          <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: C.navy }}>
                             Dissent, recorded
                           </div>
                           {d.dissent.map((v, i) => (
                             <div key={i} style={{ fontSize: '0.88rem', marginTop: '0.2rem' }}>
                               <span>{v.note}</span>
-                              <span style={{ ...mono, fontSize: '0.72rem', color: C.slate }}>
+                              <span style={{ ...mono, fontSize: '0.78rem', color: C.slate }}>
                                 {' '}— {v.name ? v.name : NAME_WITHHELD}
                               </span>
                             </div>
@@ -256,10 +256,10 @@ export default function JourneyCanvasPanel({ clientId }: { clientId: string }) {
                 {/* ─── THE EVIDENCE IT RESTS ON ─── */}
                 {gate.evidence.length ? (
                   <div style={{ marginTop: '0.4rem' }}>
-                    <div style={{ ...mono, fontSize: '0.68rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: C.slate }}>Evidence</div>
+                    <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: C.slate }}>Evidence</div>
                     <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
                       {gate.evidence.map((e) => (
-                        <span key={e.reference || Math.random()} style={{ ...mono, fontSize: '0.76rem', border: `1px solid ${C.borderSoft}`, borderRadius: 999, padding: '0.16rem 0.55rem', background: C.tintCyan }}>
+                        <span key={e.reference || Math.random()} style={{ ...mono, fontSize: '0.78rem', border: `1px solid ${C.borderSoft}`, borderRadius: 999, padding: '0.16rem 0.55rem', background: C.tintCyan }}>
                           {e.reference || 'unreferenced'}{e.description ? ` · ${e.description}` : ''}
                         </span>
                       ))}
@@ -270,7 +270,7 @@ export default function JourneyCanvasPanel({ clientId }: { clientId: string }) {
                 {/* ─── WHO SIGNED ─── */}
                 {gate.signoffs.length ? (
                   <div style={{ marginTop: '0.5rem' }}>
-                    <div style={{ ...mono, fontSize: '0.68rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: C.slate }}>Signed</div>
+                    <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: C.slate }}>Signed</div>
                     {gate.signoffs.map((s, i) => (
                       <div key={i} style={{ fontSize: '0.88rem', marginTop: '0.15rem' }}>
                         <span style={{ fontWeight: 600 }}>{s.signer_name || 'Name not recorded'}</span>

@@ -91,7 +91,7 @@ export default function ShowcaseSharing({ clientId, canManage }) {
 
   return (
     <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '1rem 1.1rem', background: C.card }}>
-      <div style={{ ...mono, fontSize: '0.75rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
+      <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
         Share the method with a prospect
       </div>
       <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '92ch' }}>
@@ -141,7 +141,7 @@ export default function ShowcaseSharing({ clientId, canManage }) {
         <div style={{ flex: '1 1 220px', minWidth: 180 }}>
           <label
             htmlFor="showcase-label"
-            style={{ ...mono, fontSize: '0.68rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate, display: 'block', marginBottom: 4 }}
+            style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate, display: 'block', marginBottom: 4 }}
           >
             Who is this link for
           </label>
@@ -172,7 +172,7 @@ export default function ShowcaseSharing({ clientId, canManage }) {
 
       {state.links.length > 0 ? (
         <>
-          <div style={{ ...mono, fontSize: '0.68rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate, margin: '1.1rem 0 0.4rem' }}>
+          <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate, margin: '1.1rem 0 0.4rem' }}>
             Links ({live.length} live)
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -187,7 +187,7 @@ export default function ShowcaseSharing({ clientId, canManage }) {
                 }}>
                   <div style={{ minWidth: 0, flex: '1 1 320px' }}>
                     <div style={{ fontSize: '0.97rem', color: C.navy, fontWeight: 600 }}>{l.grantee_name}</div>
-                    <div style={{ ...mono, fontSize: '0.76rem', color: C.slate }}>
+                    <div style={{ ...mono, fontSize: '0.78rem', color: C.slate }}>
                       {l.revoked_at
                         ? `Withdrawn ${fmtDate(l.revoked_at)}`
                         : expired

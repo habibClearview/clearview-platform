@@ -66,7 +66,7 @@ const card = { background: C.white, border: '1px solid var(--cv-border-soft)', b
 const secH = { fontFamily: 'var(--cv-font)', fontSize: '1.25rem', fontWeight: 700, color: C.navy, margin: 0 }
 const hint = { fontSize: '0.9rem', color: C.slate, lineHeight: 1.45 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const th = { ...mono, padding: '0.45rem 0.55rem', textAlign: 'left', fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
+const th = { ...mono, padding: '0.45rem 0.55rem', textAlign: 'left', fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
 const td = { padding: '0.35rem 0.55rem', verticalAlign: 'top', fontSize: '0.9rem', color: C.navy }
 const tdNum = { ...td, ...mono, textAlign: 'right', whiteSpace: 'nowrap' }
 const inp = { width: '100%', padding: '0.34rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '0.9rem', fontFamily: 'inherit', background: 'var(--cv-bg-2)', color: C.navy, boxSizing: 'border-box' }
@@ -87,7 +87,7 @@ function Flag({ level, children }) {
       background: 'var(--cv-bg-2)', borderLeft: `3px solid ${colour}`,
       borderRadius: 6, padding: '0.5rem 0.7rem', marginTop: '0.45rem',
     }}>
-      <span style={{ ...mono, fontSize: '0.7rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: colour, fontWeight: 700, paddingTop: '0.12rem', whiteSpace: 'nowrap' }}>
+      <span style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: colour, fontWeight: 700, paddingTop: '0.12rem', whiteSpace: 'nowrap' }}>
         {level === 'deficit' ? 'Deficit' : 'Gap'}
       </span>
       <span style={{ ...hint, color: C.navy }}>{children}</span>
@@ -98,7 +98,7 @@ function Flag({ level, children }) {
 function Stat({ label, value, note, colour }) {
   return (
     <div style={{ background: C.white, borderRadius: 12, padding: '0.75rem 0.9rem', borderTop: `3px solid ${colour || C.cyan}`, boxShadow: '0 1px 2px var(--cv-shadow-1), 0 10px 26px var(--cv-shadow-2)', minWidth: 0 }}>
-      <div style={{ ...mono, fontSize: '0.72rem', letterSpacing: '0.1em', color: C.slate, textTransform: 'uppercase' }}>{label}</div>
+      <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.1em', color: C.slate, textTransform: 'uppercase' }}>{label}</div>
       <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.6rem', fontWeight: 700, color: C.navy, lineHeight: 1.15, wordBreak: 'break-word' }}>{value}</div>
       {note && <div style={{ ...hint, fontSize: '0.8rem', marginTop: '0.15rem' }}>{note}</div>}
     </div>
@@ -506,7 +506,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
                     <td style={td}>{textCell(T_MARKET, r, 'source', 'Who quoted it')}</td>
                     <td style={td}>
                       {numCell(T_MARKET, r, 'price', '0')}
-                      {below && <div style={{ ...mono, fontSize: '0.72rem', color: C.amber, marginTop: '0.15rem', textAlign: 'right' }}>Below our floor</div>}
+                      {below && <div style={{ ...mono, fontSize: '0.78rem', color: C.amber, marginTop: '0.15rem', textAlign: 'right' }}>Below our floor</div>}
                     </td>
                     <td style={td}>{textCell(T_MARKET, r, 'quality_level', 'High, Mid, Low')}</td>
                     <td style={td}>
@@ -573,7 +573,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.6rem' }}>
           {v.tierCoverage.map((t) => (
             <span key={t.key} style={{
-              ...mono, fontSize: '0.76rem', padding: '0.2rem 0.5rem', borderRadius: 5,
+              ...mono, fontSize: '0.78rem', padding: '0.2rem 0.5rem', borderRadius: 5,
               border: `1px solid ${t.priced ? C.teal : t.present ? C.amber : C.red}`,
               color: t.priced ? C.teal : t.present ? C.amber : C.red,
             }}>

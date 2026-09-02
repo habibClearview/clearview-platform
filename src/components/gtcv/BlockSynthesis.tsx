@@ -172,7 +172,7 @@ export default function BlockSynthesis({ clientId, dpId, canManage }) {
         <label
           htmlFor={`gate-synthesis-${dpId}`}
           style={{
-            ...mono, fontSize: '0.72rem', letterSpacing: '.1em', textTransform: 'uppercase',
+            ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase',
             color: C.slate, display: 'block', marginBottom: 6,
           }}
         >

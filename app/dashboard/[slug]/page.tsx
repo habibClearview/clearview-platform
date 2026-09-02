@@ -28,7 +28,7 @@ function LoginPrompt({onLogin}:{onLogin:(e:string,p:string)=>Promise<string|null
     <div style={{minHeight:'100vh',background:'#F8F4EE',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"var(--cv-font)"}}>
       <div style={{width:'100%',maxWidth:380,padding:'0 1.5rem'}}>
         <div style={{textAlign:'center',marginBottom:'2rem'}}>
-          <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.65rem',letterSpacing:'0.15em',color:'#00B4D8',marginBottom:'0.5rem'}}>CANVAS COACH</div>
+          <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',letterSpacing:'0.15em',color:'#00B4D8',marginBottom:'0.5rem'}}>CANVAS COACH</div>
           <div style={{fontFamily:'var(--cv-font)',fontSize:'1.8rem',fontWeight:700,color:'#1B2A4A'}}>Clearview</div>
         </div>
         <div style={{background:'#fff',border:'1px solid #D8E0E8',borderRadius:12,padding:'2rem',boxShadow:'0 4px 24px rgba(0,0,0,0.06)'}}>

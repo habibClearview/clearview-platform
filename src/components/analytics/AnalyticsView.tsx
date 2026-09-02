@@ -44,19 +44,19 @@ export default function AnalyticsView({ result, debtObligations, monthLabels, cc
         <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:CC.navy,marginBottom:'1rem'}}>Credit Risk — {clientName}</div>
         <div style={{display:'flex',alignItems:'center',gap:'1.5rem',flexWrap:'wrap'}}>
           <div>
-            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.7rem',color:CC.slate,marginBottom:'0.3rem'}}>CLASSIFICATION</div>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',color:CC.slate,marginBottom:'0.3rem'}}>CLASSIFICATION</div>
             <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',fontWeight:700,padding:'0.3rem 0.8rem',borderRadius:20,background:creditRisk.classification==='Stable'?CC.green:creditRisk.classification==='At Risk'?CC.amber:CC.red,color:CC.white}}>{creditRisk.classification}</span>
           </div>
           <div>
-            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.7rem',color:CC.slate,marginBottom:'0.3rem'}}>SCORE</div>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',color:CC.slate,marginBottom:'0.3rem'}}>SCORE</div>
             <div style={{fontFamily:'var(--cv-font)',fontSize:'2rem',fontWeight:700,color:CC.navy}}>{creditRisk.score}<span style={{fontSize:'1rem',color:CC.slate}}>/100</span></div>
           </div>
           <div>
-            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.7rem',color:CC.slate,marginBottom:'0.3rem'}}>AVG DSCR Y1</div>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',color:CC.slate,marginBottom:'0.3rem'}}>AVG DSCR Y1</div>
             <div style={{fontFamily:'var(--cv-font)',fontSize:'2rem',fontWeight:700,color:creditRisk.dscrAvgY1>=1.5?CC.green:creditRisk.dscrAvgY1>=1.0?CC.amber:CC.red}}>{creditRisk.dscrAvgY1.toFixed(2)}<span style={{fontSize:'1rem',color:CC.slate}}>x</span></div>
           </div>
           <div>
-            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.7rem',color:CC.slate,marginBottom:'0.3rem'}}>REVENUE TREND</div>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',color:CC.slate,marginBottom:'0.3rem'}}>REVENUE TREND</div>
             <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:creditRisk.revenueGrowthTrend==='growing'?CC.green:creditRisk.revenueGrowthTrend==='stable'?CC.amber:CC.red,textTransform:'capitalize'}}>{creditRisk.revenueGrowthTrend}</div>
           </div>
         </div>

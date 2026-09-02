@@ -1237,15 +1237,15 @@ function PerfMetric({label,value,formula,tag,tagTone,bad,needsInput,travelsTo,hi
     <div style={{background:C.white,border:`1px solid ${bad?C.red:'var(--cv-border-soft)'}`,borderRadius:12,padding:'0.95rem 1.05rem',display:'flex',flexDirection:'column',gap:'0.4rem'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
         <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.82rem',letterSpacing:'0.04em',color:C.slate,textTransform:'uppercase',fontWeight:600}}>{label}</span>
-        {travelsTo&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',fontWeight:700,padding:'0.1rem 0.4rem',borderRadius:5,background:'var(--cv-tint-cyan)',color:C.teal,border:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>{travelsTo==='intelligence'?'→ Intelligence':'coach tab'}</span>}
+        {travelsTo&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,padding:'0.1rem 0.4rem',borderRadius:5,background:'var(--cv-tint-cyan)',color:C.teal,border:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>{travelsTo==='intelligence'?'→ Intelligence':'coach tab'}</span>}
       </div>
       {needsInput
         ? <span style={{fontFamily:'var(--cv-font)',fontSize:'1.35rem',fontWeight:700,color:C.slate}}>—</span>
         : <span style={{fontFamily:'var(--cv-font)',fontSize:'1.55rem',fontWeight:700,color:bad?C.red:C.navy,lineHeight:1.05}}>{value}
-            {tag&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',fontWeight:700,marginLeft:'0.45rem',padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-wa-10)',color:tagColor,border:`1px solid ${tagColor}`}}>{tag}</span>}
+            {tag&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,marginLeft:'0.45rem',padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-wa-10)',color:tagColor,border:`1px solid ${tagColor}`}}>{tag}</span>}
           </span>}
       <span style={{fontSize:'0.82rem',color:C.slate,borderTop:`1px dashed ${C.border}`,paddingTop:'0.4rem'}}>{formula}</span>
-      {needsInput&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.74rem',color:C.amber,fontWeight:700,lineHeight:1.35}}>{hint||'Needs customer input'}</span>}
+      {needsInput&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',color:C.amber,fontWeight:700,lineHeight:1.35}}>{hint||'Needs customer input'}</span>}
     </div>
   )
 }
@@ -1542,7 +1542,7 @@ function PerformanceTab({config,result,months,cc,clientId,P,onSave,onGoToIntelli
         <div style={{marginBottom:'0.4rem'}}>
           <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'0.7rem',flexWrap:'wrap'}}>
             <span style={secLabel}>Customer economics</span>
-            {!anySet && <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>needs customer data</span>}
+            {!anySet && <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>needs customer data</span>}
             {canEditCE && <button style={addBtn(true,C.teal)} onClick={()=>setCeEditing(e=>!e)}>{ceEditing?'Close':'Enter customer figures'}</button>}
           </div>
           <p style={{color:C.slate,fontSize:'0.94rem',lineHeight:1.5,margin:'0 0 0.8rem',maxWidth:'70ch'}}>

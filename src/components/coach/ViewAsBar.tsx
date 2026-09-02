@@ -55,7 +55,7 @@ export default function ViewAsBar({ realRole, viewingAs, onChange }) {
       borderRadius: 12, background: C.card, padding: '0.6rem 1.05rem', marginBottom: '1.1rem',
     }}>
       <div style={{ display: 'flex', gap: '0.7rem', alignItems: 'center', flexWrap: 'wrap' }}>
-        <label htmlFor="view-as" style={{ ...mono, fontSize: '0.7rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
+        <label htmlFor="view-as" style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
           View as
         </label>
         <select
@@ -80,7 +80,7 @@ export default function ViewAsBar({ realRole, viewingAs, onChange }) {
           style={{
             ...mono, width: 18, height: 18, lineHeight: '16px', padding: 0, borderRadius: '50%',
             border: `1px solid ${C.slate}`, background: open ? C.slate : 'transparent',
-            color: open ? C.card : C.slate, fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
+            color: open ? C.card : C.slate, fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer',
             flexShrink: 0,
           }}
         >i</button>

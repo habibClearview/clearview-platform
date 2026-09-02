@@ -38,7 +38,7 @@ export default function DeliverablesBusinessView({ clients = [] }) {
       border: `1px solid ${C.border}`, borderRadius: 12, background: C.card,
       padding: '1.1rem 1.2rem', marginTop: '1.4rem',
     }}>
-      <div style={{ ...mono, fontSize: '0.75rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
+      <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
         Deliverables and claims
       </div>
       <p style={{ ...hint, margin: '0.45rem 0 0', maxWidth: '92ch' }}>
@@ -49,7 +49,7 @@ export default function DeliverablesBusinessView({ clients = [] }) {
 
       <div style={{ marginTop: '0.9rem', maxWidth: 420 }}>
         <label htmlFor="deliv-client" style={{
-          ...mono, fontSize: '0.68rem', letterSpacing: '.1em', textTransform: 'uppercase',
+          ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase',
           color: C.slate, display: 'block', marginBottom: '0.3rem',
         }}>Which engagement</label>
         <select

@@ -137,7 +137,7 @@ export default function RowActions({
               being touched: they hang off the activity and carry no service of
               their own, so a move cannot strand them. */}
           {activityId && services.length > 0 ? (
-            <label style={{ fontSize: 12, color: C.slate }}>
+            <label style={{ fontSize: 12.5, color: C.slate }}>
               {REMOVAL_LABELS.move}
               <select
                 value=""
@@ -145,7 +145,7 @@ export default function RowActions({
                 onChange={(e) => { if (e.target.value) send({ removal: 'move', serviceId: e.target.value }) }}
                 aria-label={REMOVAL_LABELS.move}
                 style={{
-                  ...mono, fontSize: 11.5, width: '100%', marginTop: 3, padding: '3px 6px',
+                  ...mono, fontSize: 12.5, width: '100%', marginTop: 3, padding: '3px 6px',
                   borderRadius: 6, border: `1px solid ${C.border}`, background: C.card, color: C.navy,
                 }}
               >
@@ -160,7 +160,7 @@ export default function RowActions({
           <button type="button" disabled={busy} onClick={remove} style={btn(C.red)}>
             {REMOVAL_LABELS.delete}
           </button>
-          <span style={{ fontSize: 11, color: C.slate, lineHeight: 1.35 }}>
+          <span style={{ fontSize: 12.5, color: C.slate, lineHeight: 1.35 }}>
             {serviceId
               ? 'Deleting removes the service. Its activities are parked, not destroyed, so nothing the room said is lost.'
               : 'Deleting leaves nothing behind. Park it instead if there is any chance it comes back.'}
@@ -173,7 +173,7 @@ export default function RowActions({
 
 function btn(colour: string): React.CSSProperties {
   return {
-    ...mono, fontSize: 11.5, fontWeight: 600, padding: '3px 8px', borderRadius: 6,
+    ...mono, fontSize: 12.5, fontWeight: 600, padding: '3px 8px', borderRadius: 6,
     border: `1px solid ${colour}`, background: 'transparent', color: colour,
     cursor: 'pointer', whiteSpace: 'nowrap',
   }

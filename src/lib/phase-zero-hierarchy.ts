@@ -443,9 +443,21 @@ export function buildTool1Rows(
     problemId: null, firstOfProblem: true, lastOfProblem: true,
     activityId: null, draft: d,
   }))
-  // Anything with no service at all, so nothing on the engagement is invisible.
-  const homeless = liveActivities.filter((a) => !a.service_id || !live.some((s) => s.id === a.service_id))
-  const homelessProblems = liveProblems.filter((p) => !p.service_id || !live.some((s) => s.id === p.service_id))
-  if (homeless.length > 0 || homelessProblems.length > 0) drawService(null)
+  // ─────────────────────────────────────────────────────────────
+  // NO ROW WITHOUT A SERVICE. 2 September 2026.
+  //
+  // Rows with no service were drawn here so that nothing on the engagement
+  // could be invisible. On screen that meant a run of rows reading "Not in a
+  // service", "Name a service first", "Name an activity first" across every
+  // column — rows that cannot be worked on, cannot be filled in, and say the
+  // same thing five times. Habib's words: that should not be, especially since
+  // there should be nothing in the other columns unless there is a service.
+  //
+  // They are still not invisible. The Parked area above the table lists every
+  // one of them and is the ONE place they can be pulled into a service, which
+  // is the only thing that can usefully be done with them. Showing them twice,
+  // once where they can be fixed and once where they cannot, is what made the
+  // table look broken.
+  // ─────────────────────────────────────────────────────────────
   return out
 }

@@ -78,7 +78,7 @@ export default function ProblemsCell({
       {mine.length === 0 && !adding ? (
         // C22. Its own visible state, in words, not an empty cell.
         <span style={{
-          ...mono, fontSize: 11, color: C.amber, border: `1px dashed ${C.amber}`,
+          ...mono, fontSize: 12.5, color: C.amber, border: `1px dashed ${C.amber}`,
           borderRadius: 5, padding: '2px 6px', alignSelf: 'flex-start',
         }}>{NO_PROBLEM_STATED}</span>
       ) : null}
@@ -114,7 +114,7 @@ export default function ProblemsCell({
             type="button"
             onClick={() => setAdding(true)}
             style={{
-              ...mono, fontSize: 11, color: C.slate, background: 'transparent',
+              ...mono, fontSize: 12.5, color: C.slate, background: 'transparent',
               border: 'none', padding: 0, cursor: 'pointer', alignSelf: 'flex-start',
             }}
           >{mine.length === 0 ? '+ state the problem' : '+ another problem'}</button>
@@ -168,7 +168,7 @@ function ProblemLine({
         onClick={onRemove}
         title="Park this problem. Nothing is lost."
         style={{
-          ...mono, fontSize: 11, color: C.slate, background: 'transparent',
+          ...mono, fontSize: 12.5, color: C.slate, background: 'transparent',
           border: 'none', cursor: 'pointer', padding: '1px 3px',
         }}
       >×</button>

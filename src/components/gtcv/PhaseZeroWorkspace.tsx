@@ -88,7 +88,7 @@ const table = { width: '100%', borderCollapse: 'collapse', fontSize: '0.93rem', 
 // normal screen width, so Tool 1's table sets no floor and lets its cells wrap.
 // Everything inside it is a box that wraps rather than a fixed-width control.
 const toolOneTable = { width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', tableLayout: 'fixed' }
-const th = { padding: '0.45rem 0.55rem', textAlign: 'left', fontFamily: 'var(--cv-font-mono)', fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
+const th = { padding: '0.45rem 0.55rem', textAlign: 'left', fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
 /** T1.23. A heading that may wrap rather than force the table wider. */
 const thWrap = { ...th, whiteSpace: 'normal' }
 const td = { padding: '0.4rem 0.4rem', verticalAlign: 'top', borderBottom: `1px solid ${C.borderSoft}` }
@@ -141,7 +141,7 @@ const serviceCell = { fontWeight: 700, color: C.navy, fontSize: '0.9rem' }
  */
 const addLine = {
   fontFamily: 'var(--cv-font-mono)',
-  fontSize: '0.7rem', color: C.slate, background: 'transparent',
+  fontSize: '0.78rem', color: C.slate, background: 'transparent',
   border: 'none', padding: 0, cursor: 'pointer',
 }
 const strip = { display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.85rem' }
@@ -405,7 +405,7 @@ function ActivityTable({
                     ) : null}
                     {r.firstOfService && r.serviceId ? (
                       <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                        <span style={{ ...mono, fontSize: '0.62rem', letterSpacing: '.06em', textTransform: 'uppercase', color: C.faint }}>
+                        <span style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.06em', textTransform: 'uppercase', color: C.faint }}>
                           Service
                         </span>
                         <RowActions
@@ -515,7 +515,7 @@ function MultiValueCell({ activity, field, values, canManage, onAction, placehol
           if (carry) await onAction({ action: 'addActivityValue', activityId: activity.id, field, value: activity[field] })
           await onAction({ action: 'addActivityValue', activityId: activity.id, field, value: '' })
         }}
-        style={{ ...mono, fontSize: '0.7rem', color: C.slate, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', alignSelf: 'flex-start' }}
+        style={{ ...mono, fontSize: '0.78rem', color: C.slate, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', alignSelf: 'flex-start' }}
       >
         {shown.length === 0 ? '+ add' : '+ another'}
       </button>
@@ -542,7 +542,7 @@ function ValueLine({ value, placeholder, onCommit, onRemove }) {
         type="button"
         onClick={onRemove}
         title="Remove this value. The others are not touched."
-        style={{ ...mono, fontSize: '0.7rem', color: C.slate, background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px 3px' }}
+        style={{ ...mono, fontSize: '0.78rem', color: C.slate, background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px 3px' }}
       >×</button>
     </span>
   )
@@ -775,7 +775,7 @@ function ServiceFrame({ service, summary, collapsed, onToggle, right, children }
           style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
         >
           <Chevron open={!collapsed} />
-          <span style={{ ...mono, fontSize: '0.7rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>Service</span>
+          <span style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>Service</span>
           <span style={{ fontFamily: 'var(--cv-font)', fontSize: '1.05rem', fontWeight: 700, color: C.navy }}>
             {service?.service_name}
           </span>
@@ -805,13 +805,13 @@ function ActivityGroup({ activity, problemCount, noProblemStated, collapsed, onT
           style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textAlign: 'left' }}
         >
           <Chevron open={!collapsed} />
-          <span style={{ ...mono, fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>Activity</span>
+          <span style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>Activity</span>
           <span style={{ fontWeight: 600, fontSize: '0.97rem', color: C.navy }}>{activityLabel(activity)}</span>
         </button>
         {noProblemStated ? (
           <span style={pill(C.tintAmber, C.navy)}>{NO_PROBLEM_STATED}</span>
         ) : (
-          <span style={{ ...mono, fontSize: '0.76rem', color: C.slate }}>
+          <span style={{ ...mono, fontSize: '0.78rem', color: C.slate }}>
             {problemCount} problem{problemCount === 1 ? '' : 's'}
           </span>
         )}
@@ -827,7 +827,7 @@ function ParkedArea({ count, children, label }) {
   if (!count) return null
   return (
     <div style={{ marginTop: '0.9rem', border: `1px dashed ${C.amber}`, borderRadius: 10, padding: '0.6rem 0.75rem', background: C.tintAmber }}>
-      <div style={{ ...mono, fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.navy, marginBottom: '0.45rem' }}>
+      <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.navy, marginBottom: '0.45rem' }}>
         {label ? `${label} — ${count}` : `Parked — ${count} not in any service`}
       </div>
       {/* C28 as amended: these are here so that NOTHING disappears for lack of
@@ -880,7 +880,7 @@ function HypothesisBlock({
         <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
           {SCORE_FIELDS.map((f) => (
             <label key={f.key} style={{ display: 'inline-flex', flexDirection: 'column', gap: '0.15rem' }}>
-              <span style={{ ...mono, fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: C.slate }}>{f.label}</span>
+              <span style={{ ...mono, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: C.slate }}>{f.label}</span>
               {editable ? (
                 <select
                   aria-label={f.label}
@@ -898,7 +898,7 @@ function HypothesisBlock({
           ))}
           <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.1rem', fontWeight: 700, color: C.navy, textAlign: 'center' }}>
             {row.total}
-            <div style={{ ...mono, fontSize: '0.62rem', color: C.faint, fontWeight: 400 }}>of 20</div>
+            <div style={{ ...mono, fontSize: '0.78rem', color: C.faint, fontWeight: 400 }}>of 20</div>
           </div>
           <span style={pill(standing.color, 'var(--cv-on-accent)')}>{standing.label}</span>
           {editable ? (
@@ -914,7 +914,7 @@ function HypothesisBlock({
           <button
             type="button"
             onClick={() => onAction({ action: 'setRowService', table: 'gtcv_hypotheses_shortlist', id: row.id, serviceId: anchoredService.id })}
-            style={{ ...mono, fontSize: '0.75rem', color: C.teal, background: 'transparent', border: `1px solid ${C.teal}`, borderRadius: 6, padding: '0.22rem 0.55rem', cursor: 'pointer' }}
+            style={{ ...mono, fontSize: '0.78rem', color: C.teal, background: 'transparent', border: `1px solid ${C.teal}`, borderRadius: 6, padding: '0.22rem 0.55rem', cursor: 'pointer' }}
           >
             Put into {anchoredService.service_name || 'this service'}
           </button>
@@ -929,10 +929,10 @@ function HypothesisBlock({
           style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
         >
           <Chevron open={!collapsed} />
-          <span style={{ ...mono, fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: C.slate }}>
+          <span style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: C.slate }}>
             Built from
           </span>
-          <span style={{ ...mono, fontSize: '0.76rem', color: build.activities.length ? C.navy : C.amber }}>
+          <span style={{ ...mono, fontSize: '0.78rem', color: build.activities.length ? C.navy : C.amber }}>
             {build.activities.length === 0
               ? 'nothing named yet'
               : `${build.activities.length} activit${build.activities.length === 1 ? 'y' : 'ies'}, ${build.problems.length} problem${build.problems.length === 1 ? '' : 's'}`}
@@ -951,13 +951,13 @@ function HypothesisBlock({
               build.activities.map((a) => (
                 <div key={a.id} style={{ borderLeft: `3px solid ${C.borderSoft}`, paddingLeft: '0.55rem', marginBottom: '0.35rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                    <span style={{ ...mono, fontSize: '0.64rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: C.slate }}>Activity</span>
+                    <span style={{ ...mono, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: C.slate }}>Activity</span>
                     <span style={{ fontWeight: 600, fontSize: '0.92rem', color: C.navy }}>{activityLabel(a)}</span>
                     {editable ? (
                       <button
                         type="button"
                         onClick={() => onAction({ action: 'unlinkHypothesisSource', id: row.id, activityId: a.id })}
-                        style={{ ...mono, fontSize: '0.68rem', color: C.red, background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                        style={{ ...mono, fontSize: '0.78rem', color: C.red, background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
                       >
                         remove
                       </button>
@@ -965,13 +965,13 @@ function HypothesisBlock({
                   </div>
                   {build.problems.filter((p) => p.activity_id === a.id).map((p) => (
                     <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', paddingLeft: '1rem', flexWrap: 'wrap' }}>
-                      <span style={{ ...mono, fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: C.slate }}>Problem</span>
+                      <span style={{ ...mono, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: C.slate }}>Problem</span>
                       <span style={{ fontSize: '0.88rem', color: C.navy }}>{problemLabel(p)}</span>
                       {editable ? (
                         <button
                           type="button"
                           onClick={() => onAction({ action: 'unlinkHypothesisSource', id: row.id, problemId: p.id })}
-                          style={{ ...mono, fontSize: '0.68rem', color: C.red, background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                          style={{ ...mono, fontSize: '0.78rem', color: C.red, background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
                         >
                           remove
                         </button>
@@ -1857,7 +1857,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
             borderRadius: 9, padding: '0.5rem 0.7rem', marginBottom: '0.8rem',
             display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap',
           }}>
-            <span style={{ ...mono, fontSize: '0.76rem', color: C.slate }}>
+            <span style={{ ...mono, fontSize: '0.78rem', color: C.slate }}>
               {selectedForService.size === 0
                 ? 'Tick activities to make a new service out of them'
                 : `${selectedForService.size} activit${selectedForService.size === 1 ? 'y' : 'ies'} chosen`}
@@ -2074,7 +2074,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                     ariaLabel="The problem"
                     onCommit={(v) => updParkedProblem(r.id, { problem: v })}
                   />
-                  <div style={{ ...mono, fontSize: '0.72rem', color: C.slate, marginTop: '0.15rem' }}>
+                  <div style={{ ...mono, fontSize: '0.78rem', color: C.slate, marginTop: '0.15rem' }}>
                     {why}{parent ? ` · ${activityLabel(parent)}` : ''}
                   </div>
                 </div>
@@ -2087,7 +2087,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                       <button
                         type="button"
                         onClick={() => updParkedProblem(r.id, { parked_at: null })}
-                        style={{ ...mono, fontSize: '0.74rem', color: C.teal, background: 'transparent', border: `1px solid ${C.teal}`, borderRadius: 6, padding: '0.2rem 0.55rem', cursor: 'pointer' }}
+                        style={{ ...mono, fontSize: '0.78rem', color: C.teal, background: 'transparent', border: `1px solid ${C.teal}`, borderRadius: 6, padding: '0.2rem 0.55rem', cursor: 'pointer' }}
                       >
                         Put back on {activityLabel(parent)}
                       </button>
@@ -2282,7 +2282,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                 <button
                   type="button"
                   onClick={() => hierarchyAction({ action: 'setRowService', table: 'gtcv_signal_story', id: r.id, serviceId: anchoredService.id })}
-                  style={{ ...mono, fontSize: '0.72rem', color: C.teal, background: 'transparent', border: `1px solid ${C.teal}`, borderRadius: 6, padding: '0.18rem 0.5rem', cursor: 'pointer' }}
+                  style={{ ...mono, fontSize: '0.78rem', color: C.teal, background: 'transparent', border: `1px solid ${C.teal}`, borderRadius: 6, padding: '0.18rem 0.5rem', cursor: 'pointer' }}
                 >
                   Put into {anchoredService.service_name || 'this service'}
                 </button>
@@ -2401,7 +2401,7 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
                 <button
                   type="button"
                   onClick={() => hierarchyAction({ action: 'setRowService', table: 'gtcv_continue_pause_kill', id: r.id, serviceId: anchoredService.id })}
-                  style={{ ...mono, fontSize: '0.72rem', color: C.teal, background: 'transparent', border: `1px solid ${C.teal}`, borderRadius: 6, padding: '0.18rem 0.5rem', cursor: 'pointer' }}
+                  style={{ ...mono, fontSize: '0.78rem', color: C.teal, background: 'transparent', border: `1px solid ${C.teal}`, borderRadius: 6, padding: '0.18rem 0.5rem', cursor: 'pointer' }}
                 >
                   Put into {anchoredService.service_name || 'this service'}
                 </button>

@@ -65,11 +65,11 @@ const CSS = `
 .gj .top{background:var(--spine);color:var(--spine-ink)}
 .gj .top-in{max-width:1220px;margin:0 auto;padding:13px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .gj .brand{display:flex;flex-direction:column;line-height:1.1}
-.gj .brand .k{font-family:var(--fm);font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--gold)}
+.gj .brand .k{font-family:var(--fm);font-size:12.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--gold)}
 .gj .brand .w{font-family:var(--fd);font-size:21px}
-.gj .tag{font-family:var(--fm);font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;border:1px dashed rgba(239,234,221,.4);border-radius:999px;padding:4px 10px}
+.gj .tag{font-family:var(--fm);font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;border:1px dashed rgba(239,234,221,.4);border-radius:999px;padding:4px 10px}
 .gj .hero{padding:30px 0 8px}
-.gj .eyebrow{font-family:var(--fm);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--teal);margin:0 0 8px}
+.gj .eyebrow{font-family:var(--fm);font-size:12.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--teal);margin:0 0 8px}
 .gj .hero h1{font-family:var(--fd);font-weight:600;font-size:clamp(30px,5.4vw,58px);line-height:1.08;margin:0;letter-spacing:-.015em;max-width:20ch}
 .gj .hero p{margin:14px 0 0;font-size:16px;line-height:1.6;color:var(--ink-soft);max-width:78ch}
 .gj .hero p b{color:var(--ink)}
@@ -81,7 +81,7 @@ const CSS = `
 .gj .node{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--card);border:2.5px solid var(--idle);color:var(--ink-faint);font-size:16px;font-family:var(--fm);font-weight:700}
 .gj .stop.done .node{background:var(--good);border-color:var(--good);color:#fff}
 .gj .stop.now .node{border-color:var(--now);color:var(--now);box-shadow:0 0 0 5px rgba(183,121,31,.16);animation:gjpulse 2.4s ease-in-out infinite}
-.gj .stop .lab{font-family:var(--fm);font-size:9px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint);text-align:center}
+.gj .stop .lab{font-family:var(--fm);font-size:12.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint);text-align:center}
 .gj .stop.now .lab{color:var(--now);font-weight:700}
 @keyframes gjpulse{0%,100%{box-shadow:0 0 0 5px rgba(183,121,31,.16)}50%{box-shadow:0 0 0 9px transparent}}
 @media (prefers-reduced-motion:reduce){.gj .stop.now .node{animation:none}}
@@ -92,49 +92,49 @@ const CSS = `
 .gj .bmc{min-width:960px;background:var(--card);border:1.5px solid var(--ink);border-radius:14px;box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:10px}
 .gj .bmc-title{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;padding-bottom:4px;border-bottom:1px solid var(--line-soft)}
 .gj .bmc-title .t{font-family:var(--fd);font-size:22px;font-weight:600}
-.gj .bmc-title .s{font-size:12px;color:var(--ink-soft);margin-top:2px}
-.gj .bmc-title .meta{font-family:var(--fm);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);text-align:right}
+.gj .bmc-title .s{font-size:12.5px;color:var(--ink-soft);margin-top:2px}
+.gj .bmc-title .meta{font-family:var(--fm);font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);text-align:right}
 .gj .headbars{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-.gj .hb{padding:8px;text-align:center;font-family:var(--fm);font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#fff;border-radius:7px}
+.gj .hb{padding:8px;text-align:center;font-family:var(--fm);font-size:12.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#fff;border-radius:7px}
 .gj .hb.internal{background:var(--gold)} .gj .hb.connect{background:var(--navy)} .gj .hb.external{background:var(--teal)}
 .gj .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .gj .box{--edge:var(--navy);background:var(--box);border:1px solid var(--line);border-top:3px solid var(--edge);border-radius:9px;padding:11px 12px 12px;display:flex;flex-direction:column}
 .gj .c-gold{--edge:var(--gold)} .gj .c-navy{--edge:var(--navy)} .gj .c-teal{--edge:var(--teal)} .gj .c-purple{--edge:var(--purple)}
 .gj .tagrow{display:flex;align-items:center;gap:8px}
-.gj .dptag{font-family:var(--fm);font-size:10px;font-weight:700;letter-spacing:.05em;color:#fff;background:var(--edge);border-radius:4px;padding:2px 7px}
-.gj .sublab{font-family:var(--fm);font-size:8.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint)}
-.gj .sdot{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-family:var(--fm);font-size:8.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint)}
+.gj .dptag{font-family:var(--fm);font-size:12.5px;font-weight:700;letter-spacing:.05em;color:#fff;background:var(--edge);border-radius:4px;padding:2px 7px}
+.gj .sublab{font-family:var(--fm);font-size:12.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint)}
+.gj .sdot{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-family:var(--fm);font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint)}
 .gj .sdot i{width:8px;height:8px;border-radius:50%;background:var(--idle)}
 .gj .box.done .sdot{color:var(--good)} .gj .box.done .sdot i{background:var(--good)}
 .gj .box.now .sdot{color:var(--now)} .gj .box.now .sdot i{background:var(--now)}
 .gj .box.blocked .sdot{color:#C62828} .gj .box.blocked .sdot i{background:#C62828}
 .gj .box h4{font-family:var(--fd);font-weight:600;font-size:14.5px;margin:9px 0 0;line-height:1.15}
-.gj .box .q{font-style:italic;font-size:11.5px;color:var(--ink-soft);margin:6px 0 0;line-height:1.35}
+.gj .box .q{font-style:italic;font-size:12.5px;color:var(--ink-soft);margin:6px 0 0;line-height:1.35}
 .gj .box ul{margin:9px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
-.gj .box li{position:relative;padding-left:13px;font-size:11px;color:var(--ink-soft);line-height:1.35}
+.gj .box li{position:relative;padding-left:13px;font-size:12.5px;color:var(--ink-soft);line-height:1.35}
 .gj .box li::before{content:"-";position:absolute;left:0;color:var(--edge);font-weight:700}
-.gj .fit{margin-top:11px;font-family:var(--fm);font-size:8.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:var(--edge);border-radius:4px;padding:4px 8px;align-self:flex-start}
-.gj .trans-l{font-family:var(--fm);font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);text-align:center;padding:6px 0 0}
+.gj .fit{margin-top:11px;font-family:var(--fm);font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:var(--edge);border-radius:4px;padding:4px 8px;align-self:flex-start}
+.gj .trans-l{font-family:var(--fm);font-size:12.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);text-align:center;padding:6px 0 0}
 .gj .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .gj .spine-box{background:var(--spine);color:var(--spine-ink);border-radius:10px;padding:14px 16px;border:1px solid var(--line)}
 .gj .spine-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
 .gj .spine-head .dptag{background:var(--teal);color:#04222a}
-.gj .spine-lab{font-family:var(--fm);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:rgba(239,234,221,.7)}
+.gj .spine-lab{font-family:var(--fm);font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:rgba(239,234,221,.7)}
 .gj .spine-box h4{font-family:var(--fd);font-size:16px;margin:8px 0 0}
-.gj .spine-box .q{font-style:italic;font-size:12px;color:rgba(239,234,221,.85);margin:5px 0 0}
+.gj .spine-box .q{font-style:italic;font-size:12.5px;color:rgba(239,234,221,.85);margin:5px 0 0}
 .gj .stages{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}
-.gj .stage{font-family:var(--fm);font-size:8.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border-radius:4px;padding:4px 9px}
+.gj .stage{font-family:var(--fm);font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border-radius:4px;padding:4px 9px}
 .gj .stage.s1{background:var(--gold);color:#2a1c04} .gj .stage.s2{background:#3E6E72;color:#eafcff}
 .gj .stage.s3{background:var(--teal);color:#04222a} .gj .stage.s4{background:#2E7D32;color:#eafce9}
 .gj .fits{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:12px}
 .gj .fitc{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:7px;padding:9px}
-.gj .fitc .fn{font-family:var(--fm);font-size:8.5px;letter-spacing:.06em;color:var(--teal)}
-.gj .fitc .ft{font-family:var(--fd);font-size:12px;margin:3px 0 4px}
-.gj .fitc .fdz{font-size:10px;color:rgba(239,234,221,.72);line-height:1.35}
+.gj .fitc .fn{font-family:var(--fm);font-size:12.5px;letter-spacing:.06em;color:var(--teal)}
+.gj .fitc .ft{font-family:var(--fd);font-size:12.5px;margin:3px 0 4px}
+.gj .fitc .fdz{font-size:12.5px;color:rgba(239,234,221,.72);line-height:1.35}
 .gj .legend{display:flex;flex-wrap:wrap;gap:18px;margin:20px 2px 0;font-size:12.5px;color:var(--ink-soft)}
 .gj .legend span{display:inline-flex;align-items:center;gap:8px}
 .gj .legend i{width:12px;height:12px;border-radius:50%;display:inline-block}
-.gj .foot{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);text-align:center;color:var(--ink-faint);font-size:12px}
+.gj .foot{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);text-align:center;color:var(--ink-faint);font-size:12.5px}
 .gj .foot .tm{font-family:var(--fd);color:var(--ink-soft)}
 @media (max-width:720px){ .gj .fits{grid-template-columns:repeat(2,1fr)} }
 `
@@ -526,7 +526,7 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
                 <span className="dptag" style={{ background: 'var(--navy)' }}>
                   {termPrefix} {openDp.replace('dp', '')}
                 </span>
-                <span style={{ fontFamily: 'var(--fm)', fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
+                <span style={{ fontFamily: 'var(--fm)', fontSize: 12.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
                   {statusWord(s)}
                 </span>
                 <button
@@ -539,12 +539,12 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
               <h2 style={{ fontFamily: 'var(--fd)', fontSize: 24, margin: '14px 0 0', lineHeight: 1.15 }}>{b.title}</h2>
               <p style={{ fontStyle: 'italic', color: 'var(--ink-soft)', margin: '8px 0 0', fontSize: 15 }}>&quot;{b.q}&quot;</p>
 
-              <h3 style={{ fontFamily: 'var(--fm)', fontSize: 10.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--teal)', margin: '22px 0 8px' }}>What this block does</h3>
+              <h3 style={{ fontFamily: 'var(--fm)', fontSize: 12.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--teal)', margin: '22px 0 8px' }}>What this block does</h3>
               <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.6 }}>
                 {b.bullets.map((li, i) => <li key={i}>{li}</li>)}
               </ul>
 
-              <h3 style={{ fontFamily: 'var(--fm)', fontSize: 10.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--teal)', margin: '22px 0 8px' }}>Evidence this gate needs</h3>
+              <h3 style={{ fontFamily: 'var(--fm)', fontSize: 12.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--teal)', margin: '22px 0 8px' }}>Evidence this gate needs</h3>
               {evidence.length === 0 ? (
                 <p style={{ color: 'var(--ink-faint)', fontSize: 13.5, margin: 0 }}>No evidence mapped to this block yet.</p>
               ) : (
@@ -553,19 +553,19 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
                 </ul>
               )}
 
-              <h3 style={{ fontFamily: 'var(--fm)', fontSize: 10.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--teal)', margin: '22px 0 8px' }}>Fit test</h3>
+              <h3 style={{ fontFamily: 'var(--fm)', fontSize: 12.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--teal)', margin: '22px 0 8px' }}>Fit test</h3>
               <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-soft)' }}>{b.fit}</p>
 
               {hasWorkspace(openDp) ? (
                 <div style={{ marginTop: 24 }}>
-                  <h3 style={{ fontFamily: 'var(--fm)', fontSize: 10.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--teal)', margin: '0 0 10px' }}>Do the work</h3>
+                  <h3 style={{ fontFamily: 'var(--fm)', fontSize: 12.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--teal)', margin: '0 0 10px' }}>Do the work</h3>
                   <BlockWorkspace dpId={openDp} clientId={view.client.id} canManage={canManage} currency={view.config?.currency} />
                 </div>
               ) : null}
 
               {canManage ? (
                 <>
-                  <h3 style={{ fontFamily: 'var(--fm)', fontSize: 10.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--gold)', margin: '24px 0 8px' }}>Move this gate</h3>
+                  <h3 style={{ fontFamily: 'var(--fm)', fontSize: 12.5, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--gold)', margin: '24px 0 8px' }}>Move this gate</h3>
                   {/*
                     This used to say the next block opens once this one is
                     complete, and that the route enforced it. Neither was true:

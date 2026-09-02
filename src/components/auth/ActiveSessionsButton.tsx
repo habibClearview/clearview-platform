@@ -130,9 +130,9 @@ export default function ActiveSessionsButton({ fontSize = '0.88rem' }: { fontSiz
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                         {describeDevice(s.user_agent)}
-                        {s.is_current && <span style={{ fontSize: '0.62rem', fontFamily: 'var(--cv-font-mono)', color: '#00838F', border: '1px solid #00B4D8', borderRadius: 3, padding: '0.05rem 0.35rem' }}>THIS DEVICE</span>}
+                        {s.is_current && <span style={{ fontSize: '0.78rem', fontFamily: 'var(--cv-font-mono)', color: '#00838F', border: '1px solid #00B4D8', borderRadius: 3, padding: '0.05rem 0.35rem' }}>THIS DEVICE</span>}
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#4A5A6A', marginTop: '0.2rem' }}>
+                      <div style={{ fontSize: '0.78rem', color: '#4A5A6A', marginTop: '0.2rem' }}>
                         {s.ip ? `IP ${s.ip} · ` : ''}Last active {fmt(s.last_active)}
                       </div>
                     </div>
@@ -140,7 +140,7 @@ export default function ActiveSessionsButton({ fontSize = '0.88rem' }: { fontSiz
                       type="button"
                       disabled={busyId === s.id}
                       onClick={() => signOutOne(s)}
-                      style={{ flexShrink: 0, fontFamily: 'var(--cv-font-mono)', fontSize: '0.7rem', padding: '0.32rem 0.7rem', border: '1px solid #C0392B', borderRadius: 4, background: 'transparent', color: '#C0392B', cursor: busyId === s.id ? 'wait' : 'pointer' }}>
+                      style={{ flexShrink: 0, fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', padding: '0.32rem 0.7rem', border: '1px solid #C0392B', borderRadius: 4, background: 'transparent', color: '#C0392B', cursor: busyId === s.id ? 'wait' : 'pointer' }}>
                       {busyId === s.id ? '…' : 'Sign out'}
                     </button>
                   </div>
@@ -154,13 +154,13 @@ export default function ActiveSessionsButton({ fontSize = '0.88rem' }: { fontSiz
                   type="button"
                   disabled={busyId === 'others'}
                   onClick={signOutOthers}
-                  style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.76rem', padding: '0.5rem 1rem', border: 'none', borderRadius: 5, background: '#C0392B', color: '#FFFFFF', cursor: busyId === 'others' ? 'wait' : 'pointer', fontWeight: 700 }}>
+                  style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', padding: '0.5rem 1rem', border: 'none', borderRadius: 5, background: '#C0392B', color: '#FFFFFF', cursor: busyId === 'others' ? 'wait' : 'pointer', fontWeight: 700 }}>
                   {busyId === 'others' ? 'Signing out…' : `Sign out all ${otherCount} other device${otherCount === 1 ? '' : 's'}`}
                 </button>
               </div>
             )}
 
-            <p style={{ fontSize: '0.7rem', color: '#8494A4', margin: '0.9rem 0 0', lineHeight: 1.45 }}>
+            <p style={{ fontSize: '0.78rem', color: '#8494A4', margin: '0.9rem 0 0', lineHeight: 1.45 }}>
               A device already open may keep working for up to about an hour until its access expires, then it is fully locked out.
             </p>
           </div>

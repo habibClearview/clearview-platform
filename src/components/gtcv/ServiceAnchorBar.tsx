@@ -57,7 +57,7 @@ export default function ServiceAnchorBar({
   // it looked like, because every control it has was behind a fold nobody had a
   // reason to open. The controls were always there: bring a service back, pull
   // an activity into a service. They are now visible without a press.
-  const [showParked, setShowParked] = useState(true)
+  const [showParked, setShowParked] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
@@ -142,8 +142,8 @@ export default function ServiceAnchorBar({
     }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{
-          ...mono, fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate,
-        }}>Service</span>
+          fontSize: 12.5, fontWeight: 600, letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate,
+        }}>The service this decision point is working on</span>
 
         {live.length === 0 ? (
           <span style={{ fontSize: 15, color: C.slate }}>
@@ -187,7 +187,7 @@ export default function ServiceAnchorBar({
               onChange={(e) => act({ action: 'setServiceState', id: current?.id, serviceState: e.target.value })}
               aria-label="Is this service current, redesigned or new"
               style={{
-                ...mono, fontSize: 12, color: C.navy, border: `1px solid ${C.border}`,
+                ...mono, fontSize: 12.5, color: C.navy, border: `1px solid ${C.border}`,
                 borderRadius: 8, padding: '4px 8px', background: C.card,
               }}
             >
@@ -251,7 +251,7 @@ export default function ServiceAnchorBar({
             type="button"
             onClick={() => setShowParked((v) => !v)}
             style={{
-              ...mono, fontSize: 12, color: C.amber, background: 'transparent',
+              ...mono, fontSize: 12.5, color: C.amber, background: 'transparent',
               border: 'none', padding: 0, cursor: 'pointer',
             }}
           >
@@ -263,7 +263,7 @@ export default function ServiceAnchorBar({
                   activities, which were parked with it. */}
               {parkedServices.map((s) => (
                 <div key={s.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span style={{ ...mono, fontSize: 10.5, letterSpacing: '.08em', textTransform: 'uppercase', color: C.slate }}>Service</span>
+                  <span style={{ ...mono, fontSize: 12.5, letterSpacing: '.08em', textTransform: 'uppercase', color: C.slate }}>Service</span>
                   <span style={{ fontSize: 14, fontWeight: 600, color: C.navy }}>{s.service_name}</span>
                   {canManage ? (
                     <button
@@ -291,7 +291,7 @@ export default function ServiceAnchorBar({
                       disabled={busy}
                       onChange={(e) => { if (e.target.value) act({ action: 'moveMany', serviceId: e.target.value, activityIds: [a.id] }) }}
                       aria-label={`Move ${a.activity || 'this activity'} into a service`}
-                      style={{ ...mono, fontSize: 11.5, padding: '2px 6px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.card }}
+                      style={{ ...mono, fontSize: 12.5, padding: '2px 6px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.card }}
                     >
                       <option value="">Pull into a service...</option>
                       {live.map((s) => <option key={s.id} value={s.id}>{s.service_name}</option>)}
@@ -312,9 +312,9 @@ function Figure({ label, n, all, amber }: { label: string; n: number; all: numbe
   return (
     <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 5 }}>
       <span style={{ ...mono, fontSize: 17, fontWeight: 700, color: amber && n > 0 ? C.amber : C.navy }}>{n}</span>
-      <span style={{ fontSize: 11.5, color: C.slate }}>{label}</span>
+      <span style={{ fontSize: 12.5, color: C.slate }}>{label}</span>
       {all !== n ? (
-        <span style={{ ...mono, fontSize: 10.5, color: C.slate }} title="All services in this engagement">
+        <span style={{ ...mono, fontSize: 12.5, color: C.slate }} title="All services in this engagement">
           ({all} in all)
         </span>
       ) : null}
@@ -324,7 +324,7 @@ function Figure({ label, n, all, amber }: { label: string; n: number; all: numbe
 
 function pill(colour: string, solid: boolean): React.CSSProperties {
   return {
-    ...mono, fontSize: 12, fontWeight: 600, padding: '5px 10px', borderRadius: 7,
+    ...mono, fontSize: 12.5, fontWeight: 600, padding: '5px 10px', borderRadius: 7,
     border: `1px solid ${colour}`, background: solid ? colour : 'transparent',
     color: solid ? '#FFFFFF' : colour, cursor: 'pointer',
   }

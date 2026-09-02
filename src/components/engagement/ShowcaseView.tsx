@@ -47,7 +47,7 @@ const CSS = `
   padding:34px 30px 30px; margin:0 -4px 30px;
 }
 .sc .eyebrow{
-  font-family:var(--fm); font-size:10px; letter-spacing:.24em;
+  font-family:var(--fm); font-size:12.5px; letter-spacing:.24em;
   text-transform:uppercase; color:var(--gold); margin:0;
 }
 .sc .band h1{
@@ -58,7 +58,7 @@ const CSS = `
 .sc .live{
   display:inline-flex; align-items:center; gap:9px; margin-top:20px;
   border:1px solid rgba(243,236,222,.3); border-radius:999px; padding:6px 14px;
-  font-family:var(--fm); font-size:11.5px; letter-spacing:.06em; color:rgba(243,236,222,.9);
+  font-family:var(--fm); font-size:12.5px; letter-spacing:.06em; color:rgba(243,236,222,.9);
 }
 .sc .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);}
 
@@ -74,7 +74,7 @@ const CSS = `
 .sc .blk.c-navy{border-top-color:var(--teal);}
 .sc .blk.c-purple{border-top-color:var(--purple);}
 .sc .blk .no{
-  font-family:var(--fm); font-size:9.5px; letter-spacing:.14em;
+  font-family:var(--fm); font-size:12.5px; letter-spacing:.14em;
   text-transform:uppercase; color:var(--ink-faint); margin:0;
 }
 .sc .blk h3{font-family:var(--fd); font-size:17px; font-weight:600; margin:5px 0 0;}
@@ -82,7 +82,7 @@ const CSS = `
 .sc .blk ul{margin:11px 0 0; padding-left:17px; color:var(--ink-soft); font-size:13.7px; line-height:1.55;}
 .sc .blk li{margin-bottom:4px;}
 .sc .blk .fit{
-  display:inline-block; margin-top:11px; font-family:var(--fm); font-size:9.5px;
+  display:inline-block; margin-top:11px; font-family:var(--fm); font-size:12.5px;
   letter-spacing:.1em; text-transform:uppercase; color:var(--teal);
   border:1px solid var(--teal); border-radius:999px; padding:3px 9px;
 }
@@ -148,7 +148,7 @@ export default function ShowcaseView({ view }) {
             {progressLine(view)}
           </span>
           {named ? (
-            <p style={{ fontFamily: 'var(--fm)', fontSize: 12, letterSpacing: '.06em', marginTop: 14 }}>
+            <p style={{ fontFamily: 'var(--fm)', fontSize: 12.5, letterSpacing: '.06em', marginTop: 14 }}>
               {named}
             </p>
           ) : null}

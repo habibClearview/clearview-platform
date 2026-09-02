@@ -45,7 +45,7 @@ const card = { background: C.white, border: '1px solid var(--cv-border-soft)', b
 const secH = { fontFamily: 'var(--cv-font)', fontSize: '1.25rem', fontWeight: 700, color: C.navy, margin: 0 }
 const hint = { fontSize: '0.9rem', color: C.slate, lineHeight: 1.45 }
 const mono = { fontFamily: 'var(--cv-font-mono)' }
-const th = { ...mono, padding: '0.45rem 0.55rem', textAlign: 'left', fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
+const th = { ...mono, padding: '0.45rem 0.55rem', textAlign: 'left', fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
 const td = { padding: '0.35rem 0.55rem', verticalAlign: 'top', fontSize: '0.9rem', color: C.navy }
 const inp = { width: '100%', padding: '0.34rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '0.9rem', fontFamily: 'inherit', background: 'var(--cv-bg-2)', color: C.navy, boxSizing: 'border-box' }
 const btn = (col) => ({ ...mono, fontSize: '0.86rem', fontWeight: 600, padding: '0.4rem 0.85rem', border: `1px solid ${col}`, borderRadius: 7, background: 'transparent', color: col, cursor: 'pointer' })
@@ -80,10 +80,10 @@ const moneyLine = (byCur) => {
 function StageChip({ stage, count, byCur, share }) {
   return (
     <div style={{ background: C.white, borderRadius: 12, padding: '0.75rem 0.9rem', borderTop: `3px solid ${stage.colour}`, boxShadow: '0 1px 2px var(--cv-shadow-1), 0 10px 26px var(--cv-shadow-2)', minWidth: 0 }}>
-      <div style={{ ...mono, fontSize: '0.72rem', letterSpacing: '0.1em', color: C.slate, textTransform: 'uppercase' }}>{stage.label}</div>
+      <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.1em', color: C.slate, textTransform: 'uppercase' }}>{stage.label}</div>
       <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.7rem', fontWeight: 700, color: C.navy, lineHeight: 1.1 }}>{count}</div>
       <div style={{ ...hint, fontSize: '0.8rem' }}>{share}% of the pipeline</div>
-      <div style={{ ...mono, fontSize: '0.76rem', color: C.slate, marginTop: '0.25rem', wordBreak: 'break-word' }}>{moneyLine(byCur)}</div>
+      <div style={{ ...mono, fontSize: '0.78rem', color: C.slate, marginTop: '0.25rem', wordBreak: 'break-word' }}>{moneyLine(byCur)}</div>
     </div>
   )
 }
@@ -331,7 +331,7 @@ export default function PipelineTracker({ clientId, canManage , currency }) {
                           ? <input aria-label="Next action date" type="date" style={{ ...inp, ...(late ? { borderColor: C.amber } : {}) }} value={r.next_action_date || ''}
                               onChange={(e) => commit(r.id, { next_action_date: e.target.value || null })} />
                           : <span style={{ color: late ? C.amber : C.navy }}>{r.next_action_date || '-'}</span>}
-                        {late && <div style={{ ...mono, fontSize: '0.72rem', color: C.amber, marginTop: '0.15rem' }}>Past due</div>}
+                        {late && <div style={{ ...mono, fontSize: '0.78rem', color: C.amber, marginTop: '0.15rem' }}>Past due</div>}
                       </td>
                       <td style={td}>{textCell(r, 'owner', 'Who owns it')}</td>
                       <td style={td}>{textCell(r, 'notes', 'Notes')}</td>

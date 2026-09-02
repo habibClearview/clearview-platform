@@ -24,7 +24,7 @@ const lbl = {display:'block',fontWeight:600,fontSize:'0.83rem',marginBottom:'0.3
 const fGrid = {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:'1.1rem'}
 const btn = (col=C.navy) => ({fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',fontWeight:600,padding:'0.6rem 1.4rem',border:'none',borderRadius:5,background:col,color:C.white,cursor:'pointer'})
 const ghostBtn = {fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',fontWeight:600,padding:'0.6rem 1.4rem',border:`1px solid ${C.border}`,borderRadius:5,background:C.white,color:C.navy,cursor:'pointer'}
-const smallBtn = (col=C.cyan) => ({fontFamily: 'var(--cv-font-mono)',fontSize:'0.74rem',padding:'0.32rem 0.7rem',border:`1px solid ${col}`,borderRadius:4,background:'transparent',color:col,cursor:'pointer'})
+const smallBtn = (col=C.cyan) => ({fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',padding:'0.32rem 0.7rem',border:`1px solid ${col}`,borderRadius:4,background:'transparent',color:col,cursor:'pointer'})
 
 const STEPS = ['Welcome','About Your Business','Business Structure','Products & Figures','Funding & Capital','Review & Submit']
 
@@ -360,7 +360,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
         <div style={{display:'flex',gap:'0.3rem',marginBottom:'1.5rem'}}>
           {STEPS.map((s,i)=><div key={s} style={{flex:1,height:4,borderRadius:2,background:i<=step?C.cyan:C.border}}/>)}
         </div>
-        <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.65rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.4rem'}}>CANVAS COACH — CLEARVIEW DATA CAPTURE</div>
+        <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.4rem'}}>CANVAS COACH — CLEARVIEW DATA CAPTURE</div>
         <h1 style={{fontFamily:'var(--cv-font)',fontSize:'1.6rem',fontWeight:700,color:C.navy,marginBottom:'1.75rem'}}>{STEPS[step]}</h1>
 
         {step===0&&(
@@ -621,7 +621,7 @@ function ProductList({unitKey,products,addProduct,updateProductName,removeProduc
           </div>
           <MonthRow label={`${p.name||'Category'} — Sales Revenue`} labelColor={C.green} lineId={`${p.id}_rev`} pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel}/>
           <div style={{marginTop:'0.5rem',paddingLeft:'0.75rem',borderLeft:`2px solid ${C.border}`}}>
-            <div style={{fontSize:'0.76rem',fontWeight:600,color:C.red,marginBottom:'0.3rem'}}>Cost of Goods / Procurement Cost</div>
+            <div style={{fontSize:'0.78rem',fontWeight:600,color:C.red,marginBottom:'0.3rem'}}>Cost of Goods / Procurement Cost</div>
             {p.costLines.map((c:any,ci:number)=>(
               <div key={c.id} style={{marginBottom:'0.5rem'}}>
                 <div style={{display:'flex',gap:'0.5rem',alignItems:'center',marginBottom:'0.3rem'}}>
@@ -629,7 +629,7 @@ function ProductList({unitKey,products,addProduct,updateProductName,removeProduc
                     borderColor:!c.name&&Object.values(figureData[c.id]||{}).some((v:any)=>v>0)?C.amber:undefined,
                     background:!c.name&&Object.values(figureData[c.id]||{}).some((v:any)=>v>0)?'#FFFBEA':undefined,
                   }} placeholder="Cost name (e.g. Input Purchases, Raw Materials) — optional" value={c.name} onChange={e=>updateCostLineName(unitKey,pi,ci,e.target.value)}/>
-                  {!c.name&&Object.values(figureData[c.id]||{}).some((v:any)=>v>0)&&<span style={{fontSize:'0.68rem',color:C.amber,marginLeft:'4px'}}>Give this cost a name</span>}
+                  {!c.name&&Object.values(figureData[c.id]||{}).some((v:any)=>v>0)&&<span style={{fontSize:'0.78rem',color:C.amber,marginLeft:'4px'}}>Give this cost a name</span>}
                   {p.costLines.length>1&&<button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1rem'}} onClick={()=>removeCostLine(unitKey,pi,ci)}>×</button>}
                 </div>
                 <MonthRow label={c.name||'Cost of Goods'} labelColor={C.red} lineId={c.id} pastMonths={pastMonths} futureMonths={futureMonths} figureData={figureData} setFigure={setFigure} monthLabel={monthLabel} compact/>
@@ -637,7 +637,7 @@ function ProductList({unitKey,products,addProduct,updateProductName,removeProduc
             ))}
             <button style={smallBtn(C.red)} onClick={()=>addCostLine(unitKey,pi)}>+ Add Another Cost Line</button>
           </div>
-          <p style={{fontSize:'0.68rem',color:C.slate,marginTop:'0.5rem'}}>All figures in {cc}.</p>
+          <p style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.5rem'}}>All figures in {cc}.</p>
         </div>
       ))}
       <button style={smallBtn()} onClick={()=>addProduct(unitKey)}>+ Add Product</button>

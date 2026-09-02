@@ -190,7 +190,7 @@ export default function VerificationRecognition({
         <ConfidenceRing score={confidence.score} color={toneColor(confInfo.tone)} />
         <div>
           <div style={{
-            display: 'inline-block', fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', fontWeight: 700,
+            display: 'inline-block', fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', fontWeight: 700,
             padding: '0.15rem 0.55rem', borderRadius: 6, marginBottom: '0.4rem',
             background: toneColor(confInfo.tone), color: C.onAccent, textTransform: 'uppercase',
           }}>{confInfo.title}</div>

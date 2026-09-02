@@ -62,7 +62,7 @@ const H = (size = '1.15rem') => ({
   fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: size,
 })
 const LABEL = {
-  fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em',
+  fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.04em',
   textTransform: 'uppercase', color: C.slate,
 }
 const inputStyle = {
@@ -129,7 +129,7 @@ function missingParts(p) {
 
 function Pill({ text, tone, title }) {
   return (
-    <span title={title} style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap', display: 'inline-block' }}>
+    <span title={title} style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap', display: 'inline-block' }}>
       {text}
     </span>
   )
@@ -447,7 +447,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
             ) : (
               <div style={{ fontSize: '0.85rem', color: C.navy, lineHeight: 1.45 }}>{r[p.key] || '-'}</div>
             )}
-            <div style={{ fontSize: '0.76rem', color: C.slate, marginTop: 3, lineHeight: 1.35 }}>{p.help}</div>
+            <div style={{ fontSize: '0.78rem', color: C.slate, marginTop: 3, lineHeight: 1.35 }}>{p.help}</div>
           </label>
         ))}
       </div>
@@ -471,7 +471,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
           ) : (
             <div style={{ fontSize: '0.85rem' }}>{(DIFF_TYPES.find((d) => d.key === r.differentiation_type) || {}).label || '-'}</div>
           )}
-          <div style={{ fontSize: '0.76rem', color: C.slate, marginTop: 3, lineHeight: 1.35 }}>
+          <div style={{ fontSize: '0.78rem', color: C.slate, marginTop: 3, lineHeight: 1.35 }}>
             {(DIFF_TYPES.find((d) => d.key === r.differentiation_type) || {}).help
               || 'Capability, context or access. If it is none of the three, it is not a difference.'}
           </div>

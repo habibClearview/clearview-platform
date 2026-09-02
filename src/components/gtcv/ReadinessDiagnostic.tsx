@@ -48,7 +48,7 @@ const panelHead = { background: C.header, color: 'var(--cv-on-accent)', padding:
 const panelBody = { padding: '1.1rem 1.2rem 1.3rem' }
 const tableWrap = { overflowX: 'auto' }
 const table = { width: '100%', borderCollapse: 'collapse', fontSize: '0.93rem', minWidth: 900 }
-const th = { padding: '0.5rem 0.55rem', textAlign: 'left', fontFamily: 'var(--cv-font-mono)', fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
+const th = { padding: '0.5rem 0.55rem', textAlign: 'left', fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
 const td = { padding: '0.5rem 0.5rem', verticalAlign: 'top', borderBottom: `1px solid ${C.borderSoft}` }
 const inputBase = { width: '100%', padding: '0.4rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '0.9rem', fontFamily: 'inherit', background: C.bg2, color: C.navy, boxSizing: 'border-box', resize: 'vertical' }
 const roBox = { ...inputBase, background: C.disabled, minHeight: 32, whiteSpace: 'pre-wrap' }
@@ -176,7 +176,7 @@ function CheckpointCard({ checkpoint, total, scored }) {
   const b = band(total)
   return (
     <div style={{ background: C.card, border: `1px solid ${C.borderSoft}`, borderTop: `3px solid ${b.color}`, borderRadius: 12, padding: '0.9rem 1rem', flex: '1 1 200px', minWidth: 200 }}>
-      <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.75rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>{checkpoint.label}</div>
+      <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>{checkpoint.label}</div>
       <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.1, marginTop: '0.2rem' }}>
         {total}<span style={{ fontSize: '1rem', color: C.faint }}> of {MAX_TOTAL}</span>
       </div>
@@ -341,7 +341,7 @@ export default function ReadinessDiagnostic({ clientId, canManage }) {
           <CheckpointCard key={cp.id} checkpoint={cp} total={totals[cp.id].total} scored={totals[cp.id].scored} />
         ))}
         <div style={{ background: C.card, border: `1px solid ${C.borderSoft}`, borderTop: `3px solid ${C.teal}`, borderRadius: 12, padding: '0.9rem 1rem', flex: '1 1 200px', minWidth: 200 }}>
-          <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.75rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>Movement</div>
+          <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>Movement</div>
           <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.1, marginTop: '0.2rem', color: movement > 0 ? C.green : movement < 0 ? C.red : C.navy }}>
             {movement > 0 ? `+${movement}` : movement}
           </div>
@@ -386,7 +386,7 @@ export default function ReadinessDiagnostic({ clientId, canManage }) {
                 <tr>
                   <th style={{ ...th, width: '22%' }}>Fit test</th>
                   {CHECKPOINTS.map((cp) => (
-                    <th key={cp.id} style={{ ...th, width: '22%' }}>{cp.label}<div style={{ fontSize: '0.7rem', textTransform: 'none', letterSpacing: 0, color: C.faint }}>{cp.when}</div></th>
+                    <th key={cp.id} style={{ ...th, width: '22%' }}>{cp.label}<div style={{ fontSize: '0.78rem', textTransform: 'none', letterSpacing: 0, color: C.faint }}>{cp.when}</div></th>
                   ))}
                   <th style={{ ...th, width: 130 }}>Baseline to close</th>
                 </tr>
@@ -425,7 +425,7 @@ export default function ReadinessDiagnostic({ clientId, canManage }) {
                         <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.25rem', fontWeight: 700, color: delta > 0 ? C.green : delta < 0 ? C.red : C.faint }}>
                           {delta > 0 ? `+${delta}` : delta}
                         </div>
-                        <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.75rem', color: C.faint }}>{base} to {close}</div>
+                        <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', color: C.faint }}>{base} to {close}</div>
                       </td>
                     </tr>
                   )

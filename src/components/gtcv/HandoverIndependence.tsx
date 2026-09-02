@@ -177,7 +177,7 @@ export default function HandoverIndependence({ clientId, canManage }) {
     <div style={{
       border: `1px solid ${C.border}`, borderRadius: 12, padding: '1rem 1.1rem', background: C.card,
     }}>
-      <div style={{ ...mono, fontSize: '0.75rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
+      <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
         The five independence tests
       </div>
       <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '92ch' }}>
@@ -191,7 +191,7 @@ export default function HandoverIndependence({ clientId, canManage }) {
         borderTop: `1px solid ${C.border}`, flexWrap: 'wrap', alignItems: 'baseline',
       }}>
         <div>
-          <div style={{ ...mono, fontSize: '0.68rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
+          <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
             Done unaided
           </div>
           <div style={{
@@ -229,7 +229,7 @@ export default function HandoverIndependence({ clientId, canManage }) {
             }}>
               <div style={{ display: 'flex', gap: '0.7rem', justifyContent: 'space-between', flexWrap: 'wrap', alignItems: 'baseline' }}>
                 <div style={{ flex: '1 1 300px', minWidth: 240 }}>
-                  <div style={{ ...mono, fontSize: '0.68rem', letterSpacing: '.12em', textTransform: 'uppercase', color: C.slate }}>
+                  <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.12em', textTransform: 'uppercase', color: C.slate }}>
                     Test {number} · {t.category}
                   </div>
                   <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.05rem', fontWeight: 600, color: C.navy, marginTop: 2 }}>
@@ -246,7 +246,7 @@ export default function HandoverIndependence({ clientId, canManage }) {
               <div style={{ marginTop: '0.7rem' }}>
                 <label
                   htmlFor={`handover-evidence-${number}`}
-                  style={{ ...mono, fontSize: '0.68rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate, display: 'block', marginBottom: 4 }}
+                  style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate, display: 'block', marginBottom: 4 }}
                 >
                   What you actually saw them do
                 </label>
@@ -281,7 +281,7 @@ export default function HandoverIndependence({ clientId, canManage }) {
                     >{r.l}</button>
                   ))}
                   {unsaved ? (
-                    <span style={{ ...mono, fontSize: '0.76rem', color: C.amber }}>Unsaved</span>
+                    <span style={{ ...mono, fontSize: '0.78rem', color: C.amber }}>Unsaved</span>
                   ) : null}
                 </div>
               ) : null}
@@ -298,7 +298,7 @@ export default function HandoverIndependence({ clientId, canManage }) {
                   The Executive Director confirms this result
                 </label>
                 {row?.ceo_confirmed_at ? (
-                  <span style={{ ...mono, fontSize: '0.76rem', color: C.green }}>
+                  <span style={{ ...mono, fontSize: '0.78rem', color: C.green }}>
                     Confirmed {new Date(row.ceo_confirmed_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                   </span>
                 ) : null}

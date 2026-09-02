@@ -41,7 +41,7 @@ const H = (size = '1.15rem'): React.CSSProperties => ({
   fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: size,
 })
 const LABEL: React.CSSProperties = {
-  fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em',
+  fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.04em',
   textTransform: 'uppercase', color: C.slate,
 }
 
@@ -124,7 +124,7 @@ function Meter({ label, pct, tone }: { label: string; pct: number | null; tone: 
 }
 function Badge({ text, tone }: { text: string; tone: string }) {
   return (
-    <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap' }}>
+    <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap' }}>
       {text}
     </span>
   )
@@ -328,7 +328,7 @@ function DeliveriesView({ rows, clientId, P, onChange }: { rows: Delivery[]; cli
                     <td style={{ ...td, fontFamily: 'var(--cv-font-mono)' }}>{d.delivered_at || '—'}</td>
                     <td style={td}><Badge text={outcome.t} tone={outcome.tone} /></td>
                     <td style={td}>{d.handled_by || '—'}</td>
-                    <td style={td}><button onClick={() => del(d.id)} style={{ ...btn(C.red), padding: '0.2rem 0.5rem', fontSize: '0.72rem' }}>Delete</button></td>
+                    <td style={td}><button onClick={() => del(d.id)} style={{ ...btn(C.red), padding: '0.2rem 0.5rem', fontSize: '0.78rem' }}>Delete</button></td>
                   </tr>
                 )
               })}
@@ -455,8 +455,8 @@ function ComplaintsView({ rows, clientId, P, onChange }: { rows: Complaint[]; cl
                     </td>
                     <td style={td}>{c.handled_by || '—'}</td>
                     <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                      {c.status === 'open' && <button onClick={() => resolve(c)} style={{ ...btn(C.green), padding: '0.2rem 0.5rem', fontSize: '0.72rem', marginRight: 6 }}>Resolve</button>}
-                      <button onClick={() => del(c.id)} style={{ ...btn(C.red), padding: '0.2rem 0.5rem', fontSize: '0.72rem' }}>Delete</button>
+                      {c.status === 'open' && <button onClick={() => resolve(c)} style={{ ...btn(C.green), padding: '0.2rem 0.5rem', fontSize: '0.78rem', marginRight: 6 }}>Resolve</button>}
+                      <button onClick={() => del(c.id)} style={{ ...btn(C.red), padding: '0.2rem 0.5rem', fontSize: '0.78rem' }}>Delete</button>
                     </td>
                   </tr>
                 )
@@ -605,7 +605,7 @@ function StaffView({ deliveries, complaints, scores, clientId, P, onChange }: {
                   <td style={td}>{s.metric || '—'}</td>
                   <td style={{ ...td, fontFamily: 'var(--cv-font-mono)' }}>{s.value == null ? '—' : s.value}</td>
                   <td style={td}>{s.notes || '—'}</td>
-                  <td style={td}><button onClick={() => del(s.id)} style={{ ...btn(C.red), padding: '0.2rem 0.5rem', fontSize: '0.72rem' }}>Delete</button></td>
+                  <td style={td}><button onClick={() => del(s.id)} style={{ ...btn(C.red), padding: '0.2rem 0.5rem', fontSize: '0.78rem' }}>Delete</button></td>
                 </tr>
               ))}
             </tbody>

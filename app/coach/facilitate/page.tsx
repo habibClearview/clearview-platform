@@ -546,7 +546,7 @@ function Answers({ feed, open, revealed }: { feed: Feed | null; open: Question; 
             {(open.target_fields || []).map((f) => (
               c.values?.[f.column] ? (
                 <div key={f.column} style={{ marginBottom: '0.35rem' }}>
-                  <span style={{ color: C.quiet, fontSize: '0.72rem', letterSpacing: '.08em', textTransform: 'uppercase', display: 'block' }}>
+                  <span style={{ color: C.quiet, fontSize: '0.78rem', letterSpacing: '.08em', textTransform: 'uppercase', display: 'block' }}>
                     {f.heading}
                   </span>
                   {/* Drawn as text. React escapes a string, so a submitted

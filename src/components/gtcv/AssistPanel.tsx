@@ -129,7 +129,7 @@ export default function AssistPanel({
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ ...mono, fontSize: '0.76rem', letterSpacing: '0.09em', textTransform: 'uppercase', color: C.slate }}>
+          <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.09em', textTransform: 'uppercase', color: C.slate }}>
             Assistance
           </div>
           <div style={{ fontWeight: 700, color: C.navy, marginTop: '0.15rem' }}>{title}</div>
@@ -158,7 +158,7 @@ export default function AssistPanel({
             borderLeft: `3px solid ${C.amber}`, background: C.white,
             borderRadius: 6, padding: '0.5rem 0.7rem', marginBottom: '0.55rem',
           }}>
-            <span style={{ ...mono, fontSize: '0.7rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.amber, fontWeight: 700, paddingTop: '0.12rem', whiteSpace: 'nowrap' }}>
+            <span style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.amber, fontWeight: 700, paddingTop: '0.12rem', whiteSpace: 'nowrap' }}>
               Draft
             </span>
             <span style={{ ...hint, color: C.navy }}>

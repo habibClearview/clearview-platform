@@ -141,7 +141,7 @@ export default function DeliverablesPanel({ clientId, canManage , currency: enga
       <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '1rem 1.1rem', background: C.card }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.8rem', flexWrap: 'wrap' }}>
           <div style={{ maxWidth: 640 }}>
-            <div style={{ ...mono, fontSize: '0.75rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
+            <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
               Deliverables and claims
             </div>
             <div style={{ ...hint, marginTop: '0.3rem' }}>
@@ -173,7 +173,7 @@ export default function DeliverablesPanel({ clientId, canManage , currency: enga
 
       {torOpen ? (
         <div style={{ border: `1px solid ${C.teal}`, borderRadius: 12, padding: '1rem 1.1rem', background: C.card }}>
-          <div style={{ ...mono, fontSize: '0.75rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
+          <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
             Paste the deliverables section
           </div>
           <p style={{ ...hint, margin: '0.4rem 0 0.7rem' }}>
@@ -259,7 +259,7 @@ export default function DeliverablesPanel({ clientId, canManage , currency: enga
 function Stat({ label, value, tone }) {
   return (
     <div>
-      <div style={{ ...mono, fontSize: '0.68rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>{label}</div>
+      <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>{label}</div>
       <div style={{ fontSize: '1.15rem', fontWeight: 600, color: tone || C.navy, marginTop: 2 }}>{value}</div>
     </div>
   )
@@ -268,7 +268,7 @@ function Stat({ label, value, tone }) {
 function Lab({ l, children }) {
   return (
     <div>
-      <label style={{ ...mono, fontSize: '0.7rem', letterSpacing: '.08em', textTransform: 'uppercase', color: C.slate, display: 'block', marginBottom: 4 }}>{l}</label>
+      <label style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.08em', textTransform: 'uppercase', color: C.slate, display: 'block', marginBottom: 4 }}>{l}</label>
       {children}
     </div>
   )
@@ -369,7 +369,7 @@ function Deliverable({ d, maps, packs, busy, run, clientId, onOpenPack }) {
                   <div style={{ maxWidth: 560 }}>
                     <div style={{ fontSize: '0.98rem', color: C.navy, fontWeight: 600 }}>{DP_LABEL[m.dp_id] || m.dp_id}</div>
                     {m.required_evidence ? <div style={{ ...hint, marginTop: '0.15rem' }}>{m.required_evidence}</div> : null}
-                    <div style={{ ...mono, fontSize: '0.75rem', color: C.slate, marginTop: '0.2rem' }}>
+                    <div style={{ ...mono, fontSize: '0.78rem', color: C.slate, marginTop: '0.2rem' }}>
                       {m.source === 'ai' ? 'Proposed from the document' : 'Added by hand'}
                       {m.approved ? ` · approved ${fmtDate(m.approved_at)}` : ' · not approved'}
                     </div>
@@ -421,7 +421,7 @@ function Deliverable({ d, maps, packs, busy, run, clientId, onOpenPack }) {
 
       {live.length > 0 ? (
         <div style={{ marginTop: '0.9rem', borderTop: `1px solid ${C.border}`, paddingTop: '0.7rem' }}>
-          <div style={{ ...mono, fontSize: '0.72rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>Claims</div>
+          <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>Claims</div>
           {live.map((p) => (
             <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.4rem' }}>
               <div style={{ ...mono, fontSize: '0.87rem', color: C.navy }}>
@@ -539,7 +539,7 @@ function PackViewer({ clientId, packId, onClose }) {
         </div>
       ) : null}
 
-      <div style={{ ...mono, fontSize: '0.72rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate, marginTop: '0.9rem' }}>
+      <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate, marginTop: '0.9rem' }}>
         Gates evidencing this claim
       </div>
       {gates.map((g) => (
@@ -552,7 +552,7 @@ function PackViewer({ clientId, packId, onClose }) {
         </div>
       ))}
 
-      <div style={{ ...mono, fontSize: '0.72rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate, marginTop: '0.9rem' }}>
+      <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate, marginTop: '0.9rem' }}>
         Evidence in this pack ({evidence.length})
       </div>
       <div style={{ ...hint, marginTop: '0.3rem' }}>

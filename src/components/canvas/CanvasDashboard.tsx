@@ -96,7 +96,7 @@ function StatusBadge({ status, label }: { status: string; label?: string }) {
     <span style={{
       background: c.bg, color: c.color,
       padding: '3px 10px', borderRadius: 12,
-      fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+      fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap',
       fontFamily: "var(--cv-font)",
     }}>{c.text}</span>
   )
@@ -161,7 +161,7 @@ function Field({
   return (
     <div style={{ marginBottom: 16 }}>
       <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.slate, marginBottom: 4 }}>{label}</label>
-      {hint && <p style={{ fontSize: 12, color: C.slate, marginBottom: 4, marginTop: 0 }}>{hint}</p>}
+      {hint && <p style={{ fontSize: 12.5, color: C.slate, marginBottom: 4, marginTop: 0 }}>{hint}</p>}
       {rows > 1
         ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows} disabled={disabled} style={style} />
         : <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} disabled={disabled} style={style} />
@@ -348,7 +348,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
             >
               <PhaseDot status={status} locked={locked} />
               {getPhaseLabel(id)}
-              {locked && <span style={{ fontSize: 11 }}>🔒</span>}
+              {locked && <span style={{ fontSize: 12.5 }}>🔒</span>}
             </button>
           )
         })}
@@ -368,7 +368,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
       <header style={{ background: C.navy, padding: '16px 24px', color: C.white }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <p style={{ margin: 0, fontSize: 11, color: C.cyan, fontFamily: "var(--cv-font)", letterSpacing: 1, textTransform: 'uppercase' }}>
+            <p style={{ margin: 0, fontSize: 12.5, color: C.cyan, fontFamily: "var(--cv-font)", letterSpacing: 1, textTransform: 'uppercase' }}>
               Canvas Coach &nbsp;|&nbsp; habibonifade.com
             </p>
             <h1 style={{ margin: '4px 0 0', fontFamily: 'var(--cv-font)', fontSize: 22, color: C.white }}>
@@ -379,11 +379,11 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
             </p>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <p style={{ margin: 0, fontSize: 12, color: '#A0B4C8' }}>Engagement progress</p>
+            <p style={{ margin: 0, fontSize: 12.5, color: '#A0B4C8' }}>Engagement progress</p>
             <div style={{ width: 160, height: 8, background: 'rgba(255,255,255,0.15)', borderRadius: 4, marginTop: 6, overflow: 'hidden' }}>
               <div style={{ width: `${pct}%`, height: '100%', background: C.cyan, borderRadius: 4, transition: 'width 0.4s' }} />
             </div>
-            <p style={{ margin: '4px 0 0', fontSize: 12, color: C.cyan }}>{complete} of {order.length - 1} phases complete</p>
+            <p style={{ margin: '4px 0 0', fontSize: 12.5, color: C.cyan }}>{complete} of {order.length - 1} phases complete</p>
           </div>
         </div>
       </header>
@@ -463,7 +463,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
                 { n: '03', t: 'Prioritisation', d: 'The customer ranks this problem high enough to spend budget on it now, not later.' },
               ].map(s => (
                 <div key={s.n} style={{ background: C.cream, padding: 16, borderRadius: 8, borderTop: `3px solid ${C.cyan}` }}>
-                  <p style={{ fontSize: 11, color: C.cyan, fontWeight: 700, letterSpacing: 1, margin: '0 0 4px', textTransform: 'uppercase' }}>{s.n}</p>
+                  <p style={{ fontSize: 12.5, color: C.cyan, fontWeight: 700, letterSpacing: 1, margin: '0 0 4px', textTransform: 'uppercase' }}>{s.n}</p>
                   <p style={{ fontFamily: 'var(--cv-font)', fontWeight: 700, margin: '0 0 8px', fontSize: 16 }}>{s.t}</p>
                   <p style={{ margin: 0, fontSize: 13, color: C.slate }}>{s.d}</p>
                 </div>
@@ -480,7 +480,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
               ].map(a => (
                 <div key={a.t} style={{ background: C.cream, padding: 16, borderRadius: 8, borderTop: `3px solid ${C.teal}` }}>
                   <p style={{ fontFamily: 'var(--cv-font)', fontWeight: 700, margin: '0 0 2px', fontSize: 15 }}>{a.t}</p>
-                  <p style={{ fontSize: 11, color: C.teal, margin: '0 0 8px', fontWeight: 600 }}>{a.sub}</p>
+                  <p style={{ fontSize: 12.5, color: C.teal, margin: '0 0 8px', fontWeight: 600 }}>{a.sub}</p>
                   <p style={{ margin: 0, fontSize: 13, color: C.slate }}>{a.d}</p>
                 </div>
               ))}
@@ -615,14 +615,14 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
                     <tr key={dp.id} style={{ background: i % 2 === 0 ? C.cream : C.white }}>
                       <td style={{ padding: '9px 12px', fontWeight: 700, color: C.cyan }}>{dp.number}</td>
                       <td style={{ padding: '9px 12px', fontWeight: 600, color: C.navy }}>{dp.zone}</td>
-                      <td style={{ padding: '9px 12px', color: C.slate, maxWidth: 220, fontSize: 12 }}>{dp.core_question}</td>
+                      <td style={{ padding: '9px 12px', color: C.slate, maxWidth: 220, fontSize: 12.5 }}>{dp.core_question}</td>
                       <td style={{ padding: '9px 12px' }}>
                         {locked ? <StatusBadge status="locked" /> : <StatusBadge status={g?.status || 'not_started'} />}
                       </td>
-                      <td style={{ padding: '9px 12px', fontSize: 12 }}>
+                      <td style={{ padding: '9px 12px', fontSize: 12.5 }}>
                         {Object.values(state.component_evidence).filter(e => e.component_id.startsWith(dp.id) && e.status === 'submitted').length} / 9 submitted
                       </td>
-                      <td style={{ padding: '9px 12px', color: C.slate, fontSize: 12 }}>
+                      <td style={{ padding: '9px 12px', color: C.slate, fontSize: 12.5 }}>
                         {g?.coach_note ? <span style={{ color: C.amber }}>{g.coach_note.slice(0, 60)}{g.coach_note.length > 60 ? '...' : ''}</span> : '—'}
                       </td>
                     </tr>
@@ -763,7 +763,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
         <div style={{ background: C.navy, borderRadius: 8, padding: 24, marginBottom: 24, color: C.white }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
             <div>
-              <p style={{ margin: '0 0 4px', fontSize: 11, color: C.cyan, fontFamily: "var(--cv-font)", textTransform: 'uppercase', letterSpacing: 1 }}>
+              <p style={{ margin: '0 0 4px', fontSize: 12.5, color: C.cyan, fontFamily: "var(--cv-font)", textTransform: 'uppercase', letterSpacing: 1 }}>
                 {dp.number} &nbsp;|&nbsp; {dp.zone}
               </p>
               <h2 style={{ fontFamily: 'var(--cv-font)', fontSize: 22, margin: '0 0 12px', color: C.white }}>
@@ -776,7 +776,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
               <StatusBadge status={state.gate_signoffs[dpId]?.status || 'not_started'} />
               <PrintBtn />
-              <p style={{ margin: 0, fontSize: 12, color: '#A0B4C8' }}>{evidenceCount} / {dp.components.length} components with evidence</p>
+              <p style={{ margin: 0, fontSize: 12.5, color: '#A0B4C8' }}>{evidenceCount} / {dp.components.length} components with evidence</p>
             </div>
           </div>
         </div>
@@ -812,7 +812,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
               }}>
                 <div style={{ background: C.lightBg, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <span style={{ fontSize: 12, color: C.cyan, fontWeight: 700, fontFamily: "var(--cv-font)" }}>
+                    <span style={{ fontSize: 12.5, color: C.cyan, fontWeight: 700, fontFamily: "var(--cv-font)" }}>
                       Component {comp.number}
                     </span>
                     <span style={{ fontFamily: 'var(--cv-font)', fontSize: 15, color: C.navy, fontWeight: 700, marginLeft: 10 }}>
@@ -824,27 +824,27 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
                 <div style={{ padding: '16px 20px', fontFamily: "var(--cv-font)" }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
                     <div>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: C.slate, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 0.5 }}>What it is</p>
+                      <p style={{ fontSize: 12.5, fontWeight: 700, color: C.slate, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 0.5 }}>What it is</p>
                       <p style={{ fontSize: 14, color: C.navy, margin: 0 }}>{comp.what_it_is}</p>
                     </div>
                     <div>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: C.slate, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Why it matters</p>
+                      <p style={{ fontSize: 12.5, fontWeight: 700, color: C.slate, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Why it matters</p>
                       <p style={{ fontSize: 14, color: C.navy, margin: 0 }}>{comp.why_it_matters}</p>
                     </div>
                   </div>
                   <div style={{ background: '#EBF8FF', padding: 14, borderRadius: 6, marginBottom: 16, borderLeft: `4px solid ${C.cyan}` }}>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: C.cyan, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Your action</p>
+                    <p style={{ fontSize: 12.5, fontWeight: 700, color: C.cyan, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Your action</p>
                     <p style={{ fontSize: 14, color: C.navy, margin: 0 }}>{comp.action_trigger}</p>
                   </div>
                   <div style={{ background: C.cream, padding: 14, borderRadius: 6, marginBottom: 16 }}>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: C.green, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 0.5 }}>What good looks like</p>
+                    <p style={{ fontSize: 12.5, fontWeight: 700, color: C.green, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 0.5 }}>What good looks like</p>
                     <p style={{ fontSize: 14, color: C.navy, margin: 0 }}>{comp.signal_to_look_for}</p>
                   </div>
 
                   {/* Coach guidance — coach only */}
                   {isCoach && (
                     <div style={{ background: '#FFF8E7', padding: 14, borderRadius: 6, marginBottom: 16, borderLeft: `4px solid ${C.amber}` }}>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: C.amber, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Coach guidance (not visible to client)</p>
+                      <p style={{ fontSize: 12.5, fontWeight: 700, color: C.amber, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Coach guidance (not visible to client)</p>
                       <p style={{ fontSize: 14, color: C.navy, margin: 0 }}>{comp.coach_guidance}</p>
                     </div>
                   )}
@@ -920,7 +920,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
                       <td style={{ padding: '9px 12px', color: C.slate, maxWidth: 280 }}>{ev.description || '—'}</td>
                       <td style={{ padding: '9px 12px' }}><StatusBadge status={ev.status || 'not_started'} /></td>
                       <td style={{ padding: '9px 12px' }}>
-                        {ev.url ? <a href={ev.url} target="_blank" rel="noopener noreferrer" style={{ color: C.cyan, fontSize: 12 }}>Open</a> : '—'}
+                        {ev.url ? <a href={ev.url} target="_blank" rel="noopener noreferrer" style={{ color: C.cyan, fontSize: 12.5 }}>Open</a> : '—'}
                       </td>
                     </tr>
                   )
@@ -1038,7 +1038,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
                       key={s}
                       onClick={() => update({ handover_tests: state.handover_tests.map(t => t.id === test.id ? { ...t, status: s } : t) })}
                       style={{
-                        padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                        padding: '5px 12px', borderRadius: 6, fontSize: 12.5, cursor: 'pointer',
                         background: test.status === s ? C.navy : C.white,
                         color: test.status === s ? C.white : C.slate,
                         border: `1px solid ${C.border}`,
@@ -1142,7 +1142,7 @@ function GateBlock({
             Coach-authorised progress on {gate.coach_date}.
           </p>
           <p style={{ margin: '6px 0 0', fontSize: 14, color: C.navy }}>Note: {gate.coach_note}</p>
-          <p style={{ margin: '6px 0 0', fontSize: 12, color: C.slate }}>This note is visible to all parties including the Ignite funder.</p>
+          <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.slate }}>This note is visible to all parties including the Ignite funder.</p>
         </div>
       )}
 
@@ -1399,7 +1399,7 @@ function ReadinessAssessment({ answers, onChange, editable }: { answers: any[]; 
                 key={i}
                 onClick={() => editable && upd(a.id, v)}
                 style={{
-                  padding: '4px 12px', borderRadius: 5, fontSize: 12, cursor: editable ? 'pointer' : 'default',
+                  padding: '4px 12px', borderRadius: 5, fontSize: 12.5, cursor: editable ? 'pointer' : 'default',
                   background: a.answer === v ? (v === true ? C.green : v === false ? C.red : C.slate) : C.white,
                   color: a.answer === v ? C.white : C.slate,
                   border: `1px solid ${C.border}`, fontFamily: "var(--cv-font)",
@@ -1427,7 +1427,7 @@ function DecisionTable({ decisions, onChange, editable }: { decisions: CanvasDec
       {decisions.map(d => (
         <div key={d.id} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: 16, marginBottom: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: C.cyan, fontFamily: 'var(--cv-font-mono)' }}>{d.id}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: C.cyan, fontFamily: 'var(--cv-font-mono)' }}>{d.id}</span>
             {editable && <button onClick={() => del(d.id)} style={delBtnStyle}>Remove</button>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
@@ -1454,7 +1454,7 @@ function InterviewTable({ interviews, phaseId, onAdd, onUpdate, editable }: { in
       {interviews.length === 0 && <p style={{ color: C.slate, fontSize: 14 }}>No interviews recorded for this Decision Point yet.</p>}
       {interviews.map(int => (
         <div key={int.id} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: 16, marginBottom: 12 }}>
-          <p style={{ fontSize: 12, fontWeight: 700, color: C.cyan, fontFamily: 'var(--cv-font-mono)', margin: '0 0 12px' }}>{int.id}</p>
+          <p style={{ fontSize: 12.5, fontWeight: 700, color: C.cyan, fontFamily: 'var(--cv-font-mono)', margin: '0 0 12px' }}>{int.id}</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
             <Field label="Date" value={int.date} onChange={v => onUpdate(int.id, { ...int, date: v })} disabled={!editable} />
             <Field label="Respondent" value={int.respondent} onChange={v => onUpdate(int.id, { ...int, respondent: v })} placeholder="Name" disabled={!editable} />
@@ -1482,7 +1482,7 @@ function HypothesisTable({ hypotheses, phaseId, onAdd, onUpdate, editable }: { h
       {hypotheses.map(h => (
         <div key={h.id} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: 16, marginBottom: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: C.cyan, fontFamily: 'var(--cv-font-mono)' }}>{h.id}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: C.cyan, fontFamily: 'var(--cv-font-mono)' }}>{h.id}</span>
             <StatusBadge status={h.status} />
           </div>
           <Field label="Hypothesis" value={h.hypothesis} onChange={v => onUpdate(h.id, { ...h, hypothesis: v })} rows={2} placeholder='e.g. "We believe that agrodealers will pay UGX 50,000 per advisory session because..."' disabled={!editable} />
@@ -1576,7 +1576,7 @@ function EvidenceLibrary({ entries, onChange, editable }: { entries: EvidenceEnt
                 </td>
                 <td style={{ padding: '9px 12px' }}><input value={e.description} onChange={ev => upd(e.id, 'description', ev.target.value)} style={{ ...inputStyle, width: 220 }} placeholder="What is this?" disabled={!editable} /></td>
                 <td style={{ padding: '9px 12px' }}>
-                  {e.url ? <a href={e.url} target="_blank" rel="noopener noreferrer" style={{ color: C.cyan, fontSize: 12 }}>Open</a> : <input value={e.url} onChange={ev => upd(e.id, 'url', ev.target.value)} style={{ ...inputStyle, width: 140 }} placeholder="URL..." disabled={!editable} />}
+                  {e.url ? <a href={e.url} target="_blank" rel="noopener noreferrer" style={{ color: C.cyan, fontSize: 12.5 }}>Open</a> : <input value={e.url} onChange={ev => upd(e.id, 'url', ev.target.value)} style={{ ...inputStyle, width: 140 }} placeholder="URL..." disabled={!editable} />}
                 </td>
                 <td style={{ padding: '9px 12px' }}><StatusBadge status={e.status} /></td>
                 <td style={{ padding: '9px 12px' }}>
@@ -1621,7 +1621,7 @@ function CommercialReadiness({ point, scores, onChange, editable }: { point: 'ba
         <div key={ft.id} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 0', borderBottom: `1px solid ${C.border}`, fontFamily: "var(--cv-font)" }}>
           <div style={{ flex: 1 }}>
             <p style={{ fontWeight: 600, color: C.navy, margin: '0 0 2px', fontSize: 14 }}>{ft.number} {ft.name}</p>
-            <p style={{ color: C.slate, fontSize: 12, margin: 0 }}>{ft.description}</p>
+            <p style={{ color: C.slate, fontSize: 12.5, margin: 0 }}>{ft.description}</p>
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
             {[1, 2, 3, 4, 5].map(v => (
@@ -1667,8 +1667,8 @@ function CommercialReadinessSummary({ scores }: { scores: DiagnosticScore[] }) {
             <p style={{ fontSize: 32, fontWeight: 700, color: p.color, margin: '0 0 4px', fontFamily: 'var(--cv-font)' }}>
               {p.data ? p.data.total : '—'}
             </p>
-            {p.data && <p style={{ fontSize: 12, color: C.slate, margin: 0 }}>out of {maxScore}</p>}
-            {p.data && <p style={{ fontSize: 12, color: C.slate, margin: '4px 0 0' }}>{p.data.date}</p>}
+            {p.data && <p style={{ fontSize: 12.5, color: C.slate, margin: 0 }}>out of {maxScore}</p>}
+            {p.data && <p style={{ fontSize: 12.5, color: C.slate, margin: '4px 0 0' }}>{p.data.date}</p>}
           </div>
         ))}
       </div>
@@ -1756,7 +1756,7 @@ function FunderView({ state }: { state: CanvasEngagementState }) {
   return (
     <div style={{ fontFamily: "var(--cv-font)", background: C.cream, minHeight: '100vh' }}>
       <header style={{ background: C.navy, padding: '16px 24px', color: C.white, borderBottom: `3px solid ${C.cyan}` }}>
-        <p style={{ margin: '0 0 4px', fontSize: 11, color: C.cyan, letterSpacing: 1, textTransform: 'uppercase' }}>Canvas Coach | habibonifade.com — Funder View</p>
+        <p style={{ margin: '0 0 4px', fontSize: 12.5, color: C.cyan, letterSpacing: 1, textTransform: 'uppercase' }}>Canvas Coach | habibonifade.com — Funder View</p>
         <h1 style={{ fontFamily: 'var(--cv-font)', fontSize: 22, margin: 0 }}>{state.engagement_title}</h1>
         <p style={{ margin: '4px 0 0', fontSize: 13, color: '#A0B4C8' }}>Read-only dashboard for {state.funder} programme staff</p>
       </header>
@@ -1774,7 +1774,7 @@ function FunderView({ state }: { state: CanvasEngagementState }) {
               { l: 'Start Date', v: state.start_date || 'Not set' },
             ].map(i => (
               <div key={i.l} style={{ background: C.white, padding: 16, borderRadius: 8, borderLeft: `3px solid ${C.cyan}` }}>
-                <p style={{ fontSize: 11, color: C.slate, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 0.5 }}>{i.l}</p>
+                <p style={{ fontSize: 12.5, color: C.slate, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 0.5 }}>{i.l}</p>
                 <p style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0, fontFamily: 'var(--cv-font)' }}>{i.v}</p>
               </div>
             ))}
@@ -1800,8 +1800,8 @@ function FunderView({ state }: { state: CanvasEngagementState }) {
                     <td style={{ padding: '9px 12px' }}><StatusBadge status={g?.status || 'locked'} /></td>
                     <td style={{ padding: '9px 12px' }}>{g?.ceo_signed ? <span style={{ color: C.green, fontWeight: 600 }}>Yes — {g.ceo_name}</span> : '—'}</td>
                     <td style={{ padding: '9px 12px' }}>{g?.coach_authorised ? <span style={{ color: C.amber, fontWeight: 600 }}>Yes</span> : '—'}</td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: C.slate }}>{g?.coach_note || '—'}</td>
-                    <td style={{ padding: '9px 12px', fontSize: 12 }}>{g?.ceo_date || g?.coach_date || '—'}</td>
+                    <td style={{ padding: '9px 12px', fontSize: 12.5, color: C.slate }}>{g?.coach_note || '—'}</td>
+                    <td style={{ padding: '9px 12px', fontSize: 12.5 }}>{g?.ceo_date || g?.coach_date || '—'}</td>
                   </tr>
                 )
               })}
@@ -1821,7 +1821,7 @@ function FunderView({ state }: { state: CanvasEngagementState }) {
                 <p style={{ fontSize: 36, fontWeight: 700, color: p.color, margin: '0 0 4px', fontFamily: 'var(--cv-font)' }}>
                   {p.data ? p.data.total : 'Pending'}
                 </p>
-                {p.data && <p style={{ fontSize: 12, color: C.slate, margin: 0 }}>out of {maxScore} &nbsp;|&nbsp; {p.data.date}</p>}
+                {p.data && <p style={{ fontSize: 12.5, color: C.slate, margin: 0 }}>out of {maxScore} &nbsp;|&nbsp; {p.data.date}</p>}
               </div>
             ))}
           </div>
@@ -1864,7 +1864,7 @@ function FunderView({ state }: { state: CanvasEngagementState }) {
                 <div key={dp.id} style={{ background: '#FFF3CD', padding: 14, borderRadius: 8, marginBottom: 10 }}>
                   <p style={{ fontWeight: 700, color: C.amber, margin: '0 0 6px' }}>{dp.number} — {dp.zone}</p>
                   <p style={{ margin: 0, color: C.navy, fontSize: 14 }}><strong>Coach note:</strong> {g.coach_note}</p>
-                  <p style={{ margin: '4px 0 0', fontSize: 12, color: C.slate }}>Authorised on {g.coach_date}</p>
+                  <p style={{ margin: '4px 0 0', fontSize: 12.5, color: C.slate }}>Authorised on {g.coach_date}</p>
                 </div>
               )
             })
@@ -1895,6 +1895,6 @@ const addBtnStyle: React.CSSProperties = {
 
 const delBtnStyle: React.CSSProperties = {
   background: 'transparent', border: `1px solid ${C.border}`, color: C.red,
-  padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+  padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12.5,
   fontFamily: "var(--cv-font)",
 }

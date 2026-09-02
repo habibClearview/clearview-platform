@@ -136,7 +136,7 @@ export default function PendingRows({
       {anyPending ? (
         <>
           <div style={{
-            ...mono, fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase',
+            ...mono, fontSize: 12.5, letterSpacing: '.1em', textTransform: 'uppercase',
             color: C.amber, marginBottom: 8,
           }}>Pending — sent by the room, not yet in the table</div>
 
@@ -190,7 +190,7 @@ export default function PendingRows({
               border: `1px solid ${C.border}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer',
             }}
           >{q.agreed_value}</button>
-          <span style={{ fontSize: 12, color: C.slate, marginLeft: 8 }}>
+          <span style={{ fontSize: 12.5, color: C.slate, marginLeft: 8 }}>
             agreed by the room — press to see how they answered
           </span>
           {openDistribution === q.id ? <Distribution snapshot={q.agreed_distribution} /> : null}
@@ -260,7 +260,7 @@ function PendingRow({
           {(question.target_fields || []).map((f) => (
             group.display?.[f.column] ? (
               <div key={f.column} style={{ fontSize: 14, color: C.navy, lineHeight: 1.45 }}>
-                <span style={{ ...mono, fontSize: 10.5, letterSpacing: '.08em', textTransform: 'uppercase', color: C.slate, marginRight: 6 }}>
+                <span style={{ ...mono, fontSize: 12.5, letterSpacing: '.08em', textTransform: 'uppercase', color: C.slate, marginRight: 6 }}>
                   {f.heading}
                 </span>
                 {/* Drawn as text. React escapes a string, so a submitted script
@@ -283,7 +283,7 @@ function PendingRow({
             {group.submissions.some((s) => s.is_guest) ? (
               <span style={{
                 marginLeft: 6, padding: '1px 6px', borderRadius: 4,
-                border: `1px solid ${C.border}`, fontSize: 11, color: C.slate,
+                border: `1px solid ${C.border}`, fontSize: 12.5, color: C.slate,
               }}>{GUEST_LABEL}</span>
             ) : null}
           </div>
@@ -298,7 +298,7 @@ function PendingRow({
               that NAME a problem or an activity have nothing to choose. */}
           {kind ? (
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 6 }}>
-              <span style={{ ...mono, fontSize: 10.5, letterSpacing: '.08em', textTransform: 'uppercase', color: C.slate }}>
+              <span style={{ ...mono, fontSize: 12.5, letterSpacing: '.08em', textTransform: 'uppercase', color: C.slate }}>
                 {verb}
               </span>
               {options.length > 0 ? (

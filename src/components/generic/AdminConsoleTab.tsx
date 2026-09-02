@@ -68,7 +68,7 @@ const h3: React.CSSProperties = {
 }
 const label: React.CSSProperties = {
   fontFamily: 'var(--cv-font-mono)',
-  fontSize: '0.72rem',
+  fontSize: '0.78rem',
   letterSpacing: '0.06em',
   textTransform: 'uppercase',
   color: C.slate,
@@ -456,9 +456,9 @@ function UsersAndLogins({ config, clientId, P }: any) {
                           </div>
                           {resetLink[m.id] && (
                             <div style={{ marginTop: 6 }}>
-                              <div style={{ ...label, textTransform: 'none', fontSize: '0.72rem' }}>One-time reset link (send to this person):</div>
+                              <div style={{ ...label, textTransform: 'none', fontSize: '0.78rem' }}>One-time reset link (send to this person):</div>
                               <input readOnly value={resetLink[m.id]} onFocus={e => e.currentTarget.select()}
-                                style={{ width: '100%', maxWidth: 320, fontSize: '0.72rem', fontFamily: 'var(--cv-font-mono)', padding: '0.3rem 0.4rem', border: `1px solid ${C.border}`, borderRadius: 6, color: C.navy, background: C.card }} />
+                                style={{ width: '100%', maxWidth: 320, fontSize: '0.78rem', fontFamily: 'var(--cv-font-mono)', padding: '0.3rem 0.4rem', border: `1px solid ${C.border}`, borderRadius: 6, color: C.navy, background: C.card }} />
                             </div>
                           )}
                           {msg?.text && (
@@ -476,7 +476,7 @@ function UsersAndLogins({ config, clientId, P }: any) {
           </div>
         )}
 
-        <div style={{ ...label, textTransform: 'none', fontSize: '0.76rem', color: C.slate, marginTop: '0.9rem', lineHeight: 1.5 }}>
+        <div style={{ ...label, textTransform: 'none', fontSize: '0.78rem', color: C.slate, marginTop: '0.9rem', lineHeight: 1.5 }}>
           Status reflects sign-in state: <b>Active</b> = has signed in; <b>Invited</b> = emailed but hasn’t accepted;
           <b> Never logged in</b> = account confirmed but never signed in. “Deactivated” shows after you deactivate a
           login this session.
@@ -677,7 +677,7 @@ function RolesMatrix() {
               <tr key={r} style={{ borderBottom: `1px solid ${C.borderSoft}` }}>
                 <td style={{ padding: '0.6rem', verticalAlign: 'top' }}>
                   <div style={{ color: C.navy, fontWeight: 600 }}>{roleLabel(r)}</div>
-                  <div style={{ ...label, textTransform: 'none', fontSize: '0.74rem', color: C.slate, marginTop: 3, maxWidth: 220, lineHeight: 1.4 }}>
+                  <div style={{ ...label, textTransform: 'none', fontSize: '0.78rem', color: C.slate, marginTop: 3, maxWidth: 220, lineHeight: 1.4 }}>
                     {ROLE_NOTES[r]}
                   </div>
                 </td>
@@ -689,7 +689,7 @@ function RolesMatrix() {
           </tbody>
         </table>
       </div>
-      <div style={{ ...label, textTransform: 'none', fontSize: '0.76rem', color: C.slate, marginTop: '0.9rem' }}>
+      <div style={{ ...label, textTransform: 'none', fontSize: '0.78rem', color: C.slate, marginTop: '0.9rem' }}>
         Assignable roles follow the hierarchy in <code>assignable-roles.ts</code>: a CEO staffs their own org
         (finance manager, unit head, accounts assistant); a finance manager manages the two roles below them; a
         super coach may assign any role.

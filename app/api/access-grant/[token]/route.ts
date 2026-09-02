@@ -71,7 +71,7 @@ async function sendOtpEmail(toEmail: string, code: string, granteeName: string) 
       html: `
         <div style="font-family:var(--cv-font);max-width:480px;margin:0 auto;padding:32px 24px;">
           <div style="background:#1B2A41;padding:20px 24px;border-radius:8px 8px 0 0;border-bottom:3px solid #00CCCC;">
-            <p style="margin:0;font-size:11px;color:#00CCCC;letter-spacing:1px;text-transform:uppercase;">Canvas Coach | ClearView</p>
+            <p style="margin:0;font-size:12.5px;color:#00CCCC;letter-spacing:1px;text-transform:uppercase;">Canvas Coach | ClearView</p>
           </div>
           <div style="background:#F5F0E8;padding:24px;border-radius:0 0 8px 8px;border:1px solid #D8E0E8;border-top:none;color:#1B2A41;line-height:1.6;">
             <p>Hi ${granteeName || 'there'},</p>

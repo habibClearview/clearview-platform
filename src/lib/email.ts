@@ -147,7 +147,7 @@ export function brandedEmail(input: BrandedEmailInput): string {
   return `
     <div style="font-family:var(--cv-font);max-width:560px;margin:0 auto;padding:32px 24px;">
       <div style="background:#1B2A41;padding:20px 24px;border-radius:8px 8px 0 0;border-bottom:3px solid #00CCCC;">
-        <p style="margin:0;font-size:11px;color:#00CCCC;letter-spacing:1px;text-transform:uppercase;">The Canvas Coach</p>
+        <p style="margin:0;font-size:12.5px;color:#00CCCC;letter-spacing:1px;text-transform:uppercase;">The Canvas Coach</p>
         <p style="margin:4px 0 0;font-size:20px;color:#F5F0E8;font-family:var(--cv-font);">Grant-to-Commercial Viability</p>
       </div>
       <div style="background:#F5F0E8;padding:26px 24px;border-radius:0 0 8px 8px;border:1px solid #D8E0E8;border-top:none;color:#1B2A41;line-height:1.6;">
@@ -156,7 +156,7 @@ export function brandedEmail(input: BrandedEmailInput): string {
         ${cta}
         ${foot}
       </div>
-      <p style="text-align:center;color:#8A94A0;font-size:11px;margin:16px 0 0;">Grant-to-Commercial Viability Canvas™ · The Canvas Coach · habibonifade.com</p>
+      <p style="text-align:center;color:#8A94A0;font-size:12.5px;margin:16px 0 0;">Grant-to-Commercial Viability Canvas™ · The Canvas Coach · habibonifade.com</p>
     </div>`
 }
 

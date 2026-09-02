@@ -41,7 +41,7 @@ const H = (size = '1.15rem'): React.CSSProperties => ({
   fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: size,
 })
 const LABEL: React.CSSProperties = {
-  fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em',
+  fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.04em',
   textTransform: 'uppercase', color: C.slate,
 }
 const inputStyle: React.CSSProperties = {
@@ -57,7 +57,7 @@ function btn(color: string, solid = false): React.CSSProperties {
 }
 function Badge({ text, tone }: { text: string; tone: string }) {
   return (
-    <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap' }}>
+    <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap' }}>
       {text}
     </span>
   )
@@ -296,7 +296,7 @@ function DepartmentsManager({ depts, rows, clientId, onChanged }: {
   return (
     <div style={{ ...CARD, background: C.cream }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setOpen(o => !o)}>
-        <div style={H('1.05rem')}>Departments <span style={{ ...LABEL, fontSize: '0.7rem' }}>· {depts.length}</span></div>
+        <div style={H('1.05rem')}>Departments <span style={{ ...LABEL, fontSize: '0.78rem' }}>· {depts.length}</span></div>
         <button style={btn(C.cyan)}>{open ? 'Close' : 'Manage departments'}</button>
       </div>
       {open && (
@@ -391,7 +391,7 @@ function DeptSection({ deptName, tone, rows, currency, clientId, canManage, allR
                       <td style={td}>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
                           {current.map(t => (
-                            <span key={t.id} style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.74rem', color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.08rem 0.4rem' }}>
+                            <span key={t.id} style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.08rem 0.4rem' }}>
                               {fmtTarget(t, currency)}
                             </span>
                           ))}

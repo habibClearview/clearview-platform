@@ -99,7 +99,7 @@ export default function InterviewReporting({ clientId }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
 
       <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '1rem 1.1rem', background: C.card }}>
-        <div style={{ ...mono, fontSize: '0.75rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
+        <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
           What the conversations add up to
         </div>
         <p style={{ ...hint, margin: '0.4rem 0 0', maxWidth: '92ch' }}>
@@ -178,7 +178,7 @@ export default function InterviewReporting({ clientId }) {
             </p>
           ) : null}
 
-          <div style={{ ...mono, fontSize: '0.68rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate, margin: '0.9rem 0 0.4rem' }}>
+          <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate, margin: '0.9rem 0 0.4rem' }}>
             How the six dimensions scored, as a spread
           </div>
           <div style={{ overflowX: 'auto' }}>
@@ -212,7 +212,7 @@ export default function InterviewReporting({ clientId }) {
 
           {r.verbatims.length > 0 ? (
             <>
-              <div style={{ ...mono, fontSize: '0.68rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate, margin: '0.9rem 0 0.4rem' }}>
+              <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate, margin: '0.9rem 0 0.4rem' }}>
                 In their own words
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -235,7 +235,7 @@ export default function InterviewReporting({ clientId }) {
 const th = {
   textAlign: 'left', padding: '0.35rem 0.5rem', borderBottom: `1px solid ${C.border}`,
   fontFamily: 'var(--cv-font-mono)',
-  fontSize: '0.68rem', letterSpacing: '.08em', textTransform: 'uppercase', color: C.slate,
+  fontSize: '0.78rem', letterSpacing: '.08em', textTransform: 'uppercase', color: C.slate,
   fontWeight: 600, whiteSpace: 'nowrap',
 }
 const td = {
@@ -246,7 +246,7 @@ const td = {
 function Stat({ label, value, tone }) {
   return (
     <div>
-      <div style={{ ...mono, fontSize: '0.68rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>{label}</div>
+      <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>{label}</div>
       <div style={{
         fontFamily: 'var(--cv-font)', fontSize: '1.35rem', fontWeight: 600,
         color: tone || C.navy, marginTop: 2, fontVariantNumeric: 'tabular-nums',

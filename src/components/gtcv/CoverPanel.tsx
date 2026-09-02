@@ -70,7 +70,7 @@ export default function CoverPanel({ slug }) {
     background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, padding: '15px 17px',
   }
   const label = {
-    fontFamily: 'var(--cv-font-mono)', fontSize: 9.5, letterSpacing: '.13em',
+    fontFamily: 'var(--cv-font-mono)', fontSize: 12.5, letterSpacing: '.13em',
     textTransform: 'uppercase', color: C.faint, margin: '0 0 5px',
   }
 
@@ -81,7 +81,7 @@ export default function CoverPanel({ slug }) {
         background: C.navy, color: '#F3ECDE', borderRadius: 14, padding: '22px 24px', marginBottom: 16,
       }}>
         <p style={{
-          fontFamily: 'var(--cv-font-mono)', fontSize: 10, letterSpacing: '.24em',
+          fontFamily: 'var(--cv-font-mono)', fontSize: 12.5, letterSpacing: '.24em',
           textTransform: 'uppercase', color: C.gold, margin: 0,
         }}>Grant-to-Commercial Viability Canvas</p>
         <h2 style={{ fontFamily: 'var(--cv-font)', fontSize: 28, margin: '8px 0 0', fontWeight: 600 }}>
@@ -159,15 +159,15 @@ export default function CoverPanel({ slug }) {
                 background: C.box, border: `1px solid ${C.line}`, borderRadius: 9, padding: '10px 12px',
               }}>
                 <p style={{
-                  fontFamily: 'var(--cv-font-mono)', fontSize: 9, letterSpacing: '.1em',
+                  fontFamily: 'var(--cv-font-mono)', fontSize: 12.5, letterSpacing: '.1em',
                   textTransform: 'uppercase', color: C.teal, margin: 0, fontWeight: 700,
                 }}>{PARTY_ROLE_LABELS[p.party_role] || p.party_role}</p>
                 <p style={{ margin: '4px 0 0', fontSize: 14, fontWeight: 600 }}>{p.name}</p>
                 {p.organisation ? (
-                  <p style={{ margin: '2px 0 0', fontSize: 12, color: C.soft }}>{p.organisation}</p>
+                  <p style={{ margin: '2px 0 0', fontSize: 12.5, color: C.soft }}>{p.organisation}</p>
                 ) : null}
                 {p.is_signatory ? (
-                  <p style={{ margin: '5px 0 0', fontSize: 11, color: C.gold, fontWeight: 600 }}>Signs the Charter</p>
+                  <p style={{ margin: '5px 0 0', fontSize: 12.5, color: C.gold, fontWeight: 600 }}>Signs the Charter</p>
                 ) : null}
               </div>
             ))}
@@ -185,7 +185,7 @@ export default function CoverPanel({ slug }) {
         engagement belongs to the organisation. Removing the attribution is a breach of the licence.
       </div>
 
-      <p style={{ marginTop: 18, fontSize: 12, color: C.faint, fontFamily: 'var(--cv-font)', textAlign: 'center' }}>
+      <p style={{ marginTop: 18, fontSize: 12.5, color: C.faint, fontFamily: 'var(--cv-font)', textAlign: 'center' }}>
         Grant-to-Commercial Viability Canvas&trade; · The Canvas Coach · habibonifade.com
       </p>
     </div>

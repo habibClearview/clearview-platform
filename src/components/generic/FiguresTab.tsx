@@ -42,7 +42,7 @@ const PLAN_TINT = 'var(--cv-tint-cyan, rgba(0,180,216,.08))'
 
 const CARD: React.CSSProperties = { background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: 14, padding: '1.2rem 1.4rem', marginBottom: '1.2rem' }
 const H = (s = '1.15rem'): React.CSSProperties => ({ fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: s })
-const LABEL: React.CSSProperties = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em', textTransform: 'uppercase', color: C.slate }
+const LABEL: React.CSSProperties = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.04em', textTransform: 'uppercase', color: C.slate }
 const selStyle: React.CSSProperties = { fontFamily: 'inherit', fontSize: '0.95rem', padding: '0.5rem 0.7rem', border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.navy, fontWeight: 600 }
 
 // The four groups every profit picture is built from, each with a plain-word
@@ -87,7 +87,7 @@ function InfoDot({ text }: { text: string }) {
   return (
     <span style={{ position: 'relative', display: 'inline-block' }}>
       <button type="button" onClick={() => setOpen(o => !o)} aria-label="What does this mean?" title="What does this mean?"
-        style={{ marginLeft: 6, width: 19, height: 19, borderRadius: 10, border: `1.5px solid ${C.cyan}`, background: open ? C.cyan : 'transparent', color: open ? '#fff' : C.cyan, fontSize: '0.72rem', fontWeight: 700, fontFamily: 'var(--cv-font)', fontStyle: 'italic', cursor: 'pointer', lineHeight: 1, padding: 0, verticalAlign: 'middle' }}>i</button>
+        style={{ marginLeft: 6, width: 19, height: 19, borderRadius: 10, border: `1.5px solid ${C.cyan}`, background: open ? C.cyan : 'transparent', color: open ? '#fff' : C.cyan, fontSize: '0.78rem', fontWeight: 700, fontFamily: 'var(--cv-font)', fontStyle: 'italic', cursor: 'pointer', lineHeight: 1, padding: 0, verticalAlign: 'middle' }}>i</button>
       {open && (
         <>
           <span onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
@@ -101,7 +101,7 @@ function InfoDot({ text }: { text: string }) {
 }
 
 function Badge({ text, color }: { text: string; color: string }) {
-  return <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.68rem', letterSpacing: '0.04em', textTransform: 'uppercase', color, border: `1px solid ${color}`, borderRadius: 12, padding: '2px 8px' }}>{text}</span>
+  return <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.04em', textTransform: 'uppercase', color, border: `1px solid ${color}`, borderRadius: 12, padding: '2px 8px' }}>{text}</span>
 }
 
 // Buffered number box. Commits when the reader clicks away or presses Enter,
@@ -354,8 +354,8 @@ export default function FiguresTab({ config, months, cc, P, onSave, onGoToOverTi
                           <tr key={l.id} style={{ borderBottom: `1px solid ${C.borderSoft}` }}>
                             <td style={{ ...td, textAlign: 'left', fontFamily: 'inherit', color: C.navy }}>
                               {l.name}
-                              {isPastOrCurrent && locked && <span style={{ display: 'block', fontSize: '0.74rem', color: C.slate }}>Filled in using the {hasComps(l) ? 'cost breakdown' : 'price list'}. Edit it in <button style={{ ...linkBtn, fontSize: '0.74rem' }} onClick={onGoToCatchUp}>the detailed view</button>.</span>}
-                              {isPastOrCurrent && fld !== 0 && <span style={{ display: 'block', fontSize: '0.74rem', color: C.teal, fontFamily: 'var(--cv-font-mono)' }}>includes {fmt(fld, currency)} from Clearview Field</span>}
+                              {isPastOrCurrent && locked && <span style={{ display: 'block', fontSize: '0.78rem', color: C.slate }}>Filled in using the {hasComps(l) ? 'cost breakdown' : 'price list'}. Edit it in <button style={{ ...linkBtn, fontSize: '0.78rem' }} onClick={onGoToCatchUp}>the detailed view</button>.</span>}
+                              {isPastOrCurrent && fld !== 0 && <span style={{ display: 'block', fontSize: '0.78rem', color: C.teal, fontFamily: 'var(--cv-font-mono)' }}>includes {fmt(fld, currency)} from Clearview Field</span>}
                             </td>
                             <td style={td}><NumCell value={planOf(l)} onCommit={v => commitPlan(l.id, v)} disabled={!canEditPlan || !inHorizon} tint /></td>
                             <td style={td}>

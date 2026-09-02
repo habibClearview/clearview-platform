@@ -72,7 +72,7 @@ const inp = { width: '100%', padding: '0.36rem 0.55rem', border: `1px solid ${C.
 const area = { ...inp, minHeight: 62, resize: 'vertical', lineHeight: 1.4 }
 const btn = (col) => ({ ...mono, fontSize: '0.86rem', fontWeight: 600, padding: '0.4rem 0.85rem', border: `1px solid ${col}`, borderRadius: 7, background: 'transparent', color: col, cursor: 'pointer' })
 const pill = (active, col) => ({ ...mono, fontSize: '0.84rem', padding: '0.35rem 0.75rem', borderRadius: 8, border: `1px solid ${active ? col : C.border}`, background: active ? col : 'transparent', color: active ? 'var(--cv-on-accent)' : C.slate, cursor: 'pointer', fontWeight: active ? 700 : 400, whiteSpace: 'nowrap' })
-const phaseHead = (col) => ({ ...mono, fontSize: '0.76rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: col, fontWeight: 700, borderBottom: `1px solid ${C.border}`, paddingBottom: '0.3rem', marginBottom: '0.6rem' })
+const phaseHead = (col) => ({ ...mono, fontSize: '0.78rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: col, fontWeight: 700, borderBottom: `1px solid ${C.border}`, paddingBottom: '0.3rem', marginBottom: '0.6rem' })
 const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '0.75rem' }
 
 const today = () => new Date().toISOString().split('T')[0]
@@ -214,7 +214,7 @@ export default function PilotCapture({ clientId, canManage }) {
             style={{ ...mono, border: 'none', background: 'transparent', color: C.navy, cursor: 'pointer', fontSize: '1rem', padding: '0 0.2rem' }}>
             {expanded ? 'v' : '>'}
           </button>
-          <span style={{ ...mono, fontSize: '0.76rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: 4, background: Number(r.iteration) === 2 ? C.purple : C.cyan, color: 'var(--cv-on-accent)' }}>
+          <span style={{ ...mono, fontSize: '0.78rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: 4, background: Number(r.iteration) === 2 ? C.purple : C.cyan, color: 'var(--cv-on-accent)' }}>
             ITERATION {r.iteration} / CLIENT {r.client_number}
           </span>
           <span style={{ fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy }}>
@@ -368,7 +368,7 @@ export default function PilotCapture({ clientId, canManage }) {
   function renderComparisonColumn(s, accent) {
     return (
       <div key={s.iteration} style={{ background: 'var(--cv-bg-2)', border: '1px solid var(--cv-border-soft)', borderRadius: 12, borderTop: `3px solid ${accent}`, padding: '0.95rem 1.05rem' }}>
-        <div style={{ ...mono, fontSize: '0.76rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: accent, fontWeight: 700 }}>Iteration {s.iteration}</div>
+        <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: accent, fontWeight: 700 }}>Iteration {s.iteration}</div>
         <div style={{ ...hint, marginTop: '0.15rem' }}>{ITERATION_RULE[s.iteration].summary}</div>
         <div style={{ fontFamily: 'var(--cv-font)', fontSize: '2rem', fontWeight: 700, color: C.navy, marginTop: '0.5rem', lineHeight: 1.1 }}>
           {s.viability === null ? '-' : s.viability.toFixed(1)}
@@ -381,7 +381,7 @@ export default function PilotCapture({ clientId, canManage }) {
           <br />
           {s.revisions} session{s.revisions === 1 ? '' : 's'} recommending a revision
         </div>
-        <div style={{ ...mono, fontSize: '0.74rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: C.slate, marginTop: '0.8rem', marginBottom: '0.3rem' }}>Key learning</div>
+        <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: C.slate, marginTop: '0.8rem', marginBottom: '0.3rem' }}>Key learning</div>
         {s.learnings.length === 0
           ? <div style={hint}>Nothing recorded yet.</div>
           : (
@@ -442,7 +442,7 @@ export default function PilotCapture({ clientId, canManage }) {
           {coverage.flat().map((c) => (
             <div key={`${c.iteration}-${c.clientNumber}`}
               style={{ background: 'var(--cv-bg-2)', border: `1px solid ${c.count ? C.border : 'var(--cv-border-soft)'}`, borderTop: `3px solid ${c.count ? (c.iteration === 2 ? C.purple : C.cyan) : C.border}`, borderRadius: 10, padding: '0.65rem 0.8rem' }}>
-              <div style={{ ...mono, fontSize: '0.72rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: C.slate }}>
+              <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: C.slate }}>
                 Iteration {c.iteration}, client {c.clientNumber}
               </div>
               <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.4rem', fontWeight: 700, color: c.count ? C.navy : C.slate, lineHeight: 1.2 }}>
@@ -467,7 +467,7 @@ export default function PilotCapture({ clientId, canManage }) {
             {renderComparisonColumn(i2, C.purple)}
           </div>
           <div style={{ marginTop: '0.9rem', borderLeft: `3px solid ${v.tone}`, background: C.alt, borderRadius: 8, padding: '0.75rem 0.95rem' }}>
-            <div style={{ ...mono, fontSize: '0.74rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: v.tone, fontWeight: 700 }}>What the comparison says</div>
+            <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: v.tone, fontWeight: 700 }}>What the comparison says</div>
             <div style={{ ...hint, marginTop: '0.25rem' }}>{v.text}</div>
           </div>
         </div>

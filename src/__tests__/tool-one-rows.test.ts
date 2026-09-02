@@ -90,9 +90,16 @@ describe('nothing is invisible', () => {
     expect(rows.find((r) => r.activityId === 'a1')?.problemId).toBe(null)
   })
 
-  it('draws rows that belong to no service at all', () => {
+  // 2 September 2026. This used to assert the opposite. Rows with no service
+  // were drawn so nothing could be invisible, and on screen that was a run of
+  // rows reading "Not in a service" and "Name a service first" across every
+  // column — rows nobody can work on. They are in the Parked area above the
+  // table, which is the one place they can be pulled into a service.
+  it('draws NO row for something that belongs to no service', () => {
     const rows = buildTool1Rows([svc('s1')], [], [act('a1', null, null)])
-    expect(rows.some((r) => r.serviceId === null && r.activityId === 'a1')).toBe(true)
+    expect(rows.some((r) => r.activityId === 'a1')).toBe(false)
+    // The named service still gets its own row to be added to.
+    expect(rows.map((r) => r.serviceId)).toEqual(['s1'])
   })
 
   it('leaves parked rows out, and only those', () => {

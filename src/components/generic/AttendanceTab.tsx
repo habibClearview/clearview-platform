@@ -25,7 +25,7 @@ const C = {
 }
 const CARD: React.CSSProperties = { background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: 14, padding: '1.3rem 1.5rem', marginBottom: '1.35rem' }
 const H = (s = '1.15rem'): React.CSSProperties => ({ fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: s })
-const LABEL: React.CSSProperties = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em', textTransform: 'uppercase', color: C.slate }
+const LABEL: React.CSSProperties = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.04em', textTransform: 'uppercase', color: C.slate }
 const inputStyle: React.CSSProperties = { fontFamily: 'inherit', fontSize: '0.9rem', padding: '0.45rem 0.6rem', border: `1px solid ${C.border}`, borderRadius: 7, background: C.card, color: C.navy }
 const th: React.CSSProperties = { ...LABEL, textAlign: 'left', padding: '0.5rem 0.7rem', borderBottom: `1px solid ${C.border}` }
 const td: React.CSSProperties = { padding: '0.5rem 0.7rem', fontSize: '0.88rem', color: C.navy, borderBottom: `1px solid ${C.borderSoft}` }
@@ -170,7 +170,7 @@ export default function AttendanceTab({ config, clientId, cc, P }: any) {
                                 <button key={st.key} disabled={!canManage || needsMigration}
                                   onClick={() => mark(s.id, st.key)}
                                   style={{
-                                    fontFamily: 'var(--cv-font-mono)', fontSize: '0.76rem', fontWeight: 700, cursor: canManage ? 'pointer' : 'default',
+                                    fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', fontWeight: 700, cursor: canManage ? 'pointer' : 'default',
                                     padding: '0.28rem 0.55rem', borderRadius: 6,
                                     border: `1px solid ${on ? st.tone : C.border}`,
                                     background: on ? st.tone : 'transparent',

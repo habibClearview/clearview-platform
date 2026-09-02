@@ -31,11 +31,11 @@ const CSS = `
   --ink-faint:#7c899b;--line:rgba(255,255,255,.16);--teal:#2AEBEB;--gold:#E0B15A}
 .sc *{box-sizing:border-box}
 .sc .wrap{max-width:640px;margin:0 auto;padding:22px 18px 70px}
-.sc .kicker{font-family:var(--fm);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--teal);margin:0 0 6px}
+.sc .kicker{font-family:var(--fm);font-size:12.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--teal);margin:0 0 6px}
 .sc h1{font-family:var(--fd);font-weight:600;font-size:clamp(23px,5.4vw,31px);line-height:1.12;margin:0}
 .sc .sub{margin:9px 0 0;color:var(--ink-soft);font-size:15px}
 .sc .box{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:16px;margin-top:19px}
-.sc label{display:block;font-family:var(--fm);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 5px}
+.sc label{display:block;font-family:var(--fm);font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 5px}
 .sc input,.sc textarea{width:100%;border:1px solid var(--line);border-radius:9px;padding:12px;
   background:var(--paper);color:var(--ink);font-family:var(--fb);font-size:17px}
 .sc textarea{min-height:118px;resize:vertical}
@@ -47,7 +47,7 @@ const CSS = `
 .sc .ok{color:var(--teal)} .sc .bad{color:var(--gold)}
 .sc .said{border-top:1px solid var(--line);padding:13px 0 0;margin-top:13px}
 .sc .said:first-child{border-top:none;padding-top:0;margin-top:0}
-.sc .who{font-family:var(--fm);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint)}
+.sc .who{font-family:var(--fm);font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint)}
 .sc .what{margin:5px 0 0;font-size:15.5px;white-space:pre-wrap}
 .sc .foot{margin-top:26px;font-size:13px;color:var(--ink-faint);text-align:center}
 `

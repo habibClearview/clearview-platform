@@ -96,7 +96,7 @@ export default function CopyLink({ url, label, hint, compact = false }) {
     <div style={{ minWidth: 0 }}>
       {label ? (
         <div style={{
-          fontFamily: 'var(--cv-font-mono)', fontSize: '0.68rem', letterSpacing: '.1em',
+          fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '.1em',
           textTransform: 'uppercase', color: 'var(--cv-slate)', marginBottom: '0.3rem',
         }}>{label}</div>
       ) : null}

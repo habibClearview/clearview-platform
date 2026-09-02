@@ -586,7 +586,7 @@ export default function FieldCapturePage() {
         {/* ---- Header ---- */}
         <header style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1rem'}}>
           <div>
-            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',letterSpacing:'0.12em',color:D.cyan}}>CLEARVIEW FIELD</div>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',letterSpacing:'0.12em',color:D.cyan}}>CLEARVIEW FIELD</div>
             <div style={{fontFamily:'var(--cv-font)',fontSize:'2rem',fontWeight:700,marginTop:'0.1rem',lineHeight:1.1}}>
               {mode==='history'?'History':mode==='stock'?'Stock':'Record'}
             </div>
@@ -754,7 +754,7 @@ export default function FieldCapturePage() {
                         </span>
                         <span style={{minWidth:0,flex:1}}>
                           <span style={{display:'block',fontWeight:600,fontSize:'0.92rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.quantity}{q.unit_label?` ${q.unit_label}`:''} {q.item_name}</span>
-                          <span style={{display:'inline-block',fontSize:'0.72rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
+                          <span style={{display:'inline-block',fontSize:'0.78rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
                         </span>
                         <span style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:'var(--cv-green-text)',whiteSpace:'nowrap',flexShrink:0}}>+{fmt(q.quantity*(q.override_price??q.standard_price),currency)}</span>
                       </button>
@@ -766,7 +766,7 @@ export default function FieldCapturePage() {
                       <span style={{width:38,height:38,borderRadius:10,background:D.bg2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.3rem',flexShrink:0}}>💸</span>
                       <span style={{minWidth:0,flex:1}}>
                         <span style={{display:'block',fontWeight:600,fontSize:'0.92rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.plan_line_name}</span>
-                        <span style={{display:'inline-block',fontSize:'0.72rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
+                        <span style={{display:'inline-block',fontSize:'0.78rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
                       </span>
                       <span style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap',flexShrink:0}}>-{fmt(q.amount,currency)}</span>
                     </button>
@@ -777,7 +777,7 @@ export default function FieldCapturePage() {
                       <span style={{width:38,height:38,borderRadius:10,background:D.bg2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.3rem',flexShrink:0}}>❓</span>
                       <span style={{minWidth:0,flex:1}}>
                         <span style={{display:'block',fontWeight:600,fontSize:'0.92rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.description}</span>
-                        <span style={{display:'inline-block',fontSize:'0.72rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
+                        <span style={{display:'inline-block',fontSize:'0.78rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
                       </span>
                       <span style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
                         <span style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</span>

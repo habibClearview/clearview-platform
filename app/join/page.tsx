@@ -83,7 +83,7 @@ export default function JoinPage() {
 
         <form onSubmit={go}>
           <label htmlFor="join-code" style={{
-            fontFamily: 'var(--cv-font-mono)', fontSize: '0.7rem', letterSpacing: '.12em',
+            fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '.12em',
             textTransform: 'uppercase', color: C.slate, display: 'block', marginBottom: '0.4rem',
           }}>The code</label>
           <input

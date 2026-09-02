@@ -55,7 +55,7 @@ export default function LoginPage({ clientName = 'Clearview', onSuccess }: Login
     <div style={{ minHeight: '100vh', background: C.cream, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: "var(--cv-font)" }}>
       {/* Logo bar */}
       <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
-        <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.7rem', letterSpacing: '0.18em', color: C.slate, marginBottom: '0.4rem' }}>CANVAS COACH</div>
+        <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.18em', color: C.slate, marginBottom: '0.4rem' }}>CANVAS COACH</div>
         <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.8rem', fontWeight: 700, color: C.navy }}>Clearview</div>
         <div style={{ fontSize: '0.82rem', color: C.slate, marginTop: '0.25rem' }}>{clientName}</div>
       </div>
@@ -138,7 +138,7 @@ export default function LoginPage({ clientName = 'Clearview', onSuccess }: Login
         )}
       </div>
 
-      <div style={{ marginTop: '2rem', fontSize: '0.72rem', color: C.slate, fontFamily: 'var(--cv-font-mono)' }}>
+      <div style={{ marginTop: '2rem', fontSize: '0.78rem', color: C.slate, fontFamily: 'var(--cv-font-mono)' }}>
         Canvas Coach · Clearview Planner · habibonifade.com
       </div>
     </div>

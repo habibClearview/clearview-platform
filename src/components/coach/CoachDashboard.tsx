@@ -109,17 +109,17 @@ function PiHeaderBar({title,chips}){return(
   </div>
 )}
 function PiChip({active,onClick,children}){return(
-  <button onClick={onClick} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.76rem',border:`1px solid ${active?C.cyan:'rgba(255,255,255,0.35)'}`,color:active?'#0B1420':'rgba(255,255,255,0.85)',background:active?C.cyan:'transparent',borderRadius:999,padding:'0.32rem 0.8rem',cursor:'pointer',fontWeight:active?700:400}}>{children}</button>
+  <button onClick={onClick} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',border:`1px solid ${active?C.cyan:'rgba(255,255,255,0.35)'}`,color:active?'#0B1420':'rgba(255,255,255,0.85)',background:active?C.cyan:'transparent',borderRadius:999,padding:'0.32rem 0.8rem',cursor:'pointer',fontWeight:active?700:400}}>{children}</button>
 )}
 function PiBody({children}){return<div style={{border:'1px solid var(--cv-border-soft)',borderTop:'none',borderRadius:'0 0 10px 10px',padding:'1.3rem',background:C.white,marginBottom:'2rem'}}>{children}</div>}
 function PiSectionHeading({label,sub}){return(<div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',margin:'1.9rem 0 0.8rem'}}><span style={{fontFamily:'var(--cv-font)',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>{label}</span>{sub&&<span style={{color:C.slate,fontSize:'0.85rem'}}>{sub}</span>}</div>)}
 function PiKpiCard({label,value,rev,sub,total,color,deltaBadge}){return(
   <div style={total?{border:`2px solid ${C.cyan}`,borderRadius:10,padding:'0.9rem 1rem',background:'var(--cv-tint-cyan)'}:{border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.9rem 1rem',background:'var(--cv-bg-2)'}}>
-    <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.74rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate}}>{label}</div>
+    <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate}}>{label}</div>
     <div style={{fontFamily:'var(--cv-font)',fontSize:total?'1.7rem':'1.5rem',fontWeight:700,color:color||C.navy,marginTop:'0.25rem'}}>{value}</div>
     {rev!=null&&<div style={{fontFamily:'var(--cv-font)',fontSize:total?'1.18rem':'1.02rem',fontWeight:700,color:total?C.cyan:C.green,marginTop:'0.1rem'}}>{rev}</div>}
     {sub&&<div style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.25rem'}}>{sub}</div>}
-    {deltaBadge&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',fontWeight:700,borderRadius:999,padding:'0.05rem 0.5rem',display:'inline-block',marginTop:'0.35rem',background:deltaBadge.up?'var(--cv-tint-green)':'var(--cv-tint-red)',color:deltaBadge.up?C.green:C.red}}>{deltaBadge.text}</span>}
+    {deltaBadge&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,borderRadius:999,padding:'0.05rem 0.5rem',display:'inline-block',marginTop:'0.35rem',background:deltaBadge.up?'var(--cv-tint-green)':'var(--cv-tint-red)',color:deltaBadge.up?C.green:C.red}}>{deltaBadge.text}</span>}
   </div>
 )}
 function MiniDistBar({segments}){return(<div style={{display:'flex',height:6,borderRadius:3,overflow:'hidden',marginTop:'0.55rem'}}>{segments.map((s,i)=><div key={i} style={{width:`${s.pct}%`,background:s.color}}/>)}</div>)}
@@ -559,7 +559,7 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
           <PiKpiCard label="Invoiced &middot; Not Paid" value={fmtGlance(outstanding,feeCur)} color={C.amber} sub="sent, awaiting payment (current)"/>
           <PiKpiCard label="Awaiting Issue" value={fmtGlance(awaitingIssue,feeCur)} color={C.red} sub="fee agreed, not yet invoiced (current)"/>
           <div style={{border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.9rem 1rem',background:'var(--cv-bg-2)'}}>
-            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.74rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate,marginBottom:'0.5rem'}}>Revenue vs. delivery cost &middot; last 6 months</div>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate,marginBottom:'0.5rem'}}>Revenue vs. delivery cost &middot; last 6 months</div>
             <RevenueCostTrendChart periods={trendPeriods} revenueByPeriod={revenueByPeriod} costByPeriod={costByPeriod} cur={feeCur}/>
           </div>
         </PiKpiRow>
@@ -1039,10 +1039,10 @@ function PerfDist({label,summary,unit,decimals=0,note,roadmap,roadmapNote}:{labe
     <div style={{background:'var(--cv-card)',border:'1px solid var(--cv-border-soft)',borderRadius:12,padding:'0.9rem 1rem'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.4rem'}}>
         <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.04em',color:C.slate,fontWeight:600}}>{label}</span>
-        <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.66rem',fontWeight:700,padding:'0.1rem 0.4rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>roadmap</span>
+        <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,padding:'0.1rem 0.4rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>roadmap</span>
       </div>
       <div style={{fontFamily:'var(--cv-font)',fontSize:'1.5rem',fontWeight:700,color:C.slate,lineHeight:1.1}}>—</div>
-      <div style={{fontSize:'0.76rem',color:C.slate,marginTop:6}}>{roadmapNote||'Needs a short per-period customer input from each business.'}</div>
+      <div style={{fontSize:'0.78rem',color:C.slate,marginTop:6}}>{roadmapNote||'Needs a short per-period customer input from each business.'}</div>
     </div>
   )
   const s=summary
@@ -1062,10 +1062,10 @@ function PerfDist({label,summary,unit,decimals=0,note,roadmap,roadmapNote}:{labe
       <div style={{display:'flex',alignItems:'flex-end',gap:2,height:32,marginTop:6}}>
         {counts.map((c,i)=><div key={i} style={{flex:1,height:`${Math.max(6,(c/cMax)*100)}%`,background:i===medBin?C.teal:'var(--cv-tint-cyan)',borderRadius:'2px 2px 0 0'}}/>)}
       </div>
-      <div style={{display:'flex',justifyContent:'space-between',fontFamily: 'var(--cv-font-mono)',fontSize:'0.66rem',color:C.slate,marginTop:2}}>
+      <div style={{display:'flex',justifyContent:'space-between',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',color:C.slate,marginTop:2}}>
         <span>{has?fmtV(min):''}</span><span>{has?fmtV(max):''}</span>
       </div>
-      <div style={{fontSize:'0.76rem',color:C.slate,marginTop:4}}>{has?`${s.count} business${s.count===1?'':'es'}`:'no data yet'}{note?` · ${note}`:''}</div>
+      <div style={{fontSize:'0.78rem',color:C.slate,marginTop:4}}>{has?`${s.count} business${s.count===1?'':'es'}`:'no data yet'}{note?` · ${note}`:''}</div>
     </div>
   )
 }
@@ -1191,7 +1191,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
 
       {/* Executive finding — lead with the headline, then drill down */}
       <div style={{...card,borderLeft:`4px solid ${C.cyan}`}}>
-        <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',letterSpacing:'0.14em',textTransform:'uppercase',color:C.teal,marginBottom:'0.4rem'}}>The finding</div>
+        <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',letterSpacing:'0.14em',textTransform:'uppercase',color:C.teal,marginBottom:'0.4rem'}}>The finding</div>
         <div style={{fontSize:'1.05rem',lineHeight:1.6,color:C.navy}}>
           Across <b>{view.totalBusinesses}</b> business{view.totalBusinesses===1?'':'es'}, <b>{readyCount}</b> {readyCount===1?'is':'are'} investment-ready today
           {perfSum&&perfSum.revenueGrowth.median!==null?<> — median revenue growth is <b style={{color:C.teal}}>{perfSum.revenueGrowth.median>0?'+':''}{perfSum.revenueGrowth.median}%</b></>:null}
@@ -1204,19 +1204,19 @@ function PortfolioIntelligenceHub({clients,programmes}){
       <div className="cv-grid-4" style={{marginBottom:'1.25rem',gap:'0.6rem'}}>
         <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
           <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>{snapshotCount} model{snapshotCount===1?'':'s'}</div>
-          <div style={{fontSize:'0.76rem',color:C.slate}}>Full standardised financial models, not survey estimates.</div>
+          <div style={{fontSize:'0.78rem',color:C.slate}}>Full standardised financial models, not survey estimates.</div>
         </div>
         <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
           <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>90%+</div>
-          <div style={{fontSize:'0.76rem',color:C.slate}}>have no credit-agency rating — the coverage gap we fill.</div>
+          <div style={{fontSize:'0.78rem',color:C.slate}}>have no credit-agency rating — the coverage gap we fill.</div>
         </div>
         <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
           <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>Independent</div>
-          <div style={{fontSize:'0.76rem',color:C.slate}}>Model-derived; no payment relationship with the business rated.</div>
+          <div style={{fontSize:'0.78rem',color:C.slate}}>Model-derived; no payment relationship with the business rated.</div>
         </div>
         <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
           <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>Median-based</div>
-          <div style={{fontSize:'0.76rem',color:C.slate}}>One outlier can't distort a benchmark; only present values are counted.</div>
+          <div style={{fontSize:'0.78rem',color:C.slate}}>One outlier can't distort a benchmark; only present values are counted.</div>
         </div>
       </div>
 
@@ -1276,7 +1276,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
                 <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.84rem',minWidth:680}}>
                   <thead>
                     <tr>{['Sector','Biz','Rule of 40','Gross','EBITDA','Net','Burn','LTV:CAC','Churn','NRR'].map((h,i)=>(
-                      <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.68rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
+                      <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
                     ))}</tr>
                   </thead>
                   <tbody>
@@ -1325,7 +1325,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.84rem',minWidth:640}}>
               <thead>
                 <tr>{['Sector','Biz','Ready','LRS','Growth','Cost','Cover','EBITDA','Weakest'].map((h,i)=>(
-                  <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.68rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0||i===8?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
+                  <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0||i===8?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
                 ))}</tr>
               </thead>
               <tbody>
@@ -1404,7 +1404,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
               <div key={b.label} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'0.3rem'}}>
                 <div style={{fontSize:'0.85rem',color:C.navy,fontWeight:600}}>{b.count}</div>
                 <div style={{width:'100%',height:`${Math.max(4,(b.count/maxCount)*70)}px`,background:C.cyan,borderRadius:'3px 3px 0 0'}}/>
-                <div style={{fontSize:'0.75rem',color:C.slate}}>{b.label}</div>
+                <div style={{fontSize:'0.78rem',color:C.slate}}>{b.label}</div>
               </div>
             )
           })}
@@ -1455,7 +1455,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
         {(data.profiles||[]).length===0
           ? <div style={{color:C.slate,fontSize:'0.9rem'}}>No businesses match the current filter.</div>
           : (()=>{
-              const tierPill=(t:string)=>{const map:any={'Investment Ready':['Ready',C.green],'Near Ready':['Near',C.cyan],'Development Stage':['Dev',C.amber],'Pre-Investment':['Pre',C.red]};const [lbl,col]=map[t]||[t,C.slate];return <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',fontWeight:700,padding:'0.05rem 0.4rem',borderRadius:5,color:col,background:'var(--cv-wa-10)',border:`1px solid ${col}`}}>{lbl}</span>}
+              const tierPill=(t:string)=>{const map:any={'Investment Ready':['Ready',C.green],'Near Ready':['Near',C.cyan],'Development Stage':['Dev',C.amber],'Pre-Investment':['Pre',C.red]};const [lbl,col]=map[t]||[t,C.slate];return <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,padding:'0.05rem 0.4rem',borderRadius:5,color:col,background:'var(--cv-wa-10)',border:`1px solid ${col}`}}>{lbl}</span>}
               const pv=(v:any,unit='',dec=0,sign=false)=> v===null||v===undefined?'—':`${sign&&v>0?'+':''}${(typeof v==='number'?v.toFixed(dec):v)}${unit}`
               const rows=[...(data.profiles||[])].sort((a:any,b:any)=>b.irScore-a.irScore)
               return (
@@ -1463,7 +1463,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.84rem',minWidth:720}}>
                     <thead>
                       <tr>{['Business','Sector','Size','Ready','LRS','Growth','Cost','Cover','EBITDA','Conf.'].map((h,i)=>(
-                        <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.66rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 9px',textAlign:i<=2?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
+                        <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 9px',textAlign:i<=2?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
                       ))}</tr>
                     </thead>
                     <tbody>
@@ -1490,7 +1490,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
 
       {/* DFI risk layer — roadmap */}
       <div style={{...card,background:'var(--cv-tint-amber)',borderLeft:`4px solid ${C.amber}`}}>
-        <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',letterSpacing:'0.12em',textTransform:'uppercase',color:C.amber,fontWeight:700,marginBottom:'0.3rem'}}>Roadmap · DFI risk layer</div>
+        <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',letterSpacing:'0.12em',textTransform:'uppercase',color:C.amber,fontWeight:700,marginBottom:'0.3rem'}}>Roadmap · DFI risk layer</div>
         <div style={{fontSize:'0.94rem',color:C.navy,lineHeight:1.55}}>
           To let a credit committee price risk directly, per-enterprise <b>collateral coverage</b>, <b>working-capital cycle</b>
           (largely derivable from the model), <b>FX exposure</b>, and sector <b>default / recovery proxies</b> — benchmarked to
@@ -1502,7 +1502,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
       <div style={card}>
         <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'0.3rem',flexWrap:'wrap'}}>
           <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>Impact &amp; inclusion</div>
-          <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.7rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>roadmap · to collect</span>
+          <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>roadmap · to collect</span>
         </div>
         <p style={{fontSize:'0.92rem',color:C.slate,lineHeight:1.55,margin:'0 0 0.7rem'}}>
           The reach a donor or impact investor weighs — smallholder farmers and farmer groups reached, and the share of
@@ -1540,7 +1540,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
           <div style={{...card,maxWidth:640,width:'100%',maxHeight:'85vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.9rem'}}>
               <div>
-                <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',fontWeight:700,color:'var(--cv-on-accent)',background:C.navy,borderRadius:20,padding:'0.1rem 0.6rem',marginBottom:'0.4rem',display:'inline-block'}}>LEVEL 3</span>
+                <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,color:'var(--cv-on-accent)',background:C.navy,borderRadius:20,padding:'0.1rem 0.6rem',marginBottom:'0.4rem',display:'inline-block'}}>LEVEL 3</span>
                 <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>{openProfile.displayName}{openProfile.isNamed&&<span style={{marginLeft:'0.5rem'}}><Badge text="Verified" color={C.green}/></span>}</div>
                 <div style={{fontSize:'0.92rem',color:C.slate,marginTop:'0.2rem'}}>{openProfile.sector||'Sector n/a'} · {openProfile.country||'Country n/a'} · {openProfile.sizeBracket}</div>
               </div>
@@ -2183,8 +2183,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         <div style={{...card,background:'var(--cv-header)',color:'var(--cv-on-accent)',marginBottom:'1.25rem'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
             <div>
-              <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.3rem'}}>{CLIENT_TYPE_LABELS[selClient.type]} · {prog?.name||'—'} · Clearview Financial Model</div>
-              <h2 style={{fontFamily:'var(--cv-font)',fontSize:'1.4rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0 0 0.25rem'}}>{selClient.name}</h2>
+              <div style={{fontSize:'0.8rem',fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase',color:C.cyan,marginBottom:'0.45rem',opacity:0.9}}>{CLIENT_TYPE_LABELS[selClient.type]} · {prog?.name||'—'} · Clearview Financial Model</div>
+              <h2 style={{fontFamily:'var(--cv-font)',fontSize:'2.1rem',fontWeight:600,lineHeight:1.15,letterSpacing:'-0.015em',color:'var(--cv-on-accent)',margin:'0 0 0.35rem'}}>{selClient.name}</h2>
               <div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{selClient.contact_name&&`${selClient.contact_name} · `}{selClient.country} · {selClient.sector}</div>
             </div>
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
@@ -2236,8 +2236,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         <div style={{...card,background:'var(--cv-header)',color:'var(--cv-on-accent)',marginBottom:'1.25rem'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
             <div>
-              <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.3rem'}}>{CLIENT_TYPE_LABELS[selClient.type]} \u00b7 {prog?.name||'\u2014'} \u00b7 {isCanvas?'Full GtCV Canvas':'Clearview Financial'}</div>
-              <h2 style={{fontFamily:'var(--cv-font)',fontSize:'1.4rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0 0 0.25rem'}}>{selClient.name}</h2>
+              <div style={{fontSize:'0.8rem',fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase',color:C.cyan,marginBottom:'0.45rem',opacity:0.9}}>{CLIENT_TYPE_LABELS[selClient.type]} \u00b7 {prog?.name||'\u2014'} \u00b7 {isCanvas?'Full GtCV Canvas':'Clearview Financial'}</div>
+              <h2 style={{fontFamily:'var(--cv-font)',fontSize:'2.1rem',fontWeight:600,lineHeight:1.15,letterSpacing:'-0.015em',color:'var(--cv-on-accent)',margin:'0 0 0.35rem'}}>{selClient.name}</h2>
               <div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{selClient.contact_name&&`${selClient.contact_name} \u00b7 `}{selClient.country} \u00b7 {selClient.sector}</div>
             </div>
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
@@ -2312,7 +2312,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                      plain text on the sidebar's own background, with space
                      above it, which is what a heading looks like. */
                   <div style={{padding:'1.15rem 0.85rem 0.4rem'}}>
-                    <div style={{fontSize:'0.68rem',letterSpacing:'.14em',textTransform:'uppercase',color:C.slate,fontWeight:600}}>{groupDef.label}</div>
+                    <div style={{fontSize:'0.78rem',letterSpacing:'.14em',textTransform:'uppercase',color:C.slate,fontWeight:600}}>{groupDef.label}</div>
                     <div style={{fontSize:'0.78rem',color:C.slate,opacity:0.75,marginTop:2,lineHeight:1.35}}>{groupDef.note}</div>
                   </div>
                 ):null}

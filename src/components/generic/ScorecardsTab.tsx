@@ -27,7 +27,7 @@ const C = {
 }
 const CARD: React.CSSProperties = { background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: 14, padding: '1.3rem 1.5rem', marginBottom: '1.35rem' }
 const H = (s = '1.15rem'): React.CSSProperties => ({ fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: s })
-const LABEL: React.CSSProperties = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em', textTransform: 'uppercase', color: C.slate }
+const LABEL: React.CSSProperties = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.04em', textTransform: 'uppercase', color: C.slate }
 
 type Metric = 'new_customers' | 'lead_conversion' | 'prospect_conversion' | 'sales_value' | 'sales_count' | 'repeat_rate' | 'attendance_rate' | 'custom'
 interface Staff { id: string; staff_code: string; full_name: string; department: string; active: boolean }
@@ -204,7 +204,7 @@ export default function ScorecardsTab({ config, clientId, cc, P }: any) {
                                 </div>
                                 {series
                                   ? <div style={{ marginTop: 6 }}><Spark values={series} target={t.target_value} color={tone} /></div>
-                                  : <div style={{ marginTop: 6, fontSize: '0.76rem', color: C.slate, fontStyle: 'italic' }}>
+                                  : <div style={{ marginTop: 6, fontSize: '0.78rem', color: C.slate, fontStyle: 'italic' }}>
                                       {computable ? 'this-period rate' : 'actuals not tracked yet'}
                                     </div>}
                               </div>

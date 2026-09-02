@@ -24,7 +24,7 @@ const FAC_LABELS: Record<string, string> = {
 const card: React.CSSProperties = { background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '1.2rem 1.4rem', marginBottom: '1.15rem' }
 const h2: React.CSSProperties = { fontFamily: 'var(--cv-font)', fontSize: '1.15rem', fontWeight: 700, color: C.navy, margin: '0 0 0.2rem' }
 const lead: React.CSSProperties = { fontSize: '0.9rem', color: C.slate, margin: '0 0 0.9rem' }
-const kicker: React.CSSProperties = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.68rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: C.teal, marginBottom: '0.35rem' }
+const kicker: React.CSSProperties = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: C.teal, marginBottom: '0.35rem' }
 
 const med = (ms: any, unit = '', dec = 0) => ms && ms.median !== null && ms.median !== undefined ? `${ms.median.toFixed(dec)}${unit}` : '—'
 const fmtMoney = (n: number, cc: string) => {
@@ -37,11 +37,11 @@ function Dist({ label, summary, unit, decimals = 0, note, roadmap, roadmapNote }
   if (roadmap) return (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '0.9rem 1rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
-        <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: C.slate, fontWeight: 600 }}>{label}</span>
-        <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.64rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: 20, background: 'var(--cv-tint-amber)', color: C.amber, border: `1px solid ${C.amber}` }}>roadmap</span>
+        <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: C.slate, fontWeight: 600 }}>{label}</span>
+        <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: 20, background: 'var(--cv-tint-amber)', color: C.amber, border: `1px solid ${C.amber}` }}>roadmap</span>
       </div>
       <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.5rem', fontWeight: 700, color: C.slate }}>—</div>
-      <div style={{ fontSize: '0.74rem', color: C.slate, marginTop: 6 }}>{roadmapNote || 'Needs a short per-period customer input.'}</div>
+      <div style={{ fontSize: '0.78rem', color: C.slate, marginTop: 6 }}>{roadmapNote || 'Needs a short per-period customer input.'}</div>
     </div>
   )
   const s = summary
@@ -55,20 +55,20 @@ function Dist({ label, summary, unit, decimals = 0, note, roadmap, roadmapNote }
   const fv = (v: number) => `${v.toFixed(decimals)}${unit || ''}`
   return (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '0.9rem 1rem' }}>
-      <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: C.slate, fontWeight: 600 }}>{label}</div>
+      <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: C.slate, fontWeight: 600 }}>{label}</div>
       <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.5rem', fontWeight: 700, color: C.navy, lineHeight: 1.1 }}>{has ? fv(s.median) : '—'}<span style={{ fontSize: '0.78rem', color: C.slate, fontWeight: 400 }}> median</span></div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 32, marginTop: 6 }}>
         {counts.map((c, i) => <div key={i} style={{ flex: 1, height: `${Math.max(6, (c / cMax) * 100)}%`, background: i === medBin ? C.teal : 'var(--cv-tint-cyan)', borderRadius: '2px 2px 0 0' }} />)}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--cv-font-mono)', fontSize: '0.64rem', color: C.slate, marginTop: 2 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', color: C.slate, marginTop: 2 }}>
         <span>{has ? fv(min) : ''}</span><span>{has ? fv(max) : ''}</span>
       </div>
-      <div style={{ fontSize: '0.74rem', color: C.slate, marginTop: 4 }}>{has ? `${s.count} business${s.count === 1 ? '' : 'es'}` : 'no data yet'}{note ? ` · ${note}` : ''}</div>
+      <div style={{ fontSize: '0.78rem', color: C.slate, marginTop: 4 }}>{has ? `${s.count} business${s.count === 1 ? '' : 'es'}` : 'no data yet'}{note ? ` · ${note}` : ''}</div>
     </div>
   )
 }
 
-const thStyle = (left: boolean): React.CSSProperties => ({ background: C.navy, color: C.navyOn, fontFamily: 'var(--cv-font-mono)', fontSize: '0.66rem', textTransform: 'uppercase', letterSpacing: '0.03em', padding: '8px 9px', textAlign: left ? 'left' : 'right', whiteSpace: 'nowrap' })
+const thStyle = (left: boolean): React.CSSProperties => ({ background: C.navy, color: C.navyOn, fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.03em', padding: '8px 9px', textAlign: left ? 'left' : 'right', whiteSpace: 'nowrap' })
 const tdStyle = (left: boolean, bold = false): React.CSSProperties => ({ padding: '7px 9px', textAlign: left ? 'left' : 'right', color: bold ? C.navy : C.slate, fontWeight: bold ? 700 : 400 })
 
 export default function MarketIntelligenceReport({ data, scopeDescription }: { data: any; scopeDescription?: string }) {
@@ -86,7 +86,7 @@ export default function MarketIntelligenceReport({ data, scopeDescription }: { d
     <div>
       {/* Header */}
       <div style={{ background: 'linear-gradient(160deg,var(--cv-navy),#22344f)', color: '#eef4f7', borderRadius: 14, padding: '1.5rem 1.7rem', marginBottom: '1.15rem', borderBottom: `3px solid ${C.cyan}` }}>
-        <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.68rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: C.cyan }}>ClearView · Market Intelligence</div>
+        <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: C.cyan }}>ClearView · Market Intelligence</div>
         <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.7rem', fontWeight: 700, margin: '0.3rem 0 0.2rem' }}>Portfolio Performance &amp; Investability</div>
         <div style={{ color: '#b9c7d4', fontSize: '0.9rem' }}>{scopeDescription || 'Whole portfolio'} · {view.totalBusinesses} business{view.totalBusinesses === 1 ? '' : 'es'}</div>
       </div>
@@ -110,7 +110,7 @@ export default function MarketIntelligenceReport({ data, scopeDescription }: { d
           ['Median-based', "One outlier can't distort a benchmark; only present values are counted."]].map(([t, d], i) => (
           <div key={i} style={{ background: 'var(--cv-tint-cyan)', border: `1px solid ${C.border}`, borderRadius: 10, padding: '0.75rem 0.9rem' }}>
             <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.15rem', fontWeight: 700, color: C.navy }}>{t}</div>
-            <div style={{ fontSize: '0.74rem', color: C.slate }}>{d}</div>
+            <div style={{ fontSize: '0.78rem', color: C.slate }}>{d}</div>
           </div>
         ))}
       </div>
@@ -241,7 +241,7 @@ export default function MarketIntelligenceReport({ data, scopeDescription }: { d
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 8 }}>
                 {Object.entries(view.currentFundAbsorption[cc]).map(([type, val]: any) => (
                   <div key={type} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '0.6rem 0.7rem' }}>
-                    <div style={{ fontSize: '0.76rem', color: C.slate }}>{FAC_LABELS[type] || type}</div>
+                    <div style={{ fontSize: '0.78rem', color: C.slate }}>{FAC_LABELS[type] || type}</div>
                     <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.05rem', fontWeight: 700, color: C.navy }}>{val === null ? 'n/a' : fmtMoney(val, cc)}</div>
                   </div>
                 ))}
@@ -295,7 +295,7 @@ export default function MarketIntelligenceReport({ data, scopeDescription }: { d
         </p>
       </div>
 
-      <div style={{ textAlign: 'center', fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', color: C.slate, padding: '1rem 0 2rem' }}>
+      <div style={{ textAlign: 'center', fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', color: C.slate, padding: '1rem 0 2rem' }}>
         Confidential · Powered by Canvas Coach · ClearView
       </div>
     </div>

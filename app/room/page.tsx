@@ -501,7 +501,7 @@ export default function RoomPage() {
             ].map((f) => (
               <label key={f.label} style={{ display: 'block', marginBottom: '0.8rem' }}>
                 <span style={{
-                  display: 'block', fontSize: '0.75rem', letterSpacing: '.08em',
+                  display: 'block', fontSize: '0.78rem', letterSpacing: '.08em',
                   textTransform: 'uppercase', color: C.slate, marginBottom: '0.25rem',
                 }}>{f.label}</span>
                 <input
@@ -570,7 +570,7 @@ export default function RoomPage() {
             and none of it needing a scroll. The fault this replaces was a
             question floating with nothing to say what it belonged to. */}
         <div style={{
-          fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '.06em',
+          fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '.06em',
           textTransform: 'uppercase', color: C.slate, marginBottom: '0.5rem',
           lineHeight: 1.6,
         }}>
@@ -718,7 +718,7 @@ function CollectInput({
       {fields.map((f) => (
         <label key={f.column} style={{ display: 'block', marginBottom: '0.8rem' }}>
           <span style={{
-            display: 'block', fontSize: '0.75rem', letterSpacing: '.08em',
+            display: 'block', fontSize: '0.78rem', letterSpacing: '.08em',
             textTransform: 'uppercase', color: C.slate, marginBottom: '0.25rem',
           }}>{f.heading}</span>
           <input

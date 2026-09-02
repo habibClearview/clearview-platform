@@ -87,9 +87,14 @@ export type DPStatus = '○' | '◐' | '✓' | '⚠'
 
 export function statusLabel(s: string): string {
   const m: Record<string, string> = {
-    setup:'Setup', phase_0:'Phase 0',
-    dp01:'DP01', dp02:'DP02', dp03:'DP03', dp04:'DP04', dp05:'DP05',
-    dp06:'DP06', dp07:'DP07', dp08:'DP08', dp09:'DP09',
+    // 2 September 2026. These read "DP03" — a code, sitting next to the
+    // client's name where a person expects words. Every zone in this method IS
+    // a decision point with a decision gate, so that is what it is called here
+    // and everywhere else. The code survives as the key, not as the label.
+    setup:'Setup', phase_0:'Clearing the ground',
+    dp01:'Decision Point 1', dp02:'Decision Point 2', dp03:'Decision Point 3',
+    dp04:'Decision Point 4', dp05:'Decision Point 5', dp06:'Decision Point 6',
+    dp07:'Decision Point 7', dp08:'Decision Point 8', dp09:'Decision Point 9',
     complete:'Complete', paused:'Paused',
   }
   return m[s] || s
@@ -365,7 +370,7 @@ export interface CoachState {
 // a sequence of steps, which is why the items inside carry no running number.
 export const TAB_GROUPS = [
   { id: 'engagement', label: 'This engagement', note: 'Where you start and what governs it' },
-  { id: 'work', label: 'The work', note: 'The eleven zones, in order' },
+  { id: 'work', label: 'The work', note: 'Eleven decision points, in order. Each closes at a gate.' },
   { id: 'record', label: 'The record', note: 'What you show a funder' },
   { id: 'notes', label: 'Your notes', note: 'Yours. The client never sees these' },
 ] as const
@@ -397,15 +402,15 @@ export const CANVAS_TABS = [
   { id: 'sessions',     label: 'Sessions and rooms',        marker: '5',  group: 'engagement', teamOnly: true },
 
   { id: 'phase0',       label: 'Clearing the ground',       marker: 'P0', group: 'work', dpId: 'phase_0' },
-  { id: 'dp01',         label: 'Service Reality',      marker: '1',  group: 'work', dpId: 'dp01' },
-  { id: 'dp02',         label: 'Customer Clarity',     marker: '2',  group: 'work', dpId: 'dp02' },
-  { id: 'dp03',         label: 'Value Proposition',    marker: '3',  group: 'work', dpId: 'dp03' },
-  { id: 'dp04',         label: 'Viability Model',      marker: '4',  group: 'work', dpId: 'dp04' },
-  { id: 'dp05',         label: 'Market Entry',         marker: '5',  group: 'work', dpId: 'dp05' },
-  { id: 'dp06',         label: 'Identity and Partners', marker: '6', group: 'work', dpId: 'dp06' },
-  { id: 'dp07',         label: 'Pilot and Learn',      marker: '7',  group: 'work', dpId: 'dp07' },
-  { id: 'dp08',         label: 'Scale Pathway',        marker: '8',  group: 'work', dpId: 'dp08' },
-  { id: 'dp09',         label: 'Commercial Readiness',            marker: '9',  group: 'work', dpId: 'dp09' },
+  { id: 'dp01',         label: 'Decision Point 1 · Service Reality',      marker: '1',  group: 'work', dpId: 'dp01' },
+  { id: 'dp02',         label: 'Decision Point 2 · Customer Clarity',     marker: '2',  group: 'work', dpId: 'dp02' },
+  { id: 'dp03',         label: 'Decision Point 3 · Value Proposition',    marker: '3',  group: 'work', dpId: 'dp03' },
+  { id: 'dp04',         label: 'Decision Point 4 · Viability Model',      marker: '4',  group: 'work', dpId: 'dp04' },
+  { id: 'dp05',         label: 'Decision Point 5 · Market Entry',         marker: '5',  group: 'work', dpId: 'dp05' },
+  { id: 'dp06',         label: 'Decision Point 6 · Identity and Partners', marker: '6', group: 'work', dpId: 'dp06' },
+  { id: 'dp07',         label: 'Decision Point 7 · Pilot and Learn',      marker: '7',  group: 'work', dpId: 'dp07' },
+  { id: 'dp08',         label: 'Decision Point 8 · Scale Pathway',        marker: '8',  group: 'work', dpId: 'dp08' },
+  { id: 'dp09',         label: 'Decision Point 9 · Commercial Readiness',            marker: '9',  group: 'work', dpId: 'dp09' },
   { id: 'handover',     label: 'Handover',                  marker: 'HO', group: 'work', dpId: 'handover' },
 
   { id: 'tracker',      label: 'Engagement Tracker',        marker: '1',  group: 'record' },
@@ -416,7 +421,7 @@ export const CANVAS_TABS = [
   { id: 'how_to_start', label: 'How to start',              marker: '1',  group: 'notes' },
   { id: 'coach_ref',    label: 'Coach Quick Reference',     marker: '2',  group: 'notes', coachOnly: true },
   { id: 'ip_framework', label: 'The method, in full',       marker: '3',  group: 'notes' },
-  { id: 'diagnostic',   label: 'Pre-engagement diagnostic', marker: '4',  group: 'notes', teamOnly: true },
+  { id: 'diagnostic',   label: 'Pre-engagement diagnostic', marker: '4',  group: 'notes' },
 ]
 
 // ─── READINESS QUESTIONS ─────────────────────────────────────
