@@ -31,7 +31,7 @@ const C = {
   navy: 'var(--cv-navy)', teal: 'var(--cv-teal)', green: 'var(--cv-green)',
   amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
 const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.45 }
 const field = {
   width: '100%', padding: '0.42rem 0.55rem', borderRadius: 7,
@@ -39,7 +39,7 @@ const field = {
   // border alone was faint enough that the placeholder looked like body text
   // and the field looked like a caption rather than something to type in.
   border: `1px solid ${C.border}`, background: 'var(--cv-card)', color: 'inherit',
-  fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: '0.92rem',
+  fontFamily: "var(--cv-font)", fontSize: '0.92rem',
 }
 const btn = (col, solid) => ({
   ...mono, fontSize: '0.84rem', fontWeight: 600, padding: '0.36rem 0.8rem',

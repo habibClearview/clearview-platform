@@ -64,9 +64,9 @@ const C = {
   purple: 'var(--cv-purple)', alt: 'var(--cv-alt)',
 }
 const card = { background: C.white, border: '1px solid var(--cv-border-soft)', borderRadius: 14, padding: '1.25rem 1.4rem', marginBottom: '1.1rem', boxShadow: '0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)' }
-const secH = { fontFamily: 'Georgia,serif', fontSize: '1.25rem', fontWeight: 700, color: C.navy, margin: 0 }
+const secH = { fontFamily: 'var(--cv-font)', fontSize: '1.25rem', fontWeight: 700, color: C.navy, margin: 0 }
 const hint = { fontSize: '0.9rem', color: C.slate, lineHeight: 1.45 }
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
 const lbl = { display: 'block', fontWeight: 600, fontSize: '0.86rem', marginBottom: '0.2rem', color: C.navy }
 const inp = { width: '100%', padding: '0.36rem 0.55rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '0.9rem', fontFamily: 'inherit', background: 'var(--cv-bg-2)', color: C.navy, boxSizing: 'border-box' }
 const area = { ...inp, minHeight: 62, resize: 'vertical', lineHeight: 1.4 }
@@ -217,7 +217,7 @@ export default function PilotCapture({ clientId, canManage }) {
           <span style={{ ...mono, fontSize: '0.76rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: 4, background: Number(r.iteration) === 2 ? C.purple : C.cyan, color: 'var(--cv-on-accent)' }}>
             ITERATION {r.iteration} / CLIENT {r.client_number}
           </span>
-          <span style={{ fontFamily: 'Georgia,serif', fontWeight: 700, color: C.navy }}>
+          <span style={{ fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy }}>
             {r.session_title || r.pilot_client_label || 'Untitled pilot session'}
           </span>
           <span style={{ ...mono, fontSize: '0.8rem', color: C.slate }}>{r.session_date || 'no date'}</span>
@@ -370,7 +370,7 @@ export default function PilotCapture({ clientId, canManage }) {
       <div key={s.iteration} style={{ background: 'var(--cv-bg-2)', border: '1px solid var(--cv-border-soft)', borderRadius: 12, borderTop: `3px solid ${accent}`, padding: '0.95rem 1.05rem' }}>
         <div style={{ ...mono, fontSize: '0.76rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: accent, fontWeight: 700 }}>Iteration {s.iteration}</div>
         <div style={{ ...hint, marginTop: '0.15rem' }}>{ITERATION_RULE[s.iteration].summary}</div>
-        <div style={{ fontFamily: 'Georgia,serif', fontSize: '2rem', fontWeight: 700, color: C.navy, marginTop: '0.5rem', lineHeight: 1.1 }}>
+        <div style={{ fontFamily: 'var(--cv-font)', fontSize: '2rem', fontWeight: 700, color: C.navy, marginTop: '0.5rem', lineHeight: 1.1 }}>
           {s.viability === null ? '-' : s.viability.toFixed(1)}
           <span style={{ fontSize: '0.9rem', color: C.slate, fontWeight: 400 }}> of 5 average viability</span>
         </div>
@@ -445,7 +445,7 @@ export default function PilotCapture({ clientId, canManage }) {
               <div style={{ ...mono, fontSize: '0.72rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: C.slate }}>
                 Iteration {c.iteration}, client {c.clientNumber}
               </div>
-              <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.4rem', fontWeight: 700, color: c.count ? C.navy : C.slate, lineHeight: 1.2 }}>
+              <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.4rem', fontWeight: 700, color: c.count ? C.navy : C.slate, lineHeight: 1.2 }}>
                 {c.count} session{c.count === 1 ? '' : 's'}
               </div>
               {c.count === 0 && <div style={{ ...hint, fontSize: '0.78rem' }}>Not captured yet</div>}

@@ -36,15 +36,15 @@ const C = {
   lightBg:'var(--cv-alt)',
 }
 const card: React.CSSProperties = {background:C.white,border:'1px solid var(--cv-border-soft)',borderRadius:14,padding:'1.4rem 1.6rem',marginBottom:'1.35rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)'}
-const secH: React.CSSProperties = {fontFamily:'Georgia,serif',fontSize:'1.32rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
+const secH: React.CSSProperties = {fontFamily:'var(--cv-font)',fontSize:'1.32rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
 const inp:  React.CSSProperties = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'1.06rem',fontFamily:'inherit',background:'var(--cv-bg-2)',color:C.navy,boxSizing:'border-box'}
 const lbl:  React.CSSProperties = {display:'block',fontWeight:600,fontSize:'1.0rem',marginBottom:'0.22rem',color:C.navy}
 const fGrid:React.CSSProperties = {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:'1.1rem'}
-const addBtn = (sm=false, col=C.cyan): React.CSSProperties => ({fontFamily:'monospace',fontSize:sm?'0.84rem':'0.88rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:4,background:'transparent',color:col,cursor:'pointer'})
-const solidBtn = (col=C.cyan, sm=false): React.CSSProperties => ({fontFamily:'monospace',fontSize:sm?'0.88rem':'0.94rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:4,background:col,color:'var(--cv-on-accent)',cursor:'pointer'})
+const addBtn = (sm=false, col=C.cyan): React.CSSProperties => ({fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.84rem':'0.88rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:4,background:'transparent',color:col,cursor:'pointer'})
+const solidBtn = (col=C.cyan, sm=false): React.CSSProperties => ({fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.88rem':'0.94rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:4,background:col,color:'var(--cv-on-accent)',cursor:'pointer'})
 
 function navBtn(active: boolean): React.CSSProperties {
-  return {fontFamily:'monospace',fontSize:'0.96rem',padding:'0.65rem 1rem',border:'none',background:'transparent',
+  return {fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',padding:'0.65rem 1rem',border:'none',background:'transparent',
     color:active?C.cyan:'var(--cv-wa-60)',cursor:'pointer',
     borderBottom:active?`3px solid ${C.cyan}`:'3px solid transparent',
     fontWeight:active?700:400,whiteSpace:'nowrap'}
@@ -54,15 +54,15 @@ function KPI({label,value,sub,color}:{label:string;value:string;sub?:string;colo
   const accent = color || C.cyan
   return (
     <div style={{background:C.white,borderRadius:14,padding:'1.15rem 1.3rem 1.25rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}>
-      <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.14em',color:C.slate,textTransform:'uppercase',marginBottom:'0.45rem'}}>{label}</div>
-      <div style={{fontFamily:'Georgia,serif',fontSize:'1.75rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>
+      <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.09rem',letterSpacing:'0.14em',color:C.slate,textTransform:'uppercase',marginBottom:'0.45rem'}}>{label}</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.75rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>
       {sub&&<div style={{fontSize:'1.0rem',color:C.slate,marginTop:'0.32rem'}}>{sub}</div>}
     </div>
   )
 }
 
 function Badge({text,color}:{text:string;color?:string}) {
-  return <span style={{fontFamily:'monospace',fontSize:'0.88rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>
+  return <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>
 }
 
 function Spinner({label}:{label?:string}) {
@@ -254,7 +254,7 @@ function FunnelTab({ clientId, P, cc }: { clientId: string; P: any; cc: string }
       <div style={card}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'1rem',flexWrap:'wrap',marginBottom: (showForm ? '1rem' : 0)}}>
           <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap'}}>
-            <span style={{fontFamily:'monospace',fontSize:'0.96rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.08em'}}>Recruiter</span>
+            <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.08em'}}>Recruiter</span>
             <select style={{...inp,width:'auto',minWidth:180}} value={officerFilter} onChange={e=>setOfficerFilter(e.target.value)}>
               <option value="__all__">All recruiters</option>
               {officers.map(o => <option key={o} value={o}>{o}</option>)}
@@ -310,13 +310,13 @@ function FunnelTab({ clientId, P, cc }: { clientId: string; P: any; cc: string }
                 {byOfficer.map((r,i)=>(
                   <tr key={r.officer} style={{background:i%2===0?C.cream:C.white}}>
                     <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{r.officer}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace'}}>{r.lead}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace'}}>{r.prospect}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',color:C.green,fontWeight:700}}>{r.client}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace'}}>{r.total}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',color:C.slate}}>{pct(r.prospect + r.client, r.total)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',color:C.slate}}>{pct(r.client, r.prospect + r.client)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:700,color:C.navy}}>{pct(r.client, r.total)}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)'}}>{r.lead}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)'}}>{r.prospect}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',color:C.green,fontWeight:700}}>{r.client}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)'}}>{r.total}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',color:C.slate}}>{pct(r.prospect + r.client, r.total)}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',color:C.slate}}>{pct(r.client, r.prospect + r.client)}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.navy}}>{pct(r.client, r.total)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -343,7 +343,7 @@ function FunnelTab({ clientId, P, cc }: { clientId: string; P: any; cc: string }
                   .map((r,i)=>(
                     <tr key={i} style={{background:i%2===0?C.cream:C.white}}>
                       <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{r.name}</td>
-                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',color:C.green,fontWeight:700}}>{cc} {Math.round(r.amt).toLocaleString()}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',color:C.green,fontWeight:700}}>{cc} {Math.round(r.amt).toLocaleString()}</td>
                     </tr>
                   ))}
               </tbody>
@@ -354,7 +354,7 @@ function FunnelTab({ clientId, P, cc }: { clientId: string; P: any; cc: string }
 
       {/* Lead list with stage advance */}
       <div style={card}>
-        <div style={secH}>Leads {officerFilter !== '__all__' && <span style={{fontFamily:'monospace',fontSize:'0.9rem',color:C.slate}}>· filtered</span>}</div>
+        <div style={secH}>Leads {officerFilter !== '__all__' && <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.9rem',color:C.slate}}>· filtered</span>}</div>
         {loading ? <Spinner/> : visible.length === 0 ? (
           <Empty>{leads.length === 0 ? 'No leads yet.' : 'No leads match this officer filter.'}</Empty>
         ) : (
@@ -383,7 +383,7 @@ function FunnelTab({ clientId, P, cc }: { clientId: string; P: any; cc: string }
                         {busyId===l.id ? '…' : `→ ${STAGE_LABEL[next].replace(/s$/,'')}`}
                       </button>
                     )}
-                    {!next && <span style={{fontFamily:'monospace',fontSize:'0.84rem',color:C.green}}>✓ converted</span>}
+                    {!next && <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.84rem',color:C.green}}>✓ converted</span>}
                   </div>
                 </div>
               )
@@ -432,7 +432,7 @@ function CustomersTab({ clientId }: { clientId: string }) {
   return (
     <div style={card}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'1rem',flexWrap:'wrap',marginBottom:'1rem'}}>
-        <div style={secH}>Customers <span style={{fontFamily:'monospace',fontSize:'1rem',color:C.slate}}>· {rows.length}</span></div>
+        <div style={secH}>Customers <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1rem',color:C.slate}}>· {rows.length}</span></div>
         {rows.length > 0 && <input style={{...inp,width:'auto',minWidth:220}} placeholder="Search name, phone, village" value={q} onChange={e=>setQ(e.target.value)}/>}
       </div>
       {loading ? <Spinner/> : error ? (
@@ -455,7 +455,7 @@ function CustomersTab({ clientId }: { clientId: string }) {
               {filtered.map((r,i)=>(
                 <tr key={r.id} style={{background:i%2===0?C.cream:C.white}}>
                   <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{r.name || '—'}</td>
-                  <td style={{padding:'8px 10px',fontFamily:'monospace',color:C.slate}}>{r.phone || '—'}</td>
+                  <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)',color:C.slate}}>{r.phone || '—'}</td>
                   <td style={{padding:'8px 10px',color:C.slate}}>{r.village || '—'}</td>
                 </tr>
               ))}
@@ -547,10 +547,10 @@ function CampaignsTab({ clientId, fmt }: { clientId: string; fmt: (n:any)=>strin
                 {channelRows.map((r,i)=>(
                   <tr key={r.channel} style={{background:i%2===0?C.cream:C.white}}>
                     <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{r.channel}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace'}}>{r.events}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace'}}>{fmt(r.cost)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace'}}>{r.customers}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:700,color:r.cac===null?C.slate:C.navy}}>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)'}}>{r.events}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)'}}>{fmt(r.cost)}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)'}}>{r.customers}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:r.cac===null?C.slate:C.navy}}>
                       {r.cac===null ? 'No customers recorded' : fmt(r.cac)}
                     </td>
                   </tr>

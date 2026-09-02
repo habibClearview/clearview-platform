@@ -31,12 +31,12 @@ const C = {
   slate: 'var(--cv-slate)', navy: 'var(--cv-navy)', teal: 'var(--cv-teal)',
   green: 'var(--cv-green)', amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
 const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
 const field = {
   width: '100%', padding: '0.42rem 0.55rem', borderRadius: 7,
   border: `1px solid ${C.border}`, background: 'transparent', color: 'inherit',
-  fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: '0.92rem',
+  fontFamily: "var(--cv-font)", fontSize: '0.92rem',
 }
 const btn = (col, solid) => ({
   ...mono, fontSize: '0.83rem', fontWeight: 600, padding: '0.34rem 0.78rem',

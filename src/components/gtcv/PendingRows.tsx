@@ -54,8 +54,8 @@ const C = {
   tint: '#FBF7EE',
 }
 
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
-const sans = "'Segoe UI',system-ui,sans-serif"
+const mono = { fontFamily: 'var(--cv-font-mono)' }
+const sans = "var(--cv-font)"
 
 export default function PendingRows({
   clientId, dpId, canManage, tool = null,

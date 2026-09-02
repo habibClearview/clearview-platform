@@ -35,12 +35,12 @@ const C = {
   slate: 'var(--cv-slate)', navy: 'var(--cv-navy)', teal: 'var(--cv-teal)',
   green: 'var(--cv-green)', amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
 const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
 const cell = {
   width: '100%', padding: '0.5rem 0.6rem', borderRadius: 8,
   border: `1px solid ${C.border}`, background: 'transparent', color: 'inherit',
-  fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: '0.93rem', lineHeight: 1.5,
+  fontFamily: "var(--cv-font)", fontSize: '0.93rem', lineHeight: 1.5,
 }
 const btn = (col, solid) => ({
   ...mono, fontSize: '0.83rem', fontWeight: 600, padding: '0.34rem 0.8rem',
@@ -195,7 +195,7 @@ export default function HandoverIndependence({ clientId, canManage }) {
             Done unaided
           </div>
           <div style={{
-            fontFamily: 'Georgia,serif', fontSize: '1.5rem', fontWeight: 600,
+            fontFamily: 'var(--cv-font)', fontSize: '1.5rem', fontWeight: 600,
             color: independent ? C.green : passed > 0 ? C.amber : C.slate,
             fontVariantNumeric: 'tabular-nums',
           }}>{passed} of {INDEPENDENCE_TESTS.length}</div>
@@ -232,7 +232,7 @@ export default function HandoverIndependence({ clientId, canManage }) {
                   <div style={{ ...mono, fontSize: '0.68rem', letterSpacing: '.12em', textTransform: 'uppercase', color: C.slate }}>
                     Test {number} · {t.category}
                   </div>
-                  <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.05rem', fontWeight: 600, color: C.navy, marginTop: 2 }}>
+                  <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.05rem', fontWeight: 600, color: C.navy, marginTop: 2 }}>
                     {t.label}
                   </div>
                   <p style={{ ...hint, margin: '0.2rem 0 0' }}>{t.description}</p>

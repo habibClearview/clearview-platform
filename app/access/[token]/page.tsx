@@ -132,7 +132,7 @@ export default function AccessGrantPage() {
     setSubmitting(false)
   }
 
-  const page: React.CSSProperties = { minHeight: '100vh', background: C.cream, fontFamily: "'Segoe UI',system-ui,sans-serif" }
+  const page: React.CSSProperties = { minHeight: '100vh', background: C.cream, fontFamily: "var(--cv-font)" }
   const wrap: React.CSSProperties = { maxWidth: 640, margin: '0 auto', padding: '2rem 1.5rem' }
   const card: React.CSSProperties = { background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '1.75rem 2rem', boxShadow: '0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)' }
   const inputStyle: React.CSSProperties = { width: '100%', maxWidth: 360, padding: '0.55rem 0.7rem', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: '0.95rem' }
@@ -153,12 +153,12 @@ export default function AccessGrantPage() {
   // dashboard scoped to this grant, with Word download and print-to-PDF.
   if (phase === 'view' && report) {
     return (
-      <div style={{ minHeight: '100vh', background: C.cream, fontFamily: "'Segoe UI',system-ui,sans-serif" }}>
+      <div style={{ minHeight: '100vh', background: C.cream, fontFamily: "var(--cv-font)" }}>
         <style>{`@media print{ .mi-noprint{display:none!important} body{background:#fff} .mi-access-report{-webkit-print-color-adjust:exact;print-color-adjust:exact} }`}</style>
         <div className="mi-noprint" style={{ background: C.header, borderBottom: '3px solid var(--cv-cyan)' }}>
           <div style={{ maxWidth: 1080, margin: '0 auto', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.7rem' }}>
             <div style={{ color: '#fff' }}>
-              <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.15rem', fontWeight: 700 }}>Canvas Coach ClearView</div>
+              <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.15rem', fontWeight: 700 }}>Canvas Coach ClearView</div>
               <div style={{ fontSize: '0.85rem', color: 'var(--cv-wa-85)' }}>{info.granteeName} · {report.scopeDescription}</div>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -179,13 +179,13 @@ export default function AccessGrantPage() {
   return (
     <div style={page}>
       <div style={{ background: C.header, padding: '1.5rem 0', marginBottom: '2rem' }}>
-        <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 1.5rem', color: '#fff', fontFamily: 'Georgia,serif', fontSize: '1.3rem', fontWeight: 700 }}>
+        <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 1.5rem', color: '#fff', fontFamily: 'var(--cv-font)', fontSize: '1.3rem', fontWeight: 700 }}>
           Canvas Coach ClearView
         </div>
       </div>
       <div style={wrap}>
         <div style={card}>
-          <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.3rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+          <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.3rem', fontWeight: 700, marginBottom: '0.4rem' }}>
             You've been granted access
           </div>
           <div style={{ color: C.slate, fontSize: '0.98rem', marginBottom: '1.2rem' }}>

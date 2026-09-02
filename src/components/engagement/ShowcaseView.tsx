@@ -26,9 +26,9 @@ const CSS = `
   --ink:#1B2A41; --ink-soft:#4C5A6B; --ink-faint:#8B8272;
   --line:rgba(27,42,65,.16);
   --gold:#B7791F; --navy:#22344F; --teal:#00767A; --purple:#6B4A8B;
-  --fd:Georgia,"Times New Roman",serif;
-  --fb:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
-  --fm:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --fd:var(--cv-font);
+  --fb:var(--cv-font);
+  --fm:var(--cv-font);
   background:var(--paper); color:var(--ink); font-family:var(--fb);
   line-height:1.55; min-height:100vh; padding:0 20px 70px;
   -webkit-font-smoothing:antialiased;

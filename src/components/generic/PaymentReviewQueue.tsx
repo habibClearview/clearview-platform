@@ -114,7 +114,7 @@ export default function PaymentReviewQueue({ clientId }: PaymentReviewQueueProps
 
   return (
     <div>
-      <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.1rem', fontWeight: 700, color: C.navy, marginBottom: '0.3rem' }}>
+      <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.1rem', fontWeight: 700, color: C.navy, marginBottom: '0.3rem' }}>
         Payments to review
       </div>
       <div style={{ color: C.slate, fontSize: '0.9rem', marginBottom: '1rem', maxWidth: 640 }}>
@@ -138,7 +138,7 @@ export default function PaymentReviewQueue({ clientId }: PaymentReviewQueueProps
               <div key={t.id} style={{ background: C.card, borderTop: i === 0 ? 'none' : `1px solid ${C.border}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '0.85rem 1.1rem', flexWrap: 'wrap' }}>
                   <div>
-                    <div style={{ fontWeight: 700, color: C.navy, fontFamily: 'monospace' }}>{(t.currency || 'UGX')} {(Number(t.amount) || 0).toLocaleString()}</div>
+                    <div style={{ fontWeight: 700, color: C.navy, fontFamily: 'var(--cv-font-mono)' }}>{(t.currency || 'UGX')} {(Number(t.amount) || 0).toLocaleString()}</div>
                     <div style={{ color: C.slate, fontSize: '0.8rem' }}>{t.provider_id} · {new Date(t.occurred_at).toLocaleString()}</div>
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -159,7 +159,7 @@ export default function PaymentReviewQueue({ clientId }: PaymentReviewQueueProps
                         {candidates.map(c => (
                           <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.7rem', background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, flexWrap: 'wrap', gap: '0.5rem' }}>
                             <div style={{ fontSize: '0.88rem' }}>
-                              <span style={{ fontFamily: 'monospace', fontWeight: 700, color: c.amount === t.amount ? C.green : C.navy }}>{c.amount.toLocaleString()}</span>
+                              <span style={{ fontFamily: 'var(--cv-font-mono)', fontWeight: 700, color: c.amount === t.amount ? C.green : C.navy }}>{c.amount.toLocaleString()}</span>
                               <span style={{ color: C.slate, marginLeft: '0.6rem' }}>{c.transaction_date} · {c.business_unit_id}</span>
                               {c.amount === t.amount && <span style={{ marginLeft: '0.6rem', color: C.green, fontSize: '0.8rem' }}>exact amount match</span>}
                             </div>
@@ -182,6 +182,6 @@ export default function PaymentReviewQueue({ clientId }: PaymentReviewQueueProps
 
 function btn(color: string, solid = false): React.CSSProperties {
   return solid
-    ? { fontFamily: 'monospace', fontSize: '0.82rem', fontWeight: 700, padding: '0.3rem 0.7rem', border: 'none', borderRadius: 6, background: color, color: 'var(--cv-on-accent)', cursor: 'pointer' }
-    : { fontFamily: 'monospace', fontSize: '0.82rem', padding: '0.3rem 0.7rem', border: `1px solid ${color}`, borderRadius: 6, background: 'transparent', color, cursor: 'pointer' }
+    ? { fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', fontWeight: 700, padding: '0.3rem 0.7rem', border: 'none', borderRadius: 6, background: color, color: 'var(--cv-on-accent)', cursor: 'pointer' }
+    : { fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', padding: '0.3rem 0.7rem', border: `1px solid ${color}`, borderRadius: 6, background: 'transparent', color, cursor: 'pointer' }
 }

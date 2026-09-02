@@ -42,20 +42,20 @@ const C = {
   disabled: 'var(--cv-disabled)', bg2: 'var(--cv-bg-2)',
 }
 
-const wrap = { fontFamily: "'Segoe UI',system-ui,-apple-system,sans-serif", color: C.navy }
+const wrap = { fontFamily: "var(--cv-font)", color: C.navy }
 const panel = { background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: 14, boxShadow: '0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)', overflow: 'hidden', marginBottom: '1.25rem' }
 const panelHead = { background: C.header, color: 'var(--cv-on-accent)', padding: '0.85rem 1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }
 const panelBody = { padding: '1.1rem 1.2rem 1.3rem' }
 const tableWrap = { overflowX: 'auto' }
 const table = { width: '100%', borderCollapse: 'collapse', fontSize: '0.93rem', minWidth: 900 }
-const th = { padding: '0.5rem 0.55rem', textAlign: 'left', fontFamily: 'monospace', fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
+const th = { padding: '0.5rem 0.55rem', textAlign: 'left', fontFamily: 'var(--cv-font-mono)', fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
 const td = { padding: '0.5rem 0.5rem', verticalAlign: 'top', borderBottom: `1px solid ${C.borderSoft}` }
 const inputBase = { width: '100%', padding: '0.4rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '0.9rem', fontFamily: 'inherit', background: C.bg2, color: C.navy, boxSizing: 'border-box', resize: 'vertical' }
 const roBox = { ...inputBase, background: C.disabled, minHeight: 32, whiteSpace: 'pre-wrap' }
 const emptyNote = { fontSize: '0.93rem', color: C.faint, padding: '0.7rem 0' }
 
 function pill(bg, fg) {
-  return { fontFamily: 'monospace', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.04em', padding: '0.22rem 0.6rem', borderRadius: 999, background: bg, color: fg, display: 'inline-block', whiteSpace: 'nowrap' }
+  return { fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.04em', padding: '0.22rem 0.6rem', borderRadius: 999, background: bg, color: fg, display: 'inline-block', whiteSpace: 'nowrap' }
 }
 function noteBox(border, bg) {
   return { border: `1px solid ${border}`, background: bg, borderRadius: 8, padding: '0.65rem 0.85rem', fontSize: '0.9rem', color: C.navy, lineHeight: 1.45 }
@@ -116,7 +116,7 @@ function SaveIndicator({ state, message }) {
   }
   const m = map[state] || map.idle
   return (
-    <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: m.color, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+    <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', color: m.color, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
       <span style={{ width: 8, height: 8, borderRadius: '50%', background: m.color, display: 'inline-block' }} />
       {m.text}
     </span>
@@ -137,14 +137,14 @@ function ScoreCell({ row, canManage, message, onScore, onEvidence, ariaLabel }) 
       {canManage ? (
         <select
           aria-label={ariaLabel || 'Score'}
-          style={{ ...inputBase, fontFamily: 'monospace' }}
+          style={{ ...inputBase, fontFamily: 'var(--cv-font-mono)' }}
           value={score}
           onChange={(e) => onScore(num(e.target.value), local)}
         >
           {[0, 1, 2, 3].map((n) => <option key={n} value={n}>{SCORE_LABELS[n]}</option>)}
         </select>
       ) : (
-        <div style={{ ...roBox, fontFamily: 'monospace' }}>{SCORE_LABELS[score]}</div>
+        <div style={{ ...roBox, fontFamily: 'var(--cv-font-mono)' }}>{SCORE_LABELS[score]}</div>
       )}
 
       {canManage ? (
@@ -176,8 +176,8 @@ function CheckpointCard({ checkpoint, total, scored }) {
   const b = band(total)
   return (
     <div style={{ background: C.card, border: `1px solid ${C.borderSoft}`, borderTop: `3px solid ${b.color}`, borderRadius: 12, padding: '0.9rem 1rem', flex: '1 1 200px', minWidth: 200 }}>
-      <div style={{ fontFamily: 'monospace', fontSize: '0.75rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>{checkpoint.label}</div>
-      <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.1, marginTop: '0.2rem' }}>
+      <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.75rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>{checkpoint.label}</div>
+      <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.1, marginTop: '0.2rem' }}>
         {total}<span style={{ fontSize: '1rem', color: C.faint }}> of {MAX_TOTAL}</span>
       </div>
       <div style={{ marginTop: '0.4rem' }}><span style={pill(b.color, 'var(--cv-on-accent)')}>{b.label}</span></div>
@@ -313,8 +313,8 @@ export default function ReadinessDiagnostic({ clientId, canManage }) {
     <div style={wrap}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
         <div>
-          <div style={{ fontFamily: 'monospace', fontSize: '0.78rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: C.teal }}>DP09</div>
-          <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.45rem', fontWeight: 700 }}>Commercial Readiness Diagnostic</div>
+          <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: C.teal }}>DP09</div>
+          <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.45rem', fontWeight: 700 }}>Commercial Readiness Diagnostic</div>
           <div style={{ fontSize: '0.95rem', color: C.slate, maxWidth: '92ch', marginTop: '0.25rem' }}>
             Six fit tests, each scored 0 to 3, maximum {MAX_TOTAL}. The same six are taken three times, at
             baseline, at the mid point and at close. A score above 1 has to point at evidence, and the movement
@@ -341,8 +341,8 @@ export default function ReadinessDiagnostic({ clientId, canManage }) {
           <CheckpointCard key={cp.id} checkpoint={cp} total={totals[cp.id].total} scored={totals[cp.id].scored} />
         ))}
         <div style={{ background: C.card, border: `1px solid ${C.borderSoft}`, borderTop: `3px solid ${C.teal}`, borderRadius: 12, padding: '0.9rem 1rem', flex: '1 1 200px', minWidth: 200 }}>
-          <div style={{ fontFamily: 'monospace', fontSize: '0.75rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>Movement</div>
-          <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.1, marginTop: '0.2rem', color: movement > 0 ? C.green : movement < 0 ? C.red : C.navy }}>
+          <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.75rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>Movement</div>
+          <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.1, marginTop: '0.2rem', color: movement > 0 ? C.green : movement < 0 ? C.red : C.navy }}>
             {movement > 0 ? `+${movement}` : movement}
           </div>
           <div style={{ fontSize: '0.85rem', color: C.slate, marginTop: '0.4rem', lineHeight: 1.35 }}>
@@ -374,8 +374,8 @@ export default function ReadinessDiagnostic({ clientId, canManage }) {
       <section style={panel}>
         <div style={panelHead}>
           <div>
-            <div style={{ fontFamily: 'monospace', fontSize: '0.8rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--cv-wa-75)' }}>Six fit tests, three sittings</div>
-            <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.12rem', fontWeight: 700 }}>Scores and the evidence behind them</div>
+            <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.8rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--cv-wa-75)' }}>Six fit tests, three sittings</div>
+            <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.12rem', fontWeight: 700 }}>Scores and the evidence behind them</div>
           </div>
           <span style={pill('var(--cv-wa-20)', 'var(--cv-on-accent)')}>0 to 3 per test, {MAX_TOTAL} maximum</span>
         </div>
@@ -422,28 +422,28 @@ export default function ReadinessDiagnostic({ clientId, canManage }) {
                         )
                       })}
                       <td style={{ ...td, textAlign: 'center' }}>
-                        <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.25rem', fontWeight: 700, color: delta > 0 ? C.green : delta < 0 ? C.red : C.faint }}>
+                        <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.25rem', fontWeight: 700, color: delta > 0 ? C.green : delta < 0 ? C.red : C.faint }}>
                           {delta > 0 ? `+${delta}` : delta}
                         </div>
-                        <div style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: C.faint }}>{base} to {close}</div>
+                        <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.75rem', color: C.faint }}>{base} to {close}</div>
                       </td>
                     </tr>
                   )
                 })}
                 <tr>
-                  <td style={{ ...td, fontFamily: 'Georgia,serif', fontWeight: 700, fontSize: '1.02rem' }}>Total</td>
+                  <td style={{ ...td, fontFamily: 'var(--cv-font)', fontWeight: 700, fontSize: '1.02rem' }}>Total</td>
                   {CHECKPOINTS.map((cp) => {
                     const t = totals[cp.id].total
                     const b = band(t)
                     return (
                       <td key={cp.id} style={td}>
-                        <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.35rem', fontWeight: 700 }}>{t}<span style={{ fontSize: '0.9rem', color: C.faint }}> of {MAX_TOTAL}</span></div>
+                        <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.35rem', fontWeight: 700 }}>{t}<span style={{ fontSize: '0.9rem', color: C.faint }}> of {MAX_TOTAL}</span></div>
                         <div style={{ marginTop: '0.3rem' }}><span style={pill(b.color, 'var(--cv-on-accent)')}>{b.label}</span></div>
                       </td>
                     )
                   })}
                   <td style={{ ...td, textAlign: 'center' }}>
-                    <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.35rem', fontWeight: 700, color: movement > 0 ? C.green : movement < 0 ? C.red : C.faint }}>
+                    <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.35rem', fontWeight: 700, color: movement > 0 ? C.green : movement < 0 ? C.red : C.faint }}>
                       {movement > 0 ? `+${movement}` : movement}
                     </div>
                   </td>

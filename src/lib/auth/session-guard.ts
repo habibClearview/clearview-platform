@@ -10,9 +10,39 @@
 //      it's genuinely gone (signed out elsewhere, admin force-signout), drop it.
 // ============================================================
 
-// Idle timeout. Kept deliberately short for a platform showing real financial
-// data. Change this one number to make it shorter/longer.
-export const IDLE_MS = 5 * 60 * 1000 // 5 minutes
+// ────────────────────────────────────────────────────────────
+// IDLE TIMEOUT — 60 MINUTES, NOT 5.  2 September 2026.
+//
+// Five minutes was set as a security default without anybody using the app for
+// an hour first. What it means in practice: read a long page, take a phone
+// call, look at a second screen, and the app has signed you out when you look
+// back. Habib hit it while working through the live site and described it as
+// the webapp closing itself, which is exactly what it is.
+//
+// Five minutes is also not a meaningful security boundary — it is the same
+// protection as sixty against the case this actually guards, which is a laptop
+// left open and walked away from. What it reliably did instead was interrupt
+// the person using it. Eleven password entries in five hours on 13 August is
+// the same number telling the same story from the other side.
+//
+// Sixty minutes, and a warning two minutes before, so it is never a surprise
+// and can always be waved away with a keystroke.
+// ────────────────────────────────────────────────────────────
+export const IDLE_MS = 60 * 60 * 1000 // 60 minutes
+
+/** How long before the sign-out the warning appears. */
+export const IDLE_WARNING_MS = 2 * 60 * 1000 // 2 minutes
+
+/** True once the warning should be on screen, but before the sign-out itself. */
+export function shouldWarnIdle(now: number, lastActivity: number, idleMs = IDLE_MS, warnMs = IDLE_WARNING_MS): boolean {
+  const idleFor = now - lastActivity
+  return idleFor >= idleMs - warnMs && idleFor < idleMs
+}
+
+/** Whole seconds left before the sign-out, for the countdown in the warning. */
+export function secondsUntilSignOut(now: number, lastActivity: number, idleMs = IDLE_MS): number {
+  return Math.max(0, Math.ceil((idleMs - (now - lastActivity)) / 1000))
+}
 
 // How often the guard re-checks idle + session state.
 export const HEARTBEAT_MS = 15 * 1000 // 15 seconds

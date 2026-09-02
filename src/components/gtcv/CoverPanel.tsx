@@ -70,21 +70,21 @@ export default function CoverPanel({ slug }) {
     background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, padding: '15px 17px',
   }
   const label = {
-    fontFamily: 'ui-monospace,monospace', fontSize: 9.5, letterSpacing: '.13em',
+    fontFamily: 'var(--cv-font-mono)', fontSize: 9.5, letterSpacing: '.13em',
     textTransform: 'uppercase', color: C.faint, margin: '0 0 5px',
   }
 
   return (
-    <div style={{ fontFamily: "'Segoe UI',system-ui,sans-serif", color: C.ink }}>
+    <div style={{ fontFamily: "var(--cv-font)", color: C.ink }}>
 
       <div style={{
         background: C.navy, color: '#F3ECDE', borderRadius: 14, padding: '22px 24px', marginBottom: 16,
       }}>
         <p style={{
-          fontFamily: 'ui-monospace,monospace', fontSize: 10, letterSpacing: '.24em',
+          fontFamily: 'var(--cv-font-mono)', fontSize: 10, letterSpacing: '.24em',
           textTransform: 'uppercase', color: C.gold, margin: 0,
         }}>Grant-to-Commercial Viability Canvas</p>
-        <h2 style={{ fontFamily: 'Georgia,serif', fontSize: 28, margin: '8px 0 0', fontWeight: 600 }}>
+        <h2 style={{ fontFamily: 'var(--cv-font)', fontSize: 28, margin: '8px 0 0', fontWeight: 600 }}>
           {client.name || 'This engagement'}
         </h2>
         <p style={{ margin: '10px 0 0', fontSize: 14, color: 'rgba(243,236,222,.85)' }}>
@@ -96,7 +96,7 @@ export default function CoverPanel({ slug }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 12 }}>
         <div style={box}>
           <p style={label}>Where it stands</p>
-          <p style={{ fontFamily: 'Georgia,serif', fontSize: 20, margin: 0 }}>
+          <p style={{ fontFamily: 'var(--cv-font)', fontSize: 20, margin: 0 }}>
             {PHASE_LABEL[client.status] || client.status || 'Not started'}
           </p>
           <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.soft }}>
@@ -107,7 +107,7 @@ export default function CoverPanel({ slug }) {
         <div style={box}>
           <p style={label}>Momentum</p>
           <p style={{
-            fontFamily: 'Georgia,serif', fontSize: 20, margin: 0,
+            fontFamily: 'var(--cv-font)', fontSize: 20, margin: 0,
             color: momentumColour(cfg.momentum_status),
           }}>
             {(cfg.momentum_status || 'green') === 'green' ? 'On track'
@@ -124,7 +124,7 @@ export default function CoverPanel({ slug }) {
 
         <div style={box}>
           <p style={label}>Lead consultant</p>
-          <p style={{ fontFamily: 'Georgia,serif', fontSize: 18, margin: 0 }}>{lead?.name || 'Not named'}</p>
+          <p style={{ fontFamily: 'var(--cv-font)', fontSize: 18, margin: 0 }}>{lead?.name || 'Not named'}</p>
           {co ? (
             <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.soft }}>
               with {co.name} as co-implementer
@@ -136,7 +136,7 @@ export default function CoverPanel({ slug }) {
 
         <div style={box}>
           <p style={label}>Dates</p>
-          <p style={{ fontFamily: 'Georgia,serif', fontSize: 18, margin: 0 }}>
+          <p style={{ fontFamily: 'var(--cv-font)', fontSize: 18, margin: 0 }}>
             {client.start_date ? new Date(client.start_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : 'Not set'}
             {client.expected_close ? ' to ' + new Date(client.expected_close).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : ''}
           </p>
@@ -159,7 +159,7 @@ export default function CoverPanel({ slug }) {
                 background: C.box, border: `1px solid ${C.line}`, borderRadius: 9, padding: '10px 12px',
               }}>
                 <p style={{
-                  fontFamily: 'ui-monospace,monospace', fontSize: 9, letterSpacing: '.1em',
+                  fontFamily: 'var(--cv-font-mono)', fontSize: 9, letterSpacing: '.1em',
                   textTransform: 'uppercase', color: C.teal, margin: 0, fontWeight: 700,
                 }}>{PARTY_ROLE_LABELS[p.party_role] || p.party_role}</p>
                 <p style={{ margin: '4px 0 0', fontSize: 14, fontWeight: 600 }}>{p.name}</p>
@@ -185,7 +185,7 @@ export default function CoverPanel({ slug }) {
         engagement belongs to the organisation. Removing the attribution is a breach of the licence.
       </div>
 
-      <p style={{ marginTop: 18, fontSize: 12, color: C.faint, fontFamily: 'Georgia,serif', textAlign: 'center' }}>
+      <p style={{ marginTop: 18, fontSize: 12, color: C.faint, fontFamily: 'var(--cv-font)', textAlign: 'center' }}>
         Grant-to-Commercial Viability Canvas&trade; · The Canvas Coach · habibonifade.com
       </p>
     </div>

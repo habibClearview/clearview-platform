@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Idle-timeout + heartbeat: only active once someone is actually signed in.
   // Auto signs-out an unattended screen and drops a revoked session promptly.
-  useSessionGuard(!!user)
+  const idleWarningSeconds = useSessionGuard(!!user)
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -104,6 +104,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{ user, loading, signIn, signOut }}>
       {children}
+      {idleWarningSeconds !== null ? (
+        // Any key, click or scroll cancels this by resetting the idle clock,
+        // so it needs no button of its own — but it says so, because a warning
+        // that does not tell you how to stop it is just an alarm.
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)',
+            zIndex: 12000, background: 'var(--cv-header, #12263A)', color: '#FFFFFF',
+            border: '1px solid rgba(255,255,255,.24)', borderRadius: 12,
+            padding: '12px 18px', fontFamily: 'var(--cv-font)', fontSize: 15,
+            boxShadow: '0 10px 30px rgba(0,0,0,.28)', maxWidth: '90vw', textAlign: 'center',
+          }}
+        >
+          Still there? You will be signed out in {idleWarningSeconds} second{idleWarningSeconds === 1 ? '' : 's'}.
+          <span style={{ opacity: 0.75 }}> Move the mouse or press a key to stay signed in.</span>
+        </div>
+      ) : null}
     </AuthContext.Provider>
   )
 }

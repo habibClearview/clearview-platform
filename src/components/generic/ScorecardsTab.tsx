@@ -26,8 +26,8 @@ const C = {
   card: 'var(--cv-card)', cream: 'var(--cv-cream)',
 }
 const CARD: React.CSSProperties = { background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: 14, padding: '1.3rem 1.5rem', marginBottom: '1.35rem' }
-const H = (s = '1.15rem'): React.CSSProperties => ({ fontFamily: 'Georgia,serif', fontWeight: 700, color: C.navy, fontSize: s })
-const LABEL: React.CSSProperties = { fontFamily: 'monospace', fontSize: '0.72rem', letterSpacing: '0.04em', textTransform: 'uppercase', color: C.slate }
+const H = (s = '1.15rem'): React.CSSProperties => ({ fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: s })
+const LABEL: React.CSSProperties = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em', textTransform: 'uppercase', color: C.slate }
 
 type Metric = 'new_customers' | 'lead_conversion' | 'prospect_conversion' | 'sales_value' | 'sales_count' | 'repeat_rate' | 'attendance_rate' | 'custom'
 interface Staff { id: string; staff_code: string; full_name: string; department: string; active: boolean }
@@ -168,7 +168,7 @@ export default function ScorecardsTab({ config, clientId, cc, P }: any) {
                   <div key={s.id} style={{ border: `1px solid ${C.borderSoft}`, borderRadius: 12, padding: '1rem 1.1rem', background: C.cream }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.7rem' }}>
                       <div style={{ fontWeight: 700, color: C.navy, fontSize: '1.02rem' }}>
-                        {s.full_name} <span style={{ fontFamily: 'monospace', color: C.slate, fontWeight: 400, fontSize: '0.85rem' }}>{s.staff_code}</span>
+                        {s.full_name} <span style={{ fontFamily: 'var(--cv-font-mono)', color: C.slate, fontWeight: 400, fontSize: '0.85rem' }}>{s.staff_code}</span>
                       </div>
                       <div style={{ ...LABEL }}>
                         {st.total} leads · Lead→Prospect {st.leadToProspect ?? '—'}% · Prospect→Client {st.prospectToClient ?? '—'}%
@@ -197,7 +197,7 @@ export default function ScorecardsTab({ config, clientId, cc, P }: any) {
                               <div key={metric} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: '0.7rem 0.8rem' }}>
                                 <div style={{ ...LABEL, marginBottom: 3 }}>{metric === 'custom' ? (t.metric_label || 'Custom') : METRIC_LABEL[metric]}</div>
                                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6 }}>
-                                  <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '1.2rem', color: tone }}>
+                                  <span style={{ fontFamily: 'var(--cv-font-mono)', fontWeight: 700, fontSize: '1.2rem', color: tone }}>
                                     {computable && actual != null ? fmtVal(metric, actual) : '—'}
                                   </span>
                                   <span style={{ fontSize: '0.78rem', color: C.slate }}>target {fmtVal(metric, t.target_value)}/{t.period === 'monthly' ? 'mo' : t.period === 'weekly' ? 'wk' : 'qtr'}</span>

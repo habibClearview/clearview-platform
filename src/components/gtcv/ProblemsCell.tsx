@@ -31,7 +31,7 @@ const C = {
   navy: '#1B2A41', slate: '#4C5A6B', border: 'rgba(27,42,65,.16)',
   amber: '#D98C1F', card: '#FFFFFF', red: '#C0392B',
 }
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
 
 export default function ProblemsCell({
   clientId, activityId, problems, canManage, onChanged,
@@ -179,5 +179,5 @@ function ProblemLine({
 const box: React.CSSProperties = {
   width: '100%', fontSize: 13, padding: '3px 5px', borderRadius: 5,
   border: `1px solid ${C.border}`, background: C.card, color: C.navy,
-  fontFamily: "'Segoe UI',system-ui,sans-serif",
+  fontFamily: "var(--cv-font)",
 }

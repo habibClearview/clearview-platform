@@ -8,7 +8,7 @@ import type { GenericPermissions } from '@/components/generic/GenericDashboard'
 
 function Loading() {
   return (
-    <div style={{minHeight:'100vh',background:'#F8F4EE',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Georgia,serif',fontSize:'1.1rem',color:'#1B2A4A'}}>
+    <div style={{minHeight:'100vh',background:'#F8F4EE',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'var(--cv-font)',fontSize:'1.1rem',color:'#1B2A4A'}}>
       Loading Clearview...
     </div>
   )
@@ -25,11 +25,11 @@ function LoginPrompt({onLogin}:{onLogin:(e:string,p:string)=>Promise<string|null
     if (err) { setError(err); setLoading(false) }
   }
   return (
-    <div style={{minHeight:'100vh',background:'#F8F4EE',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+    <div style={{minHeight:'100vh',background:'#F8F4EE',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"var(--cv-font)"}}>
       <div style={{width:'100%',maxWidth:380,padding:'0 1.5rem'}}>
         <div style={{textAlign:'center',marginBottom:'2rem'}}>
-          <div style={{fontFamily:'monospace',fontSize:'0.65rem',letterSpacing:'0.15em',color:'#00B4D8',marginBottom:'0.5rem'}}>CANVAS COACH</div>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.8rem',fontWeight:700,color:'#1B2A4A'}}>Clearview</div>
+          <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.65rem',letterSpacing:'0.15em',color:'#00B4D8',marginBottom:'0.5rem'}}>CANVAS COACH</div>
+          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.8rem',fontWeight:700,color:'#1B2A4A'}}>Clearview</div>
         </div>
         <div style={{background:'#fff',border:'1px solid #D8E0E8',borderRadius:12,padding:'2rem',boxShadow:'0 4px 24px rgba(0,0,0,0.06)'}}>
           <div style={{marginBottom:'1.25rem'}}>
@@ -146,17 +146,17 @@ export default function GenericClientPage() {
 
   if (checking) return <Loading/>
   if (initError) return (
-    <div style={{minHeight:'100vh',background:'#F8F4EE',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Segoe UI',system-ui,sans-serif",padding:'2rem'}}>
+    <div style={{minHeight:'100vh',background:'#F8F4EE',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"var(--cv-font)",padding:'2rem'}}>
       <div style={{maxWidth:460,textAlign:'center'}}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:'#1B2A4A',marginBottom:'0.6rem'}}>Couldn't load this dashboard</div>
+        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:'#1B2A4A',marginBottom:'0.6rem'}}>Couldn't load this dashboard</div>
         <div style={{color:'#C0392B',fontSize:'0.95rem',marginBottom:'1.2rem',padding:'0.7rem',background:'#FDF0EE',borderRadius:6,wordBreak:'break-word'}}>{initError}</div>
         <button onClick={()=>window.location.reload()} style={{padding:'0.6rem 1.2rem',border:'none',borderRadius:6,background:'#1B2A4A',color:'#fff',fontSize:'0.9rem',fontWeight:600,cursor:'pointer'}}>Reload</button>
       </div>
     </div>
   )
   if (!user) return <LoginPrompt onLogin={handleLogin}/>
-  if (authError) return <div style={{padding:'2rem',fontFamily:'Georgia,serif',color:'#C0392B'}}>You don't have access to this client's dashboard. Contact your administrator if you believe this is a mistake.</div>
-  if (!clientId) return <div style={{padding:'2rem',fontFamily:'Georgia,serif',color:'#C0392B'}}>Client not found.</div>
+  if (authError) return <div style={{padding:'2rem',fontFamily:'var(--cv-font)',color:'#C0392B'}}>You don't have access to this client's dashboard. Contact your administrator if you believe this is a mistake.</div>
+  if (!clientId) return <div style={{padding:'2rem',fontFamily:'var(--cv-font)',color:'#C0392B'}}>Client not found.</div>
 
   const permissions: GenericPermissions = {
     role: user.role||'accounts_assistant',

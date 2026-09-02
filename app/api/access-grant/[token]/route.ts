@@ -69,7 +69,7 @@ async function sendOtpEmail(toEmail: string, code: string, granteeName: string) 
       to: [toEmail],
       subject: `Your access code: ${code}`,
       html: `
-        <div style="font-family:'Segoe UI',system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
+        <div style="font-family:var(--cv-font);max-width:480px;margin:0 auto;padding:32px 24px;">
           <div style="background:#1B2A41;padding:20px 24px;border-radius:8px 8px 0 0;border-bottom:3px solid #00CCCC;">
             <p style="margin:0;font-size:11px;color:#00CCCC;letter-spacing:1px;text-transform:uppercase;">Canvas Coach | ClearView</p>
           </div>

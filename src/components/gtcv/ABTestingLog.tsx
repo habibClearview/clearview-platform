@@ -51,9 +51,9 @@ const C = {
   purple: 'var(--cv-purple)', alt: 'var(--cv-alt)',
 }
 const card = { background: C.white, border: '1px solid var(--cv-border-soft)', borderRadius: 14, padding: '1.25rem 1.4rem', marginBottom: '1.1rem', boxShadow: '0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)' }
-const secH = { fontFamily: 'Georgia,serif', fontSize: '1.25rem', fontWeight: 700, color: C.navy, margin: 0 }
+const secH = { fontFamily: 'var(--cv-font)', fontSize: '1.25rem', fontWeight: 700, color: C.navy, margin: 0 }
 const hint = { fontSize: '0.9rem', color: C.slate, lineHeight: 1.45 }
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
 const th = { ...mono, padding: '0.45rem 0.55rem', textAlign: 'left', fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
 const td = { padding: '0.35rem 0.55rem', verticalAlign: 'top', fontSize: '0.9rem', color: C.navy }
 const inp = { width: '100%', padding: '0.34rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '0.9rem', fontFamily: 'inherit', background: 'var(--cv-bg-2)', color: C.navy, boxSizing: 'border-box' }
@@ -120,7 +120,7 @@ function StatCard({ s, winner }) {
         <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.12em', color: C.slate, textTransform: 'uppercase' }}>Variant {s.variant}</div>
         {winner && <span style={{ ...mono, fontSize: '0.7rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: 4, background: C.green, color: 'var(--cv-on-accent)' }}>WINNER</span>}
       </div>
-      <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.85rem', fontWeight: 700, color: C.navy, lineHeight: 1.1 }}>{pct(s.rate)}</div>
+      <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.85rem', fontWeight: 700, color: C.navy, lineHeight: 1.1 }}>{pct(s.rate)}</div>
       <div style={{ ...hint, marginTop: '0.15rem' }}>{s.replies} replied of {s.sent} sent</div>
       <div style={{ ...hint, marginTop: '0.35rem' }}>
         {s.firm} firm yes, {s.buyers} with a purchasing signal
@@ -273,7 +273,7 @@ export default function ABTestingLog({ clientId, canManage }) {
         </div>
 
         <div style={{ marginTop: '0.9rem', borderLeft: `3px solid ${v.tone}`, background: C.alt, borderRadius: 8, padding: '0.75rem 0.95rem' }}>
-          <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.05rem', fontWeight: 700, color: v.tone }}>{v.headline}</div>
+          <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.05rem', fontWeight: 700, color: v.tone }}>{v.headline}</div>
           <div style={{ ...hint, marginTop: '0.25rem' }}>{v.detail}</div>
         </div>
       </div>

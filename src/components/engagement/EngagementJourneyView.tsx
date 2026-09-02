@@ -37,9 +37,9 @@ const CSS = `
   --good:#2E7D32; --now:#B7791F; --idle:#BDB4A0;
   --spine:#1B2A41; --spine-ink:#EFEADD;
   --shadow:0 1px 2px rgba(27,42,65,.05), 0 10px 30px rgba(27,42,65,.09);
-  --fd:Georgia,"Times New Roman",serif;
-  --fb:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
-  --fm:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --fd:var(--cv-font);
+  --fb:var(--cv-font);
+  --fm:var(--cv-font);
   background:var(--paper);color:var(--ink);font-family:var(--fb);line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .gj{
@@ -70,8 +70,8 @@ const CSS = `
 .gj .tag{font-family:var(--fm);font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;border:1px dashed rgba(239,234,221,.4);border-radius:999px;padding:4px 10px}
 .gj .hero{padding:30px 0 8px}
 .gj .eyebrow{font-family:var(--fm);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--teal);margin:0 0 8px}
-.gj .hero h1{font-family:var(--fd);font-weight:600;font-size:clamp(26px,4.4vw,40px);line-height:1.06;margin:0;text-wrap:balance}
-.gj .hero p{margin:12px 0 0;font-size:15px;color:var(--ink-soft);max-width:64ch}
+.gj .hero h1{font-family:var(--fd);font-weight:600;font-size:clamp(30px,5.4vw,58px);line-height:1.08;margin:0;letter-spacing:-.015em;max-width:20ch}
+.gj .hero p{margin:14px 0 0;font-size:16px;line-height:1.6;color:var(--ink-soft);max-width:78ch}
 .gj .hero p b{color:var(--ink)}
 .gj .path-scroll{overflow-x:auto;padding:8px 2px 12px;margin-top:20px}
 .gj .path{position:relative;display:flex;justify-content:space-between;gap:6px;min-width:640px}
@@ -191,7 +191,7 @@ function boxStateClass(s, isCurrent) {
 
 function Loading() {
   return (
-    <div style={{ minHeight: '100vh', background: '#EDE6D6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia,serif', fontSize: '1.1rem', color: '#1B2A41' }}>
+    <div style={{ minHeight: '100vh', background: '#EDE6D6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--cv-font)', fontSize: '1.1rem', color: '#1B2A41' }}>
       Loading the journey...
     </div>
   )
@@ -199,9 +199,9 @@ function Loading() {
 
 function Message({ title, body }) {
   return (
-    <div style={{ minHeight: '100vh', background: '#EDE6D6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Segoe UI',system-ui,sans-serif", padding: '2rem' }}>
+    <div style={{ minHeight: '100vh', background: '#EDE6D6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "var(--cv-font)", padding: '2rem' }}>
       <div style={{ maxWidth: 460, textAlign: 'center' }}>
-        <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.3rem', fontWeight: 700, color: '#1B2A41', marginBottom: '0.6rem' }}>{title}</div>
+        <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.3rem', fontWeight: 700, color: '#1B2A41', marginBottom: '0.6rem' }}>{title}</div>
         <div style={{ color: '#4C5A6B', fontSize: '0.95rem' }}>{body}</div>
       </div>
     </div>
@@ -338,7 +338,7 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
           <div role="status" style={{
             margin: '0 auto 14px', maxWidth: 1180, padding: '10px 14px', borderRadius: 10,
             border: '1px solid #B7791F', background: '#FFF8E8', color: '#5A4412',
-            fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: 13.5,
+            fontFamily: "var(--cv-font)", fontSize: 13.5,
           }}>
             Part of this engagement could not be loaded ({view.load_errors.join(', ')}), so what you
             see below may be incomplete. Reload before treating it as the record.

@@ -472,11 +472,11 @@ export default function FieldCapturePage() {
 
   if (!token) {
     return (
-      <div style={{minHeight:'100vh',background:D.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:'1.5rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+      <div style={{minHeight:'100vh',background:D.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:'1.5rem',fontFamily:"var(--cv-font)"}}>
         <BuildStamp/>
         <div style={{background:D.card,border:`1px solid ${D.border}`,borderRadius:18,padding:'1.9rem',maxWidth:420,width:'100%'}}>
-          <div style={{fontFamily:'monospace',fontSize:'0.8rem',letterSpacing:'0.12em',color:D.cyan,marginBottom:'0.6rem'}}>CLEARVIEW FIELD</div>
-          <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.6rem',color:D.text,margin:'0 0 1rem'}}>Enter your access link</h1>
+          <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.8rem',letterSpacing:'0.12em',color:D.cyan,marginBottom:'0.6rem'}}>CLEARVIEW FIELD</div>
+          <h1 style={{fontFamily:'var(--cv-font)',fontSize:'1.6rem',color:D.text,margin:'0 0 1rem'}}>Enter your access link</h1>
           <p style={{fontSize:'0.9rem',color:D.muted,lineHeight:1.6,marginBottom:'1.2rem'}}>Paste the code you were given, or open this page using the link directly.</p>
           <input style={{width:'100%',padding:'0.9rem',background:D.bg2,border:`1px solid ${D.border}`,borderRadius:12,fontSize:'1rem',color:D.text,boxSizing:'border-box',marginBottom:'0.9rem'}}
             placeholder="Paste your access code here" value={tokenInput} onChange={e=>setTokenInput(e.target.value)}/>
@@ -489,12 +489,12 @@ export default function FieldCapturePage() {
   }
 
   if (loading && !auth) {
-    return <div style={{minHeight:'100vh',background:D.bg,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Georgia,serif',fontSize:'1.2rem',color:D.text}}>Loading...</div>
+    return <div style={{minHeight:'100vh',background:D.bg,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'var(--cv-font)',fontSize:'1.2rem',color:D.text}}>Loading...</div>
   }
 
   if (!auth) {
     return (
-      <div style={{minHeight:'100vh',background:D.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:'1.5rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+      <div style={{minHeight:'100vh',background:D.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:'1.5rem',fontFamily:"var(--cv-font)"}}>
         <div style={{background:D.card,border:`1px solid ${D.border}`,borderRadius:18,padding:'1.9rem',maxWidth:420,width:'100%',textAlign:'center'}}>
           <div style={{color:'var(--cv-red-text)',marginBottom:'1.1rem'}}>{authError || 'Could not load your data.'}</div>
           <button style={{padding:'0.85rem 1.6rem',background:D.cyan,color:'var(--cv-on-cyan)',border:'none',borderRadius:12,fontWeight:700,cursor:'pointer'}}
@@ -580,14 +580,14 @@ export default function FieldCapturePage() {
   )
 
   return (
-    <div style={{minHeight:'100vh',background:D.bg,fontFamily:"'Segoe UI',system-ui,sans-serif",paddingBottom:'2.5rem',color:D.text}}>
+    <div style={{minHeight:'100vh',background:D.bg,fontFamily:"var(--cv-font)",paddingBottom:'2.5rem',color:D.text}}>
       <BuildStamp/>
       <div style={{maxWidth:460,margin:'0 auto',padding:'1.1rem 1rem'}}>
         {/* ---- Header ---- */}
         <header style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1rem'}}>
           <div>
-            <div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.12em',color:D.cyan}}>CLEARVIEW FIELD</div>
-            <div style={{fontFamily:'Georgia,serif',fontSize:'2rem',fontWeight:700,marginTop:'0.1rem',lineHeight:1.1}}>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',letterSpacing:'0.12em',color:D.cyan}}>CLEARVIEW FIELD</div>
+            <div style={{fontFamily:'var(--cv-font)',fontSize:'2rem',fontWeight:700,marginTop:'0.1rem',lineHeight:1.1}}>
               {mode==='history'?'History':mode==='stock'?'Stock':'Record'}
             </div>
             <div style={{fontSize:'0.92rem',color:D.muted,marginTop:'0.25rem'}}>{auth.operator.display_name} · {auth.unit.name}</div>
@@ -641,7 +641,7 @@ export default function FieldCapturePage() {
         {/* ---- Expandable queue review (edit/remove) ---- */}
         {queueOpen && pendingCount>0 && (
           <div style={{marginBottom:'1rem'}}>
-            <div style={{fontSize:'0.8rem',fontFamily:'monospace',color:D.faint,marginBottom:'0.5rem'}}>QUEUED ENTRIES</div>
+            <div style={{fontSize:'0.8rem',fontFamily: 'var(--cv-font-mono)',color:D.faint,marginBottom:'0.5rem'}}>QUEUED ENTRIES</div>
             {salesQueue.map(q=>(
               <div key={q.local_id} style={{background:D.card,border:`1px solid ${D.border}`,borderRadius:12,padding:'0.7rem 0.85rem',marginBottom:'0.5rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
                 <div style={{minWidth:0}}>
@@ -649,7 +649,7 @@ export default function FieldCapturePage() {
                   <div style={{fontSize:'0.8rem',color:D.faint}}>{q.override_price?'(price overridden)':`× ${fmt(q.standard_price,currency)}`}</div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
-                  <div style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-green-text)',whiteSpace:'nowrap'}}>+{fmt(q.quantity*(q.override_price??q.standard_price),currency)}</div>
+                  <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:'var(--cv-green-text)',whiteSpace:'nowrap'}}>+{fmt(q.quantity*(q.override_price??q.standard_price),currency)}</div>
                   <button onClick={()=>openSaleEdit(q)} style={{background:'transparent',border:'none',color:D.cyan,fontSize:'0.92rem',cursor:'pointer',fontWeight:600}}>Edit</button>
                   <button onClick={()=>removeSale(q.local_id)} style={{background:'transparent',border:'none',color:'var(--cv-red-text)',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
                 </div>
@@ -662,7 +662,7 @@ export default function FieldCapturePage() {
                   <div style={{fontSize:'0.8rem',color:D.faint}}>{q.transaction_date}</div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
-                  <div style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</div>
+                  <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</div>
                   <button onClick={()=>openCostEdit(q)} style={{background:'transparent',border:'none',color:D.cyan,fontSize:'0.92rem',cursor:'pointer',fontWeight:600}}>Edit</button>
                   <button onClick={()=>removeCost(q.local_id)} style={{background:'transparent',border:'none',color:'var(--cv-red-text)',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
                 </div>
@@ -675,7 +675,7 @@ export default function FieldCapturePage() {
                   <div style={{fontSize:'0.8rem',color:D.amber}}>Awaiting categorization · {q.transaction_date}</div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
-                  <div style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</div>
+                  <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</div>
                   <button onClick={()=>removeUncategorizedCost(q.local_id)} style={{background:'transparent',border:'none',color:'var(--cv-red-text)',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
                 </div>
               </div>
@@ -756,7 +756,7 @@ export default function FieldCapturePage() {
                           <span style={{display:'block',fontWeight:600,fontSize:'0.92rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.quantity}{q.unit_label?` ${q.unit_label}`:''} {q.item_name}</span>
                           <span style={{display:'inline-block',fontSize:'0.72rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
                         </span>
-                        <span style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-green-text)',whiteSpace:'nowrap',flexShrink:0}}>+{fmt(q.quantity*(q.override_price??q.standard_price),currency)}</span>
+                        <span style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:'var(--cv-green-text)',whiteSpace:'nowrap',flexShrink:0}}>+{fmt(q.quantity*(q.override_price??q.standard_price),currency)}</span>
                       </button>
                     )
                   })}
@@ -768,7 +768,7 @@ export default function FieldCapturePage() {
                         <span style={{display:'block',fontWeight:600,fontSize:'0.92rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.plan_line_name}</span>
                         <span style={{display:'inline-block',fontSize:'0.72rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
                       </span>
-                      <span style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap',flexShrink:0}}>-{fmt(q.amount,currency)}</span>
+                      <span style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap',flexShrink:0}}>-{fmt(q.amount,currency)}</span>
                     </button>
                   ))}
                   {uncategorizedCostsQueue.map(q=>(
@@ -780,7 +780,7 @@ export default function FieldCapturePage() {
                         <span style={{display:'inline-block',fontSize:'0.72rem',color:D.amber,background:D.amberDim,borderRadius:6,padding:'0.05rem 0.4rem',marginTop:'0.2rem'}}>waiting</span>
                       </span>
                       <span style={{display:'flex',alignItems:'center',gap:'0.5rem',flexShrink:0}}>
-                        <span style={{fontFamily:'monospace',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</span>
+                        <span style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:'var(--cv-red-text)',whiteSpace:'nowrap'}}>-{fmt(q.amount,currency)}</span>
                         <button onClick={()=>removeUncategorizedCost(q.local_id)} style={{background:'transparent',border:'none',color:'var(--cv-red-text)',fontSize:'1.2rem',cursor:'pointer'}}>×</button>
                       </span>
                     </div>
@@ -940,7 +940,7 @@ export default function FieldCapturePage() {
                       <div style={{fontWeight:700,fontSize:'0.92rem'}}>{level.catalogue?.name || 'Item'}</div>
                       {low && <div style={{fontSize:'0.8rem',color:D.amber,marginTop:'0.1rem'}}>⚠ At or below reorder threshold ({level.reorder_threshold})</div>}
                     </div>
-                    <div style={{fontFamily:'monospace',fontWeight:700,fontSize:'1.1rem',whiteSpace:'nowrap'}}>
+                    <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,fontSize:'1.1rem',whiteSpace:'nowrap'}}>
                       {level.quantity_on_hand}{level.catalogue?.unit_label?` ${level.catalogue.unit_label}`:''}
                     </div>
                   </div>

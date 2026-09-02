@@ -33,7 +33,7 @@ export default function BuildStamp() {
         bottom: 8,
         right: 10,
         zIndex: 9999,
-        fontFamily: 'monospace',
+        fontFamily: 'var(--cv-font-mono)',
         fontSize: '0.6rem',
         letterSpacing: '0.05em',
         color: '#0B1F33',

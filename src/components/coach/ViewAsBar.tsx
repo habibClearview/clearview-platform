@@ -33,7 +33,7 @@ const C = {
   slate: 'var(--cv-slate)', teal: 'var(--cv-teal)', amber: 'var(--cv-amber)',
   green: 'var(--cv-green)', red: 'var(--cv-red)',
 }
-const mono = { fontFamily: 'monospace' }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
 const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
 
 export default function ViewAsBar({ realRole, viewingAs, onChange }) {

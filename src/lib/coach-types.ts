@@ -25,6 +25,23 @@ export function canEdit(role: AnyRole): boolean {
 export function canViewCoachGuidance(role: AnyRole): boolean {
   return role === 'super_coach' || isCoImplementer(role)
 }
+/**
+ * THE CONSULTANT'S OWN WORKBENCH. 2 September 2026.
+ *
+ * Setting up who is on the engagement, planning the sessions and the
+ * pre-engagement diagnostic are things the consultant does TO run the
+ * engagement. The organisation being coached does not set the engagement up,
+ * does not schedule its own workshops, and is not the subject of a diagnostic
+ * it fills in about itself — but every one of those screens was on their menu,
+ * which is what Habib found and could not explain.
+ *
+ * It is the same set of people as the coaching guidance, but it is a different
+ * question — "may they see how the sausage is made" rather than "may they see
+ * the coach's notes" — so it gets its own name rather than reusing that one.
+ */
+export function canRunTheEngagement(role: AnyRole): boolean {
+  return role === 'super_coach' || isCoImplementer(role)
+}
 export function canSignOff(role: AnyRole): boolean {
   return role === 'ceo' || role === 'super_coach'
 }
@@ -362,23 +379,33 @@ export const TAB_GROUPS = [
 // The interview tools live inside DP02 and pilot observation inside DP07,
 // rather than as their own entries ten and seven places away from the zone they
 // belong to. A tool belongs where it is used.
+// THE CODES ARE NOT LABELS. 2 September 2026.
+//
+// Every zone read "DP01 Service Reality", "DP02 Customer Clarity" and so on.
+// The DP number is an internal identifier — it is still there as dpId, which is
+// what the code matches on — but on screen it was a column of numbers nobody
+// had been told the meaning of, on top of names that already say what each zone
+// is. Habib's words: confusing, and not quite sure what those are.
+//
+// The names stand on their own. Where an order needs showing, the list is
+// already in order.
 export const CANVAS_TABS = [
   { id: 'cover',        label: 'Cover',                     marker: '1',  group: 'engagement' },
   { id: 'journey',      label: 'Journey Canvas',            marker: '2',  group: 'engagement' },
   { id: 'charter',      label: 'Engagement Charter',        marker: '3',  group: 'engagement' },
-  { id: 'eng_setup',    label: 'Who is on it, and settings', marker: '4', group: 'engagement' },
-  { id: 'sessions',     label: 'Sessions and rooms',        marker: '5',  group: 'engagement' },
+  { id: 'eng_setup',    label: 'Who is on it, and settings', marker: '4', group: 'engagement', teamOnly: true },
+  { id: 'sessions',     label: 'Sessions and rooms',        marker: '5',  group: 'engagement', teamOnly: true },
 
   { id: 'phase0',       label: 'Clearing the ground',       marker: 'P0', group: 'work', dpId: 'phase_0' },
-  { id: 'dp01',         label: 'DP01 Service Reality',      marker: '1',  group: 'work', dpId: 'dp01' },
-  { id: 'dp02',         label: 'DP02 Customer Clarity',     marker: '2',  group: 'work', dpId: 'dp02' },
-  { id: 'dp03',         label: 'DP03 Value Proposition',    marker: '3',  group: 'work', dpId: 'dp03' },
-  { id: 'dp04',         label: 'DP04 Viability Model',      marker: '4',  group: 'work', dpId: 'dp04' },
-  { id: 'dp05',         label: 'DP05 Market Entry',         marker: '5',  group: 'work', dpId: 'dp05' },
-  { id: 'dp06',         label: 'DP06 Identity and Partners', marker: '6', group: 'work', dpId: 'dp06' },
-  { id: 'dp07',         label: 'DP07 Pilot and Learn',      marker: '7',  group: 'work', dpId: 'dp07' },
-  { id: 'dp08',         label: 'DP08 Scale Pathway',        marker: '8',  group: 'work', dpId: 'dp08' },
-  { id: 'dp09',         label: 'DP09 Readiness',            marker: '9',  group: 'work', dpId: 'dp09' },
+  { id: 'dp01',         label: 'Service Reality',      marker: '1',  group: 'work', dpId: 'dp01' },
+  { id: 'dp02',         label: 'Customer Clarity',     marker: '2',  group: 'work', dpId: 'dp02' },
+  { id: 'dp03',         label: 'Value Proposition',    marker: '3',  group: 'work', dpId: 'dp03' },
+  { id: 'dp04',         label: 'Viability Model',      marker: '4',  group: 'work', dpId: 'dp04' },
+  { id: 'dp05',         label: 'Market Entry',         marker: '5',  group: 'work', dpId: 'dp05' },
+  { id: 'dp06',         label: 'Identity and Partners', marker: '6', group: 'work', dpId: 'dp06' },
+  { id: 'dp07',         label: 'Pilot and Learn',      marker: '7',  group: 'work', dpId: 'dp07' },
+  { id: 'dp08',         label: 'Scale Pathway',        marker: '8',  group: 'work', dpId: 'dp08' },
+  { id: 'dp09',         label: 'Commercial Readiness',            marker: '9',  group: 'work', dpId: 'dp09' },
   { id: 'handover',     label: 'Handover',                  marker: 'HO', group: 'work', dpId: 'handover' },
 
   { id: 'tracker',      label: 'Engagement Tracker',        marker: '1',  group: 'record' },
@@ -389,7 +416,7 @@ export const CANVAS_TABS = [
   { id: 'how_to_start', label: 'How to start',              marker: '1',  group: 'notes' },
   { id: 'coach_ref',    label: 'Coach Quick Reference',     marker: '2',  group: 'notes', coachOnly: true },
   { id: 'ip_framework', label: 'The method, in full',       marker: '3',  group: 'notes' },
-  { id: 'diagnostic',   label: 'Pre-engagement diagnostic', marker: '4',  group: 'notes' },
+  { id: 'diagnostic',   label: 'Pre-engagement diagnostic', marker: '4',  group: 'notes', teamOnly: true },
 ]
 
 // ─── READINESS QUESTIONS ─────────────────────────────────────

@@ -58,10 +58,10 @@ const CARD = {
   borderRadius: 14, padding: '1.4rem 1.6rem', marginBottom: '1.35rem',
 }
 const H = (size = '1.15rem') => ({
-  fontFamily: 'Georgia,serif', fontWeight: 700, color: C.navy, fontSize: size,
+  fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: size,
 })
 const LABEL = {
-  fontFamily: 'monospace', fontSize: '0.72rem', letterSpacing: '0.04em',
+  fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em',
   textTransform: 'uppercase', color: C.slate,
 }
 const inputStyle = {
@@ -73,8 +73,8 @@ const th = { ...LABEL, textAlign: 'left', padding: '0.5rem 0.7rem', borderBottom
 const td = { padding: '0.5rem 0.7rem', fontSize: '0.86rem', color: C.navy, verticalAlign: 'top' }
 function btn(color, solid = false) {
   return solid
-    ? { fontFamily: 'monospace', fontSize: '0.82rem', fontWeight: 700, padding: '0.42rem 0.9rem', border: 'none', borderRadius: 7, background: color, color: 'var(--cv-on-accent)', cursor: 'pointer' }
-    : { fontFamily: 'monospace', fontSize: '0.82rem', padding: '0.42rem 0.9rem', border: `1px solid ${color}`, borderRadius: 7, background: 'transparent', color, cursor: 'pointer' }
+    ? { fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', fontWeight: 700, padding: '0.42rem 0.9rem', border: 'none', borderRadius: 7, background: color, color: 'var(--cv-on-accent)', cursor: 'pointer' }
+    : { fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', padding: '0.42rem 0.9rem', border: `1px solid ${color}`, borderRadius: 7, background: 'transparent', color, cursor: 'pointer' }
 }
 
 // ----- the method, as code -----
@@ -123,7 +123,7 @@ function gateCheck(row) {
 
 function Pill({ text, tone }) {
   return (
-    <span style={{ fontFamily: 'monospace', fontSize: '0.72rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap', display: 'inline-block' }}>
+    <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap', display: 'inline-block' }}>
       {text}
     </span>
   )
@@ -372,7 +372,7 @@ export default function CustomerSegmentsTable({ clientId, canManage }) {
                       </td>
                       <td style={td}>
                         {canManage ? (
-                          <select aria-label="How urgent the problem is" style={{ ...inputStyle, fontFamily: 'monospace' }} value={r.problem_urgency == null ? '' : String(r.problem_urgency)}
+                          <select aria-label="How urgent the problem is" style={{ ...inputStyle, fontFamily: 'var(--cv-font-mono)' }} value={r.problem_urgency == null ? '' : String(r.problem_urgency)}
                             onChange={(e) => patch(r.id, { problem_urgency: e.target.value === '' ? null : Number(e.target.value) })}>
                             <option value="">-</option>
                             {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
@@ -382,7 +382,7 @@ export default function CustomerSegmentsTable({ clientId, canManage }) {
                       {STAGES.map((s) => (
                         <td key={s.key} style={td} title={s.question}>
                           {canManage ? (
-                            <select aria-label={s.label} style={{ ...inputStyle, fontFamily: 'monospace' }} value={r[s.key] || 'unsure'}
+                            <select aria-label={s.label} style={{ ...inputStyle, fontFamily: 'var(--cv-font-mono)' }} value={r[s.key] || 'unsure'}
                               onChange={(e) => patch(r.id, { [s.key]: e.target.value })}>
                               {ANSWERS.map((a) => <option key={a} value={a}>{a}</option>)}
                             </select>
@@ -394,14 +394,14 @@ export default function CustomerSegmentsTable({ clientId, canManage }) {
                       </td>
                       <td style={td}>
                         {canManage ? (
-                          <input aria-label="Conversations held" style={{ ...inputStyle, fontFamily: 'monospace' }} inputMode="numeric" value={r.conversations_logged ?? 0}
+                          <input aria-label="Conversations held" style={{ ...inputStyle, fontFamily: 'var(--cv-font-mono)' }} inputMode="numeric" value={r.conversations_logged ?? 0}
                             onChange={(e) => patch(r.id, { conversations_logged: Math.max(0, Number(e.target.value) || 0) })} />
                         ) : (r.conversations_logged ?? 0)}
                         <div style={{ ...LABEL, marginTop: 3 }}>of {MIN_CONVERSATIONS}</div>
                       </td>
                       <td style={td}>
                         {canManage ? (
-                          <input aria-label="How many converged" style={{ ...inputStyle, fontFamily: 'monospace' }} inputMode="numeric" value={r.converging_count ?? 0}
+                          <input aria-label="How many converged" style={{ ...inputStyle, fontFamily: 'var(--cv-font-mono)' }} inputMode="numeric" value={r.converging_count ?? 0}
                             onChange={(e) => patch(r.id, { converging_count: Math.max(0, Number(e.target.value) || 0) })} />
                         ) : (r.converging_count ?? 0)}
                         <div style={{ ...LABEL, marginTop: 3 }}>of {MIN_CONVERGING}</div>

@@ -47,15 +47,15 @@ export default function CoachPage() {
   }
 
   if (status === 'checking') return (
-    <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'#F8F4EE',fontFamily:'monospace',fontSize:'0.85rem',color:'#4A5A6A'}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'#F8F4EE',fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',color:'#4A5A6A'}}>
       Loading...
     </div>
   )
 
   if (status === 'denied') return (
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'#F8F4EE',fontFamily:'Georgia,serif',color:'#C0392B',gap:'0.75rem',textAlign:'center',padding:'2rem'}}>
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'#F8F4EE',fontFamily:'var(--cv-font)',color:'#C0392B',gap:'0.75rem',textAlign:'center',padding:'2rem'}}>
       <div>You don&#39;t have access to the Coach Dashboard.</div>
-      <button onClick={handleSignOut} style={{fontFamily:'monospace',fontSize:'0.85rem',padding:'0.5rem 1rem',border:'1px solid #C0392B',borderRadius:6,background:'transparent',color:'#C0392B',cursor:'pointer'}}>Sign out</button>
+      <button onClick={handleSignOut} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',padding:'0.5rem 1rem',border:'1px solid #C0392B',borderRadius:6,background:'transparent',color:'#C0392B',cursor:'pointer'}}>Sign out</button>
     </div>
   )
 

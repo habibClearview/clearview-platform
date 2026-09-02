@@ -26,12 +26,12 @@ const C = {
   alt: 'var(--cv-alt)',
 }
 const card = { background: C.white, border: '1px solid var(--cv-border-soft)', borderRadius: 14, padding: '1.35rem 1.5rem', marginBottom: '1.25rem', boxShadow: '0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)' }
-const secH = { fontFamily: 'Georgia,serif', fontSize: '1.32rem', fontWeight: 700, color: C.navy, margin: 0 }
+const secH = { fontFamily: 'var(--cv-font)', fontSize: '1.32rem', fontWeight: 700, color: C.navy, margin: 0 }
 const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.45 }
-const ruleNo = { fontFamily: 'monospace', fontSize: '0.78rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }
-const ruleTitle = { fontFamily: 'Georgia,serif', fontSize: '1.1rem', fontWeight: 700, color: C.navy, marginTop: '0.1rem' }
+const ruleNo = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }
+const ruleTitle = { fontFamily: 'var(--cv-font)', fontSize: '1.1rem', fontWeight: 700, color: C.navy, marginTop: '0.1rem' }
 const ruleBody = { fontSize: '1.01rem', color: C.navy, lineHeight: 1.55, marginTop: '0.45rem' }
-const listLbl = { fontFamily: 'monospace', fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.3rem' }
+const listLbl = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.3rem' }
 
 // The eight rules. avoid = what not to ask, instead = what to ask in its
 // place. Only rules 3 and 5 carry those lists in the method.
@@ -118,7 +118,7 @@ export default function InterviewBriefing() {
       ))}
 
       <div style={{ borderTop: `1px solid ${C.border}`, marginTop: '1.2rem', paddingTop: '1rem' }}>
-        <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.1rem', fontWeight: 700, color: C.navy }}>
+        <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.1rem', fontWeight: 700, color: C.navy }}>
           What these conversations are testing
         </div>
         <div style={{ ...hint, marginTop: '0.3rem' }}>
@@ -126,7 +126,7 @@ export default function InterviewBriefing() {
         </div>
         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', margin: '0.6rem 0 0.9rem' }}>
           {TESTS.map((t) => (
-            <span key={t} style={{ fontFamily: 'monospace', fontSize: '0.87rem', color: C.teal, border: `1px solid ${C.teal}`, borderRadius: 999, padding: '0.2rem 0.7rem' }}>{t}</span>
+            <span key={t} style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.87rem', color: C.teal, border: `1px solid ${C.teal}`, borderRadius: 999, padding: '0.2rem 0.7rem' }}>{t}</span>
           ))}
         </div>
         <div style={{ ...hint, color: C.navy }}>

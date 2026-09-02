@@ -21,8 +21,8 @@ import { useCallback, useEffect, useState } from 'react'
 const CSS = `
 .sc{--paper:#EDE6D6;--card:#FBF7EE;--ink:#1B2A41;--ink-soft:#4C5A6B;--ink-faint:#8B8272;
   --line:rgba(27,42,65,.18);--teal:#00767A;--gold:#B7791F;
-  --fd:Georgia,"Times New Roman",serif;--fb:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
-  --fm:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --fd:var(--cv-font);--fb:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+  --fm:var(--cv-font-mono);
   background:var(--paper);color:var(--ink);font-family:var(--fb);min-height:100vh;line-height:1.55}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .sc{
   --paper:#0B1420;--card:#111E31;--ink:#EDF2F8;--ink-soft:#AAB9C9;--ink-faint:#7c899b;

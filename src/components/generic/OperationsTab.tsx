@@ -38,10 +38,10 @@ const CARD: React.CSSProperties = {
   borderRadius: 14, padding: '1.4rem 1.6rem', marginBottom: '1.35rem',
 }
 const H = (size = '1.15rem'): React.CSSProperties => ({
-  fontFamily: 'Georgia,serif', fontWeight: 700, color: C.navy, fontSize: size,
+  fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: size,
 })
 const LABEL: React.CSSProperties = {
-  fontFamily: 'monospace', fontSize: '0.72rem', letterSpacing: '0.04em',
+  fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em',
   textTransform: 'uppercase', color: C.slate,
 }
 
@@ -100,7 +100,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: str
   return (
     <div style={{ minWidth: 130 }}>
       <div style={LABEL}>{label}</div>
-      <div style={{ fontFamily: 'monospace', fontSize: '1.5rem', fontWeight: 700, color: tone || C.navy, marginTop: 4 }}>
+      <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '1.5rem', fontWeight: 700, color: tone || C.navy, marginTop: 4 }}>
         {value}
       </div>
     </div>
@@ -112,7 +112,7 @@ function Meter({ label, pct, tone }: { label: string; pct: number | null; tone: 
     <div style={{ marginBottom: '0.6rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: C.slate, marginBottom: 3 }}>
         <span>{label}</span>
-        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: pct == null ? C.slate : tone }}>
+        <span style={{ fontFamily: 'var(--cv-font-mono)', fontWeight: 700, color: pct == null ? C.slate : tone }}>
           {pct == null ? 'n/a' : `${Math.round(pct)}%`}
         </span>
       </div>
@@ -124,7 +124,7 @@ function Meter({ label, pct, tone }: { label: string; pct: number | null; tone: 
 }
 function Badge({ text, tone }: { text: string; tone: string }) {
   return (
-    <span style={{ fontFamily: 'monospace', fontSize: '0.72rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap' }}>
+    <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap' }}>
       {text}
     </span>
   )
@@ -139,8 +139,8 @@ const td: React.CSSProperties = { padding: '0.55rem 0.7rem', fontSize: '0.86rem'
 
 function btn(color: string, solid = false): React.CSSProperties {
   return solid
-    ? { fontFamily: 'monospace', fontSize: '0.82rem', fontWeight: 700, padding: '0.42rem 0.9rem', border: 'none', borderRadius: 7, background: color, color: 'var(--cv-on-accent)', cursor: 'pointer' }
-    : { fontFamily: 'monospace', fontSize: '0.82rem', padding: '0.42rem 0.9rem', border: `1px solid ${color}`, borderRadius: 7, background: 'transparent', color, cursor: 'pointer' }
+    ? { fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', fontWeight: 700, padding: '0.42rem 0.9rem', border: 'none', borderRadius: 7, background: color, color: 'var(--cv-on-accent)', cursor: 'pointer' }
+    : { fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', padding: '0.42rem 0.9rem', border: `1px solid ${color}`, borderRadius: 7, background: 'transparent', color, cursor: 'pointer' }
 }
 
 // ── Main component ───────────────────────────────────────────
@@ -196,7 +196,7 @@ export default function OperationsTab({ config, clientId, cc, P }: any) {
       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1.2rem' }}>
         {tabs.map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} style={{
-            fontFamily: 'monospace', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer',
+            fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer',
             padding: '0.45rem 0.95rem', borderRadius: 8,
             border: `1px solid ${tab === id ? C.cyan : C.border}`,
             background: tab === id ? C.cyan : 'transparent',
@@ -324,8 +324,8 @@ function DeliveriesView({ rows, clientId, P, onChange }: { rows: Delivery[]; cli
                   <tr key={d.id}>
                     <td style={td}>{d.reference || '—'}</td>
                     <td style={td}>{d.customer || '—'}</td>
-                    <td style={{ ...td, fontFamily: 'monospace' }}>{d.due_date || '—'}</td>
-                    <td style={{ ...td, fontFamily: 'monospace' }}>{d.delivered_at || '—'}</td>
+                    <td style={{ ...td, fontFamily: 'var(--cv-font-mono)' }}>{d.due_date || '—'}</td>
+                    <td style={{ ...td, fontFamily: 'var(--cv-font-mono)' }}>{d.delivered_at || '—'}</td>
                     <td style={td}><Badge text={outcome.t} tone={outcome.tone} /></td>
                     <td style={td}>{d.handled_by || '—'}</td>
                     <td style={td}><button onClick={() => del(d.id)} style={{ ...btn(C.red), padding: '0.2rem 0.5rem', fontSize: '0.72rem' }}>Delete</button></td>
@@ -447,7 +447,7 @@ function ComplaintsView({ rows, clientId, P, onChange }: { rows: Complaint[]; cl
                     <td style={td}>{c.customer || '—'}</td>
                     <td style={td}>{c.category || '—'}</td>
                     <td style={td}>{c.severity ? <Badge text={c.severity} tone={c.severity === 'high' ? C.red : c.severity === 'low' ? C.slate : C.amber} /> : '—'}</td>
-                    <td style={{ ...td, fontFamily: 'monospace' }}>{c.raised_at || '—'}</td>
+                    <td style={{ ...td, fontFamily: 'var(--cv-font-mono)' }}>{c.raised_at || '—'}</td>
                     <td style={td}>
                       {c.status === 'resolved'
                         ? <Badge text={days != null ? `resolved · ${days}d` : 'resolved'} tone={C.green} />
@@ -601,9 +601,9 @@ function StaffView({ deliveries, complaints, scores, clientId, P, onChange }: {
                 <tr key={s.id}>
                   <td style={td}>{s.staff_name || '—'}</td>
                   <td style={td}>{s.role || '—'}</td>
-                  <td style={{ ...td, fontFamily: 'monospace' }}>{s.period || '—'}</td>
+                  <td style={{ ...td, fontFamily: 'var(--cv-font-mono)' }}>{s.period || '—'}</td>
                   <td style={td}>{s.metric || '—'}</td>
-                  <td style={{ ...td, fontFamily: 'monospace' }}>{s.value == null ? '—' : s.value}</td>
+                  <td style={{ ...td, fontFamily: 'var(--cv-font-mono)' }}>{s.value == null ? '—' : s.value}</td>
                   <td style={td}>{s.notes || '—'}</td>
                   <td style={td}><button onClick={() => del(s.id)} style={{ ...btn(C.red), padding: '0.2rem 0.5rem', fontSize: '0.72rem' }}>Delete</button></td>
                 </tr>

@@ -31,8 +31,8 @@ const C = {
   navy: '#1B2A41', slate: '#4C5A6B', border: 'rgba(27,42,65,.16)',
   teal: '#2A9D8F', amber: '#D98C1F', tint: '#FBF7EE', card: '#FFFFFF',
 }
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
-const sans = "'Segoe UI',system-ui,sans-serif"
+const mono = { fontFamily: 'var(--cv-font-mono)' }
+const sans = "var(--cv-font)"
 
 const STATES: { value: string; label: string }[] = [
   { value: 'current', label: 'Current' },
@@ -158,7 +158,7 @@ export default function ServiceAnchorBar({
               onChange={(e) => { setCurrentId(e.target.value); act({ action: 'setCurrentService', serviceId: e.target.value }) }}
               aria-label="Which service the room is working on"
               style={{
-                fontFamily: 'Georgia,serif', fontSize: 18, fontWeight: 600, color: C.navy,
+                fontFamily: 'var(--cv-font)', fontSize: 18, fontWeight: 600, color: C.navy,
                 border: `1px solid ${C.border}`, borderRadius: 8, padding: '4px 8px',
                 background: C.card, maxWidth: '26rem',
               }}

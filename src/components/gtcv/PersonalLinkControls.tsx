@@ -28,7 +28,7 @@ const C = {
   border: 'var(--cv-border)', slate: 'var(--cv-slate)', navy: 'var(--cv-navy)',
   teal: 'var(--cv-teal)', red: 'var(--cv-red)', green: 'var(--cv-green)',
 }
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
 const btn = (col: string) => ({
   ...mono, fontSize: '0.79rem', fontWeight: 600, padding: '0.28rem 0.6rem',
   border: `1px solid ${col}`, borderRadius: 7, background: 'transparent',

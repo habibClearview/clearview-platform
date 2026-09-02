@@ -145,13 +145,13 @@ export function brandedEmail(input: BrandedEmailInput): string {
     ? `<p style="color:#4A5A6A;font-size:13px;margin:18px 0 0;">${render(input.footNote)}</p>`
     : ''
   return `
-    <div style="font-family:'Segoe UI',system-ui,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">
+    <div style="font-family:var(--cv-font);max-width:560px;margin:0 auto;padding:32px 24px;">
       <div style="background:#1B2A41;padding:20px 24px;border-radius:8px 8px 0 0;border-bottom:3px solid #00CCCC;">
         <p style="margin:0;font-size:11px;color:#00CCCC;letter-spacing:1px;text-transform:uppercase;">The Canvas Coach</p>
-        <p style="margin:4px 0 0;font-size:20px;color:#F5F0E8;font-family:Georgia,serif;">Grant-to-Commercial Viability</p>
+        <p style="margin:4px 0 0;font-size:20px;color:#F5F0E8;font-family:var(--cv-font);">Grant-to-Commercial Viability</p>
       </div>
       <div style="background:#F5F0E8;padding:26px 24px;border-radius:0 0 8px 8px;border:1px solid #D8E0E8;border-top:none;color:#1B2A41;line-height:1.6;">
-        <h1 style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin:0 0 14px;">${render(input.heading)}</h1>
+        <h1 style="font-family:var(--cv-font);font-size:22px;font-weight:600;margin:0 0 14px;">${render(input.heading)}</h1>
         ${body}
         ${cta}
         ${foot}

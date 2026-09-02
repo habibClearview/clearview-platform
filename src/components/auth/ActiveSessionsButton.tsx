@@ -94,7 +94,7 @@ export default function ActiveSessionsButton({ fontSize = '0.88rem' }: { fontSiz
         type="button"
         onClick={() => setOpen(true)}
         title="See every device your account is signed in on, and sign any of them out"
-        style={{ fontFamily: 'monospace', fontSize, background: 'transparent', border: '1px solid var(--cv-wa-45, rgba(120,140,160,0.45))', borderRadius: 4, color: 'var(--cv-wa-85, #4A5A6A)', cursor: 'pointer', padding: '0.18rem 0.5rem' }}>
+        style={{ fontFamily: 'var(--cv-font-mono)', fontSize, background: 'transparent', border: '1px solid var(--cv-wa-45, rgba(120,140,160,0.45))', borderRadius: 4, color: 'var(--cv-wa-85, #4A5A6A)', cursor: 'pointer', padding: '0.18rem 0.5rem' }}>
         Devices
       </button>
 
@@ -110,7 +110,7 @@ export default function ActiveSessionsButton({ fontSize = '0.88rem' }: { fontSiz
           <div
             style={{ background: '#FFFFFF', color: '#1B2A4A', borderRadius: 10, width: '100%', maxHeight: '84vh', overflowY: 'auto', boxShadow: '0 12px 40px rgba(0,0,0,0.3)', padding: '1.25rem 1.35rem', boxSizing: 'border-box' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 700 }}>Your signed-in devices</div>
+              <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.15rem', fontWeight: 700 }}>Your signed-in devices</div>
               <button type="button" onClick={() => setOpen(false)} aria-label="Close" style={{ background: 'none', border: 'none', fontSize: '1.4rem', lineHeight: 1, color: '#4A5A6A', cursor: 'pointer' }}>×</button>
             </div>
             <p style={{ fontSize: '0.82rem', color: '#4A5A6A', margin: '0 0 1rem', lineHeight: 1.5 }}>
@@ -130,7 +130,7 @@ export default function ActiveSessionsButton({ fontSize = '0.88rem' }: { fontSiz
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                         {describeDevice(s.user_agent)}
-                        {s.is_current && <span style={{ fontSize: '0.62rem', fontFamily: 'monospace', color: '#00838F', border: '1px solid #00B4D8', borderRadius: 3, padding: '0.05rem 0.35rem' }}>THIS DEVICE</span>}
+                        {s.is_current && <span style={{ fontSize: '0.62rem', fontFamily: 'var(--cv-font-mono)', color: '#00838F', border: '1px solid #00B4D8', borderRadius: 3, padding: '0.05rem 0.35rem' }}>THIS DEVICE</span>}
                       </div>
                       <div style={{ fontSize: '0.72rem', color: '#4A5A6A', marginTop: '0.2rem' }}>
                         {s.ip ? `IP ${s.ip} · ` : ''}Last active {fmt(s.last_active)}
@@ -140,7 +140,7 @@ export default function ActiveSessionsButton({ fontSize = '0.88rem' }: { fontSiz
                       type="button"
                       disabled={busyId === s.id}
                       onClick={() => signOutOne(s)}
-                      style={{ flexShrink: 0, fontFamily: 'monospace', fontSize: '0.7rem', padding: '0.32rem 0.7rem', border: '1px solid #C0392B', borderRadius: 4, background: 'transparent', color: '#C0392B', cursor: busyId === s.id ? 'wait' : 'pointer' }}>
+                      style={{ flexShrink: 0, fontFamily: 'var(--cv-font-mono)', fontSize: '0.7rem', padding: '0.32rem 0.7rem', border: '1px solid #C0392B', borderRadius: 4, background: 'transparent', color: '#C0392B', cursor: busyId === s.id ? 'wait' : 'pointer' }}>
                       {busyId === s.id ? '…' : 'Sign out'}
                     </button>
                   </div>
@@ -154,7 +154,7 @@ export default function ActiveSessionsButton({ fontSize = '0.88rem' }: { fontSiz
                   type="button"
                   disabled={busyId === 'others'}
                   onClick={signOutOthers}
-                  style={{ fontFamily: 'monospace', fontSize: '0.76rem', padding: '0.5rem 1rem', border: 'none', borderRadius: 5, background: '#C0392B', color: '#FFFFFF', cursor: busyId === 'others' ? 'wait' : 'pointer', fontWeight: 700 }}>
+                  style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.76rem', padding: '0.5rem 1rem', border: 'none', borderRadius: 5, background: '#C0392B', color: '#FFFFFF', cursor: busyId === 'others' ? 'wait' : 'pointer', fontWeight: 700 }}>
                   {busyId === 'others' ? 'Signing out…' : `Sign out all ${otherCount} other device${otherCount === 1 ? '' : 's'}`}
                 </button>
               </div>

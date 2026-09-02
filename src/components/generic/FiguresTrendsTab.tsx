@@ -29,8 +29,8 @@ const C = {
   card: 'var(--cv-card)', cream: 'var(--cv-cream)',
 }
 const CARD: React.CSSProperties = { background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: 14, padding: '1.3rem 1.5rem', marginBottom: '1.35rem' }
-const H = (s = '1.15rem'): React.CSSProperties => ({ fontFamily: 'Georgia,serif', fontWeight: 700, color: C.navy, fontSize: s })
-const LABEL: React.CSSProperties = { fontFamily: 'monospace', fontSize: '0.72rem', letterSpacing: '0.04em', textTransform: 'uppercase', color: C.slate }
+const H = (s = '1.15rem'): React.CSSProperties => ({ fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: s })
+const LABEL: React.CSSProperties = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em', textTransform: 'uppercase', color: C.slate }
 const selStyle: React.CSSProperties = { fontFamily: 'inherit', fontSize: '0.95rem', padding: '0.5rem 0.7rem', border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.navy, fontWeight: 600 }
 
 interface Metric { key: string; label: string; plan: number[]; actual: (number | null)[]; higherBetter: boolean }
@@ -102,7 +102,7 @@ function CombinedChart({ series, months }: { series: Series[]; months: string[] 
         {nowIdx >= 0 && nowIdx < n - 1 && (
           <>
             <line x1={X(nowIdx)} y1={padT} x2={X(nowIdx)} y2={Hh - padB} stroke={C.cyan} strokeWidth="1" strokeDasharray="2 3" opacity={0.5} />
-            <text x={X(nowIdx)} y={padT - 5} textAnchor="end" style={{ fill: C.cyan, fontSize: 10, fontWeight: 700, fontFamily: 'monospace' }}>now</text>
+            <text x={X(nowIdx)} y={padT - 5} textAnchor="end" style={{ fill: C.cyan, fontSize: 10, fontWeight: 700, fontFamily: 'var(--cv-font-mono)' }}>now</text>
           </>
         )}
         {series.map(s => {
@@ -117,7 +117,7 @@ function CombinedChart({ series, months }: { series: Series[]; months: string[] 
           )
         })}
         {months.slice(0, n).map((mo, i) => i % labelStep === 0 ? (
-          <text key={i} x={X(i)} y={Hh - 12} textAnchor="middle" style={{ fill: C.slate, fontSize: 10.5, fontFamily: 'monospace' }}>{mo}</text>
+          <text key={i} x={X(i)} y={Hh - 12} textAnchor="middle" style={{ fill: C.slate, fontSize: 10.5, fontFamily: 'var(--cv-font-mono)' }}>{mo}</text>
         ) : null)}
       </svg>
     </div>
@@ -137,7 +137,7 @@ function MetricTableWide({ metric, months, cc }: { metric: Metric; months: strin
   const tone = (fav: boolean | null) => fav === null ? C.slate : fav ? C.green : C.red
 
   const firstCol: React.CSSProperties = { position: 'sticky', left: 0, zIndex: 2, background: C.card, textAlign: 'left', padding: '0.5rem 0.8rem', fontFamily: 'inherit', whiteSpace: 'nowrap', borderRight: `1px solid ${C.border}` }
-  const cell: React.CSSProperties = { padding: '0.5rem 0.8rem', fontSize: '0.88rem', textAlign: 'right', fontFamily: 'ui-monospace,monospace', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }
+  const cell: React.CSSProperties = { padding: '0.5rem 0.8rem', fontSize: '0.88rem', textAlign: 'right', fontFamily: 'var(--cv-font-mono)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }
   const totCol: React.CSSProperties = { ...cell, borderLeft: `2px solid ${C.border}`, fontWeight: 700 }
 
   return (

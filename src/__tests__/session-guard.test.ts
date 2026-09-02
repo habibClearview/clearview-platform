@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isIdle, IDLE_MS, HEARTBEAT_MS, screenRunsUnattended, isSafeReturnPath } from '@/lib/auth/session-guard'
+import { isIdle, IDLE_MS, HEARTBEAT_MS, screenRunsUnattended, isSafeReturnPath, shouldWarnIdle, secondsUntilSignOut } from '@/lib/auth/session-guard'
 
 describe('isIdle', () => {
   const now = 1_000_000_000_000
@@ -25,9 +25,29 @@ describe('isIdle', () => {
     expect(isIdle(now, 0, IDLE_MS)).toBe(false)
   })
 
-  it('uses a short idle window and a frequent check interval', () => {
-    expect(IDLE_MS).toBeLessThanOrEqual(5 * 60 * 1000)
+  // 2 September 2026. This asserted five minutes or less, which was the
+  // original policy. Five minutes signed Habib out while he was reading the
+  // live site — from outside it looks like the app closing itself. The window
+  // is an hour now, still bounded so it cannot quietly drift to "never", and
+  // the sign-out is warned about before it happens.
+  it('uses an idle window a person can work inside, and still has one', () => {
+    expect(IDLE_MS).toBeGreaterThanOrEqual(30 * 60 * 1000)
+    expect(IDLE_MS).toBeLessThanOrEqual(2 * 60 * 60 * 1000)
     expect(HEARTBEAT_MS).toBeLessThanOrEqual(30 * 1000)
+  })
+
+  it('warns before it signs anybody out, and never after', () => {
+    const last = now - IDLE_MS + 60 * 1000        // one minute left
+    expect(shouldWarnIdle(now, last)).toBe(true)
+    expect(isIdle(now, last, IDLE_MS)).toBe(false)
+    expect(secondsUntilSignOut(now, last)).toBe(60)
+
+    const fresh = now - 1000                       // just used it
+    expect(shouldWarnIdle(now, fresh)).toBe(false)
+
+    const gone = now - IDLE_MS - 1000              // already past it
+    expect(shouldWarnIdle(now, gone)).toBe(false)
+    expect(isIdle(now, gone, IDLE_MS)).toBe(true)
   })
 })
 

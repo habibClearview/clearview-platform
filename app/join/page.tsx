@@ -66,14 +66,14 @@ export default function JoinPage() {
     <main style={{
       minHeight: '100vh', background: C.bg, color: C.navy,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '1.25rem', fontFamily: "'Segoe UI',system-ui,sans-serif",
+      padding: '1.25rem', fontFamily: "var(--cv-font)",
     }}>
       <div style={{
         width: '100%', maxWidth: 460, background: C.card,
         border: `1px solid ${C.border}`, borderRadius: 14, padding: '1.75rem 1.5rem',
       }}>
         <h1 style={{
-          fontFamily: 'Georgia,serif', fontSize: '1.5rem', fontWeight: 600,
+          fontFamily: 'var(--cv-font)', fontSize: '1.5rem', fontWeight: 600,
           margin: 0, lineHeight: 1.2,
         }}>Join the session</h1>
         <p style={{ color: C.slate, fontSize: '1rem', lineHeight: 1.55, margin: '0.6rem 0 1.4rem' }}>
@@ -83,7 +83,7 @@ export default function JoinPage() {
 
         <form onSubmit={go}>
           <label htmlFor="join-code" style={{
-            fontFamily: 'monospace', fontSize: '0.7rem', letterSpacing: '.12em',
+            fontFamily: 'var(--cv-font-mono)', fontSize: '0.7rem', letterSpacing: '.12em',
             textTransform: 'uppercase', color: C.slate, display: 'block', marginBottom: '0.4rem',
           }}>The code</label>
           <input
@@ -100,7 +100,7 @@ export default function JoinPage() {
             maxLength={JOIN_CODE_LENGTH + 4}
             style={{
               width: '100%', boxSizing: 'border-box',
-              fontFamily: 'monospace', fontSize: '1.5rem', letterSpacing: '.18em',
+              fontFamily: 'var(--cv-font-mono)', fontSize: '1.5rem', letterSpacing: '.18em',
               textAlign: 'center', textTransform: 'uppercase',
               padding: '0.75rem 0.6rem', borderRadius: 10,
               border: `1px solid ${err ? C.red : C.border}`,
@@ -117,7 +117,7 @@ export default function JoinPage() {
             disabled={!ready || busy}
             style={{
               width: '100%', marginTop: '1.1rem', padding: '0.7rem 1rem',
-              fontFamily: 'monospace', fontSize: '1rem', fontWeight: 700,
+              fontFamily: 'var(--cv-font-mono)', fontSize: '1rem', fontWeight: 700,
               border: 'none', borderRadius: 10,
               background: ready && !busy ? C.teal : C.border,
               color: ready && !busy ? 'var(--cv-on-accent, #FFFFFF)' : C.slate,

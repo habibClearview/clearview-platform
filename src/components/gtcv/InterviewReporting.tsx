@@ -46,7 +46,7 @@ const C = {
   slate: 'var(--cv-slate)', navy: 'var(--cv-navy)', teal: 'var(--cv-teal)',
   green: 'var(--cv-green)', amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
 const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
 
 export default function InterviewReporting({ clientId }) {
@@ -142,7 +142,7 @@ export default function InterviewReporting({ clientId }) {
           borderRadius: 11, padding: '0.9rem 1rem', background: C.card,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.7rem', flexWrap: 'wrap', alignItems: 'baseline' }}>
-            <h3 style={{ fontFamily: 'Georgia,serif', fontSize: '1.1rem', fontWeight: 600, color: C.navy, margin: 0 }}>
+            <h3 style={{ fontFamily: 'var(--cv-font)', fontSize: '1.1rem', fontWeight: 600, color: C.navy, margin: 0 }}>
               {r.name}
             </h3>
             <span style={{
@@ -234,7 +234,7 @@ export default function InterviewReporting({ clientId }) {
 
 const th = {
   textAlign: 'left', padding: '0.35rem 0.5rem', borderBottom: `1px solid ${C.border}`,
-  fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+  fontFamily: 'var(--cv-font-mono)',
   fontSize: '0.68rem', letterSpacing: '.08em', textTransform: 'uppercase', color: C.slate,
   fontWeight: 600, whiteSpace: 'nowrap',
 }
@@ -248,7 +248,7 @@ function Stat({ label, value, tone }) {
     <div>
       <div style={{ ...mono, fontSize: '0.68rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>{label}</div>
       <div style={{
-        fontFamily: 'Georgia,serif', fontSize: '1.35rem', fontWeight: 600,
+        fontFamily: 'var(--cv-font)', fontSize: '1.35rem', fontWeight: 600,
         color: tone || C.navy, marginTop: 2, fontVariantNumeric: 'tabular-nums',
       }}>{value}</div>
     </div>

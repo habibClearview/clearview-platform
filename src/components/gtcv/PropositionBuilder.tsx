@@ -59,10 +59,10 @@ const CARD = {
   borderRadius: 14, padding: '1.4rem 1.6rem', marginBottom: '1.35rem',
 }
 const H = (size = '1.15rem') => ({
-  fontFamily: 'Georgia,serif', fontWeight: 700, color: C.navy, fontSize: size,
+  fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: size,
 })
 const LABEL = {
-  fontFamily: 'monospace', fontSize: '0.72rem', letterSpacing: '0.04em',
+  fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em',
   textTransform: 'uppercase', color: C.slate,
 }
 const inputStyle = {
@@ -74,8 +74,8 @@ const th = { ...LABEL, textAlign: 'left', padding: '0.45rem 0.6rem', borderBotto
 const td = { padding: '0.45rem 0.6rem', fontSize: '0.85rem', color: C.navy, verticalAlign: 'top', borderBottom: `1px solid ${C.borderSoft}` }
 function btn(color, solid = false) {
   return solid
-    ? { fontFamily: 'monospace', fontSize: '0.82rem', fontWeight: 700, padding: '0.42rem 0.9rem', border: 'none', borderRadius: 7, background: color, color: 'var(--cv-on-accent)', cursor: 'pointer' }
-    : { fontFamily: 'monospace', fontSize: '0.82rem', padding: '0.42rem 0.9rem', border: `1px solid ${color}`, borderRadius: 7, background: 'transparent', color, cursor: 'pointer' }
+    ? { fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', fontWeight: 700, padding: '0.42rem 0.9rem', border: 'none', borderRadius: 7, background: color, color: 'var(--cv-on-accent)', cursor: 'pointer' }
+    : { fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', padding: '0.42rem 0.9rem', border: `1px solid ${color}`, borderRadius: 7, background: 'transparent', color, cursor: 'pointer' }
 }
 
 // The four parts, in the order the method states them.
@@ -129,7 +129,7 @@ function missingParts(p) {
 
 function Pill({ text, tone, title }) {
   return (
-    <span title={title} style={{ fontFamily: 'monospace', fontSize: '0.72rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap', display: 'inline-block' }}>
+    <span title={title} style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap', display: 'inline-block' }}>
       {text}
     </span>
   )
@@ -576,7 +576,7 @@ function PropositionCard({ row: r, label, segments, tests, canManage, patch, pat
                     </td>
                     <td style={td}>
                       {canManage ? (
-                        <input aria-label="Date tested" type="date" style={{ ...inputStyle, fontFamily: 'monospace' }} value={t.tested_on || ''}
+                        <input aria-label="Date tested" type="date" style={{ ...inputStyle, fontFamily: 'var(--cv-font-mono)' }} value={t.tested_on || ''}
                           onChange={(e) => patchTest(t.id, { tested_on: e.target.value || null })} />
                       ) : (t.tested_on || '-')}
                     </td>

@@ -33,7 +33,7 @@ export default function EnvBanner() {
         width: '100%',
         background: env === 'staging' ? '#B8860B' : '#4A5A6A',
         color: '#FFFFFF',
-        fontFamily: 'monospace',
+        fontFamily: 'var(--cv-font-mono)',
         fontSize: '0.78rem',
         fontWeight: 700,
         letterSpacing: '0.02em',

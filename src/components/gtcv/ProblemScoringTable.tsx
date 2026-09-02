@@ -54,10 +54,10 @@ const CARD = {
   borderRadius: 14, padding: '1.4rem 1.6rem', marginBottom: '1.35rem',
 }
 const H = (size = '1.15rem') => ({
-  fontFamily: 'Georgia,serif', fontWeight: 700, color: C.navy, fontSize: size,
+  fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: size,
 })
 const LABEL = {
-  fontFamily: 'monospace', fontSize: '0.72rem', letterSpacing: '0.04em',
+  fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em',
   textTransform: 'uppercase', color: C.slate,
 }
 const inputStyle = {
@@ -69,8 +69,8 @@ const th = { ...LABEL, textAlign: 'left', padding: '0.5rem 0.7rem', borderBottom
 const td = { padding: '0.5rem 0.7rem', fontSize: '0.86rem', color: C.navy, verticalAlign: 'top', borderBottom: `1px solid ${C.borderSoft}` }
 function btn(color, solid = false) {
   return solid
-    ? { fontFamily: 'monospace', fontSize: '0.82rem', fontWeight: 700, padding: '0.42rem 0.9rem', border: 'none', borderRadius: 7, background: color, color: 'var(--cv-on-accent)', cursor: 'pointer' }
-    : { fontFamily: 'monospace', fontSize: '0.82rem', padding: '0.42rem 0.9rem', border: `1px solid ${color}`, borderRadius: 7, background: 'transparent', color, cursor: 'pointer' }
+    ? { fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', fontWeight: 700, padding: '0.42rem 0.9rem', border: 'none', borderRadius: 7, background: color, color: 'var(--cv-on-accent)', cursor: 'pointer' }
+    : { fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', padding: '0.42rem 0.9rem', border: `1px solid ${color}`, borderRadius: 7, background: 'transparent', color, cursor: 'pointer' }
 }
 
 // The four scored dimensions, in the order the method asks them.
@@ -98,7 +98,7 @@ function totalTone(total) {
 
 function Pill({ text, tone, title }) {
   return (
-    <span title={title} style={{ fontFamily: 'monospace', fontSize: '0.72rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap', display: 'inline-block' }}>
+    <span title={title} style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap', display: 'inline-block' }}>
       {text}
     </span>
   )
@@ -354,7 +354,7 @@ export default function ProblemScoringTable({ clientId, canManage }) {
             <tbody>
               {ranked.map(({ row: r, total, rank, advancing }) => (
                 <tr key={r.id} style={advancing ? { background: C.alt } : undefined}>
-                  <td style={{ ...td, fontFamily: 'monospace', fontWeight: 700, color: advancing ? C.green : C.slate }}>{rank}</td>
+                  <td style={{ ...td, fontFamily: 'var(--cv-font-mono)', fontWeight: 700, color: advancing ? C.green : C.slate }}>{rank}</td>
                   <td style={td}>
                     {canManage ? (
                       <textarea aria-label="State the problem as the customer states it" style={{ ...inputStyle, minHeight: 56, resize: 'vertical' }} value={r.problem_statement || ''}
@@ -382,7 +382,7 @@ export default function ProblemScoringTable({ clientId, canManage }) {
                   {DIMENSIONS.map((d) => (
                     <td key={d.key} style={td} title={d.help}>
                       {canManage ? (
-                        <select aria-label={d.label} style={{ ...inputStyle, fontFamily: 'monospace' }} value={r[d.key] == null ? '' : String(r[d.key])}
+                        <select aria-label={d.label} style={{ ...inputStyle, fontFamily: 'var(--cv-font-mono)' }} value={r[d.key] == null ? '' : String(r[d.key])}
                           onChange={(e) => patch(r.id, { [d.key]: e.target.value === '' ? null : Number(e.target.value) })}>
                           <option value="">-</option>
                           {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
@@ -391,7 +391,7 @@ export default function ProblemScoringTable({ clientId, canManage }) {
                     </td>
                   ))}
                   <td style={td}>
-                    <div style={{ fontFamily: 'monospace', fontSize: '1.05rem', fontWeight: 700, color: totalTone(total) }}>
+                    <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '1.05rem', fontWeight: 700, color: totalTone(total) }}>
                       {total}
                       <span style={{ color: C.slate, fontWeight: 400, fontSize: '0.78rem' }}> / {MAX_TOTAL}</span>
                     </div>

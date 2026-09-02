@@ -38,10 +38,10 @@ const CARD: React.CSSProperties = {
   borderRadius: 14, padding: '1.4rem 1.6rem', marginBottom: '1.35rem',
 }
 const H = (size = '1.15rem'): React.CSSProperties => ({
-  fontFamily: 'Georgia,serif', fontWeight: 700, color: C.navy, fontSize: size,
+  fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: size,
 })
 const LABEL: React.CSSProperties = {
-  fontFamily: 'monospace', fontSize: '0.72rem', letterSpacing: '0.04em',
+  fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em',
   textTransform: 'uppercase', color: C.slate,
 }
 const inputStyle: React.CSSProperties = {
@@ -52,12 +52,12 @@ const th: React.CSSProperties = { ...LABEL, textAlign: 'left', padding: '0.5rem 
 const td: React.CSSProperties = { padding: '0.55rem 0.7rem', fontSize: '0.86rem', color: C.navy, borderBottom: `1px solid ${C.borderSoft}`, verticalAlign: 'top' }
 function btn(color: string, solid = false): React.CSSProperties {
   return solid
-    ? { fontFamily: 'monospace', fontSize: '0.82rem', fontWeight: 700, padding: '0.42rem 0.9rem', border: 'none', borderRadius: 7, background: color, color: 'var(--cv-on-accent)', cursor: 'pointer' }
-    : { fontFamily: 'monospace', fontSize: '0.82rem', padding: '0.42rem 0.9rem', border: `1px solid ${color}`, borderRadius: 7, background: 'transparent', color, cursor: 'pointer' }
+    ? { fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', fontWeight: 700, padding: '0.42rem 0.9rem', border: 'none', borderRadius: 7, background: color, color: 'var(--cv-on-accent)', cursor: 'pointer' }
+    : { fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', padding: '0.42rem 0.9rem', border: `1px solid ${color}`, borderRadius: 7, background: 'transparent', color, cursor: 'pointer' }
 }
 function Badge({ text, tone }: { text: string; tone: string }) {
   return (
-    <span style={{ fontFamily: 'monospace', fontSize: '0.72rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap' }}>
+    <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', fontWeight: 700, color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.1rem 0.45rem', whiteSpace: 'nowrap' }}>
       {text}
     </span>
   )
@@ -321,7 +321,7 @@ function DepartmentsManager({ depts, rows, clientId, onChanged }: {
                         ? <input autoFocus style={{ ...inputStyle, width: '100%' }} value={editName} onChange={e => setEditName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') rename(d); if (e.key === 'Escape') setEditId(null) }} />
                         : <span style={{ fontWeight: 600 }}>{d.name}</span>}
                     </td>
-                    <td style={{ ...td, fontFamily: 'monospace' }}>{countFor(d.name)}</td>
+                    <td style={{ ...td, fontFamily: 'var(--cv-font-mono)' }}>{countFor(d.name)}</td>
                     <td style={{ ...td, whiteSpace: 'nowrap' }}>
                       {editId === d.id ? (
                         <>
@@ -385,13 +385,13 @@ function DeptSection({ deptName, tone, rows, currency, clientId, canManage, allR
                 return (
                   <Fragment key={s.id}>
                     <tr style={{ opacity: s.active ? 1 : 0.55 }}>
-                      <td style={{ ...td, fontFamily: 'monospace', fontWeight: 700 }}>{s.staff_code}</td>
+                      <td style={{ ...td, fontFamily: 'var(--cv-font-mono)', fontWeight: 700 }}>{s.staff_code}</td>
                       <td style={td}>{s.full_name}</td>
-                      <td style={{ ...td, fontFamily: 'monospace', color: C.slate }}>{s.phone || '—'}</td>
+                      <td style={{ ...td, fontFamily: 'var(--cv-font-mono)', color: C.slate }}>{s.phone || '—'}</td>
                       <td style={td}>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
                           {current.map(t => (
-                            <span key={t.id} style={{ fontFamily: 'monospace', fontSize: '0.74rem', color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.08rem 0.4rem' }}>
+                            <span key={t.id} style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.74rem', color: tone, border: `1px solid ${tone}`, borderRadius: 6, padding: '0.08rem 0.4rem' }}>
                               {fmtTarget(t, currency)}
                             </span>
                           ))}
@@ -476,7 +476,7 @@ function TargetsPanel({ staff, rows, currency, clientId, canManage, onChanged }:
       ) : (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: '0.9rem' }}>
           {current.map(t => (
-            <span key={t.id} style={{ fontFamily: 'monospace', fontSize: '0.78rem', fontWeight: 700, color: C.navy, background: C.card, border: `1px solid ${C.border}`, borderRadius: 7, padding: '0.2rem 0.55rem' }}>
+            <span key={t.id} style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', fontWeight: 700, color: C.navy, background: C.card, border: `1px solid ${C.border}`, borderRadius: 7, padding: '0.2rem 0.55rem' }}>
               {fmtTarget(t, currency)} <span style={{ color: C.slate, fontWeight: 400 }}>· since {t.effective_from}</span>
             </span>
           ))}
@@ -501,7 +501,7 @@ function TargetsPanel({ staff, rows, currency, clientId, canManage, onChanged }:
             )}
             <label style={{ display: 'block' }}>
               <div style={{ ...LABEL, marginBottom: 4 }}>{kind === 'percent' ? 'Percent (≥)' : kind === 'value' ? `Amount ${currency} (≥)` : 'How many (≥)'}</div>
-              <input style={{ ...inputStyle, width: '100%', fontFamily: 'monospace' }} inputMode="numeric" value={value} onChange={e => setValue(e.target.value)} placeholder={kind === 'percent' ? '60' : '12'} />
+              <input style={{ ...inputStyle, width: '100%', fontFamily: 'var(--cv-font-mono)' }} inputMode="numeric" value={value} onChange={e => setValue(e.target.value)} placeholder={kind === 'percent' ? '60' : '12'} />
             </label>
             <label style={{ display: 'block' }}>
               <div style={{ ...LABEL, marginBottom: 4 }}>Per</div>
@@ -511,7 +511,7 @@ function TargetsPanel({ staff, rows, currency, clientId, canManage, onChanged }:
             </label>
             <label style={{ display: 'block' }}>
               <div style={{ ...LABEL, marginBottom: 4 }}>Starts from</div>
-              <input type="date" style={{ ...inputStyle, width: '100%', fontFamily: 'monospace' }} value={effFrom} onChange={e => setEffFrom(e.target.value)} />
+              <input type="date" style={{ ...inputStyle, width: '100%', fontFamily: 'var(--cv-font-mono)' }} value={effFrom} onChange={e => setEffFrom(e.target.value)} />
             </label>
             <button onClick={add} disabled={saving} style={{ ...btn(C.green, true), height: 34 }}>{saving ? 'Saving…' : 'Add target'}</button>
           </div>
@@ -530,8 +530,8 @@ function TargetsPanel({ staff, rows, currency, clientId, canManage, onChanged }:
               {rows.map(t => (
                 <tr key={t.id}>
                   <td style={td}>{t.metric === 'custom' ? (t.metric_label || 'Custom') : METRIC[t.metric].label}</td>
-                  <td style={{ ...td, fontFamily: 'monospace' }}>{fmtTarget(t, currency)}</td>
-                  <td style={{ ...td, fontFamily: 'monospace', color: t.effective_from > TODAY ? C.amber : C.slate }}>
+                  <td style={{ ...td, fontFamily: 'var(--cv-font-mono)' }}>{fmtTarget(t, currency)}</td>
+                  <td style={{ ...td, fontFamily: 'var(--cv-font-mono)', color: t.effective_from > TODAY ? C.amber : C.slate }}>
                     {t.effective_from}{t.effective_from > TODAY ? ' (future)' : ''}
                   </td>
                   {canManage && <td style={td}><button onClick={() => remove(t.id)} style={btn(C.red)}>Remove</button></td>}
@@ -608,7 +608,7 @@ function StaffForm({ clientId, allRows, depts, existing, onClose, onSaved }: {
           </select>
         ))}
         {field('Full name', <input style={{ ...inputStyle, width: '100%' }} value={form.full_name} onChange={e => set('full_name', e.target.value)} placeholder="e.g. Amina Bello" />)}
-        {field('Staff code', <input style={{ ...inputStyle, width: '100%', fontFamily: 'monospace' }} value={form.staff_code} onChange={e => set('staff_code', e.target.value)} />)}
+        {field('Staff code', <input style={{ ...inputStyle, width: '100%', fontFamily: 'var(--cv-font-mono)' }} value={form.staff_code} onChange={e => set('staff_code', e.target.value)} />)}
         {field('Phone (optional)', <input style={{ ...inputStyle, width: '100%' }} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="080…" />)}
       </div>
       <div style={{ marginBottom: '0.9rem' }}>

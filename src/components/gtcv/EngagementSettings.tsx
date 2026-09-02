@@ -24,7 +24,7 @@ const C = {
   slate: 'var(--cv-slate)', navy: 'var(--cv-navy)', teal: 'var(--cv-teal)',
   green: 'var(--cv-green)', amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
 const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.5 }
 const labelText = {
   ...mono, fontSize: '0.68rem', letterSpacing: '.1em', textTransform: 'uppercase',
@@ -33,7 +33,7 @@ const labelText = {
 const field = {
   width: '100%', padding: '0.44rem 0.58rem', borderRadius: 7,
   border: `1px solid ${C.border}`, background: 'var(--cv-card)', color: 'inherit',
-  fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: '0.93rem',
+  fontFamily: "var(--cv-font)", fontSize: '0.93rem',
 }
 const smallBtn = (col, solid) => ({
   ...mono, fontSize: '0.83rem', fontWeight: 600, padding: '0.36rem 0.85rem',

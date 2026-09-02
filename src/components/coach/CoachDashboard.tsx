@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   statusLabel, statusColor, canEdit, canViewCoachGuidance, canSignOff,
   canManageTeam, canApproveTimesheets, canSubmitTimesheets,
-  CLIENT_TYPE_LABELS, CLIENT_TYPE_COLORS, CANVAS_TABS, TAB_GROUPS,
+  CLIENT_TYPE_LABELS, CLIENT_TYPE_COLORS, CANVAS_TABS, TAB_GROUPS, canRunTheEngagement,
   READINESS_QUESTIONS, buildEmptyCanvas,
 } from '@/lib/coach-types'
 import { supabase } from '@/lib/supabase'
@@ -41,7 +41,7 @@ import dynamic from 'next/dynamic'
 // uploading is occasional. Loads on demand when the upload panel is opened.
 const SpreadsheetUpload = dynamic(() => import('@/components/intake/SpreadsheetUpload'), {
   ssr: false,
-  loading: () => <div style={{fontFamily:'monospace',fontSize:'0.9rem',padding:'0.6rem 0',color:'var(--cv-slate)'}}>Loading uploader…</div>,
+  loading: () => <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.9rem',padding:'0.6rem 0',color:'var(--cv-slate)'}}>Loading uploader…</div>,
 })
 import BuildStamp from '@/components/BuildStamp'
 import ErrorBoundary from '@/components/ErrorBoundary'
@@ -66,37 +66,37 @@ const C = {
 
 // \u2500\u2500\u2500 SHARED STYLES \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 const card = {background:C.white,border:'1px solid var(--cv-border-soft)',borderRadius:14,padding:'1.35rem 1.5rem',marginBottom:'1.25rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)'}
-const secH = {fontFamily:'Georgia,serif',fontSize:'1.32rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
+const secH = {fontFamily:'var(--cv-font)',fontSize:'1.32rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
 const inp  = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'1.13rem',fontFamily:'inherit',background:'var(--cv-bg-2)',color:C.navy,boxSizing:'border-box'}
 const lbl  = {display:'block',fontWeight:600,fontSize:'1.07rem',marginBottom:'0.22rem',color:C.navy}
 const hint = {fontSize:'1.01rem',color:C.slate,lineHeight:1.4}
 const fGrid= {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:'1rem'}
 
-function navBtn(active){return{fontFamily:'monospace',fontSize:'1.01rem',padding:'0.72rem 1rem',border:'none',background:'transparent',color:active?C.cyan:'var(--cv-wa-60)',cursor:'pointer',borderBottom:active?`3px solid ${C.cyan}`:'3px solid transparent',fontWeight:active?700:400,whiteSpace:'nowrap'}}
-function addBtn(sm=false,col=C.cyan){return{fontFamily:'monospace',fontSize:sm?'0.91rem':'0.95rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:6,background:'transparent',color:col,cursor:'pointer'}}
-function solidBtn(col=C.cyan,sm=false){return{fontFamily:'monospace',fontSize:sm?'0.95rem':'1.01rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:col===C.white?C.navy:'var(--cv-on-accent)',cursor:'pointer'}}
+function navBtn(active){return{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',padding:'0.72rem 1rem',border:'none',background:'transparent',color:active?C.cyan:'var(--cv-wa-60)',cursor:'pointer',borderBottom:active?`3px solid ${C.cyan}`:'3px solid transparent',fontWeight:active?700:400,whiteSpace:'nowrap'}}
+function addBtn(sm=false,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.91rem':'0.95rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:6,background:'transparent',color:col,cursor:'pointer'}}
+function solidBtn(col=C.cyan,sm=false){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.95rem':'1.01rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:col===C.white?C.navy:'var(--cv-on-accent)',cursor:'pointer'}}
 // Pill toggle for mode / filter subtabs (new design language)
-function subPill(active,col=C.cyan){return{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
+function subPill(active,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
 
-function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem 1.15rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily:'monospace',fontSize:'1.13rem',letterSpacing:'0.12em',color:C.slate,textTransform:'uppercase',marginBottom:'0.4rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.65rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.22rem'}}>{sub}</div>}</div>)}
+function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem 1.15rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.13rem',letterSpacing:'0.12em',color:C.slate,textTransform:'uppercase',marginBottom:'0.4rem'}}>{label}</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.65rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.22rem'}}>{sub}</div>}</div>)}
 function DPDot({status}){const col=status==='\u2713'?C.green:status==='\u25d0'?C.cyan:status==='\u26a0'?C.amber:C.border;return<span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:18,height:18,borderRadius:'50%',background:col,color:'var(--cv-on-accent)',fontSize:'0.93rem',fontWeight:700,flexShrink:0}}>{status||'\u25cb'}</span>}
-function Badge({text,color}){return<span style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
+function Badge({text,color}){return<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
 function Spinner(){return<div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'3rem',color:C.slate,fontSize:'1.11rem'}}>Loading...</div>}
 // Donut score circle \u2014 reused for real scores that already exist in the data (e.g. the readiness self-assessment). No score is invented.
-function ScoreDonut({label,display,frac,rating,color}){const r=26,circ=2*Math.PI*r,f=Math.max(0,Math.min(1,frac||0));return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.15rem',borderLeft:`4px solid ${color}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)',display:'flex',alignItems:'center',gap:'0.9rem'}}><svg width="60" height="60" viewBox="0 0 62 62" style={{flexShrink:0}}><circle cx="31" cy="31" r={r} fill="none" style={{stroke:'var(--cv-border-soft)'}} strokeWidth="6"/><circle cx="31" cy="31" r={r} fill="none" style={{stroke:color}} strokeWidth="6" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ*(1-f)} transform="rotate(-90 31 31)"/></svg><div style={{minWidth:0}}><div style={{fontSize:'1.11rem',color:C.slate,marginBottom:'0.18rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,color:C.navy,lineHeight:1}}>{display}</div><div style={{fontSize:'1.07rem',fontWeight:700,color,marginTop:'0.22rem'}}>{rating}</div></div></div>)}
+function ScoreDonut({label,display,frac,rating,color}){const r=26,circ=2*Math.PI*r,f=Math.max(0,Math.min(1,frac||0));return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.15rem',borderLeft:`4px solid ${color}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)',display:'flex',alignItems:'center',gap:'0.9rem'}}><svg width="60" height="60" viewBox="0 0 62 62" style={{flexShrink:0}}><circle cx="31" cy="31" r={r} fill="none" style={{stroke:'var(--cv-border-soft)'}} strokeWidth="6"/><circle cx="31" cy="31" r={r} fill="none" style={{stroke:color}} strokeWidth="6" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ*(1-f)} transform="rotate(-90 31 31)"/></svg><div style={{minWidth:0}}><div style={{fontSize:'1.11rem',color:C.slate,marginBottom:'0.18rem'}}>{label}</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.55rem',fontWeight:700,color:C.navy,lineHeight:1}}>{display}</div><div style={{fontSize:'1.07rem',fontWeight:700,color,marginTop:'0.22rem'}}>{rating}</div></div></div>)}
 
 // ─── "MY BUSINESS AT A GLANCE" (coach's own commercial numbers) ──────
 // Compact currency formatter matching the approved design ($182k, not
 // "USD 182,000") -- only ever formats real computed values, never invents one.
 const fmtGlance=(n,cur)=>formatMoneyShort(n,cur)
-function Kicker({children,style}){return<div style={{fontFamily:'monospace',fontSize:'1.01rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.75rem',...style}}>{children}</div>}
-function GlanceKPI({label,value,sub,color}){return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem',borderLeft:`4px solid ${color||C.navy}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)'}}><div style={{fontFamily:'monospace',fontSize:'1.01rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.4rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.3rem'}}>{sub}</div>}</div>)}
+function Kicker({children,style}){return<div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.slate,marginBottom:'0.75rem',...style}}>{children}</div>}
+function GlanceKPI({label,value,sub,color}){return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem',borderLeft:`4px solid ${color||C.navy}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)'}}><div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.4rem'}}>{label}</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.55rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.3rem'}}>{sub}</div>}</div>)}
 function GlanceBar({frac,color}){return<div style={{height:6,borderRadius:3,background:'var(--cv-track)',marginTop:'0.75rem',overflow:'hidden'}}><div style={{height:'100%',width:`${Math.round(Math.max(0,Math.min(1,frac||0))*100)}%`,background:color,borderRadius:3}}/></div>}
 // Numbered LEVEL badge + "drilled from" connector -- matches the approved
 // Portfolio Intelligence mockup's Level 1 -> 2 -> 3 drill-down structure
 // (portfolio overview -> filtered segment -> one anonymised business).
-function LevelMarker({n,label,sub}){return(<div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',margin:'1.7rem 0 0.9rem'}}><span style={{fontFamily:'monospace',fontSize:'0.78rem',fontWeight:700,color:'var(--cv-on-accent)',background:C.navy,borderRadius:20,padding:'0.15rem 0.7rem'}}>LEVEL {n}</span><span style={{fontFamily:'Georgia,serif',fontSize:'1.08rem',fontWeight:700,color:C.navy}}>{label}</span>{sub&&<span style={{color:C.slate,fontSize:'0.86rem'}}>{sub}</span>}</div>)}
-function DrillConnector({children}){return<div style={{display:'flex',justifyContent:'center',textAlign:'center',padding:'0.25rem 0',color:C.teal,fontSize:'0.92rem',fontFamily:'monospace'}}>{children}</div>}
+function LevelMarker({n,label,sub}){return(<div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',margin:'1.7rem 0 0.9rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',fontWeight:700,color:'var(--cv-on-accent)',background:C.navy,borderRadius:20,padding:'0.15rem 0.7rem'}}>LEVEL {n}</span><span style={{fontFamily:'var(--cv-font)',fontSize:'1.08rem',fontWeight:700,color:C.navy}}>{label}</span>{sub&&<span style={{color:C.slate,fontSize:'0.86rem'}}>{sub}</span>}</div>)}
+function DrillConnector({children}){return<div style={{display:'flex',justifyContent:'center',textAlign:'center',padding:'0.25rem 0',color:C.teal,fontSize:'0.92rem',fontFamily: 'var(--cv-font-mono)'}}>{children}</div>}
 // Navy header + bordered body + bordered/sunk KPI cards -- the exact colour
 // tokens and card chrome from the approved Portfolio Intelligence mockup
 // (pi-header / pi-body / pi-kpi / mini-dist / delta-badge), reused here so
@@ -104,22 +104,22 @@ function DrillConnector({children}){return<div style={{display:'flex',justifyCon
 // instead of each inventing its own card style.
 function PiHeaderBar({title,chips}){return(
   <div style={{background:C.navy,color:'var(--cv-on-accent)',borderRadius:'10px 10px 0 0',padding:'0.95rem 1.4rem',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem'}}>
-    <div style={{fontFamily:'Georgia,serif',fontWeight:700,fontSize:'1.05rem'}}>{title}</div>
+    <div style={{fontFamily:'var(--cv-font)',fontWeight:700,fontSize:'1.05rem'}}>{title}</div>
     <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap'}}>{chips}</div>
   </div>
 )}
 function PiChip({active,onClick,children}){return(
-  <button onClick={onClick} style={{fontFamily:'monospace',fontSize:'0.76rem',border:`1px solid ${active?C.cyan:'rgba(255,255,255,0.35)'}`,color:active?'#0B1420':'rgba(255,255,255,0.85)',background:active?C.cyan:'transparent',borderRadius:999,padding:'0.32rem 0.8rem',cursor:'pointer',fontWeight:active?700:400}}>{children}</button>
+  <button onClick={onClick} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.76rem',border:`1px solid ${active?C.cyan:'rgba(255,255,255,0.35)'}`,color:active?'#0B1420':'rgba(255,255,255,0.85)',background:active?C.cyan:'transparent',borderRadius:999,padding:'0.32rem 0.8rem',cursor:'pointer',fontWeight:active?700:400}}>{children}</button>
 )}
 function PiBody({children}){return<div style={{border:'1px solid var(--cv-border-soft)',borderTop:'none',borderRadius:'0 0 10px 10px',padding:'1.3rem',background:C.white,marginBottom:'2rem'}}>{children}</div>}
-function PiSectionHeading({label,sub}){return(<div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',margin:'1.9rem 0 0.8rem'}}><span style={{fontFamily:'Georgia,serif',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>{label}</span>{sub&&<span style={{color:C.slate,fontSize:'0.85rem'}}>{sub}</span>}</div>)}
+function PiSectionHeading({label,sub}){return(<div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',margin:'1.9rem 0 0.8rem'}}><span style={{fontFamily:'var(--cv-font)',fontSize:'1.05rem',fontWeight:700,color:C.navy}}>{label}</span>{sub&&<span style={{color:C.slate,fontSize:'0.85rem'}}>{sub}</span>}</div>)}
 function PiKpiCard({label,value,rev,sub,total,color,deltaBadge}){return(
   <div style={total?{border:`2px solid ${C.cyan}`,borderRadius:10,padding:'0.9rem 1rem',background:'var(--cv-tint-cyan)'}:{border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.9rem 1rem',background:'var(--cv-bg-2)'}}>
-    <div style={{fontFamily:'monospace',fontSize:'0.74rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate}}>{label}</div>
-    <div style={{fontFamily:'Georgia,serif',fontSize:total?'1.7rem':'1.5rem',fontWeight:700,color:color||C.navy,marginTop:'0.25rem'}}>{value}</div>
-    {rev!=null&&<div style={{fontFamily:'Georgia,serif',fontSize:total?'1.18rem':'1.02rem',fontWeight:700,color:total?C.cyan:C.green,marginTop:'0.1rem'}}>{rev}</div>}
+    <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.74rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate}}>{label}</div>
+    <div style={{fontFamily:'var(--cv-font)',fontSize:total?'1.7rem':'1.5rem',fontWeight:700,color:color||C.navy,marginTop:'0.25rem'}}>{value}</div>
+    {rev!=null&&<div style={{fontFamily:'var(--cv-font)',fontSize:total?'1.18rem':'1.02rem',fontWeight:700,color:total?C.cyan:C.green,marginTop:'0.1rem'}}>{rev}</div>}
     {sub&&<div style={{fontSize:'0.78rem',color:C.slate,marginTop:'0.25rem'}}>{sub}</div>}
-    {deltaBadge&&<span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,borderRadius:999,padding:'0.05rem 0.5rem',display:'inline-block',marginTop:'0.35rem',background:deltaBadge.up?'var(--cv-tint-green)':'var(--cv-tint-red)',color:deltaBadge.up?C.green:C.red}}>{deltaBadge.text}</span>}
+    {deltaBadge&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',fontWeight:700,borderRadius:999,padding:'0.05rem 0.5rem',display:'inline-block',marginTop:'0.35rem',background:deltaBadge.up?'var(--cv-tint-green)':'var(--cv-tint-red)',color:deltaBadge.up?C.green:C.red}}>{deltaBadge.text}</span>}
   </div>
 )}
 function MiniDistBar({segments}){return(<div style={{display:'flex',height:6,borderRadius:3,overflow:'hidden',marginTop:'0.55rem'}}>{segments.map((s,i)=><div key={i} style={{width:`${s.pct}%`,background:s.color}}/>)}</div>)}
@@ -151,7 +151,7 @@ function CoImplementerPerfCard({ci,clients,canvasByClient}){
   return(
     <div style={{...card,padding:'1rem 1.1rem',marginBottom:0}}>
       <div style={{display:'flex',alignItems:'center',gap:'0.7rem',marginBottom:'0.8rem'}}>
-        <div style={{width:38,height:38,borderRadius:10,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'monospace',fontSize:'0.99rem',fontWeight:700}}>{initials}</div>
+        <div style={{width:38,height:38,borderRadius:10,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily: 'var(--cv-font-mono)',fontSize:'0.99rem',fontWeight:700}}>{initials}</div>
         <div><div style={{fontWeight:700,fontSize:'1.19rem'}}>{ci.name}</div><div style={{fontSize:'0.99rem',color:C.slate}}>{ci.country||''}{ci.country&&' · '}Serving {served.length} client{served.length===1?'':'s'}</div></div>
       </div>
       {served.length===0?(
@@ -338,7 +338,7 @@ function ExternalAccessPanel({clientId,clientName,portfolioFilter,clients,progra
       <div style={{...card,maxWidth:600,width:'100%',maxHeight:'85vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.9rem'}}>
           <div>
-            <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>External Access{clientName?` — ${clientName}`:' — Portfolio'}</div>
+            <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>External Access{clientName?` — ${clientName}`:' — Portfolio'}</div>
             <div style={{fontSize:'0.92rem',color:C.slate,marginTop:'0.2rem'}}>Give an investor, programme officer, DFI, or subscriber a read-only link -- to one business's Investment Brief, the whole portfolio, or a filtered segment -- without giving them a login. If you enter their email, they must confirm it before the link works for them. Revoke any time.</div>
           </div>
           <button onClick={onClose} style={{background:'none',border:'none',fontSize:'1.3rem',color:C.slate,cursor:'pointer',lineHeight:1}}>×</button>
@@ -453,7 +453,7 @@ function RevenueCostTrendChart({periods,revenueByPeriod,costByPeriod,cur}){
           )
         })}
       </svg>
-      <div style={{display:'flex',gap:'1.1rem',fontSize:'0.87rem',fontFamily:'monospace',color:C.slate,marginTop:'0.4rem'}}>
+      <div style={{display:'flex',gap:'1.1rem',fontSize:'0.87rem',fontFamily: 'var(--cv-font-mono)',color:C.slate,marginTop:'0.4rem'}}>
         <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:C.teal,marginRight:5,verticalAlign:'middle'}}/>Revenue</span>
         <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:C.purple,marginRight:5,verticalAlign:'middle'}}/>Team cost</span>
       </div>
@@ -548,7 +548,7 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
           <PiKpiCard label="Financial Model" value={String(stb.financial.count)} rev={fmtGlance(stb.financial.revenue,feeCur)} color={C.teal}/>
           <PiKpiCard label="Market Intelligence Sub." value={String(stb.portfolioIntelligence.count)} rev={fmtGlance(stb.portfolioIntelligence.revenue,feeCur)} color={C.cyan}/>
         </PiKpiRow>
-        <div style={{fontFamily:'monospace',fontSize:'0.78rem',color:C.slate,textAlign:'center',margin:'0.9rem 0 0'}}>
+        <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',color:C.slate,textAlign:'center',margin:'0.9rem 0 0'}}>
           Services total always equals Client types total <b style={{color:C.cyan}}>&middot; {fmtGlance(stb.total.revenue,feeCur)} = {fmtGlance(ctb.total.revenue,feeCur)}</b> &mdash; same money, counted two ways
           {stb.total.revenue!==ctb.total.revenue&&<span style={{color:C.amber}}> (once Advisory/Market Intelligence carry real paid revenue, these two can drift until that table gets its own collection date -- flagged, not hidden)</span>}
         </div>
@@ -559,7 +559,7 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
           <PiKpiCard label="Invoiced &middot; Not Paid" value={fmtGlance(outstanding,feeCur)} color={C.amber} sub="sent, awaiting payment (current)"/>
           <PiKpiCard label="Awaiting Issue" value={fmtGlance(awaitingIssue,feeCur)} color={C.red} sub="fee agreed, not yet invoiced (current)"/>
           <div style={{border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.9rem 1rem',background:'var(--cv-bg-2)'}}>
-            <div style={{fontFamily:'monospace',fontSize:'0.74rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate,marginBottom:'0.5rem'}}>Revenue vs. delivery cost &middot; last 6 months</div>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.74rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate,marginBottom:'0.5rem'}}>Revenue vs. delivery cost &middot; last 6 months</div>
             <RevenueCostTrendChart periods={trendPeriods} revenueByPeriod={revenueByPeriod} costByPeriod={costByPeriod} cur={feeCur}/>
           </div>
         </PiKpiRow>
@@ -663,13 +663,13 @@ function ClientCard({client,programmes,onClick,onEdit}){
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.35rem'}}>
         <div style={{fontWeight:700,fontSize:'1.13rem',color:C.navy,lineHeight:1.3}}>{client.name}</div>
         <div style={{display:'flex',gap:'0.3rem',flexShrink:0,marginLeft:'0.5rem'}}>
-          {client.clearview_active&&<span style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.teal,border:`1px solid ${C.teal}`,borderRadius:3,padding:'0.05rem 0.3rem'}}>CRV</span>}
-          {client.engagement_mode==='canvas'&&<span style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.purple,border:`1px solid ${C.purple}`,borderRadius:3,padding:'0.05rem 0.3rem'}}>GtCV</span>}
+          {client.clearview_active&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.teal,border:`1px solid ${C.teal}`,borderRadius:3,padding:'0.05rem 0.3rem'}}>CRV</span>}
+          {client.engagement_mode==='canvas'&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.purple,border:`1px solid ${C.purple}`,borderRadius:3,padding:'0.05rem 0.3rem'}}>GtCV</span>}
         </div>
       </div>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.35rem',gap:'0.5rem'}}>
         <div style={{fontSize:'0.93rem',color:prog?C.slate:C.amber}}>{CLIENT_TYPE_LABELS[client.type]} \u00b7 {prog?prog.name:'No programme -- self-paying'}</div>
-        {onEdit&&<button onClick={e=>{e.stopPropagation();onEdit()}} style={{fontFamily:'monospace',fontSize:'0.82rem',padding:'0.12rem 0.5rem',borderRadius:4,background:C.navy,color:'var(--cv-on-accent)',border:'none',cursor:'pointer',flexShrink:0}}>Edit</button>}
+        {onEdit&&<button onClick={e=>{e.stopPropagation();onEdit()}} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.82rem',padding:'0.12rem 0.5rem',borderRadius:4,background:C.navy,color:'var(--cv-on-accent)',border:'none',cursor:'pointer',flexShrink:0}}>Edit</button>}
       </div>
       {client.contact_name&&<div style={{fontSize:'0.93rem',color:C.navy,marginBottom:'0.3rem'}}>{client.contact_name}</div>}
       <Badge text={statusLabel(client.status)} color={statusColor(client.status)}/>
@@ -760,7 +760,7 @@ function ClientTeamInvite({client}){
 
   return(
     <div style={{...card,marginBottom:'1.25rem'}}>
-      <div style={{fontFamily:'Georgia,serif',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Client team &amp; logins</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Client team &amp; logins</div>
       <p style={{fontSize:'1.02rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem'}}>
         Invite this client's own people so they can log in. The CEO / owner approves figures; the Finance Manager (accountant) can also approve and enter actuals. You can invite two CEOs if the business has co-owners.
       </p>
@@ -835,7 +835,7 @@ function DeleteClientConfirm({client,onCancel,onDeleted}){
       <input style={{...inp,marginBottom:'0.75rem'}} placeholder={client.name} value={text} onChange={e=>setText(e.target.value)} autoFocus/>
       {(()=>{const isMatch=text.trim().toLowerCase()===client.name.trim().toLowerCase();return(
       <div style={{display:'flex',gap:'0.6rem'}}>
-        <button disabled={!isMatch||deleting} onClick={handleDelete} style={{fontFamily:'monospace',fontSize:'1.01rem',fontWeight:700,padding:'0.5rem 1.1rem',border:'none',borderRadius:5,background:isMatch?C.red:C.border,color:'var(--cv-on-accent)',cursor:isMatch?'pointer':'not-allowed'}}>{deleting?'Deleting...':'Permanently Delete'}</button>
+        <button disabled={!isMatch||deleting} onClick={handleDelete} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',fontWeight:700,padding:'0.5rem 1.1rem',border:'none',borderRadius:5,background:isMatch?C.red:C.border,color:'var(--cv-on-accent)',cursor:isMatch?'pointer':'not-allowed'}}>{deleting?'Deleting...':'Permanently Delete'}</button>
         <button onClick={onCancel} style={addBtn(true,C.slate)}>Cancel</button>
       </div>
       )})()}
@@ -946,7 +946,7 @@ function CopyIntakeLink({client}){
 
   if(!link){
     return(
-      <button onClick={generateLink} disabled={creating} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:creating?'not-allowed':'pointer'}}>
+      <button onClick={generateLink} disabled={creating} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:creating?'not-allowed':'pointer'}}>
         {creating?'Creating link...':`Generate ${client.name} Data Capture Link`}
       </button>
     )
@@ -954,17 +954,17 @@ function CopyIntakeLink({client}){
 
   return(
     <>
-    <button onClick={copyToClipboard} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:copied?C.green:'transparent',border:`1px solid ${copied?C.green:'var(--cv-wa-40)'}`,color:'var(--cv-on-accent)',cursor:'pointer'}}>
+    <button onClick={copyToClipboard} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:copied?C.green:'transparent',border:`1px solid ${copied?C.green:'var(--cv-wa-40)'}`,color:'var(--cv-on-accent)',cursor:'pointer'}}>
       {copied?'Copied!':`Copy ${client.name} Data Capture Link`}
     </button>
     <a href="/Clearview_Data_Capture_Template_v8.xlsx" download="Clearview_Data_Capture_Template_v8.xlsx"
-      style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,
+      style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,
         background:'transparent',border:'1px solid var(--cv-wa-40)',
         color:'var(--cv-wa-80)',cursor:'pointer',textDecoration:'none',display:'inline-block',marginLeft:'0.5rem'}}>
       ⬇ Download Template
     </a>
     <button onClick={()=>setShowUpload(v=>!v)}
-      style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,
+      style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,
         background:'transparent',border:'1px solid var(--cv-wa-40)',
         color:'var(--cv-wa-80)',cursor:'pointer',marginLeft:'0.5rem'}}>
       {showUpload?'Hide upload':'⬆ Upload completed file'}
@@ -1038,10 +1038,10 @@ function PerfDist({label,summary,unit,decimals=0,note,roadmap,roadmapNote}:{labe
   if(roadmap) return (
     <div style={{background:'var(--cv-card)',border:'1px solid var(--cv-border-soft)',borderRadius:12,padding:'0.9rem 1rem'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.4rem'}}>
-        <span style={{fontFamily:'monospace',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.04em',color:C.slate,fontWeight:600}}>{label}</span>
-        <span style={{fontFamily:'monospace',fontSize:'0.66rem',fontWeight:700,padding:'0.1rem 0.4rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>roadmap</span>
+        <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.04em',color:C.slate,fontWeight:600}}>{label}</span>
+        <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.66rem',fontWeight:700,padding:'0.1rem 0.4rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>roadmap</span>
       </div>
-      <div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:C.slate,lineHeight:1.1}}>—</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.5rem',fontWeight:700,color:C.slate,lineHeight:1.1}}>—</div>
       <div style={{fontSize:'0.76rem',color:C.slate,marginTop:6}}>{roadmapNote||'Needs a short per-period customer input from each business.'}</div>
     </div>
   )
@@ -1057,12 +1057,12 @@ function PerfDist({label,summary,unit,decimals=0,note,roadmap,roadmapNote}:{labe
   const fmtV=(v:number)=>`${v.toFixed(decimals)}${unit||''}`
   return(
     <div style={{background:'var(--cv-card)',border:'1px solid var(--cv-border-soft)',borderRadius:12,padding:'0.9rem 1rem'}}>
-      <div style={{fontFamily:'monospace',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.04em',color:C.slate,fontWeight:600}}>{label}</div>
-      <div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:C.navy,lineHeight:1.1}}>{has?fmtV(s.median):'—'}<span style={{fontSize:'0.8rem',color:C.slate,fontWeight:400}}> median</span></div>
+      <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',textTransform:'uppercase',letterSpacing:'0.04em',color:C.slate,fontWeight:600}}>{label}</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.5rem',fontWeight:700,color:C.navy,lineHeight:1.1}}>{has?fmtV(s.median):'—'}<span style={{fontSize:'0.8rem',color:C.slate,fontWeight:400}}> median</span></div>
       <div style={{display:'flex',alignItems:'flex-end',gap:2,height:32,marginTop:6}}>
         {counts.map((c,i)=><div key={i} style={{flex:1,height:`${Math.max(6,(c/cMax)*100)}%`,background:i===medBin?C.teal:'var(--cv-tint-cyan)',borderRadius:'2px 2px 0 0'}}/>)}
       </div>
-      <div style={{display:'flex',justifyContent:'space-between',fontFamily:'monospace',fontSize:'0.66rem',color:C.slate,marginTop:2}}>
+      <div style={{display:'flex',justifyContent:'space-between',fontFamily: 'var(--cv-font-mono)',fontSize:'0.66rem',color:C.slate,marginTop:2}}>
         <span>{has?fmtV(min):''}</span><span>{has?fmtV(max):''}</span>
       </div>
       <div style={{fontSize:'0.76rem',color:C.slate,marginTop:4}}>{has?`${s.count} business${s.count===1?'':'es'}`:'no data yet'}{note?` · ${note}`:''}</div>
@@ -1191,7 +1191,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
 
       {/* Executive finding — lead with the headline, then drill down */}
       <div style={{...card,borderLeft:`4px solid ${C.cyan}`}}>
-        <div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.14em',textTransform:'uppercase',color:C.teal,marginBottom:'0.4rem'}}>The finding</div>
+        <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',letterSpacing:'0.14em',textTransform:'uppercase',color:C.teal,marginBottom:'0.4rem'}}>The finding</div>
         <div style={{fontSize:'1.05rem',lineHeight:1.6,color:C.navy}}>
           Across <b>{view.totalBusinesses}</b> business{view.totalBusinesses===1?'':'es'}, <b>{readyCount}</b> {readyCount===1?'is':'are'} investment-ready today
           {perfSum&&perfSum.revenueGrowth.median!==null?<> — median revenue growth is <b style={{color:C.teal}}>{perfSum.revenueGrowth.median>0?'+':''}{perfSum.revenueGrowth.median}%</b></>:null}
@@ -1203,19 +1203,19 @@ function PortfolioIntelligenceHub({clients,programmes}){
       {/* Trust & coverage — why the numbers can be trusted */}
       <div className="cv-grid-4" style={{marginBottom:'1.25rem',gap:'0.6rem'}}>
         <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>{snapshotCount} model{snapshotCount===1?'':'s'}</div>
+          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>{snapshotCount} model{snapshotCount===1?'':'s'}</div>
           <div style={{fontSize:'0.76rem',color:C.slate}}>Full standardised financial models, not survey estimates.</div>
         </div>
         <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>90%+</div>
+          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>90%+</div>
           <div style={{fontSize:'0.76rem',color:C.slate}}>have no credit-agency rating — the coverage gap we fill.</div>
         </div>
         <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>Independent</div>
+          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>Independent</div>
           <div style={{fontSize:'0.76rem',color:C.slate}}>Model-derived; no payment relationship with the business rated.</div>
         </div>
         <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.75rem 0.9rem'}}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>Median-based</div>
+          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>Median-based</div>
           <div style={{fontSize:'0.76rem',color:C.slate}}>One outlier can't distort a benchmark; only present values are counted.</div>
         </div>
       </div>
@@ -1229,7 +1229,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
 
       {perfSum&&(
         <div style={card}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Performance — the numbers that decide bankability</div>
+          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Performance — the numbers that decide bankability</div>
           <p style={{fontSize:'0.9rem',color:C.slate,margin:'0 0 0.9rem'}}>
             Each figure is the <b>median</b> shown over the <b>spread across businesses</b> — the distribution, not a single
             average, is what a lender reads. The highlighted bar is where the median sits. These ratios are currency-neutral,
@@ -1250,7 +1250,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
 
       {perfSum&&(
         <div style={card}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Business quality &amp; durability</div>
+          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Business quality &amp; durability</div>
           <p style={{fontSize:'0.9rem',color:C.slate,margin:'0 0 0.9rem'}}>
             The efficiency and durability ratios — the numbers that tell a funder whether growth is economically
             real and whether revenue will still be there to repay. Distributions across the {hasFilter?'segment':'portfolio'}; cut by sector below.
@@ -1270,13 +1270,13 @@ function PortfolioIntelligenceHub({clients,programmes}){
 
           {data.performanceBySector&&data.performanceBySector.length>0&&(
             <div style={{marginTop:'1.1rem'}}>
-              <div style={{fontFamily:'Georgia,serif',fontSize:'1rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Quality ratios by sector</div>
+              <div style={{fontFamily:'var(--cv-font)',fontSize:'1rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Quality ratios by sector</div>
               <p style={{fontSize:'0.84rem',color:C.slate,margin:'0 0 0.6rem'}}>Ranked by Rule of 40. Margins, Rule of 40 and burn compute now; the customer ratios fill in as each business reports.</p>
               <div style={{overflowX:'auto',border:'1px solid var(--cv-border-soft)',borderRadius:10}}>
                 <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.84rem',minWidth:680}}>
                   <thead>
                     <tr>{['Sector','Biz','Rule of 40','Gross','EBITDA','Net','Burn','LTV:CAC','Churn','NRR'].map((h,i)=>(
-                      <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily:'monospace',fontSize:'0.68rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
+                      <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.68rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
                     ))}</tr>
                   </thead>
                   <tbody>
@@ -1319,13 +1319,13 @@ function PortfolioIntelligenceHub({clients,programmes}){
 
       {data.performanceBySector&&data.performanceBySector.length>0&&(
         <div style={card}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Benchmarked by segment</div>
+          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Benchmarked by segment</div>
           <p style={{fontSize:'0.88rem',color:C.slate,margin:'0 0 0.7rem'}}>Every factor cut by sector, ranked strongest-first. The portfolio row is the baseline. Peer comparisons within this portfolio, not external industry norms.</p>
           <div style={{overflowX:'auto',border:'1px solid var(--cv-border-soft)',borderRadius:10}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.84rem',minWidth:640}}>
               <thead>
                 <tr>{['Sector','Biz','Ready','LRS','Growth','Cost','Cover','EBITDA','Weakest'].map((h,i)=>(
-                  <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily:'monospace',fontSize:'0.68rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0||i===8?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
+                  <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.68rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 10px',textAlign:i===0||i===8?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
                 ))}</tr>
               </thead>
               <tbody>
@@ -1362,7 +1362,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
       )}
 
       <div style={card}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.8rem'}}>Readiness pipeline</div>
+        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.8rem'}}>Readiness pipeline</div>
         <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
           {pipelineEntries.map(([stage,color])=>(
             <div key={stage} style={{flex:'1 1 140px',borderLeft:`4px solid ${color}`,padding:'0.5rem 0.8rem',background:'var(--cv-tint-cyan)',borderRadius:4}}>
@@ -1374,7 +1374,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
       </div>
 
       <div style={card}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.4rem'}}>
+        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.4rem'}}>
           Seven-dimension average{hasFilter?' — this segment vs. portfolio':''}
         </div>
         {view.mostCommonWeakDimension&&<div style={{fontSize:'0.9rem',color:C.slate,marginBottom:'0.8rem'}}>Weakest dimension: <b style={{color:C.red}}>{LRS_DIM_LABELS[view.mostCommonWeakDimension]}</b></div>}
@@ -1396,7 +1396,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
       </div>
 
       <div style={card}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.8rem'}}>Verification confidence distribution</div>
+        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.8rem'}}>Verification confidence distribution</div>
         <div style={{display:'flex',gap:'0.4rem',alignItems:'flex-end',height:100}}>
           {view.verificationDistribution.map(b=>{
             const maxCount=Math.max(1,...view.verificationDistribution.map(x=>x.count))
@@ -1412,13 +1412,13 @@ function PortfolioIntelligenceHub({clients,programmes}){
       </div>
 
       <div style={card}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.3rem'}}>Current fund absorption capacity</div>
+        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.3rem'}}>Current fund absorption capacity</div>
         <div style={{fontSize:'0.85rem',color:C.slate,marginBottom:'0.8rem'}}>Average of what each business could absorb TODAY, by type -- not a hypothetical "if all were investment-ready" ceiling. Shown separately per currency; never blended across currencies.</div>
         {currencies.length===0?(
           <div style={{color:C.slate,fontSize:'0.9rem'}}>Not yet available.</div>
         ):currencies.map(cc=>(
           <div key={cc} style={{marginBottom:'0.8rem'}}>
-            <div style={{fontFamily:'monospace',fontSize:'0.85rem',color:C.slate,marginBottom:'0.4rem'}}>{cc}</div>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',color:C.slate,marginBottom:'0.4rem'}}>{cc}</div>
             <div className="cv-grid-4">
               {Object.entries(portfolio.currentFundAbsorption[cc]).map(([type,val])=>(
                 <div key={type} style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.6rem 0.8rem'}}>
@@ -1433,7 +1433,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
 
       {hasFilter&&segment&&(
         <div style={card}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.8rem'}}>Weakest dimensions in this segment, ranked</div>
+          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.8rem'}}>Weakest dimensions in this segment, ranked</div>
           <ol style={{margin:0,paddingLeft:'1.2rem'}}>
             {segment.weakestDimensionsInSegment.slice(0,3).map(dim=>{
               const cmp=segment.dimensionComparison.find(d=>d.dimension===dim)
@@ -1455,7 +1455,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
         {(data.profiles||[]).length===0
           ? <div style={{color:C.slate,fontSize:'0.9rem'}}>No businesses match the current filter.</div>
           : (()=>{
-              const tierPill=(t:string)=>{const map:any={'Investment Ready':['Ready',C.green],'Near Ready':['Near',C.cyan],'Development Stage':['Dev',C.amber],'Pre-Investment':['Pre',C.red]};const [lbl,col]=map[t]||[t,C.slate];return <span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,padding:'0.05rem 0.4rem',borderRadius:5,color:col,background:'var(--cv-wa-10)',border:`1px solid ${col}`}}>{lbl}</span>}
+              const tierPill=(t:string)=>{const map:any={'Investment Ready':['Ready',C.green],'Near Ready':['Near',C.cyan],'Development Stage':['Dev',C.amber],'Pre-Investment':['Pre',C.red]};const [lbl,col]=map[t]||[t,C.slate];return <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',fontWeight:700,padding:'0.05rem 0.4rem',borderRadius:5,color:col,background:'var(--cv-wa-10)',border:`1px solid ${col}`}}>{lbl}</span>}
               const pv=(v:any,unit='',dec=0,sign=false)=> v===null||v===undefined?'—':`${sign&&v>0?'+':''}${(typeof v==='number'?v.toFixed(dec):v)}${unit}`
               const rows=[...(data.profiles||[])].sort((a:any,b:any)=>b.irScore-a.irScore)
               return (
@@ -1463,13 +1463,13 @@ function PortfolioIntelligenceHub({clients,programmes}){
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.84rem',minWidth:720}}>
                     <thead>
                       <tr>{['Business','Sector','Size','Ready','LRS','Growth','Cost','Cover','EBITDA','Conf.'].map((h,i)=>(
-                        <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily:'monospace',fontSize:'0.66rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 9px',textAlign:i<=2?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
+                        <th key={h} style={{background:C.navy,color:'var(--cv-on-accent)',fontFamily: 'var(--cv-font-mono)',fontSize:'0.66rem',textTransform:'uppercase',letterSpacing:'0.03em',padding:'8px 9px',textAlign:i<=2?'left':'right',whiteSpace:'nowrap'}}>{h}</th>
                       ))}</tr>
                     </thead>
                     <tbody>
                       {rows.map((p:any)=>{const perf=p.performance||{}; return(
                         <tr key={p.refCode} onClick={()=>setOpenProfile(p)} style={{borderTop:'1px solid var(--cv-border-soft)',cursor:'pointer'}}>
-                          <td style={{padding:'7px 9px',textAlign:'left',fontWeight:700,color:C.navy,fontFamily:p.isNamed?'inherit':'monospace',whiteSpace:'nowrap'}}>{p.displayName}{p.isNamed&&<span style={{marginLeft:6}}><Badge text="Named" color={C.green}/></span>}</td>
+                          <td style={{padding:'7px 9px',textAlign:'left',fontWeight:700,color:C.navy,fontFamily:'inherit',whiteSpace:'nowrap'}}>{p.displayName}{p.isNamed&&<span style={{marginLeft:6}}><Badge text="Named" color={C.green}/></span>}</td>
                           <td style={{padding:'7px 9px',textAlign:'left',color:C.slate}}>{p.sector||'n/a'}</td>
                           <td style={{padding:'7px 9px',textAlign:'left',color:C.slate}}>{p.sizeBracket}</td>
                           <td style={{padding:'7px 9px',textAlign:'right'}}>{tierPill(p.irTier)}</td>
@@ -1490,7 +1490,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
 
       {/* DFI risk layer — roadmap */}
       <div style={{...card,background:'var(--cv-tint-amber)',borderLeft:`4px solid ${C.amber}`}}>
-        <div style={{fontFamily:'monospace',fontSize:'0.72rem',letterSpacing:'0.12em',textTransform:'uppercase',color:C.amber,fontWeight:700,marginBottom:'0.3rem'}}>Roadmap · DFI risk layer</div>
+        <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',letterSpacing:'0.12em',textTransform:'uppercase',color:C.amber,fontWeight:700,marginBottom:'0.3rem'}}>Roadmap · DFI risk layer</div>
         <div style={{fontSize:'0.94rem',color:C.navy,lineHeight:1.55}}>
           To let a credit committee price risk directly, per-enterprise <b>collateral coverage</b>, <b>working-capital cycle</b>
           (largely derivable from the model), <b>FX exposure</b>, and sector <b>default / recovery proxies</b> — benchmarked to
@@ -1501,8 +1501,8 @@ function PortfolioIntelligenceHub({clients,programmes}){
       {/* Impact & inclusion — roadmap (not yet collected; no fabricated figures) */}
       <div style={card}>
         <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'0.3rem',flexWrap:'wrap'}}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>Impact &amp; inclusion</div>
-          <span style={{fontFamily:'monospace',fontSize:'0.7rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>roadmap · to collect</span>
+          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>Impact &amp; inclusion</div>
+          <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.7rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>roadmap · to collect</span>
         </div>
         <p style={{fontSize:'0.92rem',color:C.slate,lineHeight:1.55,margin:'0 0 0.7rem'}}>
           The reach a donor or impact investor weighs — smallholder farmers and farmer groups reached, and the share of
@@ -1517,17 +1517,17 @@ function PortfolioIntelligenceHub({clients,programmes}){
 
       {/* Methodology */}
       <div style={card}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.6rem'}}>Methodology — every factor, defined</div>
+        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy,marginBottom:'0.6rem'}}>Methodology — every factor, defined</div>
         <div style={{display:'grid',gridTemplateColumns:'minmax(150px,190px) minmax(0,1fr)',gap:'0.5rem 1.2rem',fontSize:'0.88rem'}}>
-          <div style={{fontFamily:'monospace',fontWeight:700,color:C.teal}}>Growth / cost / DSCR / EBITDA</div>
+          <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.teal}}>Growth / cost / DSCR / EBITDA</div>
           <div style={{color:C.navy}}>Year-on-year revenue change; total costs ÷ revenue; operating cash ÷ debt due (1.5× = lender comfort line); operating profit ÷ revenue. Medians over the full distribution.</div>
-          <div style={{fontFamily:'monospace',fontWeight:700,color:C.teal}}>Readiness &amp; LRS</div>
+          <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.teal}}>Readiness &amp; LRS</div>
           <div style={{color:C.navy}}>A 0–30 readiness stage and a 0–100 Liquidity Readiness score from seven weighted dimensions.</div>
-          <div style={{fontFamily:'monospace',fontWeight:700,color:C.teal}}>Data confidence</div>
+          <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.teal}}>Data confidence</div>
           <div style={{color:C.navy}}>How much of each model is verified vs estimated. Feeds OPIM Principle 9 (disclosure &amp; independent verification).</div>
-          <div style={{fontFamily:'monospace',fontWeight:700,color:C.teal}}>Benchmarks</div>
+          <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.teal}}>Benchmarks</div>
           <div style={{color:C.navy}}>Computed from businesses in this portfolio; peer comparisons, not industry norms. Medians so one outlier can't distort.</div>
-          <div style={{fontFamily:'monospace',fontWeight:700,color:C.teal}}>Impact &amp; inclusion</div>
+          <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.teal}}>Impact &amp; inclusion</div>
           <div style={{color:C.navy}}>Farmers &amp; groups reached; women/youth share of chain, customers, workforce. Maps to IRIS+, HIPSO/JII and 2X. Not yet collected.</div>
         </div>
         <div style={{fontSize:'0.82rem',color:C.slate,marginTop:'0.8rem',background:'var(--cv-tint-amber)',borderLeft:`3px solid ${C.amber}`,borderRadius:6,padding:'0.6rem 0.8rem'}}>
@@ -1540,8 +1540,8 @@ function PortfolioIntelligenceHub({clients,programmes}){
           <div style={{...card,maxWidth:640,width:'100%',maxHeight:'85vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.9rem'}}>
               <div>
-                <span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,color:'var(--cv-on-accent)',background:C.navy,borderRadius:20,padding:'0.1rem 0.6rem',marginBottom:'0.4rem',display:'inline-block'}}>LEVEL 3</span>
-                <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>{openProfile.displayName}{openProfile.isNamed&&<span style={{marginLeft:'0.5rem'}}><Badge text="Verified" color={C.green}/></span>}</div>
+                <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',fontWeight:700,color:'var(--cv-on-accent)',background:C.navy,borderRadius:20,padding:'0.1rem 0.6rem',marginBottom:'0.4rem',display:'inline-block'}}>LEVEL 3</span>
+                <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>{openProfile.displayName}{openProfile.isNamed&&<span style={{marginLeft:'0.5rem'}}><Badge text="Verified" color={C.green}/></span>}</div>
                 <div style={{fontSize:'0.92rem',color:C.slate,marginTop:'0.2rem'}}>{openProfile.sector||'Sector n/a'} · {openProfile.country||'Country n/a'} · {openProfile.sizeBracket}</div>
               </div>
               <button onClick={()=>setOpenProfile(null)} style={{background:'none',border:'none',fontSize:'1.3rem',color:C.slate,cursor:'pointer',lineHeight:1}}>×</button>
@@ -1877,7 +1877,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   },[selClientId])
 
   if(loading)return<Spinner/>
-  if(error)return<div style={{padding:'2rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}><div style={{color:C.red,marginBottom:'1.5rem'}}>Error loading data: {error}</div><p style={{color:C.slate,fontSize:'1.07rem',marginBottom:'1rem'}}>This is usually caused by a stale session. Sign out and sign back in to fix it.</p><button onClick={onSignOut} style={{fontFamily:'monospace',fontSize:'1.07rem',padding:'0.6rem 1.4rem',border:'none',borderRadius:6,background:'var(--cv-header)',color:'var(--cv-on-accent)',cursor:'pointer'}}>Sign Out and Refresh</button></div>
+  if(error)return<div style={{padding:'2rem',fontFamily:"var(--cv-font)"}}><div style={{color:C.red,marginBottom:'1.5rem'}}>Error loading data: {error}</div><p style={{color:C.slate,fontSize:'1.07rem',marginBottom:'1rem'}}>This is usually caused by a stale session. Sign out and sign back in to fix it.</p><button onClick={onSignOut} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.07rem',padding:'0.6rem 1.4rem',border:'none',borderRadius:6,background:'var(--cv-header)',color:'var(--cv-on-accent)',cursor:'pointer'}}>Sign Out and Refresh</button></div>
 
   const selClient=clients.find(c=>c.id===selClientId)
 
@@ -2083,7 +2083,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 <div key={c.id} style={{display:'flex',alignItems:'center',gap:'0.9rem',padding:'0.7rem 0',borderTop:'1px solid #F4F1F0',cursor:'pointer'}} onClick={()=>window.open(`/dashboard/${c.slug}`,'_blank')}>
                   <Badge text={status.label} color={HEALTH_COLOR[status.label]}/>
                   <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700}}>{c.name}</div><div style={{fontSize:'1.07rem',color:C.slate}}>{why}</div></div>
-                  <span style={{fontFamily:'monospace',fontSize:'1.01rem',fontWeight:700,color:C.red,flexShrink:0}}>Open →</span>
+                  <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',fontWeight:700,color:C.red,flexShrink:0}}>Open →</span>
                 </div>
               )
             })}
@@ -2126,10 +2126,10 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           <div key={i} style={{...card,padding:0,overflow:'hidden'}}>
             <div style={{background:'var(--cv-alt)',padding:'0.85rem 1.1rem',borderBottom:'1px solid var(--cv-border-soft)',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.5rem'}}>
               <div>
-                <div style={{fontFamily:'Georgia,serif',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>{b.title}</div>
+                <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>{b.title}</div>
                 <div style={{fontSize:'0.86rem',color:C.slate}}>{b.meta}</div>
               </div>
-              <div style={{fontFamily:'monospace',fontSize:'0.82rem',color:C.slate}}>{b.beneficiaries.length} beneficiar{b.beneficiaries.length===1?'y':'ies'}</div>
+              <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.82rem',color:C.slate}}>{b.beneficiaries.length} beneficiar{b.beneficiaries.length===1?'y':'ies'}</div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))',gap:'0.75rem',padding:'1rem 1.1rem'}}>
               {b.beneficiaries.map(c=><BeneficiaryCard key={c.id+(c.__seStatus||'')} client={c} seStatus={c.__seStatus} hasActuals={hasActuals.has(c.id)}/>)}
@@ -2157,31 +2157,42 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     const fileLinks=selClientFullData.fileLinks||[]
     const notifications=selClientFullData.notifications||{enabled:false,recipients:[]}
 
+    // WHAT THIS PERSON MAY SEE. 2 September 2026.
+    //
+    // Two separate questions, not one: may they see the coach's notes
+    // (coachOnly), and may they see the machinery of running the engagement —
+    // setup, session planning, the diagnostic (teamOnly). The organisation
+    // being coached answers no to both.
+    const mayRun=canRunTheEngagement(previewRoleId)
     const visibleTabs=isCanvas
-      ? CANVAS_TABS.filter(t=>!t.coachOnly||(t.coachOnly&&canViewCoachGuidance(previewRoleId)))
+      ? CANVAS_TABS.filter(t=>(!t.coachOnly||canViewCoachGuidance(previewRoleId))&&(!t.teamOnly||mayRun))
       : []
+    // The zone is in the address now, so a link or a browser's memory can point
+    // at a tab this person may not open. Fall back to the cover rather than
+    // showing them a blank panel or, worse, the panel itself.
+    const shownTab=visibleTabs.some(t=>t.id===activeTab)?activeTab:'cover'
 
     function printSection(){window.print()}
 
     if(!isCanvas) return(
       <div>
         <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'1rem',fontSize:'1.01rem',color:C.slate}}>
-          <button style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem'}} onClick={()=>setView('overview')}>← Coach Dashboard</button>
+          <button style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem'}} onClick={()=>setView('overview')}>← Coach Dashboard</button>
           <span>/</span><span style={{color:C.navy,fontWeight:600}}>{selClient.name}</span>
         </div>
         <div style={{...card,background:'var(--cv-header)',color:'var(--cv-on-accent)',marginBottom:'1.25rem'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
             <div>
-              <div style={{fontFamily:'monospace',fontSize:'0.93rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.3rem'}}>{CLIENT_TYPE_LABELS[selClient.type]} · {prog?.name||'—'} · Clearview Financial Model</div>
-              <h2 style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0 0 0.25rem'}}>{selClient.name}</h2>
+              <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.3rem'}}>{CLIENT_TYPE_LABELS[selClient.type]} · {prog?.name||'—'} · Clearview Financial Model</div>
+              <h2 style={{fontFamily:'var(--cv-font)',fontSize:'1.4rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0 0 0.25rem'}}>{selClient.name}</h2>
               <div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{selClient.contact_name&&`${selClient.contact_name} · `}{selClient.country} · {selClient.sector}</div>
             </div>
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
-              <a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily:'monospace',fontSize:'1.01rem',padding:'0.4rem 1rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none',fontWeight:700}}>Open Clearview Financial Model ↗</a>
+              <a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',padding:'0.4rem 1rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none',fontWeight:700}}>Open Clearview Financial Model ↗</a>
               {isSuperCoach&&<CopyIntakeLink client={selClient}/>}
-              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily:'monospace',fontSize:'0.93rem',fontWeight:700,padding:'0.4rem 0.85rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit Name / Type / Programme</button>}
-              {isSuperCoach&&<button onClick={()=>setShowDeleteConfirm(true)} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Delete Client</button>}
+              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',fontWeight:700,padding:'0.4rem 0.85rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit Name / Type / Programme</button>}
+              {isSuperCoach&&<button onClick={()=>setShowDeleteConfirm(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Delete Client</button>}
             </div>
           </div>
         </div>
@@ -2201,9 +2212,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           />
         )}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'1rem',marginBottom:'1.25rem'}}>
-          <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 1 — Open Clearview</div><p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.7,margin:0}}>Click "Open Clearview Financial Model" above. Go to Settings to define business units and revenue lines.</p></div>
-          <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 2 — Define Business Units</div><p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.7,margin:0}}>In Settings, add business units. Set each unit type: product, service, or aggregator.</p></div>
-          <div style={{...card,marginBottom:0}}><div style={{fontFamily:'Georgia,serif',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 3 — Enter the Plan</div><p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.7,margin:0}}>Go to Planning to add revenue and cost lines. Enter monthly figures for the full planning period.</p></div>
+          <div style={{...card,marginBottom:0}}><div style={{fontFamily:'var(--cv-font)',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 1 — Open Clearview</div><p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.7,margin:0}}>Click "Open Clearview Financial Model" above. Go to Settings to define business units and revenue lines.</p></div>
+          <div style={{...card,marginBottom:0}}><div style={{fontFamily:'var(--cv-font)',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 2 — Define Business Units</div><p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.7,margin:0}}>In Settings, add business units. Set each unit type: product, service, or aggregator.</p></div>
+          <div style={{...card,marginBottom:0}}><div style={{fontFamily:'var(--cv-font)',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 3 — Enter the Plan</div><p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.7,margin:0}}>Go to Planning to add revenue and cost lines. Enter monthly figures for the full planning period.</p></div>
         </div>
         {isSuperCoach&&<ClientTeamInvite client={selClient}/>}
         {mayPreview(userRole)&&<ViewAsBar realRole={userRole} viewingAs={viewingAs||userRole} onChange={v=>setViewingAs(v===userRole?null:v)}/>}
@@ -2217,7 +2228,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       <div>
         {/* Breadcrumb */}
         <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'1rem',fontSize:'1.01rem',color:C.slate}}>
-          <button style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem'}} onClick={()=>setView('overview')}>\u2190 Coach Dashboard</button>
+          <button style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem'}} onClick={()=>setView('overview')}>\u2190 Coach Dashboard</button>
           <span>/</span><span style={{color:C.navy,fontWeight:600}}>{selClient.name}</span>
         </div>
 
@@ -2225,14 +2236,14 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         <div style={{...card,background:'var(--cv-header)',color:'var(--cv-on-accent)',marginBottom:'1.25rem'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
             <div>
-              <div style={{fontFamily:'monospace',fontSize:'0.93rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.3rem'}}>{CLIENT_TYPE_LABELS[selClient.type]} \u00b7 {prog?.name||'\u2014'} \u00b7 {isCanvas?'Full GtCV Canvas':'Clearview Financial'}</div>
-              <h2 style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0 0 0.25rem'}}>{selClient.name}</h2>
+              <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.3rem'}}>{CLIENT_TYPE_LABELS[selClient.type]} \u00b7 {prog?.name||'\u2014'} \u00b7 {isCanvas?'Full GtCV Canvas':'Clearview Financial'}</div>
+              <h2 style={{fontFamily:'var(--cv-font)',fontSize:'1.4rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0 0 0.25rem'}}>{selClient.name}</h2>
               <div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{selClient.contact_name&&`${selClient.contact_name} \u00b7 `}{selClient.country} \u00b7 {selClient.sector}</div>
             </div>
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
-              {selClient.clearview_active&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.22rem 0.6rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none'}}>Open Clearview \u2197</a>}
-              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily:'monospace',fontSize:'0.93rem',fontWeight:700,padding:'0.22rem 0.6rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit Name / Type / Programme</button>}
+              {selClient.clearview_active&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.22rem 0.6rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none'}}>Open Clearview \u2197</a>}
+              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',fontWeight:700,padding:'0.22rem 0.6rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit Name / Type / Programme</button>}
               <button style={addBtn(true)} onClick={printSection}>Print</button>
             </div>
           </div>
@@ -2275,10 +2286,10 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               onClick={()=>setNavCollapsed(v=>!v)}
               aria-expanded={!navCollapsed}
               title={navCollapsed?'Show the tab names':'Collapse to give the content more room'}
-              style={{width:'100%',textAlign:navCollapsed?'center':'left',padding:'0.5rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:C.white,color:C.slate,cursor:'pointer',fontFamily:'monospace',fontSize:'0.9rem'}}
+              style={{width:'100%',textAlign:navCollapsed?'center':'left',padding:'0.5rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:C.white,color:C.slate,cursor:'pointer',fontFamily: 'var(--cv-font-mono)',fontSize:'0.9rem'}}
             >{navCollapsed?'\u00bb':'\u00ab Collapse'}</button>
             {visibleTabs.map((tab,i)=>{
-              const isActive=activeTab===tab.id
+              const isActive=shownTab===tab.id
               // A heading before the first item of each group. Four headings
               // instead of a flat list you have to read end to end.
               const firstOfGroup=i===0||visibleTabs[i-1].group!==tab.group
@@ -2294,15 +2305,21 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               return(
                 <div key={tab.id}>
                 {groupDef&&!navCollapsed?(
-                  <div style={{padding:'0.75rem 0.85rem 0.3rem',background:'var(--cv-alt)',borderBottom:`1px solid ${C.border}`}}>
-                    <div style={{fontFamily:'monospace',fontSize:'0.66rem',letterSpacing:'.14em',textTransform:'uppercase',color:C.cyan,fontWeight:700}}>{groupDef.label}</div>
-                    <div style={{fontSize:'0.78rem',color:C.slate,marginTop:2,lineHeight:1.35}}>{groupDef.note}</div>
+                  /* A HEADING, NOT A TAB. 2 September 2026. This carried a
+                     filled background and a bottom border, which is exactly how
+                     the SELECTED tab is drawn — so two things in the sidebar
+                     looked chosen at once and neither clearly won. It is now
+                     plain text on the sidebar's own background, with space
+                     above it, which is what a heading looks like. */
+                  <div style={{padding:'1.15rem 0.85rem 0.4rem'}}>
+                    <div style={{fontSize:'0.68rem',letterSpacing:'.14em',textTransform:'uppercase',color:C.slate,fontWeight:600}}>{groupDef.label}</div>
+                    <div style={{fontSize:'0.78rem',color:C.slate,opacity:0.75,marginTop:2,lineHeight:1.35}}>{groupDef.note}</div>
                   </div>
                 ):null}
                 {groupDef&&navCollapsed?<div style={{height:1,background:C.border,margin:'0.4rem 0'}}/>:null}
-                <button onClick={()=>{if(shutBecause){setFlashLocked(shutBecause);return}setActiveTab(tab.id)}} disabled={!!shutBecause} title={shutBecause||(navCollapsed?`${tab.marker} ${tab.label}`:undefined)} style={{width:'100%',textAlign:'left',padding:navCollapsed?'0.6rem 0.3rem':'0.6rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:isActive?'var(--cv-header)':C.white,color:isActive?'var(--cv-on-accent)':(shutBecause?C.slate:C.navy),opacity:shutBecause?0.55:1,cursor:shutBecause?'not-allowed':'pointer',display:'flex',justifyContent:navCollapsed?'center':'space-between',alignItems:'center',gap:navCollapsed?'0.25rem':0,fontSize:'1.01rem',fontFamily:"'Segoe UI',system-ui,sans-serif",fontWeight:isActive?700:400}}>
+                <button onClick={()=>{if(shutBecause){setFlashLocked(shutBecause);return}setActiveTab(tab.id)}} disabled={!!shutBecause} title={shutBecause||(navCollapsed?`${tab.marker} ${tab.label}`:undefined)} aria-current={isActive?'page':undefined} style={{width:'100%',textAlign:'left',padding:navCollapsed?'0.6rem 0.3rem':'0.6rem 0.85rem',border:'none',borderLeft:isActive?`4px solid ${C.cyan}`:'4px solid transparent',borderBottom:`1px solid ${C.border}`,background:isActive?'var(--cv-header)':C.white,color:isActive?'var(--cv-on-accent)':(shutBecause?C.slate:C.navy),opacity:shutBecause?0.55:1,cursor:shutBecause?'not-allowed':'pointer',display:'flex',justifyContent:navCollapsed?'center':'space-between',alignItems:'center',gap:navCollapsed?'0.25rem':0,fontSize:'1.01rem',fontFamily:"var(--cv-font)",fontWeight:isActive?600:400}}>
                   <span>
-                    {navCollapsed?<span style={{fontFamily:'monospace',fontSize:'0.93rem',color:isActive?C.cyan:C.slate}}>{tab.marker}</span>:tab.label}
+                    {navCollapsed?<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:isActive?C.cyan:C.slate}}>{tab.marker}</span>:tab.label}
                   </span>
                   {dpCanvas&&<DPDot status={dpCanvas.status}/>}
                   {tab.coachOnly&&!navCollapsed&&<span style={{fontSize:'0.93rem',color:isActive?C.cyan:C.amber}}>\ud83d\udc41</span>}
@@ -2318,10 +2335,10 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             {flashLocked?(
               <div role="status" style={{marginBottom:'1rem',padding:'0.7rem 1rem',borderRadius:10,border:`1px solid ${C.amber}`,background:'var(--cv-alt)',color:C.navy,fontSize:'0.97rem',display:'flex',gap:'0.8rem',alignItems:'center',flexWrap:'wrap'}}>
                 <span>{flashLocked}</span>
-                <button type="button" onClick={()=>setFlashLocked(null)} style={{fontFamily:'monospace',fontSize:'0.85rem',padding:'0.25rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,background:'transparent',color:C.slate,cursor:'pointer'}}>Close</button>
+                <button type="button" onClick={()=>setFlashLocked(null)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',padding:'0.25rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,background:'transparent',color:C.slate,cursor:'pointer'}}>Close</button>
               </div>
             ):null}
-            {activeTab==='cover'&&<><WhatNeedsYou clientId={selClient.id} canManage={canEdit(previewRoleId)} onGoTo={setActiveTab}/><CoverPanel slug={selClient.slug}/><div style={{height:18}}/>
+            {shownTab==='cover'&&<>{mayRun?<WhatNeedsYou clientId={selClient.id} canManage={canEdit(previewRoleId)} onGoTo={setActiveTab}/>:null}<CoverPanel slug={selClient.slug}/><div style={{height:18}}/>
               <TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/>
               {!selClient.programme_id&&<ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>}
             </>}
@@ -2329,25 +2346,25 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 sits where it always did; what each gate DECIDED, the evidence,
                 the dissent and the signatures render beneath it, live, with a
                 dated fixed version for printing. */}
-            {activeTab==='journey'&&<><EngagementJourneyView slugOverride={selClient.slug}/><div style={{height:22}}/><JourneyCanvasPanel clientId={selClient.id}/></>}
-            {activeTab==='charter'&&<EngagementCharterView slugOverride={selClient.slug}/>}
-            {activeTab==='how_to_start'&&<TabHowToStart client={selClient}/>}
-            {activeTab==='coach_ref'&&canViewCoachGuidance(previewRoleId)&&<CoachQuickReference showGuidance={canViewCoachGuidance(previewRoleId)}/>}
-            {activeTab==='ip_framework'&&<TabIPFramework/>}
+            {shownTab==='journey'&&<><EngagementJourneyView slugOverride={selClient.slug}/><div style={{height:22}}/><JourneyCanvasPanel clientId={selClient.id}/></>}
+            {shownTab==='charter'&&<EngagementCharterView slugOverride={selClient.slug}/>}
+            {shownTab==='how_to_start'&&<TabHowToStart client={selClient}/>}
+            {shownTab==='coach_ref'&&canViewCoachGuidance(previewRoleId)&&<CoachQuickReference showGuidance={canViewCoachGuidance(previewRoleId)}/>}
+            {shownTab==='ip_framework'&&<TabIPFramework/>}
             {/* Setup, in the order it is done: who is on the engagement, their
                 logins, then how the engagement runs. Sharing a canvas with a
                 prospect is selling, not delivery, so it is not on a client's
                 page; it moves to the coach side. */}
-            {activeTab==='eng_setup'&&<><EngagementPartiesPanel clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/>{isSuperCoach&&<><ClientTeamInvite client={selClient}/><div style={{height:22}}/></>}<EngagementSettings clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
-            {activeTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
-            {activeTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={previewRoleId} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
-            {activeTab==='sessions'&&<><SessionPlanner clientId={selClient.id} canManage={canEdit(previewRoleId)}/></>}
-            {activeTab==='tracker'&&<><GtcvEngagementTracker clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><TabTracker client={selClient} canvas={canvas}/></>}
-            {activeTab==='decisions'&&<TabDecisions client={selClient} decisions={decisions} userRole={previewRoleId} userName={userName} onAdd={async(d)=>{const {data}=await supabase.from('canvas_decisions').insert([{...d,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:[...decisions,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`decisions:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:decisions.map(d=>d.id!==id?d:{...d,...updates})}})),()=>supabase.from('canvas_decisions').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
-            {activeTab==='evidence'&&<><EvidenceLibraryPanel clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><TabEvidence client={selClient} evidence={evidence} onAdd={async(e)=>{const ref=`E-${String(evidence.length+1).padStart(3,'0')}`;const {data}=await supabase.from('evidence_library').insert([{...e,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:[...evidence,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`evidence:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:evidence.map(e=>e.id!==id?e:{...e,...updates})}})),()=>supabase.from('evidence_library').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/></>}
-            {activeTab==='handover'&&<><HandoverIndependence clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
-            {activeTab==='handover'&&<TabHandover client={selClient} handover={handover} canvas={canvas} userRole={previewRoleId} onUpdate={(id,updates)=>optimisticWrite(`handover:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,handover:handover.map(h=>h.id!==id?h:{...h,...updates})}})),()=>supabase.from('handover_record').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
-            {activeTab==='phase0'&&<><TabDP client={selClient} dp={canvas.find(d=>d.dp_id==='phase_0')} userRole={previewRoleId} onUpdateDP={u=>updateDP(selClient.id,'phase_0',u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,'phase_0',cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId="phase_0" clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/></div></>}
+            {shownTab==='eng_setup'&&<><EngagementPartiesPanel clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/>{isSuperCoach&&<><ClientTeamInvite client={selClient}/><div style={{height:22}}/></>}<EngagementSettings clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
+            {shownTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
+            {shownTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={previewRoleId} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
+            {shownTab==='sessions'&&<><SessionPlanner clientId={selClient.id} canManage={canEdit(previewRoleId)}/></>}
+            {shownTab==='tracker'&&<><GtcvEngagementTracker clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><TabTracker client={selClient} canvas={canvas}/></>}
+            {shownTab==='decisions'&&<TabDecisions client={selClient} decisions={decisions} userRole={previewRoleId} userName={userName} onAdd={async(d)=>{const {data}=await supabase.from('canvas_decisions').insert([{...d,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:[...decisions,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`decisions:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:decisions.map(d=>d.id!==id?d:{...d,...updates})}})),()=>supabase.from('canvas_decisions').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
+            {shownTab==='evidence'&&<><EvidenceLibraryPanel clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><TabEvidence client={selClient} evidence={evidence} onAdd={async(e)=>{const ref=`E-${String(evidence.length+1).padStart(3,'0')}`;const {data}=await supabase.from('evidence_library').insert([{...e,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:[...evidence,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`evidence:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:evidence.map(e=>e.id!==id?e:{...e,...updates})}})),()=>supabase.from('evidence_library').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/></>}
+            {shownTab==='handover'&&<><HandoverIndependence clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
+            {shownTab==='handover'&&<TabHandover client={selClient} handover={handover} canvas={canvas} userRole={previewRoleId} onUpdate={(id,updates)=>optimisticWrite(`handover:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,handover:handover.map(h=>h.id!==id?h:{...h,...updates})}})),()=>supabase.from('handover_record').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
+            {shownTab==='phase0'&&<><TabDP client={selClient} dp={canvas.find(d=>d.dp_id==='phase_0')} userRole={previewRoleId} onUpdateDP={u=>updateDP(selClient.id,'phase_0',u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,'phase_0',cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId="phase_0" clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/></div></>}
             {['dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09'].map(dpKey=>(
               // One condition per tab. The same nine keys used to be mapped
               // twice with the same test in both, so every render walked the
@@ -2361,7 +2378,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 {dpKey==='dp07'&&<div style={{marginTop:26}}><TabPilotObservation client={selClient} pilots={pilots} onAdd={async(p)=>{const {data}=await supabase.from('pilot_observations').insert([{...p,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,pilots:[...pilots,data]}}))} } onUpdate={(id,updates)=>optimisticWrite(`pilots:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,pilots:pilots.map(p=>p.id!==id?p:{...p,...updates})}})),()=>supabase.from('pilot_observations').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/></div>}
               </div>
             ))}
-            {activeTab==='hypothesis'&&<TabHypothesis client={selClient} hypotheses={hypotheses} onAdd={async(h)=>{const ref=`HYP-${String(hypotheses.length+1).padStart(3,'0')}`;const {data}=await supabase.from('hypotheses').insert([{...h,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,hypotheses:[...hypotheses,data]}}))} } onUpdate={(id,updates)=>optimisticWrite(`hypotheses:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,hypotheses:hypotheses.map(h=>h.id!==id?h:{...h,...updates})}})),()=>supabase.from('hypotheses').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
+            {shownTab==='hypothesis'&&<TabHypothesis client={selClient} hypotheses={hypotheses} onAdd={async(h)=>{const ref=`HYP-${String(hypotheses.length+1).padStart(3,'0')}`;const {data}=await supabase.from('hypotheses').insert([{...h,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,hypotheses:[...hypotheses,data]}}))} } onUpdate={(id,updates)=>optimisticWrite(`hypotheses:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,hypotheses:hypotheses.map(h=>h.id!==id?h:{...h,...updates})}})),()=>supabase.from('hypotheses').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
           </div>
         </div>
       </div>
@@ -2376,7 +2393,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     const prog=selProgId?programmes.find(p=>p.id===selProgId):null
     if(prog)return(
       <div>
-        <button style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem',marginBottom:'1rem'}} onClick={()=>{setSelProgId(null);setEditingProg(false)}}>\u2190 All Programmes</button>
+        <button style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem',marginBottom:'1rem'}} onClick={()=>{setSelProgId(null);setEditingProg(false)}}>\u2190 All Programmes</button>
         {editingProg&&progForm?(
           <div style={card}>
             <div style={{...secH,marginBottom:'1rem'}}>Edit Programme</div>
@@ -2406,8 +2423,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           <div>
             <div style={{...card,background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                <div><div style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.cyan,letterSpacing:'0.12em',marginBottom:'0.3rem'}}>{prog.type==='donor_programme'?'DONOR PROGRAMME':'DIRECT CLIENT'}</div><h2 style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0 0 0.2rem'}}>{prog.name}</h2><div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{prog.funder} \u00b7 {prog.country}</div></div>
-                <button style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.3rem 0.8rem',border:'1px solid var(--cv-wa-30)',borderRadius:4,background:'transparent',color:'var(--cv-wa-80)',cursor:'pointer'}} onClick={()=>{setProgForm({...prog});setEditingProg(true)}}>Edit</button>
+                <div><div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.cyan,letterSpacing:'0.12em',marginBottom:'0.3rem'}}>{prog.type==='donor_programme'?'DONOR PROGRAMME':'DIRECT CLIENT'}</div><h2 style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0 0 0.2rem'}}>{prog.name}</h2><div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{prog.funder} \u00b7 {prog.country}</div></div>
+                <button style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.3rem 0.8rem',border:'1px solid var(--cv-wa-30)',borderRadius:4,background:'transparent',color:'var(--cv-wa-80)',cursor:'pointer'}} onClick={()=>{setProgForm({...prog});setEditingProg(true)}}>Edit</button>
               </div>
             </div>
             <div style={card}>
@@ -2429,7 +2446,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem'}}><div style={secH}>Programmes</div><button style={addBtn()} onClick={()=>setShowNew(!showNew)}>+ New Programme</button></div>
         {showNew&&<NewProgrammeForm onSave={async p=>{const {data,error}=await supabase.from('programmes').insert([p]).select().single();if(!error&&data){setPrograms(prev=>[...prev,data]);setShowNew(false)}}} onCancel={()=>setShowNew(false)}/>}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:'1.25rem'}}>
-          {programmes.map(p=><div key={p.id} style={{...card,cursor:'pointer',marginBottom:0}} onClick={()=>setSelProgId(p.id)}><div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}><div><div style={{fontFamily:'Georgia,serif',fontSize:'1.22rem',fontWeight:700,color:C.navy}}>{p.name}</div><div style={{fontSize:'1.01rem',color:C.slate,marginTop:'0.18rem'}}>{p.funder} \u00b7 {p.country} \u00b7 {clients.filter(c=>c.programme_id===p.id).length} clients</div></div><span style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.12rem 0.45rem',borderRadius:4,background:p.type==='donor_programme'?C.amber:C.teal,color:'var(--cv-on-accent)'}}>{p.type==='donor_programme'?'Donor':'Direct'}</span></div></div>)}
+          {programmes.map(p=><div key={p.id} style={{...card,cursor:'pointer',marginBottom:0}} onClick={()=>setSelProgId(p.id)}><div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}><div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.22rem',fontWeight:700,color:C.navy}}>{p.name}</div><div style={{fontSize:'1.01rem',color:C.slate,marginTop:'0.18rem'}}>{p.funder} \u00b7 {p.country} \u00b7 {clients.filter(c=>c.programme_id===p.id).length} clients</div></div><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.12rem 0.45rem',borderRadius:4,background:p.type==='donor_programme'?C.amber:C.teal,color:'var(--cv-on-accent)'}}>{p.type==='donor_programme'?'Donor':'Direct'}</span></div></div>)}
         </div>
       </div>
     )
@@ -2516,8 +2533,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               <div><div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy}}>{ci.name}</div><div style={{fontSize:'1.01rem',color:C.slate}}>{ci.email} \u00b7 {ci.country}</div>{ci.specialisation&&<div style={{fontSize:'1.01rem',color:C.slate}}>{ci.specialisation}</div>}</div>
               <div style={{textAlign:'right'}}>
                 {canManageTeam(userRole)
-                  ?<button onClick={()=>toggleActive(ci)} title="Click to toggle" style={{fontFamily:'monospace',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem',background:'transparent',border:`1px solid ${ci.active?C.green:C.red}`,borderRadius:4,padding:'0.1rem 0.5rem',cursor:'pointer'}}>{ci.active?'Active':'Inactive'} · click to {ci.active?'suspend':'reactivate'}</button>
-                  :<div style={{fontFamily:'monospace',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem'}}>{ci.active?'Active':'Inactive'}</div>}
+                  ?<button onClick={()=>toggleActive(ci)} title="Click to toggle" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem',background:'transparent',border:`1px solid ${ci.active?C.green:C.red}`,borderRadius:4,padding:'0.1rem 0.5rem',cursor:'pointer'}}>{ci.active?'Active':'Inactive'} · click to {ci.active?'suspend':'reactivate'}</button>
+                  :<div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem'}}>{ci.active?'Active':'Inactive'}</div>}
                 {ci.rate_per_day>0&&<div style={{fontSize:'0.93rem',color:C.slate,marginBottom:'0.4rem',marginTop:'0.3rem'}}>{ci.currency} {Number(ci.rate_per_day).toLocaleString()}/day</div>}
                 {canManageTeam(userRole)&&<button style={{...addBtn(true),marginBottom:'0.4rem'}} onClick={()=>editingCiId===ci.id?setEditingCiId(null):startEditCi(ci)}>{editingCiId===ci.id?'Cancel':'Edit profile'}</button>}
                 <InviteLoginButton email={ci.email} fullName={ci.name} role="coach" coImplementerId={ci.id} funderProgrammeId={null}/>
@@ -2536,7 +2553,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               </div>
             )}
             <div style={{display:'flex',gap:'1.5rem',fontSize:'1.01rem',color:C.slate,marginBottom:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
-              <span style={{display:'flex',alignItems:'center',gap:'0.4rem',flexWrap:'wrap'}}>Clients:{(ci.client_ids||[]).length===0?<strong style={{color:C.slate}}>None</strong>:(ci.client_ids||[]).map(id=><span key={id} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.12rem 0.55rem',borderRadius:20,background:'var(--cv-cyan-dim)',color:C.teal,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:'0.3rem'}}>{clients.find(c=>c.id===id)?.name||id}{canManageTeam(userRole)&&<span style={{cursor:'pointer',fontWeight:700}} onClick={()=>unassignClient(ci,id)} title="Remove this client">×</span>}</span>)}</span>
+              <span style={{display:'flex',alignItems:'center',gap:'0.4rem',flexWrap:'wrap'}}>Clients:{(ci.client_ids||[]).length===0?<strong style={{color:C.slate}}>None</strong>:(ci.client_ids||[]).map(id=><span key={id} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.12rem 0.55rem',borderRadius:20,background:'var(--cv-cyan-dim)',color:C.teal,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:'0.3rem'}}>{clients.find(c=>c.id===id)?.name||id}{canManageTeam(userRole)&&<span style={{cursor:'pointer',fontWeight:700}} onClick={()=>unassignClient(ci,id)} title="Remove this client">×</span>}</span>)}</span>
               {canManageTeam(userRole)&&(addingClientFor===ci.id?(
                 <select autoFocus style={{...inp,width:'auto',fontSize:'0.93rem',padding:'0.15rem 0.4rem'}} value="" onChange={e=>assignClient(ci,e.target.value)} onBlur={()=>setAddingClientFor(null)}>
                   <option value="">Select a client…</option>
@@ -2550,12 +2567,12 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             </div>
             {/* Timesheet table */}
             {ciTs.length>0&&<div style={{overflowX:'auto'}}>
-              <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem',fontFamily:"var(--cv-font)"}}>
                 <thead><tr style={{background:C.lightBg}}>{['Date','Client','DP','Hours','Description','Status'].map(h=><th key={h} style={{padding:'0.4rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`}}>{h}</th>)}</tr></thead>
                 <tbody>{ciTs.slice(0,10).map((ts,i)=><tr key={ts.id} style={{background:i%2===0?C.cream:C.white}}>
                   <td style={{padding:'0.4rem 0.6rem'}}>{ts.date}</td>
                   <td style={{padding:'0.4rem 0.6rem'}}>{clients.find(c=>c.id===ts.client_id)?.name||'\u2014'}</td>
-                  <td style={{padding:'0.4rem 0.6rem',fontFamily:'monospace',fontSize:'0.93rem'}}>{ts.dp_id||'\u2014'}</td>
+                  <td style={{padding:'0.4rem 0.6rem',fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem'}}>{ts.dp_id||'\u2014'}</td>
                   <td style={{padding:'0.4rem 0.6rem'}}>{ts.hours}</td>
                   <td style={{padding:'0.4rem 0.6rem',maxWidth:180}}>{ts.description}</td>
                   <td style={{padding:'0.4rem 0.6rem'}}><Badge text={ts.status} color={ts.status==='approved'?C.green:ts.status==='submitted'?C.amber:ts.status==='rejected'?C.red:C.slate}/></td>
@@ -2594,7 +2611,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     if(canvases.length===0) return null
     return(
       <div style={{...card,marginBottom:'1.25rem'}}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Show a prospect a real engagement</div>
+        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Show a prospect a real engagement</div>
         <p style={{fontSize:'1.02rem',color:C.slate,lineHeight:1.6,margin:'0 0 0.9rem'}}>
           Give a prospect a read-only link to one of your live canvases, so they see the method
           working rather than described. Choose which engagement to show, and whether to name the
@@ -2668,7 +2685,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     :[['clients','Clients']]
   const roleBadgeLabel=isSuperCoach?'Super Coach':isFunder?'Funder':'Co-Implementer'
   return(
-    <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif",background:C.cream,color:C.navy,minHeight:'100vh'}}>
+    <div style={{fontFamily:"var(--cv-font)",background:C.cream,color:C.navy,minHeight:'100vh'}}>
       <BuildStamp/>
       {/* Canvas save status — a failed background save of a client/decision-point/
           component/diagnostic/etc. edit is shown here instead of being silently
@@ -2687,15 +2704,15 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       <header style={{background:'var(--cv-header)',borderBottom:`3px solid ${C.cyan}`}}>
         <div style={{maxWidth:1320,margin:'0 auto',padding:'1.25rem 1.5rem',display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
           <div>
-            <div style={{fontFamily:'monospace',fontSize:'0.93rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>CANVAS COACH \u2014 COACH DASHBOARD</div>
-            <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0.1rem 0 0.15rem'}}>{userName}</h1>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>CANVAS COACH \u2014 COACH DASHBOARD</div>
+            <h1 style={{fontFamily:'var(--cv-font)',fontSize:'1.5rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0.1rem 0 0.15rem'}}>{userName}</h1>
             <div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{activeClients.length} active \u00b7 {programmes.length} programme{programmes.length!==1?'s':''} \u00b7 {clearviewLive.length} Clearview live \u00b7 {canvasClients.length} canvas engagement{canvasClients.length!==1?'s':''}{pausedClients.length>0&&<span style={{marginLeft:8,color:C.red}}>\u00b7 {pausedClients.length} paused</span>}{pending>0&&<span style={{marginLeft:8,color:C.amber}}>\u00b7 \u23f3 {pending} pending</span>}</div>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}>
-            <span style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem'}}>{roleBadgeLabel}</span>
-            <button onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle light/dark theme" style={{fontFamily:'monospace',fontSize:'0.93rem',background:'transparent',border:`1px solid var(--cv-wa-25)`,borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>{theme==='dark'?'☀':'☾'} Theme</button>
+            <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem'}}>{roleBadgeLabel}</span>
+            <button onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle light/dark theme" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',background:'transparent',border:`1px solid var(--cv-wa-25)`,borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>{theme==='dark'?'☀':'☾'} Theme</button>
             <ActiveSessionsButton fontSize="0.93rem" />
-            <button onClick={onSignOut} style={{fontFamily:'monospace',fontSize:'0.93rem',background:'transparent',border:`1px solid var(--cv-wa-25)`,borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
+            <button onClick={onSignOut} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',background:'transparent',border:`1px solid var(--cv-wa-25)`,borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
             {/* Global sign-out: revokes EVERY session for this login (all devices),
                 so a session left open on another computer is ended. Supabase
                 scope:'global' invalidates all refresh tokens for the user. */}
@@ -2705,7 +2722,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               try { const { error } = await supabase.auth.signOut({ scope: 'global' }); signOutError = error } catch(e) { signOutError = e }
               if(signOutError){ window.alert('We could not confirm sign-out on all devices — other sessions may still be active. Please check your connection and try again.'); return }
               window.location.href='/'
-            }} title="Log out of every device where you are signed in" style={{fontFamily:'monospace',fontSize:'0.93rem',background:'transparent',border:'1px solid rgba(192,57,43,0.45)',borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out — all devices</button>
+            }} title="Log out of every device where you are signed in" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',background:'transparent',border:'1px solid rgba(192,57,43,0.45)',borderRadius:4,color:'var(--cv-wa-60)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out — all devices</button>
           </div>
         </div>
       </header>
@@ -2725,7 +2742,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         {view==='portfolio'&&<PortfolioIntelligenceHub clients={clients} programmes={programmes}/>}
         </ErrorBoundary>
       </main>
-      <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.93rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach \u00b7 Coach Dashboard \u00b7 habibonifade.com \u00b7 Confidential</footer>
+      <footer style={{textAlign:'center',padding:'1.5rem',fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach \u00b7 Coach Dashboard \u00b7 habibonifade.com \u00b7 Confidential</footer>
     </div>
   )
 }
@@ -2770,8 +2787,8 @@ function TabCover({client,prog,programmes,onUpdate}){
           </div>
           {client.notes&&<div style={{...card,background:C.cream}}><p style={{margin:0,fontSize:'1.07rem',color:C.slate,fontStyle:'italic'}}>{client.notes}</p></div>}
           <div style={{textAlign:'center',padding:'1.5rem',borderTop:`1px solid ${C.border}`,marginTop:'1rem'}}>
-            <div style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.cyan,letterSpacing:'0.1em',marginBottom:'0.3rem'}}>CANVAS COACH</div>
-            <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>Grant-to-Commercial Viability Canvas</div>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.cyan,letterSpacing:'0.1em',marginBottom:'0.3rem'}}>CANVAS COACH</div>
+            <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>Grant-to-Commercial Viability Canvas</div>
             <div style={{fontSize:'1.01rem',color:C.slate,marginTop:'0.3rem'}}>habibonifade.com</div>
           </div>
         </div>
@@ -2894,23 +2911,23 @@ function TabHowToStart({client}){
     <div>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 2 \u2014 How to Start</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       <div style={card}>
-        <h3 style={{fontFamily:'Georgia,serif',color:C.navy,marginTop:0}}>Welcome to your Canvas Coach engagement platform</h3>
+        <h3 style={{fontFamily:'var(--cv-font)',color:C.navy,marginTop:0}}>Welcome to your Canvas Coach engagement platform</h3>
         <p style={{fontSize:'1.13rem',lineHeight:1.7,color:C.slate}}>This platform is where the work of your engagement lives. It tracks every decision you make, every piece of evidence you produce, and every milestone you reach on your journey to commercial independence.</p>
-        <h4 style={{color:C.navy,fontFamily:'Georgia,serif'}}>What this platform tracks</h4>
+        <h4 style={{color:C.navy,fontFamily:'var(--cv-font)'}}>What this platform tracks</h4>
         <ul style={{fontSize:'1.13rem',lineHeight:1.8,color:C.slate}}>
           <li>Your progress through 9 Decision Points, each building on the last</li>
           <li>Evidence you produce at each stage: documents, interviews, financial data, observations</li>
           <li>Decisions made and who made them, all numbered and referenced</li>
           <li>Your commercial readiness, measured at the start, middle, and end of the engagement</li>
         </ul>
-        <h4 style={{color:C.navy,fontFamily:'Georgia,serif'}}>What {client.name} does here</h4>
+        <h4 style={{color:C.navy,fontFamily:'var(--cv-font)'}}>What {client.name} does here</h4>
         <ul style={{fontSize:'1.13rem',lineHeight:1.8,color:C.slate}}>
           <li>Enter evidence and link to documents as you complete each component</li>
           <li>Your CEO signs off each Decision Point when the work is done</li>
           <li>Record what you learned from customer conversations and pilot deliveries</li>
           <li>Review the Engagement Tracker (Tab 7) to see where you are and what comes next</li>
         </ul>
-        <h4 style={{color:C.navy,fontFamily:'Georgia,serif'}}>What your coach does here</h4>
+        <h4 style={{color:C.navy,fontFamily:'var(--cv-font)'}}>What your coach does here</h4>
         <ul style={{fontSize:'1.13rem',lineHeight:1.8,color:C.slate}}>
           <li>Reviews your evidence and guides next steps</li>
           <li>Can authorise progress if a gate is delayed, with a note visible to everyone</li>
@@ -2927,9 +2944,9 @@ function TabHowToStart({client}){
 function TabCoachRef(){
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 3 \u2014 Coach Quick Reference</h3><div style={{display:'flex',gap:'0.5rem'}}><span style={{fontFamily:'monospace',fontSize:'0.93rem',color:C.amber,border:`1px solid ${C.amber}`,borderRadius:4,padding:'0.2rem 0.5rem'}}>Coach only \u2014 not visible to client</span><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 3 \u2014 Coach Quick Reference</h3><div style={{display:'flex',gap:'0.5rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.amber,border:`1px solid ${C.amber}`,borderRadius:4,padding:'0.2rem 0.5rem'}}>Coach only \u2014 not visible to client</span><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       <div style={{...card,background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`}}>
-        <h4 style={{fontFamily:'Georgia,serif',color:C.navy,marginTop:0}}>Delivery Rhythm</h4>
+        <h4 style={{fontFamily:'var(--cv-font)',color:C.navy,marginTop:0}}>Delivery Rhythm</h4>
         <ul style={{fontSize:'1.07rem',lineHeight:1.8,color:C.navy}}>
           <li><strong>Kick-off immersion:</strong> 3 days on-site. Baseline, Phase 0, DP01 and DP02.</li>
           <li><strong>Customer validation visit:</strong> 2 days. Real customer conversations and debrief.</li>
@@ -2937,19 +2954,19 @@ function TabCoachRef(){
           <li><strong>Iteration 2 and handover visit:</strong> 3 days. Client leads, consultant observes.</li>
           <li><strong>Between visits:</strong> in-country associate provides daily continuity. 2 remote sessions per week.</li>
         </ul>
-        <h4 style={{fontFamily:'Georgia,serif',color:C.navy}}>Gate Escalation Protocol</h4>
+        <h4 style={{fontFamily:'var(--cv-font)',color:C.navy}}>Gate Escalation Protocol</h4>
         <ul style={{fontSize:'1.07rem',lineHeight:1.8,color:C.navy}}>
           <li>Gate not signed within 5 working days of completion: escalate to CEO directly by phone or WhatsApp.</li>
           <li>Gate not signed within 10 working days: use Coach Authorise Progress with a mandatory note.</li>
           <li>All coach-authorised progress is visible to the Ignite funder view \u2014 be specific in the note.</li>
         </ul>
-        <h4 style={{fontFamily:'Georgia,serif',color:C.navy}}>Commercial Readiness Diagnostic Points</h4>
+        <h4 style={{fontFamily:'var(--cv-font)',color:C.navy}}>Commercial Readiness Diagnostic Points</h4>
         <ul style={{fontSize:'1.07rem',lineHeight:1.8,color:C.navy}}>
           <li><strong>Baseline:</strong> DP06 \u2014 before pilots begin.</li>
           <li><strong>Mid-point:</strong> DP07 \u2014 after Iteration 1.</li>
           <li><strong>Final:</strong> DP09 \u2014 at engagement close.</li>
         </ul>
-        <h4 style={{fontFamily:'Georgia,serif',color:C.navy}}>Non-Negotiables</h4>
+        <h4 style={{fontFamily:'var(--cv-font)',color:C.navy}}>Non-Negotiables</h4>
         <ul style={{fontSize:'1.07rem',lineHeight:1.8,color:C.navy}}>
           <li>Independence Test 4 (client presents commercial model unassisted) must be Yes before handover.</li>
           <li>Pilot clients must pay \u2014 even a nominal amount. Zero-payment pilots do not count.</li>
@@ -2965,34 +2982,34 @@ function TabIPFramework(){
     <div>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 4 \u2014 IP Framework Reference</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       <div style={card}>
-        <h4 style={{fontFamily:'Georgia,serif',color:C.navy,marginTop:0}}>Three-Stage Adoption Test</h4>
+        <h4 style={{fontFamily:'var(--cv-font)',color:C.navy,marginTop:0}}>Three-Stage Adoption Test</h4>
         <p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.6}}>Before any service can be sold commercially, three things must be true about the buyer. All three must be present \u2014 one or two is not enough.</p>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
           {[{n:'01',t:'Willingness',d:'The customer sees the problem as real and worth solving. They want a solution and are open to engaging with a provider.'},{n:'02',t:'Ability',d:'The customer has the financial means to pay for the solution at the price offered. Budget exists and can be accessed.'},{n:'03',t:'Prioritisation',d:'The customer ranks this problem high enough to spend budget on it now, not next quarter or next year.'}].map(s=>(
             <div key={s.n} style={{background:C.cream,padding:16,borderRadius:8,borderTop:`3px solid ${C.cyan}`}}>
-              <p style={{fontSize:'0.93rem',color:C.cyan,fontWeight:700,letterSpacing:1,margin:'0 0 4px',textTransform:'uppercase',fontFamily:'monospace'}}>{s.n}</p>
-              <p style={{fontFamily:'Georgia,serif',fontWeight:700,margin:'0 0 8px',fontSize:'1rem',color:C.navy}}>{s.t}</p>
+              <p style={{fontSize:'0.93rem',color:C.cyan,fontWeight:700,letterSpacing:1,margin:'0 0 4px',textTransform:'uppercase',fontFamily: 'var(--cv-font-mono)'}}>{s.n}</p>
+              <p style={{fontFamily:'var(--cv-font)',fontWeight:700,margin:'0 0 8px',fontSize:'1rem',color:C.navy}}>{s.t}</p>
               <p style={{margin:0,fontSize:'1.07rem',color:C.slate}}>{s.d}</p>
             </div>
           ))}
         </div>
-        <h4 style={{fontFamily:'Georgia,serif',color:C.navy}}>Asset Liquidity Hierarchy</h4>
+        <h4 style={{fontFamily:'var(--cv-font)',color:C.navy}}>Asset Liquidity Hierarchy</h4>
         <p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.6}}>In agricultural markets, assets serve different financial functions. Understanding this helps diagnose customer budget behaviour.</p>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
           {[{t:'Poultry',sub:'ATM equivalent',d:'Easily converted to cash. Sold when small amounts are needed quickly.'},{t:'Small ruminants',sub:'Savings equivalent',d:'Converted for planned medium expenses. Goats and sheep are liquid but not instant.'},{t:'Large ruminants',sub:'Fixed asset equivalent',d:'Sold for major planned expenses only. Cattle represent significant stored value.'}].map(a=>(
             <div key={a.t} style={{background:C.cream,padding:16,borderRadius:8,borderTop:`3px solid ${C.teal}`}}>
-              <p style={{fontFamily:'Georgia,serif',fontWeight:700,margin:'0 0 2px',fontSize:'1.16rem',color:C.navy}}>{a.t}</p>
+              <p style={{fontFamily:'var(--cv-font)',fontWeight:700,margin:'0 0 2px',fontSize:'1.16rem',color:C.navy}}>{a.t}</p>
               <p style={{fontSize:'0.93rem',color:C.teal,margin:'0 0 8px',fontWeight:600}}>{a.sub}</p>
               <p style={{margin:0,fontSize:'1.07rem',color:C.slate}}>{a.d}</p>
             </div>
           ))}
         </div>
-        <h4 style={{fontFamily:'Georgia,serif',color:C.navy}}>Six Fit Tests \u2014 Commercial Readiness Diagnostic</h4>
+        <h4 style={{fontFamily:'var(--cv-font)',color:C.navy}}>Six Fit Tests \u2014 Commercial Readiness Diagnostic</h4>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.07rem'}}>
           <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Test','Name','What it diagnoses'].map(h=><th key={h} style={{padding:'8px 12px',textAlign:'left'}}>{h}</th>)}</tr></thead>
           <tbody>{[['01','Problem\u2013Provider Fit','Does the organisation have the right to own this problem in this market?'],['02','Problem\u2013Solution Fit','Does the service solve the problem as the client experiences it?'],['03','Solution\u2013Problem Owner Fit','Is the solution designed for the actor with budget, not just the beneficiary?'],['04','Solution\u2013Pilot Fit','Can this be tested meaningfully within the engagement timeline?'],['05','Solution\u2013Market Fit','Is there demonstrated willingness to pay at a cost-recovery price?'],['06','Solution\u2013Scale Channel Fit','Are there channels to reach beyond the founding clients independently?']].map(([n,name,desc],i)=>(
             <tr key={n} style={{background:i%2===0?C.cream:C.white}}>
-              <td style={{padding:'8px 12px',color:C.cyan,fontWeight:700,fontFamily:'monospace'}}>{n}</td>
+              <td style={{padding:'8px 12px',color:C.cyan,fontWeight:700,fontFamily: 'var(--cv-font-mono)'}}>{n}</td>
               <td style={{padding:'8px 12px',fontWeight:600,color:C.navy}}>{name}</td>
               <td style={{padding:'8px 12px',color:C.slate}}>{desc}</td>
             </tr>
@@ -3140,7 +3157,7 @@ function TabTracker({client,canvas}){
     <div>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 7 \u2014 Engagement Tracker</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       <div style={{overflowX:'auto'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.07rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.07rem',fontFamily:"var(--cv-font)"}}>
           <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Phase','Zone / Decision Point','Core Question','Status','Components','CEO Sign-Off'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left',fontWeight:600,whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
           <tbody>
             {dpOrder.map((dpId,i)=>{
@@ -3149,11 +3166,11 @@ function TabTracker({client,canvas}){
               const totalComps=dp?.components?.length||0
               return(
                 <tr key={dpId} style={{background:i%2===0?C.cream:C.white}}>
-                  <td style={{padding:'9px 12px',fontWeight:700,color:C.cyan,fontFamily:'monospace'}}>{dpLabels[dpId]}</td>
+                  <td style={{padding:'9px 12px',fontWeight:700,color:C.cyan,fontFamily: 'var(--cv-font-mono)'}}>{dpLabels[dpId]}</td>
                   <td style={{padding:'9px 12px',fontWeight:600,color:C.navy}}>{dp?.label||dpId}</td>
                   <td style={{padding:'9px 12px',color:C.slate,maxWidth:220,fontSize:'1.01rem'}}>{dp?.core_question||'\u2014'}</td>
                   <td style={{padding:'9px 12px'}}>{dp?<div style={{display:'flex',alignItems:'center',gap:'0.4rem'}}><DPDot status={dp.status}/><span style={{fontSize:'1.01rem'}}>{dp.status}</span></div>:<Badge text="Not started" color={C.slate}/>}</td>
-                  <td style={{padding:'9px 12px',fontFamily:'monospace',fontSize:'1.01rem'}}>{dp?`${completedComps}/${totalComps}`:'\u2014'}</td>
+                  <td style={{padding:'9px 12px',fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem'}}>{dp?`${completedComps}/${totalComps}`:'\u2014'}</td>
                   <td style={{padding:'9px 12px'}}>{dp?.ceo_signed_off?<Badge text={`CEO \u2713 ${dp.ceo_signed_off_at?.split('T')[0]||''}`} color={C.green}/>:'\u2014'}</td>
                 </tr>
               )
@@ -3191,7 +3208,7 @@ function TabDecisions({client,decisions,userRole,userName,onAdd,onUpdate}){
       {decisions.map(d=>(
         <div key={d.id} style={{...card,borderLeft:`4px solid ${C.cyan}`}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.5rem'}}>
-            <span style={{fontFamily:'monospace',fontSize:'1.01rem',fontWeight:700,color:C.cyan}}>{d.reference}</span>
+            <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',fontWeight:700,color:C.cyan}}>{d.reference}</span>
             <span style={{fontSize:'1.01rem',color:C.slate}}>{d.date} \u00b7 {d.dp_id||'\u2014'}</span>
           </div>
           <p style={{margin:'0 0 0.5rem',fontSize:'1.13rem',color:C.navy}}>{d.decision}</p>
@@ -3233,9 +3250,9 @@ function TabEvidence({client,evidence,onAdd,onUpdate}){
           <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Ref','Date','DP','Type','Description','Status','Link'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
           <tbody>{evidence.length===0?<tr><td colSpan={7} style={{padding:'2rem',textAlign:'center',color:C.slate}}>No evidence recorded yet.</td></tr>:evidence.map((e,i)=>(
             <tr key={e.id} style={{background:i%2===0?C.cream:C.white}}>
-              <td style={{padding:'8px 10px',fontFamily:'monospace',fontWeight:700,color:C.cyan}}>{e.reference}</td>
+              <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.cyan}}>{e.reference}</td>
               <td style={{padding:'8px 10px'}}>{e.date}</td>
-              <td style={{padding:'8px 10px',fontFamily:'monospace',fontSize:'1.01rem'}}>{e.dp_id||'\u2014'}</td>
+              <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem'}}>{e.dp_id||'\u2014'}</td>
               <td style={{padding:'8px 10px'}}>{e.type}</td>
               <td style={{padding:'8px 10px',maxWidth:240}}>{e.description}</td>
               <td style={{padding:'8px 10px'}}><Badge text={e.status} color={e.status==='accepted'?C.green:e.status==='queried'?C.amber:C.slate}/></td>
@@ -3258,7 +3275,7 @@ function TabHandover({client,handover,canvas,userRole,onUpdate}){
       {handover.map(test=>(
         <div key={test.id} style={{...card,opacity:locked?0.6:1}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.75rem',flexWrap:'wrap',gap:'0.5rem'}}>
-            <p style={{fontFamily:'Georgia,serif',fontSize:'1.16rem',fontWeight:700,color:C.navy,margin:0}}>Test {test.test_number}: {test.test_description}</p>
+            <p style={{fontFamily:'var(--cv-font)',fontSize:'1.16rem',fontWeight:700,color:C.navy,margin:0}}>Test {test.test_number}: {test.test_description}</p>
             <Badge text={test.status.replace('_',' ')} color={test.status==='yes'?C.green:test.status==='no'?C.red:test.status==='partial'?C.amber:C.slate}/>
           </div>
           {!locked&&canViewCoachGuidance(userRole)&&(
@@ -3292,8 +3309,8 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
       <div style={{background:'var(--cv-header)',borderRadius:8,padding:'1.5rem',marginBottom:'1.5rem',color:'var(--cv-on-accent)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
           <div>
-            <p style={{margin:'0 0 4px',fontSize:'0.93rem',color:C.cyan,fontFamily:'monospace',letterSpacing:'0.08em'}}>{dp.label?.split('\u2014')[0]?.trim()}</p>
-            <h2 style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',margin:'0 0 0.5rem',color:'var(--cv-on-accent)'}}>{dp.core_question}</h2>
+            <p style={{margin:'0 0 4px',fontSize:'0.93rem',color:C.cyan,fontFamily: 'var(--cv-font-mono)',letterSpacing:'0.08em'}}>{dp.label?.split('\u2014')[0]?.trim()}</p>
+            <h2 style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',margin:'0 0 0.5rem',color:'var(--cv-on-accent)'}}>{dp.core_question}</h2>
             <p style={{margin:0,fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>Session time: {dp.session_time}</p>
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:'0.5rem',alignItems:'flex-end'}}>
@@ -3328,7 +3345,7 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
                 <div style={{display:'flex',gap:'0.4rem',alignItems:'center',flexShrink:0}}>
                   {comp.ceo_signed_off&&<Badge text="CEO \u2713" color={C.green}/>}
                   {comp.evidence_recorded&&<Badge text="Evidence" color={C.teal}/>}
-                  {canEdit(userRole)&&<select value={comp.status} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();onUpdateComp(comp.component_number,{status:e.target.value})}} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.2rem 0.3rem',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',cursor:'pointer'}}>
+                  {canEdit(userRole)&&<select value={comp.status} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();onUpdateComp(comp.component_number,{status:e.target.value})}} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.2rem 0.3rem',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',cursor:'pointer'}}>
                     {['\u25cb','\u25d0','\u2713','\u26a0'].map(s=><option key={s} value={s}>{s}</option>)}
                   </select>}
                   <span style={{fontSize:'0.93rem',color:C.slate}}>{expanded?'\u25b2':'\u25bc'}</span>
@@ -3384,7 +3401,7 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
       {/* CEO Gate Sign-Off */}
       <div style={{border:`2px solid ${dp.ceo_signed_off?C.green:dp.status==='coach_authorised'?C.amber:C.border}`,borderRadius:10,padding:'1.5rem',marginTop:'1rem'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem',flexWrap:'wrap',gap:'0.5rem'}}>
-          <h3 style={{fontFamily:'Georgia,serif',margin:0,color:C.navy}}>CEO Sign-Off Gate</h3>
+          <h3 style={{fontFamily:'var(--cv-font)',margin:0,color:C.navy}}>CEO Sign-Off Gate</h3>
           {dp.ceo_signed_off&&<Badge text={`CEO signed off`} color={C.green}/>}
         </div>
         {dp.ceo_signed_off?(
@@ -3445,7 +3462,7 @@ function TabInterviewBriefing({client,interviews,onAdd}){
       )}
       {interviews.filter(i=>i.objective).map(i=>(
         <div key={i.id} style={{...card,borderLeft:`4px solid ${C.cyan}`}}>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.5rem'}}><span style={{fontFamily:'monospace',fontSize:'1.01rem',fontWeight:700,color:C.cyan}}>{i.reference}</span><span style={{fontSize:'1.01rem',color:C.slate}}>{i.date} \u00b7 {i.dp_id}</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.5rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',fontWeight:700,color:C.cyan}}>{i.reference}</span><span style={{fontSize:'1.01rem',color:C.slate}}>{i.date} \u00b7 {i.dp_id}</span></div>
           <p style={{fontWeight:600,color:C.navy,margin:'0 0 0.4rem'}}>Objective: {i.objective}</p>
           <p style={{fontSize:'1.07rem',color:C.slate,margin:'0 0 0.4rem'}}>Respondent profile: {i.respondent}</p>
           {i.key_questions&&<div style={{background:C.lightBg,borderRadius:5,padding:'0.75rem',marginTop:'0.5rem'}}><p style={{fontWeight:600,fontSize:'1.01rem',color:C.navy,margin:'0 0 0.4rem'}}>Key Questions:</p><pre style={{fontSize:'1.07rem',color:C.slate,margin:0,whiteSpace:'pre-wrap',fontFamily:'inherit'}}>{i.key_questions}</pre></div>}
@@ -3485,7 +3502,7 @@ function TabInterviewCapture({client,interviews,onAdd,onUpdate}){
       )}
       {interviews.filter(i=>i.respondent).map(i=>(
         <div key={i.id} style={{...card,borderLeft:`4px solid ${C.cyan}`}}>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.5rem'}}><span style={{fontFamily:'monospace',fontSize:'1.01rem',fontWeight:700,color:C.cyan}}>{i.reference}</span><span style={{fontSize:'1.01rem',color:C.slate}}>{i.date} \u00b7 {i.dp_id}</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.5rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',fontWeight:700,color:C.cyan}}>{i.reference}</span><span style={{fontSize:'1.01rem',color:C.slate}}>{i.date} \u00b7 {i.dp_id}</span></div>
           <p style={{fontWeight:600,color:C.navy,margin:'0 0 0.3rem'}}>{i.respondent} \u2014 {i.role}, {i.organisation}</p>
           <p style={{fontSize:'1.01rem',color:C.slate,margin:'0 0 0.75rem'}}>Interviewer: {i.interviewer}</p>
           {i.key_quotes&&<div style={{background:'var(--cv-tint-cyan)',borderRadius:5,padding:'0.75rem',marginBottom:'0.5rem',borderLeft:`3px solid ${C.cyan}`}}><p style={{fontWeight:600,fontSize:'1.01rem',color:C.cyan,margin:'0 0 0.4rem'}}>Key Quotes:</p><p style={{margin:0,fontSize:'1.07rem',color:C.navy,fontStyle:'italic',lineHeight:1.6}}>{i.key_quotes}</p></div>}
@@ -3538,8 +3555,8 @@ function TabHypothesis({client,hypotheses,onAdd,onUpdate}){
         <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Ref','DP','Hypothesis','Evidence For','Evidence Against','Status','Decision'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600}}>{h}</th>)}</tr></thead>
         <tbody>{hypotheses.length===0?<tr><td colSpan={7} style={{padding:'2rem',textAlign:'center',color:C.slate}}>No hypotheses recorded.</td></tr>:hypotheses.map((h,i)=>(
           <tr key={h.id} style={{background:i%2===0?C.cream:C.white,verticalAlign:'top'}}>
-            <td style={{padding:'8px 10px',fontFamily:'monospace',fontWeight:700,color:C.cyan,whiteSpace:'nowrap'}}>{h.reference}</td>
-            <td style={{padding:'8px 10px',fontFamily:'monospace',fontSize:'1.01rem'}}>{h.dp_id}</td>
+            <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.cyan,whiteSpace:'nowrap'}}>{h.reference}</td>
+            <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem'}}>{h.dp_id}</td>
             <td style={{padding:'8px 10px',maxWidth:200}}><input style={{...inp,background:'transparent',border:'none',padding:0}} value={h.hypothesis||''} onChange={e=>onUpdate(h.id,{hypothesis:e.target.value})}/></td>
             <td style={{padding:'8px 10px',maxWidth:150}}><input style={{...inp,background:'transparent',border:'none',padding:0}} value={h.evidence_for||''} onChange={e=>onUpdate(h.id,{evidence_for:e.target.value})} placeholder="Add..."/></td>
             <td style={{padding:'8px 10px',maxWidth:150}}><input style={{...inp,background:'transparent',border:'none',padding:0}} value={h.evidence_against||''} onChange={e=>onUpdate(h.id,{evidence_against:e.target.value})} placeholder="Add..."/></td>

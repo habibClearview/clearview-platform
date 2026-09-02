@@ -144,7 +144,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <main style={{
       minHeight: '100vh', background: C.bg, color: C.ink,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: "'Segoe UI',system-ui,sans-serif", padding: '2rem',
+      fontFamily: "var(--cv-font)", padding: '2rem',
     }}>{children}</main>
   )
 }
@@ -250,7 +250,7 @@ function Room() {
 
   const page: React.CSSProperties = {
     minHeight: '100vh', background: C.bg, color: C.ink,
-    fontFamily: "'Segoe UI',system-ui,sans-serif",
+    fontFamily: "var(--cv-font)",
     padding: '1.5rem', boxSizing: 'border-box',
   }
 
@@ -314,7 +314,7 @@ function Room() {
           <JoinPanel clientId={clientId} gateId={gateId} />
           {/* R26. Never below forty pixels, whatever the screen. */}
           <h1 style={{
-            fontFamily: 'Georgia,serif', fontWeight: 600, lineHeight: 1.15,
+            fontFamily: 'var(--cv-font)', fontWeight: 600, lineHeight: 1.15,
             fontSize: 'clamp(40px, 4.4vw, 80px)', margin: '2.5rem 0 1.5rem',
           }}>{open.question_text}</h1>
 
@@ -322,12 +322,12 @@ function Room() {
             display: 'flex', alignItems: 'baseline', gap: '2rem',
             flexWrap: 'wrap', marginBottom: '1.5rem',
           }}>
-            <div style={{ fontFamily: 'monospace', fontSize: 'clamp(28px, 3vw, 52px)' }}>
+            <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: 'clamp(28px, 3vw, 52px)' }}>
               {answerCounter(feed?.answered ?? 0, state?.room_size ?? null)}
             </div>
             {secondsLeft !== null ? (
               <div style={{
-                fontFamily: 'monospace', fontSize: 'clamp(28px, 3vw, 52px)',
+                fontFamily: 'var(--cv-font-mono)', fontSize: 'clamp(28px, 3vw, 52px)',
                 color: secondsLeft <= 10 ? C.amber : C.quiet,
               }}>{formatTimer(secondsLeft)}</div>
             ) : null}
@@ -488,7 +488,7 @@ function JoinPanel({ clientId, gateId }: { clientId: string; gateId: string | nu
         {link ? (
           <>
             {link.join_code ? (
-              <div style={{ fontFamily: 'monospace', fontSize: 'clamp(28px, 3vw, 46px)', letterSpacing: '.12em' }}>
+              <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: 'clamp(28px, 3vw, 46px)', letterSpacing: '.12em' }}>
                 {link.join_code}
               </div>
             ) : null}
@@ -518,7 +518,7 @@ function ConnectionIndicator({ live, devices }: { live: boolean; devices: number
     <div style={{
       position: 'fixed', top: 10, right: 12, zIndex: 50,
       display: 'flex', alignItems: 'center', gap: '0.9rem',
-      fontFamily: 'monospace', fontSize: '0.8rem',
+      fontFamily: 'var(--cv-font-mono)', fontSize: '0.8rem',
       background: 'rgba(0,0,0,0.45)', border: `1px solid ${C.border}`,
       borderRadius: 999, padding: '0.35rem 0.8rem',
     }}>
@@ -587,13 +587,13 @@ function Answers({ feed, open, revealed }: { feed: Feed | null; open: Question; 
         <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'flex-end', minHeight: '9rem' }}>
           {rows.map((r) => (
             <div key={r.value} style={{ textAlign: 'center', flex: '1 1 0' }}>
-              <div style={{ fontFamily: 'monospace', fontSize: '1.6rem' }}>{r.count}</div>
+              <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '1.6rem' }}>{r.count}</div>
               <div style={{
                 background: r.count ? C.teal : C.border,
                 height: `${Math.round((r.count / most) * 100)}px`,
                 minHeight: 4, borderRadius: 6, margin: '0.35rem 0',
               }} />
-              <div style={{ fontFamily: 'monospace', fontSize: '1.6rem' }}>{r.value}</div>
+              <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '1.6rem' }}>{r.value}</div>
             </div>
           ))}
         </div>
@@ -620,7 +620,7 @@ function Answers({ feed, open, revealed }: { feed: Feed | null; open: Question; 
           border: `1px solid ${C.border}`, borderRadius: 12, padding: '1rem 1.6rem',
           background: C.card, textAlign: 'center', minWidth: '9rem',
         }}>
-          <div style={{ fontFamily: 'monospace', fontSize: '2.6rem' }}>{r.count}</div>
+          <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '2.6rem' }}>{r.count}</div>
           <div style={{ fontSize: '1.1rem' }}>{r.option}</div>
         </div>
       ))}

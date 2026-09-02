@@ -50,7 +50,7 @@ const C = {
   slate: 'var(--cv-slate)', border: 'var(--cv-border)', teal: 'var(--cv-teal)',
   red: 'var(--cv-red)', green: 'var(--cv-green)', amber: 'var(--cv-amber)',
 }
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
 const hint = { fontSize: '0.88rem', color: C.slate, lineHeight: 1.45 }
 const btn = (col, solid) => ({
   ...mono, fontSize: '0.86rem', fontWeight: 600, padding: '0.4rem 0.9rem',

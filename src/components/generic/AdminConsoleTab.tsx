@@ -55,26 +55,26 @@ const card: React.CSSProperties = {
   marginBottom: '1.35rem',
 }
 const h2: React.CSSProperties = {
-  fontFamily: 'Georgia, serif',
+  fontFamily: 'var(--cv-font)',
   fontSize: '1.28rem',
   color: C.navy,
   margin: '0 0 0.35rem',
 }
 const h3: React.CSSProperties = {
-  fontFamily: 'Georgia, serif',
+  fontFamily: 'var(--cv-font)',
   fontSize: '1.06rem',
   color: C.navy,
   margin: '0 0 0.9rem',
 }
 const label: React.CSSProperties = {
-  fontFamily: 'monospace',
+  fontFamily: 'var(--cv-font-mono)',
   fontSize: '0.72rem',
   letterSpacing: '0.06em',
   textTransform: 'uppercase',
   color: C.slate,
 }
 const btn = (col: string = C.slate, filled = false): React.CSSProperties => ({
-  fontFamily: 'monospace',
+  fontFamily: 'var(--cv-font-mono)',
   fontSize: '0.8rem',
   fontWeight: 600,
   padding: '0.32rem 0.7rem',
@@ -458,7 +458,7 @@ function UsersAndLogins({ config, clientId, P }: any) {
                             <div style={{ marginTop: 6 }}>
                               <div style={{ ...label, textTransform: 'none', fontSize: '0.72rem' }}>One-time reset link (send to this person):</div>
                               <input readOnly value={resetLink[m.id]} onFocus={e => e.currentTarget.select()}
-                                style={{ width: '100%', maxWidth: 320, fontSize: '0.72rem', fontFamily: 'monospace', padding: '0.3rem 0.4rem', border: `1px solid ${C.border}`, borderRadius: 6, color: C.navy, background: C.card }} />
+                                style={{ width: '100%', maxWidth: 320, fontSize: '0.72rem', fontFamily: 'var(--cv-font-mono)', padding: '0.3rem 0.4rem', border: `1px solid ${C.border}`, borderRadius: 6, color: C.navy, background: C.card }} />
                             </div>
                           )}
                           {msg?.text && (

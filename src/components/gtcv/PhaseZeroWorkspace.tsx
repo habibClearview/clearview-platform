@@ -74,13 +74,13 @@ const C = {
   disabled: 'var(--cv-disabled)', bg2: 'var(--cv-bg-2)',
 }
 
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
-const wrap = { fontFamily: "'Segoe UI',system-ui,-apple-system,sans-serif", color: C.navy }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
+const wrap = { fontFamily: "var(--cv-font)", color: C.navy }
 const card = { background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: 14, marginBottom: '1.25rem', boxShadow: '0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)', overflow: 'hidden' }
 const cardHead = { background: C.header, color: 'var(--cv-on-accent)', padding: '0.85rem 1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }
 const cardBody = { padding: '1.1rem 1.2rem 1.3rem' }
-const toolNo = { fontFamily: 'monospace', fontSize: '0.8rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--cv-wa-75)' }
-const toolTitle = { fontFamily: 'Georgia,serif', fontSize: '1.12rem', fontWeight: 700 }
+const toolNo = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.8rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--cv-wa-75)' }
+const toolTitle = { fontFamily: 'var(--cv-font)', fontSize: '1.12rem', fontWeight: 700 }
 const purpose = { fontSize: '0.95rem', color: C.slate, lineHeight: 1.45, marginBottom: '0.9rem' }
 const tableWrap = { overflowX: 'auto' }
 const table = { width: '100%', borderCollapse: 'collapse', fontSize: '0.93rem', minWidth: 860 }
@@ -88,22 +88,22 @@ const table = { width: '100%', borderCollapse: 'collapse', fontSize: '0.93rem', 
 // normal screen width, so Tool 1's table sets no floor and lets its cells wrap.
 // Everything inside it is a box that wraps rather than a fixed-width control.
 const toolOneTable = { width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', tableLayout: 'fixed' }
-const th = { padding: '0.45rem 0.55rem', textAlign: 'left', fontFamily: 'monospace', fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
+const th = { padding: '0.45rem 0.55rem', textAlign: 'left', fontFamily: 'var(--cv-font-mono)', fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
 /** T1.23. A heading that may wrap rather than force the table wider. */
 const thWrap = { ...th, whiteSpace: 'normal' }
 const td = { padding: '0.4rem 0.4rem', verticalAlign: 'top', borderBottom: `1px solid ${C.borderSoft}` }
 const cellInput = { width: '100%', minWidth: 0, padding: '0.4rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '0.93rem', fontFamily: 'inherit', background: C.bg2, color: C.navy, boxSizing: 'border-box', resize: 'vertical' }
 const roInput = { ...cellInput, background: C.disabled, cursor: 'default' }
 const selectStyle = { ...cellInput, minWidth: 108 }
-const addButton = { fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: 700, border: 'none', borderRadius: 6, background: 'var(--cv-cyan)', color: 'var(--cv-on-accent)', padding: '0.4rem 0.9rem', cursor: 'pointer' }
-const delButton = { fontFamily: 'monospace', fontSize: '0.85rem', border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.red, padding: '0.28rem 0.55rem', cursor: 'pointer' }
+const addButton = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.85rem', fontWeight: 700, border: 'none', borderRadius: 6, background: 'var(--cv-cyan)', color: 'var(--cv-on-accent)', padding: '0.4rem 0.9rem', cursor: 'pointer' }
+const delButton = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.85rem', border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.red, padding: '0.28rem 0.55rem', cursor: 'pointer' }
 const emptyNote = { fontSize: '0.93rem', color: C.faint, padding: '0.7rem 0' }
 /** Two controls on one heading, without either wrapping under the other. */
 function HeadingControls({ children }) {
   return <span style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>{children}</span>
 }
 const runWithRoomButton = {
-  fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+  fontFamily: 'var(--cv-font-mono)',
   fontSize: '0.78rem', fontWeight: 700, padding: '0.4rem 0.8rem', borderRadius: 8,
   border: '1px solid var(--cv-teal)', background: 'var(--cv-teal)', color: '#FFFFFF',
   cursor: 'pointer', whiteSpace: 'nowrap',
@@ -140,14 +140,14 @@ const serviceCell = { fontWeight: 700, color: C.navy, fontSize: '0.9rem' }
  * second "who pays" is added under Who pays.
  */
 const addLine = {
-  fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+  fontFamily: 'var(--cv-font-mono)',
   fontSize: '0.7rem', color: C.slate, background: 'transparent',
   border: 'none', padding: 0, cursor: 'pointer',
 }
 const strip = { display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.85rem' }
 
 function pill(bg, fg) {
-  return { fontFamily: 'monospace', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.04em', padding: '0.22rem 0.6rem', borderRadius: 999, background: bg, color: fg, display: 'inline-block', whiteSpace: 'nowrap' }
+  return { fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.04em', padding: '0.22rem 0.6rem', borderRadius: 999, background: bg, color: fg, display: 'inline-block', whiteSpace: 'nowrap' }
 }
 function noteBox(border, bg) {
   return { border: `1px solid ${border}`, background: bg, borderRadius: 8, padding: '0.6rem 0.8rem', fontSize: '0.9rem', color: C.navy, lineHeight: 1.45 }
@@ -674,7 +674,7 @@ function SaveIndicator({ state, message }) {
     // and on a narrow screen the longer one wrapped onto its own line — so the
     // header grew a line and the whole page moved, on every write. It now
     // occupies the same space whatever it says.
-    <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: m.color, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', minWidth: '11.5rem', whiteSpace: 'nowrap' }}>
+    <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', color: m.color, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', minWidth: '11.5rem', whiteSpace: 'nowrap' }}>
       <span style={{ width: 8, height: 8, borderRadius: '50%', background: m.color, display: 'inline-block' }} />
       {m.text}
     </span>
@@ -776,7 +776,7 @@ function ServiceFrame({ service, summary, collapsed, onToggle, right, children }
         >
           <Chevron open={!collapsed} />
           <span style={{ ...mono, fontSize: '0.7rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>Service</span>
-          <span style={{ fontFamily: 'Georgia,serif', fontSize: '1.05rem', fontWeight: 700, color: C.navy }}>
+          <span style={{ fontFamily: 'var(--cv-font)', fontSize: '1.05rem', fontWeight: 700, color: C.navy }}>
             {service?.service_name}
           </span>
         </button>
@@ -896,7 +896,7 @@ function HypothesisBlock({
               )}
             </label>
           ))}
-          <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.1rem', fontWeight: 700, color: C.navy, textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.1rem', fontWeight: 700, color: C.navy, textAlign: 'center' }}>
             {row.total}
             <div style={{ ...mono, fontSize: '0.62rem', color: C.faint, fontWeight: 400 }}>of 20</div>
           </div>
@@ -1797,8 +1797,8 @@ export default function PhaseZeroWorkspace({ clientId, canManage }) {
     <div style={wrap}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
         <div>
-          <div style={{ fontFamily: 'monospace', fontSize: '0.78rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: C.teal }}>Phase 0</div>
-          <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.45rem', fontWeight: 700 }}>Clear the ground</div>
+          <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: C.teal }}>Phase 0</div>
+          <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.45rem', fontWeight: 700 }}>Clear the ground</div>
           <div style={{ fontSize: '0.95rem', color: C.slate, maxWidth: '92ch', marginTop: '0.25rem' }}>
             Five tools, used in order. Strip the activity back to what is actually true, find out who has the
             money, shortlist the few problems worth testing, separate what was observed from what is believed,

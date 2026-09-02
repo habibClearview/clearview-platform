@@ -46,15 +46,15 @@ const C = {
   purple: 'var(--cv-purple)', alt: 'var(--cv-alt)', bg2: 'var(--cv-bg-2)',
 }
 const card = { background: C.white, border: '1px solid var(--cv-border-soft)', borderRadius: 14, padding: '1.35rem 1.5rem', marginBottom: '1.25rem', boxShadow: '0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)' }
-const secH = { fontFamily: 'Georgia,serif', fontSize: '1.32rem', fontWeight: 700, color: C.navy, margin: 0 }
+const secH = { fontFamily: 'var(--cv-font)', fontSize: '1.32rem', fontWeight: 700, color: C.navy, margin: 0 }
 const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.45 }
-const th = { padding: '0.45rem 0.55rem', textAlign: 'left', fontFamily: 'monospace', fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, color: C.slate, borderBottom: `1px solid ${C.border}`, verticalAlign: 'bottom', whiteSpace: 'nowrap' }
+const th = { padding: '0.45rem 0.55rem', textAlign: 'left', fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, color: C.slate, borderBottom: `1px solid ${C.border}`, verticalAlign: 'bottom', whiteSpace: 'nowrap' }
 const td = { padding: '0.35rem 0.4rem', verticalAlign: 'top', borderBottom: '1px solid var(--cv-border-soft)' }
 const cell = { width: '100%', padding: '0.4rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '1.01rem', fontFamily: 'inherit', background: C.bg2, color: C.navy, boxSizing: 'border-box' }
 const readCell = { fontSize: '1.01rem', color: C.navy, lineHeight: 1.4, padding: '0.4rem 0.5rem', whiteSpace: 'pre-wrap', minHeight: '1.2rem' }
-const ghostBtn = { fontFamily: 'monospace', fontSize: '0.87rem', padding: '0.28rem 0.65rem', border: `1px solid ${C.cyan}`, borderRadius: 6, background: 'transparent', color: C.cyan, cursor: 'pointer' }
-const solidBtn = { fontFamily: 'monospace', fontSize: '0.95rem', fontWeight: 700, padding: '0.38rem 0.9rem', border: 'none', borderRadius: 6, background: C.cyan, color: 'var(--cv-on-accent)', cursor: 'pointer' }
-const delBtn = { fontFamily: 'monospace', fontSize: '0.87rem', padding: '0.25rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.red, cursor: 'pointer' }
+const ghostBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.87rem', padding: '0.28rem 0.65rem', border: `1px solid ${C.cyan}`, borderRadius: 6, background: 'transparent', color: C.cyan, cursor: 'pointer' }
+const solidBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.95rem', fontWeight: 700, padding: '0.38rem 0.9rem', border: 'none', borderRadius: 6, background: C.cyan, color: 'var(--cv-on-accent)', cursor: 'pointer' }
+const delBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.87rem', padding: '0.25rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.red, cursor: 'pointer' }
 
 // The decision points, using the app's runtime dp ids.
 const DP_OPTIONS = [
@@ -352,7 +352,7 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           {savePill && (
-            <span style={{ fontFamily: 'monospace', fontSize: '0.87rem', color: savePill.color, border: `1px solid ${savePill.color}`, borderRadius: 999, padding: '0.15rem 0.6rem' }}>
+            <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.87rem', color: savePill.color, border: `1px solid ${savePill.color}`, borderRadius: 999, padding: '0.15rem 0.6rem' }}>
               {savePill.text}
             </span>
           )}
@@ -382,8 +382,8 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
             { k: 'unset', l: 'Not set', c: C.purple },
           ].map((s) => (
             <div key={s.k} style={{ borderTop: `3px solid ${s.c}`, background: C.alt, borderRadius: 8, padding: '0.5rem 0.9rem', minWidth: 100 }}>
-              <div style={{ fontFamily: 'monospace', fontSize: '0.85rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate }}>{s.l}</div>
-              <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.5rem', fontWeight: 700, color: s.c, lineHeight: 1.1 }}>{counts[s.k]}</div>
+              <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.85rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate }}>{s.l}</div>
+              <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.5rem', fontWeight: 700, color: s.c, lineHeight: 1.1 }}>{counts[s.k]}</div>
             </div>
           ))}
         </div>
@@ -393,7 +393,7 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
         <div style={hint}>Loading the evidence library...</div>
       ) : visible.length === 0 ? (
         <div style={{ border: `1px dashed ${C.border}`, borderRadius: 10, padding: '1.4rem', textAlign: 'center' }}>
-          <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.15rem', color: C.navy, marginBottom: '0.35rem' }}>
+          <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.15rem', color: C.navy, marginBottom: '0.35rem' }}>
             {dpId ? 'No evidence recorded against this gate yet' : 'No evidence recorded yet'}
           </div>
           <div style={{ ...hint, marginBottom: canManage ? '0.9rem' : 0 }}>
@@ -422,7 +422,7 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
             <tbody>
               {visible.map((r) => (
                 <tr key={r.id}>
-                  <td style={{ ...td, fontFamily: 'monospace', fontWeight: 700, color: C.cyan, whiteSpace: 'nowrap', paddingTop: '0.75rem' }}>
+                  <td style={{ ...td, fontFamily: 'var(--cv-font-mono)', fontWeight: 700, color: C.cyan, whiteSpace: 'nowrap', paddingTop: '0.75rem' }}>
                     {r.reference || '...'}
                   </td>
 
@@ -525,7 +525,7 @@ aria-label="Paste a link, or a file name"                         style={cell}
                       )}
                     </div>
                     {r.file_path && (
-                      <div style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: C.slate, marginTop: '0.25rem', wordBreak: 'break-all' }}>
+                      <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.8rem', color: C.slate, marginTop: '0.25rem', wordBreak: 'break-all' }}>
                         {r.file_path}
                       </div>
                     )}

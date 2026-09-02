@@ -41,8 +41,8 @@ const C = {
 const PLAN_TINT = 'var(--cv-tint-cyan, rgba(0,180,216,.08))'
 
 const CARD: React.CSSProperties = { background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: 14, padding: '1.2rem 1.4rem', marginBottom: '1.2rem' }
-const H = (s = '1.15rem'): React.CSSProperties => ({ fontFamily: 'Georgia,serif', fontWeight: 700, color: C.navy, fontSize: s })
-const LABEL: React.CSSProperties = { fontFamily: 'monospace', fontSize: '0.72rem', letterSpacing: '0.04em', textTransform: 'uppercase', color: C.slate }
+const H = (s = '1.15rem'): React.CSSProperties => ({ fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: s })
+const LABEL: React.CSSProperties = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em', textTransform: 'uppercase', color: C.slate }
 const selStyle: React.CSSProperties = { fontFamily: 'inherit', fontSize: '0.95rem', padding: '0.5rem 0.7rem', border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.navy, fontWeight: 600 }
 
 // The four groups every profit picture is built from, each with a plain-word
@@ -87,7 +87,7 @@ function InfoDot({ text }: { text: string }) {
   return (
     <span style={{ position: 'relative', display: 'inline-block' }}>
       <button type="button" onClick={() => setOpen(o => !o)} aria-label="What does this mean?" title="What does this mean?"
-        style={{ marginLeft: 6, width: 19, height: 19, borderRadius: 10, border: `1.5px solid ${C.cyan}`, background: open ? C.cyan : 'transparent', color: open ? '#fff' : C.cyan, fontSize: '0.72rem', fontWeight: 700, fontFamily: 'Georgia,serif', fontStyle: 'italic', cursor: 'pointer', lineHeight: 1, padding: 0, verticalAlign: 'middle' }}>i</button>
+        style={{ marginLeft: 6, width: 19, height: 19, borderRadius: 10, border: `1.5px solid ${C.cyan}`, background: open ? C.cyan : 'transparent', color: open ? '#fff' : C.cyan, fontSize: '0.72rem', fontWeight: 700, fontFamily: 'var(--cv-font)', fontStyle: 'italic', cursor: 'pointer', lineHeight: 1, padding: 0, verticalAlign: 'middle' }}>i</button>
       {open && (
         <>
           <span onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
@@ -101,7 +101,7 @@ function InfoDot({ text }: { text: string }) {
 }
 
 function Badge({ text, color }: { text: string; color: string }) {
-  return <span style={{ fontFamily: 'monospace', fontSize: '0.68rem', letterSpacing: '0.04em', textTransform: 'uppercase', color, border: `1px solid ${color}`, borderRadius: 12, padding: '2px 8px' }}>{text}</span>
+  return <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.68rem', letterSpacing: '0.04em', textTransform: 'uppercase', color, border: `1px solid ${color}`, borderRadius: 12, padding: '2px 8px' }}>{text}</span>
 }
 
 // Buffered number box. Commits when the reader clicks away or presses Enter,
@@ -109,13 +109,13 @@ function Badge({ text, color }: { text: string; color: string }) {
 function NumCell({ value, onCommit, disabled, tint }: { value: number; onCommit: (v: number) => void; disabled?: boolean; tint?: boolean }) {
   const [buf, setBuf] = useState<string>(value ? String(value) : '')
   useEffect(() => { setBuf(value ? String(value) : '') }, [value])
-  if (disabled) return <span style={{ display: 'block', textAlign: 'right', fontFamily: 'ui-monospace,monospace', fontSize: '0.9rem', color: C.slate }}>{fmt(value || 0, '')}</span>
+  if (disabled) return <span style={{ display: 'block', textAlign: 'right', fontFamily: 'var(--cv-font-mono)', fontSize: '0.9rem', color: C.slate }}>{fmt(value || 0, '')}</span>
   return (
     <input inputMode="numeric" value={buf}
       onChange={e => setBuf(e.target.value)}
       onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
       onBlur={() => { const n = Number(buf.replace(/,/g, '')); if (!isNaN(n) && n !== value) onCommit(n) }}
-      style={{ width: 116, textAlign: 'right', fontFamily: 'ui-monospace,monospace', fontSize: '0.9rem', padding: '0.34rem 0.45rem', border: `1px solid ${tint ? C.cyan : C.border}`, borderRadius: 7, background: tint ? PLAN_TINT : C.card, color: C.navy }} />
+      style={{ width: 116, textAlign: 'right', fontFamily: 'var(--cv-font-mono)', fontSize: '0.9rem', padding: '0.34rem 0.45rem', border: `1px solid ${tint ? C.cyan : C.border}`, borderRadius: 7, background: tint ? PLAN_TINT : C.card, color: C.navy }} />
   )
 }
 
@@ -266,7 +266,7 @@ export default function FiguresTab({ config, months, cc, P, onSave, onGoToOverTi
   }
 
   const th: React.CSSProperties = { ...LABEL, padding: '0.5rem 0.7rem', textAlign: 'right', borderBottom: `1px solid ${C.border}` }
-  const td: React.CSSProperties = { padding: '0.5rem 0.7rem', fontSize: '0.92rem', textAlign: 'right', fontFamily: 'ui-monospace,monospace', fontVariantNumeric: 'tabular-nums' }
+  const td: React.CSSProperties = { padding: '0.5rem 0.7rem', fontSize: '0.92rem', textAlign: 'right', fontFamily: 'var(--cv-font-mono)', fontVariantNumeric: 'tabular-nums' }
   const btn = (accent: string): React.CSSProperties => ({ fontFamily: 'inherit', fontSize: '0.9rem', fontWeight: 700, padding: '0.55rem 1rem', border: `1px solid ${accent}`, borderRadius: 9, background: accent, color: '#fff', cursor: 'pointer' })
   const btnGhost = (accent: string): React.CSSProperties => ({ ...btn(accent), background: 'transparent', color: accent })
   const linkBtn: React.CSSProperties = { background: 'none', border: 'none', color: C.cyan, fontFamily: 'inherit', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', padding: 0, textAlign: 'left' }
@@ -355,7 +355,7 @@ export default function FiguresTab({ config, months, cc, P, onSave, onGoToOverTi
                             <td style={{ ...td, textAlign: 'left', fontFamily: 'inherit', color: C.navy }}>
                               {l.name}
                               {isPastOrCurrent && locked && <span style={{ display: 'block', fontSize: '0.74rem', color: C.slate }}>Filled in using the {hasComps(l) ? 'cost breakdown' : 'price list'}. Edit it in <button style={{ ...linkBtn, fontSize: '0.74rem' }} onClick={onGoToCatchUp}>the detailed view</button>.</span>}
-                              {isPastOrCurrent && fld !== 0 && <span style={{ display: 'block', fontSize: '0.74rem', color: C.teal, fontFamily: 'monospace' }}>includes {fmt(fld, currency)} from Clearview Field</span>}
+                              {isPastOrCurrent && fld !== 0 && <span style={{ display: 'block', fontSize: '0.74rem', color: C.teal, fontFamily: 'var(--cv-font-mono)' }}>includes {fmt(fld, currency)} from Clearview Field</span>}
                             </td>
                             <td style={td}><NumCell value={planOf(l)} onCommit={v => commitPlan(l.id, v)} disabled={!canEditPlan || !inHorizon} tint /></td>
                             <td style={td}>

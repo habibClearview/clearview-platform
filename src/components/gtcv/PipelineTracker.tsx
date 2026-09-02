@@ -42,9 +42,9 @@ const C = {
   purple: 'var(--cv-purple)', alt: 'var(--cv-alt)',
 }
 const card = { background: C.white, border: '1px solid var(--cv-border-soft)', borderRadius: 14, padding: '1.25rem 1.4rem', marginBottom: '1.1rem', boxShadow: '0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)' }
-const secH = { fontFamily: 'Georgia,serif', fontSize: '1.25rem', fontWeight: 700, color: C.navy, margin: 0 }
+const secH = { fontFamily: 'var(--cv-font)', fontSize: '1.25rem', fontWeight: 700, color: C.navy, margin: 0 }
 const hint = { fontSize: '0.9rem', color: C.slate, lineHeight: 1.45 }
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
 const th = { ...mono, padding: '0.45rem 0.55rem', textAlign: 'left', fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
 const td = { padding: '0.35rem 0.55rem', verticalAlign: 'top', fontSize: '0.9rem', color: C.navy }
 const inp = { width: '100%', padding: '0.34rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '0.9rem', fontFamily: 'inherit', background: 'var(--cv-bg-2)', color: C.navy, boxSizing: 'border-box' }
@@ -81,7 +81,7 @@ function StageChip({ stage, count, byCur, share }) {
   return (
     <div style={{ background: C.white, borderRadius: 12, padding: '0.75rem 0.9rem', borderTop: `3px solid ${stage.colour}`, boxShadow: '0 1px 2px var(--cv-shadow-1), 0 10px 26px var(--cv-shadow-2)', minWidth: 0 }}>
       <div style={{ ...mono, fontSize: '0.72rem', letterSpacing: '0.1em', color: C.slate, textTransform: 'uppercase' }}>{stage.label}</div>
-      <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.7rem', fontWeight: 700, color: C.navy, lineHeight: 1.1 }}>{count}</div>
+      <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.7rem', fontWeight: 700, color: C.navy, lineHeight: 1.1 }}>{count}</div>
       <div style={{ ...hint, fontSize: '0.8rem' }}>{share}% of the pipeline</div>
       <div style={{ ...mono, fontSize: '0.76rem', color: C.slate, marginTop: '0.25rem', wordBreak: 'break-word' }}>{moneyLine(byCur)}</div>
     </div>

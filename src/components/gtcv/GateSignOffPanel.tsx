@@ -46,13 +46,13 @@ const C = {
   purple: 'var(--cv-purple)', alt: 'var(--cv-alt)',
 }
 const card = { background: C.white, border: '1px solid var(--cv-border-soft)', borderRadius: 14, padding: '1.35rem 1.5rem', marginBottom: '1.25rem', boxShadow: '0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)' }
-const secH = { fontFamily: 'Georgia,serif', fontSize: '1.32rem', fontWeight: 700, color: C.navy, margin: 0 }
+const secH = { fontFamily: 'var(--cv-font)', fontSize: '1.32rem', fontWeight: 700, color: C.navy, margin: 0 }
 const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.4 }
-const mono = { fontFamily: 'monospace', fontSize: '0.85rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate }
+const mono = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.85rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate }
 const cell = { width: '100%', padding: '0.4rem 0.55rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '1.01rem', fontFamily: 'inherit', background: 'var(--cv-bg-2)', color: C.navy, boxSizing: 'border-box' }
-const ghostBtn = { fontFamily: 'monospace', fontSize: '0.91rem', padding: '0.3rem 0.7rem', border: `1px solid ${C.cyan}`, borderRadius: 6, background: 'transparent', color: C.cyan, cursor: 'pointer' }
-const solidBtn = { fontFamily: 'monospace', fontSize: '0.95rem', fontWeight: 700, padding: '0.38rem 0.9rem', border: 'none', borderRadius: 6, background: C.cyan, color: 'var(--cv-on-accent)', cursor: 'pointer' }
-const warnBtn = { fontFamily: 'monospace', fontSize: '0.91rem', padding: '0.3rem 0.7rem', border: `1px solid ${C.red}`, borderRadius: 6, background: 'transparent', color: C.red, cursor: 'pointer' }
+const ghostBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.91rem', padding: '0.3rem 0.7rem', border: `1px solid ${C.cyan}`, borderRadius: 6, background: 'transparent', color: C.cyan, cursor: 'pointer' }
+const solidBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.95rem', fontWeight: 700, padding: '0.38rem 0.9rem', border: 'none', borderRadius: 6, background: C.cyan, color: 'var(--cv-on-accent)', cursor: 'pointer' }
+const warnBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.91rem', padding: '0.3rem 0.7rem', border: `1px solid ${C.red}`, borderRadius: 6, background: 'transparent', color: C.red, cursor: 'pointer' }
 
 const ROLE_LABEL = {
   client_funder: 'Programme funder',
@@ -270,7 +270,7 @@ export default function GateSignOffPanel({ clientId, dpId, canManage }) {
             {DP_LABEL[dpId] || dpId}
           </div>
         </div>
-        <span style={{ fontFamily: 'monospace', fontSize: '0.87rem', color: gateState.color, border: `1px solid ${gateState.color}`, borderRadius: 999, padding: '0.15rem 0.6rem' }}>
+        <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.87rem', color: gateState.color, border: `1px solid ${gateState.color}`, borderRadius: 999, padding: '0.15rem 0.6rem' }}>
           {gateState.text}
         </span>
       </div>
@@ -308,17 +308,17 @@ export default function GateSignOffPanel({ clientId, dpId, canManage }) {
                     <div style={{ fontSize: '1.01rem', color: C.navy, fontWeight: 600 }}>
                       {record ? record.signer_name : party ? party.name : 'Nobody named yet'}
                     </div>
-                    <div style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: C.slate }}>
+                    <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', color: C.slate }}>
                       {roleLabel(role)}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                     {done ? (
-                      <span style={{ fontFamily: 'monospace', fontSize: '0.87rem', color: C.green }}>
+                      <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.87rem', color: C.green }}>
                         Signed {fmtDate(record.signed_at)}
                       </span>
                     ) : (
-                      <span style={{ fontFamily: 'monospace', fontSize: '0.87rem', color: C.amber }}>Outstanding</span>
+                      <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.87rem', color: C.amber }}>Outstanding</span>
                     )}
                     {!done && myRole === role && (
                       <button type="button" style={solidBtn} onClick={signAsMe} disabled={busy}>Sign</button>
@@ -404,7 +404,7 @@ export default function GateSignOffPanel({ clientId, dpId, canManage }) {
               <div style={{ ...mono, margin: '1.1rem 0 0.5rem' }}>Returned</div>
               {returns.map((r) => (
                 <div key={r.id} style={{ border: `1px solid ${C.red}`, borderRadius: 8, padding: '0.6rem 0.75rem', marginBottom: '0.4rem' }}>
-                  <div style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: C.red }}>
+                  <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.85rem', color: C.red }}>
                     {r.signer_name} . {fmtDate(r.signed_at)}
                   </div>
                   <div style={{ fontSize: '1.01rem', color: C.navy, marginTop: '0.2rem', whiteSpace: 'pre-wrap' }}>{r.note || ''}</div>

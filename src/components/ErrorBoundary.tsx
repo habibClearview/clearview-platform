@@ -29,13 +29,13 @@ export default class ErrorBoundary extends React.Component<Props, State> {
   render() {
     if (!this.state.hasError) return this.props.children
     const btn: React.CSSProperties = {
-      fontFamily: 'monospace', fontSize: '0.9rem', fontWeight: 600, padding: '0.5rem 1rem',
+      fontFamily: 'var(--cv-font-mono)', fontSize: '0.9rem', fontWeight: 600, padding: '0.5rem 1rem',
       borderRadius: 6, border: '1px solid var(--cv-border)', background: 'transparent',
       color: 'var(--cv-navy)', cursor: 'pointer',
     }
     return (
-      <div style={{ padding: '2.5rem 1.5rem', textAlign: 'center', fontFamily: "'Segoe UI',system-ui,sans-serif" }}>
-        <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.25rem', fontWeight: 700, color: 'var(--cv-navy)', marginBottom: '0.5rem' }}>
+      <div style={{ padding: '2.5rem 1.5rem', textAlign: 'center', fontFamily: "var(--cv-font)" }}>
+        <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.25rem', fontWeight: 700, color: 'var(--cv-navy)', marginBottom: '0.5rem' }}>
           This section couldn&rsquo;t load
         </div>
         <div style={{ color: 'var(--cv-slate)', fontSize: '1rem', lineHeight: 1.6, maxWidth: '46ch', margin: '0 auto 1.25rem' }}>

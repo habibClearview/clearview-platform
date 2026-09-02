@@ -62,7 +62,7 @@ function RunThisWithTheRoom({ dpId, clientId }) {
     )
   }
   const base = {
-    fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+    fontFamily: 'var(--cv-font-mono)',
     fontSize: 13, fontWeight: 700, padding: '8px 14px', borderRadius: 8,
     border: '1px solid #2A9D8F', background: '#2A9D8F', color: '#FFFFFF',
   }
@@ -77,7 +77,7 @@ function RunThisWithTheRoom({ dpId, clientId }) {
       {/* Q8, word for word, on the blocks Stage 1 gives no questions to. */}
       {!has ? (
         <span style={{
-          fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: 13.5, color: '#6B7A8C',
+          fontFamily: "var(--cv-font)", fontSize: 13.5, color: '#6B7A8C',
         }}>{NO_QUESTIONS_YET}</span>
       ) : null}
     </div>
@@ -90,9 +90,9 @@ function RunThisWithTheRoom({ dpId, clientId }) {
 function ZoneBriefPanel({ dpId }) {
   const brief = zoneBrief(dpId)
   if (!brief) return null
-  const sans = "'Segoe UI',system-ui,sans-serif"
+  const sans = "var(--cv-font)"
   const cap = {
-    fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+    fontFamily: 'var(--cv-font-mono)',
     fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', color: '#6B7A8C',
   }
   return (
@@ -102,7 +102,7 @@ function ZoneBriefPanel({ dpId }) {
     }}>
       <div style={cap}>What this zone settles</div>
       <p style={{
-        fontFamily: 'Georgia,serif', fontSize: 17, lineHeight: 1.45, color: '#1B2A41',
+        fontFamily: 'var(--cv-font)', fontSize: 17, lineHeight: 1.45, color: '#1B2A41',
         margin: '6px 0 0', maxWidth: '78ch',
       }}>{brief.question}</p>
 
@@ -124,7 +124,7 @@ function ZoneBriefPanel({ dpId }) {
 }
 
 const loading = () => (
-  <p style={{ fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: 13.5, color: '#8B8272', padding: '10px 0' }}>
+  <p style={{ fontFamily: "var(--cv-font)", fontSize: 13.5, color: '#8B8272', padding: '10px 0' }}>
     Loading...
   </p>
 )
@@ -232,7 +232,7 @@ export default function BlockWorkspace({ dpId, clientId, canManage, currency }) 
 
   if (!clientId || !dpId) {
     return (
-      <p style={{ fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: 13.5, color: '#8B8272' }}>
+      <p style={{ fontFamily: "var(--cv-font)", fontSize: 13.5, color: '#8B8272' }}>
         Select a client to open this block.
       </p>
     )
@@ -260,7 +260,7 @@ export default function BlockWorkspace({ dpId, clientId, canManage, currency }) 
 
       {own.length === 0 ? (
         <div style={{
-          fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: 13.5, color: '#4C5A6B',
+          fontFamily: "var(--cv-font)", fontSize: 13.5, color: '#4C5A6B',
           background: '#FBF7EE', border: '1px dashed rgba(27,42,65,.18)', borderRadius: 12,
           padding: '14px 16px',
         }}>
@@ -272,7 +272,7 @@ export default function BlockWorkspace({ dpId, clientId, canManage, currency }) 
       {surfaces.map(({ key, title, Comp }) => (
         <section key={key}>
           <h3 style={{
-            fontFamily: 'Georgia,serif', fontSize: 17, fontWeight: 600, margin: '0 0 10px',
+            fontFamily: 'var(--cv-font)', fontSize: 17, fontWeight: 600, margin: '0 0 10px',
             color: '#1B2A41',
           }}>{title}</h3>
           {/* C44, C49 as amended, 14 August 2026.

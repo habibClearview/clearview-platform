@@ -26,7 +26,7 @@ const C = {
   card: 'var(--cv-card)', border: 'var(--cv-border)', navy: 'var(--cv-navy)',
   slate: 'var(--cv-slate)', teal: 'var(--cv-teal)',
 }
-const mono = { fontFamily: 'monospace' }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
 const hint = { fontSize: '0.92rem', color: C.slate, lineHeight: 1.5 }
 
 export default function DeliverablesBusinessView({ clients = [] }) {

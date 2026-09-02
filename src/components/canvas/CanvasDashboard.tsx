@@ -97,7 +97,7 @@ function StatusBadge({ status, label }: { status: string; label?: string }) {
       background: c.bg, color: c.color,
       padding: '3px 10px', borderRadius: 12,
       fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
-      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      fontFamily: "var(--cv-font)",
     }}>{c.text}</span>
   )
 }
@@ -121,11 +121,11 @@ function Section({ title, children, defaultOpen = true }: { title: string; child
         style={{
           width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           padding: '14px 20px', background: C.lightBg, border: 'none', cursor: 'pointer',
-          fontFamily: 'Georgia, serif', fontSize: 15, fontWeight: 700, color: C.navy, textAlign: 'left',
+          fontFamily: 'var(--cv-font)', fontSize: 15, fontWeight: 700, color: C.navy, textAlign: 'left',
         }}
       >
         {title}
-        <span style={{ fontSize: 18, color: C.slate, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>{open ? '−' : '+'}</span>
+        <span style={{ fontSize: 18, color: C.slate, fontFamily: "var(--cv-font)" }}>{open ? '−' : '+'}</span>
       </button>
       {open && <div style={{ padding: '20px 20px' }}>{children}</div>}
     </div>
@@ -138,7 +138,7 @@ function PrintBtn({ label = 'Print this section' }: { label?: string }) {
     <button onClick={() => window.print()} style={{
       background: 'transparent', border: `1px solid ${C.border}`, color: C.slate,
       padding: '6px 16px', borderRadius: 6, fontSize: 13, cursor: 'pointer',
-      fontFamily: "'Segoe UI', system-ui, sans-serif", display: 'flex', alignItems: 'center', gap: 6,
+      fontFamily: "var(--cv-font)", display: 'flex', alignItems: 'center', gap: 6,
     }}>
       <span>🖨</span> {label}
     </button>
@@ -154,7 +154,7 @@ function Field({
 }) {
   const style: React.CSSProperties = {
     width: '100%', padding: '9px 12px', borderRadius: 6, border: `1px solid ${C.border}`,
-    fontSize: 14, fontFamily: "'Segoe UI', system-ui, sans-serif",
+    fontSize: 14, fontFamily: "var(--cv-font)",
     background: disabled ? '#F5F5F5' : C.white, color: C.navy,
     resize: rows > 1 ? 'vertical' : 'none', boxSizing: 'border-box',
   }
@@ -338,7 +338,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
                 background: active ? C.cyan : 'transparent',
                 color: locked ? '#6B7A8D' : active ? C.navy : C.white,
                 border: 'none', padding: '0 14px', cursor: locked ? 'not-allowed' : 'pointer',
-                fontFamily: "'Segoe UI', system-ui, sans-serif",
+                fontFamily: "var(--cv-font)",
                 fontSize: 13, fontWeight: active ? 700 : 500,
                 display: 'flex', alignItems: 'center', gap: 6,
                 borderRight: `1px solid rgba(255,255,255,0.1)`,
@@ -368,10 +368,10 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
       <header style={{ background: C.navy, padding: '16px 24px', color: C.white }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <p style={{ margin: 0, fontSize: 11, color: C.cyan, fontFamily: "'Segoe UI', system-ui, sans-serif", letterSpacing: 1, textTransform: 'uppercase' }}>
+            <p style={{ margin: 0, fontSize: 11, color: C.cyan, fontFamily: "var(--cv-font)", letterSpacing: 1, textTransform: 'uppercase' }}>
               Canvas Coach &nbsp;|&nbsp; habibonifade.com
             </p>
-            <h1 style={{ margin: '4px 0 0', fontFamily: 'Georgia, serif', fontSize: 22, color: C.white }}>
+            <h1 style={{ margin: '4px 0 0', fontFamily: 'var(--cv-font)', fontSize: 22, color: C.white }}>
               {state.engagement_title}
             </h1>
             <p style={{ margin: '2px 0 0', fontSize: 13, color: '#A0B4C8' }}>
@@ -395,7 +395,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
     return (
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 20, color: C.navy, margin: 0 }}>Engagement Setup</h2>
+          <h2 style={{ fontFamily: 'var(--cv-font)', fontSize: 20, color: C.navy, margin: 0 }}>Engagement Setup</h2>
           <PrintBtn />
         </div>
 
@@ -415,8 +415,8 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
         </Section>
 
         <Section title="How to Use This Platform">
-          <div style={{ background: C.cream, padding: 20, borderRadius: 8, fontFamily: "'Segoe UI', system-ui, sans-serif", color: C.navy, lineHeight: 1.7 }}>
-            <h3 style={{ fontFamily: 'Georgia, serif', marginTop: 0 }}>Welcome to your Canvas Coach engagement platform</h3>
+          <div style={{ background: C.cream, padding: 20, borderRadius: 8, fontFamily: "var(--cv-font)", color: C.navy, lineHeight: 1.7 }}>
+            <h3 style={{ fontFamily: 'var(--cv-font)', marginTop: 0 }}>Welcome to your Canvas Coach engagement platform</h3>
             <p>This platform is where the work of your engagement lives. It tracks every decision you make, every piece of evidence you produce, and every milestone you reach on your journey to commercial independence.</p>
             <p style={{ fontWeight: 600, color: C.navy }}>What this platform tracks:</p>
             <ul>
@@ -453,8 +453,8 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
         </Section>
 
         <Section title="IP Framework Reference">
-          <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", color: C.navy, lineHeight: 1.7 }}>
-            <h3 style={{ fontFamily: 'Georgia, serif', marginTop: 0 }}>Three-Stage Adoption Test</h3>
+          <div style={{ fontFamily: "var(--cv-font)", color: C.navy, lineHeight: 1.7 }}>
+            <h3 style={{ fontFamily: 'var(--cv-font)', marginTop: 0 }}>Three-Stage Adoption Test</h3>
             <p>Before any service can be sold, three things must be true about the buyer:</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 24 }}>
               {[
@@ -464,13 +464,13 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
               ].map(s => (
                 <div key={s.n} style={{ background: C.cream, padding: 16, borderRadius: 8, borderTop: `3px solid ${C.cyan}` }}>
                   <p style={{ fontSize: 11, color: C.cyan, fontWeight: 700, letterSpacing: 1, margin: '0 0 4px', textTransform: 'uppercase' }}>{s.n}</p>
-                  <p style={{ fontFamily: 'Georgia, serif', fontWeight: 700, margin: '0 0 8px', fontSize: 16 }}>{s.t}</p>
+                  <p style={{ fontFamily: 'var(--cv-font)', fontWeight: 700, margin: '0 0 8px', fontSize: 16 }}>{s.t}</p>
                   <p style={{ margin: 0, fontSize: 13, color: C.slate }}>{s.d}</p>
                 </div>
               ))}
             </div>
 
-            <h3 style={{ fontFamily: 'Georgia, serif' }}>Asset Liquidity Hierarchy</h3>
+            <h3 style={{ fontFamily: 'var(--cv-font)' }}>Asset Liquidity Hierarchy</h3>
             <p>In agricultural markets, assets serve different financial functions. Understanding this helps you understand your customer's financial behaviour:</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 24 }}>
               {[
@@ -479,19 +479,19 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
                 { t: 'Large ruminants', sub: 'Fixed asset equivalent', d: 'Sold for major planned expenses only. Cattle represent significant stored value.' },
               ].map(a => (
                 <div key={a.t} style={{ background: C.cream, padding: 16, borderRadius: 8, borderTop: `3px solid ${C.teal}` }}>
-                  <p style={{ fontFamily: 'Georgia, serif', fontWeight: 700, margin: '0 0 2px', fontSize: 15 }}>{a.t}</p>
+                  <p style={{ fontFamily: 'var(--cv-font)', fontWeight: 700, margin: '0 0 2px', fontSize: 15 }}>{a.t}</p>
                   <p style={{ fontSize: 11, color: C.teal, margin: '0 0 8px', fontWeight: 600 }}>{a.sub}</p>
                   <p style={{ margin: 0, fontSize: 13, color: C.slate }}>{a.d}</p>
                 </div>
               ))}
             </div>
 
-            <h3 style={{ fontFamily: 'Georgia, serif' }}>Commercial Readiness Diagnostic — Six Fit Tests</h3>
+            <h3 style={{ fontFamily: 'var(--cv-font)' }}>Commercial Readiness Diagnostic — Six Fit Tests</h3>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: C.navy, color: C.white }}>
                   {['Test', 'Name', 'What it diagnoses'].map(h => (
-                    <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontFamily: "'Segoe UI', system-ui, sans-serif" }}>{h}</th>
+                    <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontFamily: "var(--cv-font)" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -548,11 +548,11 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
     return (
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 20, color: C.navy, margin: 0 }}>Phase 0 — Assumption Clearing</h2>
+          <h2 style={{ fontFamily: 'var(--cv-font)', fontSize: 20, color: C.navy, margin: 0 }}>Phase 0 — Assumption Clearing</h2>
           <PrintBtn />
         </div>
 
-        <div style={{ background: C.cream, padding: 16, borderRadius: 8, marginBottom: 24, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+        <div style={{ background: C.cream, padding: 16, borderRadius: 8, marginBottom: 24, fontFamily: "var(--cv-font)" }}>
           <p style={{ margin: 0, color: C.navy, fontSize: 14, lineHeight: 1.6 }}>
             Before the canvas work begins, Phase 0 clears the assumptions that could derail the engagement later. Every tool here is a live working document, not a one-time exercise. You can return to any of them as the engagement progresses.
           </p>
@@ -599,7 +599,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
         <Section title="Engagement Tracker">
           <p style={{ color: C.slate, fontSize: 14 }}>This table gives a live view of progress across all Decision Points.</p>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, fontFamily: "var(--cv-font)" }}>
               <thead>
                 <tr style={{ background: C.navy, color: C.white }}>
                   {['Phase', 'Decision Point', 'Core Question', 'Status', 'Evidence Summary', 'Priority Action'].map(h => (
@@ -636,9 +636,9 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
         {/* Coach Quick Reference — coach only */}
         {isCoach && (
           <Section title="Coach Quick Reference (Coach and Co-implementer only)">
-            <div style={{ background: '#FFF8E7', padding: 16, borderRadius: 8, borderLeft: `4px solid ${C.amber}`, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+            <div style={{ background: '#FFF8E7', padding: 16, borderRadius: 8, borderLeft: `4px solid ${C.amber}`, fontFamily: "var(--cv-font)" }}>
               <p style={{ margin: '0 0 12px', fontWeight: 600, color: C.amber }}>This section is not visible to the client or the funder.</p>
-              <h4 style={{ margin: '0 0 8px', color: C.navy, fontFamily: 'Georgia, serif' }}>Delivery Rhythm</h4>
+              <h4 style={{ margin: '0 0 8px', color: C.navy, fontFamily: 'var(--cv-font)' }}>Delivery Rhythm</h4>
               <ul style={{ margin: '0 0 16px', paddingLeft: 20, color: C.navy, lineHeight: 1.7 }}>
                 <li><strong>Kick-off immersion:</strong> 3 days on-site. Baseline + DP01 and DP02.</li>
                 <li><strong>Customer validation visit:</strong> 2 days. Real client conversations + debrief.</li>
@@ -646,7 +646,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
                 <li><strong>Iteration 2 and handover visit:</strong> 3 days. Ikore leads, consultant observes.</li>
                 <li><strong>Between visits:</strong> in-country associate provides daily continuity. 2 remote sessions per week.</li>
               </ul>
-              <h4 style={{ margin: '0 0 8px', color: C.navy, fontFamily: 'Georgia, serif' }}>Escalation Protocol</h4>
+              <h4 style={{ margin: '0 0 8px', color: C.navy, fontFamily: 'var(--cv-font)' }}>Escalation Protocol</h4>
               <ul style={{ margin: 0, paddingLeft: 20, color: C.navy, lineHeight: 1.7 }}>
                 <li>Gate not signed within 5 working days of completion: escalate to CEO directly.</li>
                 <li>Gate not signed within 10 working days: use Coach Authorise Progress with mandatory note.</li>
@@ -700,8 +700,8 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
 
         {/* Tool 5: Engagement Commitment */}
         <Section title="Tool 5 — Engagement Commitment">
-          <div style={{ background: C.cream, padding: 20, borderRadius: 8, fontFamily: "'Segoe UI', system-ui, sans-serif", lineHeight: 1.7, color: C.navy, marginBottom: 16 }}>
-            <h3 style={{ fontFamily: 'Georgia, serif', marginTop: 0 }}>Engagement Commitment — Ikore</h3>
+          <div style={{ background: C.cream, padding: 20, borderRadius: 8, fontFamily: "var(--cv-font)", lineHeight: 1.7, color: C.navy, marginBottom: 16 }}>
+            <h3 style={{ fontFamily: 'var(--cv-font)', marginTop: 0 }}>Engagement Commitment — Ikore</h3>
             <p>By signing below, Ikore confirms that:</p>
             <ol>
               <li>We have read and understood how this engagement works.</li>
@@ -763,10 +763,10 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
         <div style={{ background: C.navy, borderRadius: 8, padding: 24, marginBottom: 24, color: C.white }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
             <div>
-              <p style={{ margin: '0 0 4px', fontSize: 11, color: C.cyan, fontFamily: "'Segoe UI', system-ui, sans-serif", textTransform: 'uppercase', letterSpacing: 1 }}>
+              <p style={{ margin: '0 0 4px', fontSize: 11, color: C.cyan, fontFamily: "var(--cv-font)", textTransform: 'uppercase', letterSpacing: 1 }}>
                 {dp.number} &nbsp;|&nbsp; {dp.zone}
               </p>
-              <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 22, margin: '0 0 12px', color: C.white }}>
+              <h2 style={{ fontFamily: 'var(--cv-font)', fontSize: 22, margin: '0 0 12px', color: C.white }}>
                 {dp.core_question}
               </h2>
               <p style={{ margin: 0, fontSize: 13, color: '#A0B4C8' }}>
@@ -783,7 +783,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
 
         {/* What good looks like */}
         <Section title="What a strong answer to this Decision Point looks like">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontFamily: "var(--cv-font)" }}>
             <div style={{ background: '#D4EDDA', padding: 16, borderRadius: 8 }}>
               <p style={{ fontWeight: 700, color: C.green, margin: '0 0 8px', fontSize: 13 }}>A strong answer</p>
               <p style={{ margin: 0, fontSize: 14, color: C.navy }}>{dp.good_answer}</p>
@@ -793,7 +793,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
               <p style={{ margin: 0, fontSize: 14, color: C.navy }}>{dp.weak_answer}</p>
             </div>
           </div>
-          <div style={{ marginTop: 16, background: C.cream, padding: 16, borderRadius: 8, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+          <div style={{ marginTop: 16, background: C.cream, padding: 16, borderRadius: 8, fontFamily: "var(--cv-font)" }}>
             <p style={{ fontWeight: 600, color: C.navy, margin: '0 0 8px', fontSize: 14 }}>Why this matters for Ikore specifically</p>
             <p style={{ margin: 0, fontSize: 14, color: C.slate }}>{dp.why_it_matters_for_ikore}</p>
           </div>
@@ -812,16 +812,16 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
               }}>
                 <div style={{ background: C.lightBg, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <span style={{ fontSize: 12, color: C.cyan, fontWeight: 700, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+                    <span style={{ fontSize: 12, color: C.cyan, fontWeight: 700, fontFamily: "var(--cv-font)" }}>
                       Component {comp.number}
                     </span>
-                    <span style={{ fontFamily: 'Georgia, serif', fontSize: 15, color: C.navy, fontWeight: 700, marginLeft: 10 }}>
+                    <span style={{ fontFamily: 'var(--cv-font)', fontSize: 15, color: C.navy, fontWeight: 700, marginLeft: 10 }}>
                       {comp.title}
                     </span>
                   </div>
                   <StatusBadge status={ev.status || 'not_started'} />
                 </div>
-                <div style={{ padding: '16px 20px', fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+                <div style={{ padding: '16px 20px', fontFamily: "var(--cv-font)" }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
                     <div>
                       <p style={{ fontSize: 12, fontWeight: 700, color: C.slate, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 0.5 }}>What it is</p>
@@ -882,7 +882,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
                           onClick={() => markEvidenceStatus(comp.id, s)}
                           style={{
                             padding: '6px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer',
-                            fontFamily: "'Segoe UI', system-ui, sans-serif",
+                            fontFamily: "var(--cv-font)",
                             background: (ev.status || 'not_started') === s ? C.cyan : C.white,
                             color: (ev.status || 'not_started') === s ? C.navy : C.slate,
                             border: `1px solid ${(ev.status || 'not_started') === s ? C.cyan : C.border}`,
@@ -903,7 +903,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
         {/* DP Evidence Summary */}
         <Section title="Evidence Summary for this Decision Point">
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, fontFamily: "var(--cv-font)" }}>
               <thead>
                 <tr style={{ background: C.lightBg }}>
                   {['Component', 'Description', 'Status', 'Document link'].map(h => (
@@ -1006,7 +1006,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
     return (
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 20, color: C.navy, margin: 0 }}>Handover and Engagement Close</h2>
+          <h2 style={{ fontFamily: 'var(--cv-font)', fontSize: 20, color: C.navy, margin: 0 }}>Handover and Engagement Close</h2>
           <PrintBtn />
         </div>
 
@@ -1026,7 +1026,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
           {state.handover_tests.map(test => (
             <div key={test.id} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: 20, marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-                <p style={{ fontFamily: 'Georgia, serif', fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>
+                <p style={{ fontFamily: 'var(--cv-font)', fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>
                   Test {test.number}: {test.test}
                 </p>
                 <StatusBadge status={test.status} />
@@ -1042,7 +1042,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
                         background: test.status === s ? C.navy : C.white,
                         color: test.status === s ? C.white : C.slate,
                         border: `1px solid ${C.border}`,
-                        fontFamily: "'Segoe UI', system-ui, sans-serif",
+                        fontFamily: "var(--cv-font)",
                       }}
                     >{s.replace('_', ' ')}</button>
                   ))}
@@ -1091,7 +1091,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
   }
 
   return (
-    <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", background: C.cream, minHeight: '100vh' }}>
+    <div style={{ fontFamily: "var(--cv-font)", background: C.cream, minHeight: '100vh' }}>
       <Header />
       <NavBar />
       <main style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }}>
@@ -1122,7 +1122,7 @@ function GateBlock({
   return (
     <div style={{ marginTop: 32, border: `2px solid ${gate.ceo_signed ? C.green : gate.coach_authorised ? C.amber : C.border}`, borderRadius: 10, padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-        <h3 style={{ fontFamily: 'Georgia, serif', margin: 0, color: C.navy }}>
+        <h3 style={{ fontFamily: 'var(--cv-font)', margin: 0, color: C.navy }}>
           Gate — {phaseName}
         </h3>
         <StatusBadge status={gate.status} />
@@ -1155,7 +1155,7 @@ function GateBlock({
             onClick={onCEOSign}
             style={{
               background: C.navy, color: C.white, padding: '12px 28px', borderRadius: 8,
-              border: 'none', cursor: 'pointer', fontFamily: 'Georgia, serif', fontSize: 15,
+              border: 'none', cursor: 'pointer', fontFamily: 'var(--cv-font)', fontSize: 15,
               fontWeight: 700, letterSpacing: 0.3,
             }}
           >
@@ -1173,13 +1173,13 @@ function GateBlock({
                 const email = prompt('Email address to escalate to:')
                 if (email) alert(`Escalation email sent to ${email} — [In production, this triggers the Resend API]`)
               }}
-              style={{ padding: '8px 16px', borderRadius: 6, border: `1px solid ${C.amber}`, background: 'transparent', color: C.amber, cursor: 'pointer', fontSize: 13, fontFamily: "'Segoe UI', system-ui, sans-serif" }}
+              style={{ padding: '8px 16px', borderRadius: 6, border: `1px solid ${C.amber}`, background: 'transparent', color: C.amber, cursor: 'pointer', fontSize: 13, fontFamily: "var(--cv-font)" }}
             >
               Escalate to CEO by email
             </button>
             <button
               onClick={() => setShowAuthorise(true)}
-              style={{ padding: '8px 16px', borderRadius: 6, border: `1px solid ${C.navy}`, background: C.navy, color: C.white, cursor: 'pointer', fontSize: 13, fontFamily: "'Segoe UI', system-ui, sans-serif" }}
+              style={{ padding: '8px 16px', borderRadius: 6, border: `1px solid ${C.navy}`, background: C.navy, color: C.white, cursor: 'pointer', fontSize: 13, fontFamily: "var(--cv-font)" }}
             >
               Authorise progress (Coach override)
             </button>
@@ -1199,7 +1199,7 @@ function GateBlock({
                   onCoachAuthorise(authoriseNote)
                   setShowAuthorise(false)
                 }}
-                style={{ background: C.amber, color: C.navy, border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 700, cursor: 'pointer', fontFamily: "'Segoe UI', system-ui, sans-serif" }}
+                style={{ background: C.amber, color: C.navy, border: 'none', padding: '10px 24px', borderRadius: 6, fontWeight: 700, cursor: 'pointer', fontFamily: "var(--cv-font)" }}
               >
                 Confirm Coach Authorisation
               </button>
@@ -1218,7 +1218,7 @@ function SignButton({ label, onSign }: { label: string; onSign: () => void }) {
       onClick={onSign}
       style={{
         background: C.navy, color: C.white, padding: '12px 28px', borderRadius: 8,
-        border: 'none', cursor: 'pointer', fontFamily: 'Georgia, serif', fontSize: 15,
+        border: 'none', cursor: 'pointer', fontFamily: 'var(--cv-font)', fontSize: 15,
         fontWeight: 700, marginTop: 8,
       }}
     >
@@ -1230,9 +1230,9 @@ function SignButton({ label, onSign }: { label: string; onSign: () => void }) {
 // ─── LOCKED MESSAGE ───────────────────────────────────────────
 function LockedMessage({ phase }: { phase: string }) {
   return (
-    <div style={{ textAlign: 'center', padding: '80px 40px', fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+    <div style={{ textAlign: 'center', padding: '80px 40px', fontFamily: "var(--cv-font)" }}>
       <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
-      <h2 style={{ fontFamily: 'Georgia, serif', color: C.navy, marginBottom: 8 }}>{phase} is locked</h2>
+      <h2 style={{ fontFamily: 'var(--cv-font)', color: C.navy, marginBottom: 8 }}>{phase} is locked</h2>
       <p style={{ color: C.slate, maxWidth: 440, margin: '0 auto' }}>
         Complete the previous section and get CEO sign-off (or coach authorisation) to unlock this section.
       </p>
@@ -1384,15 +1384,15 @@ function ReadinessAssessment({ answers, onChange, editable }: { answers: any[]; 
   return (
     <div>
       <div style={{ background: flag ? '#FFF3CD' : '#D4EDDA', padding: 14, borderRadius: 8, marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontWeight: 700, color: flag ? C.amber : C.green, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+        <span style={{ fontWeight: 700, color: flag ? C.amber : C.green, fontFamily: "var(--cv-font)" }}>
           Score: {score} / {answers.length}
         </span>
-        <span style={{ fontSize: 13, color: flag ? C.amber : C.green, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+        <span style={{ fontSize: 13, color: flag ? C.amber : C.green, fontFamily: "var(--cv-font)" }}>
           {flag ? 'Score below 6 — discuss with your coach before proceeding' : 'Good readiness for this engagement'}
         </span>
       </div>
       {answers.map(a => (
-        <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 0', borderBottom: `1px solid ${C.border}`, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+        <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 0', borderBottom: `1px solid ${C.border}`, fontFamily: "var(--cv-font)" }}>
           <div style={{ display: 'flex', gap: 6 }}>
             {[true, false, null].map((v, i) => (
               <button
@@ -1402,7 +1402,7 @@ function ReadinessAssessment({ answers, onChange, editable }: { answers: any[]; 
                   padding: '4px 12px', borderRadius: 5, fontSize: 12, cursor: editable ? 'pointer' : 'default',
                   background: a.answer === v ? (v === true ? C.green : v === false ? C.red : C.slate) : C.white,
                   color: a.answer === v ? C.white : C.slate,
-                  border: `1px solid ${C.border}`, fontFamily: "'Segoe UI', system-ui, sans-serif",
+                  border: `1px solid ${C.border}`, fontFamily: "var(--cv-font)",
                 }}
               >{v === true ? 'Yes' : v === false ? 'No' : 'Not sure'}</button>
             ))}
@@ -1427,7 +1427,7 @@ function DecisionTable({ decisions, onChange, editable }: { decisions: CanvasDec
       {decisions.map(d => (
         <div key={d.id} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: 16, marginBottom: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: C.cyan, fontFamily: 'monospace' }}>{d.id}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: C.cyan, fontFamily: 'var(--cv-font-mono)' }}>{d.id}</span>
             {editable && <button onClick={() => del(d.id)} style={delBtnStyle}>Remove</button>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
@@ -1454,7 +1454,7 @@ function InterviewTable({ interviews, phaseId, onAdd, onUpdate, editable }: { in
       {interviews.length === 0 && <p style={{ color: C.slate, fontSize: 14 }}>No interviews recorded for this Decision Point yet.</p>}
       {interviews.map(int => (
         <div key={int.id} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: 16, marginBottom: 12 }}>
-          <p style={{ fontSize: 12, fontWeight: 700, color: C.cyan, fontFamily: 'monospace', margin: '0 0 12px' }}>{int.id}</p>
+          <p style={{ fontSize: 12, fontWeight: 700, color: C.cyan, fontFamily: 'var(--cv-font-mono)', margin: '0 0 12px' }}>{int.id}</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
             <Field label="Date" value={int.date} onChange={v => onUpdate(int.id, { ...int, date: v })} disabled={!editable} />
             <Field label="Respondent" value={int.respondent} onChange={v => onUpdate(int.id, { ...int, respondent: v })} placeholder="Name" disabled={!editable} />
@@ -1482,7 +1482,7 @@ function HypothesisTable({ hypotheses, phaseId, onAdd, onUpdate, editable }: { h
       {hypotheses.map(h => (
         <div key={h.id} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: 16, marginBottom: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: C.cyan, fontFamily: 'monospace' }}>{h.id}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: C.cyan, fontFamily: 'var(--cv-font-mono)' }}>{h.id}</span>
             <StatusBadge status={h.status} />
           </div>
           <Field label="Hypothesis" value={h.hypothesis} onChange={v => onUpdate(h.id, { ...h, hypothesis: v })} rows={2} placeholder='e.g. "We believe that agrodealers will pay UGX 50,000 per advisory session because..."' disabled={!editable} />
@@ -1547,7 +1547,7 @@ function EvidenceLibrary({ entries, onChange, editable }: { entries: EvidenceEnt
     <div>
       {entries.length === 0 && <p style={{ color: C.slate, fontSize: 14 }}>No evidence entries yet. Evidence is added here as it is produced throughout the engagement.</p>}
       <div style={{ overflowX: 'auto', marginBottom: 16 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, fontFamily: "var(--cv-font)" }}>
           <thead>
             <tr style={{ background: C.navy, color: C.white }}>
               {['Ref', 'Date', 'Phase', 'Type', 'Description', 'Link', 'Status', ''].map(h => (
@@ -1558,7 +1558,7 @@ function EvidenceLibrary({ entries, onChange, editable }: { entries: EvidenceEnt
           <tbody>
             {entries.map((e, i) => (
               <tr key={e.id} style={{ background: i % 2 === 0 ? C.cream : C.white }}>
-                <td style={{ padding: '9px 12px', fontFamily: 'monospace', color: C.cyan, fontWeight: 700 }}>{e.id}</td>
+                <td style={{ padding: '9px 12px', fontFamily: 'var(--cv-font-mono)', color: C.cyan, fontWeight: 700 }}>{e.id}</td>
                 <td style={{ padding: '9px 12px' }}><input value={e.date} onChange={ev => upd(e.id, 'date', ev.target.value)} style={{ ...inputStyle, width: 90 }} disabled={!editable} /></td>
                 <td style={{ padding: '9px 12px' }}>
                   <select value={e.phase} onChange={ev => upd(e.id, 'phase', ev.target.value)} disabled={!editable} style={{ ...inputStyle, width: 80 }}>
@@ -1610,7 +1610,7 @@ function CommercialReadiness({ point, scores, onChange, editable }: { point: 'ba
   return (
     <div>
       <div style={{ background: C.cream, padding: 14, borderRadius: 8, marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontFamily: 'Georgia, serif', fontWeight: 700, color: C.navy, fontSize: 16 }}>
+        <span style={{ fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: 16 }}>
           {point.charAt(0).toUpperCase() + point.slice(1)} Score: {total} / {maxScore}
         </span>
         <div style={{ width: 180, height: 10, background: C.border, borderRadius: 5, overflow: 'hidden' }}>
@@ -1618,7 +1618,7 @@ function CommercialReadiness({ point, scores, onChange, editable }: { point: 'ba
         </div>
       </div>
       {FIT_TESTS.map(ft => (
-        <div key={ft.id} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 0', borderBottom: `1px solid ${C.border}`, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+        <div key={ft.id} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 0', borderBottom: `1px solid ${C.border}`, fontFamily: "var(--cv-font)" }}>
           <div style={{ flex: 1 }}>
             <p style={{ fontWeight: 600, color: C.navy, margin: '0 0 2px', fontSize: 14 }}>{ft.number} {ft.name}</p>
             <p style={{ color: C.slate, fontSize: 12, margin: 0 }}>{ft.description}</p>
@@ -1633,7 +1633,7 @@ function CommercialReadiness({ point, scores, onChange, editable }: { point: 'ba
                   background: (current[ft.id] || 0) >= v ? C.cyan : C.white,
                   color: (current[ft.id] || 0) >= v ? C.navy : C.slate,
                   cursor: editable ? 'pointer' : 'default', fontWeight: 700, fontSize: 14,
-                  fontFamily: "'Segoe UI', system-ui, sans-serif",
+                  fontFamily: "var(--cv-font)",
                 }}
               >{v}</button>
             ))}
@@ -1663,8 +1663,8 @@ function CommercialReadinessSummary({ scores }: { scores: DiagnosticScore[] }) {
           { label: 'Final', data: final, color: C.green },
         ].map(p => (
           <div key={p.label} style={{ background: C.cream, padding: 20, borderRadius: 8, textAlign: 'center', borderTop: `4px solid ${p.color}` }}>
-            <p style={{ fontFamily: 'Georgia, serif', fontSize: 16, fontWeight: 700, color: C.navy, margin: '0 0 4px' }}>{p.label}</p>
-            <p style={{ fontSize: 32, fontWeight: 700, color: p.color, margin: '0 0 4px', fontFamily: 'Georgia, serif' }}>
+            <p style={{ fontFamily: 'var(--cv-font)', fontSize: 16, fontWeight: 700, color: C.navy, margin: '0 0 4px' }}>{p.label}</p>
+            <p style={{ fontSize: 32, fontWeight: 700, color: p.color, margin: '0 0 4px', fontFamily: 'var(--cv-font)' }}>
               {p.data ? p.data.total : '—'}
             </p>
             {p.data && <p style={{ fontSize: 12, color: C.slate, margin: 0 }}>out of {maxScore}</p>}
@@ -1674,7 +1674,7 @@ function CommercialReadinessSummary({ scores }: { scores: DiagnosticScore[] }) {
       </div>
 
       {[baseline, midpoint, final].some(Boolean) && (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, fontFamily: "var(--cv-font)" }}>
           <thead>
             <tr style={{ background: C.navy, color: C.white }}>
               <th style={{ padding: '9px 14px', textAlign: 'left' }}>Fit Test</th>
@@ -1711,7 +1711,7 @@ function NotificationPanel({ settings, onChange, editable }: { settings: any; on
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <input type="checkbox" checked={settings.enabled} onChange={e => onChange({ ...settings, enabled: e.target.checked })} disabled={!editable} id="notif-toggle" />
-        <label htmlFor="notif-toggle" style={{ fontSize: 14, color: C.navy, fontFamily: "'Segoe UI', system-ui, sans-serif", fontWeight: 600 }}>Enable automatic email notifications</label>
+        <label htmlFor="notif-toggle" style={{ fontSize: 14, color: C.navy, fontFamily: "var(--cv-font)", fontWeight: 600 }}>Enable automatic email notifications</label>
       </div>
       {settings.enabled && (
         <>
@@ -1723,7 +1723,7 @@ function NotificationPanel({ settings, onChange, editable }: { settings: any; on
                 <Field label="Role" value={r.role} onChange={v => upd(i, 'role', v)} placeholder="e.g. CEO" disabled={!editable} />
                 {editable && <button onClick={() => del(i)} style={delBtnStyle}>Remove</button>}
               </div>
-              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13, fontFamily: "var(--cv-font)" }}>
                 {[
                   { f: 'notify_gate_signed', l: 'Gate signed' },
                   { f: 'notify_gate_authorised', l: 'Coach authorisation' },
@@ -1754,10 +1754,10 @@ function FunderView({ state }: { state: CanvasEngagementState }) {
   const maxScore = FIT_TESTS.length * 5
 
   return (
-    <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", background: C.cream, minHeight: '100vh' }}>
+    <div style={{ fontFamily: "var(--cv-font)", background: C.cream, minHeight: '100vh' }}>
       <header style={{ background: C.navy, padding: '16px 24px', color: C.white, borderBottom: `3px solid ${C.cyan}` }}>
         <p style={{ margin: '0 0 4px', fontSize: 11, color: C.cyan, letterSpacing: 1, textTransform: 'uppercase' }}>Canvas Coach | habibonifade.com — Funder View</p>
-        <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 22, margin: 0 }}>{state.engagement_title}</h1>
+        <h1 style={{ fontFamily: 'var(--cv-font)', fontSize: 22, margin: 0 }}>{state.engagement_title}</h1>
         <p style={{ margin: '4px 0 0', fontSize: 13, color: '#A0B4C8' }}>Read-only dashboard for {state.funder} programme staff</p>
       </header>
       <main style={{ maxWidth: 1000, margin: '0 auto', padding: '32px 24px' }}>
@@ -1775,7 +1775,7 @@ function FunderView({ state }: { state: CanvasEngagementState }) {
             ].map(i => (
               <div key={i.l} style={{ background: C.white, padding: 16, borderRadius: 8, borderLeft: `3px solid ${C.cyan}` }}>
                 <p style={{ fontSize: 11, color: C.slate, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 0.5 }}>{i.l}</p>
-                <p style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0, fontFamily: 'Georgia, serif' }}>{i.v}</p>
+                <p style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0, fontFamily: 'var(--cv-font)' }}>{i.v}</p>
               </div>
             ))}
           </div>
@@ -1817,8 +1817,8 @@ function FunderView({ state }: { state: CanvasEngagementState }) {
               { label: 'Final', data: final, color: C.green },
             ].map(p => (
               <div key={p.label} style={{ background: C.white, padding: 20, borderRadius: 8, textAlign: 'center', borderTop: `4px solid ${p.color}` }}>
-                <p style={{ fontFamily: 'Georgia, serif', fontSize: 15, fontWeight: 700, color: C.navy, margin: '0 0 4px' }}>{p.label}</p>
-                <p style={{ fontSize: 36, fontWeight: 700, color: p.color, margin: '0 0 4px', fontFamily: 'Georgia, serif' }}>
+                <p style={{ fontFamily: 'var(--cv-font)', fontSize: 15, fontWeight: 700, color: C.navy, margin: '0 0 4px' }}>{p.label}</p>
+                <p style={{ fontSize: 36, fontWeight: 700, color: p.color, margin: '0 0 4px', fontFamily: 'var(--cv-font)' }}>
                   {p.data ? p.data.total : 'Pending'}
                 </p>
                 {p.data && <p style={{ fontSize: 12, color: C.slate, margin: 0 }}>out of {maxScore} &nbsp;|&nbsp; {p.data.date}</p>}
@@ -1878,23 +1878,23 @@ function FunderView({ state }: { state: CanvasEngagementState }) {
 // ─── STYLE CONSTANTS ──────────────────────────────────────────
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 13, fontWeight: 600, color: C.slate, marginBottom: 4,
-  fontFamily: "'Segoe UI', system-ui, sans-serif",
+  fontFamily: "var(--cv-font)",
 }
 
 const inputStyle: React.CSSProperties = {
   padding: '8px 10px', borderRadius: 6, border: `1px solid ${C.border}`,
-  fontSize: 13, fontFamily: "'Segoe UI', system-ui, sans-serif",
+  fontSize: 13, fontFamily: "var(--cv-font)",
   background: C.white, color: C.navy, boxSizing: 'border-box',
 }
 
 const addBtnStyle: React.CSSProperties = {
   background: 'transparent', border: `1px dashed ${C.cyan}`, color: C.cyan,
   padding: '8px 18px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
-  fontFamily: "'Segoe UI', system-ui, sans-serif", marginTop: 8,
+  fontFamily: "var(--cv-font)", marginTop: 8,
 }
 
 const delBtnStyle: React.CSSProperties = {
   background: 'transparent', border: `1px solid ${C.border}`, color: C.red,
   padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
-  fontFamily: "'Segoe UI', system-ui, sans-serif",
+  fontFamily: "var(--cv-font)",
 }

@@ -152,7 +152,7 @@ export default function VerificationRecognition({
       }}>
         <span style={{ fontSize: '1.4rem' }}>{readiness === 'tier1_active' ? '🔗' : '📲'}</span>
         <div>
-          <div style={{ fontFamily: 'Georgia,serif', fontWeight: 700, color: C.navy, fontSize: '1rem' }}>{readinessInfo.title}</div>
+          <div style={{ fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: '1rem' }}>{readinessInfo.title}</div>
           <div style={{ color: C.slate, fontSize: '0.9rem' }}>{readinessInfo.blurb}</div>
         </div>
       </div>
@@ -172,7 +172,7 @@ export default function VerificationRecognition({
           <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
             {providers.map(p => (
               <button key={p.id} disabled={connecting === p.id} onClick={() => connectProvider(p.id)} style={{
-                fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: 700, padding: '0.5rem 0.9rem',
+                fontFamily: 'var(--cv-font-mono)', fontSize: '0.85rem', fontWeight: 700, padding: '0.5rem 0.9rem',
                 border: `1px solid ${C.cyan}`, borderRadius: 8, background: 'transparent', color: C.cyan,
                 cursor: connecting === p.id ? 'default' : 'pointer', opacity: connecting === p.id ? 0.6 : 1,
               }}>{connecting === p.id ? 'Connecting…' : `Connect ${p.label}`}</button>
@@ -190,7 +190,7 @@ export default function VerificationRecognition({
         <ConfidenceRing score={confidence.score} color={toneColor(confInfo.tone)} />
         <div>
           <div style={{
-            display: 'inline-block', fontFamily: 'monospace', fontSize: '0.72rem', fontWeight: 700,
+            display: 'inline-block', fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', fontWeight: 700,
             padding: '0.15rem 0.55rem', borderRadius: 6, marginBottom: '0.4rem',
             background: toneColor(confInfo.tone), color: C.onAccent, textTransform: 'uppercase',
           }}>{confInfo.title}</div>
@@ -199,7 +199,7 @@ export default function VerificationRecognition({
       </div>
 
       {/* Earned badges */}
-      <div style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: C.slate, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' }}>
+      <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', color: C.slate, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' }}>
         Recognition earned
       </div>
       {earned.length === 0 ? (
@@ -226,7 +226,7 @@ export default function VerificationRecognition({
       {/* Locked badges -- how to earn */}
       {locked.length > 0 && (
         <>
-          <div style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: C.slate, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' }}>
+          <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', color: C.slate, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' }}>
             How to earn more
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.7rem' }}>

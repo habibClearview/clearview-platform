@@ -41,15 +41,15 @@ const C = {
   purple: 'var(--cv-purple)', alt: 'var(--cv-alt)',
 }
 const card = { background: C.white, border: '1px solid var(--cv-border-soft)', borderRadius: 14, padding: '1.35rem 1.5rem', marginBottom: '1.25rem', boxShadow: '0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)' }
-const secH = { fontFamily: 'Georgia,serif', fontSize: '1.32rem', fontWeight: 700, color: C.navy, margin: 0 }
+const secH = { fontFamily: 'var(--cv-font)', fontSize: '1.32rem', fontWeight: 700, color: C.navy, margin: 0 }
 const hint = { fontSize: '1.01rem', color: C.slate, lineHeight: 1.4 }
-const th = { padding: '0.45rem 0.6rem', textAlign: 'left', fontFamily: 'monospace', fontSize: '0.87rem', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 700, color: C.slate, borderBottom: `1px solid ${C.border}`, verticalAlign: 'bottom' }
+const th = { padding: '0.45rem 0.6rem', textAlign: 'left', fontFamily: 'var(--cv-font-mono)', fontSize: '0.87rem', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 700, color: C.slate, borderBottom: `1px solid ${C.border}`, verticalAlign: 'bottom' }
 const td = { padding: '0.35rem 0.4rem', verticalAlign: 'top', borderBottom: '1px solid var(--cv-border-soft)' }
 const cell = { width: '100%', padding: '0.4rem 0.55rem', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: '1.01rem', fontFamily: 'inherit', background: 'var(--cv-bg-2)', color: C.navy, boxSizing: 'border-box' }
 const readCell = { fontSize: '1.01rem', color: C.navy, lineHeight: 1.4, padding: '0.4rem 0.55rem', whiteSpace: 'pre-wrap', minHeight: '1.2rem' }
-const ghostBtn = { fontFamily: 'monospace', fontSize: '0.91rem', padding: '0.3rem 0.7rem', border: `1px solid ${C.cyan}`, borderRadius: 6, background: 'transparent', color: C.cyan, cursor: 'pointer' }
-const solidBtn = { fontFamily: 'monospace', fontSize: '0.95rem', fontWeight: 700, padding: '0.38rem 0.9rem', border: 'none', borderRadius: 6, background: C.cyan, color: 'var(--cv-on-accent)', cursor: 'pointer' }
-const delBtn = { fontFamily: 'monospace', fontSize: '0.91rem', padding: '0.25rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.red, cursor: 'pointer' }
+const ghostBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.91rem', padding: '0.3rem 0.7rem', border: `1px solid ${C.cyan}`, borderRadius: 6, background: 'transparent', color: C.cyan, cursor: 'pointer' }
+const solidBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.95rem', fontWeight: 700, padding: '0.38rem 0.9rem', border: 'none', borderRadius: 6, background: C.cyan, color: 'var(--cv-on-accent)', cursor: 'pointer' }
+const delBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.91rem', padding: '0.25rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.red, cursor: 'pointer' }
 
 const FIELDS = [
   { key: 'segment', label: 'Segment', type: 'text', width: 150, placeholder: 'Who this reaches' },
@@ -237,7 +237,7 @@ export default function ChannelLogicTable({ clientId, canManage }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           {pill && (
-            <span style={{ fontFamily: 'monospace', fontSize: '0.87rem', color: pill.color, border: `1px solid ${pill.color}`, borderRadius: 999, padding: '0.15rem 0.6rem' }}>
+            <span style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.87rem', color: pill.color, border: `1px solid ${pill.color}`, borderRadius: 999, padding: '0.15rem 0.6rem' }}>
               {pill.text}
             </span>
           )}
@@ -252,8 +252,8 @@ export default function ChannelLogicTable({ clientId, canManage }) {
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', margin: '0.85rem 0 1rem' }}>
           {strip.map((s) => (
             <div key={s.l} style={{ borderTop: `3px solid ${s.color}`, background: C.alt, borderRadius: 8, padding: '0.5rem 0.9rem', minWidth: 116 }}>
-              <div style={{ fontFamily: 'monospace', fontSize: '0.85rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate }}>{s.l}</div>
-              <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.5rem', fontWeight: 700, color: s.color, lineHeight: 1.1 }}>{s.v}</div>
+              <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.85rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: C.slate }}>{s.l}</div>
+              <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.5rem', fontWeight: 700, color: s.color, lineHeight: 1.1 }}>{s.v}</div>
             </div>
           ))}
         </div>
@@ -263,7 +263,7 @@ export default function ChannelLogicTable({ clientId, canManage }) {
         <div style={hint}>Loading the channel logic...</div>
       ) : rows.length === 0 ? (
         <div style={{ border: `1px dashed ${C.border}`, borderRadius: 10, padding: '1.4rem', textAlign: 'center' }}>
-          <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.15rem', color: C.navy, marginBottom: '0.35rem' }}>
+          <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.15rem', color: C.navy, marginBottom: '0.35rem' }}>
             No channels mapped yet
           </div>
           <div style={{ ...hint, marginBottom: canManage ? '0.9rem' : 0 }}>

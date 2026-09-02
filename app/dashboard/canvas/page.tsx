@@ -6,7 +6,7 @@ import CanvasDashboard from '@/components/canvas/CanvasDashboard'
 
 function Loading() {
   return (
-    <div style={{ minHeight:'100vh', background:'#F8F4EE', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Georgia, serif', fontSize:'1.1rem', color:'#1B2A4A' }}>
+    <div style={{ minHeight:'100vh', background:'#F8F4EE', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--cv-font)', fontSize:'1.1rem', color:'#1B2A4A' }}>
       Loading Clearview…
     </div>
   )

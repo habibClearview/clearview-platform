@@ -69,14 +69,14 @@ const TILE_COLOR = { green:'#1A7A4A', amber:'#8A6100', red:'#C0392B', slate:'#4A
 
 // ── Style helpers ────────────────────────────────────────────
 const card: React.CSSProperties = {background:C.white,border:'1px solid var(--cv-border-soft)',borderRadius:14,padding:'1.4rem 1.6rem',marginBottom:'1.35rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)'}
-const secH: React.CSSProperties = {fontFamily:'Georgia,serif',fontSize:'1.32rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
+const secH: React.CSSProperties = {fontFamily:'var(--cv-font)',fontSize:'1.32rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
 const inp:  React.CSSProperties = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'1.06rem',fontFamily:'inherit',background:'var(--cv-bg-2)',color:C.navy,boxSizing:'border-box'}
 const lbl:  React.CSSProperties = {display:'block',fontWeight:600,fontSize:'1.0rem',marginBottom:'0.22rem',color:C.navy}
 const hint: React.CSSProperties = {fontSize:'0.96rem',color:C.slate,lineHeight:1.4,marginTop:'0.18rem'}
 const fGrid:React.CSSProperties = {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:'1.1rem'}
 const kpiGrid:React.CSSProperties = {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(175px,1fr))',gap:'1rem',marginBottom:'1.25rem'}
-const addBtn = (sm=false, col=C.cyan): React.CSSProperties => ({fontFamily:'monospace',fontSize:sm?'0.84rem':'0.88rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:4,background:'transparent',color:col,cursor:'pointer'})
-const solidBtn = (col=C.cyan, sm=false): React.CSSProperties => ({fontFamily:'monospace',fontSize:sm?'0.88rem':'0.94rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:4,background:col,color:col===C.white?'var(--cv-navy)':'var(--cv-on-accent)',cursor:'pointer'})
+const addBtn = (sm=false, col=C.cyan): React.CSSProperties => ({fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.84rem':'0.88rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:4,background:'transparent',color:col,cursor:'pointer'})
+const solidBtn = (col=C.cyan, sm=false): React.CSSProperties => ({fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.88rem':'0.94rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:4,background:col,color:col===C.white?'var(--cv-navy)':'var(--cv-on-accent)',cursor:'pointer'})
 const delBtn: React.CSSProperties = {fontSize:'0.96rem',color:C.red,background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,cursor:'pointer',padding:'0.18rem 0.42rem'}
 
 // ── In-app toast notifications ───────────────────────────────
@@ -129,7 +129,7 @@ function ToastHost() {
 }
 
 function navBtn(active: boolean): React.CSSProperties {
-  return {fontFamily:'monospace',fontSize:'0.96rem',padding:'0.65rem 1rem',border:'none',background:'transparent',
+  return {fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',padding:'0.65rem 1rem',border:'none',background:'transparent',
     color:active?C.cyan:'var(--cv-wa-60)',cursor:'pointer',
     borderBottom:active?`3px solid ${C.cyan}`:'3px solid transparent',
     fontWeight:active?700:400,whiteSpace:'nowrap'}
@@ -208,21 +208,21 @@ function KPI({label,value,sub,color}:{label:string;value:string;sub?:string;colo
   const accent = color || C.cyan
   return (
     <div style={{background:C.white,borderRadius:14,padding:'1.15rem 1.3rem 1.25rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}>
-      <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.14em',color:C.slate,textTransform:'uppercase',marginBottom:'0.45rem'}}>{label}</div>
-      <div style={{fontFamily:'Georgia,serif',fontSize:'1.75rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>
+      <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.09rem',letterSpacing:'0.14em',color:C.slate,textTransform:'uppercase',marginBottom:'0.45rem'}}>{label}</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.75rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>
       {sub&&<div style={{fontSize:'1.0rem',color:C.slate,marginTop:'0.32rem'}}>{sub}</div>}
     </div>
   )
 }
 
 function Badge({text,color}:{text:string;color?:string}) {
-  return <span style={{fontFamily:'monospace',fontSize:'0.88rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>
+  return <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>
 }
 
 // Rounded category chip for spend requests (matches the mockup's .cat pill).
 function CategoryTag({category}:{category?:string}) {
   if (!category) return null
-  return <span style={{fontFamily:'monospace',fontSize:'0.88rem',fontWeight:700,borderRadius:20,padding:'0.14rem 0.55rem',background:categoryColor(category),color:'var(--cv-on-accent)',whiteSpace:'nowrap',textTransform:'capitalize',display:'inline-block'}}>{category.replace(/_/g,' ')}</span>
+  return <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',fontWeight:700,borderRadius:20,padding:'0.14rem 0.55rem',background:categoryColor(category),color:'var(--cv-on-accent)',whiteSpace:'nowrap',textTransform:'capitalize',display:'inline-block'}}>{category.replace(/_/g,' ')}</span>
 }
 
 // FM -> CEO -> Done approval-stage tracker dots (mockup .stage). Reads only
@@ -235,7 +235,7 @@ function StageTracker({r}:{r:any}) {
   else if (r.status==='pending_ceo')  { fm=done; ceo=on; fin=wait }
   else                                { fm=on; ceo=wait; fin=wait } // pending_fm
   const dot=(c:string)=><span style={{width:9,height:9,borderRadius:'50%',background:c,display:'inline-block',flexShrink:0}}/>
-  const lab:React.CSSProperties={fontFamily:'monospace',fontSize:'0.88rem',color:C.slate}
+  const lab:React.CSSProperties={fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',color:C.slate}
   return (
     <div style={{display:'flex',alignItems:'center',gap:'0.4rem',flexWrap:'wrap'}} aria-label="Approval stage">
       {dot(fm)}<span style={lab}>FM</span>
@@ -268,7 +268,7 @@ function PLRow({label,values,bold,highlight,negate,months,cc,actualMask,closedMa
         const isActual = actualMask?.[i]
         const isClosed = isActual && closedMask?.[i]
         return (
-        <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',
+        <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',
           color:isClosed?'var(--cv-on-accent)':negate?C.red:v<0?C.red:C.navy,fontWeight:bold?700:400,
           background:isClosed?'var(--cv-header)':isActual?'var(--cv-tint-teal)':undefined,
           borderBottom:isActual&&!isClosed?`2px solid ${C.teal}`:undefined}}>
@@ -276,7 +276,7 @@ function PLRow({label,values,bold,highlight,negate,months,cc,actualMask,closedMa
         </td>
         )
       })}
-      <td style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',fontWeight:700,color:negate?C.red:total<0?C.red:C.navy,borderLeft:`2px solid ${C.border}`}}>
+      <td style={{padding:'7px 8px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',fontWeight:700,color:negate?C.red:total<0?C.red:C.navy,borderLeft:`2px solid ${C.border}`}}>
         {display(total)}
       </td>
     </tr>
@@ -298,7 +298,7 @@ function PLTable({title,rows,months,cc,showExport,closedMask}:{title?:string;row
     <div style={{...card,padding:0,overflow:'hidden'}}>
       {title&&(
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.85rem 1.1rem',borderBottom:`1px solid ${C.border}`}}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.09rem',fontWeight:700,color:C.navy}}>{title}</div>
+          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.09rem',fontWeight:700,color:C.navy}}>{title}</div>
           {showExport&&<div style={{display:'flex',gap:'0.5rem'}}>
             <button style={addBtn(true)} onClick={()=>window.print()}>Print</button>
             <button style={addBtn(true)} onClick={exportCSV}>Export CSV</button>
@@ -309,7 +309,7 @@ function PLTable({title,rows,months,cc,showExport,closedMask}:{title?:string;row
         Tip: each column headed FY is one year. Click a year to open or close its monthly detail.
       </div>
       {hasActuals&&(
-        <div style={{padding:'0.5rem 1.1rem',fontSize:'0.96rem',fontFamily:'monospace',color:C.teal,display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap',background:'var(--cv-tint-teal-soft)'}}>
+        <div style={{padding:'0.5rem 1.1rem',fontSize:'0.96rem',fontFamily: 'var(--cv-font-mono)',color:C.teal,display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap',background:'var(--cv-tint-teal-soft)'}}>
           <span style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
             <span style={{width:10,height:10,borderRadius:2,background:'var(--cv-tint-teal)',border:`2px solid ${C.teal}`,display:'inline-block'}}></span>
             Real data, still updating (live)
@@ -321,7 +321,7 @@ function PLTable({title,rows,months,cc,showExport,closedMask}:{title?:string;row
         </div>
       )}
       <div style={{overflowX:'auto'}}>
-        <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily:'monospace'}}>
+        <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily: 'var(--cv-font-mono)'}}>
           <thead>
             <tr style={{background:'var(--cv-header)'}}>
               <th style={{textAlign:'left',padding:'8px 10px',color:'var(--cv-on-accent)',minWidth:160,fontSize:'1.0rem'}}></th>
@@ -377,7 +377,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
     <div style={{...card,padding:0,overflow:'hidden'}}>
       {title&&(
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.85rem 1.1rem',borderBottom:`1px solid ${C.border}`}}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.09rem',fontWeight:700,color:C.navy}}>{title}</div>
+          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.09rem',fontWeight:700,color:C.navy}}>{title}</div>
           {showExport&&<div style={{display:'flex',gap:'0.5rem'}}>
             <button style={addBtn(true)} onClick={()=>window.print()}>Print</button>
             <button style={addBtn(true)} onClick={exportCSV}>Export CSV</button>
@@ -388,7 +388,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
         Tip: each column headed FY is one year. Click a year to open or close its monthly detail.
       </div>
       {hasActuals&&(
-        <div style={{padding:'0.5rem 1.1rem',fontSize:'0.96rem',fontFamily:'monospace',color:C.teal,display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap',background:'var(--cv-tint-teal-soft)'}}>
+        <div style={{padding:'0.5rem 1.1rem',fontSize:'0.96rem',fontFamily: 'var(--cv-font-mono)',color:C.teal,display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap',background:'var(--cv-tint-teal-soft)'}}>
           <span style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
             <span style={{width:10,height:10,borderRadius:2,background:'var(--cv-tint-teal)',border:`2px solid ${C.teal}`,display:'inline-block'}}></span>
             Real data, still updating (live)
@@ -404,7 +404,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
         </div>
       )}
       <div style={{overflowX:'auto'}}>
-        <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily:'monospace'}}>
+        <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily: 'var(--cv-font-mono)'}}>
           <thead>
             <tr style={{background:'var(--cv-header)'}}>
               <th style={{textAlign:'left',padding:'8px 10px',color:'var(--cv-on-accent)',minWidth:160,fontSize:'1.0rem',position:'sticky',left:0,background:'var(--cv-header)'}}></th>
@@ -437,7 +437,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
                         const isActual = r.actualMask?.[i]
                         const isClosed = isActual && closedMask?.[i]
                         return (
-                          <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',
+                          <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',
                             color:isClosed?'var(--cv-on-accent)':r.negate?C.red:r.values[i]<0?C.red:C.navy,fontWeight:r.bold?700:400,
                             background:isClosed?'var(--cv-header)':isActual?'var(--cv-tint-teal)':undefined,
                             borderBottom:isActual&&!isClosed?`2px solid ${C.teal}`:undefined}}>
@@ -445,7 +445,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
                           </td>
                         )
                       })}
-                      <td onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Collapse FY ${g.label}`} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',fontWeight:700,cursor:'pointer',
+                      <td onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Collapse FY ${g.label}`} style={{padding:'7px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',fontWeight:700,cursor:'pointer',
                         color:r.negate?C.red:cell.value<0?C.red:C.navy,
                         background:cell.isFullyActual?'var(--cv-tint-teal)':cell.isPartiallyActual?'var(--cv-tint-amber-2)':undefined,
                         borderLeft:`2px solid ${C.border}`}}>
@@ -453,7 +453,7 @@ function PLTableCollapsible({title,rows,months,startDate,cc,showExport,closedMas
                       </td>
                     </React.Fragment>
                   ) : (
-                    <td key={g.year} onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Expand FY ${g.label}`} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',fontWeight:r.bold?700:400,cursor:'pointer',
+                    <td key={g.year} onClick={()=>toggle(g.year)} onKeyDown={toggleKeyHandler(g.year)} tabIndex={0} role="button" aria-label={`Expand FY ${g.label}`} style={{padding:'7px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',fontWeight:r.bold?700:400,cursor:'pointer',
                       color:r.negate?C.red:cell.value<0?C.red:C.navy,
                       background:cell.isFullyActual?'var(--cv-tint-teal)':cell.isPartiallyActual?'var(--cv-tint-amber-2)':undefined,
                       borderLeft:`2px solid ${C.border}`}}>
@@ -500,9 +500,9 @@ function ScoreTrendCard({
 
   return (
     <div style={{...card,padding:0,overflow:'hidden',marginBottom:'1.25rem'}}>
-      <div style={{padding:'0.85rem 1.1rem',borderBottom:`1px solid ${C.border}`,fontFamily:'Georgia,serif',fontSize:'1.09rem',fontWeight:700,color:C.navy}}>{title}</div>
+      <div style={{padding:'0.85rem 1.1rem',borderBottom:`1px solid ${C.border}`,fontFamily:'var(--cv-font)',fontSize:'1.09rem',fontWeight:700,color:C.navy}}>{title}</div>
       <div style={{overflowX:'auto'}}>
-        <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily:'monospace'}}>
+        <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily: 'var(--cv-font-mono)'}}>
           <thead>
             <tr style={{background:'var(--cv-header)'}}>
               <th style={{textAlign:'left',padding:'8px 10px',color:'var(--cv-on-accent)',minWidth:160,fontSize:'1.0rem',position:'sticky',left:0,background:'var(--cv-header)'}}></th>
@@ -531,16 +531,16 @@ function ScoreTrendCard({
                 {years.map(y => expanded[y.label] ? (
                   <React.Fragment key={y.label}>
                     {(monthsByYear[y.label]||[]).map((m,i) => (
-                      <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',fontWeight:ri===0?700:400,color:row.getColor(m.result)}}>
+                      <td key={i} style={{padding:'7px 8px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',fontWeight:ri===0?700:400,color:row.getColor(m.result)}}>
                         {row.getValue(m.result)}
                       </td>
                     ))}
-                    <td onClick={()=>toggle(y.label)} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',fontWeight:ri===0?700:400,cursor:'pointer',color:row.getColor(y.result),borderLeft:`2px solid ${C.border}`}}>
+                    <td onClick={()=>toggle(y.label)} style={{padding:'7px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',fontWeight:ri===0?700:400,cursor:'pointer',color:row.getColor(y.result),borderLeft:`2px solid ${C.border}`}}>
                       {row.getValue(y.result)}
                     </td>
                   </React.Fragment>
                 ) : (
-                  <td key={y.label} onClick={()=>toggle(y.label)} style={{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',fontWeight:ri===0?700:400,cursor:'pointer',color:row.getColor(y.result),borderLeft:`2px solid ${C.border}`}}>
+                  <td key={y.label} onClick={()=>toggle(y.label)} style={{padding:'7px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',fontWeight:ri===0?700:400,cursor:'pointer',color:row.getColor(y.result),borderLeft:`2px solid ${C.border}`}}>
                     {row.getValue(y.result)}
                   </td>
                 ))}
@@ -901,7 +901,7 @@ export default function GenericDashboard({
 
   if (loading) return <Spinner/>
   if (error) return (
-    <div style={{padding:'2rem',fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+    <div style={{padding:'2rem',fontFamily:"var(--cv-font)"}}>
       <div style={{color:C.red,marginBottom:'1rem'}}>Error loading data: {error}</div>
       <button onClick={P.onSignOut} style={solidBtn('var(--cv-header)')}>Sign Out</button>
     </div>
@@ -1005,18 +1005,18 @@ export default function GenericDashboard({
   ]
 
   return (
-    <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif",background:C.cream,color:C.navy,minHeight:'100vh'}}>
+    <div style={{fontFamily:"var(--cv-font)",background:C.cream,color:C.navy,minHeight:'100vh'}}>
       <BuildStamp/>
       <ToastHost/>
       {/* Header */}
       <header style={{background:'var(--cv-header)',borderBottom:`3px solid ${C.cyan}`}}>
         <div style={{maxWidth:1600,margin:'0 auto',padding:'1.25rem 1.5rem',display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
           <div>
-            <div style={{fontFamily:'monospace',fontSize:'0.88rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>CANVAS COACH — CLEARVIEW</div>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>CANVAS COACH — CLEARVIEW</div>
             <div style={{display:'flex',alignItems:'center',gap:'0.7rem',flexWrap:'wrap'}}>
-              <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0.1rem 0 0.15rem'}}>{config.business_name || clientName || 'New Client'}</h1>
+              <h1 style={{fontFamily:'var(--cv-font)',fontSize:'1.5rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0.1rem 0 0.15rem'}}>{config.business_name || clientName || 'New Client'}</h1>
               {result?.scores&&(
-                <span style={{fontFamily:'monospace',fontSize:'0.88rem',fontWeight:700,letterSpacing:'0.04em',padding:'0.2rem 0.65rem',borderRadius:20,background:'var(--cv-wa-10)',color:result.scores.classColor,border:`1px solid ${result.scores.classColor}`,display:'inline-flex',alignItems:'center',gap:'0.4rem'}}>
+                <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',fontWeight:700,letterSpacing:'0.04em',padding:'0.2rem 0.65rem',borderRadius:20,background:'var(--cv-wa-10)',color:result.scores.classColor,border:`1px solid ${result.scores.classColor}`,display:'inline-flex',alignItems:'center',gap:'0.4rem'}}>
                   <span style={{width:7,height:7,borderRadius:7,background:result.scores.classColor,display:'inline-block'}}/>{result.scores.classification}
                 </span>
               )}
@@ -1027,10 +1027,10 @@ export default function GenericDashboard({
             </div>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}>
-            <span style={{fontFamily:'monospace',fontSize:'0.88rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem',textTransform:'uppercase'}}>{P.role.replace('_',' ')}</span>
-            <button onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle light/dark theme" style={{fontFamily:'monospace',fontSize:'0.88rem',background:'transparent',border:`1px solid var(--cv-wa-45)`,borderRadius:4,color:'var(--cv-wa-85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>{theme==='dark'?'☀':'☾'} Theme</button>
+            <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem',textTransform:'uppercase'}}>{P.role.replace('_',' ')}</span>
+            <button onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle light/dark theme" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',background:'transparent',border:`1px solid var(--cv-wa-45)`,borderRadius:4,color:'var(--cv-wa-85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>{theme==='dark'?'☀':'☾'} Theme</button>
             <ActiveSessionsButton fontSize="0.88rem" />
-            <button onClick={P.onSignOut} style={{fontFamily:'monospace',fontSize:'0.88rem',background:'transparent',border:`1px solid var(--cv-wa-45)`,borderRadius:4,color:'var(--cv-wa-85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
+            <button onClick={P.onSignOut} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',background:'transparent',border:`1px solid var(--cv-wa-45)`,borderRadius:4,color:'var(--cv-wa-85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
             {/* Global sign-out: revokes EVERY session for this login (all devices),
                 so a session left open on another computer is ended — not just this
                 tab. Uses Supabase scope:'global' which invalidates all refresh
@@ -1041,7 +1041,7 @@ export default function GenericDashboard({
               try { const { error } = await supabase.auth.signOut({ scope: 'global' }); signOutError = error } catch(e) { signOutError = e }
               if(signOutError){ notify('We could not confirm sign-out on all devices — other sessions may still be active. Please check your connection and try again.'); return }
               window.location.href='/'
-            }} title="Log out of every device where you are signed in" style={{fontFamily:'monospace',fontSize:'0.88rem',background:'transparent',border:`1px solid var(--cv-red-45, rgba(192,57,43,0.45))`,borderRadius:4,color:'var(--cv-wa-85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out — all devices</button>
+            }} title="Log out of every device where you are signed in" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',background:'transparent',border:`1px solid var(--cv-red-45, rgba(192,57,43,0.45))`,borderRadius:4,color:'var(--cv-wa-85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out — all devices</button>
           </div>
         </div>
       </header>
@@ -1056,12 +1056,12 @@ export default function GenericDashboard({
         .cv-side{flex:0 0 234px;width:234px;border-right:1px solid ${C.border};background:${C.white};padding:0.5rem 0}
         .cv-main{flex:1;min-width:0;padding:1.5rem}
         .cv-navgroup{padding:0.1rem 0}
-        .cv-navgroup-title{font-family:monospace;font-size:0.72rem;letter-spacing:0.12em;color:${C.slate};text-transform:uppercase;padding:0.7rem 1.25rem 0.35rem;opacity:0.7}
-        .cv-navbtn{display:block;width:100%;text-align:left;font-family:monospace;font-size:0.95rem;line-height:1.3;padding:0.6rem 1.1rem 0.6rem 1.25rem;border:none;border-left:3px solid transparent;background:transparent;color:${C.slate};font-weight:500;cursor:pointer}
+        .cv-navgroup-title{font-family: var(--cv-font-mono);font-size:0.72rem;letter-spacing:0.12em;color:${C.slate};text-transform:uppercase;padding:0.7rem 1.25rem 0.35rem;opacity:0.7}
+        .cv-navbtn{display:block;width:100%;text-align:left;font-family: var(--cv-font-mono);font-size:0.95rem;line-height:1.3;padding:0.6rem 1.1rem 0.6rem 1.25rem;border:none;border-left:3px solid transparent;background:transparent;color:${C.slate};font-weight:500;cursor:pointer}
         .cv-navbtn:hover{background:var(--cv-tint-cyan)}
         .cv-navbtn.active{border-left-color:${C.cyan};background:var(--cv-tint-cyan);color:${C.navy};font-weight:700}
         .cv-subtabs{display:flex;gap:2px;flex-wrap:wrap;border-bottom:1px solid ${C.border};margin-bottom:1.25rem}
-        .cv-subtab{font-family:monospace;font-size:0.98rem;padding:0.5rem 0.95rem 0.7rem;border:none;border-bottom:2px solid transparent;background:transparent;color:${C.slate};cursor:pointer;margin-bottom:-1px}
+        .cv-subtab{font-family: var(--cv-font-mono);font-size:0.98rem;padding:0.5rem 0.95rem 0.7rem;border:none;border-bottom:2px solid transparent;background:transparent;color:${C.slate};cursor:pointer;margin-bottom:-1px}
         .cv-subtab:hover{color:${C.navy}}
         .cv-subtab.active{color:${C.navy};border-bottom-color:${C.cyan};font-weight:700}
         @media (max-width:860px){
@@ -1143,7 +1143,7 @@ export default function GenericDashboard({
         </main>
       </div>
 
-      <footer style={{textAlign:'center',padding:'1.5rem',fontFamily:'monospace',fontSize:'0.88rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>
+      <footer style={{textAlign:'center',padding:'1.5rem',fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>
         Canvas Coach · Clearview · {config.business_name} · habibonifade.com · Confidential
       </footer>
     </div>
@@ -1160,7 +1160,7 @@ function ScoreDonut({label,display,frac,rating,color,onClick}:{label:string;disp
       </svg>
       <div style={{minWidth:0}}>
         <div style={{fontSize:'0.96rem',color:C.slate,marginBottom:'0.18rem'}}>{label}</div>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.45rem',fontWeight:700,color:C.navy,lineHeight:1}}>{display}</div>
+        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.45rem',fontWeight:700,color:C.navy,lineHeight:1}}>{display}</div>
         <div style={{fontSize:'0.96rem',fontWeight:700,color,marginTop:'0.22rem'}}>{rating}</div>
       </div>
     </div>
@@ -1178,8 +1178,8 @@ function KPITile({label,display,sub,color,onClick}:{label:string;display:string;
   const fill = color===SCORING_ENGINE_AMBER ? TILE_COLOR.amber : color
   return (
     <button type="button" onClick={onClick} disabled={!onClick} style={{background:fill,border:'none',borderRadius:14,padding:'1.05rem 1.2rem',color:'#fff',display:'flex',flexDirection:'column',gap:'0.5rem',minHeight:128,width:'100%',textAlign:'left',fontFamily:'inherit',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)',cursor:onClick?'pointer':'default'}}>
-      <div style={{fontFamily:'monospace',fontSize:'0.86rem',letterSpacing:'0.08em',textTransform:'uppercase',color:'#fff'}}>{label}</div>
-      <div style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,lineHeight:1.1}}>{display}</div>
+      <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.86rem',letterSpacing:'0.08em',textTransform:'uppercase',color:'#fff'}}>{label}</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.55rem',fontWeight:700,lineHeight:1.1}}>{display}</div>
       <div style={{fontSize:'0.96rem',color:'rgba(255,255,255,0.9)'}}>{sub}</div>
     </button>
   )
@@ -1216,7 +1216,7 @@ function TrendChart({months,revenue,cost,ebitda,cc}:{months:string[];revenue:num
   )
 }
 
-const ovLabel: React.CSSProperties = {fontFamily:'monospace',fontSize:'0.96rem',letterSpacing:'0.14em',color:C.slate,textTransform:'uppercase',margin:'0.25rem 0 0.7rem'}
+const ovLabel: React.CSSProperties = {fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',letterSpacing:'0.14em',color:C.slate,textTransform:'uppercase',margin:'0.25rem 0 0.7rem'}
 
 // ── PERFORMANCE & GROWTH TAB ─────────────────────────────────
 // The enterprise's management view of how the business is performing:
@@ -1236,16 +1236,16 @@ function PerfMetric({label,value,formula,tag,tagTone,bad,needsInput,travelsTo,hi
   return (
     <div style={{background:C.white,border:`1px solid ${bad?C.red:'var(--cv-border-soft)'}`,borderRadius:12,padding:'0.95rem 1.05rem',display:'flex',flexDirection:'column',gap:'0.4rem'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem'}}>
-        <span style={{fontFamily:'monospace',fontSize:'0.82rem',letterSpacing:'0.04em',color:C.slate,textTransform:'uppercase',fontWeight:600}}>{label}</span>
-        {travelsTo&&<span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,padding:'0.1rem 0.4rem',borderRadius:5,background:'var(--cv-tint-cyan)',color:C.teal,border:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>{travelsTo==='intelligence'?'→ Intelligence':'coach tab'}</span>}
+        <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.82rem',letterSpacing:'0.04em',color:C.slate,textTransform:'uppercase',fontWeight:600}}>{label}</span>
+        {travelsTo&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',fontWeight:700,padding:'0.1rem 0.4rem',borderRadius:5,background:'var(--cv-tint-cyan)',color:C.teal,border:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>{travelsTo==='intelligence'?'→ Intelligence':'coach tab'}</span>}
       </div>
       {needsInput
-        ? <span style={{fontFamily:'Georgia,serif',fontSize:'1.35rem',fontWeight:700,color:C.slate}}>—</span>
-        : <span style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,color:bad?C.red:C.navy,lineHeight:1.05}}>{value}
-            {tag&&<span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,marginLeft:'0.45rem',padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-wa-10)',color:tagColor,border:`1px solid ${tagColor}`}}>{tag}</span>}
+        ? <span style={{fontFamily:'var(--cv-font)',fontSize:'1.35rem',fontWeight:700,color:C.slate}}>—</span>
+        : <span style={{fontFamily:'var(--cv-font)',fontSize:'1.55rem',fontWeight:700,color:bad?C.red:C.navy,lineHeight:1.05}}>{value}
+            {tag&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',fontWeight:700,marginLeft:'0.45rem',padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-wa-10)',color:tagColor,border:`1px solid ${tagColor}`}}>{tag}</span>}
           </span>}
       <span style={{fontSize:'0.82rem',color:C.slate,borderTop:`1px dashed ${C.border}`,paddingTop:'0.4rem'}}>{formula}</span>
-      {needsInput&&<span style={{fontFamily:'monospace',fontSize:'0.74rem',color:C.amber,fontWeight:700,lineHeight:1.35}}>{hint||'Needs customer input'}</span>}
+      {needsInput&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.74rem',color:C.amber,fontWeight:700,lineHeight:1.35}}>{hint||'Needs customer input'}</span>}
     </div>
   )
 }
@@ -1258,7 +1258,7 @@ function MonthlyTrendChart({months,rev,ebitda,selStart,selEnd,cc}:{
 }) {
   const n = rev.length
   if (n < 2) return (
-    <div style={{height:150,borderRadius:10,border:`1px dashed ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',textAlign:'center',fontFamily:'monospace',fontSize:'0.86rem',color:C.slate,background:'var(--cv-alt)',padding:'0 1.5rem'}}>
+    <div style={{height:150,borderRadius:10,border:`1px dashed ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',textAlign:'center',fontFamily: 'var(--cv-font-mono)',fontSize:'0.86rem',color:C.slate,background:'var(--cv-alt)',padding:'0 1.5rem'}}>
       A monthly trend needs at least two months in the plan.
     </div>
   )
@@ -1439,7 +1439,7 @@ function PerformanceTab({config,result,months,cc,clientId,P,onSave,onGoToIntelli
   const sBurn   = burn===null?{tag:'Cash-generative',tone:'good' as const}:(burn<1?{tag:'Efficient',tone:'good' as const}:burn<=2?{tag:'Watch',tone:'warn' as const}:{tag:'High',tone:'bad' as const})
 
   const gridStyle: React.CSSProperties = {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(215px,1fr))',gap:'0.85rem'}
-  const secLabel: React.CSSProperties = {fontFamily:'monospace',fontSize:'0.82rem',letterSpacing:'0.14em',textTransform:'uppercase',color:C.teal,margin:'0 0 0.7rem'}
+  const secLabel: React.CSSProperties = {fontFamily: 'var(--cv-font-mono)',fontSize:'0.82rem',letterSpacing:'0.14em',textTransform:'uppercase',color:C.teal,margin:'0 0 0.7rem'}
 
   return (
     <div>
@@ -1448,7 +1448,7 @@ function PerformanceTab({config,result,months,cc,clientId,P,onSave,onGoToIntelli
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.7rem'}}>
           <div style={secH}>Performance &amp; Growth</div>
           <label style={{display:'flex',alignItems:'center',gap:'0.5rem',fontSize:'0.9rem',color:C.slate}}>
-            <span style={{fontFamily:'monospace',fontSize:'0.8rem',textTransform:'uppercase',letterSpacing:'0.06em'}}>Period</span>
+            <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.8rem',textTransform:'uppercase',letterSpacing:'0.06em'}}>Period</span>
             <select value={win} onChange={e=>setWin(e.target.value)} style={{...inp,width:'auto',padding:'0.35rem 0.6rem',fontSize:'0.94rem'}}>
               {options.map(o=><option key={o.key} value={o.key}>{o.label}</option>)}
             </select>
@@ -1457,7 +1457,7 @@ function PerformanceTab({config,result,months,cc,clientId,P,onSave,onGoToIntelli
         <p style={{color:C.slate,fontSize:'1.0rem',lineHeight:1.55,margin:'0.4rem 0 0'}}>
           How the business is performing over <strong>{sel.label.toLowerCase()}</strong>. Pick any month, year, or
           the whole plan above. Figures come from your financial model — including its future months. Ratios marked
-          <span style={{fontFamily:'monospace',fontSize:'0.78rem',color:C.teal}}> → Intelligence</span> also feed the anonymised Market Intelligence product.
+          <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',color:C.teal}}> → Intelligence</span> also feed the anonymised Market Intelligence product.
         </p>
       </div>
 
@@ -1485,7 +1485,7 @@ function PerformanceTab({config,result,months,cc,clientId,P,onSave,onGoToIntelli
 
       {/* Monthly trend chart — real figures from the model */}
       <div style={{...card,marginBottom:'1.3rem'}}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Revenue &amp; EBITDA, month by month</div>
+        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.1rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>Revenue &amp; EBITDA, month by month</div>
         <p style={{color:C.slate,fontSize:'0.92rem',lineHeight:1.5,margin:'0 0 0.9rem'}}>
           Straight from your model, including future months. Red points mark months where the business makes a loss.
           The shaded band is the period selected above.
@@ -1506,7 +1506,7 @@ function PerformanceTab({config,result,months,cc,clientId,P,onSave,onGoToIntelli
 
       {/* What to do about it */}
       <div style={{...card,marginBottom:'1.3rem'}}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.1rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>What this means — and what to do</div>
+        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.1rem',fontWeight:700,color:C.navy,marginBottom:'0.2rem'}}>What this means — and what to do</div>
         <p style={{color:C.slate,fontSize:'0.92rem',lineHeight:1.5,margin:'0 0 0.9rem'}}>
           Plain-English actions based on the figures above. Work down the list — the red items first.
         </p>
@@ -1542,7 +1542,7 @@ function PerformanceTab({config,result,months,cc,clientId,P,onSave,onGoToIntelli
         <div style={{marginBottom:'0.4rem'}}>
           <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'0.7rem',flexWrap:'wrap'}}>
             <span style={secLabel}>Customer economics</span>
-            {!anySet && <span style={{fontFamily:'monospace',fontSize:'0.72rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>needs customer data</span>}
+            {!anySet && <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.72rem',fontWeight:700,padding:'0.1rem 0.45rem',borderRadius:20,background:'var(--cv-tint-amber)',color:C.amber,border:`1px solid ${C.amber}`}}>needs customer data</span>}
             {canEditCE && <button style={addBtn(true,C.teal)} onClick={()=>setCeEditing(e=>!e)}>{ceEditing?'Close':'Enter customer figures'}</button>}
           </div>
           <p style={{color:C.slate,fontSize:'0.94rem',lineHeight:1.5,margin:'0 0 0.8rem',maxWidth:'70ch'}}>
@@ -1699,7 +1699,7 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,pend
         <div style={{...card,marginBottom:0,height:360,display:'flex',flexDirection:'column'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.5rem'}}>
             <div style={{...secH,fontSize:'1.2rem',marginBottom:0}}>This Month&apos;s Story</div>
-            <span style={{fontFamily:'monospace',fontSize:'0.88rem',letterSpacing:'0.1em',color:C.purple,border:`1px solid ${C.purple}`,borderRadius:4,padding:'0.1rem 0.42rem'}}>OPUS</span>
+            <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',letterSpacing:'0.1em',color:C.purple,border:`1px solid ${C.purple}`,borderRadius:4,padding:'0.1rem 0.42rem'}}>OPUS</span>
           </div>
           {story ? (
             <>
@@ -1726,7 +1726,7 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,pend
           const metric = (label:string,value:string,color:string) => (
             <div style={{background:C.lightBg,borderRadius:8,padding:'0.7rem 0.8rem'}}>
               <div style={{color:C.slate,fontSize:'0.88rem',letterSpacing:'0.06em',textTransform:'uppercase',marginBottom:'0.25rem'}}>{label}</div>
-              <div style={{fontWeight:700,fontSize:'1.09rem',color,fontFamily:'monospace'}}>{value}</div>
+              <div style={{fontWeight:700,fontSize:'1.09rem',color,fontFamily: 'var(--cv-font-mono)'}}>{value}</div>
             </div>
           )
           return (
@@ -1744,13 +1744,13 @@ function OverviewTab({config,result,months,cc,P,onSave,pendingApprovalCount,pend
               {/* Sub-units if any */}
               {result.subUnitsByParent[u.id]&&(
                 <div style={{marginTop:'0.85rem',borderTop:`1px solid ${C.border}`,paddingTop:'0.6rem'}}>
-                  <div style={{fontSize:'0.88rem',color:C.slate,marginBottom:'0.4rem',fontFamily:'monospace',letterSpacing:'0.08em'}}>SUB-UNITS</div>
+                  <div style={{fontSize:'0.88rem',color:C.slate,marginBottom:'0.4rem',fontFamily: 'var(--cv-font-mono)',letterSpacing:'0.08em'}}>SUB-UNITS</div>
                   {result.subUnitsByParent[u.id].map(su=>{
                     const spl = result.unitPL[su.id]
                     return spl ? (
                       <div key={su.id} style={{display:'flex',justifyContent:'space-between',fontSize:'1.0rem',padding:'0.25rem 0'}}>
                         <span style={{color:C.navy}}>{su.name}</span>
-                        <span style={{fontFamily:'monospace',color:spl.ann_ebitda>=0?C.green:C.red,fontWeight:700}}>{fmt(spl.ann_ebitda,cc)}</span>
+                        <span style={{fontFamily: 'var(--cv-font-mono)',color:spl.ann_ebitda>=0?C.green:C.red,fontWeight:700}}>{fmt(spl.ann_ebitda,cc)}</span>
                       </div>
                     ) : null
                   })}
@@ -1829,7 +1829,7 @@ function LineFieldSubRows({l,months,cc,canEdit,rowBg,colSpanBefore,rows,totalFie
               {canEdit
                 ? <BufferedInput type="number" value={v??''} placeholder="0"
                     onCommit={(val)=>onUpdate(field,m,Number(val))}
-                    style={{width:74,padding:'2px 4px',border:`1px solid ${C.border}`,borderRadius:3,fontSize:'0.88rem',fontFamily:'monospace',textAlign:'right',background:C.lightBg,color:C.slate}}/>
+                    style={{width:74,padding:'2px 4px',border:`1px solid ${C.border}`,borderRadius:3,fontSize:'0.88rem',fontFamily: 'var(--cv-font-mono)',textAlign:'right',background:C.lightBg,color:C.slate}}/>
                 : <span style={{display:'block',textAlign:'right',padding:'2px 4px',fontSize:'0.88rem',color:C.slate}}>{isCurrency?fmt(v,cc):v.toLocaleString()}</span>
               }
             </td>
@@ -2034,7 +2034,7 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
       {/* Unit selector */}
       <div style={{display:'flex',gap:'0.45rem',marginBottom:'1.25rem',flexWrap:'wrap',alignItems:'center'}}>
         {config.business_units.filter(u=>u.active).map(u=>(
-          <button key={u.id} style={{fontFamily:'monospace',fontSize:'0.96rem',padding:'0.45rem 0.85rem',
+          <button key={u.id} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',padding:'0.45rem 0.85rem',
             border:`2px solid ${selUnit===u.id?(u.color||C.cyan):C.border}`,borderRadius:4,
             background:selUnit===u.id?(u.color||C.cyan):C.white,
             color:selUnit===u.id?'var(--cv-on-accent)':C.navy,cursor:'pointer'}}
@@ -2050,7 +2050,7 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
         {sections.map(([cat,label])=>{
           const on = !driversMode && selSection===cat
           return (
-            <button key={cat} style={{fontFamily:'monospace',fontSize:'0.96rem',padding:'0.4rem 0.85rem',border:'none',
+            <button key={cat} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',padding:'0.4rem 0.85rem',border:'none',
               background:on?'var(--cv-header)':C.white,color:on?'var(--cv-on-accent)':C.slate,
               borderRadius:4,cursor:'pointer',fontWeight:on?700:400}}
               onClick={()=>{setDriversMode(false);setSelSection(cat)}}>
@@ -2058,7 +2058,7 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
             </button>
           )
         })}
-        <button key="drivers" style={{fontFamily:'monospace',fontSize:'0.96rem',padding:'0.4rem 0.85rem',border:'none',
+        <button key="drivers" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',padding:'0.4rem 0.85rem',border:'none',
           background:driversMode?'var(--cv-header)':C.white,color:driversMode?'var(--cv-on-accent)':C.teal,
           borderRadius:4,cursor:'pointer',fontWeight:driversMode?700:400,marginLeft:'0.5rem'}}
           onClick={()=>setDriversMode(true)}>
@@ -2129,7 +2129,7 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
 
       {/* Section header + add */}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem',gap:'0.6rem',flexWrap:'wrap'}}>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>{unit?.name} — {sections.find(s=>s[0]===selSection)?.[1]} <span style={{fontFamily:'monospace',fontSize:'0.85rem',fontWeight:400,color:C.slate}}>({lines.length})</span></div>
+        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>{unit?.name} — {sections.find(s=>s[0]===selSection)?.[1]} <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',fontWeight:400,color:C.slate}}>({lines.length})</span></div>
         <div style={{display:'flex',gap:'0.5rem',alignItems:'center',flexWrap:'wrap'}}>
           {P.canEditPlan&&<button style={addBtn(true,C.red)} onClick={removeEmptyNewLines} title="Remove blank &quot;New line&quot; rows that were added by accident">Clean up empty rows</button>}
           {P.canEditPlan&&<button style={addBtn(true,accent)} onClick={()=>addLine(selSection)}>+ Add {selSection==='cost_of_sales'?'a cost':'line'}</button>}
@@ -2176,10 +2176,10 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
                   <option value="service_fee">Service fee</option>
                 </select>
               )}
-              <span style={{fontFamily:'monospace',fontSize:'0.88rem',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',color:badgeColor,border:`1px solid ${badgeColor}`,borderRadius:20,padding:'0.15rem 0.6rem',whiteSpace:'nowrap'}}>{badgeLabel}</span>
+              <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',color:badgeColor,border:`1px solid ${badgeColor}`,borderRadius:20,padding:'0.15rem 0.6rem',whiteSpace:'nowrap'}}>{badgeLabel}</span>
               <div style={{textAlign:'right',minWidth:100,marginLeft:'auto'}}>
                 <span style={{fontSize:'0.84rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.06em',marginRight:'0.5rem'}}>Annual total</span>
-                <span style={{fontFamily:'monospace',fontSize:'1.09rem',fontWeight:700,color:C.navy}}>{fmt(total,cc)}</span>
+                <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.09rem',fontWeight:700,color:C.navy}}>{fmt(total,cc)}</span>
               </div>
               {P.canEditPlan&&<button style={delBtn} onClick={()=>deleteLine(l.id)} aria-label={`Delete ${l.name}`}>×</button>}
             </div>
@@ -2197,7 +2197,7 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
 
             {/* Month inputs (+ spread/service sub-rows unchanged) */}
             <div style={{overflowX:'auto',padding:'0.7rem 1.1rem 1.1rem'}}>
-              <table style={{borderCollapse:'collapse',fontSize:'0.96rem',fontFamily:'monospace'}}>
+              <table style={{borderCollapse:'collapse',fontSize:'0.96rem',fontFamily: 'var(--cv-font-mono)'}}>
                 <thead>
                   <tr>
                     <th style={{position:'sticky',left:0,zIndex:2,background:C.white,minWidth:160,maxWidth:220,textAlign:'left',padding:'2px 10px 2px 2px',color:C.slate,fontSize:'0.84rem',fontWeight:600,borderRight:`1px solid ${C.border}`}}>Line</th>
@@ -2211,10 +2211,10 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
                     <td style={{position:'sticky',left:0,zIndex:1,background:C.white,padding:'3px 10px 3px 2px',minWidth:160,maxWidth:220,borderRight:`1px solid ${C.border}`,verticalAlign:'middle'}}>
                       {P.canEditPlan
                         ? <BufferedInput value={l.name} onCommit={(val)=>updateLineName(l.id,String(val))} ariaLabel="Line name"
-                            style={{...inp,background:'transparent',border:'none',padding:0,fontSize:'1.0rem',fontWeight:700,fontFamily:'Georgia,serif',color:C.navy,width:'100%'}}/>
-                        : <span style={{fontSize:'1.0rem',fontWeight:700,fontFamily:'Georgia,serif',color:C.navy}}>{l.name}</span>
+                            style={{...inp,background:'transparent',border:'none',padding:0,fontSize:'1.0rem',fontWeight:700,fontFamily:'var(--cv-font)',color:C.navy,width:'100%'}}/>
+                        : <span style={{fontSize:'1.0rem',fontWeight:700,fontFamily:'var(--cv-font)',color:C.navy}}>{l.name}</span>
                       }
-                      {(isSpread||isServiceFee)&&<span style={{display:'block',fontSize:'0.78rem',color:C.slate,fontFamily:'monospace'}}>↳ revenue</span>}
+                      {(isSpread||isServiceFee)&&<span style={{display:'block',fontSize:'0.78rem',color:C.slate,fontFamily: 'var(--cv-font-mono)'}}>↳ revenue</span>}
                     </td>
                     {(isSpread||isServiceFee)
                       ? revenueByMonth.map((v,m)=>(
@@ -2227,7 +2227,7 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
                             {P.canEditPlan
                               ? <BufferedInput type="number" value={v??''} placeholder="0"
                                   onCommit={(val)=>updateLine(l.id,m,Number(val))}
-                                  style={{width:80,padding:'3px 5px',border:`1px solid ${C.border}`,borderRadius:3,fontSize:'0.96rem',fontFamily:'monospace',textAlign:'right',background:C.white,color:C.navy}}/>
+                                  style={{width:80,padding:'3px 5px',border:`1px solid ${C.border}`,borderRadius:3,fontSize:'0.96rem',fontFamily: 'var(--cv-font-mono)',textAlign:'right',background:C.white,color:C.navy}}/>
                               : <span style={{display:'block',textAlign:'right',padding:'3px 5px',fontSize:'0.96rem'}}>{fmt(v,cc)}</span>
                             }
                           </td>
@@ -2258,7 +2258,7 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
       {totals&&(
         <div style={{...card,padding:0,overflow:'hidden',borderTop:`3px solid ${accent}`}}>
           <div style={{overflowX:'auto',padding:'0.8rem 1.1rem'}}>
-            <table style={{borderCollapse:'collapse',fontSize:'0.96rem',fontFamily:'monospace'}}>
+            <table style={{borderCollapse:'collapse',fontSize:'0.96rem',fontFamily: 'var(--cv-font-mono)'}}>
               <tbody>
                 <tr style={{background:'var(--cv-header)'}}>
                   <td style={{padding:'6px 10px',fontWeight:700,color:'var(--cv-on-accent)',fontSize:'1.0rem',whiteSpace:'nowrap'}}>Section total</td>
@@ -2292,11 +2292,11 @@ function PlanningTab({config,result,months,cc,P,onSave,clientId,marketEvents,mar
                 {P.canEditPlan
                   ? <BufferedInput type="number" value={l.monthly_plan[0]??''} placeholder="Monthly amount"
                       onCommit={(val)=>onSave({...config,shared_lines:config.shared_lines.map(sl=>sl.id===l.id?{...sl,monthly_plan:Array(config.planning_months).fill(Number(val))}:sl)})}
-                      style={{...inp,textAlign:'right',fontFamily:'monospace',fontSize:'1.06rem'}}/>
-                  : <span style={{fontFamily:'monospace',fontSize:'1.06rem',color:C.navy,display:'block',textAlign:'right'}}>{fmt(l.monthly_plan[0],cc)}/mo</span>
+                      style={{...inp,textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontSize:'1.06rem'}}/>
+                  : <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.06rem',color:C.navy,display:'block',textAlign:'right'}}>{fmt(l.monthly_plan[0],cc)}/mo</span>
                 }
               </div>
-              <div style={{fontFamily:'monospace',fontSize:'1.0rem',color:C.slate,width:100,textAlign:'right'}}>{fmt(l.monthly_plan.reduce((s,v)=>s+v,0),cc)}/yr</div>
+              <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',color:C.slate,width:100,textAlign:'right'}}>{fmt(l.monthly_plan.reduce((s,v)=>s+v,0),cc)}/yr</div>
               {P.canEditPlan&&<button style={delBtn} onClick={()=>onSave({...config,shared_lines:config.shared_lines.filter(sl=>sl.id!==l.id)})}>×</button>}
             </div>
           ))}
@@ -2434,7 +2434,7 @@ function DriversSection({config,cc,P,onSave}) {
         <div>
           <div style={{fontWeight:700,color:C.navy,marginBottom:'0.5rem',fontSize:'1.06rem'}}>Which sales route makes the most money (per year)</div>
           <div style={{overflowX:'auto'}}>
-            <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily:'monospace'}}>
+            <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily: 'var(--cv-font-mono)'}}>
               <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Sales route','Revenue','Cost of sales','Margin','Margin %'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600}}>{h}</th>)}</tr></thead>
               <tbody>{channelSummary.map((s,i)=>(
                 <tr key={s.channel_id===null?'unassigned':`channel:${s.channel_id}`} style={{background:i%2===0?C.cream:C.white}}>
@@ -2547,7 +2547,7 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
           </div>
           <div style={{display:'flex',gap:'0.5rem',marginTop:'0.75rem',alignItems:'center',flexWrap:'wrap'}}>
             <button style={solidBtn(C.teal)} disabled={busy} onClick={propose}>{busy?'Saving…':'Propose for approval'}</button>
-            {msg&&<span style={{fontFamily:'monospace',fontSize:'0.95rem',color:msg.ok?C.green:C.red}}>{msg.text}</span>}
+            {msg&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.95rem',color:msg.ok?C.green:C.red}}>{msg.text}</span>}
           </div>
         </div>
       )}
@@ -2565,7 +2565,7 @@ function MarketActivitiesSection({clientId,config,cc,P,events,loadError,onChange
                 <tr key={e.id} style={{borderBottom:`1px solid ${C.border}`}}>
                   <td style={{padding:'6px 8px',fontWeight:600,color:C.navy}}>{e.name}{e.review_note&&e.status==='rejected'?<div style={{fontSize:'0.9rem',color:C.red,fontWeight:400}}>Sent back: {e.review_note}</div>:null}</td>
                   <td style={{padding:'6px 8px',color:C.slate}}>{unitName(e.unit_id)}</td>
-                  <td style={{padding:'6px 8px',fontFamily:'monospace'}}>{fmt(e.cost,cc)}</td>
+                  <td style={{padding:'6px 8px',fontFamily: 'var(--cv-font-mono)'}}>{fmt(e.cost,cc)}</td>
                   <td style={{padding:'6px 8px',color:C.slate}}>{startLabel}{e.months_count>1?` · ${e.months_count} mo`:''}</td>
                   <td style={{padding:'6px 8px',color:C.slate}}>{e.expected_uplift_pct!=null?`+${e.expected_uplift_pct}%`:'—'}</td>
                   <td style={{padding:'6px 8px'}}><Badge text={statusText(e.status)} color={statusColor(e.status)}/></td>
@@ -2638,10 +2638,10 @@ function ScenariosTab({config,result,months,cc,P,onSave}) {
               {P.canEditPlan ? (
                 <div style={{display:'flex',gap:'0.75rem',alignItems:'center',fontSize:'1.0rem',color:C.slate}}>
                   <span>Revenue ×</span>
-                  <input type="number" step="0.01" style={{width:70,padding:'0.25rem 0.4rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily:'monospace',fontSize:'1.0rem'}}
+                  <input type="number" step="0.01" style={{width:70,padding:'0.25rem 0.4rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem'}}
                     value={sc.rev_mult} onChange={e=>updateScenario(sc.id,'rev_mult',e.target.value===''?1:Number(e.target.value))} aria-label={`Revenue multiplier for ${sc.label}`}/>
                   <span>Costs ×</span>
-                  <input type="number" step="0.01" style={{width:70,padding:'0.25rem 0.4rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily:'monospace',fontSize:'1.0rem'}}
+                  <input type="number" step="0.01" style={{width:70,padding:'0.25rem 0.4rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem'}}
                     value={sc.cost_mult} onChange={e=>updateScenario(sc.id,'cost_mult',e.target.value===''?1:Number(e.target.value))} aria-label={`Cost multiplier for ${sc.label}`}/>
                 </div>
               ) : (
@@ -2985,11 +2985,11 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
     setLineValues(v => ({...v, [lineId]: total}))
   }
 
-  const segBtn = (active:boolean): React.CSSProperties => ({fontFamily:'monospace',fontSize:'0.96rem',border:0,
+  const segBtn = (active:boolean): React.CSSProperties => ({fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',border:0,
     background:active?'var(--cv-header)':'transparent',color:active?'var(--cv-on-accent)':C.slate,
     padding:'0.42rem 0.85rem',borderRadius:7,cursor:'pointer',fontWeight:active?700:400})
   const unitSelect = canSeeAll ? (
-    <select style={{fontFamily:'monospace',fontSize:'1.0rem',padding:'0.38rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,background:C.white,color:C.navy}}
+    <select style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',padding:'0.38rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,background:C.white,color:C.navy}}
       value={selUnit} onChange={e=>setSelUnit(e.target.value)}>
       {visibleUnits.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
     </select>
@@ -3007,7 +3007,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
           {unitSelect}
           {view==='guided'&&(
             <>
-              <select style={{fontFamily:'monospace',fontSize:'1.0rem',padding:'0.38rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,background:C.white,color:C.navy}}
+              <select style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',padding:'0.38rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,background:C.white,color:C.navy}}
                 value={selPeriod} onChange={e=>setSelPeriod(e.target.value)}>
                 {periodMonths.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
@@ -3085,7 +3085,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
         <div style={card}>
           <div style={{fontWeight:700,color:C.navy,marginBottom:'0.75rem',fontSize:'1.06rem'}}>All Units — {periodMonths.find(m=>m.value===selPeriod)?.label}</div>
           <div style={{overflowX:'auto'}}>
-            <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily:'monospace'}}>
+            <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily: 'var(--cv-font-mono)'}}>
               <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
                 {['Business Unit','Revenue','Total Costs','Gross Profit','Status'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600}}>{h}</th>)}
               </tr></thead>
@@ -3116,7 +3116,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem',flexWrap:'wrap',gap:'0.5rem'}}>
           <div style={{fontWeight:700,color:C.navy,fontSize:'1.04rem'}}>{config.business_units.find(u=>u.id===selUnit)?.name}</div>
           <div style={{display:'flex',gap:'0.5rem'}}>
-            <div style={{fontFamily:'monospace',fontSize:'1.0rem',color:C.slate}}>Revenue: <strong style={{color:C.green}}>{fmt(totalRev,cc)}</strong> · Total Costs: <strong style={{color:C.red}}>{fmt(totalCost,cc)}</strong> · Gross Profit: <strong style={{color:grossProfit>=0?C.green:C.red}}>{fmt(grossProfit,cc)}</strong> · Net Result: <strong style={{color:netResult>=0?C.green:C.red}}>{fmt(netResult,cc)}</strong></div>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',color:C.slate}}>Revenue: <strong style={{color:C.green}}>{fmt(totalRev,cc)}</strong> · Total Costs: <strong style={{color:C.red}}>{fmt(totalCost,cc)}</strong> · Gross Profit: <strong style={{color:grossProfit>=0?C.green:C.red}}>{fmt(grossProfit,cc)}</strong> · Net Result: <strong style={{color:netResult>=0?C.green:C.red}}>{fmt(netResult,cc)}</strong></div>
           </div>
         </div>
         {loading?<Spinner/>:(
@@ -3127,8 +3127,8 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
               return (
                 <div key={cat} style={{marginBottom:'1.5rem'}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:`2px solid ${cat==='revenue'?C.green:C.red}`,paddingBottom:'0.4rem',marginBottom:'0.75rem'}}>
-                    <div style={{fontFamily:'monospace',fontSize:'0.96rem',letterSpacing:'0.1em',color:cat==='revenue'?C.green:C.red,textTransform:'uppercase',fontWeight:700}}>{label}</div>
-                    <div style={{fontFamily:'monospace',fontSize:'1.0rem',fontWeight:700,color:cat==='revenue'?C.green:C.red}}>{fmt(sTotal,cc)}</div>
+                    <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',letterSpacing:'0.1em',color:cat==='revenue'?C.green:C.red,textTransform:'uppercase',fontWeight:700}}>{label}</div>
+                    <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',fontWeight:700,color:cat==='revenue'?C.green:C.red}}>{fmt(sTotal,cc)}</div>
                   </div>
                   {sLines.map(l=>{
                     const fieldAmt = Number(fieldLineValues[l.id]||0)
@@ -3153,10 +3153,10 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
                             <div key={item.id} style={{display:'grid',gridTemplateColumns:'1fr 90px 110px',alignItems:'center',gap:'0.5rem',marginBottom:'0.35rem'}}>
                               <span style={{fontSize:'1.0rem',color:C.navy}}>{item.name}{item.unit_label?` (${item.unit_label})`:''}</span>
                               <input type="number" aria-label={`Quantity for ${item.name}`}
-                                style={{width:'100%',padding:'0.35rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'1.0rem',fontFamily:'monospace',textAlign:'right',background:disabled?'var(--cv-disabled)':C.white,boxSizing:'border-box'}}
+                                style={{width:'100%',padding:'0.35rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'1.0rem',fontFamily: 'var(--cv-font-mono)',textAlign:'right',background:disabled?'var(--cv-disabled)':C.white,boxSizing:'border-box'}}
                                 value={catalogueQuantities[l.id]?.[item.id]??''} placeholder="0" disabled={disabled}
                                 onChange={e=>updateQuantity(l.id,item.id,Number(e.target.value))}/>
-                              <span style={{fontSize:'0.96rem',color:C.slate,fontFamily:'monospace',textAlign:'right'}}>
+                              <span style={{fontSize:'0.96rem',color:C.slate,fontFamily: 'var(--cv-font-mono)',textAlign:'right'}}>
                                 @ {fmt(Number(item.price||0),cc)} = {fmt((Number(catalogueQuantities[l.id]?.[item.id])||0)*Number(item.price||0),cc)}
                               </span>
                             </div>
@@ -3173,7 +3173,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
                           <div style={{display:'grid',gridTemplateColumns:'1fr 180px',alignItems:'center',gap:'0.75rem'}}>
                             <span style={{fontSize:'0.95rem',color:C.slate}}>{hasComps?'Total — added up from the parts below':''}</span>
                             <input id={`actual-${l.id}`} type="number"
-                              style={{width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'1.06rem',fontFamily:'monospace',background:(disabled||hasComps)?'var(--cv-disabled)':C.white,color:C.navy,textAlign:'right',boxSizing:'border-box'}}
+                              style={{width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'1.06rem',fontFamily: 'var(--cv-font-mono)',background:(disabled||hasComps)?'var(--cv-disabled)':C.white,color:C.navy,textAlign:'right',boxSizing:'border-box'}}
                               value={lineValues[l.id]??''} placeholder="0"
                               disabled={disabled||hasComps}
                               onChange={e=>setLineValues(v=>({...v,[l.id]:Number(e.target.value)}))}/>
@@ -3187,14 +3187,14 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
                               {comps.map((c,idx)=>(
                                 <div key={idx} style={{display:'grid',gridTemplateColumns:'1fr 140px 30px',gap:'0.4rem',marginBottom:'0.35rem',alignItems:'center'}}>
                                   <input value={c.name} placeholder="e.g. Raw materials" disabled={disabled} onChange={e=>updateComp(l.id,idx,'name',e.target.value)} style={{width:'100%',padding:'0.34rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.98rem',boxSizing:'border-box',background:disabled?'var(--cv-disabled)':C.white,color:C.navy}}/>
-                                  <input type="number" value={c.amount||''} placeholder="0" disabled={disabled} onChange={e=>updateComp(l.id,idx,'amount',Number(e.target.value))} style={{width:'100%',padding:'0.34rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.98rem',fontFamily:'monospace',textAlign:'right',boxSizing:'border-box',background:disabled?'var(--cv-disabled)':C.white,color:C.navy}}/>
+                                  <input type="number" value={c.amount||''} placeholder="0" disabled={disabled} onChange={e=>updateComp(l.id,idx,'amount',Number(e.target.value))} style={{width:'100%',padding:'0.34rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'0.98rem',fontFamily: 'var(--cv-font-mono)',textAlign:'right',boxSizing:'border-box',background:disabled?'var(--cv-disabled)':C.white,color:C.navy}}/>
                                   {!disabled && <button type="button" onClick={()=>removeComp(l.id,idx)} title="Remove this part" aria-label="Remove" style={{border:'none',background:'none',color:C.red,cursor:'pointer',fontSize:'1.15rem',lineHeight:1}}>×</button>}
                                 </div>
                               ))}
                               {!disabled && (
                                 <div style={{display:'flex',flexWrap:'wrap',gap:'0.35rem',marginTop:comps.length?'0.45rem':0}}>
                                   {COST_PARTS.map(name=>(
-                                    <button key={name} type="button" onClick={()=>addComp(l.id,name==='Other (name it)'?'':name)} style={{fontFamily:'monospace',fontSize:'0.9rem',padding:'0.3rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:14,background:C.white,color:C.teal,cursor:'pointer'}}>+ {name}</button>
+                                    <button key={name} type="button" onClick={()=>addComp(l.id,name==='Other (name it)'?'':name)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.9rem',padding:'0.3rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:14,background:C.white,color:C.teal,cursor:'pointer'}}>+ {name}</button>
                                   ))}
                                 </div>
                               )}
@@ -3208,7 +3208,7 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
                           The input above is manual entry only (e.g. a paper-only store);
                           the two are added together for every total on this page. */}
                       {fieldAmt!==0 && (
-                        <div style={{fontSize:'0.96rem',color:C.teal,marginTop:'0.3rem',fontFamily:'monospace'}}>
+                        <div style={{fontSize:'0.96rem',color:C.teal,marginTop:'0.3rem',fontFamily: 'var(--cv-font-mono)'}}>
                           + {fmt(fieldAmt,cc)} from Clearview Field · Total: {fmt(combined(l.id),cc)}
                         </div>
                       )}
@@ -3222,11 +3222,11 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
                         placeholder={`Name this line — e.g. ${cat==='revenue'?'Wholesale sales':cat==='cost_of_sales'?'Packaging':cat==='staff'?'Casual wages':'Electricity'}`}
                         style={{flex:1,padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,fontSize:'1.0rem',color:C.navy,background:C.white,boxSizing:'border-box'}}/>
                       <button type="button" style={addBtn(true)} onClick={()=>createLine(cat)}>Add</button>
-                      <button type="button" onClick={()=>{setAddLineCat(null);setAddLineName('')}} style={{fontFamily:'monospace',fontSize:'0.96rem',padding:'0.42rem 0.7rem',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.slate,cursor:'pointer'}}>Cancel</button>
+                      <button type="button" onClick={()=>{setAddLineCat(null);setAddLineName('')}} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',padding:'0.42rem 0.7rem',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.slate,cursor:'pointer'}}>Cancel</button>
                     </div>
                   ) : (
                     <button type="button" onClick={()=>{setAddLineCat(cat);setAddLineName('')}}
-                      style={{marginTop:'0.4rem',background:'none',border:`1px dashed ${cat==='revenue'?C.green:C.red}`,color:cat==='revenue'?C.green:C.red,fontFamily:'monospace',fontSize:'0.96rem',padding:'0.42rem 0.8rem',borderRadius:4,cursor:'pointer'}}>
+                      style={{marginTop:'0.4rem',background:'none',border:`1px dashed ${cat==='revenue'?C.green:C.red}`,color:cat==='revenue'?C.green:C.red,fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',padding:'0.42rem 0.8rem',borderRadius:4,cursor:'pointer'}}>
                       + Add a {cat==='revenue'?'revenue':cat==='cost_of_sales'?'cost of sales':cat==='staff'?'staff':'overhead'} line
                     </button>
                   ))}
@@ -3245,11 +3245,11 @@ function ActualsTab({config,months,cc,P,onSave,onCloseStatusChanged}) {
               )}
               {P.canEnterActuals&&(
                 <button
-                  style={{fontFamily:'monospace',fontSize:'1.0rem',fontWeight:600,padding:'0.55rem 1rem',border:`1px solid ${C.red}`,borderRadius:4,background:'transparent',color:C.red,cursor:saving?'default':'pointer',opacity:saving?0.6:1}}
+                  style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',fontWeight:600,padding:'0.55rem 1rem',border:`1px solid ${C.red}`,borderRadius:4,background:'transparent',color:C.red,cursor:saving?'default':'pointer',opacity:saving?0.6:1}}
                   disabled={saving} onClick={clearMonth}>Clear this month</button>
               )}
               {saveMsg&&(
-                <span style={{fontFamily:'monospace',fontSize:'0.98rem',fontWeight:600,color:saveMsg.ok?C.green:C.red}}>{saveMsg.text}</span>
+                <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.98rem',fontWeight:600,color:saveMsg.ok?C.green:C.red}}>{saveMsg.text}</span>
               )}
             </div>
           </>
@@ -3438,15 +3438,15 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll,onSave}) {
   }
 
   const unitName = config.business_units.find((u:any)=>u.id===selUnit)?.name || ''
-  const thBase:React.CSSProperties = {background:'var(--cv-header)',color:'var(--cv-on-accent)',padding:'7px 9px',fontWeight:400,fontSize:'0.88rem',textAlign:'right',whiteSpace:'nowrap',fontFamily:'monospace'}
-  const grpTd:React.CSSProperties = {background:C.lightBg,color:C.navy,fontFamily:'monospace',fontSize:'0.88rem',letterSpacing:'0.06em',textTransform:'uppercase',fontWeight:700,padding:'5px 9px'}
+  const thBase:React.CSSProperties = {background:'var(--cv-header)',color:'var(--cv-on-accent)',padding:'7px 9px',fontWeight:400,fontSize:'0.88rem',textAlign:'right',whiteSpace:'nowrap',fontFamily: 'var(--cv-font-mono)'}
+  const grpTd:React.CSSProperties = {background:C.lightBg,color:C.navy,fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',letterSpacing:'0.06em',textTransform:'uppercase',fontWeight:700,padding:'5px 9px'}
 
   return (
     <div style={{...card,padding:0,overflow:'hidden'}}>
       <div style={{padding:'0.85rem 1.1rem',borderBottom:`1px solid ${C.border}`,display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.6rem',flexWrap:'wrap'}}>
-        <div style={{fontFamily:'Georgia,serif',fontWeight:700,fontSize:'1.12rem',color:C.navy}}>{unitName} · enter what you have</div>
+        <div style={{fontFamily:'var(--cv-font)',fontWeight:700,fontSize:'1.12rem',color:C.navy}}>{unitName} · enter what you have</div>
         <div style={{display:'flex',gap:'0.5rem',alignItems:'center'}}>
-          <select style={{fontFamily:'monospace',fontSize:'0.96rem',padding:'0.35rem 0.55rem',border:`1px solid ${C.border}`,borderRadius:6,background:C.white,color:C.navy}}
+          <select style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',padding:'0.35rem 0.55rem',border:`1px solid ${C.border}`,borderRadius:6,background:C.white,color:C.navy}}
             value={monthsCount} onChange={e=>setMonthsCount(Number(e.target.value))}>
             <option value={6}>Last 6 months</option>
             <option value={12}>Last 12 months</option>
@@ -3456,7 +3456,7 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll,onSave}) {
         </div>
       </div>
       {/* Legend */}
-      <div style={{display:'flex',gap:'1.1rem',flexWrap:'wrap',fontFamily:'monospace',fontSize:'0.88rem',color:C.slate,padding:'0.6rem 1.1rem',background:C.lightBg,borderBottom:`1px solid ${C.border}`}}>
+      <div style={{display:'flex',gap:'1.1rem',flexWrap:'wrap',fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',color:C.slate,padding:'0.6rem 1.1rem',background:C.lightBg,borderBottom:`1px solid ${C.border}`}}>
         <span style={{display:'inline-flex',alignItems:'center',gap:'0.35rem'}}><span style={{width:11,height:11,borderRadius:3,background:'var(--cv-tint-teal)',border:'1px solid var(--cv-border-soft)'}}/>closed · locked</span>
         <span style={{display:'inline-flex',alignItems:'center',gap:'0.35rem'}}><span style={{width:11,height:11,borderRadius:3,background:'var(--cv-tint-cyan)'}}/>from Clearview Field</span>
         <span style={{display:'inline-flex',alignItems:'center',gap:'0.35rem'}}><span style={{width:11,height:11,borderRadius:3,background:C.white,border:`1px solid ${C.border}`}}/>type here</span>
@@ -3464,7 +3464,7 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll,onSave}) {
       </div>
       {loading ? <Spinner/> : (
         <div style={{overflowX:'auto'}}>
-          <table style={{borderCollapse:'collapse',fontFamily:'monospace',fontSize:'1.0rem',width:'100%',minWidth:720}}>
+          <table style={{borderCollapse:'collapse',fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',width:'100%',minWidth:720}}>
             <thead><tr>
               <th style={{...thBase,textAlign:'left',minWidth:170}}>Line</th>
               {periods.map(p=>{
@@ -3504,7 +3504,7 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll,onSave}) {
                               return (
                                 <td key={p.value} style={{padding:'3px 5px',borderBottom:'1px solid var(--cv-border-soft)'}}>
                                   <div title={`Broken down into parts — edit in "One month · guided".\n${partsLabel}`}
-                                    style={{width:'100%',minWidth:66,textAlign:'right',padding:'0.3rem 0.35rem',borderRadius:4,fontFamily:'monospace',fontSize:'0.96rem',boxSizing:'border-box',background:'var(--cv-tint-cyan)',color:C.navy,cursor:'help'}}>
+                                    style={{width:'100%',minWidth:66,textAlign:'right',padding:'0.3rem 0.35rem',borderRadius:4,fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',boxSizing:'border-box',background:'var(--cv-tint-cyan)',color:C.navy,cursor:'help'}}>
                                     {fmt(manualNum(p.value,l.id),cc)} <span style={{fontSize:'0.82rem',color:C.teal}} aria-label="has a breakdown">▣</span>
                                   </div>
                                 </td>
@@ -3517,10 +3517,10 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll,onSave}) {
                                   onChange={e=>setCell(p.value,l.id,e.target.value)}
                                   onPaste={e=>handlePaste(e,flatIdx,pi)}
                                   title={hasField?`+ ${fmt(fAmt,cc)} from Clearview Field · Total ${fmt(cellCombined(p.value,l.id),cc)}`:undefined}
-                                  style={{width:'100%',minWidth:66,textAlign:'right',padding:'0.3rem 0.35rem',border:'1px solid transparent',borderRadius:4,fontFamily:'monospace',fontSize:'0.96rem',boxSizing:'border-box',
+                                  style={{width:'100%',minWidth:66,textAlign:'right',padding:'0.3rem 0.35rem',border:'1px solid transparent',borderRadius:4,fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',boxSizing:'border-box',
                                     background:locked?'var(--cv-tint-teal)':hasField?'var(--cv-tint-cyan)':C.white,
                                     color:locked?C.green:C.navy}}/>
-                                {hasField&&<div style={{fontSize:'0.88rem',color:C.teal,textAlign:'right',marginTop:'1px',fontFamily:'monospace'}}>+{fmt(fAmt,cc)}</div>}
+                                {hasField&&<div style={{fontSize:'0.88rem',color:C.teal,textAlign:'right',marginTop:'1px',fontFamily: 'var(--cv-font-mono)'}}>+{fmt(fAmt,cc)}</div>}
                               </td>
                             )
                           })}
@@ -3536,13 +3536,13 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll,onSave}) {
                               <input autoFocus value={addLineName} onChange={e=>setAddLineName(e.target.value)}
                                 onKeyDown={e=>{ if(e.key==='Enter') createLine(cat); if(e.key==='Escape'){setAddLineCat(null);setAddLineName('')} }}
                                 placeholder={`Name this ${label.toLowerCase()} line`}
-                                style={{padding:'0.32rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily:'monospace',fontSize:'0.95rem',minWidth:220,color:C.navy,background:C.white}}/>
+                                style={{padding:'0.32rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily: 'var(--cv-font-mono)',fontSize:'0.95rem',minWidth:220,color:C.navy,background:C.white}}/>
                               <button type="button" style={addBtn(true)} onClick={()=>createLine(cat)}>Add</button>
-                              <button type="button" onClick={()=>{setAddLineCat(null);setAddLineName('')}} style={{fontFamily:'monospace',fontSize:'0.9rem',padding:'0.32rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.slate,cursor:'pointer'}}>Cancel</button>
+                              <button type="button" onClick={()=>{setAddLineCat(null);setAddLineName('')}} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.9rem',padding:'0.32rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.slate,cursor:'pointer'}}>Cancel</button>
                             </span>
                           ) : (
                             <button type="button" onClick={()=>{setAddLineCat(cat);setAddLineName('')}}
-                              style={{background:'none',border:`1px dashed ${cat==='revenue'?C.green:C.red}`,color:cat==='revenue'?C.green:C.red,fontFamily:'monospace',fontSize:'0.9rem',padding:'0.3rem 0.7rem',borderRadius:4,cursor:'pointer'}}>
+                              style={{background:'none',border:`1px dashed ${cat==='revenue'?C.green:C.red}`,color:cat==='revenue'?C.green:C.red,fontFamily: 'var(--cv-font-mono)',fontSize:'0.9rem',padding:'0.3rem 0.7rem',borderRadius:4,cursor:'pointer'}}>
                               + Add a {label.toLowerCase()} line
                             </button>
                           )}
@@ -3564,7 +3564,7 @@ function ActualsGridView({config,selUnit,cc,P,canSeeAll,onSave}) {
           </table>
         </div>
       )}
-      <div style={{fontSize:'0.96rem',color:C.teal,fontFamily:'monospace',padding:'0.6rem 1.1rem',borderTop:`1px solid ${C.border}`}}>
+      <div style={{fontSize:'0.96rem',color:C.teal,fontFamily: 'var(--cv-font-mono)',padding:'0.6rem 1.1rem',borderTop:`1px solid ${C.border}`}}>
         Tip: copy a block from Excel and paste straight into the grid. Field-app figures are shown in blue and can't be edited by hand; closed months are locked in green. Add a line under any section below; rename lines in “One month · guided” or Planning.
       </div>
     </div>
@@ -3642,7 +3642,7 @@ function SpendRequestsTab({clientId,config,cc,P}) {
             </div>
             <div style={{display:'flex',gap:'1rem',alignItems:'center',flexWrap:'wrap'}}>
               <StageTracker r={r}/>
-              <span style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy,whiteSpace:'nowrap'}}>{fmt(r.amount,cc)}</span>
+              <span style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy,whiteSpace:'nowrap'}}>{fmt(r.amount,cc)}</span>
               <Badge text={r.status.replace('_',' ')} color={statusColor(r.status)}/>
             </div>
           </div>
@@ -3815,7 +3815,7 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
       </div>
       <div style={{display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap'}}>
         <StageTracker r={r}/>
-        <span style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy,whiteSpace:'nowrap'}}>{fmt(r.amount,cc)}</span>
+        <span style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy,whiteSpace:'nowrap'}}>{fmt(r.amount,cc)}</span>
       </div>
     </div>
   )
@@ -3835,7 +3835,7 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
           Actuals screen; approving it here is what was previously impossible. */}
       {canApproveActuals&&pendingActuals.length>0&&(
         <div style={{...card,borderLeft:`4px solid ${C.green}`}}>
-          <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.green,marginBottom:'0.9rem'}}>Monthly figures awaiting approval ({pendingActuals.length})</div>
+          <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.09rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.green,marginBottom:'0.9rem'}}>Monthly figures awaiting approval ({pendingActuals.length})</div>
           {pendingActuals.map(a=>{
             const {rev,cost}=actualTotals(a)
             const unitName=config.business_units.find((u:any)=>u.id===a.unit_id)?.name||a.unit_id
@@ -3848,8 +3848,8 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
                     <div style={{fontSize:'1.0rem',color:C.slate,marginTop:'0.15rem'}}>Submitted by {a.submitted_by||a.entered_by||'—'}{a.submitted_at?` · ${new Date(a.submitted_at).toLocaleDateString('en-GB')}`:''}</div>
                   </div>
                   <div style={{display:'flex',gap:'1.2rem',flexWrap:'wrap'}}>
-                    <div><div style={{fontSize:'0.8rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.08em'}}>Revenue</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.green}}>{fmt(rev,cc)}</div></div>
-                    <div><div style={{fontSize:'0.8rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.08em'}}>Total costs</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.red}}>{fmt(cost,cc)}</div></div>
+                    <div><div style={{fontSize:'0.8rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.08em'}}>Revenue</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.green}}>{fmt(rev,cc)}</div></div>
+                    <div><div style={{fontSize:'0.8rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.08em'}}>Total costs</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.red}}>{fmt(cost,cc)}</div></div>
                   </div>
                 </div>
                 <textarea style={{...inp,minHeight:50,resize:'vertical',margin:'0.75rem 0 0.5rem'}} placeholder="If sending back, add a note on what to correct" value={actualNotes[a.id]||''} onChange={e=>setActualNotes(n=>({...n,[a.id]:e.target.value}))}/>
@@ -3874,7 +3874,7 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
       )}
       {isFM&&pendingFM.length>0&&(
         <div style={{...card,borderLeft:`4px solid ${C.amber}`}}>
-          <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.amber,marginBottom:'0.9rem'}}>Pending FM Review ({pendingFM.length})</div>
+          <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.09rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.amber,marginBottom:'0.9rem'}}>Pending FM Review ({pendingFM.length})</div>
           {pendingFM.map(r=>(
             <div key={r.id} style={{border:'1px solid var(--cv-border-soft)',borderRadius:12,padding:'1rem 1.1rem',marginBottom:'0.85rem',background:C.lightBg}}>
               {reqRow(r)}
@@ -3889,7 +3889,7 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
       )}
       {(isCEO||delegatedApprover)&&pendingCEO.length>0&&(
         <div style={{...card,borderLeft:`4px solid ${C.cyan}`}}>
-          <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.cyan,marginBottom:'0.9rem'}}>Awaiting CEO Approval ({pendingCEO.length})</div>
+          <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.09rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.cyan,marginBottom:'0.9rem'}}>Awaiting CEO Approval ({pendingCEO.length})</div>
           {pendingCEO.map(r=>(
             <div key={r.id} style={{border:'1px solid var(--cv-border-soft)',borderRadius:12,padding:'1rem 1.1rem',marginBottom:'0.85rem',background:C.lightBg}}>
               {reqRow(r)}
@@ -3906,7 +3906,7 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
           into the plan for the months it covers. */}
       {canApproveEvents&&pendingEvents.length>0&&(
         <div style={{...card,borderLeft:`4px solid ${C.teal}`}}>
-          <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.teal,marginBottom:'0.9rem'}}>Market activities awaiting approval ({pendingEvents.length})</div>
+          <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.09rem',letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,color:C.teal,marginBottom:'0.9rem'}}>Market activities awaiting approval ({pendingEvents.length})</div>
           {pendingEvents.map((e:any)=>{
             const startLabel=(()=>{const d=new Date(e.start_period);return d.toLocaleString('en-GB',{month:'short',year:'numeric',timeZone:'UTC'})})()
             return (
@@ -3917,7 +3917,7 @@ function ApprovalsTab({clientId,config,cc,P,marketEvents,onMarketEventsChanged,o
                     <div style={{fontSize:'1.0rem',color:C.slate,marginTop:'0.15rem'}}>{unitNameFor(e.unit_id)} · {startLabel}{e.months_count>1?` · ${e.months_count} months`:''}{e.expected_uplift_pct!=null?` · expected +${e.expected_uplift_pct}% sales`:''}{e.created_by?` · proposed by ${e.created_by}`:''}</div>
                     {e.description&&<div style={{fontSize:'1.0rem',color:C.slate,fontStyle:'italic',marginTop:'0.25rem'}}>{e.description}</div>}
                   </div>
-                  <div><div style={{fontSize:'0.8rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.08em'}}>Cost</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.red}}>{fmt(e.cost,cc)}</div></div>
+                  <div><div style={{fontSize:'0.8rem',color:C.slate,textTransform:'uppercase',letterSpacing:'0.08em'}}>Cost</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.red}}>{fmt(e.cost,cc)}</div></div>
                 </div>
                 <textarea style={{...inp,minHeight:50,resize:'vertical',margin:'0.75rem 0 0.5rem'}} placeholder="If sending back, add a note on what to change" value={eventNotes[e.id]||''} onChange={ev=>setEventNotes(n=>({...n,[e.id]:ev.target.value}))}/>
                 <div style={{display:'flex',gap:'0.5rem',alignItems:'center',flexWrap:'wrap'}}>
@@ -4043,11 +4043,11 @@ function TeamTab({clientId,config,P}) {
       {members.map(m=>(
         <div key={m.id} style={{...card,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.75rem'}}>
           <div style={{display:'flex',gap:'0.85rem',alignItems:'flex-start'}}>
-            <div style={{width:38,height:38,borderRadius:10,background:'var(--cv-header)',color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'monospace',fontSize:'0.96rem',fontWeight:700,flexShrink:0}}>{(m.full_name||'?').split(' ').map((w:string)=>w[0]).join('').toUpperCase().slice(0,2)}</div>
+            <div style={{width:38,height:38,borderRadius:10,background:'var(--cv-header)',color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',fontWeight:700,flexShrink:0}}>{(m.full_name||'?').split(' ').map((w:string)=>w[0]).join('').toUpperCase().slice(0,2)}</div>
           <div>
             <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap'}}>
               <span style={{fontWeight:700,fontSize:'1.2rem',color:C.navy}}>{m.full_name}</span>
-              <span style={{fontFamily:'monospace',fontSize:'0.88rem',fontWeight:700,border:`1px solid ${C.border}`,borderRadius:20,padding:'0.14rem 0.55rem',color:C.slate,whiteSpace:'nowrap'}}>{roles.find(r=>r[0]===m.role)?.[1]||m.role}</span>
+              <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',fontWeight:700,border:`1px solid ${C.border}`,borderRadius:20,padding:'0.14rem 0.55rem',color:C.slate,whiteSpace:'nowrap'}}>{roles.find(r=>r[0]===m.role)?.[1]||m.role}</span>
             </div>
             <div style={{fontSize:'1.0rem',color:C.slate,marginTop:'0.15rem'}}>{m.email}</div>
             {m.assigned_unit_ids?.length>0&&(
@@ -4215,7 +4215,7 @@ function FieldOperatorManager({clientId,config,P}) {
               </div>
             </div>
             {latestToken&&(
-              <div style={{marginTop:'0.6rem',fontSize:'0.96rem',color:C.slate,fontFamily:'monospace',wordBreak:'break-all'}}>
+              <div style={{marginTop:'0.6rem',fontSize:'0.96rem',color:C.slate,fontFamily: 'var(--cv-font-mono)',wordBreak:'break-all'}}>
                 {fieldLink(latestToken.token)}
                 {latestToken.expires_at&&<div style={{color:C.amber,marginTop:'0.2rem'}}>Expires {new Date(latestToken.expires_at).toLocaleDateString()}</div>}
                 {latestToken.last_used_at&&<div style={{marginTop:'0.2rem'}}>Last synced {new Date(latestToken.last_used_at).toLocaleString()}</div>}
@@ -4498,7 +4498,7 @@ function CatalogueManager({clientId,config,P}) {
         const categoryIds = Array.from(new Set(unitItems.map((i:any)=>i.plan_line_id)))
         return (
           <div key={unit.id} style={{marginBottom:'1.5rem'}}>
-            <div style={{fontFamily:'monospace',fontSize:'1.0rem',letterSpacing:'0.06em',color:C.navy,fontWeight:700,marginBottom:'0.6rem',paddingBottom:'0.35rem',borderBottom:`2px solid ${C.navy}`}}>{unit.name}</div>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',letterSpacing:'0.06em',color:C.navy,fontWeight:700,marginBottom:'0.6rem',paddingBottom:'0.35rem',borderBottom:`2px solid ${C.navy}`}}>{unit.name}</div>
             {categoryIds.map((catId:any)=>{
               const line = (config.plan_lines||[]).find((l:any)=>l.id===catId)
               const catItems = unitItems.filter((i:any)=>i.plan_line_id===catId)
@@ -4521,7 +4521,7 @@ function CatalogueManager({clientId,config,P}) {
                             </>
                           ) : (
                             <>
-                              <div style={{fontFamily:'monospace',fontWeight:700,color:C.navy}}>{fmt(item.price,config.currency)}{item.unit_label?<span style={{color:C.slate,fontWeight:400}}> / {item.unit_label}</span>:null}</div>
+                              <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.navy}}>{fmt(item.price,config.currency)}{item.unit_label?<span style={{color:C.slate,fontWeight:400}}> / {item.unit_label}</span>:null}</div>
                               {canEdit&&<button style={addBtn(true)} onClick={()=>{setEditingId(item.id);setEditPrice(String(item.price))}}>Edit Price</button>}
                               {canEdit&&<button style={addBtn(true)} onClick={()=>startFullEdit(item)}>Edit Item</button>}
                               {canEdit&&(item.active
@@ -4550,7 +4550,7 @@ function CatalogueManager({clientId,config,P}) {
                         ) : (
                           <>
                             <div style={{fontSize:'1.0rem',color:C.slate}}>
-                              Cost price: <span style={{fontFamily:'monospace',fontWeight:700,color:item.cost_price!==null&&item.cost_price!==undefined?C.navy:C.amber}}>{item.cost_price!==null&&item.cost_price!==undefined?fmt(item.cost_price,config.currency):'Not set — no automatic COGS'}</span>
+                              Cost price: <span style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:item.cost_price!==null&&item.cost_price!==undefined?C.navy:C.amber}}>{item.cost_price!==null&&item.cost_price!==undefined?fmt(item.cost_price,config.currency):'Not set — no automatic COGS'}</span>
                               {item.cost_price_updated_at&&<span style={{marginLeft:8}}>· reviewed {new Date(item.cost_price_updated_at).toLocaleDateString()}</span>}
                             </div>
                             {canEdit&&<button style={addBtn(true)} onClick={()=>{setEditingCostId(item.id);setEditCostPrice(item.cost_price!==null&&item.cost_price!==undefined?String(item.cost_price):'');setEditCostLine(item.cogs_plan_line_id||'')}}>{item.cost_price!==null&&item.cost_price!==undefined?'Edit Cost Price':'Set Cost Price'}</button>}
@@ -4802,7 +4802,7 @@ function FieldOperatorsSection({clientId,businessUnits}:{clientId:string;busines
             <div style={{flex:1,minWidth:240}}>
               <div style={{fontSize:'1.0rem',color:C.slate,marginBottom:'0.4rem'}}>Share this link directly, or have them scan the QR code:</div>
               <div style={{display:'flex',gap:'0.5rem'}}>
-                <input readOnly aria-label="Field access link URL" style={{...inp,fontFamily:'monospace',fontSize:'1.0rem'}} value={newLink.url} onFocus={e=>e.target.select()}/>
+                <input readOnly aria-label="Field access link URL" style={{...inp,fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem'}} value={newLink.url} onFocus={e=>e.target.select()}/>
                 <button type="button" style={addBtn(true)} onClick={()=>{navigator.clipboard.writeText(newLink.url)}}>Copy</button>
               </div>
               <button type="button" style={{...addBtn(true,C.slate),marginTop:'0.75rem'}} onClick={()=>setNewLink(null)}>Done</button>
@@ -5001,7 +5001,7 @@ function StockAndTransfersSection({clientId,businessUnits}:{clientId:string;busi
                   <tr key={level.id} style={{background:low?'var(--cv-tint-amber)':i%2===0?C.cream:C.white}}>
                     <td style={{padding:'8px 10px'}}>{unitName(level.business_unit_id)}</td>
                     <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{level.catalogue?.name||'Item'}</td>
-                    <td style={{padding:'8px 10px',fontFamily:'monospace',fontWeight:700}}>{level.quantity_on_hand}{level.catalogue?.unit_label?` ${level.catalogue.unit_label}`:''}</td>
+                    <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)',fontWeight:700}}>{level.quantity_on_hand}{level.catalogue?.unit_label?` ${level.catalogue.unit_label}`:''}</td>
                     <td style={{padding:'8px 10px'}}>
                       {editingThresholdId===level.id ? (
                         <div style={{display:'flex',gap:'0.4rem'}}>
@@ -5420,11 +5420,11 @@ function StoresBalances({clientId, businessUnitId, refreshKey}) {
             {view.cards.map((c:any,i:number)=>(
               <tr key={c.itemId} style={{background:i%2===0?C.cream:C.white,verticalAlign:'top'}}>
                 <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{c.name}{c.unit?<span style={{color:C.slate,fontWeight:400}}> · {c.unit}</span>:null}</td>
-                <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:700,color:c.total<0?C.red:C.navy}}>{nf(c.total)}</td>
+                <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:c.total<0?C.red:C.navy}}>{nf(c.total)}</td>
                 <td style={{padding:'8px 10px',color:C.slate}}>
                   {c.holders.length===0 ? '—' : c.holders.map((h:any)=>(
                     <span key={h.key} style={{display:'inline-block',marginRight:'0.8rem',whiteSpace:'nowrap'}}>
-                      {h.name} <strong style={{color:C.navy,fontFamily:'monospace'}}>{nf(h.qty)}</strong>
+                      {h.name} <strong style={{color:C.navy,fontFamily: 'var(--cv-font-mono)'}}>{nf(h.qty)}</strong>
                     </span>
                   ))}
                 </td>
@@ -5581,7 +5581,7 @@ function SettingsTab({config,P,onSave,theme,setThemeMode}) {
                   const active = theme===mode
                   return (
                     <button key={mode} type="button" onClick={()=>setThemeMode?.(mode)}
-                      style={{fontFamily:'monospace',fontSize:'0.96rem',fontWeight:700,padding:'0.4rem 0.85rem',border:'none',borderRadius:7,cursor:'pointer',
+                      style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',fontWeight:700,padding:'0.4rem 0.85rem',border:'none',borderRadius:7,cursor:'pointer',
                         background:active?'var(--cv-header)':'transparent',color:active?'var(--cv-on-accent)':C.slate}}>{label}</button>
                   )
                 })}
@@ -5808,7 +5808,7 @@ function ClearFiguresPanel({config,P}:{config:any,P:any}) {
           <p style={{fontSize:'0.96rem',color:C.navy,marginBottom:'0.4rem'}}>This cannot be undone. Type the business name <strong>{name}</strong> to confirm.</p>
           <input style={{...inp,marginBottom:'0.75rem',maxWidth:340}} placeholder={name} value={text} onChange={e=>setText(e.target.value)}/>
           <div style={{display:'flex',gap:'0.6rem'}}>
-            <button disabled={!isMatch||busy} onClick={run} style={{fontFamily:'monospace',fontSize:'1.0rem',fontWeight:700,padding:'0.5rem 1.1rem',border:'none',borderRadius:5,background:isMatch?C.red:C.border,color:'var(--cv-on-accent)',cursor:isMatch?'pointer':'not-allowed'}}>{busy?'Clearing…':(scope==='model'?'Reset the whole model':'Clear recorded actuals')}</button>
+            <button disabled={!isMatch||busy} onClick={run} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',fontWeight:700,padding:'0.5rem 1.1rem',border:'none',borderRadius:5,background:isMatch?C.red:C.border,color:'var(--cv-on-accent)',cursor:isMatch?'pointer':'not-allowed'}}>{busy?'Clearing…':(scope==='model'?'Reset the whole model':'Clear recorded actuals')}</button>
             <button style={addBtn(true,C.slate)} onClick={()=>{setOpen(false);setText('')}}>Cancel</button>
           </div>
         </div>
@@ -5836,7 +5836,7 @@ function findCashWarningMonths(result:any, months:string[]) {
 // band in the approved mockups (".lab"). Optional right-aligned link.
 function SectionLabel({children,right}:{children:React.ReactNode;right?:React.ReactNode}) {
   return (
-    <div style={{fontFamily:'monospace',fontSize:'1rem',letterSpacing:'0.12em',textTransform:'uppercase',color:C.slate,margin:'2rem 0 0.9rem',display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:'0.75rem'}}>
+    <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1rem',letterSpacing:'0.12em',textTransform:'uppercase',color:C.slate,margin:'2rem 0 0.9rem',display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:'0.75rem'}}>
       <span>{children}</span>{right}
     </div>
   )
@@ -5850,7 +5850,7 @@ function StatCard({label,value,rating,color,valueColor,ratingColor}:{label:strin
     <div style={{background:C.white,borderRadius:14,padding:'1rem 1.15rem',display:'flex',alignItems:'center',gap:'0.85rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)',borderLeft:`4px solid ${color}`}}>
       <div style={{minWidth:0}}>
         <div style={{fontSize:'0.88rem',color:C.slate}}>{label}</div>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.35rem',fontWeight:700,color:valueColor||C.navy,lineHeight:1.05}}>{value}</div>
+        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.35rem',fontWeight:700,color:valueColor||C.navy,lineHeight:1.05}}>{value}</div>
         {rating&&<div style={{fontSize:'0.96rem',fontWeight:700,color:ratingColor||color,marginTop:'0.2rem'}}>{rating}</div>}
       </div>
     </div>
@@ -5867,7 +5867,7 @@ function MiniDonut({frac,color,center,size=42}:{frac:number;color:string;center:
         <circle cx={cx} cy={cx} r={r} fill="none" style={{stroke:'var(--cv-border-soft)'}} strokeWidth="5"/>
         <circle cx={cx} cy={cx} r={r} fill="none" style={{stroke:color}} strokeWidth="5" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ*(1-f)} transform={`rotate(-90 ${cx} ${cx})`}/>
       </svg>
-      <span style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'monospace',fontWeight:700,fontSize:'0.88rem',color}}>{center}</span>
+      <span style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontFamily: 'var(--cv-font-mono)',fontWeight:700,fontSize:'0.88rem',color}}>{center}</span>
     </div>
   )
 }
@@ -5889,7 +5889,7 @@ function ScoreBars({axes,color}:{axes:{label:string;frac:number}[];color:string}
           <div key={i}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:4}}>
               <span style={{fontSize:'0.98rem',color:C.slate}}>{a.label}</span>
-              <span style={{fontFamily:'monospace',fontSize:'0.98rem',fontWeight:700,color}}>{pct}%</span>
+              <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.98rem',fontWeight:700,color}}>{pct}%</span>
             </div>
             <div style={{height:11,borderRadius:6,background:'var(--cv-border-soft)',overflow:'hidden'}}>
               <div style={{height:'100%',width:`${pct}%`,background:color,borderRadius:6,transition:'width 0.3s'}}/>
@@ -5906,21 +5906,21 @@ function ScoreBars({axes,color}:{axes:{label:string;frac:number}[];color:string}
 function ActionBanner({kicker,title,body,lift,cta,onCta,compact}:{kicker:string;title:string;body:string;lift?:string;cta:string;onCta?:()=>void;compact?:boolean}) {
   if (compact) return (
     <div style={{background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-cyan-40)',borderTop:`3px solid ${C.cyan}`,borderRadius:14,boxShadow:'0 6px 20px var(--cv-shadow-2)',padding:'0.75rem 0.85rem',display:'flex',flexDirection:'column'}}>
-      <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.teal,fontWeight:700,marginBottom:'0.3rem'}}>{kicker}</div>
+      <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.09rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.teal,fontWeight:700,marginBottom:'0.3rem'}}>{kicker}</div>
       <div style={{fontWeight:700,fontSize:'1.16rem',lineHeight:1.2,marginBottom:'0.25rem',color:C.navy}}>{title}</div>
       <div style={{fontSize:'0.94rem',color:C.slate,lineHeight:1.35,flex:1}}>{body}</div>
-      {lift&&<div style={{fontFamily:'monospace',fontSize:'0.88rem',color:C.green,fontWeight:700,marginTop:'0.3rem'}}>&#9650; {lift}</div>}
-      <div onClick={onCta} role="button" tabIndex={0} style={{marginTop:'0.45rem',fontFamily:'monospace',fontSize:'0.88rem',fontWeight:700,color:C.navy,background:C.cyan,borderRadius:8,padding:'0.38rem 0.5rem',textAlign:'center',cursor:onCta?'pointer':'default'}}>{cta}</div>
+      {lift&&<div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',color:C.green,fontWeight:700,marginTop:'0.3rem'}}>&#9650; {lift}</div>}
+      <div onClick={onCta} role="button" tabIndex={0} style={{marginTop:'0.45rem',fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',fontWeight:700,color:C.navy,background:C.cyan,borderRadius:8,padding:'0.38rem 0.5rem',textAlign:'center',cursor:onCta?'pointer':'default'}}>{cta}</div>
     </div>
   )
   return (
     <div style={{marginTop:'0.85rem',background:'var(--cv-tint-cyan)',border:'1px solid var(--cv-cyan-40)',borderLeft:`4px solid ${C.cyan}`,borderRadius:14,padding:'0.85rem 1.1rem',display:'flex',alignItems:'center',gap:'1rem',flexWrap:'wrap'}}>
       <div style={{flex:1,minWidth:200}}>
-        <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.teal,fontWeight:700}}>{kicker}</div>
+        <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.09rem',letterSpacing:'0.1em',textTransform:'uppercase',color:C.teal,fontWeight:700}}>{kicker}</div>
         <div style={{fontWeight:700,fontSize:'1.16rem',color:C.navy}}>{title}</div>
         <div style={{fontSize:'1.0rem',color:C.slate}}>{body}</div>
       </div>
-      <div onClick={onCta} role="button" tabIndex={0} style={{marginLeft:'auto',fontFamily:'monospace',fontSize:'0.96rem',fontWeight:700,color:C.navy,background:C.cyan,borderRadius:8,padding:'0.5rem 0.8rem',cursor:onCta?'pointer':'default'}}>{cta}</div>
+      <div onClick={onCta} role="button" tabIndex={0} style={{marginLeft:'auto',fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',fontWeight:700,color:C.navy,background:C.cyan,borderRadius:8,padding:'0.5rem 0.8rem',cursor:onCta?'pointer':'default'}}>{cta}</div>
     </div>
   )
 }
@@ -5930,11 +5930,11 @@ function ActionBanner({kicker,title,body,lift,cta,onCta,compact}:{kicker:string;
 function MetricGroup({title,color,rows}:{title:string;color:string;rows:{k:string;v:string;vColor?:string}[]}) {
   return (
     <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,boxShadow:'0 8px 24px var(--cv-shadow-2)',overflow:'hidden'}}>
-      <div style={{padding:'0.65rem 0.9rem',fontFamily:'monospace',fontSize:'0.88rem',letterSpacing:'0.06em',textTransform:'uppercase',color:'var(--cv-on-accent)',fontWeight:700,background:color}}>{title}</div>
+      <div style={{padding:'0.65rem 0.9rem',fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',letterSpacing:'0.06em',textTransform:'uppercase',color:'var(--cv-on-accent)',fontWeight:700,background:color}}>{title}</div>
       {rows.map((r,i)=>(
         <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'0.45rem 0.9rem',borderTop:'1px solid var(--cv-border-soft)',fontSize:'1.0rem'}}>
           <span style={{color:C.slate}}>{r.k}</span>
-          <span style={{fontFamily:'monospace',fontWeight:700,color:r.vColor||C.navy}}>{r.v}</span>
+          <span style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:r.vColor||C.navy}}>{r.v}</span>
         </div>
       ))}
     </div>
@@ -5942,7 +5942,7 @@ function MetricGroup({title,color,rows}:{title:string;color:string;rows:{k:strin
 }
 
 // Card that heads a section with a Georgia serif title (mockup ".card-h").
-const cardHead: React.CSSProperties = {padding:'0.8rem 1.1rem',borderBottom:`1px solid ${C.border}`,fontFamily:'Georgia,serif',fontWeight:700,fontSize:'1.2rem',color:C.navy}
+const cardHead: React.CSSProperties = {padding:'0.8rem 1.1rem',borderBottom:`1px solid ${C.border}`,fontFamily:'var(--cv-font)',fontWeight:700,fontSize:'1.2rem',color:C.navy}
 
 // Split a generated story into a bold headline (first line / sentence) and
 // the remaining body, matching the mockup story card.
@@ -6006,7 +6006,7 @@ function ClearviewIntelligenceTab({clientId,config,result,months,cc,P,onSave,clo
   }
 
   function Badge2({label,color}:{label:string;color:string}) {
-    return <span style={{fontFamily:'monospace',fontSize:'1.0rem',fontWeight:700,padding:'0.25rem 0.7rem',borderRadius:20,background:color,color:'var(--cv-on-accent)'}}>{label}</span>
+    return <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',fontWeight:700,padding:'0.25rem 0.7rem',borderRadius:20,background:color,color:'var(--cv-on-accent)'}}>{label}</span>
   }
 
   // Hooks must run in the same order on every render (Rules of Hooks) --
@@ -6313,7 +6313,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
     <div>
       <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',marginBottom:'1.2rem',overflowX:'auto'}}>
         {tabList.map(t=>(
-          <button key={t[0]} onClick={()=>setActiveSection(t[0])} style={{fontFamily:'monospace',fontSize:'0.96rem',padding:'0.42rem 0.85rem',border:`1px solid ${activeSection===t[0]?C.cyan:C.border}`,borderRadius:8,background:activeSection===t[0]?C.cyan:C.white,color:activeSection===t[0]?C.navy:C.slate,cursor:'pointer',fontWeight:activeSection===t[0]?700:400,whiteSpace:'nowrap'}}>{t[1]}</button>
+          <button key={t[0]} onClick={()=>setActiveSection(t[0])} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',padding:'0.42rem 0.85rem',border:`1px solid ${activeSection===t[0]?C.cyan:C.border}`,borderRadius:8,background:activeSection===t[0]?C.cyan:C.white,color:activeSection===t[0]?C.navy:C.slate,cursor:'pointer',fontWeight:activeSection===t[0]?700:400,whiteSpace:'nowrap'}}>{t[1]}</button>
         ))}
       </div>
 
@@ -6385,9 +6385,9 @@ Write a status report, not a letter. Do not address the reader. Do not open with
           <div style={{...card,padding:0,overflow:'hidden'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.9rem 1.2rem',borderBottom:`1px solid ${C.border}`,flexWrap:'wrap',gap:'0.5rem'}}>
               <div>
-                <span style={{fontFamily:'Georgia,serif',fontWeight:700,fontSize:'1.2rem',color:C.navy}}>{head||'This Month’s Story'}</span>
-                <span style={{fontFamily:'monospace',fontSize:'0.88rem',color:C.purple,border:`1px solid ${C.purple}`,borderRadius:4,padding:'0.1rem 0.38rem',marginLeft:'0.4rem'}}>OPUS</span>
-                {narrative&&<div style={{fontSize:'0.96rem',color:C.slate,fontFamily:'monospace',marginTop:'0.15rem'}}>{narrative.period_covered} · generated {new Date(narrative.generated_at).toLocaleDateString('en-GB')}</div>}
+                <span style={{fontFamily:'var(--cv-font)',fontWeight:700,fontSize:'1.2rem',color:C.navy}}>{head||'This Month’s Story'}</span>
+                <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',color:C.purple,border:`1px solid ${C.purple}`,borderRadius:4,padding:'0.1rem 0.38rem',marginLeft:'0.4rem'}}>OPUS</span>
+                {narrative&&<div style={{fontSize:'0.96rem',color:C.slate,fontFamily: 'var(--cv-font-mono)',marginTop:'0.15rem'}}>{narrative.period_covered} · generated {new Date(narrative.generated_at).toLocaleDateString('en-GB')}</div>}
               </div>
               <div style={{display:'flex',gap:'0.5rem'}}>
                 <button onClick={()=>window.print()} style={{...addBtn(true,C.cyan),color:C.teal,fontWeight:700}}>Print</button>
@@ -6420,7 +6420,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
                       return <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="52" preserveAspectRatio="none"><line x1="0" y1={yy(0)} x2={W} y2={yy(0)} style={{stroke:C.red}} strokeDasharray="3 3" opacity="0.5"/><polyline fill="none" style={{stroke:C.red}} strokeWidth="2" points={pts}/></svg>
                     })()}
                   </div>
-                  <span onClick={()=>onNavigate&&onNavigate('cashflow')} style={{fontFamily:'monospace',fontSize:'0.96rem',color:C.red,fontWeight:700,cursor:'pointer'}}>See Cash Flow &rarr;</span>
+                  <span onClick={()=>onNavigate&&onNavigate('cashflow')} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',color:C.red,fontWeight:700,cursor:'pointer'}}>See Cash Flow &rarr;</span>
                 </>
               )}
             </div>
@@ -6436,8 +6436,8 @@ Write a status report, not a letter. Do not address the reader. Do not open with
                   ['Staff cost % revenue', pct(m.staff_cost_pct), C.navy],
                 ] as [string,string,string][]).map(([l,v,col],i)=>(
                   <div key={i} style={{padding:'0.7rem 1.15rem',borderTop:'1px solid var(--cv-border-soft)',borderRight:i%2===0?'1px solid var(--cv-border-soft)':undefined}}>
-                    <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate,marginBottom:'0.25rem'}}>{l}</div>
-                    <div style={{fontFamily:'monospace',fontWeight:700,fontSize:'1.16rem',color:col}}>{v}</div>
+                    <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.09rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate,marginBottom:'0.25rem'}}>{l}</div>
+                    <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,fontSize:'1.16rem',color:col}}>{v}</div>
                   </div>
                 ))}
               </div>
@@ -6447,10 +6447,10 @@ Write a status report, not a letter. Do not address the reader. Do not open with
           <SectionLabel>Business health check <span style={{fontWeight:400,textTransform:'none',letterSpacing:0,color:C.slate}}>· for your coach</span></SectionLabel>
           <div style={{...card,padding:0,overflow:'hidden'}}>
             <div onClick={()=>setHealthOpen(o=>!o)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.8rem 1.1rem',borderBottom:healthOpen?`1px solid ${C.border}`:'none',gap:'0.5rem',flexWrap:'wrap',cursor:'pointer'}}>
-              <span style={{fontFamily:'Georgia,serif',fontWeight:700,fontSize:'1.09rem',color:C.navy}}>Business health check{latestHealth&&<span style={{fontFamily:'monospace',fontSize:'0.96rem',color:C.slate,fontWeight:400}}> · {new Date(latestHealth.period).toLocaleString('en-GB',{month:'short',year:'numeric'})}</span>}</span>
+              <span style={{fontFamily:'var(--cv-font)',fontWeight:700,fontSize:'1.09rem',color:C.navy}}>Business health check{latestHealth&&<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',color:C.slate,fontWeight:400}}> · {new Date(latestHealth.period).toLocaleString('en-GB',{month:'short',year:'numeric'})}</span>}</span>
               <span style={{display:'flex',gap:'0.5rem',alignItems:'center'}}>
                 <button onClick={(e)=>{e.stopPropagation();generateHealthCheck()}} style={solidBtn(C.purple,true)} disabled={generatingHealth}>{generatingHealth?'Generating...':'Generate This Month'}</button>
-                <span style={{color:C.slate,fontFamily:'monospace'}}>{healthOpen?'▴':'▾'}</span>
+                <span style={{color:C.slate,fontFamily: 'var(--cv-font-mono)'}}>{healthOpen?'▴':'▾'}</span>
               </span>
             </div>
             {healthOpen && (
@@ -6472,9 +6472,9 @@ Write a status report, not a letter. Do not address the reader. Do not open with
               return (
                 <div key={key}>
                   <div onClick={()=>setExpandedStory(open?null:key)} style={{display:'flex',alignItems:'center',gap:'0.8rem',padding:'0.8rem 1.2rem',borderTop:i===0?undefined:'1px solid var(--cv-border-soft)',cursor:'pointer'}}>
-                    <span style={{fontFamily:'monospace',fontSize:'0.96rem',color:C.slate,width:90,flex:'0 0 auto'}}>{st.period_covered||new Date(st.generated_at).toLocaleDateString('en-GB',{month:'short',year:'numeric'})}</span>
+                    <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',color:C.slate,width:90,flex:'0 0 auto'}}>{st.period_covered||new Date(st.generated_at).toLocaleDateString('en-GB',{month:'short',year:'numeric'})}</span>
                     <span style={{flex:1,fontSize:'1.0rem',color:C.navy,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:open?'normal':'nowrap',lineHeight:1.5}}>{cleanStory(st.briefing_text)}</span>
-                    <span style={{color:C.slate,fontFamily:'monospace'}}>{open?'▴':'▾'}</span>
+                    <span style={{color:C.slate,fontFamily: 'var(--cv-font-mono)'}}>{open?'▴':'▾'}</span>
                   </div>
                 </div>
               )
@@ -6547,7 +6547,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
         return (
         <div>
           <div style={{...card,marginBottom:'1.1rem'}}>
-            <h2 style={{fontFamily:'Georgia,serif',fontSize:'1.32rem',margin:'0 0 0.4rem',color:C.navy}}>Going Concern</h2>
+            <h2 style={{fontFamily:'var(--cv-font)',fontSize:'1.32rem',margin:'0 0 0.4rem',color:C.navy}}>Going Concern</h2>
             <p style={{fontSize:'1.06rem',color:C.slate,lineHeight:1.5,margin:0}}>Whether the business can keep operating and meet its obligations over the next year. One score out of 20, built from five factors: debt service, liquidity, revenue sustainability, operational profitability, and management.</p>
           </div>
 
@@ -6620,7 +6620,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
         return (
           <div>
             <div style={{...card,marginBottom:'1.1rem'}}>
-              <h2 style={{fontFamily:'Georgia,serif',fontSize:'1.32rem',margin:'0 0 0.4rem',color:C.navy}}>Liquidity Readiness Score</h2>
+              <h2 style={{fontFamily:'var(--cv-font)',fontSize:'1.32rem',margin:'0 0 0.4rem',color:C.navy}}>Liquidity Readiness Score</h2>
               <p style={{fontSize:'1.06rem',color:C.slate,lineHeight:1.5,margin:0}}>
                 How ready this business is for productive liquidity to flow into it, as one core score across seven weighted
                 dimensions. Every Fit score below (Bank, Investor, Grant, Equity, Consignment, Recoverable Grant) is the same
@@ -6671,11 +6671,11 @@ Write a status report, not a letter. Do not address the reader. Do not open with
                       <div key={d.key} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,boxShadow:'0 6px 20px var(--cv-shadow-1)',borderTop:`3px solid ${col}`,padding:'0.75rem 0.85rem'}}>
                         <div style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
                           <MiniDonut frac={d.dim.score/100} color={col} center={Math.round(d.dim.score)}/>
-                          <div><div style={{fontWeight:700,fontSize:'1.0rem',lineHeight:1.12,color:C.navy}}>{d.label}</div><div style={{fontSize:'0.88rem',color:C.slate,fontFamily:'monospace'}}>{(d.weight*100).toFixed(0)}%</div></div>
+                          <div><div style={{fontWeight:700,fontSize:'1.0rem',lineHeight:1.12,color:C.navy}}>{d.label}</div><div style={{fontSize:'0.88rem',color:C.slate,fontFamily: 'var(--cv-font-mono)'}}>{(d.weight*100).toFixed(0)}%</div></div>
                         </div>
                         <div style={{marginTop:'0.5rem',display:'grid',gap:'0.1rem',borderTop:'1px solid var(--cv-border-soft)',paddingTop:'0.4rem'}}>
                           {d.dim.indicators.slice(0,2).map(ind=>(
-                            <div key={ind.label} style={{display:'flex',justifyContent:'space-between',gap:'0.5rem',fontSize:'0.88rem',color:C.slate}}><span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ind.label}</span><b style={{fontFamily:'monospace',color:C.navy,fontWeight:700}}>{Math.round(ind.value)}</b></div>
+                            <div key={ind.label} style={{display:'flex',justifyContent:'space-between',gap:'0.5rem',fontSize:'0.88rem',color:C.slate}}><span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ind.label}</span><b style={{fontFamily: 'var(--cv-font-mono)',color:C.navy,fontWeight:700}}>{Math.round(ind.value)}</b></div>
                           ))}
                         </div>
                       </div>
@@ -6818,7 +6818,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
               </p>
               <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'1rem'}}>
                 <label htmlFor="discount-rate" style={{fontSize:'1.0rem',color:C.slate}}>Discount rate assumption:</label>
-                <input id="discount-rate" type="number" min={1} max={100} value={Math.round(discountRate*100)} onChange={e=>setDiscountRate(Number(e.target.value)/100)} style={{width:70,padding:'0.3rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily:'monospace'}}/>
+                <input id="discount-rate" type="number" min={1} max={100} value={Math.round(discountRate*100)} onChange={e=>setDiscountRate(Number(e.target.value)/100)} style={{width:70,padding:'0.3rem 0.5rem',border:`1px solid ${C.border}`,borderRadius:4,fontFamily: 'var(--cv-font-mono)'}}/>
                 <span style={{fontSize:'1.0rem',color:C.slate}}>% -- adjust to your own cost of capital or required return</span>
               </div>
               <div style={kpiGrid}>
@@ -6890,7 +6890,7 @@ Write a status report, not a letter. Do not address the reader. Do not open with
                   <div key={item.field}>
                     <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.3rem'}}>
                       <label htmlFor={`assess-${item.field}`} style={{fontWeight:600,fontSize:'1.06rem',color:C.navy}}>{item.label}</label>
-                      <span style={{fontFamily:'monospace',fontWeight:700,color:C.cyan}}>{(assess as any)[item.field] ?? 2}/{item.max}</span>
+                      <span style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.cyan}}>{(assess as any)[item.field] ?? 2}/{item.max}</span>
                     </div>
                     <input id={`assess-${item.field}`} type="range" min="0" max={item.max} step="1" value={(assess as any)[item.field] ?? 2} onChange={e=>updateAssess(item.field,Number(e.target.value))} style={{width:'100%',accentColor:C.cyan,marginBottom:'0.2rem'}}/>
                   </div>
@@ -6994,8 +6994,8 @@ function CashCoverageStatement({result, months, cc}) {
 
   const chip = (bg:string,bd:string,label:string,value:React.ReactNode,sub:React.ReactNode)=>(
     <div style={{flex:'1 1 250px',background:bg,border:`1px solid ${bd}55`,borderRadius:12,padding:'0.9rem 1.1rem'}}>
-      <div style={{fontFamily:'monospace',fontSize:'0.96rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate,marginBottom:'0.25rem'}}>{label}</div>
-      <div style={{fontFamily:'Georgia,serif',fontSize:'1.55rem',fontWeight:700,color:bd,lineHeight:1.1}}>{value}</div>
+      <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate,marginBottom:'0.25rem'}}>{label}</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.55rem',fontWeight:700,color:bd,lineHeight:1.1}}>{value}</div>
       <div style={{fontSize:'0.94rem',color:C.slate,marginTop:'0.25rem',lineHeight:1.45}}>{sub}</div>
     </div>
   )
@@ -7019,7 +7019,7 @@ function CashCoverageStatement({result, months, cc}) {
       </div>
 
       <div style={{overflowX:'auto'}}>
-        <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily:'monospace'}}>
+        <table style={{borderCollapse:'collapse',width:'100%',fontSize:'1.0rem',fontFamily: 'var(--cv-font-mono)'}}>
           <thead>
             <tr style={{background:'var(--cv-header)'}}>
               <th style={{textAlign:'left',padding:'8px 10px',color:'var(--cv-on-accent)',minWidth:230,fontSize:'1.0rem',position:'sticky',left:0,background:'var(--cv-header)'}}>Cash required vs available · per period</th>
@@ -7166,7 +7166,7 @@ function WorkingCapitalTab({config,result,months,cc,P,onSave}) {
           const accent = bu?.color || C.cyan
           const on = selUnit===u.id
           return (
-            <button key={u.id} style={{fontFamily:'monospace',fontSize:'0.96rem',padding:'0.45rem 0.85rem',
+            <button key={u.id} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',padding:'0.45rem 0.85rem',
               border:`2px solid ${on?accent:C.border}`,borderRadius:4,
               background:on?accent:C.white,color:on?'var(--cv-on-accent)':C.navy,cursor:'pointer'}}
               onClick={()=>setSelUnit(u.id)}>{u.name}</button>
@@ -7223,7 +7223,7 @@ function TradeCreditBalanceGrid({lines,months,cc,canEdit,planningMonths,updateLi
                     </div>
                     {isLegacy && (
                       <div style={{marginTop:'0.25rem'}}>
-                        <span style={{fontFamily:'monospace',fontSize:'0.88rem',padding:'0.05rem 0.35rem',borderRadius:4,background:C.lightBg,color:C.slate,border:`1px solid ${C.border}`}}>legacy new/settled · read-only</span>
+                        <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',padding:'0.05rem 0.35rem',borderRadius:4,background:C.lightBg,color:C.slate,border:`1px solid ${C.border}`}}>legacy new/settled · read-only</span>
                         {canEdit && <button style={{...addBtn(true),marginLeft:'0.35rem',fontSize:'0.88rem',padding:'0.15rem 0.4rem'}} onClick={()=>convertLegacy(line.id)}>Convert to month-end balances</button>}
                       </div>
                     )}
@@ -7441,7 +7441,7 @@ function PLVarianceView({ config, result, months, cc, view, selUnit, setSelUnit,
       {view==='unit' && (
         <div style={{display:'flex',gap:'0.45rem',marginBottom:'1rem',flexWrap:'wrap'}}>
           {config.business_units.filter((u:any)=>u.active).map((u:any)=>(
-            <button key={u.id} style={{fontFamily:'monospace',fontSize:'0.96rem',padding:'0.45rem 0.85rem',
+            <button key={u.id} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',padding:'0.45rem 0.85rem',
               border:`2px solid ${selUnit===u.id?(u.color||C.cyan):C.border}`,borderRadius:4,
               background:selUnit===u.id?(u.color||C.cyan):C.white,
               color:selUnit===u.id?'var(--cv-on-accent)':C.navy,cursor:'pointer'}}
@@ -7455,7 +7455,7 @@ function PLVarianceView({ config, result, months, cc, view, selUnit, setSelUnit,
         <div style={{display:'inline-flex',border:`1px solid ${C.border}`,borderRadius:6,overflow:'hidden'}}>
           {periods.map(([id,label])=>(
             <button key={id} onClick={()=>setPeriod(id as any)}
-              style={{fontFamily:'monospace',fontSize:'0.96rem',padding:'0.42rem 0.9rem',border:'none',cursor:'pointer',
+              style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',padding:'0.42rem 0.9rem',border:'none',cursor:'pointer',
                 background:period===id?'var(--cv-header)':C.white,color:period===id?'var(--cv-on-accent)':C.slate,
                 fontWeight:period===id?700:400}}>{label}</button>
           ))}
@@ -7472,8 +7472,8 @@ function PLVarianceView({ config, result, months, cc, view, selUnit, setSelUnit,
           const col = favColor(f)
           return (
             <div key={r.key} style={{background:C.white,borderRadius:14,padding:'1.1rem 1.25rem 1.2rem',borderTop:`3px solid ${col}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}>
-              <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.13em',color:C.slate,textTransform:'uppercase',marginBottom:'0.4rem'}}>{r.label} vs plan</div>
-              <div style={{fontFamily:'Georgia,serif',fontSize:'1.6rem',fontWeight:700,color:C.navy,lineHeight:1.05}}>{r.actual===null?'—':valDisp(r.kind, actual)}</div>
+              <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.09rem',letterSpacing:'0.13em',color:C.slate,textTransform:'uppercase',marginBottom:'0.4rem'}}>{r.label} vs plan</div>
+              <div style={{fontFamily:'var(--cv-font)',fontSize:'1.6rem',fontWeight:700,color:C.navy,lineHeight:1.05}}>{r.actual===null?'—':valDisp(r.kind, actual)}</div>
               <div style={{fontSize:'0.96rem',marginTop:'0.35rem',color:col,fontWeight:600}}>
                 {r.actual===null?'no actual yet':`${signMoney(f)} · ${signPct(fp)}`}
               </div>
@@ -7486,7 +7486,7 @@ function PLVarianceView({ config, result, months, cc, view, selUnit, setSelUnit,
       {/* Variance table */}
       <div style={{...card,padding:0,overflow:'hidden'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.85rem 1.1rem',borderBottom:`1px solid ${C.border}`}}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.09rem',fontWeight:700,color:C.navy}}>
+          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.09rem',fontWeight:700,color:C.navy}}>
             {view==='unit' ? `${config.business_units.find((u:any)=>u.id===selUnit)?.name} — Plan vs Actual` : `${config.business_name} — Consolidated Plan vs Actual`}
           </div>
           <div style={{fontSize:'0.96rem',color:C.slate}}>{rangeLabel}</div>
@@ -7526,10 +7526,10 @@ function PLVarianceView({ config, result, months, cc, view, selUnit, setSelUnit,
                         {r.label}
                         {r.note && <span style={{fontSize:'0.88rem',color:C.slate,marginLeft:6,fontWeight:400}}>{r.note}</span>}
                       </td>
-                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',color:C.navy,fontWeight:r.bold?700:400}}>{r.isPct?pct(r.plan):valDisp(r.kind, r.plan)}</td>
-                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',color:C.navy,fontWeight:r.bold?700:400}}>{hasActual?(r.isPct?pct(actual):valDisp(r.kind, actual)):'—'}</td>
-                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',color:col,fontWeight:700}}>{hasActual?(r.isPct?`${dPts>=0?'+':'−'}${(Math.abs(dPts)*100).toFixed(1)} pts`:signMoney(f)):'—'}</td>
-                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'1.0rem',color:col,fontWeight:600}}>{hasActual?(r.isPct?'—':signPct(fp)):'—'}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',color:C.navy,fontWeight:r.bold?700:400}}>{r.isPct?pct(r.plan):valDisp(r.kind, r.plan)}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',color:C.navy,fontWeight:r.bold?700:400}}>{hasActual?(r.isPct?pct(actual):valDisp(r.kind, actual)):'—'}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',color:col,fontWeight:700}}>{hasActual?(r.isPct?`${dPts>=0?'+':'−'}${(Math.abs(dPts)*100).toFixed(1)} pts`:signMoney(f)):'—'}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',color:col,fontWeight:600}}>{hasActual?(r.isPct?'—':signPct(fp)):'—'}</td>
                     </tr>
                     {open && lines.length===0 && (
                       <tr style={{background:C.white}}><td colSpan={5} style={{padding:'6px 10px 6px 30px',fontSize:'0.96rem',color:C.slate}}>No component lines.</td></tr>
@@ -7544,12 +7544,12 @@ function PLVarianceView({ config, result, months, cc, view, selUnit, setSelUnit,
                         <tr key={r.key+'/'+l.id} style={{background:'var(--cv-bg-2)'}}>
                           <td style={{padding:'6px 10px 6px 34px',fontSize:'1.0rem',color:C.slate}}>
                             {l.name}
-                            {l.id===worstId && <span style={{fontFamily:'monospace',fontSize:'0.88rem',padding:'0.05rem 0.35rem',borderRadius:4,background:C.red,color:'var(--cv-on-accent)',marginLeft:6}}>biggest driver</span>}
+                            {l.id===worstId && <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',padding:'0.05rem 0.35rem',borderRadius:4,background:C.red,color:'var(--cv-on-accent)',marginLeft:6}}>biggest driver</span>}
                           </td>
-                          <td style={{padding:'6px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.96rem',color:C.slate}}>{valDisp(l.kind, l.plan)}</td>
-                          <td style={{padding:'6px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.96rem',color:C.slate}}>{lHas?valDisp(l.kind, lAct):'—'}</td>
-                          <td style={{padding:'6px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.96rem',color:lHas?lcol:C.slate,fontWeight:600}}>{lHas?signMoney(lf):'—'}</td>
-                          <td style={{padding:'6px 10px',textAlign:'right',fontFamily:'monospace',fontSize:'0.96rem',color:lHas?lcol:C.slate}}>{lHas?signPct(lfp):'—'}</td>
+                          <td style={{padding:'6px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',color:C.slate}}>{valDisp(l.kind, l.plan)}</td>
+                          <td style={{padding:'6px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',color:C.slate}}>{lHas?valDisp(l.kind, lAct):'—'}</td>
+                          <td style={{padding:'6px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',color:lHas?lcol:C.slate,fontWeight:600}}>{lHas?signMoney(lf):'—'}</td>
+                          <td style={{padding:'6px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',color:lHas?lcol:C.slate}}>{lHas?signPct(lfp):'—'}</td>
                         </tr>
                       )
                     })}
@@ -7629,22 +7629,22 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
       <div style={{display:'inline-flex',border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',marginBottom:'1.1rem'}}>
         {([['statement','Statement'],['variance','Plan vs Actual']] as [string,string][]).map(([id,label])=>(
           <button key={id} onClick={()=>setPlMode(id as any)}
-            style={{fontFamily:'monospace',fontSize:'1.0rem',padding:'0.55rem 1.3rem',border:'none',cursor:'pointer',
+            style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',padding:'0.55rem 1.3rem',border:'none',cursor:'pointer',
               background:plMode===id?C.cyan:C.white,color:plMode===id?C.navy:C.slate,fontWeight:plMode===id?700:400}}>{label}</button>
         ))}
       </div>
 
       <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.25rem'}}>
-        <button style={{fontFamily:'monospace',fontSize:'1.0rem',padding:'0.5rem 1.1rem',border:'none',
+        <button style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',padding:'0.5rem 1.1rem',border:'none',
           background:viewMode==='unit'?'var(--cv-header)':C.white,color:viewMode==='unit'?'var(--cv-on-accent)':C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:viewMode==='unit'?700:400}}
           onClick={()=>setViewMode('unit')}>By Business Unit</button>
-        <button style={{fontFamily:'monospace',fontSize:'1.0rem',padding:'0.5rem 1.1rem',border:'none',
+        <button style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',padding:'0.5rem 1.1rem',border:'none',
           background:viewMode==='consolidated'?'var(--cv-header)':C.white,color:viewMode==='consolidated'?'var(--cv-on-accent)':C.slate,
           borderRadius:4,cursor:'pointer',fontWeight:viewMode==='consolidated'?700:400}}
           onClick={()=>setViewMode('consolidated')}>Consolidated</button>
         {plMode==='statement' && (
-          <button style={{fontFamily:'monospace',fontSize:'1.0rem',padding:'0.5rem 1.1rem',border:'none',
+          <button style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',padding:'0.5rem 1.1rem',border:'none',
             background:viewMode==='margins'?'var(--cv-header)':C.white,color:viewMode==='margins'?'var(--cv-on-accent)':C.slate,
             borderRadius:4,cursor:'pointer',fontWeight:viewMode==='margins'?700:400}}
             onClick={()=>setViewMode('margins')}>Margins & Break-Even</button>
@@ -7657,7 +7657,7 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
         <div style={{marginBottom:'1.1rem',background:'var(--cv-tint-teal-soft)',border:`1px solid ${C.teal}`,borderLeft:`4px solid ${C.teal}`,borderRadius:8,padding:'0.7rem 1rem',fontSize:'0.98rem',color:C.navy,lineHeight:1.5}}>
           This business has {(result.debtSchedule?.totalInterest||[]).some((v:number)=>v>0) && (result.con?.depreciation||[]).some((v:number)=>v>0) ? 'a loan and fixed assets' : (result.con?.depreciation||[]).some((v:number)=>v>0) ? 'fixed assets' : 'a loan'}.
           {' '}Interest and depreciation are whole-business figures, not allocated to one unit, so they only appear on the{' '}
-          <button onClick={()=>setViewMode('consolidated')} style={{fontFamily:'monospace',fontWeight:700,color:C.teal,background:'none',border:'none',cursor:'pointer',padding:0,textDecoration:'underline'}}>Consolidated</button> P&L, not here.
+          <button onClick={()=>setViewMode('consolidated')} style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.teal,background:'none',border:'none',cursor:'pointer',padding:0,textDecoration:'underline'}}>Consolidated</button> P&L, not here.
         </div>
       )}
 
@@ -7734,7 +7734,7 @@ function PLTab({config,result,months,cc,P,closedPeriods}) {
           <div>
             <div style={{display:'flex',gap:'0.45rem',marginBottom:'1.25rem',flexWrap:'wrap'}}>
               {config.business_units.filter(u=>u.active).map(u=>(
-                <button key={u.id} style={{fontFamily:'monospace',fontSize:'0.96rem',padding:'0.45rem 0.85rem',
+                <button key={u.id} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',padding:'0.45rem 0.85rem',
                   border:`2px solid ${selUnit===u.id?(u.color||C.cyan):C.border}`,borderRadius:4,
                   background:selUnit===u.id?(u.color||C.cyan):C.white,
                   color:selUnit===u.id?'var(--cv-on-accent)':C.navy,cursor:'pointer'}}
@@ -7797,7 +7797,7 @@ function MarginsTab({config,result,months,cc}) {
     <div>
       <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',marginBottom:'1.5rem'}}>
         {sections.map(([id,label])=>(
-          <button key={id} style={{fontFamily:'monospace',fontSize:'1.0rem',padding:'0.5rem 1rem',
+          <button key={id} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.0rem',padding:'0.5rem 1rem',
             border:`1px solid ${section===id?C.cyan:C.border}`,borderRadius:5,
             background:section===id?C.cyan:C.white,color:section===id?C.navy:C.slate,
             cursor:'pointer',fontWeight:section===id?700:400}}
@@ -7843,10 +7843,10 @@ function MarginsTab({config,result,months,cc}) {
                       {pl.breakeven.map((be,i)=>(
                         <tr key={be.line_id} style={{background:i%2===0?C.cream:C.white}}>
                           <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{be.name}</td>
-                          <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{fmt(be.breakeven_revenue,cc)}</td>
-                          <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{fmt(be.current_revenue,cc)}</td>
-                          <td style={{padding:'8px 10px',fontFamily:'monospace',fontWeight:700,color:be.gap>=0?C.green:C.red}}>{fmt(be.gap,cc)}</td>
-                          <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{pct(be.variable_cost_pct)}</td>
+                          <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)'}}>{fmt(be.breakeven_revenue,cc)}</td>
+                          <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)'}}>{fmt(be.current_revenue,cc)}</td>
+                          <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:be.gap>=0?C.green:C.red}}>{fmt(be.gap,cc)}</td>
+                          <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)'}}>{pct(be.variable_cost_pct)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -7946,11 +7946,11 @@ function MarginsTab({config,result,months,cc}) {
                     return (
                       <tr key={u.id} style={{background:i%2===0?C.cream:C.white}}>
                         <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{u.name}</td>
-                        <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace'}}>{u.headcount}</td>
-                        <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace'}}>{fmt(pl.ann_rev,cc)}</td>
-                        <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',color:C.red}}>{fmt(pl.ann_staff,cc)}</td>
-                        <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',color:C.teal}}>{fmt(pl.staff_efficiency.revenue_per_head,cc)}</td>
-                        <td style={{padding:'8px 10px',textAlign:'right',fontFamily:'monospace',color:pl.staff_efficiency.staff_cost_pct<0.3?C.green:pl.staff_efficiency.staff_cost_pct<0.5?C.amber:C.red,fontWeight:700}}>{pct(pl.staff_efficiency.staff_cost_pct)}</td>
+                        <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)'}}>{u.headcount}</td>
+                        <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)'}}>{fmt(pl.ann_rev,cc)}</td>
+                        <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',color:C.red}}>{fmt(pl.ann_staff,cc)}</td>
+                        <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',color:C.teal}}>{fmt(pl.staff_efficiency.revenue_per_head,cc)}</td>
+                        <td style={{padding:'8px 10px',textAlign:'right',fontFamily: 'var(--cv-font-mono)',color:pl.staff_efficiency.staff_cost_pct<0.3?C.green:pl.staff_efficiency.staff_cost_pct<0.5?C.amber:C.red,fontWeight:700}}>{pct(pl.staff_efficiency.staff_cost_pct)}</td>
                       </tr>
                     )
                   })}
@@ -8035,7 +8035,7 @@ function UncategorizedCostsSection({config,P}:{config:GenericModelConfig;P:any})
                 <div style={{fontWeight:700,fontSize:'1.04rem',color:C.navy}}>{cost.description}</div>
                 <div style={{fontSize:'1.0rem',color:C.slate,marginTop:'0.15rem'}}>{unitName(cost.business_unit_id)} · {cost.transaction_date}</div>
               </div>
-              <div style={{fontFamily:'monospace',fontWeight:700,fontSize:'1.09rem',color:C.red,whiteSpace:'nowrap'}}>{fmt(cost.amount,config.currency)}</div>
+              <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,fontSize:'1.09rem',color:C.red,whiteSpace:'nowrap'}}>{fmt(cost.amount,config.currency)}</div>
             </div>
             {categorizingId===cost.id ? (
               <div style={{display:'flex',gap:'0.5rem',marginTop:'0.6rem'}}>
@@ -8062,7 +8062,7 @@ function UncategorizedCostsSection({config,P}:{config:GenericModelConfig;P:any})
 // Rounded "subtab pill" mode switcher (cyan active pill), matching the
 // Intelligence tab's section pills and the approved mockup .subtab style.
 function subtabPill(active: boolean): React.CSSProperties {
-  return {fontFamily:'monospace',fontSize:'0.96rem',padding:'0.42rem 0.85rem',
+  return {fontFamily: 'var(--cv-font-mono)',fontSize:'0.96rem',padding:'0.42rem 0.85rem',
     border:`1px solid ${active?C.cyan:C.border}`,borderRadius:8,
     background:active?C.cyan:C.white,color:active?C.navy:C.slate,
     cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap',
@@ -8237,13 +8237,13 @@ function PromotionEventsSection({clientId,config,cc,P,events,setEvents}) {
                 {channelRows.map((r,i)=>(
                   <tr key={r.channel} style={{background:i%2===0?C.cream:C.white}}>
                     <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{r.channel}</td>
-                    <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{r.events}</td>
-                    <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{fmt(r.cost,cc)}</td>
-                    <td style={{padding:'8px 10px',fontFamily:'monospace'}}>{r.customers}</td>
-                    <td style={{padding:'8px 10px',fontFamily:'monospace',fontWeight:700,color:r.cac===null?C.slate:r.cac<r.cost/Math.max(1,r.customers)*0.8?C.green:C.navy}}>
+                    <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)'}}>{r.events}</td>
+                    <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)'}}>{fmt(r.cost,cc)}</td>
+                    <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)'}}>{r.customers}</td>
+                    <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:r.cac===null?C.slate:r.cac<r.cost/Math.max(1,r.customers)*0.8?C.green:C.navy}}>
                       {r.cac===null?'No customers recorded':fmt(r.cac,cc)}
                     </td>
-                    <td style={{padding:'8px 10px',fontFamily:'monospace',color:C.green}}>{fmt(r.revenueLift,cc)}</td>
+                    <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)',color:C.green}}>{fmt(r.revenueLift,cc)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -8311,9 +8311,9 @@ function PromotionEventsSection({clientId,config,cc,P,events,setEvents}) {
 function GlanceCard({label,value,desc,accent,valueColor,descColor}:{label:string;value:string;desc?:React.ReactNode;accent:string;valueColor?:string;descColor?:string}) {
   return (
     <div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-2)',borderLeft:`4px solid ${accent}`}}>
-      <div style={{fontFamily:'monospace',fontSize:'1.09rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.35rem'}}>{label}</div>
-      <div style={{fontFamily:'Georgia,serif',fontSize:'1.4rem',fontWeight:700,color:valueColor||C.navy,lineHeight:1.1}}>{value}</div>
-      {desc&&<div style={{fontSize:'0.94rem',marginTop:'0.18rem',fontFamily:'monospace',color:descColor||C.slate,display:'flex',alignItems:'center',gap:'0.35rem'}}>{desc}</div>}
+      <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.09rem',letterSpacing:'0.08em',textTransform:'uppercase',color:C.slate,marginBottom:'0.35rem'}}>{label}</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.4rem',fontWeight:700,color:valueColor||C.navy,lineHeight:1.1}}>{value}</div>
+      {desc&&<div style={{fontSize:'0.94rem',marginTop:'0.18rem',fontFamily: 'var(--cv-font-mono)',color:descColor||C.slate,display:'flex',alignItems:'center',gap:'0.35rem'}}>{desc}</div>}
     </div>
   )
 }
@@ -8433,7 +8433,7 @@ function CashFlowTab({config,result,months,cc,closedPeriods}) {
       <div style={{...card,padding:0,overflow:'hidden',marginTop:'1.1rem'}}>
         <div style={{...cardHead,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.5rem'}}>
           <span>Cash balance over time</span>
-          <span style={{display:'flex',gap:'1rem',fontSize:'0.96rem',color:C.slate,fontFamily:'monospace'}}>
+          <span style={{display:'flex',gap:'1rem',fontSize:'0.96rem',color:C.slate,fontFamily: 'var(--cv-font-mono)'}}>
             <span><span style={{display:'inline-block',width:22,borderTop:`2px solid ${C.teal}`,verticalAlign:'middle',marginRight:5}}/>Actual to date</span>
             <span><span style={{display:'inline-block',width:22,borderTop:`2px dashed ${C.teal}`,verticalAlign:'middle',marginRight:5}}/>Projected</span>
           </span>

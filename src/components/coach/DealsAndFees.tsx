@@ -29,18 +29,18 @@ const C = {
   lightBg:'var(--cv-alt)',
 }
 const card = {background:C.white,border:'1px solid var(--cv-border-soft)',borderRadius:14,padding:'1.35rem 1.5rem',marginBottom:'1.25rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)'}
-const secH = {fontFamily:'Georgia,serif',fontSize:'1.32rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
+const secH = {fontFamily:'var(--cv-font)',fontSize:'1.32rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
 const inp  = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'1.13rem',fontFamily:'inherit',background:'var(--cv-bg-2)',color:C.navy,boxSizing:'border-box'}
 const lbl  = {display:'block',fontWeight:600,fontSize:'1.07rem',marginBottom:'0.2rem',color:C.navy}
 const hint = {fontSize:'1.01rem',color:C.slate,lineHeight:1.4}
 const fGrid= {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:'0.8rem'}
 const th   = {padding:'0.4rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`,whiteSpace:'nowrap'}
 const td   = {padding:'0.4rem 0.6rem',verticalAlign:'top'}
-function addBtn(sm=false,col=C.cyan){return{fontFamily:'monospace',fontSize:sm?'0.91rem':'0.95rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:6,background:'transparent',color:col,cursor:'pointer'}}
-function solidBtn(col=C.cyan,sm=false){return{fontFamily:'monospace',fontSize:sm?'0.95rem':'1.01rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:'var(--cv-on-accent)',cursor:'pointer'}}
-function subPill(active,col=C.cyan){return{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
-function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily:'monospace',fontSize:'1.13rem',letterSpacing:'0.1em',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.2rem'}}>{sub}</div>}</div>)}
-function Badge({text,color}){return<span style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
+function addBtn(sm=false,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.91rem':'0.95rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:6,background:'transparent',color:col,cursor:'pointer'}}
+function solidBtn(col=C.cyan,sm=false){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.95rem':'1.01rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:'var(--cv-on-accent)',cursor:'pointer'}}
+function subPill(active,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
+function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.13rem',letterSpacing:'0.1em',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.5rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.2rem'}}>{sub}</div>}</div>)}
+function Badge({text,color}){return<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
 
 const num=(v)=>{const n=Number(v);return Number.isFinite(n)?n:0}
 const fmtMoney=(n,cur)=>formatMoney(n,cur,0)
@@ -112,7 +112,7 @@ function NewProgrammeForm({onSave,onCancel}){
         <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginTop:'0.3rem'}}>
           {DEAL_SERVICE_OPTIONS.map(opt=>{
             const active=f.deal_services.includes(opt.key)
-            return<button key={opt.key} onClick={()=>toggleService(opt.key)} style={{fontFamily:'monospace',fontSize:'0.85rem',border:`1px solid ${active?C.teal:C.border}`,background:active?C.teal:'transparent',color:active?'var(--cv-on-accent)':C.slate,borderRadius:999,padding:'0.25rem 0.75rem',cursor:'pointer'}}>{opt.label}</button>
+            return<button key={opt.key} onClick={()=>toggleService(opt.key)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',border:`1px solid ${active?C.teal:C.border}`,background:active?C.teal:'transparent',color:active?'var(--cv-on-accent)':C.slate,borderRadius:999,padding:'0.25rem 0.75rem',cursor:'pointer'}}>{opt.label}</button>
           })}
         </div>
       </div>
@@ -149,8 +149,8 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
   return(
     <div>
       <div style={{background:C.navy,color:'var(--cv-on-accent)',borderRadius:'10px 10px 0 0',padding:'0.95rem 1.4rem',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem'}}>
-        <div style={{fontFamily:'Georgia,serif',fontWeight:700,fontSize:'1.05rem'}}>Pipeline</div>
-        <button onClick={()=>setShowNew(!showNew)} style={{fontFamily:'monospace',fontSize:'0.85rem',fontWeight:700,background:'var(--cv-cyan)',border:'none',color:'var(--cv-on-accent)',borderRadius:6,padding:'0.4rem 0.9rem',cursor:'pointer'}}>+ New Prospect</button>
+        <div style={{fontFamily:'var(--cv-font)',fontWeight:700,fontSize:'1.05rem'}}>Pipeline</div>
+        <button onClick={()=>setShowNew(!showNew)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',fontWeight:700,background:'var(--cv-cyan)',border:'none',color:'var(--cv-on-accent)',borderRadius:6,padding:'0.4rem 0.9rem',cursor:'pointer'}}>+ New Prospect</button>
       </div>
       <div style={{border:'1px solid var(--cv-border-soft)',borderTop:'none',borderRadius:'0 0 10px 10px',padding:'1.2rem',background:C.white}}>
       {showNew&&<NewProgrammeForm onSave={createProgramme} onCancel={()=>setShowNew(false)}/>}
@@ -186,7 +186,7 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
                     {DEAL_SERVICE_OPTIONS.map(opt=>{
                       const active=services.includes(opt.key)
                       return(
-                        <button key={opt.key} onClick={()=>toggleService(opt.key)} style={{fontFamily:'monospace',fontSize:'0.78rem',border:`1px solid ${active?C.teal:C.border}`,background:active?C.teal:'transparent',color:active?'var(--cv-on-accent)':C.slate,borderRadius:999,padding:'0.15rem 0.6rem',cursor:'pointer'}}>{opt.label}</button>
+                        <button key={opt.key} onClick={()=>toggleService(opt.key)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',border:`1px solid ${active?C.teal:C.border}`,background:active?C.teal:'transparent',color:active?'var(--cv-on-accent)':C.slate,borderRadius:999,padding:'0.15rem 0.6rem',cursor:'pointer'}}>{opt.label}</button>
                       )
                     })}
                   </div>

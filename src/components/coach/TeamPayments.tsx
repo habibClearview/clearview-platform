@@ -35,18 +35,18 @@ const C = {
   lightBg:'var(--cv-alt)',
 }
 const card = {background:C.white,border:'1px solid var(--cv-border-soft)',borderRadius:14,padding:'1.35rem 1.5rem',marginBottom:'1.25rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)'}
-const secH = {fontFamily:'Georgia,serif',fontSize:'1.32rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
+const secH = {fontFamily:'var(--cv-font)',fontSize:'1.32rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
 const inp  = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'1.13rem',fontFamily:'inherit',background:'var(--cv-bg-2)',color:C.navy,boxSizing:'border-box'}
 const lbl  = {display:'block',fontWeight:600,fontSize:'1.07rem',marginBottom:'0.2rem',color:C.navy}
 const hint = {fontSize:'1.01rem',color:C.slate,lineHeight:1.4}
 const fGrid= {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'0.8rem'}
 const th   = {padding:'0.4rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`,whiteSpace:'nowrap'}
 const td   = {padding:'0.4rem 0.6rem',verticalAlign:'top'}
-function addBtn(sm=false,col=C.cyan){return{fontFamily:'monospace',fontSize:sm?'0.91rem':'0.95rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:6,background:'transparent',color:col,cursor:'pointer'}}
-function solidBtn(col=C.cyan,sm=false){return{fontFamily:'monospace',fontSize:sm?'0.95rem':'1.01rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:'var(--cv-on-accent)',cursor:'pointer'}}
-function subPill(active,col=C.cyan){return{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
-function Badge({text,color}){return<span style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
-function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily:'monospace',fontSize:'1.13rem',letterSpacing:'0.1em',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.2rem'}}>{sub}</div>}</div>)}
+function addBtn(sm=false,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.91rem':'0.95rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:6,background:'transparent',color:col,cursor:'pointer'}}
+function solidBtn(col=C.cyan,sm=false){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.95rem':'1.01rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:'var(--cv-on-accent)',cursor:'pointer'}}
+function subPill(active,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
+function Badge({text,color}){return<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
+function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.13rem',letterSpacing:'0.1em',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.5rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.2rem'}}>{sub}</div>}</div>)}
 
 // ─── helpers ─────────────────────────────────────────────────
 const num = (v)=>{const n=Number(v);return Number.isFinite(n)?n:0}
@@ -127,7 +127,7 @@ function CostOfDeliveryChart({coImplementers,entries,expenses}){
           })}
         </svg>
       </div>
-      <div style={{display:'flex',gap:'1.1rem',fontSize:'0.93rem',fontFamily:'monospace',color:C.slate,marginTop:'0.4rem',flexWrap:'wrap'}}>
+      <div style={{display:'flex',gap:'1.1rem',fontSize:'0.93rem',fontFamily: 'var(--cv-font-mono)',color:C.slate,marginTop:'0.4rem',flexWrap:'wrap'}}>
         <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:C.navy,marginRight:5,verticalAlign:'middle'}}/>Time cost ({cur})</span>
         <span><span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:C.cyan,marginRight:5,verticalAlign:'middle'}}/>Approved expenses</span>
       </div>
@@ -203,7 +203,7 @@ function AccessSection({coImplementers,setCoImplementers,clients,setMsg}){
               <div>
                 <div style={{fontWeight:700,fontSize:'1.16rem',color:C.navy}}>{ci.name}</div>
                 <div style={{fontSize:'1.01rem',color:C.slate}}>{ci.country||'Co-implementer'}</div>
-                {rateOf(ci)>0&&<div style={{fontFamily:'monospace',fontSize:'0.99rem',color:C.teal,marginTop:'0.2rem',fontWeight:700}}>{fmtMoney(rateOf(ci),curOf(ci))}/day</div>}
+                {rateOf(ci)>0&&<div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.99rem',color:C.teal,marginTop:'0.2rem',fontWeight:700}}>{fmtMoney(rateOf(ci),curOf(ci))}/day</div>}
               </div>
               <div style={{border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden'}}>
                 {assigned.length===0&&<div style={{padding:'0.5rem 0.8rem',fontSize:'1.07rem',color:C.slate}}>No clients assigned</div>}
@@ -418,19 +418,19 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
           corner stays tidy; only the rate chip shows here. */}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'1rem',flexWrap:'wrap',paddingBottom:'0.85rem',borderBottom:'1px solid var(--cv-border-soft)',marginBottom:'0.9rem'}}>
         <div style={{display:'flex',alignItems:'center',gap:'0.7rem',minWidth:0}}>
-          <div style={{width:42,height:42,borderRadius:12,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'monospace',fontWeight:700,fontSize:'0.95rem',flexShrink:0}}>{initials}</div>
+          <div style={{width:42,height:42,borderRadius:12,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily: 'var(--cv-font-mono)',fontWeight:700,fontSize:'0.95rem',flexShrink:0}}>{initials}</div>
           <div style={{minWidth:0}}>
             <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexWrap:'wrap'}}>
               <div style={{fontWeight:700,fontSize:'1.16rem',color:C.navy}}>{ci.name}</div>
               {canManage
-                ?<button onClick={toggleActive} style={{fontFamily:'monospace',fontSize:'0.78rem',color:ci.active!==false?C.green:C.red,background:'transparent',border:`1px solid ${ci.active!==false?C.green:C.red}`,borderRadius:4,padding:'0.02rem 0.4rem',cursor:'pointer'}}>{ci.active!==false?'Active':'Inactive'}</button>
+                ?<button onClick={toggleActive} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',color:ci.active!==false?C.green:C.red,background:'transparent',border:`1px solid ${ci.active!==false?C.green:C.red}`,borderRadius:4,padding:'0.02rem 0.4rem',cursor:'pointer'}}>{ci.active!==false?'Active':'Inactive'}</button>
                 :<Badge text={ci.active!==false?'Active':'Inactive'} color={ci.active!==false?C.green:C.red}/>}
             </div>
             <div style={{fontSize:'0.95rem',color:C.slate}}>{ci.email}{ci.country?` · ${ci.country}`:''}{ci.specialisation?` · ${ci.specialisation}`:''}</div>
           </div>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexWrap:'wrap'}}>
-          <span style={{fontFamily:'monospace',fontSize:'0.85rem',background:d.rate>0?'var(--cv-tint-cyan)':'var(--cv-tint-amber)',color:d.rate>0?C.cyan:C.amber,borderRadius:999,padding:'0.25rem 0.7rem'}}>{d.rate>0?`${fmtMoney(d.rate,curOf(ci))} / day`:'no day rate set'}</span>
+          <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',background:d.rate>0?'var(--cv-tint-cyan)':'var(--cv-tint-amber)',color:d.rate>0?C.cyan:C.amber,borderRadius:999,padding:'0.25rem 0.7rem'}}>{d.rate>0?`${fmtMoney(d.rate,curOf(ci))} / day`:'no day rate set'}</span>
           {canManage&&<button style={addBtn(true)} onClick={()=>editingProfile?setEditingProfile(false):startEditProfile()}>{editingProfile?'Cancel':'Edit profile'}</button>}
           {renderInvite&&renderInvite(ci)}
           {canManage&&removeCI&&<button style={addBtn(true,C.red)} disabled={busy} title="Remove this team member from the system"
@@ -456,7 +456,7 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
       <div style={{display:'flex',gap:'0.4rem',flexWrap:'wrap',alignItems:'center',marginBottom:'0.85rem',fontSize:'1.01rem',color:C.slate}}>
         <span>Clients:</span>
         {assignedClients.length===0&&<strong style={{color:C.slate}}>none assigned</strong>}
-        {assignedClients.map(c=><span key={c.id} style={{fontFamily:'monospace',fontSize:'0.93rem',padding:'0.12rem 0.55rem',borderRadius:20,background:'var(--cv-cyan-dim)',color:C.teal,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:'0.3rem'}}>{c.name}{canManage&&<span style={{cursor:'pointer',fontWeight:700}} onClick={()=>unassignClient(c.id)} title="Remove">×</span>}</span>)}
+        {assignedClients.map(c=><span key={c.id} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.12rem 0.55rem',borderRadius:20,background:'var(--cv-cyan-dim)',color:C.teal,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:'0.3rem'}}>{c.name}{canManage&&<span style={{cursor:'pointer',fontWeight:700}} onClick={()=>unassignClient(c.id)} title="Remove">×</span>}</span>)}
         {canManage&&(addingClient?(
           <select autoFocus style={{...inp,width:'auto',fontSize:'0.93rem',padding:'0.15rem 0.4rem'}} value="" onChange={e=>assignClient(e.target.value)} onBlur={()=>setAddingClient(false)}>
             <option value="">Select a client…</option>
@@ -467,10 +467,10 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
 
       {/* The four headline numbers -- one per staff member, this period. */}
       {canApprove&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:'0.6rem',marginBottom:'0.85rem'}}>
-        <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'0.55rem 0.7rem'}}><div style={{fontFamily:'monospace',fontSize:'0.78rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Approved days</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.22rem',fontWeight:700,color:C.navy}}>{fmtDays(d.days)}</div></div>
-        <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'0.55rem 0.7rem'}}><div style={{fontFamily:'monospace',fontSize:'0.78rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Draft invoice (net)</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.22rem',fontWeight:700,color:C.teal}}>{fmtMoney(d.net,curOf(ci))}</div></div>
-        <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'0.55rem 0.7rem'}}><div style={{fontFamily:'monospace',fontSize:'0.78rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Open advances</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.22rem',fontWeight:700,color:d.openAdvanceTotal?C.red:C.navy}}>{fmtMoney(d.openAdvanceTotal,curOf(ci))}</div></div>
-        <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'0.55rem 0.7rem'}}><div style={{fontFamily:'monospace',fontSize:'0.78rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Invoices issued</div><div style={{fontFamily:'Georgia,serif',fontSize:'1.22rem',fontWeight:700,color:C.purple}}>{issuedByCi.length}</div></div>
+        <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'0.55rem 0.7rem'}}><div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Approved days</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.22rem',fontWeight:700,color:C.navy}}>{fmtDays(d.days)}</div></div>
+        <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'0.55rem 0.7rem'}}><div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Draft invoice (net)</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.22rem',fontWeight:700,color:C.teal}}>{fmtMoney(d.net,curOf(ci))}</div></div>
+        <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'0.55rem 0.7rem'}}><div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Open advances</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.22rem',fontWeight:700,color:d.openAdvanceTotal?C.red:C.navy}}>{fmtMoney(d.openAdvanceTotal,curOf(ci))}</div></div>
+        <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'0.55rem 0.7rem'}}><div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate}}>Invoices issued</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.22rem',fontWeight:700,color:C.purple}}>{issuedByCi.length}</div></div>
       </div>}
 
 
@@ -670,7 +670,7 @@ function InvoiceSection({ci,period,draft,clientName,entries,expenses,advances,se
     ].join('')
     return `<!doctype html><html><head><meta charset="utf-8"><title>${inv.invoice_number}</title>
 <style>body{font-family:Segoe UI,system-ui,sans-serif;color:#1b2a3a;max-width:720px;margin:2rem auto;padding:0 1.5rem}
-h1{font-family:Georgia,serif} table{width:100%;border-collapse:collapse;margin-top:1rem}
+h1{font-family:var(--cv-font)} table{width:100%;border-collapse:collapse;margin-top:1rem}
 td,th{padding:.5rem .6rem;border-bottom:1px solid #ddd} .tot{font-weight:700;font-size:1.1rem}
 .meta{color:#556;font-size:.85rem;line-height:1.6}</style></head><body>
 <h1>Invoice ${inv.invoice_number}</h1>

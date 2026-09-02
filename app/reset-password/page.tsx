@@ -70,10 +70,10 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: C.cream, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: "'Segoe UI', system-ui, sans-serif", padding: '1rem' }}>
+    <div style={{ minHeight: '100vh', background: C.cream, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: "var(--cv-font)", padding: '1rem' }}>
       <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
-        <div style={{ fontFamily: 'monospace', fontSize: '0.7rem', letterSpacing: '0.18em', color: C.slate, marginBottom: '0.4rem' }}>CANVAS COACH</div>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', fontWeight: 700, color: C.navy }}>Clearview</div>
+        <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.7rem', letterSpacing: '0.18em', color: C.slate, marginBottom: '0.4rem' }}>CANVAS COACH</div>
+        <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.8rem', fontWeight: 700, color: C.navy }}>Clearview</div>
       </div>
 
       <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, padding: '2rem 2.25rem', width: '100%', maxWidth: 400, boxShadow: '0 4px 24px rgba(0,0,0,0.07)' }}>
@@ -82,19 +82,19 @@ export default function ResetPasswordPage() {
         ) : done ? (
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>✅</div>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 700, color: C.navy, marginBottom: '0.5rem' }}>Password updated</h2>
+            <h2 style={{ fontFamily: 'var(--cv-font)', fontSize: '1.15rem', fontWeight: 700, color: C.navy, marginBottom: '0.5rem' }}>Password updated</h2>
             <p style={{ fontSize: '0.85rem', color: C.slate, lineHeight: 1.6, marginBottom: '1.25rem' }}>Your new password is set. Please sign in with it.</p>
-            <a href="/" style={{ display: 'inline-block', padding: '0.65rem 1.25rem', border: 'none', borderRadius: 5, background: C.cyan, color: C.navy, fontSize: '0.9rem', fontWeight: 700, fontFamily: 'monospace', textDecoration: 'none' }}>Go to sign in</a>
+            <a href="/" style={{ display: 'inline-block', padding: '0.65rem 1.25rem', border: 'none', borderRadius: 5, background: C.cyan, color: C.navy, fontSize: '0.9rem', fontWeight: 700, fontFamily: 'var(--cv-font-mono)', textDecoration: 'none' }}>Go to sign in</a>
           </div>
         ) : !ready ? (
           <div style={{ textAlign: 'center' }}>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.15rem', fontWeight: 700, color: C.navy, marginBottom: '0.5rem' }}>This reset link is invalid or has expired</h2>
+            <h2 style={{ fontFamily: 'var(--cv-font)', fontSize: '1.15rem', fontWeight: 700, color: C.navy, marginBottom: '0.5rem' }}>This reset link is invalid or has expired</h2>
             <p style={{ fontSize: '0.85rem', color: C.slate, lineHeight: 1.6, marginBottom: '1.25rem' }}>Reset links can only be used once and expire after a short time. Please request a new one from the sign-in page.</p>
             <a href="/" style={{ display: 'inline-block', padding: '0.6rem 1.1rem', border: `1px solid ${C.border}`, borderRadius: 5, background: 'transparent', color: C.slate, fontSize: '0.85rem', textDecoration: 'none' }}>Back to sign in</a>
           </div>
         ) : (
           <>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.2rem', fontWeight: 700, color: C.navy, marginBottom: '1.25rem', textAlign: 'center' }}>Set a new password</h2>
+            <h2 style={{ fontFamily: 'var(--cv-font)', fontSize: '1.2rem', fontWeight: 700, color: C.navy, marginBottom: '1.25rem', textAlign: 'center' }}>Set a new password</h2>
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: '1rem' }}>
                 <label htmlFor="new-password" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: C.navy, marginBottom: '0.3rem' }}>New password</label>
@@ -112,7 +112,7 @@ export default function ResetPasswordPage() {
                 <div style={{ background: '#FDF0EE', border: `1px solid ${C.red}`, borderRadius: 5, padding: '0.6rem 0.8rem', marginBottom: '1rem', fontSize: '0.82rem', color: C.red }}>{error}</div>
               )}
               <button type="submit" disabled={saving}
-                style={{ width: '100%', padding: '0.75rem', border: 'none', borderRadius: 5, background: saving ? '#90C8D8' : C.cyan, color: C.navy, fontSize: '0.92rem', fontWeight: 700, fontFamily: 'monospace', cursor: saving ? 'not-allowed' : 'pointer', letterSpacing: '0.04em' }}>
+                style={{ width: '100%', padding: '0.75rem', border: 'none', borderRadius: 5, background: saving ? '#90C8D8' : C.cyan, color: C.navy, fontSize: '0.92rem', fontWeight: 700, fontFamily: 'var(--cv-font-mono)', cursor: saving ? 'not-allowed' : 'pointer', letterSpacing: '0.04em' }}>
                 {saving ? 'Saving…' : 'Set new password'}
               </button>
             </form>
@@ -120,7 +120,7 @@ export default function ResetPasswordPage() {
         )}
       </div>
 
-      <div style={{ marginTop: '2rem', fontSize: '0.72rem', color: C.slate, fontFamily: 'monospace' }}>
+      <div style={{ marginTop: '2rem', fontSize: '0.72rem', color: C.slate, fontFamily: 'var(--cv-font-mono)' }}>
         Canvas Coach · Clearview Planner · habibonifade.com
       </div>
     </div>

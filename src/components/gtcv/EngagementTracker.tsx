@@ -128,12 +128,12 @@ export default function EngagementTracker({ clientId, canManage }) {
   const cell = { padding: '10px 11px', borderTop: `1px solid ${C.lineSoft}`, verticalAlign: 'top', fontSize: 13.5 }
   const input = {
     width: '100%', border: `1px solid ${C.line}`, borderRadius: 7, padding: '7px 9px',
-    background: C.box, color: C.ink, fontSize: 13, fontFamily: "'Segoe UI',system-ui,sans-serif",
+    background: C.box, color: C.ink, fontSize: 13, fontFamily: "var(--cv-font)",
   }
 
   return (
-    <div style={{ fontFamily: "'Segoe UI',system-ui,sans-serif", color: C.ink }}>
-      <h2 style={{ fontFamily: 'Georgia,serif', fontSize: 22, margin: '0 0 4px', fontWeight: 600 }}>
+    <div style={{ fontFamily: "var(--cv-font)", color: C.ink }}>
+      <h2 style={{ fontFamily: 'var(--cv-font)', fontSize: 22, margin: '0 0 4px', fontWeight: 600 }}>
         Engagement Tracker
       </h2>
       <p style={{ margin: '0 0 16px', color: C.soft, fontSize: 14, maxWidth: '92ch' }}>
@@ -165,7 +165,7 @@ export default function EngagementTracker({ clientId, canManage }) {
             <tr>
               {['Block', 'Status', 'Evidence so far', 'Priority action for the next session'].map((h, i) => (
                 <th key={h} style={{
-                  textAlign: 'left', fontFamily: 'ui-monospace,monospace', fontSize: 9.5,
+                  textAlign: 'left', fontFamily: 'var(--cv-font-mono)', fontSize: 9.5,
                   letterSpacing: '.12em', textTransform: 'uppercase', color: C.faint,
                   padding: '11px', borderBottom: `1px solid ${C.line}`, background: C.box,
                   width: i === 0 ? '22%' : i === 1 ? '16%' : '31%',

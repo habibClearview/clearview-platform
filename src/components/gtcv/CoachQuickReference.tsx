@@ -31,8 +31,8 @@ export default function CoachQuickReference({ showGuidance = true }) {
   const points = CANVAS_DECISION_POINTS || []
 
   return (
-    <div style={{ fontFamily: "'Segoe UI',system-ui,sans-serif", color: C.ink }}>
-      <h2 style={{ fontFamily: 'Georgia,serif', fontSize: 22, margin: '0 0 4px', fontWeight: 600 }}>
+    <div style={{ fontFamily: "var(--cv-font)", color: C.ink }}>
+      <h2 style={{ fontFamily: 'var(--cv-font)', fontSize: 22, margin: '0 0 4px', fontWeight: 600 }}>
         Coach Quick Reference
       </h2>
       <p style={{ margin: '0 0 18px', color: C.soft, fontSize: 14, maxWidth: '92ch' }}>
@@ -73,11 +73,11 @@ export default function CoachQuickReference({ showGuidance = true }) {
                   }}
                 >
                   <span style={{
-                    fontFamily: 'ui-monospace,monospace', fontSize: 10, fontWeight: 700,
+                    fontFamily: 'var(--cv-font-mono)', fontSize: 10, fontWeight: 700,
                     letterSpacing: '.06em', color: '#fff', background: C.teal,
                     borderRadius: 4, padding: '3px 8px',
                   }}>{dp.number || String(dp.id).toUpperCase()}</span>
-                  <span style={{ fontFamily: 'Georgia,serif', fontSize: 17, fontWeight: 600 }}>
+                  <span style={{ fontFamily: 'var(--cv-font)', fontSize: 17, fontWeight: 600 }}>
                     {dp.zone}
                   </span>
                   {dp.session_time ? (
@@ -95,21 +95,21 @@ export default function CoachQuickReference({ showGuidance = true }) {
                   {isOpen ? (
                     <div style={{ marginTop: 14 }}>
                       <p style={{
-                        fontFamily: 'ui-monospace,monospace', fontSize: 10, letterSpacing: '.14em',
+                        fontFamily: 'var(--cv-font-mono)', fontSize: 10, letterSpacing: '.14em',
                         textTransform: 'uppercase', color: C.teal, margin: '0 0 8px',
                       }}>What a good answer sounds like</p>
                       <p style={{ margin: '0 0 6px', fontSize: 13.5, color: C.soft, lineHeight: 1.55 }}>
                         {dp.good_answer}
                       </p>
                       <p style={{
-                        fontFamily: 'ui-monospace,monospace', fontSize: 10, letterSpacing: '.14em',
+                        fontFamily: 'var(--cv-font-mono)', fontSize: 10, letterSpacing: '.14em',
                         textTransform: 'uppercase', color: C.gold, margin: '14px 0 8px',
                       }}>And what a weak one sounds like</p>
                       <p style={{ margin: '0 0 6px', fontSize: 13.5, color: C.soft, lineHeight: 1.55 }}>
                         {dp.weak_answer}
                       </p>
                       <p style={{
-                        fontFamily: 'ui-monospace,monospace', fontSize: 10, letterSpacing: '.14em',
+                        fontFamily: 'var(--cv-font-mono)', fontSize: 10, letterSpacing: '.14em',
                         textTransform: 'uppercase', color: C.teal, margin: '14px 0 8px',
                       }}>The nine components</p>
                       <ol style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -148,7 +148,7 @@ export default function CoachQuickReference({ showGuidance = true }) {
         </div>
       )}
 
-      <p style={{ marginTop: 22, fontSize: 12, color: C.faint, fontFamily: 'Georgia,serif' }}>
+      <p style={{ marginTop: 22, fontSize: 12, color: C.faint, fontFamily: 'var(--cv-font)' }}>
         Grant-to-Commercial Viability Canvas&trade; · The Canvas Coach · habibonifade.com
       </p>
     </div>

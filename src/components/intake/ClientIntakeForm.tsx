@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase'
 // switches to "Upload completed template".
 const SpreadsheetUpload = dynamic(() => import('@/components/intake/SpreadsheetUpload'), {
   ssr: false,
-  loading: () => <div style={{fontFamily:'monospace',fontSize:'0.9rem',padding:'0.6rem 0',color:'#4A5A6A'}}>Loading uploader…</div>,
+  loading: () => <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.9rem',padding:'0.6rem 0',color:'#4A5A6A'}}>Loading uploader…</div>,
 })
 
 const C = {
@@ -18,13 +18,13 @@ const C = {
   red:'#C0392B', green:'#1A7A4A', amber:'#B8860B',
 }
 const card = {background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.5rem',marginBottom:'1.25rem'}
-const secH = {fontFamily:'Georgia,serif',fontSize:'1.1rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
+const secH = {fontFamily:'var(--cv-font)',fontSize:'1.1rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
 const inp = {width:'100%',padding:'0.55rem 0.7rem',border:`1px solid ${C.border}`,borderRadius:5,fontSize:'0.88rem',fontFamily:'inherit',background:'#F4F8FC',color:C.navy,boxSizing:'border-box'}
 const lbl = {display:'block',fontWeight:600,fontSize:'0.83rem',marginBottom:'0.3rem',color:C.navy}
 const fGrid = {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:'1.1rem'}
-const btn = (col=C.navy) => ({fontFamily:'monospace',fontSize:'0.85rem',fontWeight:600,padding:'0.6rem 1.4rem',border:'none',borderRadius:5,background:col,color:C.white,cursor:'pointer'})
-const ghostBtn = {fontFamily:'monospace',fontSize:'0.85rem',fontWeight:600,padding:'0.6rem 1.4rem',border:`1px solid ${C.border}`,borderRadius:5,background:C.white,color:C.navy,cursor:'pointer'}
-const smallBtn = (col=C.cyan) => ({fontFamily:'monospace',fontSize:'0.74rem',padding:'0.32rem 0.7rem',border:`1px solid ${col}`,borderRadius:4,background:'transparent',color:col,cursor:'pointer'})
+const btn = (col=C.navy) => ({fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',fontWeight:600,padding:'0.6rem 1.4rem',border:'none',borderRadius:5,background:col,color:C.white,cursor:'pointer'})
+const ghostBtn = {fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',fontWeight:600,padding:'0.6rem 1.4rem',border:`1px solid ${C.border}`,borderRadius:5,background:C.white,color:C.navy,cursor:'pointer'}
+const smallBtn = (col=C.cyan) => ({fontFamily: 'var(--cv-font-mono)',fontSize:'0.74rem',padding:'0.32rem 0.7rem',border:`1px solid ${col}`,borderRadius:4,background:'transparent',color:col,cursor:'pointer'})
 
 const STEPS = ['Welcome','About Your Business','Business Structure','Products & Figures','Funding & Capital','Review & Submit']
 
@@ -50,9 +50,9 @@ class IntakeErrorBoundary extends Component<{children:React.ReactNode},{hasError
         <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:C.cream,padding:'1.5rem'}}>
           <div style={{...card,maxWidth:480,textAlign:'center'}}>
             <div style={{fontSize:'2rem',marginBottom:'1rem'}}>⚠️</div>
-            <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.red,marginBottom:'0.75rem'}}>Something went wrong</div>
+            <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.red,marginBottom:'0.75rem'}}>Something went wrong</div>
             <p style={{color:C.slate,fontSize:'0.88rem',marginBottom:'1rem'}}>The form ran into a problem and could not continue. Please contact your coach with this message:</p>
-            <div style={{background:'#FDF0EE',borderRadius:5,padding:'0.75rem',fontSize:'0.78rem',color:C.red,fontFamily:'monospace',wordBreak:'break-word',marginBottom:'1rem'}}>{this.state.errorMsg}</div>
+            <div style={{background:'#FDF0EE',borderRadius:5,padding:'0.75rem',fontSize:'0.78rem',color:C.red,fontFamily: 'var(--cv-font-mono)',wordBreak:'break-word',marginBottom:'1rem'}}>{this.state.errorMsg}</div>
             <button style={btn()} onClick={()=>window.location.reload()}>Reload and Try Again</button>
           </div>
         </div>
@@ -346,7 +346,7 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:C.cream}}>
       <div style={{...card,maxWidth:480,textAlign:'center'}}>
         <div style={{fontSize:'2rem',marginBottom:'1rem'}}>✓</div>
-        <div style={{fontFamily:'Georgia,serif',fontSize:'1.3rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}}>Thank you</div>
+        <div style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}}>Thank you</div>
         <p style={{color:C.slate,fontSize:'0.9rem',lineHeight:1.7}}>Your information has been submitted. Your Canvas Coach will review it and set up your Clearview dashboard. You will receive login details shortly.</p>
       </div>
     </div>
@@ -355,13 +355,13 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
   const activeKeys = hasUnits ? units.filter(u=>u.name).map(u=>u.id) : [wholeKey]
 
   return (
-    <div style={{minHeight:'100vh',background:C.cream,fontFamily:"'Segoe UI',system-ui,sans-serif",padding:'2rem 1rem'}}>
+    <div style={{minHeight:'100vh',background:C.cream,fontFamily:"var(--cv-font)",padding:'2rem 1rem'}}>
       <div style={{maxWidth:920,margin:'0 auto'}}>
         <div style={{display:'flex',gap:'0.3rem',marginBottom:'1.5rem'}}>
           {STEPS.map((s,i)=><div key={s} style={{flex:1,height:4,borderRadius:2,background:i<=step?C.cyan:C.border}}/>)}
         </div>
-        <div style={{fontFamily:'monospace',fontSize:'0.65rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.4rem'}}>CANVAS COACH — CLEARVIEW DATA CAPTURE</div>
-        <h1 style={{fontFamily:'Georgia,serif',fontSize:'1.6rem',fontWeight:700,color:C.navy,marginBottom:'1.75rem'}}>{STEPS[step]}</h1>
+        <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.65rem',letterSpacing:'0.12em',color:C.cyan,marginBottom:'0.4rem'}}>CANVAS COACH — CLEARVIEW DATA CAPTURE</div>
+        <h1 style={{fontFamily:'var(--cv-font)',fontSize:'1.6rem',fontWeight:700,color:C.navy,marginBottom:'1.75rem'}}>{STEPS[step]}</h1>
 
         {step===0&&(
           <div style={card}>

@@ -24,8 +24,8 @@ const C = {
   card: 'var(--cv-card)', cream: 'var(--cv-cream)',
 }
 const CARD: React.CSSProperties = { background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: 14, padding: '1.3rem 1.5rem', marginBottom: '1.35rem' }
-const H = (s = '1.15rem'): React.CSSProperties => ({ fontFamily: 'Georgia,serif', fontWeight: 700, color: C.navy, fontSize: s })
-const LABEL: React.CSSProperties = { fontFamily: 'monospace', fontSize: '0.72rem', letterSpacing: '0.04em', textTransform: 'uppercase', color: C.slate }
+const H = (s = '1.15rem'): React.CSSProperties => ({ fontFamily: 'var(--cv-font)', fontWeight: 700, color: C.navy, fontSize: s })
+const LABEL: React.CSSProperties = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em', textTransform: 'uppercase', color: C.slate }
 const inputStyle: React.CSSProperties = { fontFamily: 'inherit', fontSize: '0.9rem', padding: '0.45rem 0.6rem', border: `1px solid ${C.border}`, borderRadius: 7, background: C.card, color: C.navy }
 const th: React.CSSProperties = { ...LABEL, textAlign: 'left', padding: '0.5rem 0.7rem', borderBottom: `1px solid ${C.border}` }
 const td: React.CSSProperties = { padding: '0.5rem 0.7rem', fontSize: '0.88rem', color: C.navy, borderBottom: `1px solid ${C.borderSoft}` }
@@ -134,7 +134,7 @@ export default function AttendanceTab({ config, clientId, cc, P }: any) {
       <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: '0.7rem', flexWrap: 'wrap' }}>
         <span style={LABEL}>Day</span>
         <input type="date" max={TODAY} style={inputStyle} value={day} onChange={e => setDay(e.target.value)} />
-        <button style={{ ...inputStyle, cursor: 'pointer', fontFamily: 'monospace' }} onClick={() => setDay(TODAY)}>Today</button>
+        <button style={{ ...inputStyle, cursor: 'pointer', fontFamily: 'var(--cv-font-mono)' }} onClick={() => setDay(TODAY)}>Today</button>
       </div>
 
       {loading ? (
@@ -160,7 +160,7 @@ export default function AttendanceTab({ config, clientId, cc, P }: any) {
                     const onTime = marked ? Math.round((sum.present / marked) * 100) : null
                     return (
                       <tr key={s.id}>
-                        <td style={{ ...td, fontFamily: 'monospace', fontWeight: 700 }}>{s.staff_code}</td>
+                        <td style={{ ...td, fontFamily: 'var(--cv-font-mono)', fontWeight: 700 }}>{s.staff_code}</td>
                         <td style={td}>{s.full_name}</td>
                         <td style={td}>
                           <div style={{ display: 'flex', gap: 4 }}>
@@ -170,7 +170,7 @@ export default function AttendanceTab({ config, clientId, cc, P }: any) {
                                 <button key={st.key} disabled={!canManage || needsMigration}
                                   onClick={() => mark(s.id, st.key)}
                                   style={{
-                                    fontFamily: 'monospace', fontSize: '0.76rem', fontWeight: 700, cursor: canManage ? 'pointer' : 'default',
+                                    fontFamily: 'var(--cv-font-mono)', fontSize: '0.76rem', fontWeight: 700, cursor: canManage ? 'pointer' : 'default',
                                     padding: '0.28rem 0.55rem', borderRadius: 6,
                                     border: `1px solid ${on ? st.tone : C.border}`,
                                     background: on ? st.tone : 'transparent',
@@ -180,7 +180,7 @@ export default function AttendanceTab({ config, clientId, cc, P }: any) {
                             })}
                           </div>
                         </td>
-                        <td style={{ ...td, fontFamily: 'monospace', fontSize: '0.82rem' }}>
+                        <td style={{ ...td, fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem' }}>
                           {marked === 0 ? <span style={{ color: C.slate }}>—</span> : (
                             <span>
                               <span style={{ color: C.green }}>{sum.present}P</span> · <span style={{ color: C.amber }}>{sum.late}L</span> · <span style={{ color: C.red }}>{sum.absent}A</span>

@@ -29,8 +29,8 @@ const C = {
   amber: 'var(--cv-amber)', red: 'var(--cv-red)', tintAmber: 'var(--cv-tint-amber)',
   tintGreen: 'var(--cv-tint-green)', tintCyan: 'var(--cv-tint-cyan)',
 }
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
-const wrap = { fontFamily: "'Segoe UI',system-ui,-apple-system,sans-serif", color: C.navy }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
+const wrap = { fontFamily: "var(--cv-font)", color: C.navy }
 
 function btn(colour: string, solid = false): React.CSSProperties {
   return {
@@ -111,7 +111,7 @@ export default function JourneyCanvasPanel({ clientId }: { clientId: string }) {
       <div className="journey-no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
         <div>
           <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: C.teal }}>Part K</div>
-          <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.45rem', fontWeight: 700 }}>Journey Canvas</div>
+          <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.45rem', fontWeight: 700 }}>Journey Canvas</div>
           <div style={{ fontSize: '0.95rem', color: C.slate, maxWidth: '80ch', marginTop: '0.25rem' }}>
             Every gate, what was decided at it, the evidence it rests on, who agreed, who dissented and who signed.
             {fixed ? ' This is a fixed copy and is not updating.' : ' It updates as decisions are taken.'}
@@ -148,7 +148,7 @@ export default function JourneyCanvasPanel({ clientId }: { clientId: string }) {
             told from a stale live one. */}
         {fixed ? (
           <div style={{ border: `2px solid ${C.navy}`, borderRadius: 10, padding: '0.7rem 0.9rem', marginBottom: '1rem', background: C.alt }}>
-            <div style={{ fontFamily: 'Georgia,serif', fontSize: '1.05rem', fontWeight: 700 }}>{fixed.stamp}</div>
+            <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.05rem', fontWeight: 700 }}>{fixed.stamp}</div>
             <div style={{ fontSize: '0.88rem', color: C.slate, marginTop: '0.15rem' }}>
               Fixed for printing and handover. It does not change. The live canvas may have moved on since.
             </div>
@@ -175,7 +175,7 @@ export default function JourneyCanvasPanel({ clientId }: { clientId: string }) {
               <span style={{ ...mono, fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: C.slate }}>
                 {gate.isBlock ? 'Block' : 'Step'}
               </span>
-              <span style={{ fontFamily: 'Georgia,serif', fontSize: '1.02rem', fontWeight: 700 }}>{gate.label}</span>
+              <span style={{ fontFamily: 'var(--cv-font)', fontSize: '1.02rem', fontWeight: 700 }}>{gate.label}</span>
               {gate.empty ? (
                 <span style={{ ...mono, fontSize: '0.74rem', color: C.faint }}>nothing yet</span>
               ) : (

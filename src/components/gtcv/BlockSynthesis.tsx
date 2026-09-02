@@ -30,7 +30,7 @@ const C = {
   card: 'var(--cv-card)', border: 'var(--cv-border)', slate: 'var(--cv-slate)',
   navy: 'var(--cv-navy)', teal: 'var(--cv-teal)', green: 'var(--cv-green)',
 }
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
 
 export default function BlockSynthesis({ clientId, dpId, canManage }) {
   const [text, setText] = useState('')
@@ -188,7 +188,7 @@ export default function BlockSynthesis({ clientId, dpId, canManage }) {
           style={{
             width: '100%', padding: '0.7rem 0.8rem', borderRadius: 8,
             border: `1px solid ${C.border}`, background: C.card, color: 'inherit',
-            fontFamily: "'Segoe UI',system-ui,sans-serif", fontSize: '0.92rem', lineHeight: 1.55,
+            fontFamily: "var(--cv-font)", fontSize: '0.92rem', lineHeight: 1.55,
             resize: 'vertical',
           }}
         />

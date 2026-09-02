@@ -11,8 +11,8 @@ const C = {
   red:'#C0392B', green:'#1A7A4A', amber:'#B8860B',
 }
 const card = {background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'1.5rem',marginBottom:'1.25rem'}
-const secH = {fontFamily:'Georgia,serif',fontSize:'1.1rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
-const btn = (col=C.navy) => ({fontFamily:'monospace',fontSize:'0.85rem',fontWeight:600,padding:'0.6rem 1.4rem',border:'none',borderRadius:5,background:col,color:C.white,cursor:'pointer'})
+const secH = {fontFamily:'var(--cv-font)',fontSize:'1.1rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
+const btn = (col=C.navy) => ({fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',fontWeight:600,padding:'0.6rem 1.4rem',border:'none',borderRadius:5,background:col,color:C.white,cursor:'pointer'})
 
 function genId(prefix:string) { return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,7)}` }
 
@@ -210,7 +210,7 @@ export default function SpreadsheetUpload({intakeToken,programmeId,existingClien
   if (submitted) return (
     <div style={{...card,textAlign:'center'}}>
       <div style={{fontSize:'2rem',marginBottom:'1rem'}}>✓</div>
-      <div style={{fontFamily:'Georgia,serif',fontSize:'1.2rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Uploaded successfully</div>
+      <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Uploaded successfully</div>
       <p style={{color:C.slate,fontSize:'0.88rem'}}>{existingClient ? `The figures were loaded into ${existingClient.name}.` : 'The client has been created and their data loaded into Clearview.'}</p>
       {created?.email && inviteState !== 'sent' && (
         <div style={{marginTop:'1.25rem'}}>

@@ -33,7 +33,7 @@ const C = {
   navy: '#0B1F33', ink: '#FFFFFF', quiet: 'rgba(255,255,255,0.66)',
   border: 'rgba(255,255,255,0.2)', teal: '#2A9D8F', amber: '#D98C1F',
 }
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
 const POLL_MS = 1500
 const STALE_MS = 4000
 
@@ -146,7 +146,7 @@ export default function RoomControlBar({
 
   return (
     <div style={{ ...bar, alignItems: 'flex-start', flexDirection: 'column', gap: 8 }}>
-      <div style={{ fontFamily: 'Georgia,serif', fontSize: 18, lineHeight: 1.3 }}>
+      <div style={{ fontFamily: 'var(--cv-font)', fontSize: 18, lineHeight: 1.3 }}>
         {open.question_text}
       </div>
 
@@ -226,7 +226,7 @@ export default function RoomControlBar({
 const bar: React.CSSProperties = {
   background: C.navy, color: C.ink, borderRadius: 12, padding: '12px 16px',
   display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap',
-  fontFamily: "'Segoe UI',system-ui,sans-serif", marginBottom: 12,
+  fontFamily: "var(--cv-font)", marginBottom: 12,
 }
 const select: React.CSSProperties = {
   ...mono, fontSize: 13, padding: '6px 10px', borderRadius: 8,

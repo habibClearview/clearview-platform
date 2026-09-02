@@ -394,7 +394,7 @@ export default function RoomPage() {
     background: C.bg,
     color: C.navy,
     padding: '1rem',
-    fontFamily: "'Segoe UI',system-ui,sans-serif",
+    fontFamily: "var(--cv-font)",
     // Nothing on this page is ever wider than the screen, on any device.
     boxSizing: 'border-box',
     overflowX: 'hidden',
@@ -426,7 +426,7 @@ export default function RoomPage() {
     return (
       <main style={page}>
         <div style={card}>
-          <h1 style={{ fontFamily: 'Georgia,serif', fontSize: '1.4rem', margin: '0 0 0.6rem' }}>Join the session</h1>
+          <h1 style={{ fontFamily: 'var(--cv-font)', fontSize: '1.4rem', margin: '0 0 0.6rem' }}>Join the session</h1>
           <p style={{ color: C.slate, margin: '0 0 1rem', lineHeight: 1.5 }}>
             Type the code that is on the screen at the front of the room.
           </p>
@@ -441,7 +441,7 @@ export default function RoomPage() {
               spellCheck={false}
               aria-label="The code"
               style={{
-                width: '100%', boxSizing: 'border-box', fontFamily: 'monospace',
+                width: '100%', boxSizing: 'border-box', fontFamily: 'var(--cv-font-mono)',
                 fontSize: '1.4rem', letterSpacing: '.18em', textAlign: 'center',
                 textTransform: 'uppercase', padding: '0.7rem', borderRadius: 10,
                 border: `1px solid ${joinError ? C.red : C.border}`, color: C.navy,
@@ -474,7 +474,7 @@ export default function RoomPage() {
     return (
       <main style={page}>
         <div style={card}>
-          <h1 style={{ fontFamily: 'Georgia,serif', fontSize: '1.3rem', margin: '0 0 0.5rem' }}>
+          <h1 style={{ fontFamily: 'var(--cv-font)', fontSize: '1.3rem', margin: '0 0 0.5rem' }}>
             Before we start
           </h1>
           <p style={{ color: C.slate, margin: '0 0 1.1rem', lineHeight: 1.5 }}>
@@ -560,7 +560,7 @@ export default function RoomPage() {
       <div style={card}>
         {secondsLeft !== null ? (
           <div style={{
-            fontFamily: 'monospace', fontSize: '1.6rem', textAlign: 'right',
+            fontFamily: 'var(--cv-font-mono)', fontSize: '1.6rem', textAlign: 'right',
             color: secondsLeft <= 10 ? C.red : C.slate, marginBottom: '0.4rem',
           }}>{formatTimer(secondsLeft)}</div>
         ) : null}
@@ -570,7 +570,7 @@ export default function RoomPage() {
             and none of it needing a scroll. The fault this replaces was a
             question floating with nothing to say what it belonged to. */}
         <div style={{
-          fontFamily: 'monospace', fontSize: '0.72rem', letterSpacing: '.06em',
+          fontFamily: 'var(--cv-font-mono)', fontSize: '0.72rem', letterSpacing: '.06em',
           textTransform: 'uppercase', color: C.slate, marginBottom: '0.5rem',
           lineHeight: 1.6,
         }}>
@@ -590,7 +590,7 @@ export default function RoomPage() {
         ) : null}
 
         <h1 style={{
-          fontFamily: 'Georgia,serif', fontSize: '1.35rem', fontWeight: 600,
+          fontFamily: 'var(--cv-font)', fontSize: '1.35rem', fontWeight: 600,
           lineHeight: 1.3, margin: '0 0 1.1rem',
         }}>{question.question_text}</h1>
 

@@ -71,16 +71,16 @@ export default function LoginPage() {
 
   if (checking) return (
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:C.cream}}>
-      <div style={{color:C.slate,fontFamily:'monospace',fontSize:'0.85rem'}}>Loading...</div>
+      <div style={{color:C.slate,fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem'}}>Loading...</div>
     </div>
   )
 
   return (
-    <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:C.cream,fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:C.cream,fontFamily:"var(--cv-font)"}}>
       <div style={{width:'100%',maxWidth:400,padding:'0 1.5rem'}}>
         <div style={{textAlign:'center',marginBottom:'2rem'}}>
-          <div style={{fontFamily:'monospace',fontSize:'0.65rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.5rem'}}>CANVAS COACH</div>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'1.8rem',fontWeight:700,color:C.navy}}>Clearview</div>
+          <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.65rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.5rem'}}>CANVAS COACH</div>
+          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.8rem',fontWeight:700,color:C.navy}}>Clearview</div>
           <div style={{fontSize:'0.8rem',color:C.slate,marginTop:'0.3rem'}}>Financial Planning Platform</div>
         </div>
         <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:12,padding:'2rem',boxShadow:'0 4px 24px rgba(0,0,0,0.06)'}}>

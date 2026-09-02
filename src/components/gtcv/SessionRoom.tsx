@@ -50,7 +50,7 @@ const C = {
   slate: 'var(--cv-slate)', cyan: 'var(--cv-teal)', green: 'var(--cv-green)',
   amber: 'var(--cv-amber)', red: 'var(--cv-red)',
 }
-const mono = { fontFamily: 'monospace' }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
 const hint = { fontSize: '0.9rem', color: C.slate, lineHeight: 1.5 }
 const label = {
   ...mono, fontSize: '0.68rem', letterSpacing: '.1em', textTransform: 'uppercase',

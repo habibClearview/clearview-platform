@@ -65,7 +65,7 @@ export default function CopyLink({ url, label, hint, compact = false }) {
   }
 
   const box = {
-    fontFamily: 'monospace',
+    fontFamily: 'var(--cv-font-mono)',
     fontSize: compact ? '0.78rem' : '0.82rem',
     // Long addresses break inside the box rather than forcing the page wider
     // than the window, which is what produced sideways scrolling elsewhere.
@@ -80,7 +80,7 @@ export default function CopyLink({ url, label, hint, compact = false }) {
     minWidth: 0,
   }
   const button = {
-    fontFamily: 'monospace',
+    fontFamily: 'var(--cv-font-mono)',
     fontSize: '0.82rem',
     padding: '0.4rem 0.75rem',
     border: '1px solid var(--cv-teal)',
@@ -96,7 +96,7 @@ export default function CopyLink({ url, label, hint, compact = false }) {
     <div style={{ minWidth: 0 }}>
       {label ? (
         <div style={{
-          fontFamily: 'monospace', fontSize: '0.68rem', letterSpacing: '.1em',
+          fontFamily: 'var(--cv-font-mono)', fontSize: '0.68rem', letterSpacing: '.1em',
           textTransform: 'uppercase', color: 'var(--cv-slate)', marginBottom: '0.3rem',
         }}>{label}</div>
       ) : null}

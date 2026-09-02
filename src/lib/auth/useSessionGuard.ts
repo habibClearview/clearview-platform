@@ -18,13 +18,18 @@
 //      genuinely gone. Previously it used getUser(), which briefly 401s during
 //      a normal token refresh and caused false sign-outs.
 // ============================================================
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ACTIVITY_EVENTS, HEARTBEAT_MS, IDLE_MS, RETURN_TO_KEY, isIdle, isSafeReturnPath, screenRunsUnattended } from './session-guard'
+import { ACTIVITY_EVENTS, HEARTBEAT_MS, IDLE_MS, RETURN_TO_KEY, isIdle, isSafeReturnPath, screenRunsUnattended, shouldWarnIdle, secondsUntilSignOut } from './session-guard'
 
 const LAST_ACTIVITY_KEY = 'cv:last-activity'
 
 export function useSessionGuard(active: boolean) {
+  // NEVER A SURPRISE. 2 September 2026. The sign-out used to happen with no
+  // warning at all, so from the outside the app simply closed itself. Now it
+  // says so first, counts down, and any key or click cancels it.
+  const [warnSeconds, setWarnSeconds] = useState<number | null>(null)
+
   useEffect(() => {
     if (!active || typeof window === 'undefined') return
 
@@ -75,6 +80,13 @@ export function useSessionGuard(active: boolean) {
       //    meant to be left alone — see UNATTENDED_SCREENS for what that covers
       //    and, just as importantly, what it does not.
       if (!unattended && isIdle(Date.now(), lastActivity(), IDLE_MS)) { endSession(); return }
+      // The warning, before anything happens. Touching the screen clears it,
+      // because that same touch resets the idle clock.
+      if (!unattended && shouldWarnIdle(Date.now(), lastActivity(), IDLE_MS)) {
+        setWarnSeconds(secondsUntilSignOut(Date.now(), lastActivity(), IDLE_MS))
+      } else {
+        setWarnSeconds((prev) => (prev === null ? prev : null))
+      }
       // 2) Revocation check — only ends the session when it's genuinely gone
       //    (a merely-expired-but-refreshable token does NOT count).
       try {
@@ -88,4 +100,6 @@ export function useSessionGuard(active: boolean) {
       if (timer) clearInterval(timer)
     }
   }, [active])
+
+  return warnSeconds
 }

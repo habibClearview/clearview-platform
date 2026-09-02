@@ -29,7 +29,7 @@ const C = {
   slate: '#4C5A6B', border: 'rgba(27,42,65,.16)', amber: '#D98C1F',
   red: '#C0392B', card: '#FFFFFF', navy: '#1B2A41',
 }
-const mono = { fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }
+const mono = { fontFamily: 'var(--cv-font-mono)' }
 
 export default function RowActions({
   clientId, activityId, problemId, serviceId, table, label, onDone,
