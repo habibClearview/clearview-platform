@@ -106,7 +106,7 @@ export interface ClientTypeBreakdown {
 /**
  * The coach's three real payer types (docs/gtcv/README.md's who-pays
  * model): a donor programme (the funder is the paying relationship,
- * regardless of how many beneficiaries it covers), an independent canvas
+ * regardless of how many clients it covers), an independent canvas
  * client (self-funded GtCV, no programme), or a subscriber (self-funded
  * Clearview, no programme). Revenue is cash collected within the given
  * period -- the same cash-basis definition feesReceivedInPeriod uses, so

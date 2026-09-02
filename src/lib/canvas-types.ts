@@ -286,7 +286,7 @@ export const DEFAULT_HANDOVER_TESTS: HandoverTest[] = [
 ]
 
 export const DEFAULT_READINESS_QUESTIONS: ReadinessQuestion[] = [
-  { id: 'rq1', question: 'We know who our paying customers are (not just beneficiaries)', answer: null },
+  { id: 'rq1', question: 'We know who our paying customers are (not just clients)', answer: null },
   { id: 'rq2', question: 'We have had direct conversations with at least 3 potential paying customers in the last 6 months', answer: null },
   { id: 'rq3', question: 'We can describe what problem we solve for a paying customer in one sentence', answer: null },
   { id: 'rq4', question: 'We have a price for at least one service', answer: null },
@@ -327,11 +327,11 @@ export const CANVAS_DECISION_POINTS: DecisionPoint[] = [
     zone: 'Zone 02 — Customer and Problem Clarity',
     core_question: 'Who will pay for our services, and what problem are we solving for them?',
     good_answer: 'Ikore can name a specific type of organisation or individual, describe the problem they experience in their own words, and confirm they have budget authority to purchase the solution.',
-    weak_answer: 'Ikore describes a beneficiary population rather than a paying customer, or describes the problem in terms of what Ikore wants to solve rather than what the customer experiences.',
-    why_it_matters_for_ikore: 'The single most common failure in LSP commercialisation is designing services for beneficiaries rather than for paying customers. This Decision Point ensures Ikore designs for the actor with budget authority.',
+    weak_answer: 'Ikore describes a client population rather than a paying customer, or describes the problem in terms of what Ikore wants to solve rather than what the customer experiences.',
+    why_it_matters_for_ikore: 'The single most common failure in LSP commercialisation is designing services for clients rather than for paying customers. This Decision Point ensures Ikore designs for the actor with budget authority.',
     session_time: '4 to 5 hours including customer visits',
     components: [
-      { id: 'dp02_c1', number: 1, title: 'Beneficiary vs Paying Customer Distinction', what_it_is: 'A clear separation between who benefits from Ikore\'s services and who has the authority and motivation to pay for them.', why_it_matters: 'Conflating beneficiaries and customers produces services that are valued but not paid for.', action_trigger: 'For each short-listed service, ask: who benefits? Then ask separately: who would write the cheque? These may be different people or organisations.', signal_to_look_for: 'Ikore can name a paying customer who is distinct from the beneficiary, or confirm they are the same and explain why.', coach_guidance: 'This is often the most uncomfortable step. Clients resist the idea that the person who benefits is not the person who pays. Hold this distinction firmly.' },
+      { id: 'dp02_c1', number: 1, title: 'Client vs Paying Customer Distinction', what_it_is: 'A clear separation between who benefits from Ikore\'s services and who has the authority and motivation to pay for them.', why_it_matters: 'Conflating clients and customers produces services that are valued but not paid for.', action_trigger: 'For each short-listed service, ask: who benefits? Then ask separately: who would write the cheque? These may be different people or organisations.', signal_to_look_for: 'Ikore can name a paying customer who is distinct from the client, or confirm they are the same and explain why.', coach_guidance: 'This is often the most uncomfortable step. Clients resist the idea that the person who benefits is not the person who pays. Hold this distinction firmly.' },
       { id: 'dp02_c2', number: 2, title: 'Customer Profile', what_it_is: 'A detailed description of the paying customer: type of organisation, size, location, decision-making structure, budget cycle.', why_it_matters: 'A vague customer description produces vague service design. The more specific the profile, the more targeted the service.', action_trigger: 'Write a one-paragraph profile of your ideal paying customer. Include: type of organisation, size (staff or budget), where they operate, who makes purchasing decisions.', signal_to_look_for: 'Profile is specific enough that Ikore could name 5 real organisations that match it right now.', coach_guidance: 'Test the profile by asking: can you name 5 organisations that match this description? If not, it is too vague.' },
       { id: 'dp02_c3', number: 3, title: 'Problem Statement', what_it_is: 'A description of the problem the paying customer experiences, in their own words, not Ikore\'s.', why_it_matters: 'Services designed around the provider\'s perception of the problem frequently miss what the customer actually needs.', action_trigger: 'Write the customer\'s problem in the first person: "We struggle with..." or "We cannot..." Use language a customer would use, not sector jargon.', signal_to_look_for: 'A problem statement that a real customer would read and say "yes, that is our problem."', coach_guidance: 'The problem statement must come from customer conversations, not from Ikore\'s assumptions. If Ikore has not yet spoken to customers, this step cannot be completed honestly.' },
       { id: 'dp02_c4', number: 4, title: 'Budget Authority Confirmation', what_it_is: 'Evidence that the paying customer has the financial authority and motivation to purchase the service.', why_it_matters: 'A customer who values the service but has no budget or no authority to spend is not a commercial customer.', action_trigger: 'For your paying customer profile: confirm they have a budget line that could cover this service, and identify who in their organisation has authority to approve the purchase.', signal_to_look_for: 'A specific budget source (operating budget, programme budget, government line item) and a named decision-maker role.', coach_guidance: 'This often requires direct customer conversations. If Ikore cannot confirm budget authority from existing knowledge, it must be verified in customer visits.' },
@@ -411,7 +411,7 @@ export const CANVAS_DECISION_POINTS: DecisionPoint[] = [
     zone: 'Zone 06 — Organisational Identity and Partner Architecture',
     core_question: 'How does Ikore present itself commercially, and who are the partners that strengthen our market position?',
     good_answer: 'Ikore has a commercial identity statement, a professional service profile, and at least one partnership agreement that expands reach or credibility.',
-    weak_answer: 'Ikore describes its development sector identity (mission, beneficiaries, donor relationships) rather than a commercial identity that would resonate with paying customers.',
+    weak_answer: 'Ikore describes its development sector identity (mission, clients, donor relationships) rather than a commercial identity that would resonate with paying customers.',
     why_it_matters_for_ikore: 'Commercial identity is the first thing a paying customer evaluates. If Ikore presents as a grant-funded NGO, paying customers will not take it seriously as a service provider.',
     session_time: '3 to 4 hours',
     components: [
@@ -495,7 +495,7 @@ export const CANVAS_DECISION_POINTS: DecisionPoint[] = [
 export const FIT_TESTS = [
   { id: 'ft01', number: '01', name: 'Problem–Provider Fit', description: 'Does Ikore have the right to own this problem in this market?' },
   { id: 'ft02', number: '02', name: 'Problem–Solution Fit', description: 'Does the service solve the problem as the client experiences it?' },
-  { id: 'ft03', number: '03', name: 'Solution–Problem Owner Fit', description: 'Is the solution designed for the actor with budget, not just the beneficiary?' },
+  { id: 'ft03', number: '03', name: 'Solution–Problem Owner Fit', description: 'Is the solution designed for the actor with budget, not just the client?' },
   { id: 'ft04', number: '04', name: 'Solution–Pilot Fit', description: 'Can this be tested meaningfully within the engagement timeline?' },
   { id: 'ft05', number: '05', name: 'Solution–Market Fit', description: 'Is there demonstrated willingness to pay at a cost-recovery price?' },
   { id: 'ft06', number: '06', name: 'Solution–Scale Channel Fit', description: 'Are there channels to reach beyond the founding clients independently?' },

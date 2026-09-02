@@ -32,7 +32,7 @@ over all downstream work."*
 **Role glossary:** **LC** Lead Consultant / Coach (Habib) · **CI** Co-implementer (e.g. Ganiat
 Ettu) · **ED** LSP Executive Director · **LT** LSP Leadership Team ·
 **FT** LSP Field Team · **FL** LSP Finance Lead · **Client/Funder** the programme (e.g. Tanager) ·
-**LSP** the Beneficiary / Local Service Provider (e.g. Ikore) · **Licensed Advisor** a coach
+**LSP** the Client / Local Service Provider (e.g. Ikore) · **Licensed Advisor** a coach
 delivering under licence.
 
 > **Client-agnostic rule:** all party names, currency, location, and the
@@ -55,7 +55,7 @@ delivering under licence.
 - **Pilots:** receives the mid-point diagnostic; adjusts the plan mid-course if gaps appear.
 - **Handover:** **co-signs the Engagement Completion Record** (three signatories: LC, ED, Funder Rep).
 
-### A2. Beneficiary / LSP ("the Organisation")
+### A2. Client / LSP ("the Organisation")
 Owns the evidence and the outputs. Sub-roles:
 - **Executive Director (ED):** Pre-Engagement Diagnostic **mandatory, non-delegable**; must name a
   specific commercial outcome, a decision they will change, and a month-six success definition.

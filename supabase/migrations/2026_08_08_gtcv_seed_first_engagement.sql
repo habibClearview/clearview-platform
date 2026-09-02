@@ -30,7 +30,7 @@ values (
 )
 on conflict (id) do nothing;
 
--- 2) The client being coached (the beneficiary organisation).
+-- 2) The client being coached (the client organisation).
 insert into engagement_clients (
   id, name, slug, type, engagement_mode, programme_id, status,
   country, sector, clearview_active, start_date, expected_close, notes

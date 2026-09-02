@@ -426,7 +426,7 @@ export const CANVAS_TABS = [
 
 // ─── READINESS QUESTIONS ─────────────────────────────────────
 export const READINESS_QUESTIONS = [
-  { id: 'rq1',  question: 'We know who our paying customers are (not just beneficiaries)' },
+  { id: 'rq1',  question: 'We know who our paying customers are (not just clients)' },
   { id: 'rq2',  question: 'We have had direct conversations with at least 3 potential paying customers in the last 6 months' },
   { id: 'rq3',  question: 'We can describe what problem we solve for a paying customer in one sentence' },
   { id: 'rq4',  question: 'We have a price for at least one service' },
@@ -442,7 +442,7 @@ export const READINESS_QUESTIONS = [
 export const COMPONENT_TITLES: Record<string, string[]> = {
   phase_0: ['Assumption Log','Stakeholder Map','Data Gap Register','Readiness Self-Assessment','Engagement Commitment Form','','','',''],
   dp01: ['Service Inventory','Grant Logic vs Market Logic Sort','Service Delivery Evidence','Cost of Delivery','Service Readiness Assessment','Competitor and Substitute Map','Internal Capability Audit','Short-List of Commercial Services','DP01 Summary and Commitment'],
-  dp02: ['Beneficiary vs Paying Customer Distinction','Customer Profile','Problem Statement','Budget Authority Confirmation','Customer Validation Plan','Customer Validation Results','Revised Customer Profile','Problem Prioritisation','DP02 Summary and Commitment'],
+  dp02: ['Client vs Paying Customer Distinction','Customer Profile','Problem Statement','Budget Authority Confirmation','Customer Validation Plan','Customer Validation Results','Revised Customer Profile','Problem Prioritisation','DP02 Summary and Commitment'],
   dp03: ['Customer Gain and Pain Map','Value Proposition Statement','Evidence of Value','Differentiation from Alternatives','Service Bundle Design','Willingness to Pay Test','Service Tiers','Customer Outcome Statement','DP03 Summary and Commitment'],
   dp04: ['Full Cost of Delivery','Pricing Decision','Break-Even Volume','36-Month Revenue Projection','Funding Gap Analysis','Scenario Analysis','Capital Requirements','Financial Model Review','DP04 Summary and Commitment'],
   dp05: ['Customer Segmentation','Channel Map','Outreach Message','Sales Process Map','First 5 Customers Plan','Pricing and Proposal Template','A/B Test Design','Business Development Responsibility','DP05 Summary and Commitment'],

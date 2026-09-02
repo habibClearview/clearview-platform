@@ -65,7 +65,7 @@ function noteBox(border, bg) {
 const FIT_TESTS = [
   { id: 'problem_provider', label: 'Problem-Provider Fit', question: 'Do we have the capability and credibility to own this problem in this market?' },
   { id: 'problem_solution', label: 'Problem-Solution Fit', question: 'Does the service solve the problem as the client experiences it?' },
-  { id: 'solution_customer', label: 'Solution-Customer Fit', question: 'Does it reach a decision maker with budget, not a beneficiary without one?' },
+  { id: 'solution_customer', label: 'Solution-Customer Fit', question: 'Does it reach a decision maker with budget, not a client without one?' },
   { id: 'solution_pilot', label: 'Solution-Pilot Fit', question: 'Is it testable in a real client environment inside the engagement window?' },
   { id: 'solution_market', label: 'Solution-Market Fit', question: 'Is there a reachable segment that buys this, at the price it costs to deliver?' },
   { id: 'solution_scale', label: 'Solution-Scale Fit', question: 'Can delivery grow beyond the founder and the first client?' },

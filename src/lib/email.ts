@@ -164,7 +164,7 @@ export function brandedEmail(input: BrandedEmailInput): string {
 
 export interface EngagementEmailConfig {
   engagementTitle: string       // e.g. "IGNITE+ Nigeria"
-  beneficiaryName: string       // e.g. "Ikore"
+  clientName: string       // e.g. "Ikore"
   coachName: string             // the lead consultant's name
   journeyUrl: string            // the link to the journey / charter
   recipientName?: string
@@ -179,7 +179,7 @@ export function buildScopeEmail(cfg: EngagementEmailConfig): { subject: string; 
   const html = brandedEmail({
     heading: `${cfg.recipientName ? cfg.recipientName + ',' : 'Hello,'}`,
     paragraphs: [
-      `This sets out the work ahead for <b>${cfg.beneficiaryName}</b> on ${cfg.engagementTitle}: a structured journey through nine decision blocks that turns grant funded delivery into a commercial model the organisation owns and can defend.`,
+      `This sets out the work ahead for <b>${cfg.clientName}</b> on ${cfg.engagementTitle}: a structured journey through nine decision blocks that turns grant funded delivery into a commercial model the organisation owns and can defend.`,
       `The link below opens the live journey. You can see the nine blocks, where the work stands, and what each decision gate will produce. Everything on it is evidence based.`,
       `Once you have looked through it, we will agree the Engagement Charter together and set the kickoff.`,
     ],
@@ -199,7 +199,7 @@ export function buildTriPartyEmail(cfg: EngagementEmailConfig): { subject: strin
   const html = brandedEmail({
     heading: 'The Engagement Charter is ready',
     paragraphs: [
-      `The Engagement Charter for <b>${cfg.beneficiaryName}</b> on ${cfg.engagementTitle} is ready for all parties to review.`,
+      `The Engagement Charter for <b>${cfg.clientName}</b> on ${cfg.engagementTitle} is ready for all parties to review.`,
       `It sets out how we work together, the evidence standard every decision meets, and what the engagement asks of each party. Open it below. You can comment or suggest a change on any section before signing.`,
     ],
     ctaLabel: 'Review the Charter',

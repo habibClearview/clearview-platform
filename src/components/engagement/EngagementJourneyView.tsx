@@ -10,7 +10,7 @@
 //
 // The nine-block METHOD content is fixed IP, identical for every engagement
 // (the same way INDEPENDENCE_TESTS is a constant). Only the names and the live
-// gate status are configuration: the client (beneficiary), the funder and the
+// gate status are configuration: the client (client), the funder and the
 // programme come from loadEngagementView, and every status dot is read from
 // the real canvas gate status. Nothing here is hardcoded to any one client.
 //
@@ -170,7 +170,7 @@ const SPINE = {
   fits: [
     { n: 'Fit 01', t: 'Problem-Provider Fit', d: 'Do we have the capability and credibility to own this problem in this market?' },
     { n: 'Fit 02', t: 'Problem-Solution Fit', d: 'Does the service solve the problem as the client experiences it, not as we describe it?' },
-    { n: 'Fit 03', t: 'Solution-Problem Owner Fit', d: 'Is it designed to reach a decision-maker with budget, not the beneficiary without it?' },
+    { n: 'Fit 03', t: 'Solution-Problem Owner Fit', d: 'Is it designed to reach a decision-maker with budget, not the client without it?' },
     { n: 'Fit 04', t: 'Solution-Pilot Fit', d: 'Is the service testable in a real client environment within the engagement timeline?' },
     { n: 'Fit 05', t: 'Solution-Market Fit', d: 'Is there willingness to pay at a price that covers full delivery cost?' },
     { n: 'Fit 06', t: 'Solution-Scale Channel Fit', d: 'Are there channels and partnerships to carry this beyond the founding clients?' },
@@ -270,11 +270,11 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
   if (error) return <Message title="Could not load this journey" body={error} />
   if (!view) return <Message title="Journey not found" body="This engagement could not be found, or you do not have access to it." />
 
-  const beneficiary = view.client?.name || 'the organisation'
+  const client = view.client?.name || 'the organisation'
   const funderParty = (view.parties || []).find((p) => p.party_role === 'client_funder') || (view.parties || []).find((p) => p.party_role === 'funder_rep')
   const funder = funderParty?.organisation || funderParty?.name || null
   const programme = view.programme_name || null
-  const metaLine = [beneficiary, programme].filter(Boolean).join(' · ')
+  const metaLine = [client, programme].filter(Boolean).join(' · ')
   const termPrefix = view.config?.terminology === 'zone' ? 'ZONE' : 'DP'
 
   const gs = view.gate_status || {}
@@ -357,9 +357,9 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
 
         <section className="hero">
           <p className="eyebrow">The engagement, on one canvas</p>
-          <h1>{beneficiary}&rsquo;s journey from grant-funded to standing on its own.</h1>
+          <h1>{client}&rsquo;s journey from grant-funded to standing on its own.</h1>
           <p>
-            A shared, visual picture for everyone involved, <b>{beneficiary}</b>&rsquo;s team walking the path
+            A shared, visual picture for everyone involved, <b>{client}</b>&rsquo;s team walking the path
             {funder ? <> and <b>{funder}</b> watching it progress</> : null}. The nine blocks are worked in order, and each one is a decision gate that does not close until the evidence behind it is real and the people who have to sign it have signed.
           </p>
         </section>

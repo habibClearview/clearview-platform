@@ -7,7 +7,7 @@
 // Evidence Library and the blocks. The fee, the milestones and the claims are
 // between the consultant and whoever pays, and the organisation being coached
 // has no part in them. Keeping them on the client screen meant the only thing
-// between a beneficiary and the fee was a role check on one tab, and one check
+// between a client and the fee was a role check on one tab, and one check
 // is one mistake away from being wrong. Off the client screen entirely, there
 // is nothing to get wrong: this view lives behind the business area, which
 // nobody but the lead consultant reaches at all.

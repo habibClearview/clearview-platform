@@ -61,8 +61,8 @@ Solution–Scale. Baseline typically 3–7; a successful close is ~12–15. The
 ## Who pays vs who is served (IMPORTANT — corrected)
 
 - **Paying customer = the programme** (Palladium/CSJ, Tanager) — the budget holder. Deals to close.
-- **Served / beneficiary = the LSP and the agribusinesses** — the organisations put through the canvas.
-- This is the handbook's own beneficiary-vs-customer distinction applied to the coach's OWN business.
+- **Served / client = the LSP and the agribusinesses** — the organisations put through the canvas.
+- This is the handbook's own client-vs-customer distinction applied to the coach's OWN business.
 
 ## The coach is on the same transformation (key strategic frame)
 

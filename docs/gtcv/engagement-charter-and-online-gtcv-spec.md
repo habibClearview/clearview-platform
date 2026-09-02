@@ -246,7 +246,7 @@ first instance:
   receives the weekly and milestone reports; is the escalation point for RED status and for protecting
   the (non-negotiable) pilot phase; co-signs the diagnostic record and the Engagement Completion
   Record.
-- **The Beneficiary / LSP (Ikore)**, owns the outputs and the evidence. Its **Executive Director**
+- **The Client / LSP (Ikore)**, owns the outputs and the evidence. Its **Executive Director**
   attends the diagnostic (non-delegable) and **signs off every gate**; its **Leadership
   Team** produces the canvas outputs, leads the second pilot iteration, and delivers the final
   handover unassisted; its **Finance Lead** attends all cost-mapping sessions and must operate the

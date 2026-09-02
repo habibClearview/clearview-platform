@@ -706,7 +706,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
             <ol>
               <li>We have read and understood how this engagement works.</li>
               <li>We will allocate sufficient time from our leadership and relevant staff to complete each Decision Point.</li>
-              <li>We will engage directly with real paying customers during this engagement, not with beneficiaries or proxy participants.</li>
+              <li>We will engage directly with real paying customers during this engagement, not with clients or proxy participants.</li>
               <li>We accept that the engagement will produce a commercial model we will be expected to operate independently.</li>
               <li>We understand that the goal is financial independence, not the production of a donor report.</li>
             </ol>

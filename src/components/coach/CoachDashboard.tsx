@@ -1179,7 +1179,7 @@ function PortfolioIntelligenceHub({clients,programmes}){
         <button onClick={()=>window.print()} title="Opens your browser's print dialog -- choose 'Save as PDF' to download a styled PDF of exactly this view" style={{fontSize:'0.85rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>⬇ PDF</button>
         <button disabled={downloading} onClick={()=>downloadBrief(filter)} style={{fontSize:'0.85rem',fontWeight:600,color:C.teal,background:'none',border:`1px solid ${C.teal}`,borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>{downloading?'Generating…':'⬇ Word Summary'}</button>
         <button onClick={()=>setShowAccess(true)} style={{fontSize:'0.85rem',fontWeight:600,color:C.navy,background:'none',border:'1px solid var(--cv-border-soft)',borderRadius:6,padding:'0.35rem 0.7rem',cursor:'pointer'}}>🔗 External Access</button>
-        <div style={{width:'100%',fontSize:'0.78rem',color:C.slate}}>To send a subscribed client (e.g. a donor programme like CSJ) an analysis of just <b>their own beneficiaries</b>: pick their <b>programme</b> above, then <b>External Access → Create Link</b> — the link is pre-scoped to exactly that client's businesses.</div>
+        <div style={{width:'100%',fontSize:'0.78rem',color:C.slate}}>To send a subscribed client (e.g. a donor programme like CSJ) an analysis of just <b>their own clients</b>: pick their <b>programme</b> above, then <b>External Access → Create Link</b> — the link is pre-scoped to exactly that client's businesses.</div>
         {downloadError&&<div style={{width:'100%',fontSize:'0.78rem',color:C.red}}>{downloadError}</div>}
       </div>
       {showAccess&&<ExternalAccessPanel portfolioFilter={hasFilter?filter:undefined} clients={clients} programmes={programmes} onClose={()=>setShowAccess(false)}/>}
@@ -1928,17 +1928,17 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   }
 
   // ─── CLIENT LIST ────────────────────────────────────────────────
-  // One card per beneficiary, grouped into a block per paying client (a
+  // One card per client, grouped into a block per paying client (a
   // donor programme, or an independent/subscriber client), grouped again
   // by which of the four real services is selected. Canvas and Financial
-  // Model beneficiaries come straight off engagement_clients (the only
+  // Model clients come straight off engagement_clients (the only
   // two services with a home there via engagement_mode); Advisory and
   // Subscription have no such field, so they come from the
   // service_engagements table instead (see supabase/migrations/
   // 2026_07_14_service_engagements.sql) -- an independent, error-tolerant
   // fetch, so a missing migration just means those two panels are empty,
   // not a broken page.
-  function BeneficiaryCard({client,seStatus,hasActuals}){
+  function ServedClientCard({client,seStatus,hasActuals}){
     const label=seStatus?({active:'Active',paused:'Paused',complete:'Complete'}[seStatus]||seStatus):statusLabel(client.status)
     const color=seStatus?({active:C.green,paused:C.amber,complete:C.slate}[seStatus]||C.slate):statusColor(client.status)
     return(
@@ -2017,8 +2017,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       inService.forEach(c=>{
         const prog=c.programme_id?programmesById[c.programme_id]:null
         const key=prog?`prog:${prog.id}`:`client:${c.id}`
-        if(!byPayer.has(key))byPayer.set(key,{title:prog?prog.name:c.name,meta:prog?([prog.funder,prog.country].filter(Boolean).join(' · ')||'Donor programme'):'Independent',beneficiaries:[]})
-        byPayer.get(key).beneficiaries.push(c)
+        if(!byPayer.has(key))byPayer.set(key,{title:prog?prog.name:c.name,meta:prog?([prog.funder,prog.country].filter(Boolean).join(' · ')||'Donor programme'):'Independent',clients:[]})
+        byPayer.get(key).clients.push(c)
       })
       blocks=Array.from(byPayer.values())
     }else if(service==='portfolio_intelligence'){
@@ -2026,6 +2026,11 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       // date, and billing term (see supabase/migrations/2026_07_14_pipeline_and_subscriptions.sql).
       subscriptionRows=serviceEngagements.filter(se=>se.service_type==='portfolio_intelligence').map(se=>{
         const payerClient=se.payer_client_id?clientsById[se.payer_client_id]:null
+        // beneficiary_client_id is the COLUMN name, which the database still
+        // uses; supabase/migrations/2026_09_02_client_not_beneficiary.sql
+        // renames it to served_client_id and has not been applied yet. Every
+        // word a person reads says client already. Do not rename this here
+        // without applying that migration in the same change.
         const ben=se.beneficiary_client_id?clientsById[se.beneficiary_client_id]:payerClient
         return {se,client:ben}
       }).filter(r=>r.client)
@@ -2038,9 +2043,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         const key=prog?`prog:${prog.id}`:`client:${se.payer_client_id}`
         const title=prog?prog.name:(payerClient?.name||'Unknown client')
         const meta=prog?([prog.funder,prog.country].filter(Boolean).join(' · ')||'Donor programme'):'Independent'
-        if(!byPayer.has(key))byPayer.set(key,{title,meta,beneficiaries:[]})
+        if(!byPayer.has(key))byPayer.set(key,{title,meta,clients:[]})
         const ben=se.beneficiary_client_id?clientsById[se.beneficiary_client_id]:payerClient
-        if(ben)byPayer.get(key).beneficiaries.push({...ben,__seStatus:se.status})
+        if(ben)byPayer.get(key).clients.push({...ben,__seStatus:se.status})
       })
       blocks=Array.from(byPayer.values())
     }
@@ -2129,10 +2134,10 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>{b.title}</div>
                 <div style={{fontSize:'0.86rem',color:C.slate}}>{b.meta}</div>
               </div>
-              <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.82rem',color:C.slate}}>{b.beneficiaries.length} beneficiar{b.beneficiaries.length===1?'y':'ies'}</div>
+              <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.82rem',color:C.slate}}>{b.clients.length} client{b.clients.length===1?'':'s'}</div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))',gap:'0.75rem',padding:'1rem 1.1rem'}}>
-              {b.beneficiaries.map(c=><BeneficiaryCard key={c.id+(c.__seStatus||'')} client={c} seStatus={c.__seStatus} hasActuals={hasActuals.has(c.id)}/>)}
+              {b.clients.map(c=><ServedClientCard key={c.id+(c.__seStatus||'')} client={c} seStatus={c.__seStatus} hasActuals={hasActuals.has(c.id)}/>)}
             </div>
           </div>
         ))}
@@ -2631,8 +2636,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     return <><ProspectShowcase/><DeliverablesBusinessView clients={clients.filter(c=>c.engagement_mode==='canvas')}/><DealsAndFees programmes={programmes} setProgrammes={setPrograms} clients={clients} setClients={setClients} onWinDeal={p=>{
       const services=p.deal_services||[]
       const engagementMode=services.includes('canvas')?'canvas':services.includes('financial')?'financial':'canvas'
-      // A direct/independent prospect IS the beneficiary -- pre-fill their
-      // name too. A donor programme's beneficiary isn't known yet (the
+      // A direct/independent prospect IS the client -- pre-fill their
+      // name too. A donor programme's client isn't known yet (the
       // deal was with the funder, not a named enterprise), so only the
       // programme link and a note carry over.
       const namePrefill=p.type==='donor_programme'?'':p.name
@@ -2799,11 +2804,11 @@ function TabCover({client,prog,programmes,onUpdate}){
 
 // A payer (a programme, or an independent client paying for itself) can
 // hold more than one service at once -- e.g. a programme paying for the
-// Clearview financial model for several beneficiaries today does not mean
-// it can't ALSO pay for GtCV canvas for a different beneficiary, direct
+// Clearview financial model for several clients today does not mean
+// it can't ALSO pay for GtCV canvas for a different client, direct
 // advisory, or a Portfolio Intelligence subscription. This is additive to
 // (not a replacement for) the single engagement_mode already on each
-// beneficiary's own client record -- nothing that already works reads
+// client's own client record -- nothing that already works reads
 // from this table. Loads and fails independently of the rest of the
 // dashboard: service_engagements is a brand-new table that won't exist
 // until the migration is applied, and that must never block the whole
@@ -2861,18 +2866,18 @@ function ServicesSection({payerType,payerId,clients}){
         <div style={secH}>Services</div>
         <button style={addBtn()} onClick={()=>setShowNew(!showNew)}>+ Add Service</button>
       </div>
-      <p style={{...hint,marginBottom:'0.75rem'}}>Every service this payer is engaged for -- can hold more than one at once, each with its own beneficiary, fee, and status.</p>
+      <p style={{...hint,marginBottom:'0.75rem'}}>Every service this payer is engaged for -- can hold more than one at once, each with its own client, fee, and status.</p>
       {msg&&<div style={{...hint,color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
       {showNew&&<NewServiceForm clients={clients} onSave={addService} onCancel={()=>setShowNew(false)}/>}
       {rows.length===0
         ?<div style={{...hint,padding:'0.5rem 0'}}>No services logged yet.</div>
         :rows.map(r=>{
-          const beneficiary=clients.find(c=>c.id===r.beneficiary_client_id)
+          const client=clients.find(c=>c.id===r.beneficiary_client_id)
           return(
             <div key={r.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.75rem',flexWrap:'wrap',padding:'0.6rem 0.75rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.45rem'}}>
               <div>
                 <div style={{fontWeight:600,fontSize:'1.07rem',color:C.navy}}>{SERVICE_TYPE_LABELS[r.service_type]||r.service_type}</div>
-                <div style={{fontSize:'0.93rem',color:C.slate}}>{beneficiary?`for ${beneficiary.name}`:'no specific beneficiary'}{r.fee?` · ${fmtGlance(r.fee,r.fee_currency)}`:''}</div>
+                <div style={{fontSize:'0.93rem',color:C.slate}}>{client?`for ${client.name}`:'no specific client'}{r.fee?` · ${fmtGlance(r.fee,r.fee_currency)}`:''}</div>
               </div>
               <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}>
                 <select style={{...inp,width:'auto',padding:'0.25rem 0.4rem',fontSize:'0.93rem'}} value={r.status} onChange={e=>updateService(r.id,{status:e.target.value})}>
@@ -2894,7 +2899,7 @@ function NewServiceForm({clients,onSave,onCancel}){
     <div style={{...card,border:`1px solid ${C.cyan}`,marginBottom:'0.75rem'}}>
       <div style={fGrid}>
         <div><label style={lbl}>Service</label><select style={inp} value={f.service_type} onChange={e=>setF(x=>({...x,service_type:e.target.value}))}>{Object.entries(SERVICE_TYPE_LABELS).map(([k,l])=><option key={k} value={k}>{l}</option>)}</select></div>
-        <div><label style={lbl}>Beneficiary (optional)</label><select style={inp} value={f.beneficiary_client_id} onChange={e=>setF(x=>({...x,beneficiary_client_id:e.target.value}))}><option value="">No specific beneficiary</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+        <div><label style={lbl}>Client (optional)</label><select style={inp} value={f.beneficiary_client_id} onChange={e=>setF(x=>({...x,beneficiary_client_id:e.target.value}))}><option value="">No specific client</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
         <div><label style={lbl}>Fee</label><input type="number" style={inp} value={f.fee} onChange={e=>setF(x=>({...x,fee:e.target.value}))}/></div>
         <div><label style={lbl}>Currency</label><CurrencyField hideLabel value={f.fee_currency} onChange={v=>setF(x=>({...x,fee_currency:v}))} style={inp}/></div>
       </div>
@@ -3007,7 +3012,7 @@ function TabIPFramework(){
         <h4 style={{fontFamily:'var(--cv-font)',color:C.navy}}>Six Fit Tests \u2014 Commercial Readiness Diagnostic</h4>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.07rem'}}>
           <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Test','Name','What it diagnoses'].map(h=><th key={h} style={{padding:'8px 12px',textAlign:'left'}}>{h}</th>)}</tr></thead>
-          <tbody>{[['01','Problem\u2013Provider Fit','Does the organisation have the right to own this problem in this market?'],['02','Problem\u2013Solution Fit','Does the service solve the problem as the client experiences it?'],['03','Solution\u2013Problem Owner Fit','Is the solution designed for the actor with budget, not just the beneficiary?'],['04','Solution\u2013Pilot Fit','Can this be tested meaningfully within the engagement timeline?'],['05','Solution\u2013Market Fit','Is there demonstrated willingness to pay at a cost-recovery price?'],['06','Solution\u2013Scale Channel Fit','Are there channels to reach beyond the founding clients independently?']].map(([n,name,desc],i)=>(
+          <tbody>{[['01','Problem\u2013Provider Fit','Does the organisation have the right to own this problem in this market?'],['02','Problem\u2013Solution Fit','Does the service solve the problem as the client experiences it?'],['03','Solution\u2013Problem Owner Fit','Is the solution designed for the actor with budget, not just the client?'],['04','Solution\u2013Pilot Fit','Can this be tested meaningfully within the engagement timeline?'],['05','Solution\u2013Market Fit','Is there demonstrated willingness to pay at a cost-recovery price?'],['06','Solution\u2013Scale Channel Fit','Are there channels to reach beyond the founding clients independently?']].map(([n,name,desc],i)=>(
             <tr key={n} style={{background:i%2===0?C.cream:C.white}}>
               <td style={{padding:'8px 12px',color:C.cyan,fontWeight:700,fontFamily: 'var(--cv-font-mono)'}}>{n}</td>
               <td style={{padding:'8px 12px',fontWeight:600,color:C.navy}}>{name}</td>

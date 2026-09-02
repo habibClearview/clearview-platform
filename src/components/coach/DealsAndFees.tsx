@@ -157,8 +157,8 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
       {msg&&<div style={{fontSize:'1.01rem',color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
 
       {/* A prospect drops off the pipeline the moment it becomes a client --
-          i.e. once any beneficiary client is attached to it. A Won deal with
-          no client created yet still shows (with the "+ Add beneficiary
+          i.e. once any client client is attached to it. A Won deal with
+          no client created yet still shows (with the "+ Add client
           client" CTA), so nothing falls through the gap between winning and
           setting the client up. A prospect can't be a prospect and a client
           at the same time. */}
@@ -219,7 +219,7 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
               {p.deal_stage==='won'&&(
                 <div style={{marginTop:'0.6rem',display:'flex',alignItems:'center',gap:'0.6rem',background:'var(--cv-tint-green)',border:`1px solid ${C.green}`,borderRadius:8,padding:'0.5rem 0.7rem'}}>
                   <span style={{fontSize:'0.9rem',color:C.green,fontWeight:600}}>✓ Won</span>
-                  <button style={{...solidBtn(C.green,true),marginLeft:'auto'}} onClick={()=>onWinDeal&&onWinDeal(p)}>+ Add beneficiary client →</button>
+                  <button style={{...solidBtn(C.green,true),marginLeft:'auto'}} onClick={()=>onWinDeal&&onWinDeal(p)}>+ Add client client →</button>
                 </div>
               )}
             </div>
@@ -264,7 +264,7 @@ function EngagementFees({clients,setClients,programmes}){
 
   return(
     <div>
-      <p style={{...hint,marginBottom:'1rem'}}>The engagement clients (LSPs / agribusinesses) are who is served. Track the fee agreed per engagement and whether it is paid, invoiced, or still unpaid. <strong>Where a Programme is set</strong>, the organisation itself is a served beneficiary, not the payer -- the programme is the paying client, and any fee entered here is the programme's own budget allocation for that engagement, not something the beneficiary owes.</p>
+      <p style={{...hint,marginBottom:'1rem'}}>The engagement clients (LSPs / agribusinesses) are who is served. Track the fee agreed per engagement and whether it is paid, invoiced, or still unpaid. <strong>Where a Programme is set</strong>, the organisation itself is a served client, not the payer -- the programme is the paying client, and any fee entered here is the programme's own budget allocation for that engagement, not something the client owes.</p>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'0.85rem',marginBottom:'1.25rem'}}>
         <KPI label="Total fees" value={fmtMoney(totalFee,cur)} sub={`${clients.length} engagements`}/>
         <KPI label="Paid" value={fmtMoney(byStatus('paid'),cur)} color={C.green}/>
@@ -284,7 +284,7 @@ function EngagementFees({clients,setClients,programmes}){
                 const isEdit=editId===c.id
                 return(<tr key={c.id} style={{background:i%2?C.white:C.cream}}>
                   <td style={{...td,fontWeight:600,color:C.navy}}>{c.name}</td>
-                  <td style={td}>{c.programme_id?(<>{progName(c.programme_id)} <Badge text="Beneficiary" color={C.purple}/></>):(<Badge text="Paying client" color={C.teal}/>)}</td>
+                  <td style={td}>{c.programme_id?(<>{progName(c.programme_id)} <Badge text="Client" color={C.purple}/></>):(<Badge text="Paying client" color={C.teal}/>)}</td>
                   {isEdit?(
                     <>
                       <td style={td}><div style={{display:'flex',gap:'0.3rem'}}><input type="number" style={{...inp,width:100,padding:'0.25rem 0.4rem'}} value={form.engagement_fee} onChange={e=>setForm(f=>({...f,engagement_fee:e.target.value}))}/><CurrencyField hideLabel label="Fee currency" value={form.fee_currency} onChange={v=>setForm(f=>({...f,fee_currency:v}))} style={{...inp,width:84,padding:'0.25rem 0.3rem'}}/></div></td>

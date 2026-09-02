@@ -20,7 +20,7 @@
 /** How a decision travels from the work to the funder. Four steps, in order. */
 export const EVIDENCE_CHAIN = [
   {
-    step: 'Step 1 · Beneficiary',
+    step: 'Step 1 · Client',
     does: 'Generates the evidence',
     detail: 'Does the work and produces the real output, the audit, the conversations, the model, the pilots.',
   },
@@ -30,7 +30,7 @@ export const EVIDENCE_CHAIN = [
     detail: 'Facilitates the session, tests the evidence, and authorises the block only when it truly holds.',
   },
   {
-    step: 'Step 3 · Beneficiary ED',
+    step: 'Step 3 · Client ED',
     does: 'Signs it off',
     detail: 'The Executive Director puts their name to the decision, it is the organisation’s, not the coach’s.',
   },

@@ -8,7 +8,7 @@
 // Service-role route (it reads the engagement config, parties and programme
 // across tables), so it authenticates the caller itself and only allows a
 // super_coach or an assigned co-implementer -- the same set can_manage_client_access
-// grants, re-derived here server-side. Recipients, subjects, the beneficiary
+// grants, re-derived here server-side. Recipients, subjects, the client
 // name, the engagement title and the coach name are all loaded from the
 // engagement, so nothing is hardcoded to any one client.
 //
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Load the engagement to fill the template. Everything is config driven:
-    //   beneficiaryName -- the client (LSP) being coached.
+    //   clientName -- the client (LSP) being coached.
     //   engagementTitle -- a per-engagement brand override, else the programme
     //                      name, else the client name.
     //   coachName       -- the lead consultant party, else the sender's name.
@@ -144,13 +144,13 @@ export async function POST(req: NextRequest) {
     const brandTitle = typeof brand?.engagement_title === 'string' ? brand.engagement_title : null
     const leadConsultant = (parties || []).find((p) => p.party_role === 'lead_consultant')
 
-    const beneficiaryName = client.name
+    const clientName = client.name
     const engagementTitle = brandTitle || programmeName || client.name
     const coachName = leadConsultant?.name || actor?.full_name || 'The Canvas Coach'
 
     const cfg: EngagementEmailConfig = {
       engagementTitle,
-      beneficiaryName,
+      clientName,
       coachName,
       journeyUrl,
     }

@@ -181,7 +181,7 @@ const METHOD_SESSIONS = {
   ],
   dp02: [
     { title: 'Opening plenary, customer segments', kind: 'plenary', mins: 180, extra: [],
-      purpose: 'Lead consultant leads, all present. Map segments from the revenue ready inventory. Separate paying clients from beneficiaries and programme officers. Name the budget holder for each segment.' },
+      purpose: 'Lead consultant leads, all present. Map segments from the revenue ready inventory. Separate paying clients from clients and programme officers. Name the budget holder for each segment.' },
     { title: 'Segment prioritisation', kind: 'client_team_only', mins: 120, extra: [],
       purpose: 'Lead consultant leads, leadership team present. Maximum three segments for validation. These are hypotheses, not conclusions.' },
     { title: 'Customer conversation training', kind: 'field_team', mins: 960, extra: ['lead_consultant'],

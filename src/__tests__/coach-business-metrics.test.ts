@@ -125,7 +125,7 @@ describe('clientTypeBreakdown', () => {
   }
   const now = new Date('2026-07-14T00:00:00Z')
 
-  it('counts a donor programme once regardless of how many beneficiaries it has', () => {
+  it('counts a donor programme once regardless of how many clients it has', () => {
     const clients = [
       client({ id: 'a', programme_id: 'donor1', engagement_mode: 'financial' }),
       client({ id: 'b', programme_id: 'donor1', engagement_mode: 'financial' }),
