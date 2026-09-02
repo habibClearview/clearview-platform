@@ -400,6 +400,15 @@ export const CANVAS_TABS = [
   { id: 'charter',      label: 'Engagement Charter',        marker: '3',  group: 'engagement' },
   { id: 'eng_setup',    label: 'Who is on it, and settings', marker: '4', group: 'engagement', teamOnly: true },
   { id: 'sessions',     label: 'Sessions and rooms',        marker: '5',  group: 'engagement', teamOnly: true },
+  // WHERE THE METHOD PUTS IT. 2 September 2026. This sat at the very bottom of
+  // a twenty-five item menu, under "Your notes", where Habib could not find it
+  // and reasonably concluded it did not exist. The Delivery Guide runs it in
+  // SETUP: the three questions are asked of the Executive Director with all
+  // parties present, everyone signs before leaving, and weak answers mean the
+  // first decision point does not open. So it is the last thing in "This
+  // engagement" — after the Charter and the people, immediately before the
+  // work it gates.
+  { id: 'diagnostic',   label: 'Pre-engagement diagnostic', marker: '6',  group: 'engagement' },
 
   { id: 'phase0',       label: 'Clearing the ground',       marker: 'P0', group: 'work', dpId: 'phase_0' },
   { id: 'dp01',         label: 'Decision Point 1 · Service Reality',      marker: '1',  group: 'work', dpId: 'dp01' },
@@ -421,7 +430,6 @@ export const CANVAS_TABS = [
   { id: 'how_to_start', label: 'How to start',              marker: '1',  group: 'notes' },
   { id: 'coach_ref',    label: 'Coach Quick Reference',     marker: '2',  group: 'notes', coachOnly: true },
   { id: 'ip_framework', label: 'The method, in full',       marker: '3',  group: 'notes' },
-  { id: 'diagnostic',   label: 'Pre-engagement diagnostic', marker: '4',  group: 'notes' },
 ]
 
 // ─── READINESS QUESTIONS ─────────────────────────────────────
