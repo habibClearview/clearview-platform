@@ -110,8 +110,15 @@ via the assessment. The closing happens in a room.
 
 ## The services
 
-Five of them. A visitor should be able to tell within seconds which one is
-theirs.
+Five of them, and they do not carry equal weight.
+
+**The Grant-to-Commercial Viability Canvas and the Investment Case Canvas
+lead.** Those two get the prominence, the depth and the strongest entry points
+on the home page. The other three are reachable and properly explained, but
+they do not compete for the same space. A home page that presents five equals
+sells none of them.
+
+A visitor should be able to tell within seconds which one is theirs.
 
 ### 1. Grant-to-Commercial Viability Canvas™ (GtCV) — the flagship
 
@@ -355,81 +362,35 @@ large ruminants as a fixed asset — is the single most memorable idea in the
 whole portfolio and deserves a diagram.
 
 
-## The proof library — use this, it is the most valuable thing here
+## The proof library — all fifteen entries
 
-Habib maintains a library of fifteen evidenced engagements, already written in
-generic phrasing for public use, each tagged with where it belongs. This is the
-answer to the site's biggest weakness: at the moment it asserts a method and
-proves nothing.
+Habib's own library of evidenced engagements, already written in generic
+phrasing for public use, each tagged with where he intends it used. This is the
+answer to the site's biggest weakness: at present it asserts a method and
+proves nothing. Use these as written; do not embellish them.
 
-Representative items, with his own suggested placement:
+| # | Category | What he did, and what came of it | Canvas link | Where it goes |
+|---|---|---|---|---|
+| 1 | MSD / PSE transition | A regional seed and markets programme moving from donor-funded to private entity. Advised the leadership on transforming community seed enterprises into viable private companies across three Southern African countries. Result: independent entities with clear customer definitions, market analysis processes and strategic plans. | Business Model Canvas + Market Analysis Canvas | "Transforming Development to Business" |
+| 2 | Capability development | A donor-funded climate jobs programme in East Africa. Designed and delivered a five-day Market Systems Development training for teams working with refugee and youth markets. Teams moved from activity delivery to systems thinking and redesigned their interventions using MSD logic. | MSD Implementation Canvas | "Building Systems Thinking Capacity" |
+| 3 | Private sector engagement | An economic development programme working with agribusiness firms on inclusive supply chains. Coached teams on using the Business Model Canvas to design and negotiate partnerships. Deal structuring clarity improved; teams began mapping partner incentives. | PSE Co-Design Canvas | "Tools That Drive Partnerships" |
+| 4 | PSE coaching | A hands-on module, "From Strategy to Execution in Private Sector Engagement", for donor programme staff. Engagement shifted from donor-led to value-driven; staff learned to articulate value propositions and structure business cases. | Deal Structure Canvas + Value Proposition Canvas | "Turning Staff into Dealmakers" |
+| 5 | Implementation learning | A market data reporting pilot in fragile settings. Supported field teams to redesign participant data systems. Reluctance to share sales data was replaced by participation once value came back to participants as market information and price alerts. | Trust & Incentives Framework | "When Data Sharing Becomes Mutual Value" |
+| 6 | Implementation learning | An agricultural value chain project on produce quality. Designed a learning loop integrating demand generation and logistics with technical training. Found that training alone does not improve quality — markets must reward it. | Systems Feedback Loop | **"Training Is Not Transformation"** |
+| 7 | Implementation learning | An agent-based distribution model for inclusive trade. Analysed the correlation between training frequency and productivity among commercial agents. Agent performance rises with frequent micro-training and reinforcement. | Behavioural Reinforcement Principle | "Frequency Beats Intensity" |
+| 8 | Implementation learning | Cross-border grain trade within inclusive markets. Helped private firms understand competitive pressure from informal traders. Porous borders and lower standards undercut quality supply; loyalty schemes introduced to retain producers. | Incentive Alignment Canvas | "Aligning Incentives Across Borders" |
+| 9 | Case study | A community commercial agent model linking refugee and host communities to formal buyers. Agents raised income and improved resilience — one farmer group reinvested UGX 2.7 million in land expansion. | Commercial Agent Model Canvas | **"Income → Investment → Independence"** |
+| 10 | Case study | Agribusiness–agent partnership coaching. Coached a lead agent to formalise agreements with a private buyer. Result: better credit discipline, higher pre-financing, expansion into new areas. | Deal Structuring Canvas | "Formalisation Multiplies Finance" |
+| 11 | Case study | A private firm expanding its supply chain into refugee settlements. Advised on the expansion. Led to a significant rise in volumes of quality produce and lower logistics costs. | Partnership Scaling Canvas | "Scaling Supply Chains Inclusively" |
+| 12 | Systemic insight | A margin-flow and income-gap study assessing commercial agent sustainability. Showed that inclusion without viable income remains exclusion, and informed the programme's incentive restructuring. | PSE Deal Nuance Canvas | **"The Income Reality of Inclusion"** |
+| 13 | Market systems coaching | Multiple mentorship cycles helping programme staff translate theory into practice. Managers began using hypothesis-test-learn-adapt loops to design interventions. | Learning Loop Canvas | "Embedding Adaptation as a Habit" |
+| 14 | Deal structuring | Negotiation and pitching support. Coached team members through live partnership pitches using AIDA and the Harvard 3 Cs. Stronger deals, closed faster, with measurable return-on-investment narratives. | Pitch Frameworks × Deal Canvas | "From Technical Proposal to Business Pitch" |
+| 15 | Transition & sustainability | Strategy advice on sustainable exit models and post-donor enterprise design across multiple donor programmes. Shifted three — agriculture, youth employment, seed systems — into commercially viable structures. | Sustainability Triggers Canvas | **"Helping Donors Exit, Enterprises Endure"** |
 
-| Category | What happened | Where it goes |
-|---|---|---|
-| MSD / PSE transition | Advised a regional seed and markets programme moving from donor-funded to private entity across three Southern African countries. Result: independent entities with clear customer definitions and strategic plans. | "Transforming Development to Business" |
-| Capability development | Designed and delivered a five-day Market Systems Development training for teams working in refugee and youth markets. Teams moved from activity delivery to systems thinking. | "Building Systems Thinking Capacity" |
-| Implementation learning | Found training alone does not improve produce quality — markets must reward quality. | Insight tile: "Training Is Not Transformation" |
-| Implementation learning | Reluctance to share sales data disappeared once value was returned to participants as market info and price alerts. | "When Data Sharing Becomes Mutual Value" |
-| Case study | An agent model linking refugee and host communities to formal buyers. One farmer group reinvested UGX 2.7 million in land expansion. | "Income → Investment → Independence" |
-| Systemic insight | Margin-flow and income-gap study showing inclusion without viable income remains exclusion. | "The Income Reality of Inclusion" |
-| Transition & sustainability | Shifted three donor programmes — agriculture, youth employment, seed systems — into commercially viable structures. | "Helping Donors Exit, Enterprises Endure" |
-
-The full library has fifteen entries. Ask Habib for the sheet; every entry
-carries a category, what he did, the learning, the canvas it links to, and
-where he intends it used.
-
-**Note the tone of these.** "Training Is Not Transformation" and "Inclusion
-without viable income remains exclusion" are the voice the site should have:
-findings that contradict the received wisdom of the sector, stated flatly. Lead
-with those, not with adjectives.
-
----
-
-## The two things a designer asks first
-
-### What the web app is, and where it lives
-
-**https://clearview.habibonifade.com** — the platform where engagements are
-actually run. It requires a login and is not public. It is not being
-redesigned; the website refers to it and never replaces it.
-
-What happens inside it: a coach sets up an engagement, agrees and signs the
-Charter, runs the pre-engagement diagnostic, then works the nine decision
-points with the client. Each decision point has its own working tables,
-collects the evidence it closes on, and is signed off before the next opens.
-Alongside that sit an evidence library, a decision record, session rooms the
-client's team joins from a phone, and the Market Intelligence product.
-
-Two things from it reach the outside world and both matter to the website:
-
-1. **The prospect link.** A coach can issue a no-login web address showing the
-   method and how far one live engagement has got — the canvas, the work that
-   happens before the first decision point, and a count of gates closed. It
-   never shows anything an engagement produced. This is the sales asset that
-   already exists.
-2. **The Market Intelligence report,** which subscribers browse online through
-   their own access link.
-
-### What people get for their email address
-
-**The website already has this built and working.** Ten questions — the same
-ten asked in the first session of a real engagement — then:
-
-- **A score out of ten**, and a band: Below threshold (under 6), Moderate
-  (6–7), or Strong (8+). The same bands the coach uses, so the number a
-  visitor sees here is the number they will hear in the room.
-- **Their gaps, named.** Every question answered no comes back with what being
-  wrong about it actually costs them, and which decision point settles it. Ten
-  yes/no answers turn into "here is where your work starts".
-- **One next step**, different for each band.
-
-It appears on screen immediately and arrives by email. The score is calculated
-on the server, not in the browser.
-
-**What is being redesigned about it:** at the moment it is a form at the
-bottom of a page. It should feel like the first step of the method — because
-that is exactly what it is.
-
+**The four in bold are the strongest and should lead any proof section.** Note
+what they have in common: each is a finding that contradicts the sector's
+received wisdom, stated flatly. That is the voice the whole site should have.
+Adjectives are what everyone else has.
 
 ## What already exists — do not redesign these away
 
@@ -551,23 +512,11 @@ stock photography of anybody else.
 
 ---
 
-## What Habib still needs to supply
+## What is still missing
 
-1. **His personal / Canvas Coach logo**, as SVG or PNG with a transparent
-   background. Only the Viable by Design newsletter logo has been provided.
-2. **One photograph** of him working. See "The photograph" above.
-3. ~~Price and duration~~ — **decided: not published.** Habib does not want
-   prices or durations on the site. Do not design a pricing table, a "from
-   £X" line, or a package comparison. The next step is a conversation, not a
-   number. (This matches his own proposal rule: fixed-price deliverables, never
-   a day rate.)
-4. **A decision on named clients.** Which programmes and funders, if any, may
-   be named on a public page.
-5. **Permission on the E-TraLiMM applied case**, from that client, if any of
-   its figures are to be shown.
-6. **The full proof library sheet** — fifteen entries, of which seven are
-   summarised above.
-7. **The single most important answer: which one of the five services does he
-   most want to sell in the next six months?** Five services given equal
-   weight sells none of them. One should lead, and the others should be
-   reachable. Without that answer the home page has no shape.
+One thing only.
+
+**The Canvas Coach mark and the HO monogram as usable files** — SVG for
+preference, otherwise PNG with a transparent background at 1000px or wider.
+Habib has shown both; what is needed is the file rather than the picture.
+Everything else in this brief is settled.
