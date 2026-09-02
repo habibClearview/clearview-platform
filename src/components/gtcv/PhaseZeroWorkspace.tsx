@@ -156,15 +156,15 @@ function noteBox(border, bg) {
 // ─── Method content (fixed IP, identical for every engagement) ───
 const DESTINATION_OPTIONS = [
   { id: '', label: 'No destination yet' },
-  { id: 'dp01', label: 'DP01 Service Reality Audit' },
-  { id: 'dp02', label: 'DP02 Customer and Problem Clarity' },
-  { id: 'dp03', label: 'DP03 Value Proposition' },
-  { id: 'dp04', label: 'DP04 Commercial Viability' },
-  { id: 'dp05', label: 'DP05 Market Entry' },
-  { id: 'dp06', label: 'DP06 Identity and Partners' },
-  { id: 'dp07', label: 'DP07 Pilot and Learn' },
-  { id: 'dp08', label: 'DP08 Scale Pathway' },
-  { id: 'dp09', label: 'DP09 Commercial Readiness' },
+  { id: 'dp01', label: 'Decision Point 1 Service Reality Audit' },
+  { id: 'dp02', label: 'Decision Point 2 Customer and Problem Clarity' },
+  { id: 'dp03', label: 'Decision Point 3 Value Proposition' },
+  { id: 'dp04', label: 'Decision Point 4 Commercial Viability' },
+  { id: 'dp05', label: 'Decision Point 5 Market Entry' },
+  { id: 'dp06', label: 'Decision Point 6 Identity and Partners' },
+  { id: 'dp07', label: 'Decision Point 7 Pilot and Learn' },
+  { id: 'dp08', label: 'Decision Point 8 Scale Pathway' },
+  { id: 'dp09', label: 'Decision Point 9 · Commercial Readiness' },
 ]
 
 const DECISIONS = [

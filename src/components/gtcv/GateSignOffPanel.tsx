@@ -14,7 +14,7 @@
 //
 // Two records carry the funder's signature as well. The pre-engagement
 // diagnostic record is signed by the Executive Director, the board chair,
-// the funder representative and the lead consultant before Zone 1 opens,
+// the funder representative and the lead consultant before Decision Point 1 opens,
 // and is filed with the funder. The engagement completion record is signed
 // by the lead consultant, the Executive Director and the funder
 // representative. The scale pathway commitment additionally carries board
@@ -70,17 +70,17 @@ const ROLE_LABEL = {
 function roleLabel(role) { return ROLE_LABEL[role] || role || 'Unassigned role' }
 
 const DP_LABEL = {
-  setup: 'Before Zone 1, the pre-engagement diagnostic record',
+  setup: 'Before Decision Point 1, the pre-engagement diagnostic record',
   phase_0: 'Phase 0, Assumption Clearing',
-  dp01: 'DP01, Service Reality Audit',
-  dp02: 'DP02, Customer and Problem Clarity',
-  dp03: 'DP03, Value Proposition Architecture',
-  dp04: 'DP04, Commercial Viability Model',
-  dp05: 'DP05, Market Entry Design',
-  dp06: 'DP06, Identity and Partner Architecture',
-  dp07: 'DP07, Pilot and Learn Architecture',
-  dp08: 'DP08, Scale and Expansion Pathway',
-  dp09: 'DP09, Commercial Readiness Diagnostic',
+  dp01: 'Decision Point 1, Service Reality Audit',
+  dp02: 'Decision Point 2, Customer and Problem Clarity',
+  dp03: 'Decision Point 3, Value Proposition Architecture',
+  dp04: 'Decision Point 4, Commercial Viability Model',
+  dp05: 'Decision Point 5, Market Entry Design',
+  dp06: 'Decision Point 6, Identity and Partner Architecture',
+  dp07: 'Decision Point 7, Pilot and Learn Architecture',
+  dp08: 'Decision Point 8, Scale and Expansion Pathway',
+  dp09: 'Decision Point 9, Commercial Readiness Diagnostic',
   handover: 'Handover, the engagement completion record',
 }
 

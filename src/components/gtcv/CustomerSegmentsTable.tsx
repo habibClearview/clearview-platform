@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client'
 // ============================================================
-// GtCV DP02: Customer Profile and Three-Stage Adoption Test.
+// GtCV Decision Point 2: Customer Profile and Three-Stage Adoption Test.
 //
 // One row per candidate customer segment. For each segment the table holds
 // the segment name, the problem in the customer's own words, the named
@@ -19,7 +19,7 @@
 //   shows the FIRST stage that is not a clear yes, which is where the
 //   segment is stuck.
 //
-//   DP02 gate. A segment needs a minimum of 5 validation conversations,
+//   Decision Point 2 gate. A segment needs a minimum of 5 validation conversations,
 //   with at least 3 of them converging on the same problem, the same
 //   budget and the same willingness to pay. Five conversations that all
 //   say different things is not evidence, it is noise. The readiness strip
@@ -109,7 +109,7 @@ function stageTone(st) {
   return C.amber
 }
 
-// The DP02 conversation rule, read straight off the row.
+// The Decision Point 2 conversation rule, read straight off the row.
 function gateCheck(row) {
   const logged = Number(row.conversations_logged) || 0
   const converging = Number(row.converging_count) || 0
@@ -306,7 +306,7 @@ export default function CustomerSegmentsTable({ clientId, canManage }) {
           <Pill text={`${summary.total} segment${summary.total === 1 ? '' : 's'}`} tone={C.slate} />
           <Pill text={`${summary.evidence} of ${summary.total} meet the ${MIN_CONVERSATIONS} and ${MIN_CONVERGING} rule`} tone={summary.evidence > 0 ? C.green : C.red} />
           <Pill text={`${summary.prioritised} reach Prioritised`} tone={summary.prioritised > 0 ? C.green : C.amber} />
-          <Pill text={`${summary.ready} ready to carry into DP03`} tone={summary.ready > 0 ? C.green : C.amber} />
+          <Pill text={`${summary.ready} ready to carry into Decision Point 3`} tone={summary.ready > 0 ? C.green : C.amber} />
         </div>
       )}
 

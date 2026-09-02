@@ -2400,7 +2400,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               // list twice to decide the same thing.
               activeTab===dpKey&&<div key={dpKey}><TabDP client={selClient} dp={canvas.find(d=>d.dp_id===dpKey)} userRole={previewRoleId} onUpdateDP={u=>updateDP(selClient.id,dpKey,u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,dpKey,cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId={dpKey} clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/></div>
                 {/* The tools belong to the zone that uses them. Interviewing is
-                    how DP02 gets its evidence and observation is how DP07 gets
+                    how Decision Point 2 gets its evidence and observation is how Decision Point 7 gets
                     its, and both used to sit ten and seven places away in a flat
                     list where you had to know where to look. */}
                 {dpKey==='dp02'&&<div style={{marginTop:26}}><InterviewBriefing/><div style={{height:22}}/><InterviewCaptureForm clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><InterviewReporting clientId={selClient.id}/></div>}
@@ -2977,7 +2977,7 @@ function TabCoachRef(){
       <div style={{...card,background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`}}>
         <h4 style={{fontFamily:'var(--cv-font)',color:C.navy,marginTop:0}}>Delivery Rhythm</h4>
         <ul style={{fontSize:'1.07rem',lineHeight:1.8,color:C.navy}}>
-          <li><strong>Kick-off immersion:</strong> 3 days on-site. Baseline, Phase 0, DP01 and DP02.</li>
+          <li><strong>Kick-off immersion:</strong> 3 days on-site. Baseline, Phase 0, Decision Point 1 and Decision Point 2.</li>
           <li><strong>Customer validation visit:</strong> 2 days. Real customer conversations and debrief.</li>
           <li><strong>Iteration 1 pilot visit:</strong> 3 days. Consultant leads with 2 real clients, CEO observes.</li>
           <li><strong>Iteration 2 and handover visit:</strong> 3 days. Client leads, consultant observes.</li>
@@ -2991,9 +2991,9 @@ function TabCoachRef(){
         </ul>
         <h4 style={{fontFamily:'var(--cv-font)',color:C.navy}}>Commercial Readiness Diagnostic Points</h4>
         <ul style={{fontSize:'1.07rem',lineHeight:1.8,color:C.navy}}>
-          <li><strong>Baseline:</strong> DP06 — before pilots begin.</li>
-          <li><strong>Mid-point:</strong> DP07 — after Iteration 1.</li>
-          <li><strong>Final:</strong> DP09 — at engagement close.</li>
+          <li><strong>Baseline:</strong> Decision Point 6 — before pilots begin.</li>
+          <li><strong>Mid-point:</strong> Decision Point 7 — after Iteration 1.</li>
+          <li><strong>Final:</strong> Decision Point 9 — at engagement close.</li>
         </ul>
         <h4 style={{fontFamily:'var(--cv-font)',color:C.navy}}>Non-Negotiables</h4>
         <ul style={{fontSize:'1.07rem',lineHeight:1.8,color:C.navy}}>
@@ -3181,7 +3181,7 @@ function TabDiagnostic({client,diagnostic,userRole,userName,onUpdate}){
 
 function TabTracker({client,canvas}){
   const dpOrder=['phase_0','dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09']
-  const dpLabels={'phase_0':'Phase 0','dp01':'DP01','dp02':'DP02','dp03':'DP03','dp04':'DP04','dp05':'DP05','dp06':'DP06','dp07':'DP07','dp08':'DP08','dp09':'DP09'}
+  const dpLabels={'phase_0':'Phase 0','dp01':'Decision Point 1','dp02':'Decision Point 2','dp03':'Decision Point 3','dp04':'Decision Point 4','dp05':'Decision Point 5','dp06':'Decision Point 6','dp07':'Decision Point 7','dp08':'Decision Point 8','dp09':'Decision Point 9'}
   return(
     <div>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Engagement Tracker</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
@@ -3300,7 +3300,7 @@ function TabHandover({client,handover,canvas,userRole,onUpdate}){
   return(
     <div>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Handover Record</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
-      {locked&&<div style={{background:'var(--cv-tint-amber-2)',padding:14,borderRadius:8,marginBottom:16,color:C.amber,fontWeight:600}}>This tab unlocks when DP09 CEO sign-off is complete.</div>}
+      {locked&&<div style={{background:'var(--cv-tint-amber-2)',padding:14,borderRadius:8,marginBottom:16,color:C.amber,fontWeight:600}}>This tab unlocks when Decision Point 9 CEO sign-off is complete.</div>}
       {handover.map(test=>(
         <div key={test.id} style={{...card,opacity:locked?0.6:1}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.75rem',flexWrap:'wrap',gap:'0.5rem'}}>

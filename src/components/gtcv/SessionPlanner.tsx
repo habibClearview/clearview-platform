@@ -19,7 +19,7 @@
 //                      where the evidence is reviewed together and the
 //                      score is agreed.
 //   CLIENT TEAM ONLY   worked with the leadership team, funder not present.
-//   FINANCE RESTRICTED the DP04 cost mapping sessions. The privacy
+//   FINANCE RESTRICTED the Decision Point 4 cost mapping sessions. The privacy
 //                      protocol is explicit: finance, HR and leadership
 //                      only, and the field team does not attend. The field
 //                      team validates delivery time in a separate session
@@ -134,17 +134,17 @@ function kindDef(v) { return KINDS.find((k) => k.v === v) || null }
 
 // ─── The decision points, in delivery order ──────────────────
 const DPS = [
-  { id: 'setup', label: 'Before Zone 1' },
+  { id: 'setup', label: 'Before Decision Point 1' },
   { id: 'phase_0', label: 'Phase 0, Assumption Clearing' },
-  { id: 'dp01', label: 'DP01, Service Reality Audit' },
-  { id: 'dp02', label: 'DP02, Customer and Problem Clarity' },
-  { id: 'dp03', label: 'DP03, Value Proposition Architecture' },
-  { id: 'dp04', label: 'DP04, Commercial Viability Model' },
-  { id: 'dp05', label: 'DP05, Market Entry Design' },
-  { id: 'dp06', label: 'DP06, Identity and Partner Architecture' },
-  { id: 'dp07', label: 'DP07, Pilot and Learn Architecture' },
-  { id: 'dp08', label: 'DP08, Scale and Expansion Pathway' },
-  { id: 'dp09', label: 'DP09, Commercial Readiness Diagnostic' },
+  { id: 'dp01', label: 'Decision Point 1, Service Reality Audit' },
+  { id: 'dp02', label: 'Decision Point 2, Customer and Problem Clarity' },
+  { id: 'dp03', label: 'Decision Point 3, Value Proposition Architecture' },
+  { id: 'dp04', label: 'Decision Point 4, Commercial Viability Model' },
+  { id: 'dp05', label: 'Decision Point 5, Market Entry Design' },
+  { id: 'dp06', label: 'Decision Point 6, Identity and Partner Architecture' },
+  { id: 'dp07', label: 'Decision Point 7, Pilot and Learn Architecture' },
+  { id: 'dp08', label: 'Decision Point 8, Scale and Expansion Pathway' },
+  { id: 'dp09', label: 'Decision Point 9, Commercial Readiness Diagnostic' },
   { id: 'handover', label: 'Handover' },
 ]
 
@@ -157,7 +157,7 @@ const DPS = [
 const METHOD_SESSIONS = {
   setup: [
     { title: 'Pre-engagement diagnostic', kind: 'joint_with_funder', mins: 120, extra: ['lsp_board'],
-      purpose: 'The three questions asked of the Executive Director out loud with all parties present. The co-implementer records verbatim. All parties sign before leaving, and the signed record is filed with the funder. Weak answers mean no Zone 1 without a follow-up conversation with the funder present.' },
+      purpose: 'The three questions asked of the Executive Director out loud with all parties present. The co-implementer records verbatim. All parties sign before leaving, and the signed record is filed with the funder. Weak answers mean no Decision Point 1 without a follow-up conversation with the funder present.' },
   ],
   phase_0: [
     { title: 'Assumption clearing, session 1', kind: 'plenary', mins: 180, extra: [],
@@ -173,11 +173,11 @@ const METHOD_SESSIONS = {
     { title: 'Activity survival decision', kind: 'field_team', mins: 120, extra: [],
       purpose: 'Co-implementer leads, field team present. One of nine decisions per activity: stay, transfer, kill, bundle, sweetener, spin off, redesign, defer, subsidise consciously.' },
     { title: 'Service synthesis rows', kind: 'client_team_only', mins: 120, extra: ['lsp_finance'],
-      purpose: 'Finance lead leads, co-implementer supports. The eight synthesis rows per service, including the revised delivery cost that enters Zone 4.' },
+      purpose: 'Finance lead leads, co-implementer supports. The eight synthesis rows per service, including the revised delivery cost that enters Decision Point 4.' },
     { title: 'Recalibrated commercial hypothesis', kind: 'one_to_one', mins: 120, extra: ['co_implementer'],
-      purpose: 'Co-implementer drafts, lead consultant reviews. One testable hypothesis per surviving service, which is what enters Zone 2.' },
+      purpose: 'Co-implementer drafts, lead consultant reviews. One testable hypothesis per surviving service, which is what enters Decision Point 2.' },
     { title: 'Gate review', kind: 'one_to_one', mins: 60, extra: ['lsp_ed'],
-      purpose: 'Lead consultant leads, Executive Director present. The ED confirms the service survival decisions, the lead consultant approves every hypothesis. Nothing enters Zone 2 without that approval.' },
+      purpose: 'Lead consultant leads, Executive Director present. The ED confirms the service survival decisions, the lead consultant approves every hypothesis. Nothing enters Decision Point 2 without that approval.' },
   ],
   dp02: [
     { title: 'Opening plenary, customer segments', kind: 'plenary', mins: 180, extra: [],
@@ -199,7 +199,7 @@ const METHOD_SESSIONS = {
   ],
   dp03: [
     { title: 'Value proposition workshop', kind: 'plenary', mins: 240, extra: [],
-      purpose: 'Half day per segment. Lead consultant leads, leadership team and field team present. Build the four components using the exact language clients used in Zone 2.' },
+      purpose: 'Half day per segment. Lead consultant leads, leadership team and field team present. Build the four components using the exact language clients used in Decision Point 2.' },
     { title: 'Differentiation mapping', kind: 'client_team_only', mins: 180, extra: [],
       purpose: 'Co-implementer leads, leadership team present. Be honest about where the differentiation is weak.' },
     { title: 'Language translation', kind: 'field_team', mins: 240, extra: [],
@@ -223,7 +223,7 @@ const METHOD_SESSIONS = {
     { title: 'Break-even calculation and pricing tiers', kind: 'finance_restricted', mins: 240, extra: [],
       purpose: 'Half day. Co-implementer leads, finance lead supports, lead consultant reviews. Market reference prices first, then minimum two tiers, then read the break-even.' },
     { title: 'Pricing stress test', kind: 'client_team_only', mins: 120, extra: ['lead_consultant'],
-      purpose: 'Lead consultant leads, leadership team present. Compare each tier against the Zone 2 willingness to pay evidence. A gap above 20 percent means the service configuration needs review.' },
+      purpose: 'Lead consultant leads, leadership team present. Compare each tier against the Decision Point 2 willingness to pay evidence. A gap above 20 percent means the service configuration needs review.' },
     { title: 'Financial model handover', kind: 'finance_restricted', mins: 120, extra: [],
       purpose: 'Co-implementer trains the finance lead to update the model. The finance lead then demonstrates a change unassisted while the co-implementer observes.' },
     { title: 'Gate review and sign-off', kind: 'one_to_one', mins: 60, extra: ['lsp_ed'],
@@ -251,15 +251,15 @@ const METHOD_SESSIONS = {
     { title: 'Commercial identity workshop', kind: 'client_team_only', mins: 180, extra: ['lead_consultant'],
       purpose: 'Lead consultant leads, leadership team present. One clear primary identity: specialist advisory firm, training provider, systems integrator, embedded coaching practice, or hybrid.' },
     { title: 'Identity stress test', kind: 'client_team_only', mins: 120, extra: ['co_implementer'],
-      purpose: 'Co-implementer leads, leadership team present. Test the claimed identity against the Zone 2 segments. Does it speak to the budget holder being targeted?' },
+      purpose: 'Co-implementer leads, leadership team present. Test the claimed identity against the Decision Point 2 segments. Does it speak to the budget holder being targeted?' },
     { title: 'Partner mapping', kind: 'client_team_only', mins: 120, extra: ['co_implementer'],
       purpose: 'Co-implementer leads, leadership team present. Every current and potential partner categorised as referral, co-delivery, endorsement or conflict.' },
     { title: 'Partner alignment review', kind: 'one_to_one', mins: 120, extra: ['co_implementer'],
-      purpose: 'Co-implementer drafts, lead consultant reviews. Name the conflict partnerships and make a specific recommendation for each. These must be addressed before Zone 7 opens.' },
+      purpose: 'Co-implementer drafts, lead consultant reviews. Name the conflict partnerships and make a specific recommendation for each. These must be addressed before Decision Point 7 opens.' },
     { title: 'Commercial identity statement', kind: 'one_to_one', mins: 240, extra: ['co_implementer'],
       purpose: 'Half day. Co-implementer drafts, lead consultant reviews and approves. Client facing, used in all outreach materials.' },
     { title: 'Gate review and sign-off', kind: 'one_to_one', mins: 60, extra: ['lsp_ed'],
-      purpose: 'Lead consultant leads, Executive Director signs. Runs in parallel with DP05.' },
+      purpose: 'Lead consultant leads, Executive Director signs. Runs in parallel with Decision Point 5.' },
   ],
   dp07: [
     { title: 'Iteration 1 preparation', kind: 'field_team', mins: 240, extra: ['lead_consultant'],
@@ -305,9 +305,9 @@ const METHOD_SESSIONS = {
   ],
   dp09: [
     { title: 'Baseline diagnostic', kind: 'joint_with_funder', mins: 120, extra: ['lsp_leadership'],
-      purpose: 'End of Zone 1. Score all six fit tests with the full leadership team, the funder representative and the lead consultant present. Agree what progression looks like at mid point. Record and sign.' },
+      purpose: 'End of Decision Point 1. Score all six fit tests with the full leadership team, the funder representative and the lead consultant present. Agree what progression looks like at mid point. Record and sign.' },
     { title: 'Mid-point diagnostic', kind: 'joint_with_funder', mins: 120, extra: ['lsp_leadership'],
-      purpose: 'During Zone 7, after Iteration 1 and before Iteration 2. Score all six fit tests and identify where the engagement must accelerate. Shared with the funder. If the score shows significant gaps, adjust the plan now, not at close.' },
+      purpose: 'During Decision Point 7, after Iteration 1 and before Iteration 2. Score all six fit tests and identify where the engagement must accelerate. Shared with the funder. If the score shows significant gaps, adjust the plan now, not at close.' },
     { title: 'Close diagnostic', kind: 'joint_with_funder', mins: 180, extra: ['lsp_leadership'],
       purpose: 'After all zones complete. Score all six fit tests and document the full progression from baseline to close.' },
   ],

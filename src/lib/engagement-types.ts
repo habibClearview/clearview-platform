@@ -32,7 +32,7 @@ export type Terminology = 'zone' | 'dp'
 export type MomentumStatus = 'green' | 'amber' | 'red'
 export type IndependenceTestSet = 'engagement' | 'tools'
 
-// Default DP02 validation-conversation minimum when engagement_config
+// Default Decision Point 2 validation-conversation minimum when engagement_config
 // leaves it NULL. Handbook-canonical (>=3 of these must converge).
 export const DEFAULT_VALIDATION_MIN_PER_SEGMENT = 5
 

@@ -1,13 +1,13 @@
 // @ts-nocheck
 'use client'
 // ============================================================
-// DP05 A/B MESSAGE TESTING LOG
+// Decision Point 5 A/B MESSAGE TESTING LOG
 //
 // One row per contact approached: who they are, which message variant they
 // were sent, what came back, how good it was, the phrase they used, and
 // whether a purchasing signal appeared.
 //
-// The method rule this encodes (GtCV handbook, DP05): a variant only wins
+// The method rule this encodes (GtCV handbook, Decision Point 5): a variant only wins
 // when it pulls about 50 percent higher response than the other. So the
 // component computes the response rate for each variant from the log and
 // flags the winner automatically. Nothing is stored precomputed: the log is
@@ -133,7 +133,7 @@ function StatCard({ s, winner }) {
 
 export default function ABTestingLog({ clientId, canManage }) {
   const [rows, setRows] = useState([])
-  // The new services from DP03. A message is tested FOR a service, so a log
+  // The new services from Decision Point 3. A message is tested FOR a service, so a log
   // that does not name one cannot say which offer the winning line belongs to.
   const [propRows, setPropRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -255,7 +255,7 @@ export default function ABTestingLog({ clientId, canManage }) {
       <div style={{ ...card }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
-            <h3 style={secH}>DP05 A/B message testing log</h3>
+            <h3 style={secH}>Decision Point 5 A/B message testing log</h3>
             <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '92ch' }}>
               One line per contact you approached. Record the variant you sent and what came back.
               A reply of any kind, full or partial, counts as a response. The winning message needs

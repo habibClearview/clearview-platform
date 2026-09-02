@@ -1,7 +1,7 @@
 // ============================================================
 // BRINGING THE PROBLEMS ACROSS FROM THE SEGMENTS
 //
-// WHY THIS EXISTS. DP02 works through two tables in order. The first names the
+// WHY THIS EXISTS. Decision Point 2 works through two tables in order. The first names the
 // customer segments and writes down the problem in the customer's own words.
 // The second scores those problems on urgency, ownership, willingness to pay
 // and access.

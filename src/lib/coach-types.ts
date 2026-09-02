@@ -87,10 +87,11 @@ export type DPStatus = '○' | '◐' | '✓' | '⚠'
 
 export function statusLabel(s: string): string {
   const m: Record<string, string> = {
-    // 2 September 2026. These read "DP03" — a code, sitting next to the
-    // client's name where a person expects words. Every zone in this method IS
-    // a decision point with a decision gate, so that is what it is called here
-    // and everywhere else. The code survives as the key, not as the label.
+    // 2 September 2026. These read like a code (the third one was "DP" then
+    // "03"), sitting next to the client's name where a person expects words.
+    // Every block in this method IS a decision point with a decision gate, so
+    // that is what it is called here and everywhere else. The code survives as
+    // the key, not as the label.
     setup:'Setup', phase_0:'Clearing the ground',
     dp01:'Decision Point 1', dp02:'Decision Point 2', dp03:'Decision Point 3',
     dp04:'Decision Point 4', dp05:'Decision Point 5', dp06:'Decision Point 6',
@@ -381,12 +382,12 @@ export const TAB_GROUPS = [
 // to sit on this list behind a role check, and one check is one mistake away
 // from putting the fee in front of the organisation being coached.
 //
-// The interview tools live inside DP02 and pilot observation inside DP07,
+// The interview tools live inside Decision Point 2 and pilot observation inside Decision Point 7,
 // rather than as their own entries ten and seven places away from the zone they
 // belong to. A tool belongs where it is used.
 // THE CODES ARE NOT LABELS. 2 September 2026.
 //
-// Every zone read "DP01 Service Reality", "DP02 Customer Clarity" and so on.
+// Every zone read "Decision Point 1 Service Reality", "Decision Point 2 Customer Clarity" and so on.
 // The DP number is an internal identifier — it is still there as dpId, which is
 // what the code matches on — but on screen it was a column of numbers nobody
 // had been told the meaning of, on top of names that already say what each zone
@@ -447,30 +448,30 @@ export const READINESS_QUESTIONS = [
 // ─── COMPONENT TITLES PER DP ─────────────────────────────────
 export const COMPONENT_TITLES: Record<string, string[]> = {
   phase_0: ['Assumption Log','Stakeholder Map','Data Gap Register','Readiness Self-Assessment','Engagement Commitment Form','','','',''],
-  dp01: ['Service Inventory','Grant Logic vs Market Logic Sort','Service Delivery Evidence','Cost of Delivery','Service Readiness Assessment','Competitor and Substitute Map','Internal Capability Audit','Short-List of Commercial Services','DP01 Summary and Commitment'],
-  dp02: ['Client vs Paying Customer Distinction','Customer Profile','Problem Statement','Budget Authority Confirmation','Customer Validation Plan','Customer Validation Results','Revised Customer Profile','Problem Prioritisation','DP02 Summary and Commitment'],
-  dp03: ['Customer Gain and Pain Map','Value Proposition Statement','Evidence of Value','Differentiation from Alternatives','Service Bundle Design','Willingness to Pay Test','Service Tiers','Customer Outcome Statement','DP03 Summary and Commitment'],
-  dp04: ['Full Cost of Delivery','Pricing Decision','Break-Even Volume','36-Month Revenue Projection','Funding Gap Analysis','Scenario Analysis','Capital Requirements','Financial Model Review','DP04 Summary and Commitment'],
-  dp05: ['Customer Segmentation','Channel Map','Outreach Message','Sales Process Map','First 5 Customers Plan','Pricing and Proposal Template','A/B Test Design','Business Development Responsibility','DP05 Summary and Commitment'],
-  dp06: ['Commercial Identity Statement','Service Profile Documents','Track Record Documentation','Partner Identification','Partnership Agreements','Digital and Offline Presence','Referral System','Commercial Readiness Baseline','DP06 Summary and Commitment'],
-  dp07: ['Pilot Client Selection','Pilot Delivery Plan','Pilot Delivery','Client Feedback Collection','Iteration 1 Debrief','Revenue Confirmation','Service Adjustments','Mid-Point Commercial Readiness Diagnostic','DP07 Summary and Commitment'],
-  dp08: ['Iteration 2 Client Selection','Client-Led Delivery','Client Feedback — Iteration 2','Renewal and Referral Evidence','Commercial Model Presentation','Scale Pathway Design','Financial Model Update','Handover Preparation','DP08 Summary and Commitment'],
+  dp01: ['Service Inventory','Grant Logic vs Market Logic Sort','Service Delivery Evidence','Cost of Delivery','Service Readiness Assessment','Competitor and Substitute Map','Internal Capability Audit','Short-List of Commercial Services','Decision Point 1 Summary and Commitment'],
+  dp02: ['Client vs Paying Customer Distinction','Customer Profile','Problem Statement','Budget Authority Confirmation','Customer Validation Plan','Customer Validation Results','Revised Customer Profile','Problem Prioritisation','Decision Point 2 Summary and Commitment'],
+  dp03: ['Customer Gain and Pain Map','Value Proposition Statement','Evidence of Value','Differentiation from Alternatives','Service Bundle Design','Willingness to Pay Test','Service Tiers','Customer Outcome Statement','Decision Point 3 Summary and Commitment'],
+  dp04: ['Full Cost of Delivery','Pricing Decision','Break-Even Volume','36-Month Revenue Projection','Funding Gap Analysis','Scenario Analysis','Capital Requirements','Financial Model Review','Decision Point 4 Summary and Commitment'],
+  dp05: ['Customer Segmentation','Channel Map','Outreach Message','Sales Process Map','First 5 Customers Plan','Pricing and Proposal Template','A/B Test Design','Business Development Responsibility','Decision Point 5 Summary and Commitment'],
+  dp06: ['Commercial Identity Statement','Service Profile Documents','Track Record Documentation','Partner Identification','Partnership Agreements','Digital and Offline Presence','Referral System','Commercial Readiness Baseline','Decision Point 6 Summary and Commitment'],
+  dp07: ['Pilot Client Selection','Pilot Delivery Plan','Pilot Delivery','Client Feedback Collection','Iteration 1 Debrief','Revenue Confirmation','Service Adjustments','Mid-Point Commercial Readiness Diagnostic','Decision Point 7 Summary and Commitment'],
+  dp08: ['Iteration 2 Client Selection','Client-Led Delivery','Client Feedback — Iteration 2','Renewal and Referral Evidence','Commercial Model Presentation','Scale Pathway Design','Financial Model Update','Handover Preparation','Decision Point 8 Summary and Commitment'],
   dp09: ['Final Commercial Readiness Diagnostic','Independence Tests Completion','Revenue Achieved vs Target','Customer Count vs Target','Post-Engagement Commercial Plan','Funder Reporting Package','Final Commercial Model Presentation','Engagement Learning Record','Formal Handover and Engagement Close'],
 }
 
 // ─── BUILD EMPTY CANVAS (for new canvas clients) ─────────────
 export function buildEmptyCanvas(clientId: string): CanvasDecisionPoint[] {
   const dps = [
-    { dp_id: 'phase_0', label: 'Phase 0 — Assumption Clearing', core_question: 'What assumptions must be cleared before canvas work begins?', commitment: 'Complete the five assumption-clearing tools before DP01 opens.', output_required: 'Completed assumption log, stakeholder map, data gap register, readiness self-assessment, and engagement commitment form.', session_time: '1 day on-site', sort_order: 0 },
-    { dp_id: 'dp01', label: 'DP01 — Service Reality Audit', core_question: 'Which of our current services could a paying customer actually buy?', commitment: 'Produce a short-list of 2–3 market-logic services with evidence of delivery.', output_required: 'Service inventory, grant-logic vs market-logic sort, short-list of commercial services.', session_time: '3–4 hours', sort_order: 1 },
-    { dp_id: 'dp02', label: 'DP02 — Customer and Problem Clarity', core_question: 'Who will pay for our services, and what problem are we solving for them?', commitment: 'Conduct direct conversations with at least 3 potential paying customers.', output_required: 'Validated customer profile, problem statement with direct customer quotes, budget authority confirmation.', session_time: '4–5 hours', sort_order: 2 },
-    { dp_id: 'dp03', label: 'DP03 — Value Proposition Architecture', core_question: 'Why would this specific customer choose our service over any alternative?', commitment: 'Develop and test a value proposition statement with at least one real customer.', output_required: 'Value proposition statement, service bundle, willingness-to-pay evidence, service tiers.', session_time: '3–4 hours', sort_order: 3 },
-    { dp_id: 'dp04', label: 'DP04 — Commercial Viability Model', core_question: 'Can we deliver this service at a price the customer will pay and a volume that sustains the organisation?', commitment: 'Build a full financial model with CEO and Finance Manager present.', output_required: 'Cost of delivery, pricing decision, break-even volume, 36-month projection, scenario analysis.', session_time: '5–6 hours', sort_order: 4 },
-    { dp_id: 'dp05', label: 'DP05 — Market Entry Design', core_question: 'How will we reach and convert our first paying customers?', commitment: 'Name and assign responsibility for the first 5 paying customer targets.', output_required: 'Customer segmentation, channel map, first 5 customers plan, sales process map, business development responsibility.', session_time: '3–4 hours', sort_order: 5 },
-    { dp_id: 'dp06', label: 'DP06 — Organisational Identity and Partner Architecture', core_question: 'How does the client present itself commercially, and who are the partners that strengthen their market position?', commitment: 'Produce a commercial identity statement and at least one partnership agreement.', output_required: 'Commercial identity statement, service profiles, track record, partner agreements, commercial readiness baseline.', session_time: '3–4 hours', sort_order: 6 },
-    { dp_id: 'dp07', label: 'DP07 — Pilot: Iteration 1', core_question: 'Did our service work with real clients, and what did we learn?', commitment: 'Deliver the service to at least 2 paying or near-paying clients with structured feedback.', output_required: 'Pilot delivery records, client feedback verbatim, revenue confirmation, service adjustments, mid-point diagnostic.', session_time: '3 days on-site', sort_order: 7 },
-    { dp_id: 'dp08', label: 'DP08 — Pilot: Iteration 2 and Commercial Handover', core_question: 'Can the client lead the service independently, and is the commercial model ready to scale?', commitment: 'Client leads Iteration 2 deliveries with consultant observing only.', output_required: 'Client-led delivery evidence, feedback, renewal or referral evidence, commercial model presentation, handover materials.', session_time: '3 days on-site', sort_order: 8 },
-    { dp_id: 'dp09', label: 'DP09 — Commercial Readiness Diagnostic', core_question: 'Is the client ready to operate commercially without programme support?', commitment: 'Complete all five independence tests and the final commercial readiness diagnostic.', output_required: 'Final diagnostic scores, independence tests, revenue vs target, post-engagement plan, funder reporting package.', session_time: '4–5 hours', sort_order: 9 },
+    { dp_id: 'phase_0', label: 'Phase 0 — Assumption Clearing', core_question: 'What assumptions must be cleared before canvas work begins?', commitment: 'Complete the five assumption-clearing tools before Decision Point 1 opens.', output_required: 'Completed assumption log, stakeholder map, data gap register, readiness self-assessment, and engagement commitment form.', session_time: '1 day on-site', sort_order: 0 },
+    { dp_id: 'dp01', label: 'Decision Point 1 — Service Reality Audit', core_question: 'Which of our current services could a paying customer actually buy?', commitment: 'Produce a short-list of 2–3 market-logic services with evidence of delivery.', output_required: 'Service inventory, grant-logic vs market-logic sort, short-list of commercial services.', session_time: '3–4 hours', sort_order: 1 },
+    { dp_id: 'dp02', label: 'Decision Point 2 — Customer and Problem Clarity', core_question: 'Who will pay for our services, and what problem are we solving for them?', commitment: 'Conduct direct conversations with at least 3 potential paying customers.', output_required: 'Validated customer profile, problem statement with direct customer quotes, budget authority confirmation.', session_time: '4–5 hours', sort_order: 2 },
+    { dp_id: 'dp03', label: 'Decision Point 3 — Value Proposition Architecture', core_question: 'Why would this specific customer choose our service over any alternative?', commitment: 'Develop and test a value proposition statement with at least one real customer.', output_required: 'Value proposition statement, service bundle, willingness-to-pay evidence, service tiers.', session_time: '3–4 hours', sort_order: 3 },
+    { dp_id: 'dp04', label: 'Decision Point 4 — Commercial Viability Model', core_question: 'Can we deliver this service at a price the customer will pay and a volume that sustains the organisation?', commitment: 'Build a full financial model with CEO and Finance Manager present.', output_required: 'Cost of delivery, pricing decision, break-even volume, 36-month projection, scenario analysis.', session_time: '5–6 hours', sort_order: 4 },
+    { dp_id: 'dp05', label: 'Decision Point 5 — Market Entry Design', core_question: 'How will we reach and convert our first paying customers?', commitment: 'Name and assign responsibility for the first 5 paying customer targets.', output_required: 'Customer segmentation, channel map, first 5 customers plan, sales process map, business development responsibility.', session_time: '3–4 hours', sort_order: 5 },
+    { dp_id: 'dp06', label: 'Decision Point 6 — Organisational Identity and Partner Architecture', core_question: 'How does the client present itself commercially, and who are the partners that strengthen their market position?', commitment: 'Produce a commercial identity statement and at least one partnership agreement.', output_required: 'Commercial identity statement, service profiles, track record, partner agreements, commercial readiness baseline.', session_time: '3–4 hours', sort_order: 6 },
+    { dp_id: 'dp07', label: 'Decision Point 7 — Pilot: Iteration 1', core_question: 'Did our service work with real clients, and what did we learn?', commitment: 'Deliver the service to at least 2 paying or near-paying clients with structured feedback.', output_required: 'Pilot delivery records, client feedback verbatim, revenue confirmation, service adjustments, mid-point diagnostic.', session_time: '3 days on-site', sort_order: 7 },
+    { dp_id: 'dp08', label: 'Decision Point 8 — Pilot: Iteration 2 and Commercial Handover', core_question: 'Can the client lead the service independently, and is the commercial model ready to scale?', commitment: 'Client leads Iteration 2 deliveries with consultant observing only.', output_required: 'Client-led delivery evidence, feedback, renewal or referral evidence, commercial model presentation, handover materials.', session_time: '3 days on-site', sort_order: 8 },
+    { dp_id: 'dp09', label: 'Decision Point 9 — Commercial Readiness Diagnostic', core_question: 'Is the client ready to operate commercially without programme support?', commitment: 'Complete all five independence tests and the final commercial readiness diagnostic.', output_required: 'Final diagnostic scores, independence tests, revenue vs target, post-engagement plan, funder reporting package.', session_time: '4–5 hours', sort_order: 9 },
   ]
 
   return dps.map(dp => ({

@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client'
 // ============================================================
-// DP05 PIPELINE TRACKER
+// Decision Point 5 PIPELINE TRACKER
 //
 // One row per prospect, moving through the five method stages in order:
 // Identified, Contacted, Met, Proposal Sent, Closed. The stage strip above
@@ -90,7 +90,7 @@ function StageChip({ stage, count, byCur, share }) {
 
 export default function PipelineTracker({ clientId, canManage , currency }) {
   const [rows, setRows] = useState([])
-  // The new services from DP03. Market entry is done FOR a service, so a row
+  // The new services from Decision Point 3. Market entry is done FOR a service, so a row
   // that does not name one cannot be read back per service.
   const [propRows, setPropRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -145,7 +145,7 @@ export default function PipelineTracker({ clientId, canManage , currency }) {
   const serviceOpts = serviceOptions(serviceList)
 
   // Which new service this opportunity is for. Blank is allowed and means it
-  // is not tied to one yet, which is common early in DP05.
+  // is not tied to one yet, which is common early in Decision Point 5.
   const serviceCell = (row) => (
     canManage ? (
       <select aria-label="Which service this opportunity is for" style={inp}
@@ -230,7 +230,7 @@ export default function PipelineTracker({ clientId, canManage , currency }) {
       <div style={{ ...card }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
-            <h3 style={secH}>DP05 pipeline tracker</h3>
+            <h3 style={secH}>Decision Point 5 pipeline tracker</h3>
             <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '92ch' }}>
               One line per prospect. Every prospect sits at one of five stages, in order:
               Identified, Contacted, Met, Proposal Sent, Closed. A prospect with no next action

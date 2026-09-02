@@ -66,7 +66,7 @@ export const PROBLEM_COLUMNS = [
  *
  * A column that is not here is not part of the chain, and the answer becomes a
  * row of the block's own table exactly as it always did. That is the right
- * answer for DP01, whose questions name services.
+ * answer for Decision Point 1, whose questions name services.
  */
 export const ACCEPT_TARGETS: Record<string, AcceptTarget> = {
   problem: { mode: 'createProblem', table: 'gtcv_problem_owner_budget' },

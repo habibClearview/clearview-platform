@@ -1,10 +1,10 @@
 // @ts-nocheck
 'use client'
 // ============================================================
-// DP06 PARTNER CATEGORISATION TABLE
+// Decision Point 6 PARTNER CATEGORISATION TABLE
 //
 // The working surface for partner categorisation: one row per partner, and
-// for each one the question DP06 actually turns on, which is not "are they
+// for each one the question Decision Point 6 actually turns on, which is not "are they
 // useful" but "what is this relationship, and does it help or hurt the
 // commercial identity we are building".
 //

@@ -1,9 +1,9 @@
 // @ts-nocheck
 'use client'
 // ============================================================
-// DP07 PILOT CAPTURE
+// Decision Point 7 PILOT CAPTURE
 //
-// One record per pilot session. The method (GtCV handbook, DP07) runs the
+// One record per pilot session. The method (GtCV handbook, Decision Point 7) runs the
 // pilot as two iterations with two real paying clients each:
 //
 //   Iteration 1  the coach leads, the organisation observes
@@ -20,7 +20,7 @@
 // Resistance, Surprise, The Price Moment.
 //
 // The iteration comparison view puts iteration 1 and iteration 2 side by
-// side on viability and key learning, which is the question DP07 actually
+// side on viability and key learning, which is the question Decision Point 7 actually
 // answers: did the offer hold up when the organisation ran it themselves.
 //
 // Client agnostic: the paying clients are labelled per record, nothing is
@@ -397,7 +397,7 @@ export default function PilotCapture({ clientId, canManage }) {
     )
   }
 
-  // The DP07 verdict in one line: did viability hold when the organisation
+  // The Decision Point 7 verdict in one line: did viability hold when the organisation
   // took the lead. That is what iteration 2 exists to answer.
   function comparisonVerdict() {
     if (i1.viability === null || i2.viability === null) {
@@ -424,7 +424,7 @@ export default function PilotCapture({ clientId, canManage }) {
       <div style={{ ...card }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
-            <h3 style={secH}>DP07 pilot capture</h3>
+            <h3 style={secH}>Decision Point 7 pilot capture</h3>
             <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '92ch' }}>
               The pilot runs as two iterations with two real paying clients each. Iteration 1 is coach
               led with the organisation observing. Iteration 2 is organisation led with the coach as

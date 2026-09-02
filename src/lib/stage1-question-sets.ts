@@ -6,7 +6,7 @@
 // gtcv_questions for an engagement, after which they are rows like any other
 // and can be edited without touching this file.
 //
-// R4 defines sets for two blocks only, "Clearing the ground" and "DP01 Service
+// R4 defines sets for two blocks only, "Clearing the ground" and "Decision Point 1 Service
 // Reality". Every other block has none, and that is not an error.
 //
 // R13: a collect question asks for the target fields SEPARATELY, and the
@@ -236,7 +236,7 @@ const PROBLEM_OWNER_BUDGET: QuestionSeed[] = [
   }),
 ]
 
-// DP01 writes into gtcv_service_inventory, whose columns are service_name,
+// Decision Point 1 writes into gtcv_service_inventory, whose columns are service_name,
 // what_it_delivers, logic_type, has_demand, hidden_delivery_costs,
 // delivery_quality_risk and decision.
 const SERVICE_REALITY: QuestionSeed[] = [

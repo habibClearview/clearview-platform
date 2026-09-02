@@ -132,7 +132,7 @@ export default function InterviewReporting({ clientId }) {
 
       {report.rows.length === 0 ? (
         <p style={hint}>
-          No conversations recorded yet. They are captured on Block 2, one per conversation, within
+          No conversations recorded yet. They are captured on Decision Point 2, one per conversation, within
           thirty minutes of each one.
         </p>
       ) : report.rows.map((r) => (

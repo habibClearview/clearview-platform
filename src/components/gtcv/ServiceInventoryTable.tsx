@@ -1,11 +1,11 @@
 // @ts-nocheck
 'use client'
 // ============================================================
-// DP01 SERVICE INVENTORY TABLE
+// Decision Point 1 SERVICE INVENTORY TABLE
 //
 // The working surface for the Service Reality Audit: one row per service the
 // organisation currently delivers, and for each one the honest answers that
-// produce the DP01 decision.
+// produce the Decision Point 1 decision.
 //
 //   what it delivers      -> the real output, not the proposal language
 //   grant or market logic -> does it exist because a donor funds it, or

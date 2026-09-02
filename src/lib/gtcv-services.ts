@@ -1,7 +1,7 @@
 // ============================================================
 // THE SERVICES, AND WHICH WORK BELONGS TO WHICH
 //
-// WHY THIS EXISTS. DP04 asks whether the numbers hold and DP05 asks how it
+// WHY THIS EXISTS. Decision Point 4 asks whether the numbers hold and Decision Point 5 asks how it
 // goes to market, and both of those questions are asked OF A SERVICE. Neither
 // screen could say which service a line belonged to, so a break-even was the
 // organisation's break-even rather than the service's.
@@ -9,13 +9,13 @@
 // TWO LISTS OF SERVICES, AND THEY ARE NOT THE SAME LIST.
 //
 //   The inventory (gtcv_service_inventory) is what the organisation delivers
-//   TODAY, most of it on grant logic. Clearing the ground and DP01 work on
+//   TODAY, most of it on grant logic. Clearing the ground and Decision Point 1 work on
 //   this: the portfolio of activities under each service the programme
 //   currently pays for.
 //
 //   The propositions (gtcv_propositions) are the NEW services. A value
 //   proposition is the commercial offer the organisation intends to sell, and
-//   DP04 builds the financial model for those, not for the inventory. Costing
+//   Decision Point 4 builds the financial model for those, not for the inventory. Costing
 //   the inventory would model the thing the engagement exists to move away
 //   from.
 //
@@ -56,7 +56,7 @@ export interface PropositionRow {
   assembled_statement?: string | null
 }
 
-/** The services delivered today, for Phase 0 and DP01. */
+/** The services delivered today, for Phase 0 and Decision Point 1. */
 export function servicesFromInventory(rows: InventoryRow[]): ServiceLike[] {
   return rows.map((r) => ({
     id: r.id,
@@ -66,7 +66,7 @@ export function servicesFromInventory(rows: InventoryRow[]): ServiceLike[] {
 }
 
 /**
- * The new services, for DP04 and DP05. A proposition has no name of its own,
+ * The new services, for Decision Point 4 and Decision Point 5. A proposition has no name of its own,
  * so the segment it is aimed at is the name a room recognises, and what the
  * organisation can do is the fallback.
  */
@@ -179,7 +179,7 @@ export interface ServiceGroup<T> {
  * held, with shared work last. Every service appears even when it has no rows
  * yet, because an empty costing for a service that exists is the finding.
  *
- * The key is named rather than assumed: DP04 and DP05 rows carry
+ * The key is named rather than assumed: Decision Point 4 and Decision Point 5 rows carry
  * proposition_id, Phase 0 rows carry service_id, and they are different lists.
  */
 export function groupByService<T extends Record<string, any>>(

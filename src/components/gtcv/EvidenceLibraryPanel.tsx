@@ -61,9 +61,10 @@ const DP_OPTIONS = [
   { v: '', l: 'Not set' },
   { v: 'setup', l: 'Setup' },
   { v: 'phase_0', l: 'Phase 0' },
-  { v: 'dp01', l: 'DP01' }, { v: 'dp02', l: 'DP02' }, { v: 'dp03', l: 'DP03' },
-  { v: 'dp04', l: 'DP04' }, { v: 'dp05', l: 'DP05' }, { v: 'dp06', l: 'DP06' },
-  { v: 'dp07', l: 'DP07' }, { v: 'dp08', l: 'DP08' }, { v: 'dp09', l: 'DP09' },
+  { v: 'dp01', l: 'Decision Point 1' }, { v: 'dp02', l: 'Decision Point 2' }, { v: 'dp03', l: 'Decision Point 3' },
+  { v: 'dp04', l: 'Decision Point 4' }, { v: 'dp05', l: 'Decision Point 5' }, { v: 'dp06', l: 'Decision Point 6' },
+  { v: 'dp07', l: 'Decision Point 7' }, { v: 'dp08', l: 'Decision Point 8' },
+  { v: 'dp09', l: 'Decision Point 9' },
   { v: 'handover', l: 'Handover' },
 ]
 

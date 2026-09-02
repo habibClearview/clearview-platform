@@ -1,5 +1,5 @@
 // ============================================================
-// GtCV DP04 COMMERCIAL VIABILITY, the calculation module.
+// GtCV Decision Point 4 COMMERCIAL VIABILITY, the calculation module.
 //
 // Pure arithmetic. No React, no Supabase, no formatting decisions that belong
 // to a screen. Everything here is a function of its inputs, which is what
@@ -48,7 +48,7 @@
 //
 // WHAT THIS MODULE IS NOT: the ClearView financial engine. The deeper
 // modelling the dashboard runs already lives in src/lib/generic-engine.ts.
-// DP04 is the workbook's cost and pricing surface, a simpler and separate
+// Decision Point 4 is the workbook's cost and pricing surface, a simpler and separate
 // thing, and it links to the engine rather than reimplementing it.
 // ============================================================
 
@@ -578,7 +578,7 @@ export function buildMarketRange(prices: MarketPriceInput[], costFloor: number):
   }
 }
 
-// ─── the whole DP04 surface, in one call ─────────────────────
+// ─── the whole Decision Point 4 surface, in one call ─────────────────────
 
 export interface ViabilityInput {
   costLines?: CostLineInput[]
@@ -611,7 +611,7 @@ export interface ViabilityResult {
 }
 
 /**
- * Build the whole DP04 readout from raw rows. The cost floor is computed
+ * Build the whole Decision Point 4 readout from raw rows. The cost floor is computed
  * once here and handed to every tier, which is the point: one floor, one
  * number, used everywhere.
  */

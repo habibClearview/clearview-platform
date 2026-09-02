@@ -338,7 +338,7 @@ describe('canvasProgress', () => {
     ])
     expect(r.doneCount).toBe(3)
     expect(r.totalCount).toBe(4)
-    expect(r.currentLabel).toBe('DP03 · value proposition')
+    expect(r.currentLabel).toBe('Decision Point 3 · value proposition')
   })
   it('reports Complete when every present stage is done', () => {
     const r = canvasProgress([{ dp_id: 'phase_0', status: '✓' }, { dp_id: 'dp01', status: '✓' }])

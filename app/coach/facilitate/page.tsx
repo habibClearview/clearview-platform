@@ -53,7 +53,7 @@ import { TOOL_NAMES } from '@/lib/stage1-question-sets'
 /** What each block is called on the wall. */
 const BLOCK_NAMES: Record<string, string> = {
   phase_0: 'Clearing the ground',
-  dp01: 'DP01 Service Reality Audit',
+  dp01: 'Decision Point 1 Service Reality Audit',
 }
 
 const POLL_MS = 1500

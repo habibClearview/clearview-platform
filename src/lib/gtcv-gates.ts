@@ -14,9 +14,9 @@
 // to match the database's is_gate_id() constraint. Those all wanted the same
 // list, and before this they each carried their own copy.
 //
-// The order is the method's and does not vary by engagement. What varies is
-// what the coach calls them, which is engagement_config.terminology, and what
-// goes in them, which is the work.
+// The order is the method's and does not vary by engagement, and neither is
+// what they are called: every one of them is a Decision Point, from dpLabel()
+// in gtcv-blocks. What varies is what goes in them, which is the work.
 // ============================================================
 
 export interface GateDefinition {

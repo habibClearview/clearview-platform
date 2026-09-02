@@ -1,10 +1,10 @@
 // @ts-nocheck
 'use client'
 // ============================================================
-// DP04 COMMERCIAL VIABILITY
+// Decision Point 4 COMMERCIAL VIABILITY
 //
 // The workbook's cost and pricing surface, as one screen instead of two
-// spreadsheet tabs that drift apart. It answers the DP04 question directly:
+// spreadsheet tabs that drift apart. It answers the Decision Point 4 question directly:
 // what does it cost to deliver this once, and at what price does the
 // organisation sustain itself.
 //
@@ -110,10 +110,10 @@ export default function CommercialViability({ clientId, canManage, currency }) {
   const [tiers, setTiers] = useState([])
   const [market, setMarket] = useState([])
   const [fixed, setFixed] = useState([])
-  // The new services, from DP03. A value proposition is the service the
-  // organisation intends to sell, and DP04 builds the financial model for
+  // The new services, from Decision Point 3. A value proposition is the service the
+  // organisation intends to sell, and Decision Point 4 builds the financial model for
   // those rather than for the inventory it is moving away from. Read only
-  // here: DP04 costs them, it does not define them.
+  // here: Decision Point 4 costs them, it does not define them.
   const [servicesRows, setServicesRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [save, setSave] = useState(null)
@@ -236,7 +236,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
       : <span style={mono}>{orDash(row[field], render || money)}</span>
   )
 
-  // Which new service this line is for. DP04 asks whether a service sustains
+  // Which new service this line is for. Decision Point 4 asks whether a service sustains
   // the organisation, and that cannot be answered by a cost model that does not
   // know which service a cost belongs to. Blank stays available and means
   // shared across services, which is the honest answer for an office or a
@@ -283,7 +283,7 @@ export default function CommercialViability({ clientId, canManage, currency }) {
       <div style={card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
-            <h3 style={secH}>DP04 commercial viability</h3>
+            <h3 style={secH}>Decision Point 4 commercial viability</h3>
             <div style={{ ...hint, marginTop: '0.3rem', maxWidth: '92ch' }}>
               What one delivery costs, and the price at which the organisation sustains itself.
               Work down the page in order. Cost first, then the market, then price, then break

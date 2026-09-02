@@ -45,7 +45,7 @@ function gateStatusFromSymbol(symbol: string | null | undefined): GateStatusValu
 
 // The DP the engagement is working now: the first in-progress gate; failing
 // that, the first not-started gate that immediately follows a completed one
-// (so a fresh, all-not-started engagement returns null, not DP01). null once
+// (so a fresh, all-not-started engagement returns null, not Decision Point 1). null once
 // everything is complete or nothing has started.
 function deriveCurrentDp(status: Record<DpId, GateStatusValue>): DpId | null {
   const inProgress = CANVAS_DP_IDS.find((id) => status[id] === 'in_progress')

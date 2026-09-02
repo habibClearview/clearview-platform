@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client'
 // ============================================================
-// DP08 CHANNEL LOGIC TABLE
+// Decision Point 8 CHANNEL LOGIC TABLE
 //
 // The working surface for the scale pathway: one row per segment, and for
 // each one the route to that segment plus the test that decides whether the

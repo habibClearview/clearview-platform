@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client'
 // ============================================================
-// GtCV DP03: Proposition Builder.
+// GtCV Decision Point 3: Proposition Builder.
 //
 // One proposition per priority segment. A GtCV value proposition has FOUR
 // parts and no others:

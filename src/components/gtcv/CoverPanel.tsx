@@ -22,9 +22,11 @@ const C = {
 }
 
 const PHASE_LABEL = {
-  setup: 'Set up', phase_0: 'Phase 0', dp01: 'Block 1', dp02: 'Block 2', dp03: 'Block 3',
-  dp04: 'Block 4', dp05: 'Block 5', dp06: 'Block 6', dp07: 'Block 7', dp08: 'Block 8',
-  dp09: 'Block 9', complete: 'Complete', paused: 'Paused', handover: 'Handover',
+  setup: 'Set up', phase_0: 'Clearing the ground',
+  dp01: 'Decision Point 1', dp02: 'Decision Point 2', dp03: 'Decision Point 3',
+  dp04: 'Decision Point 4', dp05: 'Decision Point 5', dp06: 'Decision Point 6',
+  dp07: 'Decision Point 7', dp08: 'Decision Point 8', dp09: 'Decision Point 9',
+  complete: 'Complete', paused: 'Paused', handover: 'Handover',
 }
 
 function momentumColour(m) {

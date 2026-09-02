@@ -216,22 +216,16 @@ export default function EngagementSettings({ clientId, canManage }) {
       </Setting>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '0 1.2rem' }}>
-        <Setting
-          label="What to call each block"
-          htmlFor="cfg-terminology"
-          help="Zone reads plainer to most teams. DP matches the decision point numbering a funder sees in the proposal."
-        >
-          <select
-            id="cfg-terminology"
-            style={field}
-            value={c.terminology || 'dp'}
-            disabled={busy === 'terminology'}
-            onChange={(e) => save('terminology', { terminology: e.target.value }, 'Naming changed.')}
-          >
-            <option value="zone">Zone 1, Zone 2, and so on</option>
-            <option value="dp">DP01, DP02, and so on</option>
-          </select>
-        </Setting>
+        {/*
+          WHAT TO CALL EACH BLOCK IS NO LONGER A SETTING. 2 September 2026.
+          This offered Zone or DP per engagement, and the engagements set up
+          before the default changed still carry 'zone'. The result was that
+          production showed a prospect one word on the showcase link and the
+          coach another word on the same block, which is the inconsistency
+          Habib reported. There is one word now, Decision Point, and it comes
+          from dpLabel() in gtcv-blocks. The column stays in the database until
+          a migration can drop it; nothing reads it.
+        */}
 
         <Setting
           label="Which independence tests close it"

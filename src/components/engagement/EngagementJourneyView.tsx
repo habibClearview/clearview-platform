@@ -22,7 +22,10 @@ import { supabase } from '@/lib/supabase'
 import { loadEngagementView } from '@/lib/engagement-loader'
 import { CANVAS_DP_IDS } from '@/lib/engagement-types'
 import BlockWorkspace, { hasWorkspace } from '@/components/gtcv/BlockWorkspace'
-import { BLOCK } from '@/lib/gtcv-blocks'
+import {
+  BLOCK, SPINE, CANVAS_COLUMNS, CANVAS_ROWS, TRANSITION_ROW, TRANSITION_LABEL,
+  SPINE_BLOCK_ID, dpLabel,
+} from '@/lib/gtcv-blocks'
 import { gateShutBecause } from '@/lib/gtcv-gates'
 
 // ─── Scoped design CSS (faithful to the approved preview) ────
@@ -145,37 +148,12 @@ const CSS = `
 const STOPS = [
   { id: 'setup', lab: 'Set up', kind: 'symbol' },
   { id: 'phase_0', lab: 'Clear ground', kind: 'symbol' },
-  { id: 'dp01', lab: 'Audit', glyph: '1' },
-  { id: 'dp02', lab: 'Customer', glyph: '2' },
-  { id: 'dp03', lab: 'Value', glyph: '3' },
-  { id: 'dp04', lab: 'Viability', glyph: '4' },
-  { id: 'dp05', lab: 'Market', glyph: '5' },
-  { id: 'dp06', lab: 'Identity', glyph: '6' },
-  { id: 'dp07', lab: 'Pilot', glyph: '7' },
-  { id: 'dp08', lab: 'Scale', glyph: '8' },
-  { id: 'dp09', lab: 'Readiness', glyph: '9' },
-  { id: 'handover', lab: 'Hand over', glyph: '★' },
+  ...['dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09']
+    .map((id, i) => ({ id, lab: BLOCK[id].short, glyph: String(i + 1) })),
+  { id: 'handover', lab: 'Hand over', glyph: '\u2605' },
 ]
 
 
-const SPINE = {
-  title: 'Commercial Readiness Diagnostic',
-  q: 'Where does this organisation sit on the journey from grant-dependency to commercial viability, right now?',
-  stages: [
-    { c: 's1', label: 'Grant-dependent' },
-    { c: 's2', label: 'Commercially aware' },
-    { c: 's3', label: 'Market-ready' },
-    { c: 's4', label: 'Commercially viable' },
-  ],
-  fits: [
-    { n: 'Fit 01', t: 'Problem-Provider Fit', d: 'Do we have the capability and credibility to own this problem in this market?' },
-    { n: 'Fit 02', t: 'Problem-Solution Fit', d: 'Does the service solve the problem as the client experiences it, not as we describe it?' },
-    { n: 'Fit 03', t: 'Solution-Problem Owner Fit', d: 'Is it designed to reach a decision-maker with budget, not the client without it?' },
-    { n: 'Fit 04', t: 'Solution-Pilot Fit', d: 'Is the service testable in a real client environment within the engagement timeline?' },
-    { n: 'Fit 05', t: 'Solution-Market Fit', d: 'Is there willingness to pay at a price that covers full delivery cost?' },
-    { n: 'Fit 06', t: 'Solution-Scale Channel Fit', d: 'Are there channels and partnerships to carry this beyond the founding clients?' },
-  ],
-}
 
 // The status word shown in each DP box, from the live gate status.
 function statusWord(s) {
@@ -275,7 +253,6 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
   const funder = funderParty?.organisation || funderParty?.name || null
   const programme = view.programme_name || null
   const metaLine = [client, programme].filter(Boolean).join(' · ')
-  const termPrefix = view.config?.terminology === 'zone' ? 'ZONE' : 'DP'
 
   const gs = view.gate_status || {}
   const currentId = view.current_dp_id
@@ -299,7 +276,7 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
     const s = gs[dpId] || 'not_started'
     const isCurrent = dpId === currentId
     const cls = ['box', b.color, boxStateClass(s, isCurrent)].filter(Boolean).join(' ')
-    const label = `${termPrefix} ${dpId.replace('dp', '')}`
+    const label = dpLabel(dpId)
     // A block stays shut until the one before it is signed off. The coaching
     // team is not subject to it: preparing a block before the session that
     // fills it is an ordinary part of running an engagement, and a lock that
@@ -394,17 +371,19 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
               <div className="meta">{metaLine}<br />The Canvas Coach · habibonifade.com</div>
             </div>
 
+            {/* The layout comes from gtcv-blocks so the prospect's showcase
+                link and the client's own page cannot drift into drawing the
+                same method two different ways. */}
             <div className="headbars">
-              <div className="hb internal">&larr; Internal capability</div>
-              <div className="hb connect">Connecting layer</div>
-              <div className="hb external">External market &rarr;</div>
+              {CANVAS_COLUMNS.map((c) => <div className={`hb ${c.key}`} key={c.key}>{c.label}</div>)}
             </div>
 
-            <div className="row3">{box('dp01')}{box('dp02')}{box('dp03')}</div>
-            <div className="row3">{box('dp04')}{box('dp06')}{box('dp05')}</div>
+            {CANVAS_ROWS.map((row, i) => (
+              <div className="row3" key={i}>{row.map((id) => box(id))}</div>
+            ))}
 
-            <div className="trans-l">Transition row · where the model is tested with real customers, then extended</div>
-            <div className="row2">{box('dp07')}{box('dp08')}</div>
+            <div className="trans-l">{TRANSITION_LABEL}</div>
+            <div className="row2">{TRANSITION_ROW.map((id) => box(id))}</div>
 
             {/*
               The diagnostic spine is block nine and it opens like the rest.
@@ -425,7 +404,7 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
             >
               <div className="spine-head">
                 <div>
-                  <span className="dptag">{termPrefix} 09</span>
+                  <span className="dptag">{dpLabel(SPINE_BLOCK_ID)}</span>
                   <span className="spine-lab">&nbsp;Diagnostic spine · full width · kick-off · mid-point · close</span>
                   <h4>{SPINE.title}</h4>
                   <p className="q">&quot;{SPINE.q}&quot;</p>
@@ -467,12 +446,9 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
         // instead of sitting in one of the three columns. Reading it from
         // BLOCK gave undefined and the drawer threw on the title, which is
         // why the box was left unclickable rather than fixed.
-        const b = BLOCK[openDp] || (openDp === 'dp09' ? {
-          title: SPINE.title,
-          q: SPINE.q,
-          bullets: SPINE.fits.map((f) => `${f.t}: ${f.d}`),
-          fit: 'Scored at kick-off, mid-point and close, so the movement is the finding, not the score',
-        } : null)
+        // Block nine is in BLOCK now, so the drawer no longer carries a
+        // hand-written copy of it that could disagree with the box behind it.
+        const b = BLOCK[openDp]
         if (!b) return null
         const s = gs[openDp] || 'not_started'
         // The block immediately behind this one in the method's order, so the
@@ -524,7 +500,7 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span className="dptag" style={{ background: 'var(--navy)' }}>
-                  {termPrefix} {openDp.replace('dp', '')}
+                  {dpLabel(openDp)}
                 </span>
                 <span style={{ fontFamily: 'var(--fm)', fontSize: 12.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
                   {statusWord(s)}

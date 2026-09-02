@@ -379,9 +379,9 @@ export function pipelineSnapshot(programmes: DealProgramme[]): PipelineSnapshot 
 // Supabase-backed canvas_decision_points a GtCV client actually has.
 export const CANVAS_STAGE_ORDER = ['phase_0', 'dp01', 'dp02', 'dp03', 'dp04', 'dp05', 'dp06', 'dp07', 'dp08', 'dp09']
 const CANVAS_STAGE_LABEL: Record<string, string> = {
-  phase_0: 'Phase 0 · assumption clearing', dp01: 'DP01 · service reality', dp02: 'DP02 · customer clarity',
-  dp03: 'DP03 · value proposition', dp04: 'DP04 · viability model', dp05: 'DP05 · market entry',
-  dp06: 'DP06 · identity & partners', dp07: 'DP07 · pilot 1', dp08: 'DP08 · pilot 2', dp09: 'DP09 · commercial readiness',
+  phase_0: 'Phase 0 · assumption clearing', dp01: 'Decision Point 1 · service reality', dp02: 'Decision Point 2 · customer clarity',
+  dp03: 'Decision Point 3 · value proposition', dp04: 'Decision Point 4 · viability model', dp05: 'Decision Point 5 · market entry',
+  dp06: 'Decision Point 6 · identity & partners', dp07: 'Decision Point 7 · pilot 1', dp08: 'Decision Point 8 · pilot 2', dp09: 'Decision Point 9 · commercial readiness',
 }
 
 export interface CanvasDP { dp_id: string; status?: string | null }

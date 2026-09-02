@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client'
 // ============================================================
-// GtCV DP02: Problem Prioritisation Scoring.
+// GtCV Decision Point 2: Problem Prioritisation Scoring.
 //
 // An organisation coming out of grant delivery can usually name a dozen
 // problems it could solve. Only a few of them are commercially real. This
@@ -18,7 +18,7 @@
 // owns it, nobody will pay, or nobody will see you. That is why all four
 // carry equal weight and the total is a flat sum out of 20.
 //
-// Only the top three advance to DP03. The cut is deliberate: a value
+// Only the top three advance to Decision Point 3. The cut is deliberate: a value
 // proposition written for six problems is written for none of them.
 // Unscored dimensions count as zero, so a half scored problem cannot
 // float to the top of the list.
@@ -39,7 +39,7 @@ import { segmentsAwaitingScore, carriedRow } from '@/lib/gtcv-problem-carryover'
 const TABLE = 'gtcv_problem_scores'
 const SEGMENTS_TABLE = 'gtcv_customer_segments'
 
-// How many problems carry into DP03.
+// How many problems carry into Decision Point 3.
 const ADVANCING_COUNT = 3
 
 // ----- design tokens (same --cv-* palette as the rest of the app) -----

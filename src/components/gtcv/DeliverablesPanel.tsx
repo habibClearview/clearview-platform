@@ -47,11 +47,11 @@ const btn = (col, solid) => ({
 
 const DP_LABEL = {
   setup: 'Pre-engagement', phase_0: 'Phase 0',
-  dp01: 'Block 1 Service reality', dp02: 'Block 2 Customer clarity',
-  dp03: 'Block 3 Value proposition', dp04: 'Block 4 Viability model',
-  dp05: 'Block 5 Market entry', dp06: 'Block 6 Identity and partners',
-  dp07: 'Block 7 Pilot iteration 1', dp08: 'Block 8 Pilot iteration 2',
-  dp09: 'Block 9 Readiness diagnostic', handover: 'Handover',
+  dp01: 'Decision Point 1 · Service reality', dp02: 'Decision Point 2 · Customer clarity',
+  dp03: 'Decision Point 3 · Value proposition', dp04: 'Decision Point 4 · Viability model',
+  dp05: 'Decision Point 5 · Market entry', dp06: 'Decision Point 6 · Identity and partners',
+  dp07: 'Decision Point 7 · Pilot iteration 1', dp08: 'Decision Point 8 · Pilot iteration 2',
+  dp09: 'Decision Point 9 · Readiness diagnostic', handover: 'Handover',
 }
 const DP_IDS = Object.keys(DP_LABEL)
 

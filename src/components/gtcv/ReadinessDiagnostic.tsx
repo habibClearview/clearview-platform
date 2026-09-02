@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client'
 // ============================================================
-// DP09 COMMERCIAL READINESS DIAGNOSTIC
+// Decision Point 9 COMMERCIAL READINESS DIAGNOSTIC
 //
 // Six fit tests, each scored 0 to 3, maximum 18. The same six tests are
 // taken three times: at baseline, at the mid point, and at close. The value
@@ -313,7 +313,7 @@ export default function ReadinessDiagnostic({ clientId, canManage }) {
     <div style={wrap}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
         <div>
-          <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: C.teal }}>DP09</div>
+          <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.78rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: C.teal }}>Decision Point 9</div>
           <div style={{ fontFamily: 'var(--cv-font)', fontSize: '1.45rem', fontWeight: 700 }}>Commercial Readiness Diagnostic</div>
           <div style={{ fontSize: '0.95rem', color: C.slate, maxWidth: '92ch', marginTop: '0.25rem' }}>
             Six fit tests, each scored 0 to 3, maximum {MAX_TOTAL}. The same six are taken three times, at

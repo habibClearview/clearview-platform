@@ -640,7 +640,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
               <p style={{ margin: '0 0 12px', fontWeight: 600, color: C.amber }}>This section is not visible to the client or the funder.</p>
               <h4 style={{ margin: '0 0 8px', color: C.navy, fontFamily: 'var(--cv-font)' }}>Delivery Rhythm</h4>
               <ul style={{ margin: '0 0 16px', paddingLeft: 20, color: C.navy, lineHeight: 1.7 }}>
-                <li><strong>Kick-off immersion:</strong> 3 days on-site. Baseline + DP01 and DP02.</li>
+                <li><strong>Kick-off immersion:</strong> 3 days on-site. Baseline + Decision Point 1 and Decision Point 2.</li>
                 <li><strong>Customer validation visit:</strong> 2 days. Real client conversations + debrief.</li>
                 <li><strong>Iteration 1 pilot visit:</strong> 3 days. Consultant leads with 2 real clients.</li>
                 <li><strong>Iteration 2 and handover visit:</strong> 3 days. Ikore leads, consultant observes.</li>
@@ -954,7 +954,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
           />
         </Section>
 
-        {/* Pilot observations — DP07 and DP08 only */}
+        {/* Pilot observations — Decision Point 7 and Decision Point 8 only */}
         {showPilot && (
           <Section title={`Pilot Observation — ${dpId === 'dp07' ? 'Iteration 1' : 'Iteration 2'}`}>
             <p style={{ color: C.slate, fontSize: 14 }}>Record what happened during each pilot delivery. This is completed by the lead consultant during or immediately after the visit.</p>
@@ -969,7 +969,7 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
           </Section>
         )}
 
-        {/* Commercial Readiness — DP06 baseline, DP07 midpoint, DP09 final */}
+        {/* Commercial Readiness — Decision Point 6 baseline, Decision Point 7 midpoint, Decision Point 9 final */}
         {(dpId === 'dp06' || dpId === 'dp07' || dpId === 'dp09') && (
           <Section title={`Commercial Readiness Diagnostic — ${dpId === 'dp06' ? 'Baseline' : dpId === 'dp07' ? 'Mid-Point' : 'Final'} Assessment`}>
             <CommercialReadiness
