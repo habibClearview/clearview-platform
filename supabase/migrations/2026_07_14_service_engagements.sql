@@ -5,12 +5,12 @@
 -- could only ever be tied to ONE service via engagement_clients'
 -- engagement_mode (canvas | financial) on a single client row. That's
 -- wrong -- e.g. a programme like CSJ paying for the Clearview financial
--- model for 6 clients today does not mean CSJ can't ALSO pay for
--- GtCV canvas for a different client, engage the coach directly for
+-- model for 6 beneficiaries today does not mean CSJ can't ALSO pay for
+-- GtCV canvas for a different beneficiary, engage the coach directly for
 -- advisory, or subscribe to Portfolio Intelligence, all at the same time.
 --
 -- This adds a service_engagements table: one row per (payer, service
--- type, optional client). It is purely additive and runs ALONGSIDE
+-- type, optional beneficiary). It is purely additive and runs ALONGSIDE
 -- the existing engagement_clients model -- nothing existing is migrated,
 -- dropped, or altered, so every feature that reads engagement_clients
 -- today keeps working exactly as it does now. This table only powers the
@@ -28,9 +28,9 @@ create table if not exists service_engagements (
   payer_client_id text references engagement_clients(id) on delete cascade,
   -- Who is actually served/using the service. Nullable: some services
   -- (e.g. a Portfolio Intelligence subscription, or advisory delivered
-  -- directly to the payer's own team) have no distinct client
+  -- directly to the payer's own team) have no distinct beneficiary
   -- organisation -- the payer IS the one being served.
-  served_client_id text references engagement_clients(id) on delete set null,
+  beneficiary_client_id text references engagement_clients(id) on delete set null,
   service_type text not null check (service_type in ('advisory','canvas','financial','portfolio_intelligence')),
   status text not null default 'active' check (status in ('active','paused','complete')),
   fee numeric,
@@ -48,7 +48,7 @@ create table if not exists service_engagements (
 
 create index if not exists service_engagements_payer_programme_idx on service_engagements(payer_programme_id);
 create index if not exists service_engagements_payer_client_idx on service_engagements(payer_client_id);
-create index if not exists service_engagements_served_client_idx on service_engagements(served_client_id);
+create index if not exists service_engagements_beneficiary_idx on service_engagements(beneficiary_client_id);
 
 -- RLS: super_coach only, matching co_implementers / programmes (see
 -- 2026_07_11_coach_payments_deals_fees.sql for the same pattern).
