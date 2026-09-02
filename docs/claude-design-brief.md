@@ -2,9 +2,17 @@
 
 Paste this whole file into Claude Design as the opening message.
 
-Everything below marked **[HABIB TO CONFIRM]** is a gap I could not fill from
-the existing codebase. Fill those in before pasting, or Claude Design will
-invent them.
+Everything in it was taken from Habib's own materials — the platform's code,
+the method reference, and the Drive folders he supplied. Nothing is invented.
+
+**Two things to settle before pasting:**
+
+1. **Price and duration are missing for all five services.** Not needed to
+   design a page, but the pages will have a hole where they belong. Add them
+   if you want them shown.
+2. **The E-TraLiMM applied case names a real client and carries their
+   financials.** It is excluded here deliberately. Nothing from that case goes
+   on a public page without that client's permission.
 
 ---
 
@@ -45,6 +53,9 @@ In order of importance:
 ---
 
 ## The services
+
+Five of them. A visitor should be able to tell within seconds which one is
+theirs.
 
 ### 1. Grant-to-Commercial Viability Canvas™ (GtCV) — the flagship
 
@@ -100,43 +111,157 @@ stages: Grant-dependent → Commercially aware → Market-ready → Commercially
 viable. Six fit tests: Problem-Provider, Problem-Solution, Solution-Problem
 Owner, Solution-Pilot, Solution-Market, Solution-Scale Channel.
 
-### 2. Market Intelligence — the subscription product
+### 2. Intervention Design Canvas — Market Systems Edition (IDC-MS)
+
+*From the folder Habib supplied. Note the initials: IDC-MS, not IMC-MS.*
+
+For programme teams designing market systems interventions. Where GtCV takes one
+organisation from grant to revenue, IDC-MS takes a **programme** from analysis to
+implementation. Its own line: *turning what your team knows into what your
+programme does.*
+
+**Nine decision points across four phases.** Each has a question, a completion
+test, and field-tested tools. A decision point is complete only when the team
+can pass the completion test — that standard is what separates analysis from
+implementation.
+
+| Phase | # | Decision point | The decision |
+|---|---|---|---|
+| **See** — understand before you design | 1 | System and Actor Landscape | Which actors are change-critical, and in what relationship must the programme work with them? |
+| | 2 | Development Problem and Theory of Change | What is the specific system dysfunction, and what change pathway does the evidence support? |
+| | 3 | Market Failure and Leverage Point Analysis | Where exactly is the market failing, and which intervention points have the highest leverage for durable change? |
+| **Match · Structure · Allocate** — choose, design, sequence | 4 | Partner Readiness and Value Alignment | Which actors have the will, skill and incentive to carry the change, and in what sequence? |
+| | 5 | Intervention and Deal Design | What arrangement makes the change in the partner's interest to sustain? |
+| | 6 | Investment Prioritisation and Resource Allocation | Which interventions get funds first — and what is deliberately not funded? |
+| **Test · Scale** | 7 | Learning and Adaptation | How will the programme know if the system is responding, and what decisions follow? |
+| | 8 | Scale and Sustainability Pathway | How does the change propagate beyond the programme's direct reach? |
+| **Measure** — runs throughout | 9 | Investment Readiness Diagnostic | How ready is this system to absorb and sustain investment, and how has that readiness changed? |
+
+**Proprietary tools embedded in it:** Liquidity Decision Framework™ (DP1–2),
+Three-Stage Adoption Test™ (DP4), Asset Liquidity Hierarchy™ (DP4), Will/Skill
+Matrix (DP4), Investment Infrastructure Development Model™ (DP3, DP5),
+Performance Signal Layer (DP7).
+
+**What a client receives:** Handbook, workbook, reference cards, canvas wall
+print, delivery protocols.
+
+### 3. The Investment Case Canvas™ (ICC)
+
+*From Development Programme to Investment-Grade Proposition.*
+
+For programmes and enterprises that need to make a case for capital — the
+blended finance end of the work. **Eight blocks, then the canvas forks.**
+
+1. **Operating Context** — what does sustainability mean here? Classifies the
+   programme as Type A Facilitation, Type B Transition, or Type C Investment.
+2. **Liquidity Chain and Break Points** — where is capital stuck, and is the
+   reason data or perception?
+3. **Actor Position and Role Clarity** — are you facilitating a blended finance
+   structure, or seeking capital within one?
+4. **Investment Readiness** — knowledge, structure, willingness. Which is the gap?
+5. **Blended Finance Instrument Fit** — which instrument fits the break point,
+   the incentive structure and the scale?
+6. **Leverage Point and Risk Evidence** — which single actor, if they change,
+   shifts the system? Built on the gap between *perceived* risk and *actual*
+   default rate.
+7. **Demand Side Readiness** — can end users absorb, use and repay what the
+   instrument releases? Willingness, ability, prioritisation — all three green
+   to proceed.
+8. **Transition Conditions and Risk Exposure** — what must stay true without
+   subsidy, and where does it break first? Includes a 20% adverse stress test.
+
+**Then the fork — one canvas, two audiences:**
+
+- **9A · Your Next Move** (practitioner) — three actions, one non-negotiable,
+  thirty days, each with a named owner.
+- **9B · Your Investment Case** (capital seeker) — six elements, evidence
+  first, ask last: problem statement, instrument and structure, demand
+  evidence, risk position, the ask and its condition, team and governance.
+
+That fork is a strong design feature. One canvas that asks the reader which of
+two people they are, and routes them, is worth showing on the site.
+
+### 4. Enterprise Trade Liquidity Multiplier™ (E-TraLiMM)
+
+*Habib did not mention this one; it was in the folders and it is substantial.*
+
+A reserve-based capital stacking framework. The governing idea, which is the
+part worth putting on a page: **a reserve is a confidence layer, not a loan
+pool.** The enterprise's own capital is held *visible* rather than lent out,
+and suppliers, buyers and partners then extend their own capital against the
+confidence that visibility creates.
+
+`Unlocked Trade Credit = Reserve × Supplier Confidence Multiplier`
+
+Two levels: **TraLiMM** at sector level (designed in Northern Uganda as
+agricultural distribution credit infrastructure) and **E-TraLiMM** at the level
+of a single enterprise.
+
+**Three independent reserve growth models**, usable singly or stacked:
+
+| Model | Converts | Use when |
+|---|---|---|
+| Collateral Guarantee Multiplier (CGM) | A durable asset into a supplier-facing guarantee facility | The enterprise holds land or another appraisable asset |
+| Forward Commitment Aggregation (FCA) | Future buyer demand into present capital | There is a buyer base able to commit ahead of delivery |
+| Anchor Partner Capital Stack (APC) | Institutional relationships into structured capital | A few large partners are reachable |
+
+**Three conditions must hold:** a visible transaction record, a clean or
+clearing debt position, and a predictable production cycle.
+
+⚠️ **The applied case in Habib's deck names a real client and carries their
+actual financials.** Do not put any of those figures, the client name, or the
+confidence bands on a public page without Habib's explicit permission. Describe
+the mechanism; leave the case study out unless he says otherwise.
+
+### 5. Market Intelligence — the subscription product
 
 Anonymised, benchmarked intelligence drawn from the portfolio of businesses
 Habib works with. Sold to funders, investors and programme managers, delivered
 as a live online report plus a downloadable version.
 
-What it contains:
-
 - **Investment readiness scored across seven dimensions:** Market Opportunity,
   Visibility, Trust, Profitability, Capacity, Resilience, Compliance
 - **Readiness tiers:** Pre-Investment → Development → Near Ready → Investment
   Ready, with a stated confidence level
-- **Capital absorption** — how much capital could realistically be deployed,
-  and through which instrument: credit/debt, grant, equity, consignment,
+- **Capital absorption** — how much could realistically be deployed, and
+  through which instrument: credit/debt, grant, equity, consignment,
   recoverable grant
 - **Benchmarking by segment,** business by business, ranked, against the
   portfolio median
 - **The numbers that decide bankability**, and who these businesses reach
 
-The selling point: this is real operating data from businesses being actively
-worked with, not a survey. Nothing identifies an individual business.
+The selling point: real operating data from businesses being actively worked
+with, not a survey. Nothing identifies an individual business.
 
-### 3. Investment Case Canvas
+---
 
-**[HABIB TO CONFIRM]** — I could not find this anywhere in the platform or
-your existing materials, so I have nothing accurate to say about it. Please
-write four or five lines covering:
+## The proof library — use this, it is the most valuable thing here
 
-- who it is for, and what problem it solves for them
-- how it differs from the GtCV canvas
-- what a client actually receives at the end
-- roughly what it costs and how long it takes
+Habib maintains a library of fifteen evidenced engagements, already written in
+generic phrasing for public use, each tagged with where it belongs. This is the
+answer to the site's biggest weakness: at the moment it asserts a method and
+proves nothing.
 
-### 4. IMC-MS Edition
+Representative items, with his own suggested placement:
 
-**[HABIB TO CONFIRM]** — same. I do not know what IMC-MS stands for. Please
-give me the full name and the same four or five lines.
+| Category | What happened | Where it goes |
+|---|---|---|
+| MSD / PSE transition | Advised a regional seed and markets programme moving from donor-funded to private entity across three Southern African countries. Result: independent entities with clear customer definitions and strategic plans. | "Transforming Development to Business" |
+| Capability development | Designed and delivered a five-day Market Systems Development training for teams working in refugee and youth markets. Teams moved from activity delivery to systems thinking. | "Building Systems Thinking Capacity" |
+| Implementation learning | Found training alone does not improve produce quality — markets must reward quality. | Insight tile: "Training Is Not Transformation" |
+| Implementation learning | Reluctance to share sales data disappeared once value was returned to participants as market info and price alerts. | "When Data Sharing Becomes Mutual Value" |
+| Case study | An agent model linking refugee and host communities to formal buyers. One farmer group reinvested UGX 2.7 million in land expansion. | "Income → Investment → Independence" |
+| Systemic insight | Margin-flow and income-gap study showing inclusion without viable income remains exclusion. | "The Income Reality of Inclusion" |
+| Transition & sustainability | Shifted three donor programmes — agriculture, youth employment, seed systems — into commercially viable structures. | "Helping Donors Exit, Enterprises Endure" |
+
+The full library has fifteen entries. Ask Habib for the sheet; every entry
+carries a category, what he did, the learning, the canvas it links to, and
+where he intends it used.
+
+**Note the tone of these.** "Training Is Not Transformation" and "Inclusion
+without viable income remains exclusion" are the voice the site should have:
+findings that contradict the received wisdom of the sector, stated flatly. Lead
+with those, not with adjectives.
 
 ---
 
@@ -175,7 +300,12 @@ Typeface is Poppins. It must work in light and dark.
 3. **A diagram for Market Intelligence** — the seven dimensions and the four
    readiness tiers. This is currently invisible to anyone outside the platform
    and it is the easiest thing to sell to a funder.
-4. **The assessment**, reworked so it feels like the beginning of the method
+4. **A way to route a visitor to the right service.** Five products is enough
+   to lose people. Something on the home page that asks what they are trying to
+   do and points at one of the five — the Investment Case Canvas already does
+   this internally with its 9A/9B fork, and the same idea works at site level.
+5. **A proof section** built from the library above. Findings, not adjectives.
+6. **The assessment**, reworked so it feels like the beginning of the method
    rather than a form at the bottom of a page.
 
 ## Constraints
