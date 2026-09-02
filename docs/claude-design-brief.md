@@ -385,6 +385,52 @@ with those, not with adjectives.
 
 ---
 
+## The two things a designer asks first
+
+### What the web app is, and where it lives
+
+**https://clearview.habibonifade.com** — the platform where engagements are
+actually run. It requires a login and is not public. It is not being
+redesigned; the website refers to it and never replaces it.
+
+What happens inside it: a coach sets up an engagement, agrees and signs the
+Charter, runs the pre-engagement diagnostic, then works the nine decision
+points with the client. Each decision point has its own working tables,
+collects the evidence it closes on, and is signed off before the next opens.
+Alongside that sit an evidence library, a decision record, session rooms the
+client's team joins from a phone, and the Market Intelligence product.
+
+Two things from it reach the outside world and both matter to the website:
+
+1. **The prospect link.** A coach can issue a no-login web address showing the
+   method and how far one live engagement has got — the canvas, the work that
+   happens before the first decision point, and a count of gates closed. It
+   never shows anything an engagement produced. This is the sales asset that
+   already exists.
+2. **The Market Intelligence report,** which subscribers browse online through
+   their own access link.
+
+### What people get for their email address
+
+**The website already has this built and working.** Ten questions — the same
+ten asked in the first session of a real engagement — then:
+
+- **A score out of ten**, and a band: Below threshold (under 6), Moderate
+  (6–7), or Strong (8+). The same bands the coach uses, so the number a
+  visitor sees here is the number they will hear in the room.
+- **Their gaps, named.** Every question answered no comes back with what being
+  wrong about it actually costs them, and which decision point settles it. Ten
+  yes/no answers turn into "here is where your work starts".
+- **One next step**, different for each band.
+
+It appears on screen immediately and arrives by email. The score is calculated
+on the server, not in the browser.
+
+**What is being redesigned about it:** at the moment it is a form at the
+bottom of a page. It should feel like the first step of the method — because
+that is exactly what it is.
+
+
 ## What already exists — do not redesign these away
 
 - **The live site** at habibonifade.com, built in Next.js and deployed on
