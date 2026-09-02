@@ -67,24 +67,29 @@ export const PREVIEW_ROLES: PreviewRole[] = [
     reach: 'Their own engagement only. They can edit the working tables and sign off blocks. They never see the coaching guidance or anything about the fee.',
   },
   {
+    // ONE ENTRY, NOT TWO. 2 September 2026. 'finance_manager' and 'unit_head'
+    // were separate rows in this list and identical in every function the
+    // application has: both read-only, both without the coaching guidance,
+    // both without sign-off. Two names for one behaviour taught the coach a
+    // distinction that does not exist. The id stays finance_manager because
+    // that is a real role an account holds; the preview simply stops pretending
+    // there are two things to look at.
     id: 'finance_manager',
-    label: 'Their finance lead',
-    who: 'The person in the organisation who owns the numbers.',
-    reach: 'Their own engagement, read only on the canvas. No coaching guidance, nothing about the fee.',
+    label: 'Their team — read only',
+    who: 'Anyone in the client organisation who is not the Executive Director: the finance lead, a service or department lead.',
+    reach: 'Their own engagement, and they can read all of it. They cannot change a working table, cannot sign a decision point off, and never see the coaching guidance or anything about the fee.',
   },
-  {
-    id: 'unit_head',
-    label: 'Their team lead',
-    who: 'A department or service lead in the organisation, for example business development or service delivery.',
-    reach: 'Their own engagement, read only on the canvas. No coaching guidance, nothing about the fee.',
-  },
-  {
-    id: 'funder',
-    label: 'The funder',
-    who: 'The organisation paying for the engagement.',
-    reach: 'No login exists for this. A funder today sees the engagement only through a showcase link, which shows the method and how many gates are closed and nothing the engagement produced.',
-    unreachable: true,
-  },
+  // THE FUNDER IS NOT IN THIS LIST, deliberately. 2 September 2026.
+  //
+  // No account can hold a funder role, so there is nothing to preview: a funder
+  // reaches the engagement through a showcase link, which shows the method and
+  // how many gates are closed and nothing the engagement produced. Offering
+  // "The funder" here rendered the coach's own dashboard and invited exactly
+  // the wrong conclusion — that this is what a funder sees. It is the opposite
+  // of what a preview is for.
+  //
+  // What a funder actually sees is at /showcase/[token], and it is looked at by
+  // opening a showcase link, not by pretending to be one here.
 ]
 
 export interface RoleCapability {

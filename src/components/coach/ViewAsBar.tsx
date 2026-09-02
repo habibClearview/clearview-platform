@@ -27,6 +27,7 @@
 // ============================================================
 import { useState } from 'react'
 import { PREVIEW_ROLES, capabilitiesFor, previewRole } from '@/lib/role-preview'
+import { canEdit, canSignOff, canViewCoachGuidance } from '@/lib/coach-types'
 
 const C = {
   card: 'var(--cv-card)', border: 'var(--cv-border)', navy: 'var(--cv-navy)',
@@ -87,6 +88,26 @@ export default function ViewAsBar({ realRole, viewingAs, onChange }) {
 
         {previewing ? (
           <>
+            {/* ─────────────────────────────────────────────────────
+                WHAT THIS ROLE CAN DO, WITHOUT OPENING ANYTHING.
+                2 September 2026.
+
+                The Yes/No list below has always been here — behind the "i",
+                folded away. Nobody opens an "i". So the client, the finance
+                lead and the team lead all LOOKED identical while previewing:
+                the tabs are the same and the only difference, whether the
+                fields accept typing, does not show until you try to type.
+                Habib asked why the views were all the same. They were not, but
+                the screen gave him no way to tell.
+
+                One sentence, always visible, saying the two things that
+                actually differ.
+                ───────────────────────────────────────────────────── */}
+            <span style={{ ...hint, color: C.navy, fontSize: '0.85rem' }}>
+              <strong>{canEdit(viewingAs) ? 'Can change the working tables' : 'Read only — cannot change anything'}</strong>
+              {canSignOff(viewingAs) ? ' · can sign a decision point off' : ' · cannot sign anything off'}
+              {canViewCoachGuidance(viewingAs) ? ' · sees your coaching guidance' : ' · never sees your guidance or the fee'}
+            </span>
             <span style={{ ...hint, color: C.amber, fontSize: '0.85rem' }}>
               You are seeing their screen. Anything you save is still saved as you.
             </span>

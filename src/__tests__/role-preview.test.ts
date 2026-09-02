@@ -16,22 +16,35 @@ import { canEdit, canSignOff, canViewCoachGuidance } from '@/lib/coach-types'
 import { PREVIEW_ROLES, capabilitiesFor, mayPreview, previewRole } from '@/lib/role-preview'
 
 describe('looking through another role', () => {
-  it('offers every party in an engagement, including the ones with no login', () => {
+  // 2 September 2026. These asserted the older design: one entry per role
+  // string, funder included and flagged. Habib looked at the list and asked why
+  // the views were all the same. Two of them genuinely were — finance_manager
+  // and unit_head differ in nothing the application does — and one was for a
+  // person who cannot log in at all, so previewing it showed a screen no funder
+  // will ever see. A preview that teaches a distinction which does not exist is
+  // worse than no preview.
+  it('offers one entry per thing a person can actually SEE', () => {
     const ids = PREVIEW_ROLES.map((r) => r.id)
     expect(ids).toContain('super_coach')
     expect(ids).toContain('coach')
     expect(ids).toContain('ceo')
+    // The client's team, read only. finance_manager stands for all of them
+    // because they behave identically.
     expect(ids).toContain('finance_manager')
-    expect(ids).toContain('unit_head')
-    expect(ids).toContain('funder')
+    expect(ids).not.toContain('unit_head')
   })
 
-  it('marks the funder as a role nobody can hold', () => {
-    // user_profiles.role permits only super_coach, coach, ceo, finance_manager,
-    // unit_head and accounts_assistant. Offering the funder without saying so
-    // would let a coach believe a funder has a login when the funder does not.
-    expect(previewRole('funder')?.unreachable).toBe(true)
-    expect(previewRole('ceo')?.unreachable).toBeUndefined()
+  it('does not offer the funder, who has no login to preview', () => {
+    // A funder reaches the engagement through a showcase link, which shows the
+    // method and how many gates are closed and nothing the engagement produced.
+    // Rendering the coach's dashboard under the label "The funder" invited
+    // exactly the wrong conclusion.
+    expect(PREVIEW_ROLES.map((r) => r.id)).not.toContain('funder')
+    expect(previewRole('funder')).toBeNull()
+  })
+
+  it('has no unreachable roles left in the list at all', () => {
+    for (const r of PREVIEW_ROLES) expect(r.unreachable, r.label).toBeFalsy()
   })
 
   it('explains every role in words rather than leaving one blank', () => {
