@@ -18,14 +18,44 @@ the method reference, and the Drive folders he supplied. Nothing is invented.
 
 ## Who this is for
 
-Habib Onifade. He works with organisations — mostly NGOs, local service
+Habib Onifade — an independent development finance practitioner and commercial
+viability specialist. Corporate finance background before development
+practice, which is why his financial models are operationally functional
+rather than compliance documents. Over fifteen years of practice, based in
+Nairobi, worked across Nigeria, Uganda, Kenya, South Africa, Zimbabwe, Lesotho
+and Eswatini.
+
+Two brands: **Verido UK Limited** is the registered contracting entity;
+**The Canvas Coach** (habibonifade.com) is the professional brand and the IP
+platform. The site is The Canvas Coach.
+
+The through-line across every engagement, and the sentence the site is
+ultimately selling: *define the paying client, design the service package for
+that client, build the financial model, test it under real conditions, and
+hand ownership to the organisation.*
+
+He works with organisations — mostly NGOs, local service
 providers and programme-funded bodies in Africa — that are living on grant
 money and need to start earning revenue before the grant ends.
 
-He is not a marketer and does not want to sound like one. The voice is plain,
-direct, and unafraid to say when something is not working. No "unlock",
+He is not a marketer and does not want to sound like one. No "unlock",
 "empower", "journey" (except where the method literally uses it), no stock
 photography of people pointing at whiteboards.
+
+**Habib's own voice rules, from his materials:**
+
+- Direct, specific, practitioner-level. No generic development sector language.
+- Positive framing. He strips "not X" constructions out before finalising.
+- Every acronym spelled out on first use.
+- The Canvas Coach is a trademark and is never described generically.
+- Grant-to-Commercial Viability Canvas™ always carries the ™.
+- Always reference habibonifade.com.
+
+One tension worth naming: his proof library's best lines *are* negative
+constructions — "Training Is Not Transformation", "inclusion without viable
+income remains exclusion". Those are findings, not marketing copy, and they
+are the most persuasive sentences he has. Keep them as quoted findings and
+apply the positive-framing rule to the surrounding copy.
 
 ## Who reads the site
 
@@ -51,6 +81,32 @@ In order of importance:
    not a consultant's opinion.
 
 ---
+
+## What kind of site this is, and what it is not
+
+**It is a specialist practitioner's evidence site.** The nearest models are a
+boutique advisory firm or an independent expert with proprietary method — a
+site that proves competence through structure and evidence, and makes contact
+easy.
+
+**It is not a direct-response offer page.** The long-form sales page — value
+stack, price anchoring, countdown, guarantee, "here is everything you get" —
+is built for an impulse purchase by an individual spending their own money.
+Habib's buyers are programme managers, funders and DFIs: procurement-driven,
+committee-bound, risk-averse, and specifically trained to distrust that
+format. It would cost him credibility with exactly the people who sign.
+
+**One direct-response principle does transfer and should be kept:** be
+specific about the outcome, and give the reader one obvious next action per
+page. Vagueness kills professional-services sites more often than a lack of
+persuasion does. "Nine decisions, each closed on evidence and signed before
+the next opens" is a specific promise. "We help organisations become
+sustainable" is not.
+
+**The site's job is not to close.** It is to make a serious buyer confident
+enough to start a conversation, and to capture the ones who are not ready yet
+via the assessment. The closing happens in a room.
+
 
 ## The services
 
@@ -235,6 +291,36 @@ with, not a survey. Nothing identifies an individual business.
 
 ---
 
+## The wider IP portfolio
+
+The five services above are what the site sells. Behind them sits a larger
+body of named, field-tested IP, and naming some of it is what makes the five
+credible — it shows the method came from practice rather than a book.
+
+| Framework | Where it came from |
+|---|---|
+| Liquidity Decision Framework™ | Uganda, a USAID resilience programme |
+| Three-Stage Adoption Test™ | Component: Willingness → Ability → Prioritisation |
+| Asset Liquidity Hierarchy™ | Poultry as the ATM, small ruminants as savings, large ruminants as fixed asset |
+| Investment Infrastructure Development Model™ | Uganda, mobile payments. Builds the conditions for commercial entry rather than subsidising it |
+| Trade Liquidity Multiplier (TraLiMM) | Uganda. A UGX 1bn reserve unlocking UGX 24–33bn of agricultural trade |
+| Sector Finance Activation Model | Nigeria, a DFID programme. Business-membership-organisation-structured credit access, 98%+ repayment |
+| PPP Livestock Service Delivery Model | Uganda. Three-tier model converting subsidised community animal health workers into fee-charging providers |
+| Visibility-First Finance System | Nigeria. Transaction intelligence for informal enterprise — the origin of Verido |
+| PSE Mastery Canvas | The Canvas Coach. A nine-canvas system for private sector engagement |
+
+⚠️ **Named clients and funders.** Habib's internal materials name the
+programmes and the funders behind several of these. His public proof library
+deliberately uses generic phrasing instead — "a regional seed and markets
+programme", "a donor-funded climate jobs programme in East Africa". Follow the
+proof library's convention on the public site. Do not name a client or funder
+unless Habib confirms that specific one is cleared.
+
+The Asset Liquidity Hierarchy — poultry as an ATM, small ruminants as savings,
+large ruminants as a fixed asset — is the single most memorable idea in the
+whole portfolio and deserves a diagram.
+
+
 ## The proof library — use this, it is the most valuable thing here
 
 Habib maintains a library of fifteen evidenced engagements, already written in
@@ -277,19 +363,55 @@ with those, not with adjectives.
 
 ## The look
 
-The existing palette, which should be the starting point:
+### The brand colours — these are the ones that count
 
-| Role | Light | Dark |
+From Habib's own brand rules:
+
+| Role | Hex | Use |
 |---|---|---|
-| Background | `#EDE6D6` warm paper | `#0B1420` |
-| Cards | `#FBF7EE` | `#111E31` |
-| Text | `#1B2A41` deep navy | `#EDF2F8` |
-| Gold (internal) | `#B7791F` | `#E0B15A` |
-| Navy (connecting) | `#22344F` | `#3E5C8A` |
-| Teal (external) | `#00767A` | `#2AEBEB` |
-| Purple (threshold) | `#6B4A8B` | `#B79AD6` |
+| **Navy** | `#0D1B3E` | The primary. Headings, dark bands, the ground the logo sits on. |
+| **Cyan** | `#00B4D8` | The accent. One accent, used sparingly — links, the active state, the single most important button on a page. |
+| **Gold** | `#C9A84C` | The second accent. Emphasis, rules, the "internal capability" column of the GtCV canvas. |
+| **Cream** | `#F5F0E8` | Page background. Warm, not white. |
 
-Typeface is Poppins. It must work in light and dark.
+Everything else derives from those four. Text is navy on cream in light mode.
+
+**Two things to know about how these are used today.**
+
+The **platform** at clearview.habibonifade.com runs a working palette very
+close to this: navy `#1B2A41`, cyan `#008383`, cream `#F5F0E8`. The **canvas
+drawing** additionally uses teal `#00767A` and purple `#6B4A8B` for its
+columns, and those two are *semantic* — gold means internal capability, navy
+means the connecting layer, teal means external market, purple means the
+threshold decision. Those four column colours carry meaning and must not be
+changed for aesthetic reasons.
+
+So: brand the site in navy / cyan / gold / cream. Leave the canvas's column
+colours alone. If the two need reconciling, move the canvas's navy and gold
+toward the brand values rather than the reverse.
+
+### The logos
+
+- **Viable by Design** — the LinkedIn newsletter. Wordmark in a rule box, the
+  A of VIABLE replaced by a cyan triangle or dot. Two versions exist: white on
+  charcoal, and navy on white. The cyan is process cyan.
+- **The Canvas Coach / Habib Onifade personal mark** — Habib has this. It has
+  not been supplied yet and is needed.
+
+The newsletter logo is for the newsletter section only. It is not the site's
+logo, and the two should not compete in the header.
+
+### Typeface
+
+Poppins throughout. It must work in light and dark.
+
+### The photograph
+
+Include one. This is a personal brand with no team behind it — the buyer is
+buying Habib, and a site about a named individual with no face reads as
+evasive. One good photograph, working: in a room, at a canvas, with people.
+Not a studio headshot on a grey background, and not more than two or three
+images on the whole site.
 
 ## What to design
 
@@ -315,3 +437,23 @@ Typeface is Poppins. It must work in light and dark.
 - No stock photography of people.
 - Anything claiming a result must be something Habib can evidence. Do not
   invent client names, numbers of organisations served, or testimonials.
+
+---
+
+## What Habib still needs to supply
+
+1. **His personal / Canvas Coach logo**, as SVG or PNG with a transparent
+   background. Only the Viable by Design newsletter logo has been provided.
+2. **One photograph** of him working. See "The photograph" above.
+3. **Price and duration** for each of the five services — or a decision that
+   they are not published, which is a legitimate choice for this buyer.
+4. **A decision on named clients.** Which programmes and funders, if any, may
+   be named on a public page.
+5. **Permission on the E-TraLiMM applied case**, from that client, if any of
+   its figures are to be shown.
+6. **The full proof library sheet** — fifteen entries, of which seven are
+   summarised above.
+7. **The single most important answer: which one of the five services does he
+   most want to sell in the next six months?** Five services given equal
+   weight sells none of them. One should lead, and the others should be
+   reachable. Without that answer the home page has no shape.
