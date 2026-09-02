@@ -82,6 +82,20 @@ describe('the showcase link a prospect opens', () => {
     expect(host.querySelectorAll('.spine-box').length).toBe(1)
   })
 
+  it('gives every box the number a phone sorts it by', () => {
+    // On a narrow screen the canvas stops being a three column drawing and
+    // becomes one column, and the order comes from this custom property
+    // rather than from the markup — the wide canvas has to keep six above
+    // five. If React ever stopped writing custom properties through, the
+    // phone would silently read 1,2,3,4,6,5,7,8 and nobody would notice.
+    const host = render(VIEW)
+    const boxes = Array.from(host.querySelectorAll('.box')) as HTMLElement[]
+    const orders = boxes.map((b) => b.style.getPropertyValue('--n').trim())
+    expect(orders).toEqual(['10', '20', '30', '40', '60', '50', '70', '80'])
+    const spine = host.querySelector('.spine-box') as HTMLElement
+    expect(spine.style.getPropertyValue('--n').trim()).toBe('90')
+  })
+
   it('never calls a block a zone, a DP code or a numbered block', () => {
     const text = render(VIEW).textContent || ''
     expect(text).not.toMatch(/\bZone \d/)

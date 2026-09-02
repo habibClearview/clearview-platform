@@ -24,7 +24,7 @@ import { CANVAS_DP_IDS } from '@/lib/engagement-types'
 import BlockWorkspace, { hasWorkspace } from '@/components/gtcv/BlockWorkspace'
 import {
   BLOCK, SPINE, CANVAS_COLUMNS, CANVAS_ROWS, TRANSITION_ROW, TRANSITION_LABEL,
-  SPINE_BLOCK_ID, dpLabel,
+  SPINE_BLOCK_ID, dpLabel, dpNumber,
 } from '@/lib/gtcv-blocks'
 import { gateShutBecause } from '@/lib/gtcv-gates'
 
@@ -140,6 +140,33 @@ const CSS = `
 .gj .foot{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);text-align:center;color:var(--ink-faint);font-size:12.5px}
 .gj .foot .tm{font-family:var(--fd);color:var(--ink-soft)}
 @media (max-width:720px){ .gj .fits{grid-template-columns:repeat(2,1fr)} }
+
+/* ── NARROW SCREENS ─────────────────────────────────────────
+   The same treatment as the prospect's showcase, and for the same reason: the
+   canvas needs about 960px to be read as a drawing, so below that it was a
+   960px picture in a scrolling box, legible only by panning. Under 860px the
+   rows dissolve (display:contents), each box sorts by its own number, and the
+   three column headers go because a single column has no left and no right.
+   Every box already names the column it came from. */
+@media (max-width:860px){
+  .gj .canvas-scroll{overflow-x:visible}
+  .gj .bmc{min-width:0;padding:12px;border-radius:12px}
+  .gj .headbars{display:none}
+  .gj .row3,.gj .row2{display:contents}
+  .gj .box{order:var(--n,50)}
+  .gj .trans-l{order:65;text-align:left;padding:12px 0 0;line-height:1.4}
+  .gj .spine-box{order:90}
+  .gj .box h4{font-size:16px}
+  .gj .box .q,.gj .box li,.gj .box .sublab{font-size:13.5px}
+  .gj .bmc-title .meta{text-align:left}
+  .gj .path-scroll{overflow-x:visible}
+  .gj .path{min-width:0;flex-wrap:wrap;justify-content:flex-start;gap:12px 4px}
+  .gj .path::before,.gj .path .fill{display:none}
+  .gj .stop{flex:0 0 auto;width:66px}
+}
+@media (max-width:520px){
+  .gj .fits{grid-template-columns:1fr}
+}
 `
 
 // ─── Method content (fixed IP, client-agnostic) ─────────────
@@ -290,7 +317,12 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
         tabIndex={0}
         aria-disabled={shut ? 'true' : undefined}
         title={shut || 'Open this block'}
-        style={{ cursor: shut ? 'not-allowed' : 'pointer', opacity: shut ? 0.55 : 1 }}
+        style={{
+          cursor: shut ? 'not-allowed' : 'pointer', opacity: shut ? 0.55 : 1,
+          // Its place in the worked order, which is what a single column
+          // sorts by when the canvas stops being a drawing on a phone.
+          '--n': (dpNumber(dpId) || 0) * 10,
+        }}
         onClick={open}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
       >
@@ -398,7 +430,7 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
               className={['spine-box', boxStateClass(spineState, false)].filter(Boolean).join(' ')}
               role="button"
               tabIndex={0}
-              style={{ cursor: 'pointer' }}
+              style={{ cursor: 'pointer', '--n': 90 }}
               onClick={() => setOpenDp('dp09')}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenDp('dp09') } }}
             >

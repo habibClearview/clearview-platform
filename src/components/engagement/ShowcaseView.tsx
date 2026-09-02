@@ -183,6 +183,45 @@ const CSS = `
 }
 .sc .gone h1{font-family:var(--fd); font-size:24px; font-weight:600; margin:0 0 10px;}
 .sc .gone p{color:var(--ink-soft); margin:0;}
+
+/* ── NARROW SCREENS ─────────────────────────────────────────
+   The canvas is a three column drawing and needs about 960px to be read at
+   all, so on a phone it was a 960px picture inside a scrolling box: legible
+   only by panning it, which is not legible. Below 860px it stops pretending
+   to be a drawing and becomes what is underneath it — nine decisions in the
+   order they are worked, one under the other.
+
+   The rows dissolve rather than the boxes being re-ordered in the markup
+   (display:contents makes each box a direct child of the canvas), and each
+   box carries its own number as its order, so the phone reads 1 to 9 while
+   the wide screen keeps the canvas positions, where six sits above five
+   because of the column it belongs to.
+
+   The three column headers go. A single column has no left and no right, and
+   every box already names which column it came from. */
+@media (max-width:860px){
+  .sc .canvas-scroll{overflow-x:visible}
+  .sc .bmc{min-width:0;padding:12px;border-radius:12px}
+  .sc .headbars{display:none}
+  .sc .row3,.sc .row2{display:contents}
+  .sc .box{order:var(--n,50)}
+  .sc .trans-l{order:65;text-align:left;padding:12px 0 0;line-height:1.4}
+  .sc .spine-box{order:90}
+  .sc .box h4{font-size:16px}
+  .sc .box .q,.sc .box li,.sc .box .sublab{font-size:13.5px}
+  .sc .bmc-title .meta{text-align:left}
+  .sc .band{margin:0 -20px 24px;padding:26px 18px 24px;border-radius:0 0 14px 14px}
+  /* The path wraps into rows of chips instead of scrolling sideways, so the
+     line that joins them would cut across the gaps. */
+  .sc .path-scroll{overflow-x:visible}
+  .sc .path{min-width:0;flex-wrap:wrap;justify-content:flex-start;gap:12px 4px}
+  .sc .path::before{display:none}
+  .sc .stop{flex:0 0 auto;width:66px}
+}
+@media (max-width:520px){
+  .sc .fits{grid-template-columns:1fr}
+  .sc .pre-grid{grid-template-columns:1fr}
+}
 `
 
 function progressLine(view) {
@@ -203,7 +242,7 @@ function progressLine(view) {
 function Box({ id }) {
   const b = BLOCK[id]
   return (
-    <article className={`box ${b.color}`}>
+    <article className={`box ${b.color}`} style={{ '--n': (dpNumber(id) || 0) * 10 }}>
       <div className="tagrow">
         <span className="dptag">{dpLabel(id)}</span>
         <span className="sublab">{b.sublab}</span>
@@ -332,7 +371,7 @@ export default function ShowcaseView({ view }) {
             <div className="trans-l">{TRANSITION_LABEL}</div>
             <div className="row2">{TRANSITION_ROW.map((id) => <Box key={id} id={id} />)}</div>
 
-            <div className="spine-box">
+            <div className="spine-box" style={{ '--n': 90 }}>
               <div className="spine-head">
                 <span className="dptag">{dpLabel(SPINE_BLOCK_ID)}</span>
                 <span className="spine-lab">&nbsp;Diagnostic spine · full width · kick-off · mid-point · close</span>
