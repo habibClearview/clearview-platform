@@ -7,12 +7,12 @@ the method reference, and the Drive folders he supplied. Nothing is invented.
 
 **Two things to settle before pasting:**
 
-1. **Price and duration are missing for all five services.** Not needed to
-   design a page, but the pages will have a hole where they belong. Add them
-   if you want them shown.
+1. **No prices and no durations anywhere.** This is Habib's decision, not an
+   omission. No pricing table, no "from £X", no package comparison.
 2. **The E-TraLiMM applied case names a real client and carries their
-   financials.** It is excluded here deliberately. Nothing from that case goes
-   on a public page without that client's permission.
+   financials.** Excluded deliberately, pending that client's permission.
+3. **IGNITE and Ikore must not appear anywhere on the site.** The contract is
+   not signed.
 
 ---
 
@@ -116,6 +116,18 @@ theirs.
 ### 1. Grant-to-Commercial Viability Canvas™ (GtCV) — the flagship
 
 A structured route from grant-funded delivery to services somebody pays for.
+
+**Who it is for — wider than it looks, and the site must say so.** The obvious
+reader is a non-profit whose grant is ending. The less obvious one, and a real
+part of the market, is a **trading business that already works** but has one
+service inside it paid for by a funder rather than by the client using it. That
+subsidy ends the same way a grant does, and the same nine decisions apply: is
+there a paying customer for this, what does it cost to deliver, what would
+someone pay, and does it survive without the subsidy.
+
+Do not write this page as though the reader is a charity. A commercial
+managing director with one subsidised service line should recognise themselves
+in the first paragraph.
 
 **Nine decision points, worked in order.** Each asks one question, produces a
 specific output, and does not close until there is evidence behind it and a
@@ -309,12 +321,34 @@ credible — it shows the method came from practice rather than a book.
 | Visibility-First Finance System | Nigeria. Transaction intelligence for informal enterprise — the origin of Verido |
 | PSE Mastery Canvas | The Canvas Coach. A nine-canvas system for private sector engagement |
 
-⚠️ **Named clients and funders.** Habib's internal materials name the
-programmes and the funders behind several of these. His public proof library
-deliberately uses generic phrasing instead — "a regional seed and markets
-programme", "a donor-funded climate jobs programme in East Africa". Follow the
-proof library's convention on the public site. Do not name a client or funder
-unless Habib confirms that specific one is cleared.
+**Naming clients and funders: cleared, with two exceptions.** Habib has
+already named these organisations publicly on his LinkedIn profile, so naming
+them in the text of the site is consistent with what is already public. Write
+them plainly — "a resilience programme for USAID in Uganda" — rather than
+hiding behind "a donor-funded programme".
+
+Two exceptions, both absolute:
+
+- **IGNITE and Ikore must not appear anywhere.** The contract is not signed.
+  Nothing about that engagement goes on the site, in any form, until Habib says
+  otherwise.
+- **The E-TraLiMM applied case** stays out until that client gives permission.
+  See the warning under that service.
+
+**A client logo row is approved.** Habib already runs one on his LinkedIn
+banner — Adam Smith International, Mercy Corps, Palladium, DAI — and is
+comfortable with it on the site.
+
+Two practical requirements if it is used:
+
+- **Get each logo from the organisation's own brand or press page**, not by
+  cropping the banner. A logo lifted from a screenshot is low resolution and
+  looks it, and the DAI mark on the current banner is already degraded. Every
+  one of these organisations publishes a usable version.
+- **Label the row honestly.** "Programmes I have worked on" or "Work delivered
+  for" rather than "Trusted by" or "Our clients". These were engagements
+  through implementing partners, and the accurate phrasing is also the one that
+  never has to be defended.
 
 The Asset Liquidity Hierarchy — poultry as an ATM, small ruminants as savings,
 large ruminants as a fixed asset — is the single most memorable idea in the
@@ -430,9 +464,19 @@ Poppins throughout. It must work in light and dark.
 
 Include one. This is a personal brand with no team behind it — the buyer is
 buying Habib, and a site about a named individual with no face reads as
-evasive. One good photograph, working: in a room, at a canvas, with people.
-Not a studio headshot on a grey background, and not more than two or three
-images on the whole site.
+evasive.
+
+A set of studio portraits exists, shot against black and against white. **The
+black-background frames are the ones to use.** They are lit properly, they read
+as considered rather than corporate, and black sits naturally against the navy
+brand. Of those, the most open and least formal frame is the better hero image:
+this is a person institutions have to want in a room with their leadership
+team, and unsmiling arms-folded authority is easier to come by than
+approachability.
+
+Two or three images across the whole site, no more. One in the hero or the
+about section, one beside the proof section if it needs a human anchor. No
+stock photography of anybody else.
 
 ## What to design
 
@@ -466,8 +510,11 @@ images on the whole site.
 1. **His personal / Canvas Coach logo**, as SVG or PNG with a transparent
    background. Only the Viable by Design newsletter logo has been provided.
 2. **One photograph** of him working. See "The photograph" above.
-3. **Price and duration** for each of the five services — or a decision that
-   they are not published, which is a legitimate choice for this buyer.
+3. ~~Price and duration~~ — **decided: not published.** Habib does not want
+   prices or durations on the site. Do not design a pricing table, a "from
+   £X" line, or a package comparison. The next step is a conversation, not a
+   number. (This matches his own proposal rule: fixed-price deliverables, never
+   a day rate.)
 4. **A decision on named clients.** Which programmes and funders, if any, may
    be named on a public page.
 5. **Permission on the E-TraLiMM applied case**, from that client, if any of
