@@ -56,7 +56,7 @@ import {
 import { GRANT_TYPE_LABELS, GRANT_SCOPE_LABELS, grantStatus, generateAccessToken, expiryFromDays } from '@/lib/access-grants'
 import { READINESS_STAGE_LABELS } from '@/lib/portfolio-intelligence'
 
-// \u2500\u2500\u2500 DESIGN TOKENS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ─── DESIGN TOKENS ───────────────────────────────────────────
 const C = {
   navy:'var(--cv-navy)', cyan:'var(--cv-cyan)', cream:'var(--cv-cream)', white:'var(--cv-card)',
   slate:'var(--cv-slate)', border:'var(--cv-border)', teal:'var(--cv-teal)',
@@ -64,7 +64,7 @@ const C = {
   lightBg:'var(--cv-alt)',
 }
 
-// \u2500\u2500\u2500 SHARED STYLES \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ─── SHARED STYLES ────────────────────────────────────────────
 const card = {background:C.white,border:'1px solid var(--cv-border-soft)',borderRadius:14,padding:'1.35rem 1.5rem',marginBottom:'1.25rem',boxShadow:'0 1px 2px var(--cv-shadow-1), 0 10px 30px var(--cv-shadow-1)'}
 const secH = {fontFamily:'var(--cv-font)',fontSize:'1.32rem',fontWeight:700,color:C.navy,marginBottom:'0.75rem'}
 const inp  = {width:'100%',padding:'0.42rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,fontSize:'1.13rem',fontFamily:'inherit',background:'var(--cv-bg-2)',color:C.navy,boxSizing:'border-box'}
@@ -79,10 +79,31 @@ function solidBtn(col=C.cyan,sm=false){return{fontFamily: 'var(--cv-font-mono)',
 function subPill(active,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
 
 function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.2rem 1.15rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.13rem',letterSpacing:'0.12em',color:C.slate,textTransform:'uppercase',marginBottom:'0.4rem'}}>{label}</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.65rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.22rem'}}>{sub}</div>}</div>)}
-function DPDot({status}){const col=status==='\u2713'?C.green:status==='\u25d0'?C.cyan:status==='\u26a0'?C.amber:C.border;return<span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:18,height:18,borderRadius:'50%',background:col,color:'var(--cv-on-accent)',fontSize:'0.93rem',fontWeight:700,flexShrink:0}}>{status||'\u25cb'}</span>}
+/**
+ * THE GATE'S STATE, AS A DOT. 2 September 2026.
+ *
+ * This printed whatever `status` held inside an 18-pixel circle, on the
+ * assumption that it held a SYMBOL — ✓, ◐, ⚠. The database holds WORDS:
+ * 'complete', 'in_progress', 'not_started'. So the sidebar drew the word
+ * "complete" spilling out of a small circle and across the label beside it,
+ * which is the overlap in Habib's screenshot, and why a decision point's name
+ * appeared cut off.
+ *
+ * A dot is a dot. It carries its meaning in its colour and in the label a
+ * screen reader gets, and no text at all.
+ */
+function DPDot({status}){
+  const s=String(status||'').toLowerCase()
+  const done=s==='complete'||s==='✓'
+  const going=s==='in_progress'||s==='◐'
+  const stuck=s==='blocked'||s==='⚠'
+  const col=done?C.green:going?C.cyan:stuck?C.amber:C.border
+  const said=done?'Complete':going?'In progress':stuck?'Blocked':'Not started'
+  return <span role="img" aria-label={said} title={said} style={{width:11,height:11,borderRadius:'50%',background:col,flexShrink:0,display:'inline-block'}}/>
+}
 function Badge({text,color}){return<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
 function Spinner(){return<div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'3rem',color:C.slate,fontSize:'1.11rem'}}>Loading...</div>}
-// Donut score circle \u2014 reused for real scores that already exist in the data (e.g. the readiness self-assessment). No score is invented.
+// Donut score circle — reused for real scores that already exist in the data (e.g. the readiness self-assessment). No score is invented.
 function ScoreDonut({label,display,frac,rating,color}){const r=26,circ=2*Math.PI*r,f=Math.max(0,Math.min(1,frac||0));return(<div style={{background:C.white,borderRadius:14,padding:'1.05rem 1.15rem',borderLeft:`4px solid ${color}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)',display:'flex',alignItems:'center',gap:'0.9rem'}}><svg width="60" height="60" viewBox="0 0 62 62" style={{flexShrink:0}}><circle cx="31" cy="31" r={r} fill="none" style={{stroke:'var(--cv-border-soft)'}} strokeWidth="6"/><circle cx="31" cy="31" r={r} fill="none" style={{stroke:color}} strokeWidth="6" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ*(1-f)} transform="rotate(-90 31 31)"/></svg><div style={{minWidth:0}}><div style={{fontSize:'1.11rem',color:C.slate,marginBottom:'0.18rem'}}>{label}</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.55rem',fontWeight:700,color:C.navy,lineHeight:1}}>{display}</div><div style={{fontSize:'1.07rem',fontWeight:700,color,marginTop:'0.22rem'}}>{rating}</div></div></div>)}
 
 // ─── "MY BUSINESS AT A GLANCE" (coach's own commercial numbers) ──────
@@ -587,7 +608,7 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
   )
 }
 
-// \u2500\u2500\u2500 SUPABASE HELPERS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ─── SUPABASE HELPERS ─────────────────────────────────────────
 async function loadClients(){
   const {data,error}=await supabase.from('engagement_clients').select('*').order('name')
   if(error)throw error
@@ -655,7 +676,7 @@ async function loadNotificationSettings(clientId){
   return data
 }
 
-// \u2500\u2500\u2500 CLIENT CARD \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ─── CLIENT CARD ─────────────────────────────────────────────
 function ClientCard({client,programmes,onClick,onEdit}){
   const prog=programmes.find(p=>p.id===client.programme_id)
   return(
@@ -668,7 +689,7 @@ function ClientCard({client,programmes,onClick,onEdit}){
         </div>
       </div>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.35rem',gap:'0.5rem'}}>
-        <div style={{fontSize:'0.93rem',color:prog?C.slate:C.amber}}>{CLIENT_TYPE_LABELS[client.type]} \u00b7 {prog?prog.name:'No programme -- self-paying'}</div>
+        <div style={{fontSize:'0.93rem',color:prog?C.slate:C.amber}}>{CLIENT_TYPE_LABELS[client.type]} · {prog?prog.name:'No programme -- self-paying'}</div>
         {onEdit&&<button onClick={e=>{e.stopPropagation();onEdit()}} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.82rem',padding:'0.12rem 0.5rem',borderRadius:4,background:C.navy,color:'var(--cv-on-accent)',border:'none',cursor:'pointer',flexShrink:0}}>Edit</button>}
       </div>
       {client.contact_name&&<div style={{fontSize:'0.93rem',color:C.navy,marginBottom:'0.3rem'}}>{client.contact_name}</div>}
@@ -677,7 +698,7 @@ function ClientCard({client,programmes,onClick,onEdit}){
   )
 }
 
-// \u2500\u2500\u2500 MAIN COMPONENT \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ─── MAIN COMPONENT ──────────────────────────────────────────
 // Sends a real Supabase Auth invite for a 'coach' (co-implementer) or
 // 'funder' login, scoped via the same columns the RLS migration reads
 // (user_profiles.co_implementer_id / funder_programme_id). Reuses the
@@ -862,12 +883,12 @@ function ClearviewHealthSummary({clients}){
   },[clients.length])
 
   function statusFromReport(text){
-    if(!text)return{label:'No data',color:C.slate,dot:'\u26AA'}
+    if(!text)return{label:'No data',color:C.slate,dot:'⚪'}
     const lower=text.toLowerCase()
-    if(lower.includes('red')||lower.includes('at risk')||lower.includes('concern'))return{label:'Needs attention',color:C.red,dot:'\ud83d\udd34'}
-    if(lower.includes('amber')||lower.includes('caution'))return{label:'Watch',color:C.amber,dot:'\ud83d\udfe1'}
-    if(lower.includes('green')||lower.includes('healthy')||lower.includes('strong'))return{label:'Healthy',color:C.green,dot:'\ud83d\udfe2'}
-    return{label:'Reviewed',color:C.teal,dot:'\ud83d\udd35'}
+    if(lower.includes('red')||lower.includes('at risk')||lower.includes('concern'))return{label:'Needs attention',color:C.red,dot:'🔴'}
+    if(lower.includes('amber')||lower.includes('caution'))return{label:'Watch',color:C.amber,dot:'🟡'}
+    if(lower.includes('green')||lower.includes('healthy')||lower.includes('strong'))return{label:'Healthy',color:C.green,dot:'🟢'}
+    return{label:'Reviewed',color:C.teal,dot:'🔵'}
   }
 
   if(financialClients.length===0)return null
@@ -1891,7 +1912,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 
   const selClientFullData=clientData[selClientId]||{}
 
-  // \u2500\u2500 OVERVIEW \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── OVERVIEW ───────────────────────────────────────────────
   const newSubmissions = clients.filter(c => c.status === 'setup' && (c.notes || '').includes('Self-submitted intake'))
 
   function OverviewTab(){
@@ -1905,7 +1926,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     return(
       <div>
         <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'0.75rem'}}>
-          <button style={addBtn(true,C.teal)} onClick={refreshOverview} disabled={refreshingOv}>{refreshingOv?'Refreshing...':'\u21bb Refresh client list'}</button>
+          <button style={addBtn(true,C.teal)} onClick={refreshOverview} disabled={refreshingOv}>{refreshingOv?'Refreshing...':'↻ Refresh client list'}</button>
         </div>
         {newSubmissions.length>0&&(
           <div style={{background:'var(--cv-tint-cyan)',border:`1px solid ${C.teal}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem'}}>
@@ -1914,14 +1935,14 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.5rem 0.75rem',background:C.white,borderRadius:5,marginBottom:'0.4rem',border:`1px solid ${C.border}`}}>
                 <div>
                   <div style={{fontWeight:600,fontSize:'1.07rem',color:C.navy}}>{c.name}</div>
-                  <div style={{fontSize:'0.93rem',color:C.slate}}>{c.contact_name}{c.created_at?(' \u00b7 submitted '+new Date(c.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})):''}</div>
+                  <div style={{fontSize:'0.93rem',color:C.slate}}>{c.contact_name}{c.created_at?(' · submitted '+new Date(c.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})):''}</div>
                 </div>
-                <button style={addBtn(true,C.teal)} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}>Review {'\u2192'}</button>
+                <button style={addBtn(true,C.teal)} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}>Review {'→'}</button>
               </div>
             ))}
           </div>
         )}
-        {pending>0&&<div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontWeight:600,color:C.amber}}>\u23f3 {pending} timesheet{pending>1?'s':''} awaiting approval</span><button style={addBtn(true,C.amber)} onClick={()=>setView('team')}>Review \u2192</button></div>}
+        {pending>0&&<div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontWeight:600,color:C.amber}}>⏳ {pending} timesheet{pending>1?'s':''} awaiting approval</span><button style={addBtn(true,C.amber)} onClick={()=>setView('team')}>Review →</button></div>}
         <MyBusinessGlance clients={clients} programmes={programmes} coImplementers={coImplementers}/>
       </div>
     )
@@ -2145,7 +2166,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     )
   }
 
-  // \u2500\u2500 CLIENT DETAIL \u2014 25 TABS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── CLIENT DETAIL — 25 TABS ────────────────────────────────
   function ClientDetailView(){
     if(!selClient)return<div style={{color:C.slate,padding:'2rem'}}>Client not found.</div>
     if(clientLoading&&selClient.engagement_mode==='canvas')return<Spinner/>
@@ -2233,7 +2254,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       <div>
         {/* Breadcrumb */}
         <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'1rem',fontSize:'1.01rem',color:C.slate}}>
-          <button style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem'}} onClick={()=>setView('overview')}>\u2190 Coach Dashboard</button>
+          <button style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem'}} onClick={()=>setView('overview')}>← Coach Dashboard</button>
           <span>/</span><span style={{color:C.navy,fontWeight:600}}>{selClient.name}</span>
         </div>
 
@@ -2241,13 +2262,13 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         <div style={{...card,background:'var(--cv-header)',color:'var(--cv-on-accent)',marginBottom:'1.25rem'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
             <div>
-              <div style={{fontSize:'0.8rem',fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase',color:C.cyan,marginBottom:'0.45rem',opacity:0.9}}>{CLIENT_TYPE_LABELS[selClient.type]} \u00b7 {prog?.name||'\u2014'} \u00b7 {isCanvas?'Full GtCV Canvas':'Clearview Financial'}</div>
+              <div style={{fontSize:'0.8rem',fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase',color:C.cyan,marginBottom:'0.45rem',opacity:0.9}}>{CLIENT_TYPE_LABELS[selClient.type]} · {prog?.name||'—'} · {isCanvas?'Full GtCV Canvas':'Clearview Financial'}</div>
               <h2 style={{fontFamily:'var(--cv-font)',fontSize:'2.1rem',fontWeight:600,lineHeight:1.15,letterSpacing:'-0.015em',color:'var(--cv-on-accent)',margin:'0 0 0.35rem'}}>{selClient.name}</h2>
-              <div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{selClient.contact_name&&`${selClient.contact_name} \u00b7 `}{selClient.country} \u00b7 {selClient.sector}</div>
+              <div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{selClient.contact_name&&`${selClient.contact_name} · `}{selClient.country} · {selClient.sector}</div>
             </div>
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
-              {selClient.clearview_active&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.22rem 0.6rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none'}}>Open Clearview \u2197</a>}
+              {selClient.clearview_active&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.22rem 0.6rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none'}}>Open Clearview ↗</a>}
               {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',fontWeight:700,padding:'0.22rem 0.6rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit Name / Type / Programme</button>}
               <button style={addBtn(true)} onClick={printSection}>Print</button>
             </div>
@@ -2284,7 +2305,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             screen it was being read on. */}
         <div style={{display:'grid',gridTemplateColumns:navCollapsed?'62px minmax(0,1fr)':'220px minmax(0,1fr)',gap:'1.5rem',alignItems:'start'}}>
 
-          {/* Sidebar \u2014 25 tabs */}
+          {/* Sidebar — 25 tabs */}
           <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',position:'sticky',top:'1rem'}}>
             <button
               type="button"
@@ -2292,7 +2313,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               aria-expanded={!navCollapsed}
               title={navCollapsed?'Show the tab names':'Collapse to give the content more room'}
               style={{width:'100%',textAlign:navCollapsed?'center':'left',padding:'0.5rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:C.white,color:C.slate,cursor:'pointer',fontFamily: 'var(--cv-font-mono)',fontSize:'0.9rem'}}
-            >{navCollapsed?'\u00bb':'\u00ab Collapse'}</button>
+            >{navCollapsed?'»':'« Collapse'}</button>
             {visibleTabs.map((tab,i)=>{
               const isActive=shownTab===tab.id
               // A heading before the first item of each group. Four headings
@@ -2322,12 +2343,15 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                   </div>
                 ):null}
                 {groupDef&&navCollapsed?<div style={{height:1,background:C.border,margin:'0.4rem 0'}}/>:null}
-                <button onClick={()=>{if(shutBecause){setFlashLocked(shutBecause);return}setActiveTab(tab.id)}} disabled={!!shutBecause} title={shutBecause||(navCollapsed?`${tab.marker} ${tab.label}`:undefined)} aria-current={isActive?'page':undefined} style={{width:'100%',textAlign:'left',padding:navCollapsed?'0.6rem 0.3rem':'0.6rem 0.85rem',border:'none',borderLeft:isActive?`4px solid ${C.cyan}`:'4px solid transparent',borderBottom:`1px solid ${C.border}`,background:isActive?'var(--cv-header)':C.white,color:isActive?'var(--cv-on-accent)':(shutBecause?C.slate:C.navy),opacity:shutBecause?0.55:1,cursor:shutBecause?'not-allowed':'pointer',display:'flex',justifyContent:navCollapsed?'center':'space-between',alignItems:'center',gap:navCollapsed?'0.25rem':0,fontSize:'1.01rem',fontFamily:"var(--cv-font)",fontWeight:isActive?600:400}}>
-                  <span>
-                    {navCollapsed?<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:isActive?C.cyan:C.slate}}>{tab.marker}</span>:tab.label}
+                <button onClick={()=>{if(shutBecause){setFlashLocked(shutBecause);return}setActiveTab(tab.id)}} disabled={!!shutBecause} title={shutBecause||(navCollapsed?`${tab.marker} ${tab.label}`:undefined)} aria-current={isActive?'page':undefined} style={{width:'100%',textAlign:'left',padding:navCollapsed?'0.6rem 0.3rem':'0.6rem 0.85rem',border:'none',borderLeft:isActive?`4px solid ${C.cyan}`:'4px solid transparent',borderBottom:`1px solid ${C.border}`,background:isActive?'var(--cv-header)':C.white,color:isActive?'var(--cv-on-accent)':(shutBecause?C.slate:C.navy),opacity:shutBecause?0.55:1,cursor:shutBecause?'not-allowed':'pointer',display:'flex',justifyContent:navCollapsed?'center':'space-between',alignItems:'center',gap:navCollapsed?'0.25rem':'0.5rem',fontSize:'1.01rem',fontFamily:"var(--cv-font)",fontWeight:isActive?600:400}}>
+                  {/* The label wraps rather than being cut off: "Decision
+                      Point 1 · Service Reality" does not fit a 220px sidebar on
+                      one line and should not have to. */}
+                  <span style={{minWidth:0,flex:1,lineHeight:1.3,whiteSpace:'normal',overflowWrap:'anywhere'}}>
+                    {navCollapsed?<span style={{fontSize:'0.93rem',color:isActive?C.cyan:C.slate}}>{tab.marker}</span>:tab.label}
                   </span>
                   {dpCanvas&&<DPDot status={dpCanvas.status}/>}
-                  {tab.coachOnly&&!navCollapsed&&<span style={{fontSize:'0.93rem',color:isActive?C.cyan:C.amber}}>\ud83d\udc41</span>}
+                  {tab.coachOnly&&!navCollapsed&&<span style={{fontSize:'0.93rem',color:isActive?C.cyan:C.amber}}>👁</span>}
                 </button>
                 </div>
               )
@@ -2390,7 +2414,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     )
   }
 
-  // \u2500\u2500 PROGRAMMES VIEW \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── PROGRAMMES VIEW ────────────────────────────────────────
   function ProgrammesView(){
     const [showNew,setShowNew]=useState(false)
     const [editingProg,setEditingProg]=useState(false)
@@ -2398,7 +2422,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     const prog=selProgId?programmes.find(p=>p.id===selProgId):null
     if(prog)return(
       <div>
-        <button style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem',marginBottom:'1rem'}} onClick={()=>{setSelProgId(null);setEditingProg(false)}}>\u2190 All Programmes</button>
+        <button style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem',marginBottom:'1rem'}} onClick={()=>{setSelProgId(null);setEditingProg(false)}}>← All Programmes</button>
         {editingProg&&progForm?(
           <div style={card}>
             <div style={{...secH,marginBottom:'1rem'}}>Edit Programme</div>
@@ -2428,7 +2452,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           <div>
             <div style={{...card,background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                <div><div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.cyan,letterSpacing:'0.12em',marginBottom:'0.3rem'}}>{prog.type==='donor_programme'?'DONOR PROGRAMME':'DIRECT CLIENT'}</div><h2 style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0 0 0.2rem'}}>{prog.name}</h2><div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{prog.funder} \u00b7 {prog.country}</div></div>
+                <div><div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.cyan,letterSpacing:'0.12em',marginBottom:'0.3rem'}}>{prog.type==='donor_programme'?'DONOR PROGRAMME':'DIRECT CLIENT'}</div><h2 style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0 0 0.2rem'}}>{prog.name}</h2><div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{prog.funder} · {prog.country}</div></div>
                 <button style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.3rem 0.8rem',border:'1px solid var(--cv-wa-30)',borderRadius:4,background:'transparent',color:'var(--cv-wa-80)',cursor:'pointer'}} onClick={()=>{setProgForm({...prog});setEditingProg(true)}}>Edit</button>
               </div>
             </div>
@@ -2439,7 +2463,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 ?<InviteLoginButton email={prog.funder_email} fullName={prog.funder||'Funder'} role="funder" coImplementerId={null} funderProgrammeId={prog.id}/>
                 :<div style={{...hint,color:C.amber}}>Add a funder email via Edit before you can invite them.</div>}
             </div>
-            <div style={card}><div style={secH}>Client Organisations</div>{clients.filter(c=>c.programme_id===prog.id).map(c=><div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.75rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.45rem'}}><div><div style={{fontWeight:600,fontSize:'1.07rem'}}>{c.name}</div><div style={{fontSize:'0.93rem',color:C.slate}}>{CLIENT_TYPE_LABELS[c.type]} \u00b7 {statusLabel(c.status)}</div></div><button style={addBtn(true)} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}>Open \u2192</button></div>)}</div>
+            <div style={card}><div style={secH}>Client Organisations</div>{clients.filter(c=>c.programme_id===prog.id).map(c=><div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.75rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.45rem'}}><div><div style={{fontWeight:600,fontSize:'1.07rem'}}>{c.name}</div><div style={{fontSize:'0.93rem',color:C.slate}}>{CLIENT_TYPE_LABELS[c.type]} · {statusLabel(c.status)}</div></div><button style={addBtn(true)} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}>Open →</button></div>)}</div>
             <ServicesSection payerType="programme" payerId={prog.id} clients={clients}/>
             {prog.notes&&<div style={card}><div style={secH}>Notes</div><div style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.6}}>{prog.notes}</div></div>}
           </div>
@@ -2451,13 +2475,13 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem'}}><div style={secH}>Programmes</div><button style={addBtn()} onClick={()=>setShowNew(!showNew)}>+ New Programme</button></div>
         {showNew&&<NewProgrammeForm onSave={async p=>{const {data,error}=await supabase.from('programmes').insert([p]).select().single();if(!error&&data){setPrograms(prev=>[...prev,data]);setShowNew(false)}}} onCancel={()=>setShowNew(false)}/>}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:'1.25rem'}}>
-          {programmes.map(p=><div key={p.id} style={{...card,cursor:'pointer',marginBottom:0}} onClick={()=>setSelProgId(p.id)}><div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}><div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.22rem',fontWeight:700,color:C.navy}}>{p.name}</div><div style={{fontSize:'1.01rem',color:C.slate,marginTop:'0.18rem'}}>{p.funder} \u00b7 {p.country} \u00b7 {clients.filter(c=>c.programme_id===p.id).length} clients</div></div><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.12rem 0.45rem',borderRadius:4,background:p.type==='donor_programme'?C.amber:C.teal,color:'var(--cv-on-accent)'}}>{p.type==='donor_programme'?'Donor':'Direct'}</span></div></div>)}
+          {programmes.map(p=><div key={p.id} style={{...card,cursor:'pointer',marginBottom:0}} onClick={()=>setSelProgId(p.id)}><div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}><div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.22rem',fontWeight:700,color:C.navy}}>{p.name}</div><div style={{fontSize:'1.01rem',color:C.slate,marginTop:'0.18rem'}}>{p.funder} · {p.country} · {clients.filter(c=>c.programme_id===p.id).length} clients</div></div><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.12rem 0.45rem',borderRadius:4,background:p.type==='donor_programme'?C.amber:C.teal,color:'var(--cv-on-accent)'}}>{p.type==='donor_programme'?'Donor':'Direct'}</span></div></div>)}
         </div>
       </div>
     )
   }
 
-  // \u2500\u2500 TEAM VIEW \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── TEAM VIEW ──────────────────────────────────────────────
   function TeamView(){
     const [showNew,setShowNew]=useState(false)
     const [addingClientFor,setAddingClientFor]=useState(null)
@@ -2514,12 +2538,12 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         {teamMsg&&<div style={{fontSize:'1.01rem',color:C.red,marginBottom:'0.75rem'}}>{teamMsg}</div>}
         {pendingTs.length>0&&canApproveTimesheets(userRole)&&(
           <div style={{...card,background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`}}>
-            <div style={secH}>\u23f3 Pending Timesheet Approvals ({pendingTs.length})</div>
+            <div style={secH}>⏳ Pending Timesheet Approvals ({pendingTs.length})</div>
             {pendingTs.map(ts=>{
               const ci=coImplementers.find(c=>c.id===ts.co_implementer_id)
               const cl=clients.find(c=>c.id===ts.client_id)
               return(<div key={ts.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.75rem',border:`1px solid ${C.amber}`,borderRadius:5,marginBottom:'0.45rem',background:C.white}}>
-                <div><div style={{fontWeight:600,fontSize:'1.07rem'}}>{ci?.name||'Unknown'} \u2014 {ts.date}</div><div style={{fontSize:'1.01rem',color:C.slate}}>{cl?.name||'Unknown'} \u00b7 {ts.hours}h \u00b7 {ts.dp_id||''} \u00b7 {ts.description}</div></div>
+                <div><div style={{fontWeight:600,fontSize:'1.07rem'}}>{ci?.name||'Unknown'} — {ts.date}</div><div style={{fontSize:'1.01rem',color:C.slate}}>{cl?.name||'Unknown'} · {ts.hours}h · {ts.dp_id||''} · {ts.description}</div></div>
                 <div style={{display:'flex',gap:'0.4rem'}}>
                   <button style={solidBtn(C.green,true)} onClick={()=>approveTs(ts.id)}>Approve</button>
                   <button style={solidBtn(C.red,true)} onClick={()=>rejectTs(ts.id)}>Reject</button>
@@ -2535,7 +2559,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           const pendingHours=ciTs.filter(t=>t.status==='submitted').reduce((s,t)=>s+(Number(t.hours)||0),0)
           return(<div key={ci.id} style={card}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.65rem'}}>
-              <div><div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy}}>{ci.name}</div><div style={{fontSize:'1.01rem',color:C.slate}}>{ci.email} \u00b7 {ci.country}</div>{ci.specialisation&&<div style={{fontSize:'1.01rem',color:C.slate}}>{ci.specialisation}</div>}</div>
+              <div><div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy}}>{ci.name}</div><div style={{fontSize:'1.01rem',color:C.slate}}>{ci.email} · {ci.country}</div>{ci.specialisation&&<div style={{fontSize:'1.01rem',color:C.slate}}>{ci.specialisation}</div>}</div>
               <div style={{textAlign:'right'}}>
                 {canManageTeam(userRole)
                   ?<button onClick={()=>toggleActive(ci)} title="Click to toggle" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem',background:'transparent',border:`1px solid ${ci.active?C.green:C.red}`,borderRadius:4,padding:'0.1rem 0.5rem',cursor:'pointer'}}>{ci.active?'Active':'Inactive'} · click to {ci.active?'suspend':'reactivate'}</button>
@@ -2576,8 +2600,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 <thead><tr style={{background:C.lightBg}}>{['Date','Client','DP','Hours','Description','Status'].map(h=><th key={h} style={{padding:'0.4rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`}}>{h}</th>)}</tr></thead>
                 <tbody>{ciTs.slice(0,10).map((ts,i)=><tr key={ts.id} style={{background:i%2===0?C.cream:C.white}}>
                   <td style={{padding:'0.4rem 0.6rem'}}>{ts.date}</td>
-                  <td style={{padding:'0.4rem 0.6rem'}}>{clients.find(c=>c.id===ts.client_id)?.name||'\u2014'}</td>
-                  <td style={{padding:'0.4rem 0.6rem',fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem'}}>{ts.dp_id||'\u2014'}</td>
+                  <td style={{padding:'0.4rem 0.6rem'}}>{clients.find(c=>c.id===ts.client_id)?.name||'—'}</td>
+                  <td style={{padding:'0.4rem 0.6rem',fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem'}}>{ts.dp_id||'—'}</td>
                   <td style={{padding:'0.4rem 0.6rem'}}>{ts.hours}</td>
                   <td style={{padding:'0.4rem 0.6rem',maxWidth:180}}>{ts.description}</td>
                   <td style={{padding:'0.4rem 0.6rem'}}><Badge text={ts.status} color={ts.status==='approved'?C.green:ts.status==='submitted'?C.amber:ts.status==='rejected'?C.red:C.slate}/></td>
@@ -2590,7 +2614,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     )
   }
 
-  // \u2500\u2500 HEADER + SHELL \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── HEADER + SHELL ─────────────────────────────────────────
   // Previously 4 separate top-level entries covered the same ground as
   // 3 others under confusingly similar names (Clients/Client Health,
   // Programmes/Programmes & Deals, Team/Team & Payments) with no
@@ -2709,9 +2733,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       <header style={{background:'var(--cv-header)',borderBottom:`3px solid ${C.cyan}`}}>
         <div style={{maxWidth:1320,margin:'0 auto',padding:'1.25rem 1.5rem',display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
           <div>
-            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>CANVAS COACH \u2014 COACH DASHBOARD</div>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>CANVAS COACH — COACH DASHBOARD</div>
             <h1 style={{fontFamily:'var(--cv-font)',fontSize:'1.5rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0.1rem 0 0.15rem'}}>{userName}</h1>
-            <div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{activeClients.length} active \u00b7 {programmes.length} programme{programmes.length!==1?'s':''} \u00b7 {clearviewLive.length} Clearview live \u00b7 {canvasClients.length} canvas engagement{canvasClients.length!==1?'s':''}{pausedClients.length>0&&<span style={{marginLeft:8,color:C.red}}>\u00b7 {pausedClients.length} paused</span>}{pending>0&&<span style={{marginLeft:8,color:C.amber}}>\u00b7 \u23f3 {pending} pending</span>}</div>
+            <div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{activeClients.length} active · {programmes.length} programme{programmes.length!==1?'s':''} · {clearviewLive.length} Clearview live · {canvasClients.length} canvas engagement{canvasClients.length!==1?'s':''}{pausedClients.length>0&&<span style={{marginLeft:8,color:C.red}}>· {pausedClients.length} paused</span>}{pending>0&&<span style={{marginLeft:8,color:C.amber}}>· ⏳ {pending} pending</span>}</div>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}>
             <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem'}}>{roleBadgeLabel}</span>
@@ -2747,26 +2771,26 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         {view==='portfolio'&&<PortfolioIntelligenceHub clients={clients} programmes={programmes}/>}
         </ErrorBoundary>
       </main>
-      <footer style={{textAlign:'center',padding:'1.5rem',fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach \u00b7 Coach Dashboard \u00b7 habibonifade.com \u00b7 Confidential</footer>
+      <footer style={{textAlign:'center',padding:'1.5rem',fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach · Coach Dashboard · habibonifade.com · Confidential</footer>
     </div>
   )
 }
 
-// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// ═══════════════════════════════════════════════════════════════
 // TAB CONTENT COMPONENTS
-// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// ═══════════════════════════════════════════════════════════════
 
 function TabCover({client,prog,programmes,onUpdate}){
   const [editing,setEditing]=useState(false)
   const [form,setForm]=useState({...client})
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>{client.engagement_mode==='canvas'?'Tab 1 \u2014 Cover':'Cover'}</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn(true)} onClick={()=>{setForm({...client});setEditing(!editing)}}>{editing?'Cancel':'Edit'}</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>{client.engagement_mode==='canvas'?'Tab 1 — Cover':'Cover'}</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn(true)} onClick={()=>{setForm({...client});setEditing(!editing)}}>{editing?'Cancel':'Edit'}</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       {editing?(
         <div style={card}>
           <div style={fGrid}>
             <div><label style={lbl}>Organisation Name</label><input style={inp} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></div>
-            <div><label style={lbl}>Programme</label><select style={inp} value={form.programme_id||''} onChange={e=>setForm(f=>({...f,programme_id:e.target.value||null}))}><option value="">No programme (independent \u00b7 self-paying)</option>{(programmes||[]).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+            <div><label style={lbl}>Programme</label><select style={inp} value={form.programme_id||''} onChange={e=>setForm(f=>({...f,programme_id:e.target.value||null}))}><option value="">No programme (independent · self-paying)</option>{(programmes||[]).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
             <div><label style={lbl}>Contact Name</label><input style={inp} value={form.contact_name} onChange={e=>setForm(f=>({...f,contact_name:e.target.value}))}/></div>
             <div><label style={lbl}>Contact Email</label><input style={inp} value={form.contact_email} onChange={e=>setForm(f=>({...f,contact_email:e.target.value}))}/></div>
             <div><label style={lbl}>Country</label><input style={inp} value={form.country} onChange={e=>setForm(f=>({...f,country:e.target.value}))}/></div>
@@ -2783,7 +2807,7 @@ function TabCover({client,prog,programmes,onUpdate}){
       ):(
         <div style={card}>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
-            {[['Organisation',client.name],['Programme',prog?.name||'\u2014'],['Type',CLIENT_TYPE_LABELS[client.type]||'\u2014'],['Contact',client.contact_name||'\u2014'],['Email',client.contact_email||'\u2014'],['Country',client.country],['Sector',client.sector],['Start Date',client.start_date||'\u2014'],['Target Handover',client.expected_close||'\u2014'],['Status',statusLabel(client.status)],['Engagement Mode',client.engagement_mode==='canvas'?'Full GtCV Canvas':'Clearview Financial']].map(([k,v])=>(
+            {[['Organisation',client.name],['Programme',prog?.name||'—'],['Type',CLIENT_TYPE_LABELS[client.type]||'—'],['Contact',client.contact_name||'—'],['Email',client.contact_email||'—'],['Country',client.country],['Sector',client.sector],['Start Date',client.start_date||'—'],['Target Handover',client.expected_close||'—'],['Status',statusLabel(client.status)],['Engagement Mode',client.engagement_mode==='canvas'?'Full GtCV Canvas':'Clearview Financial']].map(([k,v])=>(
               <div key={k} style={{padding:'0.75rem 1rem',background:C.lightBg,borderRadius:6}}>
                 <div style={{fontSize:'0.93rem',color:C.slate,marginBottom:'0.2rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>{k}</div>
                 <div style={{fontSize:'1.11rem',fontWeight:600,color:C.navy}}>{v}</div>
@@ -2914,7 +2938,7 @@ function NewServiceForm({clients,onSave,onCancel}){
 function TabHowToStart({client}){
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 2 \u2014 How to Start</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 2 — How to Start</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       <div style={card}>
         <h3 style={{fontFamily:'var(--cv-font)',color:C.navy,marginTop:0}}>Welcome to your Canvas Coach engagement platform</h3>
         <p style={{fontSize:'1.13rem',lineHeight:1.7,color:C.slate}}>This platform is where the work of your engagement lives. It tracks every decision you make, every piece of evidence you produce, and every milestone you reach on your journey to commercial independence.</p>
@@ -2949,7 +2973,7 @@ function TabHowToStart({client}){
 function TabCoachRef(){
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 3 \u2014 Coach Quick Reference</h3><div style={{display:'flex',gap:'0.5rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.amber,border:`1px solid ${C.amber}`,borderRadius:4,padding:'0.2rem 0.5rem'}}>Coach only \u2014 not visible to client</span><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 3 — Coach Quick Reference</h3><div style={{display:'flex',gap:'0.5rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.amber,border:`1px solid ${C.amber}`,borderRadius:4,padding:'0.2rem 0.5rem'}}>Coach only — not visible to client</span><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       <div style={{...card,background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`}}>
         <h4 style={{fontFamily:'var(--cv-font)',color:C.navy,marginTop:0}}>Delivery Rhythm</h4>
         <ul style={{fontSize:'1.07rem',lineHeight:1.8,color:C.navy}}>
@@ -2963,18 +2987,18 @@ function TabCoachRef(){
         <ul style={{fontSize:'1.07rem',lineHeight:1.8,color:C.navy}}>
           <li>Gate not signed within 5 working days of completion: escalate to CEO directly by phone or WhatsApp.</li>
           <li>Gate not signed within 10 working days: use Coach Authorise Progress with a mandatory note.</li>
-          <li>All coach-authorised progress is visible to the Ignite funder view \u2014 be specific in the note.</li>
+          <li>All coach-authorised progress is visible to the Ignite funder view — be specific in the note.</li>
         </ul>
         <h4 style={{fontFamily:'var(--cv-font)',color:C.navy}}>Commercial Readiness Diagnostic Points</h4>
         <ul style={{fontSize:'1.07rem',lineHeight:1.8,color:C.navy}}>
-          <li><strong>Baseline:</strong> DP06 \u2014 before pilots begin.</li>
-          <li><strong>Mid-point:</strong> DP07 \u2014 after Iteration 1.</li>
-          <li><strong>Final:</strong> DP09 \u2014 at engagement close.</li>
+          <li><strong>Baseline:</strong> DP06 — before pilots begin.</li>
+          <li><strong>Mid-point:</strong> DP07 — after Iteration 1.</li>
+          <li><strong>Final:</strong> DP09 — at engagement close.</li>
         </ul>
         <h4 style={{fontFamily:'var(--cv-font)',color:C.navy}}>Non-Negotiables</h4>
         <ul style={{fontSize:'1.07rem',lineHeight:1.8,color:C.navy}}>
           <li>Independence Test 4 (client presents commercial model unassisted) must be Yes before handover.</li>
-          <li>Pilot clients must pay \u2014 even a nominal amount. Zero-payment pilots do not count.</li>
+          <li>Pilot clients must pay — even a nominal amount. Zero-payment pilots do not count.</li>
           <li>The financial model must be understood by the CEO and Finance Manager, not just the consultant.</li>
         </ul>
       </div>
@@ -2985,10 +3009,10 @@ function TabCoachRef(){
 function TabIPFramework(){
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 4 \u2014 IP Framework Reference</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 4 — IP Framework Reference</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       <div style={card}>
         <h4 style={{fontFamily:'var(--cv-font)',color:C.navy,marginTop:0}}>Three-Stage Adoption Test</h4>
-        <p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.6}}>Before any service can be sold commercially, three things must be true about the buyer. All three must be present \u2014 one or two is not enough.</p>
+        <p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.6}}>Before any service can be sold commercially, three things must be true about the buyer. All three must be present — one or two is not enough.</p>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
           {[{n:'01',t:'Willingness',d:'The customer sees the problem as real and worth solving. They want a solution and are open to engaging with a provider.'},{n:'02',t:'Ability',d:'The customer has the financial means to pay for the solution at the price offered. Budget exists and can be accessed.'},{n:'03',t:'Prioritisation',d:'The customer ranks this problem high enough to spend budget on it now, not next quarter or next year.'}].map(s=>(
             <div key={s.n} style={{background:C.cream,padding:16,borderRadius:8,borderTop:`3px solid ${C.cyan}`}}>
@@ -3009,10 +3033,10 @@ function TabIPFramework(){
             </div>
           ))}
         </div>
-        <h4 style={{fontFamily:'var(--cv-font)',color:C.navy}}>Six Fit Tests \u2014 Commercial Readiness Diagnostic</h4>
+        <h4 style={{fontFamily:'var(--cv-font)',color:C.navy}}>Six Fit Tests — Commercial Readiness Diagnostic</h4>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.07rem'}}>
           <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Test','Name','What it diagnoses'].map(h=><th key={h} style={{padding:'8px 12px',textAlign:'left'}}>{h}</th>)}</tr></thead>
-          <tbody>{[['01','Problem\u2013Provider Fit','Does the organisation have the right to own this problem in this market?'],['02','Problem\u2013Solution Fit','Does the service solve the problem as the client experiences it?'],['03','Solution\u2013Problem Owner Fit','Is the solution designed for the actor with budget, not just the client?'],['04','Solution\u2013Pilot Fit','Can this be tested meaningfully within the engagement timeline?'],['05','Solution\u2013Market Fit','Is there demonstrated willingness to pay at a cost-recovery price?'],['06','Solution\u2013Scale Channel Fit','Are there channels to reach beyond the founding clients independently?']].map(([n,name,desc],i)=>(
+          <tbody>{[['01','Problem–Provider Fit','Does the organisation have the right to own this problem in this market?'],['02','Problem–Solution Fit','Does the service solve the problem as the client experiences it?'],['03','Solution–Problem Owner Fit','Is the solution designed for the actor with budget, not just the client?'],['04','Solution–Pilot Fit','Can this be tested meaningfully within the engagement timeline?'],['05','Solution–Market Fit','Is there demonstrated willingness to pay at a cost-recovery price?'],['06','Solution–Scale Channel Fit','Are there channels to reach beyond the founding clients independently?']].map(([n,name,desc],i)=>(
             <tr key={n} style={{background:i%2===0?C.cream:C.white}}>
               <td style={{padding:'8px 12px',color:C.cyan,fontWeight:700,fontFamily: 'var(--cv-font-mono)'}}>{n}</td>
               <td style={{padding:'8px 12px',fontWeight:600,color:C.navy}}>{name}</td>
@@ -3037,7 +3061,7 @@ function TabEngagementSetup({client,fileLinks,notifications,onUpdate,onUpdateFil
   async function save(){setSaving(true);await onUpdateFileLinks(links);await onUpdateNotifications(notif);setSaving(false)}
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 5 \u2014 Engagement Setup</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={solidBtn('var(--cv-header)',true)} disabled={saving} onClick={save}>{saving?'Saving\u2026':'Save'}</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 5 — Engagement Setup</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={solidBtn('var(--cv-header)',true)} disabled={saving} onClick={save}>{saving?'Saving…':'Save'}</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       <div style={card}>
         <div style={secH}>Engagement Team</div>
         <div style={fGrid}>
@@ -3093,14 +3117,14 @@ function TabDiagnostic({client,diagnostic,userRole,userName,onUpdate}){
   const score=answers.filter(a=>a.answer===true).length
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 6 \u2014 Pre-Engagement Diagnostic</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 6 — Pre-Engagement Diagnostic</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       {locked&&<div style={{background:'var(--cv-tint-green)',padding:14,borderRadius:8,marginBottom:16,fontWeight:600,color:C.green}}>Signed and locked. CEO: {d.ceo_signed_name} on {d.ceo_signed_at?.split('T')[0]}. Coach confirmed {d.coach_signed_at?.split('T')[0]}.</div>}
       <div style={card}>
         <div style={secH}>Three Questions</div>
         {[['question_1','What does commercial success look like for your organisation in 18 months?'],['question_2','What is the biggest thing stopping you from earning commercial revenue right now?'],['question_3','What would have to be true for your organisation to stop needing grant funding?']].map(([field,question])=>(
           <div key={field} style={{marginBottom:'1.25rem'}}>
             <label style={lbl}>{question}</label>
-            <p style={{...hint,marginBottom:'0.4rem'}}>Capture the answer verbatim \u2014 use the client's own words.</p>
+            <p style={{...hint,marginBottom:'0.4rem'}}>Capture the answer verbatim — use the client's own words.</p>
             <textarea style={{...inp,minHeight:80,resize:'vertical',background:locked?'var(--cv-disabled)':undefined}} value={d[field]||''} onChange={e=>!locked&&onUpdate({[field]:e.target.value})} placeholder="Enter answer exactly as given..." disabled={locked}/>
           </div>
         ))}
@@ -3118,7 +3142,7 @@ function TabDiagnostic({client,diagnostic,userRole,userName,onUpdate}){
       <div style={card}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
           <div style={secH}>Readiness Self-Assessment</div>
-          <div style={{background:score<6?'var(--cv-tint-amber-2)':score>=8?'var(--cv-tint-green)':'var(--cv-tint-cyan)',padding:'6px 14px',borderRadius:6,fontWeight:700,color:score<6?C.amber:score>=8?C.green:C.cyan,fontSize:'1.07rem'}}>{score} / {READINESS_QUESTIONS.length} \u2014 {score<6?'Below threshold \u2014 discuss with coach':score>=8?'Strong readiness':'Moderate readiness'}</div>
+          <div style={{background:score<6?'var(--cv-tint-amber-2)':score>=8?'var(--cv-tint-green)':'var(--cv-tint-cyan)',padding:'6px 14px',borderRadius:6,fontWeight:700,color:score<6?C.amber:score>=8?C.green:C.cyan,fontSize:'1.07rem'}}>{score} / {READINESS_QUESTIONS.length} — {score<6?'Below threshold — discuss with coach':score>=8?'Strong readiness':'Moderate readiness'}</div>
         </div>
         <div style={{maxWidth:280,marginBottom:'1rem'}}>
           <ScoreDonut label="Readiness self-assessment" display={`${score} / ${READINESS_QUESTIONS.length}`} frac={READINESS_QUESTIONS.length?score/READINESS_QUESTIONS.length:0} rating={score<6?'Below threshold':score>=8?'Strong readiness':'Moderate readiness'} color={score<6?C.amber:score>=8?C.green:C.cyan}/>
@@ -3160,23 +3184,23 @@ function TabTracker({client,canvas}){
   const dpLabels={'phase_0':'Phase 0','dp01':'DP01','dp02':'DP02','dp03':'DP03','dp04':'DP04','dp05':'DP05','dp06':'DP06','dp07':'DP07','dp08':'DP08','dp09':'DP09'}
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 7 \u2014 Engagement Tracker</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 7 — Engagement Tracker</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       <div style={{overflowX:'auto'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.07rem',fontFamily:"var(--cv-font)"}}>
           <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Phase','Zone / Decision Point','Core Question','Status','Components','CEO Sign-Off'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left',fontWeight:600,whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
           <tbody>
             {dpOrder.map((dpId,i)=>{
               const dp=canvas.find(d=>d.dp_id===dpId)
-              const completedComps=dp?.components?.filter(c=>c.status==='\u2713').length||0
+              const completedComps=dp?.components?.filter(c=>c.status==='✓').length||0
               const totalComps=dp?.components?.length||0
               return(
                 <tr key={dpId} style={{background:i%2===0?C.cream:C.white}}>
                   <td style={{padding:'9px 12px',fontWeight:700,color:C.cyan,fontFamily: 'var(--cv-font-mono)'}}>{dpLabels[dpId]}</td>
                   <td style={{padding:'9px 12px',fontWeight:600,color:C.navy}}>{dp?.label||dpId}</td>
-                  <td style={{padding:'9px 12px',color:C.slate,maxWidth:220,fontSize:'1.01rem'}}>{dp?.core_question||'\u2014'}</td>
+                  <td style={{padding:'9px 12px',color:C.slate,maxWidth:220,fontSize:'1.01rem'}}>{dp?.core_question||'—'}</td>
                   <td style={{padding:'9px 12px'}}>{dp?<div style={{display:'flex',alignItems:'center',gap:'0.4rem'}}><DPDot status={dp.status}/><span style={{fontSize:'1.01rem'}}>{dp.status}</span></div>:<Badge text="Not started" color={C.slate}/>}</td>
-                  <td style={{padding:'9px 12px',fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem'}}>{dp?`${completedComps}/${totalComps}`:'\u2014'}</td>
-                  <td style={{padding:'9px 12px'}}>{dp?.ceo_signed_off?<Badge text={`CEO \u2713 ${dp.ceo_signed_off_at?.split('T')[0]||''}`} color={C.green}/>:'\u2014'}</td>
+                  <td style={{padding:'9px 12px',fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem'}}>{dp?`${completedComps}/${totalComps}`:'—'}</td>
+                  <td style={{padding:'9px 12px'}}>{dp?.ceo_signed_off?<Badge text={`CEO ✓ ${dp.ceo_signed_off_at?.split('T')[0]||''}`} color={C.green}/>:'—'}</td>
                 </tr>
               )
             })}
@@ -3192,7 +3216,7 @@ function TabDecisions({client,decisions,userRole,userName,onAdd,onUpdate}){
   const [adding,setAdding]=useState(false)
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 8 \u2014 Canvas Decision Record</h3><div style={{display:'flex',gap:'0.5rem'}}>{canEdit(userRole)&&<button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Record Decision</button>}<button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 8 — Canvas Decision Record</h3><div style={{display:'flex',gap:'0.5rem'}}>{canEdit(userRole)&&<button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Record Decision</button>}<button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       {adding&&(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>
           <div style={fGrid}>
@@ -3214,7 +3238,7 @@ function TabDecisions({client,decisions,userRole,userName,onAdd,onUpdate}){
         <div key={d.id} style={{...card,borderLeft:`4px solid ${C.cyan}`}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.5rem'}}>
             <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',fontWeight:700,color:C.cyan}}>{d.reference}</span>
-            <span style={{fontSize:'1.01rem',color:C.slate}}>{d.date} \u00b7 {d.dp_id||'\u2014'}</span>
+            <span style={{fontSize:'1.01rem',color:C.slate}}>{d.date} · {d.dp_id||'—'}</span>
           </div>
           <p style={{margin:'0 0 0.5rem',fontSize:'1.13rem',color:C.navy}}>{d.decision}</p>
           <div style={{display:'flex',gap:'1.5rem',fontSize:'1.01rem',color:C.slate}}>
@@ -3233,12 +3257,12 @@ function TabEvidence({client,evidence,onAdd,onUpdate}){
   const [form,setForm]=useState({date:new Date().toISOString().split('T')[0],dp_id:'',type:'document',description:'',url:'',uploaded_by:'',status:'submitted'})
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 9 \u2014 Evidence Library</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Add Evidence</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 9 — Evidence Library</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Add Evidence</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       {adding&&(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>
           <div style={fGrid}>
             <div><label style={lbl}>Date</label><input type="date" style={inp} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></div>
-            <div><label style={lbl}>Decision Point</label><select style={inp} value={form.dp_id} onChange={e=>setForm(f=>({...f,dp_id:e.target.value}))}><option value="">\u2014</option>{['phase_0','dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09'].map(d=><option key={d} value={d}>{d}</option>)}</select></div>
+            <div><label style={lbl}>Decision Point</label><select style={inp} value={form.dp_id} onChange={e=>setForm(f=>({...f,dp_id:e.target.value}))}><option value="">—</option>{['phase_0','dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09'].map(d=><option key={d} value={d}>{d}</option>)}</select></div>
             <div><label style={lbl}>Type</label><select style={inp} value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}>{['document','interview','observation','financial_data','other'].map(t=><option key={t} value={t}>{t}</option>)}</select></div>
             <div><label style={lbl}>Uploaded by</label><input style={inp} value={form.uploaded_by} onChange={e=>setForm(f=>({...f,uploaded_by:e.target.value}))}/></div>
             <div style={{gridColumn:'1/-1'}}><label style={lbl}>Description</label><input style={inp} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="What is this evidence?"/></div>
@@ -3257,11 +3281,11 @@ function TabEvidence({client,evidence,onAdd,onUpdate}){
             <tr key={e.id} style={{background:i%2===0?C.cream:C.white}}>
               <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.cyan}}>{e.reference}</td>
               <td style={{padding:'8px 10px'}}>{e.date}</td>
-              <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem'}}>{e.dp_id||'\u2014'}</td>
+              <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem'}}>{e.dp_id||'—'}</td>
               <td style={{padding:'8px 10px'}}>{e.type}</td>
               <td style={{padding:'8px 10px',maxWidth:240}}>{e.description}</td>
               <td style={{padding:'8px 10px'}}><Badge text={e.status} color={e.status==='accepted'?C.green:e.status==='queried'?C.amber:C.slate}/></td>
-              <td style={{padding:'8px 10px'}}>{e.url?<a href={e.url} target="_blank" rel="noopener noreferrer" style={{color:C.cyan,fontSize:'1.01rem'}}>Open</a>:'\u2014'}</td>
+              <td style={{padding:'8px 10px'}}>{e.url?<a href={e.url} target="_blank" rel="noopener noreferrer" style={{color:C.cyan,fontSize:'1.01rem'}}>Open</a>:'—'}</td>
             </tr>
           ))}</tbody>
         </table>
@@ -3275,7 +3299,7 @@ function TabHandover({client,handover,canvas,userRole,onUpdate}){
   const locked=!dp09?.ceo_signed_off
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 10 \u2014 Handover Record</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 10 — Handover Record</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       {locked&&<div style={{background:'var(--cv-tint-amber-2)',padding:14,borderRadius:8,marginBottom:16,color:C.amber,fontWeight:600}}>This tab unlocks when DP09 CEO sign-off is complete.</div>}
       {handover.map(test=>(
         <div key={test.id} style={{...card,opacity:locked?0.6:1}}>
@@ -3306,7 +3330,7 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
   const [coachOverrideNote,setCoachOverrideNote]=useState('')
   const [showOverride,setShowOverride]=useState(false)
   if(!dp)return<div style={{...card,color:C.slate,textAlign:'center',padding:'2rem'}}>This Decision Point is not yet loaded. It will appear once the canvas is activated for this client.</div>
-  const completedComps=dp.components?.filter(c=>c.status==='\u2713').length||0
+  const completedComps=dp.components?.filter(c=>c.status==='✓').length||0
   const totalComps=dp.components?.length||0
   return(
     <div>
@@ -3314,7 +3338,7 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
       <div style={{background:'var(--cv-header)',borderRadius:8,padding:'1.5rem',marginBottom:'1.5rem',color:'var(--cv-on-accent)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
           <div>
-            <p style={{margin:'0 0 4px',fontSize:'0.93rem',color:C.cyan,fontFamily: 'var(--cv-font-mono)',letterSpacing:'0.08em'}}>{dp.label?.split('\u2014')[0]?.trim()}</p>
+            <p style={{margin:'0 0 4px',fontSize:'0.93rem',color:C.cyan,fontFamily: 'var(--cv-font-mono)',letterSpacing:'0.08em'}}>{dp.label?.split('—')[0]?.trim()}</p>
             <h2 style={{fontFamily:'var(--cv-font)',fontSize:'1.3rem',margin:'0 0 0.5rem',color:'var(--cv-on-accent)'}}>{dp.core_question}</h2>
             <p style={{margin:0,fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>Session time: {dp.session_time}</p>
           </div>
@@ -3337,23 +3361,23 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
 
       {/* Components */}
       <div style={card}>
-        <div style={secH}>Components \u2014 Evidence Required</div>
+        <div style={secH}>Components — Evidence Required</div>
         {(dp.components||[]).map(comp=>{
           const expanded=expandedComp===comp.id
           return(
-            <div key={comp.id} style={{border:`1px solid ${C.border}`,borderLeft:`4px solid ${comp.status==='\u2713'?C.green:comp.status==='\u25d0'?C.cyan:comp.status==='\u26a0'?C.amber:C.border}`,borderRadius:6,marginBottom:'0.6rem',overflow:'hidden'}}>
+            <div key={comp.id} style={{border:`1px solid ${C.border}`,borderLeft:`4px solid ${comp.status==='✓'?C.green:comp.status==='◐'?C.cyan:comp.status==='⚠'?C.amber:C.border}`,borderRadius:6,marginBottom:'0.6rem',overflow:'hidden'}}>
               <div style={{display:'flex',alignItems:'center',gap:'0.75rem',padding:'0.75rem 1rem',cursor:'pointer',background:expanded?C.lightBg:C.white}} onClick={()=>setExpandedComp(expanded?null:comp.id)}>
                 <DPDot status={comp.status}/>
                 <div style={{flex:1}}>
-                  <span style={{fontWeight:600,fontSize:'1.07rem',color:C.navy}}>Component {comp.component_number} \u2014 {comp.title}</span>
+                  <span style={{fontWeight:600,fontSize:'1.07rem',color:C.navy}}>Component {comp.component_number} — {comp.title}</span>
                 </div>
                 <div style={{display:'flex',gap:'0.4rem',alignItems:'center',flexShrink:0}}>
-                  {comp.ceo_signed_off&&<Badge text="CEO \u2713" color={C.green}/>}
+                  {comp.ceo_signed_off&&<Badge text="CEO ✓" color={C.green}/>}
                   {comp.evidence_recorded&&<Badge text="Evidence" color={C.teal}/>}
                   {canEdit(userRole)&&<select value={comp.status} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();onUpdateComp(comp.component_number,{status:e.target.value})}} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.2rem 0.3rem',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',cursor:'pointer'}}>
-                    {['\u25cb','\u25d0','\u2713','\u26a0'].map(s=><option key={s} value={s}>{s}</option>)}
+                    {['○','◐','✓','⚠'].map(s=><option key={s} value={s}>{s}</option>)}
                   </select>}
-                  <span style={{fontSize:'0.93rem',color:C.slate}}>{expanded?'\u25b2':'\u25bc'}</span>
+                  <span style={{fontSize:'0.93rem',color:C.slate}}>{expanded?'▲':'▼'}</span>
                 </div>
               </div>
               {expanded&&(
@@ -3361,11 +3385,11 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
                   {/* Five layers */}
                   <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:'0.75rem',marginBottom:'1rem'}}>
                     <div style={{background:'var(--cv-bg-2)',borderRadius:6,padding:'0.75rem'}}><p style={{fontWeight:700,color:C.navy,margin:'0 0 4px',fontSize:'1.01rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>What it is</p><p style={{margin:0,fontSize:'1.07rem',color:C.slate}}>{comp.what_it_is||'Content will be loaded from canvas-types.'}</p></div>
-                    <div style={{background:'var(--cv-tint-amber)',borderRadius:6,padding:'0.75rem'}}><p style={{fontWeight:700,color:C.amber,margin:'0 0 4px',fontSize:'1.01rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Why it matters</p><p style={{margin:0,fontSize:'1.07rem',color:C.slate}}>{comp.why_it_matters||'\u2014'}</p></div>
+                    <div style={{background:'var(--cv-tint-amber)',borderRadius:6,padding:'0.75rem'}}><p style={{fontWeight:700,color:C.amber,margin:'0 0 4px',fontSize:'1.01rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Why it matters</p><p style={{margin:0,fontSize:'1.07rem',color:C.slate}}>{comp.why_it_matters||'—'}</p></div>
                   </div>
-                  <div style={{background:'var(--cv-tint-cyan)',borderRadius:6,padding:'0.75rem',marginBottom:'0.75rem',borderLeft:`4px solid ${C.cyan}`}}><p style={{fontWeight:700,color:C.cyan,margin:'0 0 4px',fontSize:'1.01rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Action trigger</p><p style={{margin:0,fontSize:'1.07rem',color:C.navy}}>{comp.action_trigger||'\u2014'}</p></div>
-                  <div style={{background:'var(--cv-tint-green)',borderRadius:6,padding:'0.75rem',marginBottom:'0.75rem'}}><p style={{fontWeight:700,color:C.green,margin:'0 0 4px',fontSize:'1.01rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Signal to look for</p><p style={{margin:0,fontSize:'1.07rem',color:C.navy}}>{comp.signal_to_look_for||'\u2014'}</p></div>
-                  {canViewCoachGuidance(userRole)&&<div style={{background:'var(--cv-tint-amber)',borderRadius:6,padding:'0.75rem',marginBottom:'1rem',borderLeft:`4px solid ${C.amber}`}}><p style={{fontWeight:700,color:C.amber,margin:'0 0 4px',fontSize:'1.01rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Coach guidance (not visible to client)</p><p style={{margin:0,fontSize:'1.07rem',color:C.navy}}>{comp.coach_guidance||'\u2014'}</p></div>}
+                  <div style={{background:'var(--cv-tint-cyan)',borderRadius:6,padding:'0.75rem',marginBottom:'0.75rem',borderLeft:`4px solid ${C.cyan}`}}><p style={{fontWeight:700,color:C.cyan,margin:'0 0 4px',fontSize:'1.01rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Action trigger</p><p style={{margin:0,fontSize:'1.07rem',color:C.navy}}>{comp.action_trigger||'—'}</p></div>
+                  <div style={{background:'var(--cv-tint-green)',borderRadius:6,padding:'0.75rem',marginBottom:'0.75rem'}}><p style={{fontWeight:700,color:C.green,margin:'0 0 4px',fontSize:'1.01rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Signal to look for</p><p style={{margin:0,fontSize:'1.07rem',color:C.navy}}>{comp.signal_to_look_for||'—'}</p></div>
+                  {canViewCoachGuidance(userRole)&&<div style={{background:'var(--cv-tint-amber)',borderRadius:6,padding:'0.75rem',marginBottom:'1rem',borderLeft:`4px solid ${C.amber}`}}><p style={{fontWeight:700,color:C.amber,margin:'0 0 4px',fontSize:'1.01rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>Coach guidance (not visible to client)</p><p style={{margin:0,fontSize:'1.07rem',color:C.navy}}>{comp.coach_guidance||'—'}</p></div>}
                   {/* Evidence fields */}
                   <div style={{borderTop:`1px solid ${C.border}`,paddingTop:'0.75rem'}}>
                     <label style={{...lbl,color:C.teal}}>Evidence recorded</label>
@@ -3395,9 +3419,9 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
           <tbody>{(dp.components||[]).map((comp,i)=>(
             <tr key={comp.id} style={{background:i%2===0?C.cream:C.white}}>
               <td style={{padding:'8px 10px',fontWeight:600,color:C.navy}}>{comp.component_number}. {comp.title}</td>
-              <td style={{padding:'8px 10px',color:C.slate,maxWidth:280}}>{comp.evidence_recorded||'\u2014'}</td>
+              <td style={{padding:'8px 10px',color:C.slate,maxWidth:280}}>{comp.evidence_recorded||'—'}</td>
               <td style={{padding:'8px 10px'}}><DPDot status={comp.status}/></td>
-              <td style={{padding:'8px 10px'}}>{comp.evidence_url?<a href={comp.evidence_url} target="_blank" rel="noopener noreferrer" style={{color:C.cyan}}>Open</a>:'\u2014'}</td>
+              <td style={{padding:'8px 10px'}}>{comp.evidence_url?<a href={comp.evidence_url} target="_blank" rel="noopener noreferrer" style={{color:C.cyan}}>Open</a>:'—'}</td>
             </tr>
           ))}</tbody>
         </table>
@@ -3416,21 +3440,21 @@ function TabDP({client,dp,userRole,onUpdateDP,onUpdateComp}){
             {canSignOff(userRole)&&userRole==='ceo'&&(
               <div style={{background:C.cream,padding:'1.25rem',borderRadius:8,marginBottom:'1rem'}}>
                 <p style={{fontSize:'1.13rem',color:C.navy,lineHeight:1.7,margin:'0 0 1rem'}}>When all components are complete, click below to sign off and unlock the next Decision Point.</p>
-                <button style={solidBtn('var(--cv-header)')} onClick={()=>onUpdateDP({ceo_signed_off:true,ceo_signed_off_at:new Date().toISOString(),status:'\u2713',completed_at:new Date().toISOString()})}>I confirm this Decision Point is complete \u2014 CEO Sign-Off</button>
+                <button style={solidBtn('var(--cv-header)')} onClick={()=>onUpdateDP({ceo_signed_off:true,ceo_signed_off_at:new Date().toISOString(),status:'✓',completed_at:new Date().toISOString()})}>I confirm this Decision Point is complete — CEO Sign-Off</button>
               </div>
             )}
             {canViewCoachGuidance(userRole)&&(
               <div style={{background:'var(--cv-tint-amber)',padding:'1.25rem',borderRadius:8,border:`1px solid ${C.amber}`}}>
-                <p style={{color:C.amber,fontWeight:600,margin:'0 0 0.75rem'}}>Coach options \u2014 CEO sign-off pending</p>
+                <p style={{color:C.amber,fontWeight:600,margin:'0 0 0.75rem'}}>Coach options — CEO sign-off pending</p>
                 <div style={{display:'flex',gap:'0.75rem',marginBottom:'0.75rem',flexWrap:'wrap'}}>
                   <button style={addBtn(true,C.amber)} onClick={()=>alert('In production: this sends a notification email to the CEO via the Resend API.')}>Escalate to CEO by email</button>
                   <button style={solidBtn('var(--cv-header)',true)} onClick={()=>setShowOverride(!showOverride)}>Authorise Progress (Coach override)</button>
                 </div>
                 {showOverride&&(
                   <div>
-                    <label style={lbl}>Mandatory note \u2014 visible to all parties including the Ignite funder</label>
+                    <label style={lbl}>Mandatory note — visible to all parties including the Ignite funder</label>
                     <textarea style={{...inp,minHeight:80,resize:'vertical'}} value={coachOverrideNote} onChange={e=>setCoachOverrideNote(e.target.value)} placeholder="Explain why you are authorising progress without CEO sign-off. Be specific. Minimum 20 characters."/>
-                    <button style={{...solidBtn(C.amber),marginTop:'0.5rem'}} onClick={()=>{if(coachOverrideNote.trim().length<20){alert('Please write at least 20 characters.');return}onUpdateDP({status:'\u26a0',coach_authorised:true,coach_note:coachOverrideNote,coach_authorised_at:new Date().toISOString()});setShowOverride(false);setCoachOverrideNote('')}}>Confirm Coach Authorisation</button>
+                    <button style={{...solidBtn(C.amber),marginTop:'0.5rem'}} onClick={()=>{if(coachOverrideNote.trim().length<20){alert('Please write at least 20 characters.');return}onUpdateDP({status:'⚠',coach_authorised:true,coach_note:coachOverrideNote,coach_authorised_at:new Date().toISOString()});setShowOverride(false);setCoachOverrideNote('')}}>Confirm Coach Authorisation</button>
                   </div>
                 )}
               </div>
@@ -3447,7 +3471,7 @@ function TabInterviewBriefing({client,interviews,onAdd}){
   const [adding,setAdding]=useState(false)
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 21 \u2014 Interview Briefing</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ New Briefing</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 21 — Interview Briefing</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ New Briefing</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       <div style={{...card,background:C.cream,fontSize:'1.07rem',color:C.slate,lineHeight:1.7}}>An interview briefing is prepared before each customer validation visit. It sets the objective, target respondent profile, and key questions for the interviewer.</div>
       {adding&&(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>
@@ -3467,7 +3491,7 @@ function TabInterviewBriefing({client,interviews,onAdd}){
       )}
       {interviews.filter(i=>i.objective).map(i=>(
         <div key={i.id} style={{...card,borderLeft:`4px solid ${C.cyan}`}}>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.5rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',fontWeight:700,color:C.cyan}}>{i.reference}</span><span style={{fontSize:'1.01rem',color:C.slate}}>{i.date} \u00b7 {i.dp_id}</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.5rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',fontWeight:700,color:C.cyan}}>{i.reference}</span><span style={{fontSize:'1.01rem',color:C.slate}}>{i.date} · {i.dp_id}</span></div>
           <p style={{fontWeight:600,color:C.navy,margin:'0 0 0.4rem'}}>Objective: {i.objective}</p>
           <p style={{fontSize:'1.07rem',color:C.slate,margin:'0 0 0.4rem'}}>Respondent profile: {i.respondent}</p>
           {i.key_questions&&<div style={{background:C.lightBg,borderRadius:5,padding:'0.75rem',marginTop:'0.5rem'}}><p style={{fontWeight:600,fontSize:'1.01rem',color:C.navy,margin:'0 0 0.4rem'}}>Key Questions:</p><pre style={{fontSize:'1.07rem',color:C.slate,margin:0,whiteSpace:'pre-wrap',fontFamily:'inherit'}}>{i.key_questions}</pre></div>}
@@ -3482,7 +3506,7 @@ function TabInterviewCapture({client,interviews,onAdd,onUpdate}){
   const [form,setForm]=useState({date:new Date().toISOString().split('T')[0],dp_id:'',respondent:'',role:'',organisation:'',interviewer:'',key_quotes:'',observations:'',follow_up:'',evidence_ref:''})
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 22 \u2014 Interview Capture</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Record Interview</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 22 — Interview Capture</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Record Interview</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       {adding&&(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>
           <div style={fGrid}>
@@ -3491,7 +3515,7 @@ function TabInterviewCapture({client,interviews,onAdd,onUpdate}){
             <div><label style={lbl}>Their Role</label><input style={inp} value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} placeholder="e.g. Procurement Manager"/></div>
             <div><label style={lbl}>Organisation</label><input style={inp} value={form.organisation} onChange={e=>setForm(f=>({...f,organisation:e.target.value}))}/></div>
             <div><label style={lbl}>Interviewer</label><input style={inp} value={form.interviewer} onChange={e=>setForm(f=>({...f,interviewer:e.target.value}))}/></div>
-            <div><label style={lbl}>Decision Point</label><select style={inp} value={form.dp_id} onChange={e=>setForm(f=>({...f,dp_id:e.target.value}))}><option value="">\u2014</option>{['dp02','dp03','dp05','dp07','dp08'].map(d=><option key={d} value={d}>{d}</option>)}</select></div>
+            <div><label style={lbl}>Decision Point</label><select style={inp} value={form.dp_id} onChange={e=>setForm(f=>({...f,dp_id:e.target.value}))}><option value="">—</option>{['dp02','dp03','dp05','dp07','dp08'].map(d=><option key={d} value={d}>{d}</option>)}</select></div>
           </div>
           <div><label style={lbl}>Key Quotes (verbatim)</label><textarea style={{...inp,minHeight:100,resize:'vertical'}} value={form.key_quotes} onChange={e=>setForm(f=>({...f,key_quotes:e.target.value}))} placeholder="Capture exactly what they said. Direct quotes are the most valuable evidence."/></div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:'0.75rem'}}>
@@ -3507,8 +3531,8 @@ function TabInterviewCapture({client,interviews,onAdd,onUpdate}){
       )}
       {interviews.filter(i=>i.respondent).map(i=>(
         <div key={i.id} style={{...card,borderLeft:`4px solid ${C.cyan}`}}>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.5rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',fontWeight:700,color:C.cyan}}>{i.reference}</span><span style={{fontSize:'1.01rem',color:C.slate}}>{i.date} \u00b7 {i.dp_id}</span></div>
-          <p style={{fontWeight:600,color:C.navy,margin:'0 0 0.3rem'}}>{i.respondent} \u2014 {i.role}, {i.organisation}</p>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'0.5rem'}}><span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',fontWeight:700,color:C.cyan}}>{i.reference}</span><span style={{fontSize:'1.01rem',color:C.slate}}>{i.date} · {i.dp_id}</span></div>
+          <p style={{fontWeight:600,color:C.navy,margin:'0 0 0.3rem'}}>{i.respondent} — {i.role}, {i.organisation}</p>
           <p style={{fontSize:'1.01rem',color:C.slate,margin:'0 0 0.75rem'}}>Interviewer: {i.interviewer}</p>
           {i.key_quotes&&<div style={{background:'var(--cv-tint-cyan)',borderRadius:5,padding:'0.75rem',marginBottom:'0.5rem',borderLeft:`3px solid ${C.cyan}`}}><p style={{fontWeight:600,fontSize:'1.01rem',color:C.cyan,margin:'0 0 0.4rem'}}>Key Quotes:</p><p style={{margin:0,fontSize:'1.07rem',color:C.navy,fontStyle:'italic',lineHeight:1.6}}>{i.key_quotes}</p></div>}
           {i.observations&&<p style={{fontSize:'1.07rem',color:C.slate,margin:'0 0 0.4rem'}}><strong>Observations:</strong> {i.observations}</p>}
@@ -3523,14 +3547,14 @@ function TabInterviewReporting({interviews}){
   const byDP=['dp02','dp03','dp05','dp07','dp08'].map(dp=>({dp,items:interviews.filter(i=>i.dp_id===dp)})).filter(g=>g.items.length>0)
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 23 \u2014 Interview Reporting</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 23 — Interview Reporting</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       <div style={{...card,background:C.cream,fontSize:'1.07rem',color:C.slate,lineHeight:1.7}}>Interview reports summarise what was heard across all interviews for a given Decision Point: what we heard, what it means, and what we do next.</div>
       {byDP.length===0&&<div style={{...card,textAlign:'center',color:C.slate,padding:'2rem'}}>No interviews recorded yet.</div>}
       {byDP.map(({dp,items})=>(
         <div key={dp} style={card}>
-          <div style={secH}>{dp.toUpperCase()} \u2014 {items.length} interview{items.length!==1?'s':''}</div>
+          <div style={secH}>{dp.toUpperCase()} — {items.length} interview{items.length!==1?'s':''}</div>
           <div style={{marginBottom:'1rem'}}><p style={{fontWeight:700,color:C.navy,margin:'0 0 0.5rem'}}>What we heard:</p>{items.map(i=><div key={i.id} style={{marginBottom:'0.4rem',fontSize:'1.07rem'}}>{i.respondent&&<span style={{fontWeight:600,color:C.navy}}>{i.respondent}: </span>}<span style={{color:C.slate,fontStyle:'italic'}}>{i.key_quotes||'No quotes recorded.'}</span></div>)}</div>
-          <div style={{borderTop:`1px solid ${C.border}`,paddingTop:'0.75rem'}}><p style={{fontWeight:700,color:C.navy,margin:'0 0 0.5rem'}}>Follow-up actions:</p>{items.filter(i=>i.follow_up).map(i=><div key={i.id} style={{fontSize:'1.07rem',color:C.amber,marginBottom:'0.3rem'}}>\u00b7 {i.follow_up}</div>)}{items.filter(i=>i.follow_up).length===0&&<p style={{fontSize:'1.07rem',color:C.slate}}>No follow-up actions recorded.</p>}</div>
+          <div style={{borderTop:`1px solid ${C.border}`,paddingTop:'0.75rem'}}><p style={{fontWeight:700,color:C.navy,margin:'0 0 0.5rem'}}>Follow-up actions:</p>{items.filter(i=>i.follow_up).map(i=><div key={i.id} style={{fontSize:'1.07rem',color:C.amber,marginBottom:'0.3rem'}}>· {i.follow_up}</div>)}{items.filter(i=>i.follow_up).length===0&&<p style={{fontSize:'1.07rem',color:C.slate}}>No follow-up actions recorded.</p>}</div>
         </div>
       ))}
     </div>
@@ -3542,12 +3566,12 @@ function TabHypothesis({client,hypotheses,onAdd,onUpdate}){
   const [form,setForm]=useState({dp_id:'',date_formed:new Date().toISOString().split('T')[0],hypothesis:'',evidence_for:'',evidence_against:'',status:'holding',decision_made:''})
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 24 \u2014 Hypothesis Tracker</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Add Hypothesis</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 24 — Hypothesis Tracker</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Add Hypothesis</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       {adding&&(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>
           <div style={fGrid}>
             <div><label style={lbl}>Date Formed</label><input type="date" style={inp} value={form.date_formed} onChange={e=>setForm(f=>({...f,date_formed:e.target.value}))}/></div>
-            <div><label style={lbl}>Decision Point</label><select style={inp} value={form.dp_id} onChange={e=>setForm(f=>({...f,dp_id:e.target.value}))}><option value="">\u2014</option>{['phase_0','dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09'].map(d=><option key={d} value={d}>{d}</option>)}</select></div>
+            <div><label style={lbl}>Decision Point</label><select style={inp} value={form.dp_id} onChange={e=>setForm(f=>({...f,dp_id:e.target.value}))}><option value="">—</option>{['phase_0','dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09'].map(d=><option key={d} value={d}>{d}</option>)}</select></div>
           </div>
           <div><label style={lbl}>Hypothesis</label><textarea style={{...inp,minHeight:70,resize:'vertical'}} value={form.hypothesis} onChange={e=>setForm(f=>({...f,hypothesis:e.target.value}))} placeholder='e.g. "We believe that agrodealers will pay UGX 50,000 per session because..."'/></div>
           <div style={{display:'flex',gap:'0.6rem',marginTop:'0.75rem'}}>
@@ -3580,7 +3604,7 @@ function TabPilotObservation({client,pilots,onAdd,onUpdate}){
   const [form,setForm]=useState({date:new Date().toISOString().split('T')[0],client_name:'',service_delivered:'',went_well:'',did_not_work:'',client_feedback:'',adjustments_made:'',evidence_ref:''})
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 25 \u2014 Pilot Observation</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Record Observation</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Tab 25 — Pilot Observation</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Record Observation</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
       <div style={{...card,background:C.cream,fontSize:'1.07rem',color:C.slate,lineHeight:1.7}}>One form per pilot delivery. Completed by the lead consultant during or immediately after the visit.</div>
       {adding&&(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>
@@ -3620,7 +3644,7 @@ function TabPilotObservation({client,pilots,onAdd,onUpdate}){
   )
 }
 
-// \u2500\u2500\u2500 FORM COMPONENTS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ─── FORM COMPONENTS ─────────────────────────────────────────
 // Shared by NewClientForm and EditClientForm so the two can never drift --
 // a client's programme was previously hardcoded to 'prog_csj' with no way to
 // change it (every new client silently landed on Climate Smart Jobs, no

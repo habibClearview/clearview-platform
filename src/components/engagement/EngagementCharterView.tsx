@@ -795,6 +795,27 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
 
             <section>
               <h2 className="sh">Signatures</h2>
+              {/* ─────────────────────────────────────────────────────
+                  SAY WHY NOBODY CAN SIGN, ABOVE THE BUTTONS. 2 Sept 2026.
+                  Habib pressed "Sign here", found it greyed out, and had no
+                  way to know why or what to press instead. The reason is one
+                  step earlier in the flow — a draft has to be ISSUED before
+                  anyone can sign it — and that step was never mentioned here,
+                  only on a button further up the page.
+                  ───────────────────────────────────────────────────── */}
+              {status === 'draft' ? (
+                <div className="note" style={{
+                  border: '1px solid var(--gold)', borderRadius: 10, padding: '12px 14px',
+                  margin: '0 0 14px', background: 'rgba(212,160,23,.08)',
+                }}>
+                  <b>Nobody can sign yet — this is still a draft (v{version}).</b>
+                  <div style={{ marginTop: 4 }}>
+                    {canEdit
+                      ? 'Press "Issue for signature" at the top of this Charter. That locks the wording and opens signing for every party. Until then every Sign here button below stays greyed out.'
+                      : 'The lead consultant has to issue it for signature first. Until then the Sign here buttons below stay greyed out.'}
+                  </div>
+                </div>
+              ) : null}
               <p className="p" style={{ marginTop: 0 }}>By signing, each party confirms they have read this Charter and commit to the responsibilities and level of participation it sets out. <b>Signatures apply to this agreed version (v{version})</b>, if the Charter is edited afterwards, signing re-opens for everyone.</p>
               <p className="p" style={{ marginTop: 0 }}>A party with a login signs here themselves. A party who signs on paper in the room is entered by the Lead Consultant, and the record shows both who signed and who entered it, so it never implies somebody signed in when they did not.</p>
               <div className="sig">
