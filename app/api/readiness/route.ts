@@ -53,9 +53,48 @@ function limiterClient() {
 }
 
 /**
- * Put the address on the list. Returns why it did not happen rather than
- * throwing, because a mailing list being down is not a reason to fail a
- * visitor who has just answered ten questions.
+ * The tags a subscriber earns by finishing the assessment. Names, not numbers:
+ * a numeric tag id in the source is a fact about one Kit account that nobody
+ * reading the code can check, and Kit's tag creation is idempotent on the name,
+ * so asking for a tag by name either finds it or makes it.
+ */
+const SOURCE_TAG = 'Readiness Score'
+const BAND_TAGS: Record<string, string> = {
+  below: 'readiness-below',
+  moderate: 'readiness-moderate',
+  strong: 'readiness-strong',
+}
+
+/** name -> id, resolved once per process rather than on every submission. */
+let tagIdCache: Record<string, number> | null = null
+
+async function tagIds(key: string): Promise<Record<string, number>> {
+  if (tagIdCache) return tagIdCache
+  const res = await fetch('https://api.kit.com/v4/tags?per_page=500', {
+    headers: { 'X-Kit-Api-Key': key },
+  })
+  if (!res.ok) return {}
+  const body = await res.json().catch(() => ({}))
+  const map: Record<string, number> = {}
+  for (const t of body?.tags || []) {
+    if (t?.name && t?.id) map[String(t.name).toLowerCase()] = t.id
+  }
+  tagIdCache = map
+  return map
+}
+
+/**
+ * Put the address on the list, and tag it with where it came from and how it
+ * scored. Returns why it did not happen rather than throwing, because a mailing
+ * list being down is not a reason to fail a visitor who has just answered ten
+ * questions.
+ *
+ * WHY TAGS AND NOT ONLY A FORM. Kit's API cannot create or rename forms, so a
+ * form id is something a person has to make by hand and paste into a setting.
+ * Tags it can create, and they are what actually segments a list: a subscriber
+ * carries "Readiness Score" and their band for the life of the list, whether or
+ * not a form existed on the day they signed up. The form id stays optional and
+ * records attribution when one is configured.
  */
 async function addToKit(input: {
   email: string
@@ -64,9 +103,9 @@ async function addToKit(input: {
   score: number
   band: string
   referrer: string
-}): Promise<{ added: boolean; reason?: string }> {
+}): Promise<{ added: boolean; tagged: string[]; reason?: string }> {
   const key = (process.env.KIT_API_KEY || '').trim()
-  if (!key) return { added: false, reason: 'KIT_API_KEY is not configured' }
+  if (!key) return { added: false, tagged: [], reason: 'KIT_API_KEY is not configured' }
 
   const headers = { 'Content-Type': 'application/json', 'X-Kit-Api-Key': key }
 
@@ -89,12 +128,30 @@ async function addToKit(input: {
     })
     if (!(res.status === 200 || res.status === 201 || res.status === 202)) {
       const body = await res.text().catch(() => '')
-      return { added: false, reason: `Kit returned ${res.status}: ${body.slice(0, 200)}` }
+      return { added: false, tagged: [], reason: `Kit returned ${res.status}: ${body.slice(0, 200)}` }
     }
 
-    // The form is what triggers Kit's own welcome sequence and records where
-    // the subscriber came from. Optional: without a form id the subscriber is
-    // still on the list, just without an attributed source.
+    // Tagging happens after the subscriber exists. A tag that cannot be applied
+    // is reported and does not undo the subscription: being on the list
+    // untagged is better than not being on the list.
+    const ids = await tagIds(key)
+    const wanted = [SOURCE_TAG, BAND_TAGS[input.band]].filter(Boolean)
+    const tagged: string[] = []
+    for (const name of wanted) {
+      const id = ids[name.toLowerCase()]
+      if (!id) { console.error('readiness: no Kit tag named', name); continue }
+      const t = await fetch(`https://api.kit.com/v4/tags/${id}/subscribers`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ email_address: input.email }),
+      })
+      if (t.status === 200 || t.status === 201) tagged.push(name)
+      else console.error('readiness: tagging failed', name, t.status)
+    }
+
+    // The form is optional. It records where a subscriber came from and starts
+    // whatever sequence Kit has on it; without one the subscriber is still on
+    // the list and still tagged.
     const formId = (process.env.KIT_FORM_ID || '').trim()
     if (formId) {
       const f = await fetch(`https://api.kit.com/v4/forms/${encodeURIComponent(formId)}/subscribers`, {
@@ -104,14 +161,12 @@ async function addToKit(input: {
       })
       if (!(f.status === 200 || f.status === 201)) {
         const body = await f.text().catch(() => '')
-        // The subscriber IS on the list at this point, so this is reported and
-        // not treated as a failure.
         console.error('readiness: Kit form add failed', f.status, body.slice(0, 200))
       }
     }
-    return { added: true }
+    return { added: true, tagged }
   } catch (e: any) {
-    return { added: false, reason: `Kit request threw: ${e?.message || 'unknown'}` }
+    return { added: false, tagged: [], reason: `Kit request threw: ${e?.message || 'unknown'}` }
   }
 }
 
@@ -231,6 +286,7 @@ export async function POST(req: NextRequest) {
     // Said plainly so the page can be honest about what did and did not happen.
     emailed: sent.sent,
     subscribed: kit.added,
+    tagged: kit.tagged,
   })
 }
 
