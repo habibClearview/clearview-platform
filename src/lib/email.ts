@@ -180,8 +180,8 @@ export function buildScopeEmail(cfg: EngagementEmailConfig): { subject: string; 
   const html = brandedEmail({
     heading: `${cfg.recipientName ? cfg.recipientName + ',' : 'Hello,'}`,
     paragraphs: [
-      `This sets out the work ahead for <b>${cfg.clientName}</b> on ${cfg.engagementTitle}: a structured journey through nine decision blocks that turns grant funded delivery into a commercial model the organisation owns and can defend.`,
-      `The link below opens the live journey. You can see the nine blocks, where the work stands, and what each decision gate will produce. Everything on it is evidence based.`,
+      `This sets out the work ahead for <b>${cfg.clientName}</b> on ${cfg.engagementTitle}: a structured journey through nine Decision Points that turns grant funded delivery into a commercial model the organisation owns and can defend.`,
+      `The link below opens the live journey. You can see the nine Decision Points, where the work stands, and what each one will produce. Everything on it is evidence based.`,
       `Once you have looked through it, we will agree the Engagement Charter together and set the kickoff.`,
     ],
     ctaLabel: 'Open the journey',

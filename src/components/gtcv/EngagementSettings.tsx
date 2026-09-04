@@ -18,6 +18,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { DEFAULT_VALIDATION_MIN_PER_SEGMENT } from '@/lib/engagement-types'
 import { CONVERGENCE_MINIMUM } from '@/lib/interview-report'
+import { sendEngagementEmail } from '@/lib/engagement-actions'
 
 const C = {
   card: 'var(--cv-card)', alt: 'var(--cv-alt)', border: 'var(--cv-border)',
@@ -117,6 +118,10 @@ export default function EngagementSettings({ clientId, canManage }) {
   const [minDraft, setMinDraft] = useState('')
   const [torDraft, setTorDraft] = useState('')
   const [currencyDraft, setCurrencyDraft] = useState('')
+  // Who the welcome goes to, and where it points. Loaded beside the config
+  // because the button is useless without both.
+  const [client, setClient] = useState(null)
+  const [partyEmails, setPartyEmails] = useState([])
 
   const load = useCallback(async () => {
     if (!clientId) { setLoading(false); return }
@@ -127,6 +132,15 @@ export default function EngagementSettings({ clientId, canManage }) {
       setMinDraft(r.config?.validation_min_per_segment == null ? '' : String(r.config.validation_min_per_segment))
       setTorDraft(r.config?.tor_reference || '')
       setCurrencyDraft(r.config?.currency || '')
+      const { data: cl } = await supabase
+        .from('engagement_clients')
+        .select('id,name,slug,contact_name,contact_email')
+        .eq('id', clientId).single()
+      setClient(cl || null)
+      const { data: parties } = await supabase
+        .from('engagement_parties')
+        .select('email').eq('client_id', clientId)
+      setPartyEmails((parties || []).map((x) => x.email).filter(Boolean))
       setErr(null)
     } catch (e) { setErr(e.message) }
     setLoading(false)
@@ -185,6 +199,53 @@ export default function EngagementSettings({ clientId, canManage }) {
             setBusy(null)
           }}
         >{busy === 'scaffold' ? 'Setting up...' : 'Set this engagement up'}</button>
+      </Setting>
+
+      <Setting
+        label="Send the welcome email"
+        help={`The first email the client gets from the platform. It sets out the work ahead, and its button opens their live journey — the nine Decision Points, where the work stands, and what each gate will produce. It goes to the client contact and to everyone listed as a party above, so add the people first. Their sign-in is a separate invite, sent from the client team card.`}
+      >
+        {(() => {
+          // The client contact first, then the parties; one person listed twice
+          // is one email, and an engagement with nobody on it says so rather
+          // than offering a button that would send to no one.
+          const to = [...new Set([client?.contact_email, ...partyEmails]
+            .map((e) => (e || '').trim()).filter(Boolean))]
+          const journeyUrl = client?.slug && typeof window !== 'undefined'
+            ? `${window.location.origin}/engagement/${client.slug}`
+            : ''
+          if (to.length === 0) {
+            return <p style={hint}>No email address on the client or on any party yet. Add one, then this can be sent.</p>
+          }
+          return (
+            <div>
+              <p style={{ ...hint, margin: '0 0 0.5rem' }}>
+                Goes to {to.join(', ')}. The button in it opens {journeyUrl || 'the journey'}.
+              </p>
+              <button
+                type="button"
+                style={smallBtn(C.teal)}
+                disabled={busy === 'welcome' || !journeyUrl}
+                onClick={async () => {
+                  setBusy('welcome'); setNote(null); setErr(null)
+                  try {
+                    const r = await sendEngagementEmail({
+                      clientId, stage: 'scope', recipients: to, journeyUrl,
+                    })
+                    // Email being switched off is answered with a 200, so it
+                    // has to be read rather than assumed to be a success.
+                    if (r && r.emailConfigured === false) {
+                      setErr(r.message || r.reason || 'Email is not switched on for this environment, so nothing was sent.')
+                    } else {
+                      setNote(`The welcome email went to ${to.length} ${to.length === 1 ? 'person' : 'people'}.`)
+                    }
+                  } catch (e) { setErr(e.message || 'That did not send') }
+                  setBusy(null)
+                }}
+              >{busy === 'welcome' ? 'Sending...' : 'Send the welcome email'}</button>
+            </div>
+          )
+        })()}
       </Setting>
 
       <Setting
