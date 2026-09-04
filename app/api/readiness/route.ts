@@ -24,7 +24,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { checkRateLimit, clientIp } from '@/lib/rate-limit'
-import { scoreReadiness, bandTag, READINESS } from '@/lib/readiness-score'
+import { capture, BAND_TAGS, validEmail, clean } from '@/lib/kit'
+import { scoreReadiness, READINESS } from '@/lib/readiness-score'
 import { sendEmail, brandedEmail, escapeHtml, raw, emailAvailable } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
@@ -34,140 +35,11 @@ const PER_ADDRESS_PER_DAY = 3
 const HOUR = 3600
 const DAY = 86400
 
-/** Deliberately conservative: what gets through is what is unambiguously an address. */
-function validEmail(value: unknown): value is string {
-  return typeof value === 'string'
-    && value.length >= 6 && value.length <= 254
-    && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value)
-}
-
-function clean(value: unknown, max: number): string {
-  return typeof value === 'string' ? value.trim().slice(0, max) : ''
-}
-
 function limiterClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) return null
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-}
-
-/**
- * The tags a subscriber earns by finishing the assessment. Names, not numbers:
- * a numeric tag id in the source is a fact about one Kit account that nobody
- * reading the code can check, and Kit's tag creation is idempotent on the name,
- * so asking for a tag by name either finds it or makes it.
- */
-const SOURCE_TAG = 'Readiness Score'
-const BAND_TAGS: Record<string, string> = {
-  below: 'readiness-below',
-  moderate: 'readiness-moderate',
-  strong: 'readiness-strong',
-}
-
-/** name -> id, resolved once per process rather than on every submission. */
-let tagIdCache: Record<string, number> | null = null
-
-async function tagIds(key: string): Promise<Record<string, number>> {
-  if (tagIdCache) return tagIdCache
-  const res = await fetch('https://api.kit.com/v4/tags?per_page=500', {
-    headers: { 'X-Kit-Api-Key': key },
-  })
-  if (!res.ok) return {}
-  const body = await res.json().catch(() => ({}))
-  const map: Record<string, number> = {}
-  for (const t of body?.tags || []) {
-    if (t?.name && t?.id) map[String(t.name).toLowerCase()] = t.id
-  }
-  tagIdCache = map
-  return map
-}
-
-/**
- * Put the address on the list, and tag it with where it came from and how it
- * scored. Returns why it did not happen rather than throwing, because a mailing
- * list being down is not a reason to fail a visitor who has just answered ten
- * questions.
- *
- * WHY TAGS AND NOT ONLY A FORM. Kit's API cannot create or rename forms, so a
- * form id is something a person has to make by hand and paste into a setting.
- * Tags it can create, and they are what actually segments a list: a subscriber
- * carries "Readiness Score" and their band for the life of the list, whether or
- * not a form existed on the day they signed up. The form id stays optional and
- * records attribution when one is configured.
- */
-async function addToKit(input: {
-  email: string
-  firstName: string
-  organisation: string
-  score: number
-  band: string
-  referrer: string
-}): Promise<{ added: boolean; tagged: string[]; reason?: string }> {
-  const key = (process.env.KIT_API_KEY || '').trim()
-  if (!key) return { added: false, tagged: [], reason: 'KIT_API_KEY is not configured' }
-
-  const headers = { 'Content-Type': 'application/json', 'X-Kit-Api-Key': key }
-
-  try {
-    // An upsert: an address already on the list has its fields updated rather
-    // than being rejected, so somebody retaking the assessment is not an error.
-    const res = await fetch('https://api.kit.com/v4/subscribers', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        email_address: input.email,
-        first_name: input.firstName || undefined,
-        state: 'active',
-        fields: {
-          organisation: input.organisation || undefined,
-          readiness_score: String(input.score),
-          readiness_band: input.band,
-        },
-      }),
-    })
-    if (!(res.status === 200 || res.status === 201 || res.status === 202)) {
-      const body = await res.text().catch(() => '')
-      return { added: false, tagged: [], reason: `Kit returned ${res.status}: ${body.slice(0, 200)}` }
-    }
-
-    // Tagging happens after the subscriber exists. A tag that cannot be applied
-    // is reported and does not undo the subscription: being on the list
-    // untagged is better than not being on the list.
-    const ids = await tagIds(key)
-    const wanted = [SOURCE_TAG, BAND_TAGS[input.band]].filter(Boolean)
-    const tagged: string[] = []
-    for (const name of wanted) {
-      const id = ids[name.toLowerCase()]
-      if (!id) { console.error('readiness: no Kit tag named', name); continue }
-      const t = await fetch(`https://api.kit.com/v4/tags/${id}/subscribers`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ email_address: input.email }),
-      })
-      if (t.status === 200 || t.status === 201) tagged.push(name)
-      else console.error('readiness: tagging failed', name, t.status)
-    }
-
-    // The form is optional. It records where a subscriber came from and starts
-    // whatever sequence Kit has on it; without one the subscriber is still on
-    // the list and still tagged.
-    const formId = (process.env.KIT_FORM_ID || '').trim()
-    if (formId) {
-      const f = await fetch(`https://api.kit.com/v4/forms/${encodeURIComponent(formId)}/subscribers`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ email_address: input.email, referrer: input.referrer || null }),
-      })
-      if (!(f.status === 200 || f.status === 201)) {
-        const body = await f.text().catch(() => '')
-        console.error('readiness: Kit form add failed', f.status, body.slice(0, 200))
-      }
-    }
-    return { added: true, tagged }
-  } catch (e: any) {
-    return { added: false, tagged: [], reason: `Kit request threw: ${e?.message || 'unknown'}` }
-  }
 }
 
 export async function POST(req: NextRequest) {
@@ -215,9 +87,13 @@ export async function POST(req: NextRequest) {
 
   const result = scoreReadiness(answers as Record<string, unknown>)
 
-  const kit = await addToKit({
-    email, firstName, organisation,
-    score: result.score, band: bandTag(result.band), referrer,
+  const kit = await capture({
+    email, firstName, organisation, source: 'score', referrer,
+    extraTags: [BAND_TAGS[result.band]].filter(Boolean),
+    fields: {
+      readiness_score: String(result.score),
+      readiness_band: result.bandLabel,
+    },
   })
 
   // The report. The gaps are the substance of it: a score on its own tells

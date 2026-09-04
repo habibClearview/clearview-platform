@@ -18,10 +18,21 @@ const yes = (n: number) =>
   Object.fromEntries(READINESS.map((q, i) => [q.id, i < n]))
 
 describe('the ten questions', () => {
-  it('are the engagement\'s own ten, not a second list', () => {
+  it('are the engagement\'s own ten, by identity', () => {
+    // The public site says these in plainer words than the coach uses in a
+    // room, which is deliberate. What must never drift is WHICH ten they are,
+    // because a visitor who scores four here hears the same number in the
+    // first session.
     expect(READINESS).toHaveLength(READINESS_QUESTIONS.length)
     expect(READINESS.map((q) => q.id)).toEqual(READINESS_QUESTIONS.map((q) => q.id))
-    expect(READINESS.map((q) => q.question)).toEqual(READINESS_QUESTIONS.map((q) => q.question))
+  })
+
+  it('says each one in fewer, plainer words than the coach\'s version', () => {
+    // Not a style preference: the reader is at their desk, not in a session.
+    for (const q of READINESS) {
+      expect(q.question.length).toBeLessThan(110)
+      expect(q.question).not.toMatch(/utilis|leverage|stakeholder/i)
+    }
   })
 
   it('each say where in the method they are settled, and what a no costs', () => {

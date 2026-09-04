@@ -1,0 +1,39 @@
+// ============================================================
+// THE TEN QUESTIONS, IN ONE SMALL MODULE.
+//
+// Both the server that scores them and the browser that asks them import from
+// here. It deliberately imports nothing, so putting the diagnostic on a public
+// page does not ship the whole coaching library to a visitor's phone.
+//
+// THE WORDING IS THE PUBLIC ONE. The coach's own list in coach-types says the
+// same ten things in the register a consultant uses in a room. This says them
+// the way somebody reads them at their desk. The IDS ARE THE SAME, and a test
+// asserts that, because the two drifting apart is how a visitor scores four
+// here and hears a different number in the first session.
+//
+// Every question also names the decision point that settles it and what being
+// wrong about it costs. That mapping is the whole value of the report: it
+// turns ten yes or no answers into where the work actually starts.
+// ============================================================
+
+export interface ReadinessQuestion {
+  id: string
+  question: string
+  /** Where in the method this one is settled. */
+  settledAt: string
+  /** What it costs to be wrong about this, said plainly. */
+  ifNot: string
+}
+
+export const READINESS: ReadinessQuestion[] = [
+  { id: 'rq1', question: 'We know who our paying customers are, not just our clients', settledAt: 'Decision Point 2', ifNot: 'The people you serve and the people who would pay you are not always the same. Building for the first while hoping the second turns up is the most common reason a commercial move stalls.' },
+  { id: 'rq2', question: 'We have talked to at least three possible paying customers in the last six months', settledAt: 'Decision Point 2', ifNot: 'Without those conversations, every price and every projection rests on what you believe rather than on what a buyer told you.' },
+  { id: 'rq3', question: 'We can say what problem we solve for a paying customer in one sentence', settledAt: 'Decision Point 3', ifNot: 'If it takes a paragraph, the budget holder will not repeat it to the person who signs. What cannot be repeated does not get funded.' },
+  { id: 'rq4', question: 'We have a price for at least one service', settledAt: 'Decision Point 4', ifNot: 'A service without a price is not a service, it is an offer to chat. Naming a number is what makes willingness to pay testable.' },
+  { id: 'rq5', question: 'We know what it costs us to deliver our main service', settledAt: 'Decision Point 4', ifNot: 'Most organisations get this wrong because staff time and overhead sit in a grant line instead of against the service. A price set on the wrong cost loses money on every sale.' },
+  { id: 'rq6', question: 'We have someone who can lead business development', settledAt: 'Decision Point 5', ifNot: 'Business development that belongs to everybody belongs to nobody. Somebody has to own the first five conversations by name.' },
+  { id: 'rq7', question: 'Our leadership team is behind moving towards earned revenue', settledAt: 'The first conversation', ifNot: 'This is the one that stops engagements. If leadership is not behind it, the work produces documents rather than revenue.' },
+  { id: 'rq8', question: 'We have time set aside for this work in the next six months', settledAt: 'The Engagement Charter', ifNot: 'This is not an add on to a full delivery schedule. Time that is not protected in advance gets taken by the next donor deadline.' },
+  { id: 'rq9', question: 'We are willing to test our services on real paying clients during the work', settledAt: 'Decision Point 7', ifNot: 'Everything before the pilot is a guess. An organisation that will not test on a real paying client never finds out which parts were wrong.' },
+  { id: 'rq10', question: 'We understand the goal is financial independence, not more grant funding', settledAt: 'The first conversation', ifNot: 'If what you want is a better grant proposal, this is the wrong tool, and an honest conversation now saves you months.' },
+]

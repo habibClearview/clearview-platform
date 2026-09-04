@@ -7,6 +7,10 @@
 // That is deliberate. A visitor who scores four on the website and then hears
 // a different number in the first session would be right to distrust both.
 //
+// The ten questions themselves live in readiness-questions.ts, which imports
+// nothing, so the browser can ask them without being sent this file's
+// dependencies.
+//
 // WHY THE SCORING LIVES HERE AND NOT IN THE PAGE. The browser sends answers,
 // not a score. A number posted from a page is a number a stranger chose, and
 // this one decides what the email says and which tag the subscriber gets.
@@ -16,71 +20,10 @@
 // it. That mapping is the whole value of the report: it turns ten yes/no
 // answers into "here is where your work actually starts".
 // ============================================================
-import { READINESS_QUESTIONS } from '@/lib/coach-types'
+import { READINESS, ReadinessQuestion } from '@/lib/readiness-questions'
 
-export interface ReadinessQuestion {
-  id: string
-  question: string
-  /** Where in the method this one is settled. */
-  settledAt: string
-  /** What it costs to be wrong about this, said plainly. */
-  ifNot: string
-}
-
-/**
- * The ten questions, each tied to the decision point that answers it. The text
- * of the question itself comes from the engagement's own list so the two can
- * never drift apart.
- */
-const SETTLED_AT: Record<string, { settledAt: string; ifNot: string }> = {
-  rq1: {
-    settledAt: 'Decision Point 2 · Customer & Problem Clarity',
-    ifNot: 'The people you serve and the people who would pay you are not always the same, and building for the first while hoping the second appears is the most common reason a commercial move stalls.',
-  },
-  rq2: {
-    settledAt: 'Decision Point 2 · Customer & Problem Clarity',
-    ifNot: 'Without those conversations every price, every service and every projection rests on what you believe rather than on what a buyer said.',
-  },
-  rq3: {
-    settledAt: 'Decision Point 3 · Value Proposition Architecture',
-    ifNot: 'If it takes a paragraph, a budget holder will not repeat it to the person who signs. What cannot be repeated does not get funded.',
-  },
-  rq4: {
-    settledAt: 'Decision Point 4 · Commercial Viability Model',
-    ifNot: 'A service without a price is not a service, it is an offer to talk. Naming a number is what makes the willingness to pay testable.',
-  },
-  rq5: {
-    settledAt: 'Decision Point 4 · Commercial Viability Model',
-    ifNot: 'Most organisations underestimate here because staff time and overhead sit in a grant line rather than against the service. Price set on the wrong cost loses money on every sale.',
-  },
-  rq6: {
-    settledAt: 'Decision Point 5 · Market Entry Design',
-    ifNot: 'Business development that belongs to everybody belongs to nobody. Someone has to own the first five conversations by name.',
-  },
-  rq7: {
-    settledAt: 'The pre-engagement diagnostic',
-    ifNot: 'This is the one that stops engagements. If the leadership is not behind it, the work produces documents rather than revenue.',
-  },
-  rq8: {
-    settledAt: 'The Engagement Charter',
-    ifNot: 'This work is not an add-on to a full delivery schedule. Time that is not protected in advance is time that gets taken by the next donor deadline.',
-  },
-  rq9: {
-    settledAt: 'Decision Point 7 · Pilot & Learn Architecture',
-    ifNot: 'Everything before the pilot is a hypothesis. An organisation unwilling to test with a real paying client never finds out which parts were wrong.',
-  },
-  rq10: {
-    settledAt: 'The pre-engagement diagnostic',
-    ifNot: 'If the aim is a better grant proposal, this method is the wrong tool and an honest conversation now saves months.',
-  },
-}
-
-export const READINESS: ReadinessQuestion[] = READINESS_QUESTIONS.map((q) => ({
-  id: q.id,
-  question: q.question,
-  settledAt: SETTLED_AT[q.id]?.settledAt || 'The engagement',
-  ifNot: SETTLED_AT[q.id]?.ifNot || '',
-}))
+export type { ReadinessQuestion }
+export { READINESS }
 
 export type Band = 'below' | 'moderate' | 'strong'
 
