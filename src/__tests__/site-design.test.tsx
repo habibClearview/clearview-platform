@@ -86,3 +86,22 @@ describe('the design\'s own data', () => {
     expect(SRC).not.toMatch(/\bDP\s?\d/)
   })
 })
+
+describe('the dashboard\'s staging banner', () => {
+  // The banner is pinned to the top of every page from the root layout, which a
+  // child layout cannot unrender. On the marketing site it is not a safety rail
+  // for client data, it is a strip sitting on top of the wordmark — so the site
+  // hides it. The two halves live in two files and only work as a pair.
+  const BANNER = fs.readFileSync('src/components/common/EnvBanner.tsx', 'utf8')
+  const SITE_LAYOUT = fs.readFileSync('app/site/layout.tsx', 'utf8')
+
+  it('is addressable, and the public site hides it', () => {
+    expect(BANNER).toContain('data-env-banner')
+    expect(SITE_LAYOUT).toContain('[data-env-banner]{display:none}')
+  })
+
+  it('still shows everywhere else', () => {
+    // Hiding it is the site's business alone: nothing may hide it globally.
+    expect(fs.readFileSync('app/globals.css', 'utf8')).not.toContain('data-env-banner')
+  })
+})

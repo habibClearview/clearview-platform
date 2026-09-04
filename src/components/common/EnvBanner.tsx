@@ -24,6 +24,7 @@ export default function EnvBanner() {
 
   return (
     <div
+      data-env-banner=""
       role="status"
       aria-live="polite"
       style={{
