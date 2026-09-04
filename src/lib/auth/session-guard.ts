@@ -101,6 +101,51 @@ export function isIdle(nowMs: number, lastActivityMs: number | null | undefined,
 }
 
 /**
+ * THE IDLE RULE HAS TO SURVIVE THE BROWSER BEING CLOSED. 4 September 2026.
+ *
+ * The sixty-minute timeout only ever applied while a tab was open. Every tab
+ * stamped the activity clock to "now" the moment it mounted, so closing the
+ * laptop on Friday and opening it on Monday produced a clock that said the user
+ * had been active a second ago, and the sign-in page — which forwarded on the
+ * mere presence of a session — sent them straight to the dashboard. Habib
+ * reported exactly that: pressed Clearview sign in, landed on the dashboard,
+ * never saw the password field.
+ *
+ * That is not somebody else getting in. The session lives in his own browser
+ * and nothing about it was exposed. It is the app not applying its own rule:
+ * it claims an hour of idle ends a session, and it meant an hour of idle
+ * WITHIN one sitting.
+ *
+ * This is the decision both the sign-in page and the guard now ask before
+ * trusting a stored session. A missing timestamp is a genuine first sign-in on
+ * this browser and is never stale — only a timestamp that is present and old
+ * counts.
+ *
+ * The stored value is written by this code but localStorage is writable by
+ * anything else on the page, so a value that is not a sane, non-future number
+ * is treated as missing rather than believed.
+ */
+/**
+ * The activity clock, shared across tabs. It lives here rather than in the hook
+ * because the sign-in page has to read the same key the guard writes — one key,
+ * named once, is what keeps the two halves of the idle rule talking about the
+ * same thing.
+ */
+export const LAST_ACTIVITY_KEY = 'cv:last-activity'
+
+export function sessionIsStale(
+  nowMs: number,
+  storedLastActivity: string | number | null | undefined,
+  idleMs = IDLE_MS,
+): boolean {
+  const v = Number(storedLastActivity)
+  if (!storedLastActivity || !Number.isFinite(v) || v <= 0) return false
+  // A clock that claims the future is a clock that cannot be reasoned about.
+  if (v > nowMs) return false
+  return nowMs - v >= idleMs
+}
+
+/**
  * WHERE YOU WERE WHEN THE SESSION ENDED. 14 August 2026.
  *
  * Being signed out mid-session already costs the password. It should not also

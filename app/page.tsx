@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { DEFAULT_LANDING, RETURN_TO_KEY, isSafeReturnPath } from '@/lib/auth/session-guard'
+import { DEFAULT_LANDING, RETURN_TO_KEY, isSafeReturnPath, sessionIsStale, LAST_ACTIVITY_KEY } from '@/lib/auth/session-guard'
 
 const C = {
   navy:'#1B2A4A', cyan:'#00B4D8', cream:'#F8F4EE', white:'#FFFFFF',
@@ -22,6 +22,11 @@ export default function LoginPage() {
    * this afternoon. Anything that is not a plain same-origin path is discarded
    * rather than followed — see isSafeReturnPath.
    */
+  /** The activity clock the guard keeps. Unreadable storage means no claim either way. */
+  function readLastActivity(): string | null {
+    try { return localStorage.getItem(LAST_ACTIVITY_KEY) } catch { return null }
+  }
+
   function landingPage() {
     try {
       const saved = localStorage.getItem(RETURN_TO_KEY)
@@ -34,13 +39,20 @@ export default function LoginPage() {
   useEffect(() => {
     // Timeout after 3 seconds -- if session check hangs, just show login form
     const timeout = setTimeout(() => setChecking(false), 3000)
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       clearTimeout(timeout)
-      if (session) {
-        window.location.href = landingPage()
-      } else {
+      if (!session) { setChecking(false); return }
+      // A SESSION IS NOT THE SAME AS A WELCOME. 4 September 2026.
+      // This used to forward on the mere existence of a session, which meant a
+      // browser reopened days later went straight to the dashboard and the
+      // password field was never shown. The app's own rule is that an hour of
+      // idle ends a session; it now holds here too, at the front door.
+      if (sessionIsStale(Date.now(), readLastActivity())) {
+        try { await supabase.auth.signOut({ scope: 'local' }) } catch { /* show the form regardless */ }
         setChecking(false)
+        return
       }
+      window.location.href = landingPage()
     }).catch(() => {
       clearTimeout(timeout)
       setChecking(false)

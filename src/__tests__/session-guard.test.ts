@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { isIdle, IDLE_MS, HEARTBEAT_MS, screenRunsUnattended, isSafeReturnPath, shouldWarnIdle, secondsUntilSignOut } from '@/lib/auth/session-guard'
+import fs from 'fs'
+import { isIdle, IDLE_MS, sessionIsStale, HEARTBEAT_MS, screenRunsUnattended, isSafeReturnPath, shouldWarnIdle, secondsUntilSignOut } from '@/lib/auth/session-guard'
 
 describe('isIdle', () => {
   const now = 1_000_000_000_000
@@ -102,5 +103,69 @@ describe('isSafeReturnPath', () => {
     expect(isSafeReturnPath(null)).toBe(false)
     expect(isSafeReturnPath(undefined)).toBe(false)
     expect(isSafeReturnPath('')).toBe(false)
+  })
+})
+
+// ============================================================
+// THE IDLE RULE ACROSS A CLOSED BROWSER. 4 September 2026.
+// The timeout used to stop at the edge of a browsing session, because every
+// tab stamped the clock to "now" as it mounted and the sign-in page forwarded
+// on the mere presence of a session. Habib pressed Clearview sign in after a
+// gap and landed on the dashboard without ever seeing the password field.
+// ============================================================
+describe('sessionIsStale', () => {
+  const NOW = 1_800_000_000_000
+
+  it('is stale once the idle window has passed with the app closed', () => {
+    expect(sessionIsStale(NOW, String(NOW - IDLE_MS - 1))).toBe(true)
+    expect(sessionIsStale(NOW, String(NOW - IDLE_MS))).toBe(true)
+  })
+
+  it('is not stale inside the window', () => {
+    expect(sessionIsStale(NOW, String(NOW - IDLE_MS + 1000))).toBe(false)
+    expect(sessionIsStale(NOW, String(NOW))).toBe(false)
+  })
+
+  it('treats a first sign-in on this browser as not stale', () => {
+    // No stamp has ever been written. Signing that person out would lock out
+    // everybody signing in for the first time.
+    for (const v of [null, undefined, '', '0']) expect(sessionIsStale(NOW, v)).toBe(false)
+  })
+
+  it('does not believe a value it cannot reason about', () => {
+    // localStorage is writable by anything on the page, and a clock claiming
+    // the future cannot be measured against. Neither ends a session.
+    for (const v of ['tomorrow', 'NaN', String(NOW + 60_000)]) {
+      expect(sessionIsStale(NOW, v)).toBe(false)
+    }
+  })
+
+  it('uses the same hour the rest of the guard uses', () => {
+    expect(IDLE_MS).toBe(60 * 60 * 1000)
+  })
+})
+
+describe('the two places the rule has to hold', () => {
+  it('the sign-in page checks staleness before forwarding', () => {
+    const page = fs.readFileSync('app/page.tsx', 'utf8')
+    expect(page).toContain('sessionIsStale')
+    // and signs the stale session out rather than merely showing the form
+    expect(page).toMatch(/sessionIsStale[\s\S]{0,400}signOut/)
+  })
+
+  it('the guard judges the stored clock before overwriting it', () => {
+    const hook = fs.readFileSync('src/lib/auth/useSessionGuard.ts', 'utf8')
+    const staleAt = hook.indexOf('sessionIsStale')
+    const seedAt = hook.indexOf('markActivity()\n    ACTIVITY_EVENTS')
+    expect(staleAt).toBeGreaterThan(-1)
+    expect(seedAt).toBeGreaterThan(-1)
+    expect(staleAt).toBeLessThan(seedAt)
+  })
+
+  it('both halves read one key', () => {
+    const shared = fs.readFileSync('src/lib/auth/session-guard.ts', 'utf8')
+    expect(shared).toContain("LAST_ACTIVITY_KEY = 'cv:last-activity'")
+    expect(fs.readFileSync('src/lib/auth/useSessionGuard.ts', 'utf8'))
+      .not.toContain("const LAST_ACTIVITY_KEY =")
   })
 })

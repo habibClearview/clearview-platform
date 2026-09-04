@@ -20,9 +20,8 @@
 // ============================================================
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ACTIVITY_EVENTS, HEARTBEAT_MS, IDLE_MS, RETURN_TO_KEY, isIdle, isSafeReturnPath, screenRunsUnattended, shouldWarnIdle, secondsUntilSignOut } from './session-guard'
-
-const LAST_ACTIVITY_KEY = 'cv:last-activity'
+import { ACTIVITY_EVENTS, HEARTBEAT_MS, IDLE_MS, LAST_ACTIVITY_KEY,
+  sessionIsStale, RETURN_TO_KEY, isIdle, isSafeReturnPath, screenRunsUnattended, shouldWarnIdle, secondsUntilSignOut } from './session-guard'
 
 export function useSessionGuard(active: boolean) {
   // NEVER A SURPRISE. 2 September 2026. The sign-out used to happen with no
@@ -43,6 +42,10 @@ export function useSessionGuard(active: boolean) {
     function markActivity() {
       if (ended) return
       try { localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now())) } catch { /* ignore */ }
+    }
+
+    function readStoredActivity(): string | null {
+      try { return localStorage.getItem(LAST_ACTIVITY_KEY) } catch { return null }
     }
 
     function lastActivity(): number {
@@ -70,7 +73,19 @@ export function useSessionGuard(active: boolean) {
       window.location.href = '/'
     }
 
-    // Seed activity immediately so a freshly-loaded tab never looks instantly idle.
+    // A tab that has just mounted is not evidence that anybody was here. Seeding
+    // the clock unconditionally is what made the idle rule stop at the edge of a
+    // browsing session: close the browser for a weekend, open it, and the stamp
+    // said "active now". So look at what is stored FIRST, and if it is older
+    // than the idle window, end the session here rather than adopt it.
+    if (!unattended && sessionIsStale(Date.now(), readStoredActivity())) {
+      endSession()
+      return () => {
+        ACTIVITY_EVENTS.forEach((e) => window.removeEventListener(e, markActivity))
+        if (timer) clearInterval(timer)
+      }
+    }
+    // Past that, a freshly-loaded tab should not look instantly idle.
     markActivity()
     ACTIVITY_EVENTS.forEach((e) => window.addEventListener(e, markActivity, { passive: true }))
 
