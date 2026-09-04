@@ -371,6 +371,21 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
             A shared, visual picture for everyone involved, <b>{client}</b>&rsquo;s team walking the path
             {funder ? <> and <b>{funder}</b> watching it progress</> : null}. The nine blocks are worked in order, and each one is a decision gate that does not close until the evidence behind it is real and the people who have to sign it have signed.
           </p>
+          {/* THE OTHER TWO SURFACES, FROM THE ONE THEY LAND ON. 4 Sept 2026.
+              The Charter's only link sat inside a block drawer, and on day one
+              a client can open exactly one block — so in practice the Charter
+              was unreachable. The financial dashboard had no link here at all.
+              Both are things the client owns; both are now one press away. */}
+          <p style={{ marginTop: 18, display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+            <a
+              href={`/engagement/${slug}/charter`}
+              style={{ color: 'var(--teal)', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}
+            >Engagement Charter &rarr;</a>
+            <a
+              href={`/dashboard/${slug}`}
+              style={{ color: 'var(--teal)', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}
+            >Financial dashboard &rarr;</a>
+          </p>
         </section>
 
         <div className="path-scroll"><div className="path">

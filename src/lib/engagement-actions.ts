@@ -73,6 +73,8 @@ export async function sendEngagementEmail(input: {
   stage: 'scope' | 'triparty'
   recipients: string[]
   journeyUrl: string
+  /** Build it and hand it back instead of sending it. Same route, same builder. */
+  preview?: boolean
 }) {
   const res = await fetch('/api/engagement-email', {
     method: 'POST',
@@ -91,7 +93,10 @@ export async function sendEngagementEmail(input: {
   if (!res.ok) {
     throw new Error(data?.error || 'The email could not be sent. Try again.')
   }
-  return data as { ok?: boolean; emailConfigured?: boolean; message?: string; reason?: string }
+  return data as {
+    ok?: boolean; emailConfigured?: boolean; message?: string; reason?: string
+    preview?: boolean; subject?: string; html?: string
+  }
 }
 
 // ─── Meeting scheduling ──────────────────────────────────────

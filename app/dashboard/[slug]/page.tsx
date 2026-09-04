@@ -183,5 +183,5 @@ export default function GenericClientPage() {
     onSignOut: async () => { await supabase.auth.signOut(); window.location.href='/' },
   }
 
-  return <GenericDashboard clientId={clientId} clientName={clientName} permissions={permissions}/>
+  return <GenericDashboard clientId={clientId} clientName={clientName} permissions={permissions} slug={slug}/>
 }

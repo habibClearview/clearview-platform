@@ -1029,6 +1029,17 @@ export default function GenericDashboard({
           <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}>
             <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem',textTransform:'uppercase'}}>{P.role.replace('_',' ')}</span>
             <button onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle light/dark theme" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',background:'transparent',border:`1px solid var(--cv-wa-45)`,borderRadius:4,color:'var(--cv-wa-85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>{theme==='dark'?'☀':'☾'} Theme</button>
+            {/* THE ENGAGEMENT WAS UNREACHABLE FROM HERE. 4 September 2026.
+                This dashboard is the financial side. The journey canvas and the
+                Engagement Charter — the things a canvas client was actually
+                sold — had no link anywhere on it, so unless somebody pasted the
+                URL, a client could sign in every day and never find them. */}
+            {P.slug ? (
+              <a
+                href={`/engagement/${P.slug}`}
+                style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.88rem',background:'transparent',border:`1px solid var(--cv-cyan-40)`,borderRadius:4,color:C.cyan,cursor:'pointer',padding:'0.18rem 0.5rem',textDecoration:'none'}}
+              >Your engagement</a>
+            ) : null}
             <ActiveSessionsButton fontSize="0.88rem" />
             <button onClick={P.onSignOut} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.88rem',background:'transparent',border:`1px solid var(--cv-wa-45)`,borderRadius:4,color:'var(--cv-wa-85)',cursor:'pointer',padding:'0.18rem 0.5rem'}}>Sign out</button>
             {/* Global sign-out: revokes EVERY session for this login (all devices),

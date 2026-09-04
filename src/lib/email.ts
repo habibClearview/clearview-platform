@@ -146,13 +146,13 @@ export function brandedEmail(input: BrandedEmailInput): string {
     ? `<p style="color:#4A5A6A;font-size:13px;margin:18px 0 0;">${render(input.footNote)}</p>`
     : ''
   return `
-    <div style="font-family:var(--cv-font);max-width:560px;margin:0 auto;padding:32px 24px;">
+    <div style="font-family:'Poppins','Segoe UI',Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">
       <div style="background:#1B2A41;padding:20px 24px;border-radius:8px 8px 0 0;border-bottom:3px solid #00CCCC;">
         <p style="margin:0;font-size:12.5px;color:#00CCCC;letter-spacing:1px;text-transform:uppercase;">The Canvas Coach</p>
-        <p style="margin:4px 0 0;font-size:20px;color:#F5F0E8;font-family:var(--cv-font);">Grant-to-Commercial Viability</p>
+        <p style="margin:4px 0 0;font-size:20px;color:#F5F0E8;font-family:'Poppins','Segoe UI',Helvetica,Arial,sans-serif;">Grant-to-Commercial Viability</p>
       </div>
       <div style="background:#F5F0E8;padding:26px 24px;border-radius:0 0 8px 8px;border:1px solid #D8E0E8;border-top:none;color:#1B2A41;line-height:1.6;">
-        <h1 style="font-family:var(--cv-font);font-size:22px;font-weight:600;margin:0 0 14px;">${render(input.heading)}</h1>
+        <h1 style="font-family:'Poppins','Segoe UI',Helvetica,Arial,sans-serif;font-size:22px;font-weight:600;margin:0 0 14px;">${render(input.heading)}</h1>
         ${body}
         ${cta}
         ${foot}
@@ -169,6 +169,20 @@ export interface EngagementEmailConfig {
   coachName: string             // the lead consultant's name
   journeyUrl: string            // the link to the journey / charter
   recipientName?: string
+  /** 'canvas' runs the nine Decision Points; 'financial' is the model-only mode. */
+  engagementMode?: string
+}
+
+/**
+ * "for Tanager on Tanager" is what you get when an engagement has no programme
+ * and no brand override, because the title then falls back to the client's own
+ * name. Say it once when they are the same thing.
+ */
+function onTitle(cfg: EngagementEmailConfig): string {
+  const title = (cfg.engagementTitle || '').trim()
+  const client = (cfg.clientName || '').trim()
+  if (!title || title.toLowerCase() === client.toLowerCase()) return ''
+  return ` on ${escapeHtml(title)}`
 }
 
 /**
@@ -176,17 +190,68 @@ export interface EngagementEmailConfig {
  * engagement covers and sharing the link. Recipients are passed by the caller.
  */
 export function buildScopeEmail(cfg: EngagementEmailConfig): { subject: string; html: string } {
-  const subject = `${cfg.engagementTitle}: the journey to commercial viability`
+  const client = escapeHtml(cfg.clientName)
+  const isCanvas = (cfg.engagementMode || 'canvas') === 'canvas'
+  const subject = `${cfg.clientName}: your engagement platform is ready`
+
+  const paragraphs: EmailText[] = [
+    raw(`This is the platform your engagement runs on${onTitle(cfg)}. It is where the work lives: every decision <b>${client}</b> makes, every piece of evidence behind it, and how far the organisation has moved towards commercial independence.`),
+  ]
+
+  if (isCanvas) {
+    paragraphs.push(
+      raw('<b>What it tracks</b>'),
+      raw(
+        '<ul style="margin:0 0 14px;padding-left:20px;">'
+        + '<li style="margin:0 0 5px;">Nine Decision Points, each one built on the last, each one closing only when the evidence behind it is real and the people who have to sign it have signed</li>'
+        + '<li style="margin:0 0 5px;">The evidence itself: documents, interviews, financial data, what was seen in the field</li>'
+        + '<li style="margin:0 0 5px;">Every decision taken, numbered, and who took it</li>'
+        + '<li style="margin:0 0 5px;">Commercial readiness, measured at the start, the middle and the end</li>'
+        + '</ul>',
+      ),
+      raw('<b>The three places you will spend your time</b>'),
+      raw(
+        '<ul style="margin:0 0 14px;padding-left:20px;">'
+        + '<li style="margin:0 0 8px;"><b>Your journey.</b> The whole engagement on one canvas: the nine Decision Points in their real positions, and where the work stands on each. This is what the button below opens. Blocks open in order, so on day one most are still closed — that is the method, not a fault.</li>'
+        + '<li style="margin:0 0 8px;"><b>The Engagement Charter.</b> What each of us commits to. Read it, comment on it, and download it as a Word document whenever you want it. Once it is issued for signature, the people named as signatories sign it there.</li>'
+        + `<li style="margin:0 0 5px;"><b>The financial dashboard.</b> The plan, the actuals against it, and the statements that come out of them. It starts empty; we fill it together.</li>`
+        + '</ul>',
+      ),
+      raw(`<b>What ${client} does here</b>`),
+      raw(
+        '<ul style="margin:0 0 14px;padding-left:20px;">'
+        + '<li style="margin:0 0 5px;">Reads the Charter and says what needs to change before it is signed</li>'
+        + '<li style="margin:0 0 5px;">Answers in the room when we run a working session, from a link sent for that session</li>'
+        + '<li style="margin:0 0 5px;">Your Executive Director signs off each Decision Point once the work behind it holds</li>'
+        + '<li style="margin:0 0 5px;">Watches the canvas for where the engagement is and what comes next</li>'
+        + '</ul>',
+      ),
+      raw(`<b>What ${escapeHtml(cfg.coachName)} does here</b>`),
+      raw(
+        '<ul style="margin:0 0 14px;padding-left:20px;">'
+        + '<li style="margin:0 0 5px;">Runs the sessions and records what comes out of them</li>'
+        + '<li style="margin:0 0 5px;">Puts the evidence behind each decision on the record</li>'
+        + '<li style="margin:0 0 5px;">Opens each Decision Point when the one before it is signed</li>'
+        + '</ul>',
+      ),
+    )
+  } else {
+    paragraphs.push(
+      raw(`<b>${client}</b> is set up in financial mode: the model, the actuals against it, and the month and year close. The link below opens the engagement.`),
+    )
+  }
+
+  paragraphs.push(
+    raw('Two things to expect. A separate email invites you to set your password, and that is the one that gives you your sign-in. And nothing on the platform needs saving: every entry is recorded as it is made.'),
+    raw('If anything on it does not open, or does not look right, say so and it gets fixed. That is what the first week is for.'),
+  )
+
   const html = brandedEmail({
-    heading: `${cfg.recipientName ? cfg.recipientName + ',' : 'Hello,'}`,
-    paragraphs: [
-      `This sets out the work ahead for <b>${cfg.clientName}</b> on ${cfg.engagementTitle}: a structured journey through nine Decision Points that turns grant funded delivery into a commercial model the organisation owns and can defend.`,
-      `The link below opens the live journey. You can see the nine Decision Points, where the work stands, and what each one will produce. Everything on it is evidence based.`,
-      `Once you have looked through it, we will agree the Engagement Charter together and set the kickoff.`,
-    ],
-    ctaLabel: 'Open the journey',
+    heading: cfg.recipientName ? `${cfg.recipientName},` : 'Welcome,',
+    paragraphs,
+    ctaLabel: 'Open your engagement',
     ctaUrl: cfg.journeyUrl,
-    footNote: `Sent by ${cfg.coachName}, The Canvas Coach.`,
+    footNote: `Sent by ${escapeHtml(cfg.coachName)}, The Canvas Coach. Reply to this email if anything here does not open.`,
   })
   return { subject, html }
 }
@@ -200,7 +265,7 @@ export function buildTriPartyEmail(cfg: EngagementEmailConfig): { subject: strin
   const html = brandedEmail({
     heading: 'The Engagement Charter is ready',
     paragraphs: [
-      `The Engagement Charter for <b>${cfg.clientName}</b> on ${cfg.engagementTitle} is ready for all parties to review.`,
+      raw(`The Engagement Charter for <b>${escapeHtml(cfg.clientName)}</b>${onTitle(cfg)} is ready for all parties to review.`),
       `It sets out how we work together, the evidence standard every decision meets, and what the engagement asks of each party. Open it below. You can comment or suggest a change on any section before signing.`,
     ],
     ctaLabel: 'Review the Charter',

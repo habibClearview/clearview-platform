@@ -41,12 +41,20 @@ function getAdminClient() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { clientId, stage, recipients, journeyUrl } = (await req.json()) as {
+    const { clientId, stage, recipients, journeyUrl, preview } = (await req.json()) as {
       clientId?: string
       stage?: Stage
       recipients?: string[]
       journeyUrl?: string
+      preview?: boolean
     }
+    // A PREVIEW IS THE SAME EMAIL, NOT A SECOND COPY OF IT. 4 September 2026.
+    // Habib asked where he could read the welcome before it went to a client.
+    // Building it twice — once to show, once to send — is how the two drift
+    // apart and the reassuring preview stops being what anybody receives. So
+    // this is the same route, the same authorisation and the same builder,
+    // stopping one line short of handing it to the provider.
+    const isPreview = preview === true
 
     if (!clientId) return NextResponse.json({ error: 'Missing clientId' }, { status: 400 })
 
@@ -68,7 +76,10 @@ export async function POST(req: NextRequest) {
     // An unbounded recipient list turns one authorised send into a mailshot,
     // and a link that is not a web address is a way to hand a reader something
     // other than the page they think they are opening.
-    const cleaned = cleanRecipients(recipients)
+    // Nothing is addressed on a preview, so an empty list is not an error.
+    const cleaned = isPreview && (!recipients || recipients.length === 0)
+      ? { ok: true as const, recipients: [] as string[] }
+      : cleanRecipients(recipients)
     if (!cleaned.ok) return NextResponse.json({ error: cleaned.error }, { status: 400 })
     if (!isWebUrl(journeyUrl)) {
       return NextResponse.json({ error: 'The journey link must be a web address' }, { status: 400 })
@@ -87,22 +98,14 @@ export async function POST(req: NextRequest) {
 
     // Each send fans out to a list of recipients; cap how many sends one
     // account can trigger per hour so the endpoint can't spray mail.
-    const rl = await checkRateLimit(admin, `engagement-email:${user.id}`, 30, 3600)
+    const rl = isPreview
+      ? { allowed: true, retryAfter: 0 }
+      : await checkRateLimit(admin, `engagement-email:${user.id}`, 30, 3600)
     if (!rl.allowed) {
       return NextResponse.json(
         { error: 'Too many emails sent recently. Please wait a while before sending more.' },
         { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } },
       )
-    }
-
-    // Degrade gracefully when outbound email is not configured: tell the caller
-    // plainly (it can show the journey link on screen) rather than crash.
-    if (!emailAvailable()) {
-      return NextResponse.json({
-        ok: false,
-        emailConfigured: false,
-        message: 'Email is not configured on this environment. Share the journey link directly instead.',
-      })
     }
 
     // Load the engagement to fill the template. Everything is config driven:
@@ -112,7 +115,7 @@ export async function POST(req: NextRequest) {
     //   coachName       -- the lead consultant party, else the sender's name.
     const { data: client, error: clientErr } = await admin
       .from('engagement_clients')
-      .select('name, programme_id')
+      .select('name, programme_id, engagement_mode')
       .eq('id', clientId)
       .single()
     if (clientErr || !client) {
@@ -153,9 +156,27 @@ export async function POST(req: NextRequest) {
       clientName,
       coachName,
       journeyUrl,
+      engagementMode: (client as { engagement_mode?: string }).engagement_mode || 'canvas',
     }
 
     const { subject, html } = stage === 'scope' ? buildScopeEmail(cfg) : buildTriPartyEmail(cfg)
+
+    // Read it before anybody else does. Built by the line above, so there is
+    // no second version of this email anywhere.
+    if (isPreview) {
+      return NextResponse.json({ ok: true, preview: true, stage, subject, html })
+    }
+
+    // Outbound email not being configured is not a crash: say so plainly, so
+    // the caller can share the journey link instead. Checked here rather than
+    // at the top so a preview still works on an environment that cannot send.
+    if (!emailAvailable()) {
+      return NextResponse.json({
+        ok: false,
+        emailConfigured: false,
+        message: 'Email is not configured on this environment. Share the journey link directly instead.',
+      })
+    }
 
     const result = await sendEmail({ to: cleaned.recipients, subject, html })
     if (!result.sent) {

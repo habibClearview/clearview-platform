@@ -122,6 +122,8 @@ export default function EngagementSettings({ clientId, canManage }) {
   // because the button is useless without both.
   const [client, setClient] = useState(null)
   const [partyEmails, setPartyEmails] = useState([])
+  // The built email, exactly as it would go out. Null until asked for.
+  const [emailPreview, setEmailPreview] = useState(null)
 
   const load = useCallback(async () => {
     if (!clientId) { setLoading(false); return }
@@ -224,6 +226,23 @@ export default function EngagementSettings({ clientId, canManage }) {
               </p>
               <button
                 type="button"
+                style={smallBtn(C.slate)}
+                disabled={busy === 'preview' || !journeyUrl}
+                onClick={async () => {
+                  setBusy('preview'); setNote(null); setErr(null)
+                  try {
+                    const r = await sendEngagementEmail({
+                      clientId, stage: 'scope', recipients: to, journeyUrl, preview: true,
+                    })
+                    if (r?.html) setEmailPreview({ subject: r.subject, html: r.html })
+                    else setErr('The preview came back empty.')
+                  } catch (e) { setErr(e.message || 'Could not build the preview') }
+                  setBusy(null)
+                }}
+              >{busy === 'preview' ? 'Building...' : (emailPreview ? 'Rebuild the preview' : 'Read it first')}</button>
+              {' '}
+              <button
+                type="button"
                 style={smallBtn(C.teal)}
                 disabled={busy === 'welcome' || !journeyUrl}
                 onClick={async () => {
@@ -243,6 +262,27 @@ export default function EngagementSettings({ clientId, canManage }) {
                   setBusy(null)
                 }}
               >{busy === 'welcome' ? 'Sending...' : 'Send the welcome email'}</button>
+              {emailPreview ? (
+                <div style={{ marginTop: '0.8rem', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+                  <div style={{ ...mono, fontSize: '0.82rem', padding: '0.5rem 0.7rem', background: C.alt, borderBottom: `1px solid ${C.border}`, display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                    <span style={{ color: C.slate }}>Subject:</span>
+                    <span style={{ fontWeight: 600 }}>{emailPreview.subject}</span>
+                    <button
+                      type="button"
+                      style={{ ...smallBtn(C.slate), marginLeft: 'auto', fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+                      onClick={() => setEmailPreview(null)}
+                    >Close</button>
+                  </div>
+                  {/* The email's own HTML, rendered in a sandbox: it is a document
+                      to look at, not code to run on this page. */}
+                  <iframe
+                    title="The welcome email as it will arrive"
+                    srcDoc={emailPreview.html}
+                    sandbox=""
+                    style={{ width: '100%', height: 620, border: 0, background: '#fff', display: 'block' }}
+                  />
+                </div>
+              ) : null}
             </div>
           )
         })()}

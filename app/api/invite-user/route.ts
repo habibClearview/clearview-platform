@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
       // clientId is guaranteed present for client roles (validated above).
       const { data: clientRow, error: lookupErr } = await admin
         .from('engagement_clients')
-        .select('slug')
+        .select('slug, engagement_mode')
         .eq('id', clientId)
         // maybeSingle: a no-match returns { data: null, error: null } cleanly,
         // separating "no such client" from a real database error below.
@@ -179,7 +179,17 @@ export async function POST(req: NextRequest) {
       // Fall back to the login page (never a bespoke route) only on a genuine
       // no-match/missing slug, so a client user is never dropped onto some other
       // client's dashboard.
-      redirectTo = clientRow?.slug ? `${appUrl}/dashboard/${clientRow.slug}` : `${appUrl}/`
+      // WHERE A CLIENT LANDS IS WHERE THEY THINK THE PRODUCT IS. 4 Sept 2026.
+      // Every client role was dropped on /dashboard/<slug>, the financial
+      // planning screen. For a canvas engagement that is the wrong front door
+      // twice over: on day one it has no units, no plan and no figures, and it
+      // carries no link to the journey or the Charter — so the engagement the
+      // client was actually sold was unreachable unless somebody pasted them
+      // the URL. A canvas client now lands on their canvas. A financial-mode
+      // client still lands on the dashboard, which for them IS the engagement.
+      redirectTo = clientRow?.slug
+        ? `${appUrl}${clientRow.engagement_mode === 'financial' ? '/dashboard/' : '/engagement/'}${clientRow.slug}`
+        : `${appUrl}/`
     }
 
     // Send the invitation email via Supabase Auth admin API
