@@ -1,0 +1,9 @@
+[
+  { cat: 'Implementation learning', title: 'Training is not transformation', what: 'Training alone does not improve produce quality. The market has to reward quality before quality appears. That changes what a capability budget should be buying.' },
+  { cat: 'Systemic insight', title: 'Inclusion without income is still exclusion', what: 'A study tracing where the money actually lands in a value chain, and how little of it reaches the people a programme counted as included.' },
+  { cat: 'Transition', title: 'A donor programme that became a business', what: 'A regional seed and markets programme moved from donor funded to a private company across three Southern African countries, with clear customers and its own plan.' },
+  { cat: 'Implementation learning', title: 'People share data when they get something back', what: 'Traders would not share sales figures until the value came back to them as market information and price alerts. Then they shared it willingly.' },
+  { cat: 'Case study', title: 'Income, investment, independence', what: 'An agent model connecting refugee and host community farmers to formal buyers. One farmer group put UGX 2.7 million back into expanding their land.' },
+  { cat: 'Transition', title: 'Helping donors leave, and businesses stay', what: 'Three donor programmes, in agriculture, youth employment and seed systems, restructured so they could carry on without the donor.' },
+  { cat: 'Capability', title: 'Teaching teams to see the whole system', what: 'A five day course for teams working in refugee and youth markets. They moved from delivering activities to thinking about the system around them.' },
+]
