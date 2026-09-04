@@ -19,7 +19,7 @@ export const DIAGRAM_CSS = `
 .hb .dg{background:${C.creamWarm};color:${C.ink};padding:34px}
 .hb .dg-scroll{overflow-x:auto}
 .hb .dg-head{display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;margin-bottom:2px}
-.hb .dg-head div{padding:12px;text-align:center;font-size:13px;font-weight:700;
+.hb .dg-head > div{padding:12px;text-align:center;font-size:13px;font-weight:700;
   letter-spacing:.16em;text-transform:uppercase;color:#fff}
 .hb .dg-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;margin-bottom:2px}
 .hb .dg-row2{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:2px}
@@ -38,7 +38,7 @@ export const DIAGRAM_CSS = `
 .hb .dg-spine{background:${C.ink};color:${C.cream};padding:22px 24px}
 .hb .dg-spine .tag{background:${C.cyan};color:${C.ink}}
 .hb .dg-fits{display:grid;grid-template-columns:repeat(6,1fr);gap:2px;margin-top:18px}
-.hb .dg-fits div{background:rgba(245,245,220,.07);padding:12px}
+.hb .dg-fits > div{background:rgba(245,245,220,.07);padding:12px;display:flex;flex-direction:column}
 .hb .dg-fits .fn{font-size:12.5px;font-weight:700;color:${C.cyan}}
 .hb .dg-fits .ft{font-size:14px;font-weight:600;margin:5px 0 5px}
 .hb .dg-fits .fd{font-size:13px;opacity:.74;line-height:1.4}
@@ -73,8 +73,8 @@ export const DIAGRAM_CSS = `
 .hb .block h5{font-size:18px;font-weight:600;margin:10px 0 8px;line-height:1.2}
 .hb .block p{font-size:15px;line-height:1.5;color:${C.slate}}
 .hb .fork{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-top:2px}
-.hb .fork div{padding:26px 24px;background:${C.ink};color:${C.cream}}
-.hb .fork div:last-child{background:${C.cyan};color:${C.ink}}
+.hb .fork > div{padding:26px 24px;background:${C.ink};color:${C.cream}}
+.hb .fork > div:last-child{background:${C.cyan};color:${C.ink}}
 @media (max-width:700px){.hb .fork{grid-template-columns:1fr}}
 .hb .phase{background:${C.cream};padding:22px 20px;border-top:4px solid ${GOLD}}
 .hb .phase .pn{font-size:22px;font-weight:700;letter-spacing:-0.02em}

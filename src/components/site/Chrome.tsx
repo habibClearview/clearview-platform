@@ -39,15 +39,15 @@ const HEADER_CSS = `
   .hb .burger{display:block}
   .hb .hd-in{padding:16px 22px;position:relative}
 }
-.hb .ft{background:${C.inkDeep};color:${C.cream};padding:82px 0 40px}
-.hb .ft-grid{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:56px}
-.hb .ft h4{margin-bottom:18px}
-.hb .ft ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
-.hb .ft a{font-size:17px;text-decoration:none;opacity:.84}
-.hb .ft a:hover{opacity:1;color:${C.cyan}}
-.hb .ft-base{margin-top:64px;padding-top:26px;border-top:1px solid rgba(245,245,220,.14);
+.hb .site-ft{background:${C.inkDeep};color:${C.cream};padding:82px 0 40px}
+.hb .site-ft-grid{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:56px}
+.hb .site-ft h4{margin-bottom:18px}
+.hb .site-ft ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.hb .site-ft a{font-size:17px;text-decoration:none;opacity:.84}
+.hb .site-ft a:hover{opacity:1;color:${C.cyan}}
+.hb .site-ft-base{margin-top:64px;padding-top:26px;border-top:1px solid rgba(245,245,220,.14);
   display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;font-size:14.5px;opacity:.62}
-@media (max-width:900px){.hb .ft-grid{grid-template-columns:1fr;gap:44px}}
+@media (max-width:900px){.hb .site-ft-grid{grid-template-columns:1fr;gap:44px}}
 `
 
 export function Header() {
@@ -87,9 +87,9 @@ export function Header() {
 
 export function Footer() {
   return (
-    <footer className="ft">
+    <footer className="site-ft">
       <div className="wrap">
-        <div className="ft-grid">
+        <div className="site-ft-grid">
           <div>
             <img src="/site/viable-by-design.png" alt="Viable by Design" style={{ height: 76, width: 'auto', display: 'block', marginBottom: 26 }} />
             <p className="small" style={{ maxWidth: '38ch', opacity: 0.86 }}>
@@ -121,7 +121,7 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="ft-base">
+        <div className="site-ft-base">
           <span>Habib Onifade. The Canvas Coach.</span>
           <span>Verido UK Limited</span>
         </div>

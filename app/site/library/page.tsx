@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 const CSS = `
 .hb .res{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:2px}
-.hb .res div{background:rgba(245,245,220,.06);padding:28px 26px;display:flex;flex-direction:column}
+.hb .res > div{background:rgba(245,245,220,.06);padding:28px 26px;display:flex;flex-direction:column}
 .hb .res .k{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:${C.cyan}}
 .hb .res .meta{font-size:13px;opacity:.6;margin-left:10px;letter-spacing:.06em}
 .hb .res p{margin-top:12px;opacity:.8;font-size:17px}

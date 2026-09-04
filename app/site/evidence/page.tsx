@@ -18,7 +18,7 @@ const CSS = `
 .hb .ev:last-of-type{border-bottom:1px solid rgba(245,245,220,.16)}
 .hb .ev .cat{font-size:13.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:${C.cyan}}
 .hb .fw{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:2px}
-.hb .fw div{background:rgba(18,34,44,.08);padding:26px 24px}
+.hb .fw > div{background:rgba(18,34,44,.08);padding:26px 24px}
 @media (max-width:860px){.hb .ev{grid-template-columns:1fr;gap:10px}}
 `
 
