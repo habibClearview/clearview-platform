@@ -219,7 +219,7 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
               {p.deal_stage==='won'&&(
                 <div style={{marginTop:'0.6rem',display:'flex',alignItems:'center',gap:'0.6rem',background:'var(--cv-tint-green)',border:`1px solid ${C.green}`,borderRadius:8,padding:'0.5rem 0.7rem'}}>
                   <span style={{fontSize:'0.9rem',color:C.green,fontWeight:600}}>✓ Won</span>
-                  <button style={{...solidBtn(C.green,true),marginLeft:'auto'}} onClick={()=>onWinDeal&&onWinDeal(p)}>+ Add client client →</button>
+                  <button style={{...solidBtn(C.green,true),marginLeft:'auto'}} onClick={()=>onWinDeal&&onWinDeal(p)}>+ Set this client up →</button>
                 </div>
               )}
             </div>
