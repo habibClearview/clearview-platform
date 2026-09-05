@@ -2103,7 +2103,16 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         {showUpload&&<SpreadsheetUpload onSuccess={(clientId)=>{setShowUpload(false);supabase.from('engagement_clients').select('*').eq('id',clientId).single().then(({data})=>{if(data)setClients(prev=>[...prev,data])})}}/>}
         {(showNew||newClientPrefill)&&<NewClientForm programmes={programmes} initial={newClientPrefill} onSave={async c=>{
           const {data,error}=await supabase.from('engagement_clients').insert([c]).select().single()
-          if(!error&&data){setClients(prev=>[...prev,data]);setShowNew(false);setNewClientPrefill(null)}
+          if(!error&&data){
+            const cameFromAWonDeal=!!newClientPrefill
+            setClients(prev=>[...prev,data]);setShowNew(false);setNewClientPrefill(null)
+            // WON MEANS SET THEM UP, NOT "A CLIENT ROW NOW EXISTS". 5 Sept 2026.
+            // Marking a deal Won pre-filled this form and then stopped, leaving
+            // the coach on a list with nothing telling them what came next. It
+            // now opens the client it just made, on Cover, which is where the
+            // welcome pack and the contract upload are.
+            if(cameFromAWonDeal){setSelClientId(data.id);setActiveTab('cover');setView('client')}
+          }
         }} onCancel={()=>{setShowNew(false);setNewClientPrefill(null)}}/>}
         {newClientPrefill&&<div style={{fontSize:'0.85rem',color:C.teal,marginTop:'-0.9rem',marginBottom:'1rem'}}>Pre-filled from the Pipeline deal you just marked Won.</div>}
 

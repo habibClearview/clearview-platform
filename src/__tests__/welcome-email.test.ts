@@ -69,6 +69,18 @@ describe('where the welcome pack lives', () => {
     expect(DASH).toContain("import WelcomePack from '@/components/gtcv/WelcomePack'")
   })
 
+  it('is where a won deal lands you', () => {
+    // Marking a deal Won pre-filled the client form and then stopped. It now
+    // opens the client it just made, on the tab the welcome pack is on.
+    expect(DASH).toContain('cameFromAWonDeal')
+    expect(DASH).toMatch(/cameFromAWonDeal\)\{setSelClientId\(data\.id\);setActiveTab\('cover'\)/)
+  })
+
+  it('takes the contract straight off the signed document', () => {
+    expect(SETTINGS).toContain('/api/tor-extract')
+    expect(SETTINGS).toContain('Read it from the contract')
+  })
+
   it('exists in exactly one place, so the screen and the letter cannot drift', () => {
     const settings = fs.readFileSync('src/components/gtcv/EngagementSettings.tsx', 'utf8')
     expect(settings).not.toContain('The engagement brief')
