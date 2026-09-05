@@ -19,7 +19,7 @@
     "next": "14.2.29",
     "pdfjs-dist": "^4.10.38",
     "qrcode": "^1.5.4",
-    "react": "^18",
+    "react": "^19",
     "react-dom": "^18",
     "recharts": "^2.10.0",
     "resend": "^6.19.0",
@@ -28,7 +28,7 @@
   "devDependencies": {
     "@types/node": "^20",
     "@types/qrcode": "^1.5.6",
-    "@types/react": "^18",
+    "@types/react": "^19",
     "@types/react-dom": "^18",
     "@vitejs/plugin-react": "^6.0.5",
     "@vitest/coverage-v8": "^4.1.9",
