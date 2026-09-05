@@ -13,8 +13,8 @@
     "lint:hooks": "eslint --no-eslintrc -c .eslintrc.hooks.json 'src/**/*.{ts,tsx}' 'app/**/*.{ts,tsx}'"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0",
-    "dexie": "^4.4.4",
+    "@supabase/supabase-js": "^2.113.0",
+    "dexie": "^4.4.5",
     "docx": "^9.0.2",
     "next": "14.2.29",
     "pdfjs-dist": "^4.10.38",
@@ -22,7 +22,7 @@
     "react": "^18",
     "react-dom": "^18",
     "recharts": "^2.10.0",
-    "resend": "^6.19.0",
+    "resend": "^6.25.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
@@ -30,8 +30,8 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "@vitejs/plugin-react": "^6.0.5",
-    "@vitest/coverage-v8": "^4.1.9",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/coverage-v8": "^4.1.11",
     "autoprefixer": "^10",
     "eslint": "^8",
     "eslint-config-next": "14.2.29",
