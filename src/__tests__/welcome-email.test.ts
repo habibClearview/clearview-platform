@@ -8,7 +8,8 @@ import { buildScopeEmail, buildTriPartyEmail } from '@/lib/email'
 // about the machinery: that it can be read before it is sent, that the button
 // exists, and that the template does not print its own markup.
 // ============================================================
-const SETTINGS = fs.readFileSync('src/components/gtcv/EngagementSettings.tsx', 'utf8')
+const SETTINGS = fs.readFileSync('src/components/gtcv/WelcomePack.tsx', 'utf8')
+const DASH = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
 const ROUTE = fs.readFileSync('app/api/engagement-email/route.ts', 'utf8')
 
 const cfg = {
@@ -57,6 +58,21 @@ describe('reading it before it is sent', () => {
     expect(SETTINGS).toContain('preview: true')
     expect(SETTINGS).toContain('sandbox=""')
     expect(SETTINGS).toContain('emailPreview.subject')
+  })
+})
+
+describe('where the welcome pack lives', () => {
+  it('is on the Cover tab, the screen opening a client lands on', () => {
+    // It was five tabs deep beside the momentum flag, which is where Habib
+    // looked for it and did not find it.
+    expect(DASH).toContain("shownTab==='cover'&&<>{mayRun?<WelcomePack")
+    expect(DASH).toContain("import WelcomePack from '@/components/gtcv/WelcomePack'")
+  })
+
+  it('exists in exactly one place, so the screen and the letter cannot drift', () => {
+    const settings = fs.readFileSync('src/components/gtcv/EngagementSettings.tsx', 'utf8')
+    expect(settings).not.toContain('The engagement brief')
+    expect(settings).not.toContain('Send the welcome email')
   })
 })
 

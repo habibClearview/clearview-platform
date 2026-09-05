@@ -14,12 +14,12 @@
   color-scheme: light;
 
   /* Surfaces & backgrounds */
-  --cv-bg:          #F0F4F8;  /* generic page background */
-  --cv-bg-2:        #F4F8FC;  /* secondary / input background */
-  --cv-card:        #FFFFFF;  /* card surface (was "white") */
-  --cv-card-hi:     #EEF1F6;  /* elevated / hover surface */
+  --cv-bg:          #F5F0E8;  /* generic page background — cream, not a cool grey */
+  --cv-bg-2:        #FCFAF5;  /* secondary / input background */
+  --cv-card:        #FDFBF7;  /* card surface — warm, so it sits ON the cream rather than glaring off it */
+  --cv-card-hi:     #F1EADD;  /* elevated / hover surface */
   --cv-cream:       #F5F0E8;  /* dashboard page background */
-  --cv-alt:         #F0F4F8;  /* subtle panel / alt table row */
+  --cv-alt:         #F1EBE0;  /* subtle panel / alt table row */
   --cv-disabled:    #F5F5F5;  /* disabled input background */
   --cv-track:       #E8ECF0;  /* progress-bar track */
 

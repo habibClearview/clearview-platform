@@ -25,6 +25,7 @@ import InterviewReporting from '@/components/gtcv/InterviewReporting'
 import EngagementPartiesPanel from '@/components/gtcv/EngagementPartiesPanel'
 import ShowcaseSharing from '@/components/gtcv/ShowcaseSharing'
 import EngagementSettings from '@/components/gtcv/EngagementSettings'
+import WelcomePack from '@/components/gtcv/WelcomePack'
 import WhatNeedsYou from '@/components/gtcv/WhatNeedsYou'
 import EvidenceLibraryPanel from '@/components/gtcv/EvidenceLibraryPanel'
 import InterviewBriefing from '@/components/gtcv/InterviewBriefing'
@@ -74,7 +75,15 @@ const fGrid= {display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1
 
 function navBtn(active){return{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',padding:'0.72rem 1rem',border:'none',background:'transparent',color:active?C.cyan:'var(--cv-wa-60)',cursor:'pointer',borderBottom:active?`3px solid ${C.cyan}`:'3px solid transparent',fontWeight:active?700:400,whiteSpace:'nowrap'}}
 function addBtn(sm=false,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.91rem':'0.95rem',padding:sm?'0.28rem 0.6rem':'0.38rem 0.8rem',border:`1px solid ${col}`,borderRadius:6,background:'transparent',color:col,cursor:'pointer'}}
-function solidBtn(col=C.cyan,sm=false){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.95rem':'1.01rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:col===C.white?C.navy:'var(--cv-on-accent)',cursor:'pointer'}}
+// White on a cyan or teal button is hard to read -- both are light enough that
+// the letters wash out. --cv-on-cyan is the dark ink that already existed for
+// this; the dark navy/slate/red buttons keep the white.
+function onSolid(col){
+  if(col===C.white||col===C.cream)return C.navy
+  if(col===C.cyan||col===C.teal||col===C.green||col===C.amber)return 'var(--cv-on-cyan)'
+  return 'var(--cv-on-accent)'
+}
+function solidBtn(col=C.cyan,sm=false){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.95rem':'1.01rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:onSolid(col),cursor:'pointer'}}
 // Pill toggle for mode / filter subtabs (new design language)
 function subPill(active,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
 
@@ -2367,7 +2376,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 <button type="button" onClick={()=>setFlashLocked(null)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',padding:'0.25rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,background:'transparent',color:C.slate,cursor:'pointer'}}>Close</button>
               </div>
             ):null}
-            {shownTab==='cover'&&<>{mayRun?<WhatNeedsYou clientId={selClient.id} canManage={canEdit(previewRoleId)} onGoTo={setActiveTab}/>:null}<CoverPanel slug={selClient.slug}/><div style={{height:18}}/>
+            {shownTab==='cover'&&<>{mayRun?<WelcomePack clientId={selClient.id} canManage={canEdit(previewRoleId)}/>:null}{mayRun?<WhatNeedsYou clientId={selClient.id} canManage={canEdit(previewRoleId)} onGoTo={setActiveTab}/>:null}<CoverPanel slug={selClient.slug}/><div style={{height:18}}/>
               <TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/>
               {!selClient.programme_id&&<ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>}
             </>}
