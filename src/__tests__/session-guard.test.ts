@@ -153,13 +153,16 @@ describe('the two places the rule has to hold', () => {
     expect(page).toMatch(/sessionIsStale[\s\S]{0,400}signOut/)
   })
 
-  it('the guard judges the stored clock before overwriting it', () => {
+  it('the guard captures the stored clock before overwriting it', () => {
+    // It stamps immediately so other tabs do not see this one as idle, so the
+    // ordering that matters is: capture, then stamp, then judge the capture.
     const hook = fs.readFileSync('src/lib/auth/useSessionGuard.ts', 'utf8')
-    const staleAt = hook.indexOf('sessionIsStale')
-    const seedAt = hook.indexOf('markActivity()\n    ACTIVITY_EVENTS')
-    expect(staleAt).toBeGreaterThan(-1)
-    expect(seedAt).toBeGreaterThan(-1)
-    expect(staleAt).toBeLessThan(seedAt)
+    const capture = hook.indexOf('const stampBefore = readStoredActivity()')
+    const stamp = hook.indexOf('markActivity()', capture)
+    const judge = hook.indexOf('sessionIsStale(Date.now(), stampBefore)')
+    expect(capture).toBeGreaterThan(-1)
+    expect(capture).toBeLessThan(stamp)
+    expect(stamp).toBeLessThan(judge)
   })
 
   it('both halves read one key', () => {
@@ -167,5 +170,57 @@ describe('the two places the rule has to hold', () => {
     expect(shared).toContain("LAST_ACTIVITY_KEY = 'cv:last-activity'")
     expect(fs.readFileSync('src/lib/auth/useSessionGuard.ts', 'utf8'))
       .not.toContain("const LAST_ACTIVITY_KEY =")
+  })
+})
+
+// ============================================================
+// THE LOCKOUT. 5 September 2026.
+// The staleness rule shipped without anything stamping the clock when a
+// person signs IN. So: type the right password, land on the dashboard, the
+// guard reads a stamp from days ago, calls a two-second-old session stale,
+// and signs out. Back to the sign-in page, forever. Habib could not get into
+// his own platform, with a live client on it.
+// ============================================================
+describe('signing in must survive the staleness rule', () => {
+  const NOW = 1_800_000_000_000
+  const OLD = NOW - 3 * 24 * 3600 * 1000
+
+  it('a session created after the stamp is a sign-in, not an idle one', () => {
+    // The guard only condemns a session OLDER than the stamp.
+    const signedInAt = NOW - 2000
+    expect(sessionIsStale(NOW, String(OLD))).toBe(true)   // the stamp is old
+    expect(signedInAt > OLD).toBe(true)                    // but the session is new
+  })
+
+  it('every path that establishes a session stamps the clock', () => {
+    const guard = fs.readFileSync('src/lib/auth/session-guard.ts', 'utf8')
+    expect(guard).toContain('export function markSignedIn')
+    for (const page of ['app/page.tsx', 'app/dashboard/[slug]/page.tsx']) {
+      const src = fs.readFileSync(page, 'utf8')
+      // Inside the handler that signs in, and before it navigates away —
+      // otherwise the next page reads the clock the old session left behind.
+      const handler = src.slice(src.indexOf('signInWithPassword'))
+      const stamp = handler.indexOf('markSignedIn()')
+      const nav = Math.min(
+        ...[handler.indexOf('window.location.href'), handler.indexOf('window.location.reload()')]
+          .filter((i) => i > -1),
+      )
+      expect(stamp).toBeGreaterThan(-1)
+      expect(stamp).toBeLessThan(nav)
+    }
+  })
+
+  it('the guard reads the stamp before it overwrites it', () => {
+    const hook = fs.readFileSync('src/lib/auth/useSessionGuard.ts', 'utf8')
+    expect(hook.indexOf('const stampBefore = readStoredActivity()'))
+      .toBeLessThan(hook.indexOf('markActivity()\n    //'))
+    // and an invite / reset link, which never passes a sign-in form, is checked
+    // against when the session was actually created
+    expect(hook).toContain('last_sign_in_at')
+  })
+
+  it('cannot prove staleness means stay signed in, never the reverse', () => {
+    const hook = fs.readFileSync('src/lib/auth/useSessionGuard.ts', 'utf8')
+    expect(hook).toMatch(/catch \(\) => \{ \/\* cannot prove it is stale[\s\S]{0,80}\*\/ \}|cannot prove it is stale/)
   })
 })

@@ -73,20 +73,33 @@ export function useSessionGuard(active: boolean) {
       window.location.href = '/'
     }
 
-    // A tab that has just mounted is not evidence that anybody was here. Seeding
-    // the clock unconditionally is what made the idle rule stop at the edge of a
-    // browsing session: close the browser for a weekend, open it, and the stamp
-    // said "active now". So look at what is stored FIRST, and if it is older
-    // than the idle window, end the session here rather than adopt it.
-    if (!unattended && sessionIsStale(Date.now(), readStoredActivity())) {
-      endSession()
-      return () => {
-        ACTIVITY_EVENTS.forEach((e) => window.removeEventListener(e, markActivity))
-        if (timer) clearInterval(timer)
-      }
-    }
-    // Past that, a freshly-loaded tab should not look instantly idle.
+    // A tab that has just mounted is not evidence that anybody was here.
+    // Seeding the clock unconditionally is what made the idle rule stop at the
+    // edge of a browsing session: close the browser for a weekend, open it, and
+    // the stamp said "active now".
+    //
+    // WHAT THE CLOCK SAID BEFORE THIS TAB TOUCHED IT. Read once, now, because
+    // the very next line overwrites it — and it is the only evidence of how
+    // long the app was closed.
+    const stampBefore = readStoredActivity()
+    // A freshly-loaded tab must not look idle to the other tabs while the
+    // check below is still in flight.
     markActivity()
+    //
+    // A SESSION NEWER THAN THE STAMP IS A SIGN-IN, NOT AN IDLE ONE. Sign-in
+    // pages stamp the clock themselves, but an invite link, a password reset
+    // and a magic link all establish a session without passing through one, and
+    // treating those as idle locks the person out of the account they have just
+    // proved they own. So the stamp only condemns a session older than it.
+    if (!unattended && sessionIsStale(Date.now(), stampBefore)) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (ended) return
+        const signedInAt = Date.parse(data.session?.user?.last_sign_in_at || '')
+        const stored = Number(stampBefore)
+        if (Number.isFinite(signedInAt) && Number.isFinite(stored) && signedInAt > stored) return
+        endSession()
+      }).catch(() => { /* cannot prove it is stale, so leave them signed in */ })
+    }
     ACTIVITY_EVENTS.forEach((e) => window.addEventListener(e, markActivity, { passive: true }))
 
     timer = setInterval(async () => {

@@ -133,6 +133,26 @@ export function isIdle(nowMs: number, lastActivityMs: number | null | undefined,
  */
 export const LAST_ACTIVITY_KEY = 'cv:last-activity'
 
+/**
+ * SIGNING IN IS ACTIVITY. 5 September 2026.
+ *
+ * Shipped yesterday, and it locked Habib out of his own platform with a live
+ * client on it. sessionIsStale reads a clock that a successful sign-in never
+ * touched, so the sequence was: type the right password, land on the dashboard,
+ * the guard mounts, reads a stamp from days ago, calls the session that is two
+ * seconds old stale, and signs out. Back to the sign-in page, forever.
+ *
+ * The rule was right and the clock was wrong. Every path that establishes a
+ * session stamps it here, before it navigates.
+ */
+export function markSignedIn(): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()))
+    }
+  } catch { /* a browser refusing storage must not block a sign-in */ }
+}
+
 export function sessionIsStale(
   nowMs: number,
   storedLastActivity: string | number | null | undefined,

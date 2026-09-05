@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { DEFAULT_LANDING, RETURN_TO_KEY, isSafeReturnPath, sessionIsStale, LAST_ACTIVITY_KEY } from '@/lib/auth/session-guard'
+import { DEFAULT_LANDING, RETURN_TO_KEY, isSafeReturnPath, sessionIsStale, markSignedIn, LAST_ACTIVITY_KEY } from '@/lib/auth/session-guard'
 
 const C = {
   navy:'#1B2A4A', cyan:'#00B4D8', cream:'#F8F4EE', white:'#FFFFFF',
@@ -77,6 +77,9 @@ export default function LoginPage() {
       setError('The email or password you entered is incorrect.')
       setLoading(false)
     } else {
+      // Before navigating: this session is one second old, and the guard on the
+      // next page judges it by the shared activity clock.
+      markSignedIn()
       window.location.href = landingPage()
     }
   }

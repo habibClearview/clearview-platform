@@ -1,6 +1,7 @@
 // @ts-nocheck
 'use client'
 import { useEffect, useState } from 'react'
+import { markSignedIn } from '@/lib/auth/session-guard'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import GenericDashboard from '@/components/generic/GenericDashboard'
@@ -139,6 +140,9 @@ export default function GenericClientPage() {
     // One generic message for every sign-in failure — never echo the raw
     // provider error, which can reveal whether an email exists.
     if (error) return 'The email or password you entered is incorrect.'
+    // Same reason as the main sign-in page: the guard judges this session by
+    // the shared activity clock, which a sign-in has to set.
+    markSignedIn()
     // Reload
     window.location.reload()
     return null
