@@ -34,23 +34,24 @@ describe('the welcome email', () => {
     expect(built.html).not.toContain('Tanager on Tanager')
   })
 
-  it('still names the engagement when it has one of its own', () => {
-    const titled = buildScopeEmail({ ...(cfg as object), engagementTitle: 'IGNITE+ Nigeria' } as never)
-    expect(titled.html).toContain('on IGNITE+ Nigeria')
+  it('names the programme the work sits under', () => {
+    const titled = buildScopeEmail({
+      ...(cfg as object), brief: { payerName: 'Tanager', payerProgramme: 'IGNITE+' },
+    } as never)
+    expect(titled.html).toContain('under IGNITE+')
   })
 
   it('carries the guide, not just a link', () => {
-    for (const heading of ['What it tracks', 'The two places you will spend your time',
-      'What Tanager does here', 'What Habib Onifade does here']) {
+    for (const heading of ['Who is who', 'What happens first']) {
       expect(built.html).toContain(heading)
     }
-    expect(built.html).toContain('Open your engagement')
+    expect(built.html).toContain('Open the engagement')
     expect(built.html).toContain('https://clearview.habibonifade.com/engagement/tanager')
   })
 
   it('tells them the sign-in arrives separately', () => {
     // Otherwise they press the link, find no password, and email to ask.
-    expect(built.html).toMatch(/separate email invites you to set your password/i)
+    expect(built.html).toMatch(/sign-in arrives in a separate email/i)
   })
 
   it('uses the language the rest of the system uses', () => {
@@ -79,31 +80,20 @@ describe('the welcome email', () => {
   })
 })
 
-describe('the guide describes the screens a client actually gets', () => {
+describe('the guide describes the engagement, not the coach\'s screens', () => {
   const built = buildScopeEmail(cfg)
 
-  it('names the three real surfaces', () => {
-    for (const s of ['Your journey', 'The Engagement Charter']) {
-      expect(built.html).toContain(s)
-    }
-    // The financial model is a SEPARATE service. Telling a canvas client about
-    // a dashboard they did not buy, and have no data in, is how the first
-    // impression becomes "this is not built for us".
-    expect(built.html).not.toContain('financial dashboard')
-  })
-
   it('does not describe the coach\'s own tab list', () => {
-    // CANVAS_TABS is what the COACH sees in their client view. A client signing
-    // in gets the engagement journey and the financial dashboard, and nothing
-    // called Cover, Engagement Tracker or Hypothesis Tracker.
+    // CANVAS_TABS is what the COACH sees in their client view.
     for (const coachTab of ['Cover', 'Engagement Tracker', 'Hypothesis Tracker', 'Pre-engagement diagnostic']) {
       expect(built.html).not.toContain(coachTab)
     }
   })
 
-  it('warns them most blocks are closed on day one', () => {
-    // Otherwise the first thing they see reads as a broken page.
-    expect(built.html).toMatch(/on day one most are still closed/i)
+  it('does not send a canvas client into the financial model', () => {
+    // A separate service. Telling a GtCV client about a dashboard they did not
+    // buy, and have no data in, is how the first impression is lost.
+    expect(built.html).not.toContain('financial dashboard')
   })
 
   it('does not promise a document upload that does not exist', () => {

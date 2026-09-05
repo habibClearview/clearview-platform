@@ -24,6 +24,7 @@
 // the gates require.
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
+import { briefFromConfig, briefIntoConfig } from '@/lib/engagement-brief'
 import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 
 const TERMINOLOGY = ['zone', 'dp']
@@ -68,11 +69,13 @@ export async function GET(req: NextRequest) {
       // this list: a new setting has to be added here as well as to the PATCH,
       // and forgetting means it saves and then reads back empty, which looks
       // like the save failed. That is exactly what happened to currency.
-      .select('client_id, tor_reference, tor_uploaded, terminology, momentum_status, validation_min_per_segment, independence_test_set, currency, showcase_enabled, showcase_name_client, updated_at')
+      .select('client_id, tor_reference, tor_uploaded, terminology, momentum_status, validation_min_per_segment, independence_test_set, currency, showcase_enabled, showcase_name_client, brand_overrides, updated_at')
       .eq('client_id', clientId)
       .maybeSingle()
 
-    return NextResponse.json({ config: data || null })
+    // The brief is read out of brand_overrides rather than handed over raw, so
+    // the screen and the email agree on its shape and neither has to trust it.
+    return NextResponse.json({ config: data || null, brief: briefFromConfig(data?.brand_overrides) })
   } catch (e: any) {
     console.error('engagement-config GET: unexpected error', e)
     return NextResponse.json({ error: 'Could not load the settings' }, { status: 500 })
@@ -142,6 +145,19 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: 'A currency is a short code, such as NGN or USD' }, { status: 400 })
       }
       patch.currency = raw || null
+    }
+
+    // THE BRIEF. What the signed Scope of Work and Purchase Order say, kept
+    // beside the settings because every screen that greets a client reads it.
+    // Merged rather than replaced: brand_overrides also holds the engagement
+    // title, and a brief save must not wipe it.
+    if (body.brief !== undefined) {
+      const { data: existing } = await admin
+        .from('engagement_config')
+        .select('brand_overrides')
+        .eq('client_id', clientId)
+        .maybeSingle()
+      patch.brand_overrides = briefIntoConfig(existing?.brand_overrides, body.brief)
     }
 
     if (typeof body.torReference === 'string') {

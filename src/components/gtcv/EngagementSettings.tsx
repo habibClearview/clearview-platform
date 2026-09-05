@@ -19,6 +19,7 @@ import { supabase } from '@/lib/supabase'
 import { DEFAULT_VALIDATION_MIN_PER_SEGMENT } from '@/lib/engagement-types'
 import { CONVERGENCE_MINIMUM } from '@/lib/interview-report'
 import { sendEngagementEmail } from '@/lib/engagement-actions'
+import { SERVICE_TYPES, SERVICE_LABEL } from '@/lib/engagement-brief'
 
 const C = {
   card: 'var(--cv-card)', alt: 'var(--cv-alt)', border: 'var(--cv-border)',
@@ -124,6 +125,10 @@ export default function EngagementSettings({ clientId, canManage }) {
   const [partyEmails, setPartyEmails] = useState([])
   // The built email, exactly as it would go out. Null until asked for.
   const [emailPreview, setEmailPreview] = useState(null)
+  // The signed Scope of Work and Purchase Order, as fields.
+  const [brief, setBrief] = useState({})
+  const [briefDraft, setBriefDraft] = useState(null)
+  const [welcomeAudience, setWelcomeAudience] = useState('served')
 
   const load = useCallback(async () => {
     if (!clientId) { setLoading(false); return }
@@ -131,6 +136,7 @@ export default function EngagementSettings({ clientId, canManage }) {
     try {
       const r = await api('GET', null, `?clientId=${encodeURIComponent(clientId)}`)
       setConfig(r.config)
+      setBrief(r.brief || {})
       setMinDraft(r.config?.validation_min_per_segment == null ? '' : String(r.config.validation_min_per_segment))
       setTorDraft(r.config?.tor_reference || '')
       setCurrencyDraft(r.config?.currency || '')
@@ -204,6 +210,84 @@ export default function EngagementSettings({ clientId, canManage }) {
       </Setting>
 
       <Setting
+        label="The engagement brief"
+        help={`What the signed Scope of Work and Purchase Order say: who pays, who the work is delivered to, which services, over what period, and what it produces. The welcome email is written from this, so filling it in once is what stops the same facts being retyped into every message.`}
+      >
+        {(() => {
+          const d = briefDraft || brief || {}
+          const set = (k, v) => setBriefDraft({ ...d, [k]: v })
+          const row = { display: 'grid', gridTemplateColumns: 'minmax(150px,1fr) minmax(0,2fr)', gap: '0.5rem', alignItems: 'center', marginBottom: '0.4rem' }
+          const lab = { ...hint, margin: 0 }
+          return (
+            <div>
+              <div style={row}><span style={lab}>Paying client</span>
+                <input style={field} value={d.payerName || ''} placeholder="e.g. Tanager"
+                  onChange={(e) => set('payerName', e.target.value)} /></div>
+              <div style={row}><span style={lab}>Programme</span>
+                <input style={field} value={d.payerProgramme || ''} placeholder="e.g. IGNITE+"
+                  onChange={(e) => set('payerProgramme', e.target.value)} /></div>
+              <div style={row}><span style={lab}>Served client</span>
+                <input style={field} value={d.servedName || ''} placeholder="the organisation the work is delivered to"
+                  onChange={(e) => set('servedName', e.target.value)} /></div>
+              <div style={row}><span style={lab}>Reference</span>
+                <input style={field} value={d.reference || ''} placeholder="e.g. Purchase Order 149"
+                  onChange={(e) => set('reference', e.target.value)} /></div>
+              <div style={row}><span style={lab}>Period</span>
+                <span style={{ display: 'flex', gap: '0.4rem' }}>
+                  <input style={field} type="date" value={(d.periodStart || '').slice(0, 10)}
+                    onChange={(e) => set('periodStart', e.target.value)} />
+                  <input style={field} type="date" value={(d.periodEnd || '').slice(0, 10)}
+                    onChange={(e) => set('periodEnd', e.target.value)} />
+                </span></div>
+              <div style={{ ...row, alignItems: 'start' }}><span style={lab}>Services</span>
+                <span style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+                  {SERVICE_TYPES.map((t) => {
+                    const on = (d.services || []).includes(t)
+                    return (
+                      <label key={t} style={{ ...hint, display: 'flex', gap: '0.3rem', alignItems: 'center', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox" checked={on}
+                          onChange={() => set('services', on
+                            ? (d.services || []).filter((x) => x !== t)
+                            : [...(d.services || []), t])}
+                        />{SERVICE_LABEL[t]}
+                      </label>
+                    )
+                  })}
+                </span></div>
+              <div style={{ ...row, alignItems: 'start' }}><span style={lab}>What it produces</span>
+                <textarea
+                  style={{ ...field, minHeight: 82 }} placeholder="One deliverable per line, in the ToR's own words"
+                  value={(d.deliverables || []).join('\n')}
+                  onChange={(e) => set('deliverables', e.target.value.split('\n').map((x) => x.trim()).filter(Boolean))}
+                /></div>
+              <div style={{ ...row, alignItems: 'start' }}><span style={lab}>Your opening line</span>
+                <textarea
+                  style={{ ...field, minHeight: 82 }}
+                  placeholder="Your own words, in your voice. Left empty, the welcome opens with a generated line."
+                  value={d.welcomeIntro || ''}
+                  onChange={(e) => set('welcomeIntro', e.target.value)}
+                /></div>
+              <button
+                type="button" style={smallBtn(C.teal, true)} disabled={busy === 'brief' || !briefDraft}
+                onClick={async () => {
+                  setBusy('brief'); setNote(null); setErr(null)
+                  try {
+                    await api('PATCH', { clientId, brief: briefDraft })
+                    setBriefDraft(null)
+                    setEmailPreview(null)
+                    setNote('The brief is saved. Rebuild the preview to see the welcome it writes.')
+                    await load()
+                  } catch (e) { setErr(e.message || 'That did not save') }
+                  setBusy(null)
+                }}
+              >{busy === 'brief' ? 'Saving...' : 'Save the brief'}</button>
+            </div>
+          )
+        })()}
+      </Setting>
+
+      <Setting
         label="Send the welcome email"
         help={`The first email the client gets from the platform. It sets out the work ahead, and its button opens their live journey — the nine Decision Points, where the work stands, and what each gate will produce. It goes to the client contact and to everyone listed as a party above, so add the people first. Their sign-in is a separate invite, sent from the client team card.`}
       >
@@ -224,6 +308,20 @@ export default function EngagementSettings({ clientId, canManage }) {
               <p style={{ ...hint, margin: '0 0 0.5rem' }}>
                 Goes to {to.join(', ')}. The button in it opens {journeyUrl || 'the journey'}.
               </p>
+              {/* THE PAYER AND THE SERVED ORGANISATION DO NOT DO THE SAME THING.
+                  One is doing the work, the other is watching it and paying for
+                  it, so they get different access paragraphs and the welcome is
+                  sent twice — once to each — rather than once to everybody. */}
+              <p style={{ ...hint, margin: '0 0 0.6rem', display: 'flex', gap: '0.9rem', flexWrap: 'wrap' }}>
+                {[['served', 'the organisation being served'], ['payer', 'the paying client']].map(([v, l]) => (
+                  <label key={v} style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', cursor: 'pointer' }}>
+                    <input
+                      type="radio" name="welcome-audience" checked={welcomeAudience === v}
+                      onChange={() => { setWelcomeAudience(v); setEmailPreview(null) }}
+                    />This copy is for {l}
+                  </label>
+                ))}
+              </p>
               <button
                 type="button"
                 style={smallBtn(C.slate)}
@@ -232,7 +330,8 @@ export default function EngagementSettings({ clientId, canManage }) {
                   setBusy('preview'); setNote(null); setErr(null)
                   try {
                     const r = await sendEngagementEmail({
-                      clientId, stage: 'scope', recipients: to, journeyUrl, preview: true,
+                      clientId, stage: 'scope', recipients: to, journeyUrl,
+                      preview: true, audience: welcomeAudience,
                     })
                     if (r?.html) setEmailPreview({ subject: r.subject, html: r.html })
                     else setErr('The preview came back empty.')
@@ -250,6 +349,7 @@ export default function EngagementSettings({ clientId, canManage }) {
                   try {
                     const r = await sendEngagementEmail({
                       clientId, stage: 'scope', recipients: to, journeyUrl,
+                      audience: welcomeAudience,
                     })
                     // Email being switched off is answered with a 200, so it
                     // has to be read rather than assumed to be a success.

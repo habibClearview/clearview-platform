@@ -75,6 +75,10 @@ export async function sendEngagementEmail(input: {
   journeyUrl: string
   /** Build it and hand it back instead of sending it. Same route, same builder. */
   preview?: boolean
+  /** Whether this copy is for the organisation paying or the one served. */
+  audience?: 'payer' | 'served'
+  /** The person's own name, so the email opens with it rather than "Welcome,". */
+  recipientName?: string
 }) {
   const res = await fetch('/api/engagement-email', {
     method: 'POST',

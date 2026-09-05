@@ -22,6 +22,7 @@ import { cleanRecipients, isWebUrl } from '@/lib/validate-input'
 import { getBearerToken } from '@/lib/auth/api-authz'
 import { resolveClientAccess } from '@/lib/auth/engagement-access'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { briefFromConfig } from '@/lib/engagement-brief'
 import {
   emailAvailable,
   sendEmail,
@@ -41,12 +42,14 @@ function getAdminClient() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { clientId, stage, recipients, journeyUrl, preview } = (await req.json()) as {
+    const { clientId, stage, recipients, journeyUrl, preview, audience, recipientName } = (await req.json()) as {
       clientId?: string
       stage?: Stage
       recipients?: string[]
       journeyUrl?: string
       preview?: boolean
+      audience?: 'payer' | 'served'
+      recipientName?: string
     }
     // A PREVIEW IS THE SAME EMAIL, NOT A SECOND COPY OF IT. 4 September 2026.
     // Habib asked where he could read the welcome before it went to a client.
@@ -157,6 +160,9 @@ export async function POST(req: NextRequest) {
       coachName,
       journeyUrl,
       engagementMode: (client as { engagement_mode?: string }).engagement_mode || 'canvas',
+      brief: briefFromConfig(config?.brand_overrides),
+      audience: audience === 'payer' ? 'payer' : 'served',
+      recipientName: typeof recipientName === 'string' ? recipientName.trim().slice(0, 80) || undefined : undefined,
     }
 
     const { subject, html } = stage === 'scope' ? buildScopeEmail(cfg) : buildTriPartyEmail(cfg)
