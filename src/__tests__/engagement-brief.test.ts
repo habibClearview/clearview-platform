@@ -119,7 +119,7 @@ describe('the two letters are different letters', () => {
   it('the payer letter is about oversight, not about doing the work', () => {
     expect(payer.html).toMatch(/read only/)
     expect(payer.html).toMatch(/Add as many of your team as you like/)
-    expect(payer.html).toMatch(/join any remote one/)
+    expect(payer.html).toMatch(/An invitation to any remote working session/)
     expect(payer.html).not.toMatch(/needs you personally, not a delegate/)
   })
 

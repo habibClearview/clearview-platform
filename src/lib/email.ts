@@ -248,7 +248,7 @@ function payerLetter(cfg: EngagementEmailConfig, brief: EngagementBrief): EmailT
     'Read the progress report at each of the nine decisions, signed off before it reaches you',
     'Open any decision and the evidence behind it, read only',
     'Comment wherever you want something questioned, and get it answered on the record',
-    'See the working sessions as they run, and join any remote one you want to sit in on',
+    'An invitation to any remote working session you want to sit in on, and everything a session produces on the record afterwards',
     'Add as many of your team as you like, so nobody is waiting on one person to forward things',
   ])))
 

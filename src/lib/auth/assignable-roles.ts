@@ -27,6 +27,14 @@ export const ASSIGNABLE_ROLES: Record<string, string[]> = {
   ceo: ['finance_manager', 'unit_head', 'accounts_assistant'],
   // A finance manager may only manage the roles below them.
   finance_manager: ['unit_head', 'accounts_assistant'],
+  // THE PAYING CLIENT STAFFS ITS OWN OVERSIGHT. 5 September 2026.
+  // A programme funder pays for the work and is told they may put as many of
+  // their people on it as they want to. They may mint peers and nothing else:
+  // a funder is read-only everywhere by resolveClientAccess, so another funder
+  // is the only role that grants no power they do not already have. The route
+  // pins the new login to the INVITER'S OWN programme, so this cannot reach
+  // across into somebody else's engagement.
+  funder: ['funder'],
 }
 
 /**

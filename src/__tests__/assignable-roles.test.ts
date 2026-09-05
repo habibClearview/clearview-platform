@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import fs from 'fs'
 import { canAssignRole, canModifyUserRole } from '../lib/auth/assignable-roles'
 
 describe('canAssignRole', () => {
@@ -69,5 +70,40 @@ describe('canModifyUserRole (target-role hierarchy)', () => {
   it('a unit_head/accounts_assistant may never change anyone', () => {
     expect(canModifyUserRole('unit_head', 'accounts_assistant', 'unit_head')).toBe(false)
     expect(canModifyUserRole('accounts_assistant', 'unit_head', 'accounts_assistant')).toBe(false)
+  })
+})
+
+// ============================================================
+// THE PAYING CLIENT STAFFS ITS OWN OVERSIGHT. 5 September 2026.
+// Tanager is told in writing that they may put as many of their people on the
+// engagement as they want. A funder is read-only everywhere, so a peer is the
+// only role they can mint that grants nothing they do not already hold.
+// ============================================================
+describe('a funder may add colleagues, and nothing else', () => {
+  it('may mint a peer', () => {
+    expect(canAssignRole('funder', 'funder')).toBe(true)
+  })
+
+  it('may not mint anything that can act', () => {
+    for (const r of ['super_coach', 'coach', 'ceo', 'finance_manager', 'unit_head', 'accounts_assistant']) {
+      expect(canAssignRole('funder', r)).toBe(false)
+    }
+  })
+
+  it('may not be minted by the organisation being coached', () => {
+    // A funder sees the whole programme. A client's CEO handing that out would
+    // be handing out sight of engagements that are not theirs.
+    for (const r of ['ceo', 'finance_manager']) expect(canAssignRole(r, 'funder')).toBe(false)
+  })
+
+  it('is pinned to the inviter\'s own programme by the route', () => {
+    const route = fs.readFileSync('app/api/invite-user/route.ts', 'utf8')
+    // The cross-organisation guard reads engagement_client_id, which a funder
+    // does not have — without this pin a funder could pass any programme id.
+    expect(route).toContain('effectiveFunderProgrammeId = inviterProfile.funder_programme_id')
+    expect(route).toContain("funder_programme_id: role === 'funder' ? effectiveFunderProgrammeId : null")
+    expect(route).toContain("inviterRole === 'funder' && role === 'funder'")
+    // and a funder with no programme of their own cannot invite at all
+    expect(route).toMatch(/not attached to a programme yet, so it cannot invite anybody/)
   })
 })

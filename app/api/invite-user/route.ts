@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
     // manager invite.
     const { data: inviterProfile } = await admin
       .from('user_profiles')
-      .select('role, engagement_client_id')
+      .select('role, engagement_client_id, funder_programme_id')
       .eq('id', inviter.id)
       .single()
 
@@ -140,15 +140,33 @@ export async function POST(req: NextRequest) {
     const canInvite =
       inviterRole === 'super_coach' ||
       (inviterRole === 'ceo' && ['finance_manager', 'unit_head', 'accounts_assistant'].includes(role)) ||
-      (inviterRole === 'finance_manager' && ['unit_head', 'accounts_assistant'].includes(role))
+      (inviterRole === 'finance_manager' && ['unit_head', 'accounts_assistant'].includes(role)) ||
+      // A funder may add colleagues to watch their own programme, and nothing
+      // else. See ASSIGNABLE_ROLES for why a peer is the only safe target.
+      (inviterRole === 'funder' && role === 'funder')
 
     if (!canInvite) {
       return NextResponse.json({ error: 'You do not have permission to assign this role' }, { status: 403 })
     }
 
     // CEO/finance_manager can only invite within their own client
-    if (inviterRole !== 'super_coach' && clientId && inviterProfile.engagement_client_id !== clientId) {
+    if (inviterRole !== 'super_coach' && inviterRole !== 'funder' && clientId && inviterProfile.engagement_client_id !== clientId) {
       return NextResponse.json({ error: 'Cannot invite users to a different organisation' }, { status: 403 })
+    }
+
+    // A FUNDER'S INVITE IS PINNED TO THEIR OWN PROGRAMME. The guard above reads
+    // engagement_client_id, which a funder does not have — they are scoped by
+    // funder_programme_id instead, so without this a funder could invite a peer
+    // into somebody else's programme by passing its id.
+    let effectiveFunderProgrammeId = funderProgrammeId
+    if (inviterRole === 'funder') {
+      if (!inviterProfile.funder_programme_id) {
+        return NextResponse.json(
+          { error: 'Your login is not attached to a programme yet, so it cannot invite anybody.' },
+          { status: 403 },
+        )
+      }
+      effectiveFunderProgrammeId = inviterProfile.funder_programme_id
     }
 
     // Where the invitee lands after they click the email link and set their
@@ -290,7 +308,7 @@ export async function POST(req: NextRequest) {
       email,
       assigned_unit_ids: assignedUnitIds || [],
       co_implementer_id: role === 'coach' ? coImplementerId : null,
-      funder_programme_id: role === 'funder' ? funderProgrammeId : null,
+      funder_programme_id: role === 'funder' ? effectiveFunderProgrammeId : null,
     }
 
     // Status: the accurate value for someone who has been invited but has not
