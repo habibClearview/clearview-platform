@@ -65,7 +65,7 @@ function deriveCurrentDp(status: Record<DpId, GateStatusValue>): DpId | null {
  * Tries slug first, then id, so a caller can pass whichever it holds.
  */
 async function resolveClient(slugOrId: string): Promise<EngagementClientSummary | null> {
-  const cols = 'id,slug,name,status,programme_id'
+  const cols = 'id,slug,name,status,programme_id,engagement_mode'
   const bySlug = await supabase
     .from('engagement_clients')
     .select(cols)

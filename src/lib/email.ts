@@ -209,12 +209,11 @@ export function buildScopeEmail(cfg: EngagementEmailConfig): { subject: string; 
         + '<li style="margin:0 0 5px;">Commercial readiness, measured at the start, the middle and the end</li>'
         + '</ul>',
       ),
-      raw('<b>The three places you will spend your time</b>'),
+      raw('<b>The two places you will spend your time</b>'),
       raw(
         '<ul style="margin:0 0 14px;padding-left:20px;">'
         + '<li style="margin:0 0 8px;"><b>Your journey.</b> The whole engagement on one canvas: the nine Decision Points in their real positions, and where the work stands on each. This is what the button below opens. Blocks open in order, so on day one most are still closed — that is the method, not a fault.</li>'
         + '<li style="margin:0 0 8px;"><b>The Engagement Charter.</b> What each of us commits to. Read it, comment on it, and download it as a Word document whenever you want it. Once it is issued for signature, the people named as signatories sign it there.</li>'
-        + `<li style="margin:0 0 5px;"><b>The financial dashboard.</b> The plan, the actuals against it, and the statements that come out of them. It starts empty; we fill it together.</li>`
         + '</ul>',
       ),
       raw(`<b>What ${client} does here</b>`),

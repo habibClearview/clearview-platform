@@ -40,7 +40,7 @@ describe('the welcome email', () => {
   })
 
   it('carries the guide, not just a link', () => {
-    for (const heading of ['What it tracks', 'The three places you will spend your time',
+    for (const heading of ['What it tracks', 'The two places you will spend your time',
       'What Tanager does here', 'What Habib Onifade does here']) {
       expect(built.html).toContain(heading)
     }
@@ -83,9 +83,13 @@ describe('the guide describes the screens a client actually gets', () => {
   const built = buildScopeEmail(cfg)
 
   it('names the three real surfaces', () => {
-    for (const s of ['Your journey', 'The Engagement Charter', 'The financial dashboard']) {
+    for (const s of ['Your journey', 'The Engagement Charter']) {
       expect(built.html).toContain(s)
     }
+    // The financial model is a SEPARATE service. Telling a canvas client about
+    // a dashboard they did not buy, and have no data in, is how the first
+    // impression becomes "this is not built for us".
+    expect(built.html).not.toContain('financial dashboard')
   })
 
   it('does not describe the coach\'s own tab list', () => {

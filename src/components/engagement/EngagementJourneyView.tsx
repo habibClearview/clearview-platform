@@ -381,10 +381,17 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
               href={`/engagement/${slug}/charter`}
               style={{ color: 'var(--teal)', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}
             >Engagement Charter &rarr;</a>
-            <a
-              href={`/dashboard/${slug}`}
-              style={{ color: 'var(--teal)', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}
-            >Financial dashboard &rarr;</a>
+            {/* ONLY WHEN THE FINANCIAL MODEL IS ACTUALLY THEIR SERVICE.
+                5 September 2026. This link went to every client yesterday,
+                which sends a GtCV client into a service they did not buy and
+                have no data in. The two are separate services and the canvas
+                is not a way in to the other one. */}
+            {view.client?.engagement_mode === 'financial' ? (
+              <a
+                href={`/dashboard/${slug}`}
+                style={{ color: 'var(--teal)', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}
+              >Financial dashboard &rarr;</a>
+            ) : null}
           </p>
         </section>
 

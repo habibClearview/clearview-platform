@@ -276,6 +276,8 @@ export interface DpGateStatus {
 // and payment fields are deliberately NOT surfaced here (they live in a
 // separate, private view).
 export interface EngagementClientSummary {
+  /** Which service this engagement is: the canvas, or the financial model. */
+  engagement_mode?: 'canvas' | 'financial'
   id: string
   slug: string | null
   name: string
