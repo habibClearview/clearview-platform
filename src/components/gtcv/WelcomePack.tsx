@@ -128,6 +128,49 @@ export default function WelcomePack({ clientId, canManage }) {
       {note ? <div style={{ color: C.green, fontSize: '0.95rem', marginTop: '0.7rem' }}>{note}</div> : null}
 
       <Setting
+        label="Read it from the contract"
+        help={`Attach the signed Scope of Work or Purchase Order and the fields below are filled in from it — the reference, the period of performance and the deliverables in the document's own words. Nothing is stored: the file is read and discarded, and everything it found is yours to correct before you save.`}
+      >
+        <div>
+          <input
+            type="file" accept=".pdf,.txt,application/pdf,text/plain"
+            disabled={busy === 'tor'}
+            style={{ ...hint, marginBottom: '0.4rem' }}
+            onChange={async (e) => {
+              const file = e.target.files && e.target.files[0]
+              if (!file) return
+              setBusy('tor'); setNote(null); setErr(null)
+              try {
+                const { data } = await supabase.auth.getSession()
+                const body = new FormData()
+                body.append('clientId', clientId)
+                body.append('file', file)
+                const res = await fetch('/api/tor-extract', {
+                  method: 'POST',
+                  headers: data.session?.access_token
+                    ? { Authorization: `Bearer ${data.session.access_token}` } : {},
+                  body,
+                })
+                const json = await res.json().catch(() => ({}))
+                if (!res.ok) throw new Error(json?.error || 'Could not read that document')
+                const f = json.fields || {}
+                const found = Object.keys(f).filter((k) => f[k] !== undefined && f[k] !== null)
+                if (!found.length) {
+                  setErr(json.note || 'Nothing recognisable came out of that document. Type the details in instead.')
+                } else {
+                  setBriefDraft({ ...(briefDraft || brief || {}), ...f })
+                  setNote(`Read from the document: ${found.join(', ')}. Check it, then save the brief.`)
+                }
+              } catch (e2) { setErr(e2.message || 'Could not read that document') }
+              setBusy(null)
+              e.target.value = ''
+            }}
+          />
+          {busy === 'tor' ? <p style={hint}>Reading the document...</p> : null}
+        </div>
+      </Setting>
+
+      <Setting
         label="The engagement brief"
         help={`What the signed Scope of Work and Purchase Order say: who pays, who the work is delivered to, which services, over what period, and what it produces. The welcome email is written from this, so filling it in once is what stops the same facts being retyped into every message.`}
       >
