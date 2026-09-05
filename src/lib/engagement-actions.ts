@@ -77,8 +77,10 @@ export async function sendEngagementEmail(input: {
   preview?: boolean
   /** Whether this copy is for the organisation paying or the one served. */
   audience?: 'payer' | 'served'
-  /** The person's own name, so the email opens with it rather than "Welcome,". */
+  /** Their full name, so the letter opens "Dear Mr Morgan Mercer,". */
   recipientName?: string
+  /** Mr, Ms, Dr — whatever they are addressed as. */
+  recipientTitle?: string
 }) {
   const res = await fetch('/api/engagement-email', {
     method: 'POST',

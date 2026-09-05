@@ -129,6 +129,9 @@ export default function EngagementSettings({ clientId, canManage }) {
   const [brief, setBrief] = useState({})
   const [briefDraft, setBriefDraft] = useState(null)
   const [welcomeAudience, setWelcomeAudience] = useState('served')
+  // A letter is addressed to a person, so who it is to is part of sending it.
+  const [toTitle, setToTitle] = useState('')
+  const [toName, setToName] = useState('')
 
   const load = useCallback(async () => {
     if (!clientId) { setLoading(false); return }
@@ -318,9 +321,23 @@ export default function EngagementSettings({ clientId, canManage }) {
                     <input
                       type="radio" name="welcome-audience" checked={welcomeAudience === v}
                       onChange={() => { setWelcomeAudience(v); setEmailPreview(null) }}
-                    />This copy is for {l}
+                    />This letter is for {l}
                   </label>
                 ))}
+              </p>
+              {/* ADDRESSED TO A PERSON. "Dear Morgan," is how you write to a
+                  child. A client gets their title and their full name, and if
+                  neither is given the letter opens "Dear colleague," rather
+                  than guessing at one. */}
+              <p style={{ display: 'flex', gap: '0.4rem', margin: '0 0 0.6rem', flexWrap: 'wrap' }}>
+                <input
+                  style={{ ...field, maxWidth: 90 }} placeholder="Mr / Ms"
+                  value={toTitle} onChange={(e) => { setToTitle(e.target.value); setEmailPreview(null) }}
+                />
+                <input
+                  style={{ ...field, maxWidth: 280 }} placeholder="Full name, e.g. Morgan Mercer"
+                  value={toName} onChange={(e) => { setToName(e.target.value); setEmailPreview(null) }}
+                />
               </p>
               <button
                 type="button"
@@ -332,6 +349,7 @@ export default function EngagementSettings({ clientId, canManage }) {
                     const r = await sendEngagementEmail({
                       clientId, stage: 'scope', recipients: to, journeyUrl,
                       preview: true, audience: welcomeAudience,
+                      recipientName: toName, recipientTitle: toTitle,
                     })
                     if (r?.html) setEmailPreview({ subject: r.subject, html: r.html })
                     else setErr('The preview came back empty.')
@@ -350,6 +368,7 @@ export default function EngagementSettings({ clientId, canManage }) {
                     const r = await sendEngagementEmail({
                       clientId, stage: 'scope', recipients: to, journeyUrl,
                       audience: welcomeAudience,
+                      recipientName: toName, recipientTitle: toTitle,
                     })
                     // Email being switched off is answered with a 200, so it
                     // has to be read rather than assumed to be a success.

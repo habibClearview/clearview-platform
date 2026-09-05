@@ -136,41 +136,30 @@ export function periodInWords(brief: EngagementBrief): string | undefined {
 }
 
 /**
- * WHO SEES WHAT, IN THE WORDS THE READER NEEDS.
- *
- * The payer and the served organisation get the same email and must not get the
- * same paragraph: one is doing the work, the other is watching it and paying
- * for it. This returns the access lines for a given audience.
+ * HOW LONG, IN THE WORDS A PERSON USES. "six months", not a date arithmetic
+ * result — the reader wants the shape of the commitment, not the arithmetic.
  */
-export function accessLines(audience: 'payer' | 'served'): string[] {
-  if (audience === 'payer') {
-    return [
-      'The progress report at each Decision Point, signed off before it reaches you',
-      'Every Decision Point and the evidence behind it, read only',
-      'A comment on anything you want to question, answered on the record',
-      'Sight of the live sessions as they run, and an invitation to join any remote one',
-    ]
-  }
-  return [
-    'The whole engagement on one canvas, and where the work stands on each Decision Point',
-    'The Engagement Charter to read, comment on, and sign when it is issued',
-    'The working sessions, from a link sent for each one',
-    'Your Executive Director signs off each Decision Point once the work behind it holds',
-  ]
+export function durationInWords(brief: EngagementBrief): string | undefined {
+  if (!brief.periodStart || !brief.periodEnd) return undefined
+  const a = new Date(brief.periodStart)
+  const b = new Date(brief.periodEnd)
+  if (!Number.isFinite(a.getTime()) || !Number.isFinite(b.getTime())) return undefined
+  const months = Math.round((b.getTime() - a.getTime()) / (30.44 * 24 * 3600 * 1000))
+  if (months < 1) return undefined
+  if (months === 1) return 'a month'
+  if (months < 12) return `${['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven'][months] || months} months`
+  return months === 12 ? 'a year' : `${Math.round(months / 12 * 10) / 10} years`
 }
 
 /**
- * The three things that happen first, in order. Written here rather than in the
- * email builder because the Charter and the engagement screens say it too, and
- * a client told two different orders trusts neither.
+ * A SALUTATION IS NOT A FIRST NAME. A client is written to by name and title —
+ * "Dear Mr Morgan Mercer" — and a bare first name reads as talking down to
+ * them. With no name at all this returns nothing, and the caller must not
+ * invent one: no salutation is better than the wrong one.
  */
-export function openingSequence(brief: EngagementBrief): string[] {
-  const payer = brief.payerName
-  const served = brief.servedName
-  const both = payer && served ? `${payer} and ${served}` : (payer || served || 'both organisations')
-  return [
-    `A first meeting with ${both} together, to answer the pre-engagement questions. Those answers decide whether the engagement starts, so it is the one meeting nothing moves without.`,
-    'The inception meeting, where the Engagement Charter is agreed and signed and the rhythm of the work is set.',
-    'Then the Decision Points in order, each one signed off before the next opens, with a progress report at every one.',
-  ]
+export function salutation(fullName?: string, title?: string): string | undefined {
+  const name = (fullName || '').trim().replace(/\s+/g, ' ')
+  if (!name) return undefined
+  const t = (title || '').trim().replace(/\.$/, '')
+  return `Dear ${t ? `${t} ` : ''}${name},`
 }

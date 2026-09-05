@@ -42,7 +42,7 @@ function getAdminClient() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { clientId, stage, recipients, journeyUrl, preview, audience, recipientName } = (await req.json()) as {
+    const { clientId, stage, recipients, journeyUrl, preview, audience, recipientName, recipientTitle } = (await req.json()) as {
       clientId?: string
       stage?: Stage
       recipients?: string[]
@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
       preview?: boolean
       audience?: 'payer' | 'served'
       recipientName?: string
+      recipientTitle?: string
     }
     // A PREVIEW IS THE SAME EMAIL, NOT A SECOND COPY OF IT. 4 September 2026.
     // Habib asked where he could read the welcome before it went to a client.
@@ -162,7 +163,8 @@ export async function POST(req: NextRequest) {
       engagementMode: (client as { engagement_mode?: string }).engagement_mode || 'canvas',
       brief: briefFromConfig(config?.brand_overrides),
       audience: audience === 'payer' ? 'payer' : 'served',
-      recipientName: typeof recipientName === 'string' ? recipientName.trim().slice(0, 80) || undefined : undefined,
+      recipientName: typeof recipientName === 'string' ? recipientName.trim().slice(0, 120) || undefined : undefined,
+      recipientTitle: typeof recipientTitle === 'string' ? recipientTitle.trim().slice(0, 16) || undefined : undefined,
     }
 
     const { subject, html } = stage === 'scope' ? buildScopeEmail(cfg) : buildTriPartyEmail(cfg)

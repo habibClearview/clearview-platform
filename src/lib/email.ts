@@ -162,8 +162,8 @@ export function brandedEmail(input: BrandedEmailInput): string {
 }
 
 import {
-  type EngagementBrief, SERVICE_LABEL, SERVICE_SUMMARY,
-  periodInWords, accessLines, openingSequence,
+  type EngagementBrief, SERVICE_LABEL,
+  periodInWords, durationInWords, salutation,
 } from '@/lib/engagement-brief'
 
 // ─── Engagement email builders (config driven) ───────────────
@@ -180,8 +180,8 @@ export interface EngagementEmailConfig {
   brief?: EngagementBrief
   /** Who this copy is addressed to: the organisation paying, or the one served. */
   audience?: 'payer' | 'served'
-  /** The person's own name, so the email opens with it. */
-  recipientRoleLabel?: string
+  /** Mr, Ms, Dr — whatever they are addressed as. */
+  recipientTitle?: string
 }
 
 /**
@@ -200,96 +200,131 @@ function onTitle(cfg: EngagementEmailConfig): string {
  * Stage one email: from the coach to the client, setting out what the
  * engagement covers and sharing the link. Recipients are passed by the caller.
  */
+const SIGN_IN_HOME = 'https://habibonifade.com'
+
+/** A bulleted list, already-safe HTML in, HTML out. */
+function ul(items: string[]): string {
+  return `<ul style="margin:0 0 14px;padding-left:20px;">${
+    items.map((i) => `<li style="margin:0 0 7px;">${i}</li>`).join('')
+  }</ul>`
+}
+
+/**
+ * THE LETTER TO THE ORGANISATION PAYING FOR THE WORK.
+ *
+ * They commissioned it and they wrote the Scope of Work, so this does not tell
+ * them what is in it. What they have not seen is how the work is actually run,
+ * what it will ask of both organisations, and what they will be able to watch
+ * from where they sit. That is the whole letter.
+ */
+function payerLetter(cfg: EngagementEmailConfig, brief: EngagementBrief): EmailText[] {
+  const served = escapeHtml(brief.servedName || cfg.clientName)
+  const programme = brief.payerProgramme ? escapeHtml(brief.payerProgramme) : null
+  const span = durationInWords(brief) || 'the engagement'
+  const serviceName = escapeHtml(SERVICE_LABEL[(brief.services && brief.services[0]) || 'canvas'])
+  const p: EmailText[] = []
+
+  p.push(raw(
+    brief.welcomeIntro
+      ? escapeHtml(brief.welcomeIntro).replace(/\n+/g, '<br/>')
+      : `I am glad to be working with you, and I look forward to engaging with ${served} and your team over the next ${escapeHtml(span)}.`,
+  ))
+
+  p.push(raw(
+    `The work runs on the <b>${serviceName}</b> method. It takes services an organisation already delivers and turns them into offers that can be priced, sold and defended commercially — the segments named, the value proposition sharpened, the pricing built off real costs, and the whole thing tested with paying clients rather than argued about on paper.`,
+  ))
+
+  p.push(raw('<b>How it runs</b>'), raw(ul([
+    `<b>Before it starts.</b> One meeting with ${programme ? `${programme}, ` : ''}${served} and me together. We agree what the outputs will be and what each side is committing — the time ${served}&rsquo;s leadership will give it, and what ${programme || 'you'} needs to see along the way. The engagement does not begin until that is settled, and it is the meeting everything after depends on.`,
+    `<b>While it runs.</b> Nine decisions, taken in sequence. Each one is ${served}&rsquo;s decision, signed by their leadership, on evidence recorded at the time. Nothing moves to the next decision until the one before it is signed, so progress is never a matter of opinion.`,
+    `<b>When it closes.</b> A handover so the work keeps running without me, and a close-out report.`,
+  ])))
+
+  p.push(raw(
+    `<b>The platform is how the work is delivered</b>, not a report written about it afterwards. Every decision, the evidence behind it and where the work stands is on Clearview as it happens. That is what lets you see the engagement without having to ask anyone how it is going.`,
+  ))
+
+  p.push(raw(`<b>What ${programme || 'you'} will be able to do</b>`), raw(ul([
+    'Read the progress report at each of the nine decisions, signed off before it reaches you',
+    'Open any decision and the evidence behind it, read only',
+    'Comment wherever you want something questioned, and get it answered on the record',
+    'See the working sessions as they run, and join any remote one you want to sit in on',
+    'Add as many of your team as you like, so nobody is waiting on one person to forward things',
+  ])))
+
+  p.push(raw(
+    `<b>Your access starts today.</b> Go to <a href="${SIGN_IN_HOME}" style="color:#00767A;">habibonifade.com</a> and press <b>Clearview sign in</b>. A separate email gives you a temporary password to set your own. You will be able to look around straight away; the working areas open when the engagement does.`,
+  ))
+
+  return p
+}
+
+/**
+ * THE LETTER TO THE ORGANISATION THE WORK IS DELIVERED TO.
+ *
+ * A different letter, not a variant of the one above. This one is asking for
+ * something: the chief executive's own time, in the room, undelegated, on a
+ * timeline that does not have slack in it. If that is not understood at the
+ * start it is discovered in month three, which is too late.
+ */
+function servedLetter(cfg: EngagementEmailConfig, brief: EngagementBrief): EmailText[] {
+  const org = escapeHtml(brief.servedName || cfg.clientName)
+  const payer = brief.payerName ? escapeHtml(brief.payerName) : null
+  const span = durationInWords(brief) || 'the engagement'
+  const serviceName = escapeHtml(SERVICE_LABEL[(brief.services && brief.services[0]) || 'canvas'])
+  const p: EmailText[] = []
+
+  p.push(raw(
+    brief.welcomeIntro
+      ? escapeHtml(brief.welcomeIntro).replace(/\n+/g, '<br/>')
+      : `I am glad to be working with you and your team. Over the next ${escapeHtml(span)} we will work through this together — not me delivering something to ${org}, but the two of us building services ${org} can sell and go on selling after I have gone.`,
+  ))
+
+  p.push(raw(
+    `The method is <b>${serviceName}</b>. By the end of it your services will be defined and packaged, the client segments they are for will be named, the pricing will be built from what delivery actually costs you, and the services will have been tested with real paying clients. That last part is the one that makes the difference, and it is also the one that needs your organisation&rsquo;s attention most.`,
+  ))
+
+  p.push(raw('<b>Nine decisions, and why they are yours</b>'))
+  p.push(raw(
+    `The engagement turns on nine decisions, taken in order. Each one is a decision <b>${org}</b> makes and signs — not a recommendation I hand you. None of them can be signed without evidence recorded behind it, so a decision can always be justified later, or revisited when the evidence changes. And the work does not move past a decision until you are satisfied with it. That is the whole safeguard: nothing is built on a decision you were not comfortable making.`,
+  ))
+
+  p.push(raw('<b>What happens before we start</b>'))
+  p.push(raw(
+    `One meeting, with ${payer ? `${payer}, ` : ''}you and me, to agree what the engagement will produce and what it will ask of each of us. <b>It needs you personally, not a delegate.</b> The nine decisions belong to the person who carries the organisation, and every engagement that has been delegated at this point has had to be restarted at it. The timeline we are working to has no room for that.`,
+  ))
+
+  p.push(raw(
+    `<b>The platform is where the work lives.</b> Clearview holds each decision, the evidence behind it and what is outstanding, so at any point you can see exactly where the engagement stands rather than waiting for a report. ${payer ? `${payer} sees the same picture, read only, which means progress is never something you have to write up for them.` : ''}`,
+  ))
+
+  p.push(raw(
+    `<b>You can look around today.</b> Go to <a href="${SIGN_IN_HOME}" style="color:#00767A;">habibonifade.com</a> and press <b>Clearview sign in</b>. A separate email gives you a temporary password to set your own. The pre-engagement material is there to read now; the rest opens as we work through it.`,
+  ))
+
+  return p
+}
+
 export function buildScopeEmail(cfg: EngagementEmailConfig): { subject: string; html: string } {
   const brief = cfg.brief || {}
   const audience = cfg.audience || 'served'
-  const client = escapeHtml(cfg.clientName)
-  const payer = brief.payerName ? escapeHtml(brief.payerName) : null
-  const served = escapeHtml(brief.servedName || cfg.clientName)
-  const programme = brief.payerProgramme ? escapeHtml(brief.payerProgramme) : null
-  const period = periodInWords(brief)
-  const services = brief.services && brief.services.length
-    ? brief.services
-    : [cfg.engagementMode === 'financial' ? ('financial' as const) : ('canvas' as const)]
-
-  // The payer is not the one whose platform it is. "Ikore: your engagement
-  // platform is ready" is wrong in Tanager's inbox on the first word that
-  // matters.
   const subjectName = brief.servedName || cfg.clientName
   const subject = audience === 'payer'
-    ? `${subjectName}: the engagement platform is ready`
-    : `${subjectName}: your engagement platform is ready`
-
-  const ul = (items: string[]) =>
-    `<ul style="margin:0 0 14px;padding-left:20px;">${
-      items.map((i) => `<li style="margin:0 0 6px;">${i}</li>`).join('')
-    }</ul>`
-
-  const paragraphs: EmailText[] = []
-
-  // Habib's own words come first when he has written any. The generated
-  // opening is correct; it is not his voice, and this is a first impression.
-  if (brief.welcomeIntro) {
-    paragraphs.push(raw(escapeHtml(brief.welcomeIntro).replace(/\n+/g, '<br/>')))
-  } else {
-    paragraphs.push(raw(
-      `I am glad to be working with you. This is the platform the engagement runs on, and this note says what it covers, who does what, and what happens first.`,
-    ))
-  }
-
-  // WHO IS WHO. Named explicitly, because a payer told they are doing the
-  // exercises, or an LSP told they are being invoiced, stops reading.
-  const whoRows: string[] = []
-  if (payer) {
-    whoRows.push(`<b>${payer}</b> is the client commissioning and paying for this work${programme ? `, under ${programme}` : ''}.`)
-  }
-  whoRows.push(`<b>${served}</b> is the organisation the work is delivered to, and does the work of the engagement.`)
-  whoRows.push('<b>Habib Onifade</b> is the lead practitioner.')
-  paragraphs.push(raw('<b>Who is who</b>'), raw(ul(whoRows)))
-
-  // THE SERVICE, BY NAME. Not "the platform" — the thing that was bought.
-  paragraphs.push(
-    raw(`<b>The service${services.length > 1 ? 's' : ''}${period ? `, ${escapeHtml(period)}` : ''}</b>`),
-    raw(ul(services.map((s) => `<b>${escapeHtml(SERVICE_LABEL[s])}.</b> ${escapeHtml(SERVICE_SUMMARY[s])}`))),
-  )
-
-  if (brief.deliverables && brief.deliverables.length) {
-    paragraphs.push(
-      raw('<b>What it produces</b>'),
-      raw(ul(brief.deliverables.map((d) => escapeHtml(d)))),
-    )
-  }
-
-  // WHAT HAPPENS FIRST. The pre-engagement questions are the one meeting the
-  // whole engagement is conditional on, so they lead.
-  paragraphs.push(
-    raw('<b>What happens first</b>'),
-    raw(`<ol style="margin:0 0 14px;padding-left:20px;">${
-      openingSequence({ ...brief, servedName: brief.servedName || cfg.clientName })
-        .map((i) => `<li style="margin:0 0 6px;">${escapeHtml(i)}</li>`).join('')
-    }</ol>`),
-  )
-
-  // ACCESS, FOR THIS READER. The payer and the served organisation get the
-  // same email and must not get the same paragraph.
-  paragraphs.push(
-    raw(`<b>What ${audience === 'payer' ? (payer || 'you') : served} sees on the platform</b>`),
-    raw(ul(accessLines(audience).map((l) => escapeHtml(l)))),
-  )
-
-  paragraphs.push(raw(
-    'Your sign-in arrives in a separate email, which asks you to set a password. Nothing on the platform needs saving: every entry is recorded as it is made.',
-  ))
-  if (brief.reference) {
-    paragraphs.push(raw(`<span style="color:#4A5A6A;">This engagement is under ${escapeHtml(brief.reference)}.</span>`))
-  }
+    ? `${subjectName}: how the engagement will run, and your access`
+    : `${subjectName}: how we will work, and your access`
 
   const html = brandedEmail({
-    heading: cfg.recipientName ? `${cfg.recipientName},` : 'Welcome,',
-    paragraphs,
+    // A client is written to by name. A bare first name reads as talking down
+    // to them, and no salutation at all is better than the wrong one.
+    heading: salutation(cfg.recipientName, cfg.recipientTitle) || 'Dear colleague,',
+    paragraphs: audience === 'payer' ? payerLetter(cfg, brief) : servedLetter(cfg, brief),
     ctaLabel: 'Open the engagement',
     ctaUrl: cfg.journeyUrl,
-    footNote: `Sent by ${escapeHtml(cfg.coachName)}, The Canvas Coach. Reply to this email if anything here does not open.`,
+    // raw, because footNote is escaped like every other string: a signature
+    // written as plain text arrives with its own <br/> tags showing.
+    footNote: raw(`${escapeHtml(cfg.coachName)}<br/>Lead Practitioner, The Canvas Coach${
+      brief.reference ? `<br/><span style="color:#8A94A0;">${escapeHtml(brief.reference)}</span>` : ''
+    }`),
   })
   return { subject, html }
 }
