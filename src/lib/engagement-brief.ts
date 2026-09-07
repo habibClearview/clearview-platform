@@ -60,14 +60,21 @@ export interface EngagementBrief {
   /** The deliverables the ToR lists, in its own words. */
   deliverables?: string[]
   /**
-   * Habib's own opening line. The generated welcome is correct but it is not
-   * his voice, and the first thing a new client reads should be. Empty means
-   * the generated opening stands.
+   * Habib's own opening line, when he wants only the opening changed. Empty
+   * means the generated opening stands.
    */
   welcomeIntro?: string
+  /**
+   * THE LETTERS THEMSELVES, EDITED. These go out over his name, so every word
+   * of one has to be his to change. Each holds the full letter as plain text;
+   * empty means the generated letter is used. See src/lib/letter.ts for the
+   * three marks the text understands.
+   */
+  letterPayer?: string
+  letterServed?: string
 }
 
-const CAP = { text: 300, list: 20, item: 400, intro: 2000 }
+const CAP = { text: 300, list: 20, item: 400, intro: 2000, letter: 20000 }
 
 function str(v: unknown, max: number): string | undefined {
   if (typeof v !== 'string') return undefined
@@ -109,6 +116,8 @@ export function briefFromConfig(brandOverrides: unknown): EngagementBrief {
     reference: str(b.reference, CAP.text),
     deliverables: deliverables && deliverables.length ? deliverables : undefined,
     welcomeIntro: str(b.welcomeIntro, CAP.intro),
+    letterPayer: str(b.letterPayer, CAP.letter),
+    letterServed: str(b.letterServed, CAP.letter),
   }
 }
 

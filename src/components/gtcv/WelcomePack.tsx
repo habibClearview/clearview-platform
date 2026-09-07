@@ -95,6 +95,8 @@ export default function WelcomePack({ clientId, canManage }) {
   // What the last upload did, said beside the upload rather than only at
   // the top of a long panel where it can be scrolled past.
   const [torSaid, setTorSaid] = useState(null)
+  // The letter itself, as text. Null until it is loaded for editing.
+  const [letterDraft, setLetterDraft] = useState(null)
 
   const load = useCallback(async () => {
     if (!clientId) { setLoading(false); return }
@@ -325,10 +327,16 @@ export default function WelcomePack({ clientId, canManage }) {
                   try {
                     const r = await sendEngagementEmail({
                       clientId, stage: 'scope', recipients: to, journeyUrl,
-                      preview: true, audience: welcomeAudience,
+                      preview: true, audience: welcomeAudience, wantText: true,
                       recipientName: toName, recipientTitle: toTitle,
                     })
-                    if (r?.html) setEmailPreview({ subject: r.subject, html: r.html })
+                    if (r?.html) {
+                      setEmailPreview({ subject: r.subject, html: r.html })
+                      // Load the letter for editing at the same time, so the
+                      // words on screen are the words that can be changed.
+                      const saved = welcomeAudience === 'payer' ? brief.letterPayer : brief.letterServed
+                      setLetterDraft(saved && saved.trim() ? saved : (r.text || ''))
+                    }
                     else setErr('The preview came back empty.')
                   } catch (e) { setErr(e.message || 'Could not build the preview') }
                   setBusy(null)
@@ -377,6 +385,54 @@ export default function WelcomePack({ clientId, canManage }) {
                     sandbox=""
                     style={{ width: '100%', height: 620, border: 0, background: '#fff', display: 'block' }}
                   />
+                </div>
+              ) : null}
+              {letterDraft !== null ? (
+                <div style={{ marginTop: '0.9rem' }}>
+                  <div style={{ ...labelText, marginBottom: 5 }}>Edit the letter</div>
+                  <p style={{ ...hint, margin: '0 0 0.4rem' }}>
+                    Your words, sent over your name. A line starting with <b>#</b> is a heading,
+                    a line starting with <b>-</b> is a bullet, and a blank line separates paragraphs.
+                    Save, then rebuild the preview to read it back.
+                  </p>
+                  <textarea
+                    style={{ ...field, minHeight: 320, fontFamily: 'var(--cv-font-mono)', fontSize: '0.86rem', lineHeight: 1.55 }}
+                    value={letterDraft}
+                    onChange={(e) => setLetterDraft(e.target.value)}
+                  />
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button" style={smallBtn(C.teal, true)} disabled={busy === 'letter'}
+                      onClick={async () => {
+                        setBusy('letter'); setNote(null); setErr(null)
+                        try {
+                          const key = welcomeAudience === 'payer' ? 'letterPayer' : 'letterServed'
+                          const next = { ...(briefDraft || brief || {}), [key]: letterDraft }
+                          await api('PATCH', { clientId, brief: next })
+                          setBriefDraft(null); setEmailPreview(null)
+                          setNote('The letter is saved. Read it first again to see it as it will arrive.')
+                          await load()
+                        } catch (e) { setErr(e.message || 'That did not save') }
+                        setBusy(null)
+                      }}
+                    >{busy === 'letter' ? 'Saving...' : 'Save the letter'}</button>
+                    <button
+                      type="button" style={smallBtn(C.slate)} disabled={busy === 'letter'}
+                      onClick={async () => {
+                        // Back to the generated letter, discarding the edit.
+                        setBusy('letter'); setNote(null); setErr(null)
+                        try {
+                          const key = welcomeAudience === 'payer' ? 'letterPayer' : 'letterServed'
+                          const next = { ...(briefDraft || brief || {}), [key]: '' }
+                          await api('PATCH', { clientId, brief: next })
+                          setBriefDraft(null); setEmailPreview(null); setLetterDraft(null)
+                          setNote('Back to the generated letter.')
+                          await load()
+                        } catch (e) { setErr(e.message || 'That did not save') }
+                        setBusy(null)
+                      }}
+                    >Start again from the generated letter</button>
+                  </div>
                 </div>
               ) : null}
             </div>

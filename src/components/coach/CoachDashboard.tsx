@@ -2235,7 +2235,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
               <a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',padding:'0.4rem 1rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none',fontWeight:700}}>Open Clearview Financial Model ↗</a>
               {isSuperCoach&&<CopyIntakeLink client={selClient}/>}
-              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',fontWeight:700,padding:'0.4rem 0.85rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit Name / Type / Programme</button>}
+              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',fontWeight:700,padding:'0.4rem 0.85rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit name, stage and programme</button>}
               {isSuperCoach&&<button onClick={()=>setShowDeleteConfirm(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Delete Client</button>}
             </div>
           </div>
@@ -2287,7 +2287,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
               {selClient.clearview_active&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.22rem 0.6rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none'}}>Open Clearview ↗</a>}
-              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',fontWeight:700,padding:'0.22rem 0.6rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit Name / Type / Programme</button>}
+              {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',fontWeight:700,padding:'0.22rem 0.6rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit name, stage and programme</button>}
               <button style={addBtn(true)} onClick={printSection}>Print</button>
             </div>
           </div>

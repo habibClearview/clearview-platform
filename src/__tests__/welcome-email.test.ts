@@ -88,6 +88,38 @@ describe('where the welcome pack lives', () => {
   })
 })
 
+describe('the letter can be edited on the screen', () => {
+  it('has an editor, saved per audience', () => {
+    // Habib asked for this twice. A template with one editable line is not a
+    // letter he can send over his own name.
+    expect(SETTINGS).toContain('Edit the letter')
+    expect(SETTINGS).toContain('Save the letter')
+    expect(SETTINGS).toContain("welcomeAudience === 'payer' ? 'letterPayer' : 'letterServed'")
+  })
+
+  it('can be put back to the generated letter', () => {
+    expect(SETTINGS).toContain('Start again from the generated letter')
+  })
+
+  it('loads the generated text to edit when nothing is saved yet', () => {
+    expect(SETTINGS).toContain('wantText: true')
+    expect(ROUTE).toContain('letterText(cfg)')
+  })
+})
+
+describe('the stage of the engagement is findable', () => {
+  it('the button that holds it says so', () => {
+    // It read "Edit Name / Type / Programme", so the one control that moves an
+    // engagement to pre-engagement was behind a label that never mentioned it.
+    expect(DASH).toContain('Edit name, stage and programme')
+    expect(DASH).not.toContain('Edit Name / Type / Programme')
+  })
+
+  it('and the stage before the work starts is called what Habib calls it', () => {
+    expect(fs.readFileSync('src/lib/coach-types.ts', 'utf8')).toContain("setup:'Pre-engagement'")
+  })
+})
+
 describe('the send screen', () => {
   it('asks who the letter is to, and which of the two letters it is', () => {
     expect(SETTINGS).toContain('recipientName: toName, recipientTitle: toTitle')

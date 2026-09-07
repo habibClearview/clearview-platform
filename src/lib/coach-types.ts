@@ -92,7 +92,7 @@ export function statusLabel(s: string): string {
     // Every block in this method IS a decision point with a decision gate, so
     // that is what it is called here and everywhere else. The code survives as
     // the key, not as the label.
-    setup:'Setup', phase_0:'Clearing the ground',
+    setup:'Pre-engagement', phase_0:'Clearing the ground',
     dp01:'Decision Point 1', dp02:'Decision Point 2', dp03:'Decision Point 3',
     dp04:'Decision Point 4', dp05:'Decision Point 5', dp06:'Decision Point 6',
     dp07:'Decision Point 7', dp08:'Decision Point 8', dp09:'Decision Point 9',

@@ -27,6 +27,7 @@ import {
   emailAvailable,
   sendEmail,
   buildScopeEmail,
+  letterText,
   buildTriPartyEmail,
   type EngagementEmailConfig,
 } from '@/lib/email'
@@ -42,7 +43,7 @@ function getAdminClient() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { clientId, stage, recipients, journeyUrl, preview, audience, recipientName, recipientTitle } = (await req.json()) as {
+    const { clientId, stage, recipients, journeyUrl, preview, audience, recipientName, recipientTitle, wantText } = (await req.json()) as {
       clientId?: string
       stage?: Stage
       recipients?: string[]
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
       audience?: 'payer' | 'served'
       recipientName?: string
       recipientTitle?: string
+      wantText?: boolean
     }
     // A PREVIEW IS THE SAME EMAIL, NOT A SECOND COPY OF IT. 4 September 2026.
     // Habib asked where he could read the welcome before it went to a client.
@@ -170,9 +172,14 @@ export async function POST(req: NextRequest) {
     const { subject, html } = stage === 'scope' ? buildScopeEmail(cfg) : buildTriPartyEmail(cfg)
 
     // Read it before anybody else does. Built by the line above, so there is
-    // no second version of this email anywhere.
+    // no second version of this email anywhere. wantText also returns the
+    // GENERATED letter as editable text, which is what the editor loads when
+    // there is nothing saved to edit yet.
     if (isPreview) {
-      return NextResponse.json({ ok: true, preview: true, stage, subject, html })
+      return NextResponse.json({
+        ok: true, preview: true, stage, subject, html,
+        ...(wantText && stage === 'scope' ? { text: letterText(cfg) } : {}),
+      })
     }
 
     // Outbound email not being configured is not a crash: say so plainly, so

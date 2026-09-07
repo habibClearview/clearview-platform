@@ -117,23 +117,21 @@ describe('the two letters are different letters', () => {
   })
 
   it('the payer letter is about oversight, not about doing the work', () => {
-    expect(payer.html).toMatch(/read only/)
-    expect(payer.html).toMatch(/Add as many of your team as you like/)
-    expect(payer.html).toMatch(/An invitation to any remote working session/)
-    expect(payer.html).not.toMatch(/needs you personally, not a delegate/)
+    expect(payer.html).toMatch(/read only form/)
+    expect(payer.html).toMatch(/Add as many of your team to the platform as you require/)
+    expect(payer.html).toMatch(/invitation to any remote working session/)
+    expect(payer.html).not.toMatch(/attendance in person is required/)
   })
 
   it('the served letter asks for the chief executive in the room', () => {
-    expect(served.html).toMatch(/<b>It needs you personally, not a delegate\.<\/b>/)
-    expect(served.html).toMatch(/nine decisions/i)
-    expect(served.html).toMatch(/without evidence recorded behind it/)
-    expect(served.html).toMatch(/does not move past a decision until you are satisfied/)
-    expect(served.html).toMatch(/tested with real paying clients/)
+    expect(served.html).toMatch(/Your attendance in person is required/)
+    expect(served.html).toMatch(/nine decisions belong to the person who carries the organisation/)
+    expect(served.html).toMatch(/tested with paying clients/)
   })
 
   it('both offer access today, at the front door', () => {
     for (const m of [payer, served]) {
-      expect(m.html).toContain('https://habibonifade.com')
+      expect(m.html).toMatch(/habibonifade\.com/)
       expect(m.html).toMatch(/Clearview sign in/)
       expect(m.html).toMatch(/temporary password/)
     }
@@ -175,5 +173,66 @@ describe('the access lists say different things', () => {
   it('cover every service the platform sells', () => {
     expect(SERVICE_TYPES).toHaveLength(4)
     for (const t of SERVICE_TYPES) expect(SERVICE_LABEL[t]).toBeTruthy()
+  })
+})
+
+describe('the voice the letters are written in', () => {
+  const both = [
+    buildScopeEmail({ ...base, brief: BRIEF, audience: 'payer', recipientName: 'Morgan Mercer', recipientTitle: 'Mr' } as never),
+    buildScopeEmail({ ...base, brief: BRIEF, audience: 'served', recipientName: 'Uche Amaonwu', recipientTitle: 'Mr' } as never),
+  ]
+
+  it('use no dashes in the prose', () => {
+    for (const m of both) {
+      const prose = m.html.replace(/<[^>]+>/g, ' ')
+      expect(prose).not.toMatch(/[\u2014\u2013]/)
+      expect(prose).not.toMatch(/\s-\s/)
+    }
+  })
+
+  it('never use the "not X but Y" construction', () => {
+    for (const m of both) {
+      const prose = m.html.replace(/<[^>]+>/g, ' ')
+      expect(prose).not.toMatch(/\brather than\b/i)
+      expect(prose).not.toMatch(/\bnot\b[^.]{0,40}\bbut\b/i)
+    }
+  })
+
+  it('tie the nine decisions to the canvas, in the same words in both', () => {
+    for (const m of both) {
+      expect(m.html).toMatch(/nine sequential decision points/)
+      expect(m.html).toMatch(/internal and external commercial evidence has been collected and judged/)
+    }
+  })
+
+  it('name the Engagement Charter', () => {
+    for (const m of both) expect(m.html).toMatch(/Engagement Charter/)
+  })
+})
+
+describe('the letter can be rewritten', () => {
+  it('an edited letter is the letter that is sent', () => {
+    const edited = '# My own heading\n\nMy own words entirely.\n\n- one\n- two'
+    const m = buildScopeEmail({ ...base, audience: 'served', brief: { ...BRIEF, letterServed: edited } } as never)
+    expect(m.html).toContain('<b>My own heading</b>')
+    expect(m.html).toContain('My own words entirely.')
+    expect(m.html).toContain('<li style="margin:0 0 7px;">one</li>')
+    // and none of the generated wording survives
+    expect(m.html).not.toMatch(/nine sequential decision points/)
+  })
+
+  it('the payer edit does not leak into the served letter', () => {
+    const m = buildScopeEmail({ ...base, audience: 'served', brief: { ...BRIEF, letterPayer: 'PAYER ONLY' } } as never)
+    expect(m.html).not.toContain('PAYER ONLY')
+  })
+
+  it('an empty edit falls back to the generated letter', () => {
+    const m = buildScopeEmail({ ...base, audience: 'served', brief: { ...BRIEF, letterServed: '   ' } } as never)
+    expect(m.html).toMatch(/nine sequential decision points/)
+  })
+
+  it('a letter someone typed markup into is still text', () => {
+    const m = buildScopeEmail({ ...base, audience: 'served', brief: { ...BRIEF, letterServed: '<script>x</script>' } } as never)
+    expect(m.html).not.toContain('<script>x</script>')
   })
 })
