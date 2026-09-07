@@ -103,7 +103,9 @@ describe('the send screen', () => {
     expect(SETTINGS).toContain('emailConfigured === false')
   })
 
-  it('offers nothing to press when there is nobody to send to', () => {
-    expect(SETTINGS).toContain('No email address on the client or on any party yet')
+  it('lets the letter be read when there is nobody to send it to', () => {
+    // It used to hide the whole thing behind "no email address yet", which is
+    // exactly when you most want to read what you are about to send.
+    expect(SETTINGS).toContain('it can be read but not sent')
   })
 })

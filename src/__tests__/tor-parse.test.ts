@@ -134,3 +134,44 @@ describe('the route that reads the document', () => {
     expect(ROUTE).toContain('0x25')
   })
 })
+
+describe('the library actually reaches the deployment', () => {
+  it('is traced into the tor-extract function', () => {
+    // THE FAULT THIS CATCHES. 7 September 2026. pdfjs is behind a dynamic
+    // import so it only loads when a document is attached. webpack cannot see
+    // through that, so it was traced into the deployment ZERO times: the route
+    // built clean, deployed clean, and threw module-not-found the first time
+    // Habib attached a purchase order. Nothing in a normal build failed --
+    // only the trace file knew.
+    const cfg = fs.readFileSync('next.config.js', 'utf8')
+    expect(cfg).toContain("serverComponentsExternalPackages: ['pdfjs-dist']")
+    expect(cfg).toContain("'/api/tor-extract': ['./node_modules/pdfjs-dist/legacy/build/**/*']")
+  })
+
+  it('and the trace really lists it, when a build is present', () => {
+    const p = '.next/server/app/api/tor-extract/route.js.nft.json'
+    if (!fs.existsSync(p)) return
+    const files = JSON.parse(fs.readFileSync(p, 'utf8')).files as string[]
+    expect(files.some((f) => f.includes('pdfjs-dist'))).toBe(true)
+  })
+})
+
+describe('reading the letter is not sending it', () => {
+  const PACK = fs.readFileSync('src/components/gtcv/WelcomePack.tsx', 'utf8')
+
+  it('does not hide the letter when nobody has an address yet', () => {
+    // The whole block used to collapse to "no email address yet", so on a
+    // fresh engagement there was no way to read the letter at all.
+    expect(PACK).not.toMatch(/if \(to\.length === 0\) \{\s*return <p/)
+    expect(PACK).toContain('it can be read but not sent')
+  })
+
+  it('gates only the send button on having somewhere to send it', () => {
+    expect(PACK).toContain("disabled={busy === 'welcome' || !journeyUrl || to.length === 0}")
+    expect(PACK).toContain("disabled={busy === 'preview'}")
+  })
+
+  it('says what an upload did, beside the upload', () => {
+    expect(PACK).toContain('torSaid')
+  })
+})

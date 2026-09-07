@@ -92,6 +92,9 @@ export default function WelcomePack({ clientId, canManage }) {
   const [welcomeAudience, setWelcomeAudience] = useState('served')
   const [toTitle, setToTitle] = useState('')
   const [toName, setToName] = useState('')
+  // What the last upload did, said beside the upload rather than only at
+  // the top of a long panel where it can be scrolled past.
+  const [torSaid, setTorSaid] = useState(null)
 
   const load = useCallback(async () => {
     if (!clientId) { setLoading(false); return }
@@ -139,7 +142,7 @@ export default function WelcomePack({ clientId, canManage }) {
             onChange={async (e) => {
               const file = e.target.files && e.target.files[0]
               if (!file) return
-              setBusy('tor'); setNote(null); setErr(null)
+              setBusy('tor'); setNote(null); setErr(null); setTorSaid(null)
               try {
                 const { data } = await supabase.auth.getSession()
                 const body = new FormData()
@@ -156,17 +159,25 @@ export default function WelcomePack({ clientId, canManage }) {
                 const f = json.fields || {}
                 const found = Object.keys(f).filter((k) => f[k] !== undefined && f[k] !== null)
                 if (!found.length) {
-                  setErr(json.note || 'Nothing recognisable came out of that document. Type the details in instead.')
+                  const m = json.note || 'Nothing recognisable came out of that document. Type the details in instead.'
+                  setErr(m); setTorSaid({ ok: false, text: m })
                 } else {
                   setBriefDraft({ ...(briefDraft || brief || {}), ...f })
-                  setNote(`Read from the document: ${found.join(', ')}. Check it, then save the brief.`)
+                  const m = `Read from the document: ${found.join(', ')}. Check it, then save the brief.`
+                  setNote(m); setTorSaid({ ok: true, text: m })
                 }
-              } catch (e2) { setErr(e2.message || 'Could not read that document') }
+              } catch (e2) {
+                const m = e2.message || 'Could not read that document'
+                setErr(m); setTorSaid({ ok: false, text: m })
+              }
               setBusy(null)
               e.target.value = ''
             }}
           />
           {busy === 'tor' ? <p style={hint}>Reading the document...</p> : null}
+          {torSaid ? (
+            <p style={{ ...hint, margin: '0.35rem 0 0', color: torSaid.ok ? C.green : C.red }}>{torSaid.text}</p>
+          ) : null}
         </div>
       </Setting>
 
@@ -249,8 +260,8 @@ export default function WelcomePack({ clientId, canManage }) {
       </Setting>
 
       <Setting
-        label="Send the welcome email"
-        help={`The first email the client gets from the platform. It sets out the work ahead, and its button opens their live journey — the nine Decision Points, where the work stands, and what each gate will produce. It goes to the client contact and to everyone listed as a party above, so add the people first. Their sign-in is a separate invite, sent from the client team card.`}
+        label="The letter"
+        help={`Two letters, written from the brief above: one to the organisation paying and one to the organisation being served. Read either at any time. Sending needs an address on the client or on a party; reading does not.`}
       >
         {(() => {
           // The client contact first, then the parties; one person listed twice
@@ -258,16 +269,24 @@ export default function WelcomePack({ clientId, canManage }) {
           // than offering a button that would send to no one.
           const to = [...new Set([client?.contact_email, ...partyEmails]
             .map((e) => (e || '').trim()).filter(Boolean))]
-          const journeyUrl = client?.slug && typeof window !== 'undefined'
-            ? `${window.location.origin}/engagement/${client.slug}`
-            : ''
-          if (to.length === 0) {
-            return <p style={hint}>No email address on the client or on any party yet. Add one, then this can be sent.</p>
-          }
+          // The route refuses a link that is not a web address, so a client
+          // with no slug yet would fail the preview on a technicality. Fall
+          // back to the platform's front door: still true, still openable.
+          const origin = typeof window !== 'undefined' ? window.location.origin : ''
+          const journeyUrl = client?.slug && origin
+            ? `${origin}/engagement/${client.slug}`
+            : origin
+          // READING IS NOT SENDING. 7 September 2026. This whole block used to
+          // collapse to "no email address yet" when nobody was on the client,
+          // so on a fresh engagement there was no way to read the letter at
+          // all — which is precisely when you most want to. Only the send
+          // button needs an address now.
           return (
             <div>
               <p style={{ ...hint, margin: '0 0 0.5rem' }}>
-                Goes to {to.join(', ')}. The button in it opens {journeyUrl || 'the journey'}.
+                {to.length
+                  ? <>Goes to {to.join(', ')}. The button in it opens {journeyUrl || 'the journey'}.</>
+                  : <>Nobody has an email address on this engagement yet, so it can be read but not sent. Add the client contact or a party when you are ready to send.</>}
               </p>
               {/* THE PAYER AND THE SERVED ORGANISATION DO NOT DO THE SAME THING.
                   One is doing the work, the other is watching it and paying for
@@ -300,7 +319,7 @@ export default function WelcomePack({ clientId, canManage }) {
               <button
                 type="button"
                 style={smallBtn(C.slate)}
-                disabled={busy === 'preview' || !journeyUrl}
+                disabled={busy === 'preview'}
                 onClick={async () => {
                   setBusy('preview'); setNote(null); setErr(null)
                   try {
@@ -319,7 +338,7 @@ export default function WelcomePack({ clientId, canManage }) {
               <button
                 type="button"
                 style={smallBtn(C.teal)}
-                disabled={busy === 'welcome' || !journeyUrl}
+                disabled={busy === 'welcome' || !journeyUrl || to.length === 0}
                 onClick={async () => {
                   setBusy('welcome'); setNote(null); setErr(null)
                   try {

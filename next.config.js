@@ -117,9 +117,20 @@ const nextConfig = {
     // runtime. Next.js only bundles files it can statically see are imported, so
     // we tell the tracer to include the markdown in that function's deployment —
     // otherwise the read fails on Vercel with ENOENT.
+    //
+    // /api/tor-extract has the same shape of problem for a different reason.
+    // It reads a Scope of Work with pdfjs, behind a dynamic import so the
+    // library is only loaded when a document is actually attached. webpack
+    // cannot see through that, so pdfjs was traced into the deployment ZERO
+    // times: the route built cleanly, deployed cleanly, and then threw
+    // module-not-found the first time Habib attached a purchase order.
+    // Listing it as an external package keeps it out of the bundle AND puts it
+    // in the trace, which is what makes it exist at runtime.
     outputFileTracingIncludes: {
       '/api/support/sync-playbook': ['./docs/support-playbook/**/*'],
+      '/api/tor-extract': ['./node_modules/pdfjs-dist/legacy/build/**/*'],
     },
+    serverComponentsExternalPackages: ['pdfjs-dist'],
   },
   async headers() {
     return [
