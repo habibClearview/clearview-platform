@@ -16,6 +16,7 @@
 // rights, which matches the method: the lead consultant holds the document.
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
+import { writeAuditLog, auditIp } from '@/lib/audit-log'
 import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 
 
@@ -48,7 +49,7 @@ export async function PATCH(req: NextRequest) {
 
     const { data: charter } = await admin
       .from('engagement_charters')
-      .select('id, client_id, status')
+      .select('id, client_id, status, version, title')
       .eq('id', charterId)
       .maybeSingle()
     if (!charter || charter.client_id !== clientId) {
@@ -67,6 +68,30 @@ export async function PATCH(req: NextRequest) {
 
     const { error } = await admin.from('engagement_charters').update(patch).eq('id', charterId)
     if (error) return NextResponse.json({ error: 'Could not save the Charter' }, { status: 500 })
+
+    // WHO CHANGED IT, AND WHEN. Only the lead consultant can edit, and only
+    // while the version is a draft, which the two checks above enforce. That
+    // is the control. This is the transparency: a client who can see that the
+    // wording was last touched by a named person at a named time does not have
+    // to take the control on trust.
+    await writeAuditLog(admin, {
+      actorId: auth.userId ?? null,
+      actorEmail: null,
+      actorRole: auth.role ?? null,
+      action: 'charter.edited',
+      targetId: charterId,
+      ip: auditIp(req.headers),
+      detail: {
+        client_id: clientId,
+        edited_by: auth.fullName ?? null,
+        charter_version: charter.version,
+        changed: [
+          typeof title === 'string' ? 'title' : null,
+          content && typeof content === 'object' ? 'wording' : null,
+        ].filter(Boolean),
+        edited_at: patch.updated_at,
+      },
+    })
 
     return NextResponse.json({ ok: true })
   } catch (e: any) {

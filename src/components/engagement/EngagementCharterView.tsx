@@ -24,6 +24,7 @@
 // Fees and payments live in a separate, private agreement and never appear here.
 // ============================================================
 import { useEffect, useState } from 'react'
+import { attestationText } from '@/lib/charter-attestation'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { loadEngagementView } from '@/lib/engagement-loader'
@@ -817,6 +818,7 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
                 </div>
               ) : null}
               <p className="p" style={{ marginTop: 0 }}>By signing, each party confirms they have read this Charter and commit to the responsibilities and level of participation it sets out. <b>Signatures apply to this agreed version (v{version})</b>, if the Charter is edited afterwards, signing re-opens for everyone.</p>
+              <CharterRecord clientId={view.client.id} charterId={charter?.id} />
               <p className="p" style={{ marginTop: 0 }}>A party with a login signs here themselves. A party who signs on paper in the room is entered by the Lead Consultant, and the record shows both who signed and who entered it, so it never implies somebody signed in when they did not.</p>
               <div className="sig">
                 {signatories.length === 0 ? (
@@ -847,12 +849,21 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
                               data-action="sign"
                               disabled={busy === `sign:${p.id}` || !charter?.id || status === 'draft'}
                               title={status === 'draft' ? 'The Charter has to be issued for signature first' : 'Sign this version of the Charter'}
-                              onClick={() => run(`sign:${p.id}`, () => signCharter({
-                                clientId: view.client.id,
-                                charterId: charter.id,
-                                signerRole: p.party_role,
-                                signatureMethod: 'click',
-                              }), 'Your signature has been recorded on this version.')}
+                              onClick={() => {
+                                // A BUTTON THAT SILENTLY WRITES A ROW RECORDS A
+                                // CLICK, NOT CONSENT. The signer is shown the
+                                // exact words they are agreeing to, and the same
+                                // words are stored with the signature.
+                                if (!window.confirm(attestationText(
+                                  charter?.title || 'Engagement Charter', version, p.name,
+                                ))) return
+                                run(`sign:${p.id}`, () => signCharter({
+                                  clientId: view.client.id,
+                                  charterId: charter.id,
+                                  signerRole: p.party_role,
+                                  signatureMethod: 'click',
+                                }), 'Your signature has been recorded on this version.')
+                              }}
                             >{busy === `sign:${p.id}` ? 'Signing...' : 'Sign here'}</button>
                             <span className="signdate">
                               {status === 'draft'
@@ -968,6 +979,108 @@ function CommentThread({ sectionKey, comments, canManage, clientId, charterId, b
           Suggest change
         </button>
       </div>
+    </div>
+  )
+}
+
+/**
+ * THE RECORD OF THIS CHARTER.
+ *
+ * The controls are real: only the lead consultant can edit, only while the
+ * version is a draft, only a named signatory may sign, one signature per party
+ * per version, and an issued version cannot be changed without re-issuing and
+ * re-signing. But a control nobody can see is a control the client has to take
+ * on trust, and this engagement is sold on evidence rather than on trust.
+ *
+ * So the record is shown: who signed, when, what they agreed to, the
+ * fingerprint of the wording they agreed to, and who last touched it.
+ */
+function CharterRecord({ clientId, charterId }: { clientId: string; charterId?: string }) {
+  const [rec, setRec] = useState<any>(null)
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (!charterId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data } = await supabase.auth.getSession()
+        const token = data.session?.access_token
+        const res = await fetch(
+          `/api/charter-record?clientId=${encodeURIComponent(clientId)}&charterId=${encodeURIComponent(charterId)}`,
+          { headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: 'no-store' },
+        )
+        if (!res.ok) return
+        const json = await res.json()
+        if (!cancelled) setRec(json)
+      } catch { /* the record is an addition to the page, never the page */ }
+    })()
+    return () => { cancelled = true }
+  }, [clientId, charterId])
+
+  if (!rec || (!rec.signed?.length && !rec.lastEdit)) return null
+
+  const when = (iso?: string | null) => {
+    if (!iso) return 'not recorded'
+    const d = new Date(iso)
+    return Number.isFinite(d.getTime())
+      ? d.toLocaleString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : 'not recorded'
+  }
+
+  return (
+    <div style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '12px 14px', margin: '0 0 14px', background: 'var(--box)' }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        style={{ background: 'none', border: 0, padding: 0, font: 'inherit', fontWeight: 700, cursor: 'pointer', color: 'inherit' }}
+      >{open ? '▾' : '▸'} The record of this Charter</button>
+
+      {!open ? (
+        <div style={{ fontSize: 13.5, marginTop: 4, opacity: 0.85 }}>
+          {rec.signed.length} {rec.signed.length === 1 ? 'signature' : 'signatures'}
+          {rec.lastEdit ? `, last edited ${when(rec.lastEdit.at)}` : ''}.
+        </div>
+      ) : (
+        <div style={{ fontSize: 13.5, marginTop: 10, lineHeight: 1.65 }}>
+          {rec.lastEdit ? (
+            <p style={{ margin: '0 0 10px' }}>
+              <b>Last edited</b> {when(rec.lastEdit.at)}
+              {rec.lastEdit.by ? <> by {rec.lastEdit.by}</> : null}
+              {rec.lastEdit.changed?.length ? <> ({rec.lastEdit.changed.join(' and ')} changed)</> : null}.
+              {' '}Only the lead consultant can edit this Charter, and only while it is a draft.
+            </p>
+          ) : null}
+
+          {rec.signed.length === 0 ? <p style={{ margin: 0 }}>Nobody has signed this version yet.</p> : null}
+
+          {rec.signed.map((s: any, i: number) => (
+            <div key={i} style={{ borderTop: '1px solid var(--line)', paddingTop: 8, marginTop: 8 }}>
+              <div><b>{s.name}</b>{s.role ? <> · {s.role.replace(/_/g, ' ')}</> : null}</div>
+              <div>Signed {when(s.signedAt)}{s.charterVersion ? <> on version {s.charterVersion}</> : null}
+                {s.method === 'typed' && s.typedName ? <> by typing “{s.typedName}”</> : null}
+                {s.method === 'in_room' ? <> on paper in the room, entered by the lead consultant</> : null}
+                {s.method === 'click' ? <> by pressing Sign here</> : null}.
+              </div>
+              {s.attestation ? (
+                <div style={{ margin: '4px 0 0', fontStyle: 'italic', opacity: 0.9 }}>“{s.attestation}”</div>
+              ) : null}
+              {s.contentSha256 ? (
+                <div style={{ marginTop: 4, fontFamily: 'var(--cv-font-mono)', fontSize: 12, wordBreak: 'break-all', opacity: 0.8 }}>
+                  Wording fingerprint {s.contentSha256}
+                </div>
+              ) : null}
+              {s.fromAddress ? <div style={{ opacity: 0.75 }}>From {s.fromAddress}</div> : null}
+            </div>
+          ))}
+
+          <p style={{ margin: '10px 0 0', opacity: 0.8 }}>
+            The fingerprint is taken from the exact wording at the moment of signing. If the wording were
+            ever altered, the fingerprint would no longer match it.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

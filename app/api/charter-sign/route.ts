@@ -26,6 +26,7 @@
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
+import { attestationText, ATTESTATION_VERSION } from '@/lib/charter-attestation'
 import { writeAuditLog, auditIp } from '@/lib/audit-log'
 import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 import { isRefusal, resolveSigner } from '@/lib/auth/signing-party'
@@ -161,6 +162,15 @@ export async function POST(req: NextRequest) {
           recorded_by_user_id: signer.recordedBy ?? null,
           user_agent: (req.headers.get('user-agent') || '').slice(0, 400),
           content_sha256: contentSha256,
+          // The words the signer was shown at the moment they agreed, stored
+          // with the signature rather than looked up later, so a change to the
+          // wording cannot rewrite what somebody already agreed to.
+          attestation: attestationText(
+            charter.title || 'Engagement Charter',
+            charter.version,
+            signer.party.name,
+          ),
+          attestation_version: ATTESTATION_VERSION,
           signed_at: new Date().toISOString(),
         },
       })
