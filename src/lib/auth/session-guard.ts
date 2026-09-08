@@ -196,3 +196,27 @@ export function isSafeReturnPath(path: string | null | undefined): boolean {
 
 /** The landing page when there is nothing safe to go back to. */
 export const DEFAULT_LANDING = '/coach'
+
+/**
+ * WHERE A ROLE BELONGS ON SIGN-IN. 8 September 2026.
+ *
+ * Everybody landed on /coach, which admits funders. So a funder signing in
+ * from the welcome letter arrived on the consultant's operational dashboard,
+ * beside the fees, the deals and the payments. Tanager's procurement lead was
+ * one click from Habib's fee schedule.
+ *
+ * A funder has their own view. A client's own people belong on their client
+ * dashboard, resolved by slug elsewhere; with no slug to hand the sign-in page
+ * sends them to the front, which redirects them correctly.
+ */
+export function landingFor(role: string | null | undefined): string {
+  switch (role) {
+    case 'super_coach':
+    case 'coach':
+      return '/coach'
+    case 'funder':
+      return '/dashboard/funder'
+    default:
+      return '/'
+  }
+}

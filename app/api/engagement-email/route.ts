@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
 
     const { data: parties } = await admin
       .from('engagement_parties')
-      .select('party_role, name')
+      .select('party_role, name, email')
       .eq('client_id', clientId)
 
     let programmeName: string | null = null
@@ -159,6 +159,10 @@ export async function POST(req: NextRequest) {
     const clientName = client.name
     const engagementTitle = brandTitle || programmeName || client.name
     const coachName = leadConsultant?.name || actor?.full_name || 'The Canvas Coach'
+    // A funder's finance lead replying to a signed consulting letter should not
+    // hit an address whose own name tells them not to expect an answer.
+    const replyAddress = (leadConsultant as { email?: string } | undefined)?.email
+      || 'habib@habibonifade.com'
 
     const cfg: EngagementEmailConfig = {
       engagementTitle,
@@ -230,7 +234,47 @@ export async function POST(req: NextRequest) {
             const linked = await signInLinkFor(admin, person.email, journeyUrl as string, {
               full_name: person.name || null,
             })
-            cta = linked.link
+            // Wrapped so a mail scanner's GET cannot spend the token. See
+            // app/welcome/page.tsx for what that costs and why.
+            const origin = new URL(journeyUrl as string).origin
+            cta = `${origin}/welcome#to=${encodeURIComponent(linked.link)}`
+            // A LINK WITHOUT A ROLE IS A DOOR INTO AN EMPTY ROOM.
+            //
+            // The link signs them in. Without a user_profiles row saying who
+            // they are, they arrive scoped to nothing: no engagement, no
+            // programme, an empty dashboard, and a first impression spent.
+            //
+            // The two sides get the two roles the platform already has. Someone
+            // on the served organisation's letter is its chief executive, scoped
+            // to this engagement. Someone on the payer's letter is a funder,
+            // scoped to the programme and read only everywhere by
+            // resolveClientAccess. Nobody is given anything by being emailed a
+            // letter that they could not have been given by being invited.
+            //
+            // Only ever created, never downgraded: a person who already has a
+            // login keeps the role they have, so sending a second copy of the
+            // welcome cannot demote a super_coach to a funder.
+            const { data: already } = await admin
+              .from('user_profiles').select('id, role').eq('id', linked.userId || '').maybeSingle()
+            if (linked.userId && !already) {
+              const isPayer = person.audience === 'payer'
+              const { error: profErr } = await admin.from('user_profiles').insert({
+                id: linked.userId,
+                role: isPayer ? 'funder' : 'ceo',
+                full_name: person.name || person.email,
+                email: person.email,
+                engagement_client_id: isPayer ? null : clientId,
+                funder_programme_id: isPayer ? (client.programme_id || null) : null,
+                assigned_unit_ids: [],
+                co_implementer_id: null,
+                status: 'invited',
+              })
+              if (profErr) {
+                // Sending anyway would hand somebody a working link into an
+                // empty account, which is worse than not sending.
+                throw new Error(`the login could not be set up (${profErr.message})`)
+              }
+            }
           }
           const personal = buildScopeEmail({
             ...cfg,
@@ -240,7 +284,10 @@ export async function POST(req: NextRequest) {
             journeyUrl: cta,
             signInIncluded: includeSignIn === true,
           })
-          const one = await sendEmail({ to: person.email, subject: personal.subject, html: personal.html })
+          const one = await sendEmail({
+            to: person.email, subject: personal.subject, html: personal.html,
+            replyTo: replyAddress, text: letterText({ ...cfg, audience: person.audience }),
+          })
           if (one.sent) sentTo.push(person.email)
           else failed.push({ email: person.email, reason: one.reason || 'the provider refused it' })
         } catch (e: unknown) {
@@ -256,7 +303,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, stage, recipients: sentTo.length, sentTo, failed })
     }
 
-    const result = await sendEmail({ to: cleaned.recipients, subject, html })
+    // ONE MESSAGE PER PERSON, ALWAYS. A shared To: header on the tri-party
+    // Charter email showed the payer's and the served organisation's addresses
+    // to each other, which for two commercially separate parties is a
+    // confidentiality lapse rather than a style problem.
+    const results = await Promise.all(cleaned.recipients.map((one) =>
+      sendEmail({ to: one, subject, html, replyTo: replyAddress })))
+    const result = results.find((r) => r.sent) || results[0] || { sent: false, reason: 'nobody to send to' }
     if (!result.sent) {
       // The provider rejected the send (bad key, provider error). Report it
       // without crashing so the caller can retry or show the link.

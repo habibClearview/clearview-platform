@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { DEFAULT_LANDING, RETURN_TO_KEY, isSafeReturnPath, sessionIsStale, markSignedIn, LAST_ACTIVITY_KEY } from '@/lib/auth/session-guard'
+import { landingFor, RETURN_TO_KEY, isSafeReturnPath, sessionIsStale, markSignedIn, LAST_ACTIVITY_KEY } from '@/lib/auth/session-guard'
 
 const C = {
   navy:'#1B2A4A', cyan:'#00B4D8', cream:'#F8F4EE', white:'#FFFFFF',
@@ -34,13 +34,35 @@ export default function LoginPage() {
     try { return localStorage.getItem(LAST_ACTIVITY_KEY) } catch { return null }
   }
 
-  function landingPage() {
+  async function landingPage() {
     try {
       const saved = localStorage.getItem(RETURN_TO_KEY)
       localStorage.removeItem(RETURN_TO_KEY)
       if (isSafeReturnPath(saved)) return saved as string
-    } catch { /* storage refused; the default is always safe */ }
-    return DEFAULT_LANDING
+    } catch { /* storage refused; the role's own landing is always safe */ }
+    // Where somebody belongs depends on who they are. Sending everybody to
+    // /coach put paying clients on the consultant's dashboard.
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user?.id) {
+        const { data } = await supabase.from('user_profiles')
+          .select('role, engagement_client_id').eq('id', session.user.id).maybeSingle()
+        if (data?.role) {
+          if (data.role === 'super_coach' || data.role === 'coach' || data.role === 'funder') {
+            return landingFor(data.role)
+          }
+          // A client's own person goes to their engagement.
+          if (data.engagement_client_id) {
+            const { data: c } = await supabase.from('engagement_clients')
+              .select('slug, engagement_mode').eq('id', data.engagement_client_id).maybeSingle()
+            if (c?.slug) {
+              return c.engagement_mode === 'financial' ? `/dashboard/${c.slug}` : `/engagement/${c.slug}`
+            }
+          }
+        }
+      }
+    } catch { /* fall through to the safe default */ }
+    return landingFor(null)
   }
 
   useEffect(() => {
@@ -59,7 +81,7 @@ export default function LoginPage() {
         setChecking(false)
         return
       }
-      window.location.href = landingPage()
+      window.location.href = await landingPage()
     }).catch(() => {
       clearTimeout(timeout)
       setChecking(false)
@@ -87,7 +109,7 @@ export default function LoginPage() {
       // Before navigating: this session is one second old, and the guard on the
       // next page judges it by the shared activity clock.
       markSignedIn()
-      window.location.href = landingPage()
+      window.location.href = await landingPage()
     }
   }
 

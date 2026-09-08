@@ -21,7 +21,11 @@ export default function CoachPage() {
       const { data } = await supabase.from('user_profiles')
         .select('role, full_name, co_implementer_id, funder_programme_id')
         .eq('id', session.user.id).single()
-      if (!data || !['super_coach', 'coach', 'funder'].includes(data.role)) {
+      // A FUNDER IS NOT COACHING TEAM. 8 September 2026. This admitted them,
+      // so a paying client signing in from the welcome letter landed on the
+      // consultant's own dashboard: fees, deals, payments, every client.
+      if (data?.role === 'funder') { window.location.href = '/dashboard/funder'; return }
+      if (!data || !['super_coach', 'coach'].includes(data.role)) {
         setStatus('denied')
         return
       }

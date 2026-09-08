@@ -30,6 +30,8 @@ export interface SendEmailInput {
   to: string | string[]
   subject: string
   html: string
+  /** The plain-text alternative. Screen readers, text clients and archives. */
+  text?: string
   replyTo?: string
 }
 
@@ -63,6 +65,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         to,
         subject: input.subject,
         html: input.html,
+        ...(input.text ? { text: input.text } : {}),
         ...(input.replyTo ? { reply_to: input.replyTo } : {}),
       }),
       signal: abort.signal,
@@ -185,7 +188,10 @@ function onTitle(cfg: EngagementEmailConfig): string {
  * Stage one email: from the coach to the client, setting out what the
  * engagement covers and sharing the link. Recipients are passed by the caller.
  */
-const SIGN_IN_HOME = 'https://habibonifade.com'
+// The PORTAL, not the marketing site. habibonifade.com is rewritten by the
+// middleware to the public site, so the old value sent a paying client to a
+// landing page and asked them to find the sign-in link themselves.
+const SIGN_IN_HOME = 'https://clearview.habibonifade.com'
 
 /**
  * THE SENTENCE THE WHOLE METHOD RESTS ON.

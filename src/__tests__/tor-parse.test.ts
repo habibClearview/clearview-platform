@@ -266,3 +266,25 @@ describe('a forgotten password', () => {
     expect(SIGNIN).toContain('If that address has an account')
   })
 })
+
+describe('a sign-in link arrives with a role attached', () => {
+  const R = fs.readFileSync('app/api/engagement-email/route.ts', 'utf8')
+
+  it('creates the profile the link needs, or sends nothing', () => {
+    // A link without a role is a door into an empty room: signed in, scoped to
+    // nothing, and the first impression spent.
+    expect(R).toContain("role: isPayer ? 'funder' : 'ceo'")
+    expect(R).toContain('the login could not be set up')
+    expect(R).toContain('throw new Error')
+  })
+
+  it('scopes the two sides to the two things they may see', () => {
+    expect(R).toContain('engagement_client_id: isPayer ? null : clientId')
+    expect(R).toContain('funder_programme_id: isPayer ? (client.programme_id || null) : null')
+  })
+
+  it('never changes a role somebody already has', () => {
+    // A second copy of the welcome must not demote a super_coach to a funder.
+    expect(R).toContain('if (linked.userId && !already)')
+  })
+})

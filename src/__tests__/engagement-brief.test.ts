@@ -246,7 +246,9 @@ describe('everyone gets it, by name, at the same time', () => {
     // A shared To line puts one salutation and one sign-in link in front of
     // everybody, and shows each recipient the whole list.
     expect(ROUTE3).toContain('for (const person of list)')
-    expect(ROUTE3).toContain('sendEmail({ to: person.email')
+    expect(ROUTE3).toContain('to: person.email')
+    // and no path anywhere hands the provider the whole list at once
+    expect(ROUTE3).not.toMatch(/sendEmail\(\{\s*to: cleaned\.recipients/)
     expect(ROUTE3).toContain('audience: person.audience')
     expect(ROUTE3).toContain('recipientName: person.name')
   })
