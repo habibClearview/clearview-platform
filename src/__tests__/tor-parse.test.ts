@@ -163,7 +163,7 @@ describe('reading the letter is not sending it', () => {
     // The whole block used to collapse to "no email address yet", so on a
     // fresh engagement there was no way to read the letter at all.
     expect(PACK).not.toMatch(/if \(to\.length === 0\) \{\s*return <p/)
-    expect(PACK).toContain('it can be read but not sent')
+    expect(PACK).toContain('the letter can be read but not sent')
   })
 
   it('gates only the send button on having somewhere to send it', () => {
@@ -235,8 +235,8 @@ describe('one email, with the way in inside it', () => {
   })
 
   it('gives each recipient their own link, so it sends one letter per person', () => {
-    expect(ROUTE2).toContain('for (const address of cleaned.recipients)')
-    expect(ROUTE2).toContain('signInLinkFor(admin, address')
+    expect(ROUTE2).toContain('for (const person of list)')
+    expect(ROUTE2).toContain('signInLinkFor(admin, person.email')
   })
 
   it('reports the addresses it could not do, instead of claiming them all', () => {

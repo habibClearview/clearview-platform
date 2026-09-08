@@ -54,10 +54,12 @@ describe('reading it before it is sent', () => {
     expect(ROUTE.indexOf('if (isPreview)')).toBeLessThan(ROUTE.indexOf('emailAvailable()'))
   })
 
-  it('the screen shows it sandboxed, with its subject', () => {
+  it('the screen shows it, with its subject', () => {
     expect(SETTINGS).toContain('preview: true')
-    expect(SETTINGS).toContain('sandbox=""')
     expect(SETTINGS).toContain('emailPreview.subject')
+    // Not in an iframe: the app's own frame-ancestors and default-src refuse
+    // its own srcdoc frame, which drew "refused to connect" instead of the letter.
+    expect(SETTINGS).not.toContain('srcDoc')
   })
 })
 
@@ -138,6 +140,6 @@ describe('the send screen', () => {
   it('lets the letter be read when there is nobody to send it to', () => {
     // It used to hide the whole thing behind "no email address yet", which is
     // exactly when you most want to read what you are about to send.
-    expect(SETTINGS).toContain('it can be read but not sent')
+    expect(SETTINGS).toContain('the letter can be read but not sent')
   })
 })
