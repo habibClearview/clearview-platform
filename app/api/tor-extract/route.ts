@@ -5,12 +5,15 @@
 // welcome letter needs out of it, so they are not retyped from a document that
 // is already on the coach's desk.
 //
-// IT STORES NOTHING. The file is read in memory, the text is thrown away with
-// the request, and only the extracted fields come back — which the coach then
-// sees, corrects and saves. There is no bucket to configure and no document
-// sitting on the platform that somebody has to remember to delete. When there
-// is somewhere proper to keep contracts, this is the route that will put them
-// there; until then, not storing is better than storing badly.
+// IT KEEPS THE DOCUMENT. Until 8 September there was nowhere to put a signed
+// contract, so the file was read for its details and discarded. There is a
+// private 'contracts' bucket now, so the paper the engagement rests on is kept
+// beside the engagement rather than living only in somebody's mail.
+//
+// Storing is best effort. A bucket that is missing or refuses the write must
+// never cost the coach the extraction they were actually asking for, so a
+// failure to store is reported alongside the fields rather than instead of
+// them.
 //
 // Manager-only, on a client they manage, and size-capped: PDF parsing is the
 // kind of work an open endpoint should never be handed.
@@ -96,7 +99,22 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    return NextResponse.json({ fields: parseTor(text) })
+    // <clientId>/<timestamp>-<name>, so one engagement's papers cannot land in
+    // another's folder and two uploads of the same name cannot overwrite.
+    let stored: string | null = null
+    let storeProblem: string | null = null
+    try {
+      const safeName = (file.name || 'contract').replace(/[^A-Za-z0-9._-]/g, '_').slice(-80)
+      const path = `${clientId}/${Date.now()}-${safeName}`
+      const { error: upErr } = await admin.storage.from('contracts')
+        .upload(path, bytes, { contentType: file.type || 'application/octet-stream', upsert: false })
+      if (upErr) storeProblem = upErr.message
+      else stored = path
+    } catch (e: unknown) {
+      storeProblem = (e as Error)?.message || 'could not be stored'
+    }
+
+    return NextResponse.json({ fields: parseTor(text), stored, storeProblem })
   } catch (e: any) {
     console.error('tor-extract: unexpected error', e)
     return NextResponse.json({ error: 'Could not read that document.' }, { status: 500 })

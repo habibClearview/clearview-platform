@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
 
     const { data: signatures } = await admin
       .from('charter_signatures')
-      .select('id, signer_name, signer_role, signer_email, signature_method, typed_name, signed_at')
+      .select('id, signer_name, signer_role, signer_email, signature_method, typed_name, signed_at, ip_address, user_agent, content_sha256')
       .eq('charter_id', charterId)
       .order('signed_at', { ascending: true })
 
@@ -84,10 +84,13 @@ export async function GET(req: NextRequest) {
         typedName: sig.typed_name,
         signedAt: sig.signed_at,
         attestation: typeof d.attestation === 'string' ? d.attestation : null,
-        contentSha256: typeof d.content_sha256 === 'string' ? d.content_sha256 : null,
+        // The row is the record; the audit log is the corroborating copy.
+        contentSha256: (sig as { content_sha256?: string }).content_sha256
+          || (typeof d.content_sha256 === 'string' ? d.content_sha256 : null),
         charterVersion: typeof d.charter_version === 'number' ? d.charter_version : null,
-        fromAddress: maskIp(ev?.ip),
-        device: typeof d.user_agent === 'string' ? d.user_agent.slice(0, 180) : null,
+        fromAddress: maskIp((sig as { ip_address?: string }).ip_address || ev?.ip),
+        device: ((sig as { user_agent?: string }).user_agent
+          || (typeof d.user_agent === 'string' ? d.user_agent : '') || '').slice(0, 180) || null,
       }
     })
 

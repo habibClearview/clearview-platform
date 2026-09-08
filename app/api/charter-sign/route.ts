@@ -101,6 +101,19 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // The wording being signed, fingerprinted before the row is written so the
+    // signature itself carries proof of what it was given. The migration on
+    // 8 September added the three columns; until then this went only to the
+    // audit log, and it still goes there too as an independent second record.
+    const signedBytes = JSON.stringify({
+      title: charter.title ?? null,
+      version: charter.version,
+      content: charter.content ?? null,
+    })
+    const contentSha256 = createHash('sha256').update(signedBytes, 'utf8').digest('hex')
+    const userAgent = (req.headers.get('user-agent') || '').slice(0, 400) || null
+    const signerIp = auditIp(req.headers)
+
     const { data, error } = await admin
       .from('charter_signatures')
       .insert({
@@ -115,6 +128,9 @@ export async function POST(req: NextRequest) {
         signature_method: signer.mode === 'in_room' ? 'in_room' : method,
         typed_name: method === 'typed' ? body.typedName : null,
         signed_at: new Date().toISOString(),
+        ip_address: signerIp,
+        user_agent: userAgent,
+        content_sha256: contentSha256,
       })
       .select('id')
       .single()
@@ -138,12 +154,6 @@ export async function POST(req: NextRequest) {
       // evidence today. The migration is written and waiting in
       // supabase/migrations for when it can be run.
       // ============================================================
-      const signedBytes = JSON.stringify({
-        title: charter.title ?? null,
-        version: charter.version,
-        content: charter.content ?? null,
-      })
-      const contentSha256 = createHash('sha256').update(signedBytes, 'utf8').digest('hex')
       await writeAuditLog(admin, {
         actorId: signer.signerUserId ?? null,
         actorEmail: signer.party.email ?? null,
@@ -151,7 +161,7 @@ export async function POST(req: NextRequest) {
         action: 'charter.signed',
         targetId: body.charterId,
         targetEmail: signer.party.email ?? null,
-        ip: auditIp(req.headers),
+        ip: signerIp,
         detail: {
           signature_id: data.id,
           client_id: body.clientId,
@@ -160,7 +170,7 @@ export async function POST(req: NextRequest) {
           signature_method: signer.mode === 'in_room' ? 'in_room' : method,
           typed_name: method === 'typed' ? body.typedName : null,
           recorded_by_user_id: signer.recordedBy ?? null,
-          user_agent: (req.headers.get('user-agent') || '').slice(0, 400),
+          user_agent: userAgent,
           content_sha256: contentSha256,
           // The words the signer was shown at the moment they agreed, stored
           // with the signature rather than looked up later, so a change to the

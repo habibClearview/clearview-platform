@@ -143,7 +143,7 @@ export default function WelcomePack({ clientId, canManage }) {
 
       <Setting
         label="Read it from the contract"
-        help={`Attach the signed Purchase Order and Scope of Work together. The paying client, the served client, the programme, the reference, the period and the deliverables are filled in from them. Each document fills only what is still empty, so attaching both gets you further than either alone. Nothing is stored: the files are read and discarded, and every field is yours to correct before you save.`}
+        help={`Attach the signed Purchase Order and Scope of Work together. The paying client, the served client, the programme, the reference, the period and the deliverables are filled in from them, and each document fills only what is still empty, so attaching both gets you further than either alone. The documents are kept privately against this engagement, and every field is yours to correct before you save.`}
       >
         <div>
           <input
@@ -164,6 +164,7 @@ export default function WelcomePack({ clientId, canManage }) {
                 // overwrites what the first got right.
                 let merged = { ...(briefDraft || brief || {}) }
                 const filled = []
+                const kept = []
                 for (const file of files) {
                   const body = new FormData()
                   body.append('clientId', clientId)
@@ -171,6 +172,8 @@ export default function WelcomePack({ clientId, canManage }) {
                   const res = await fetch('/api/tor-extract', { method: 'POST', headers: auth, body })
                   const json = await res.json().catch(() => ({}))
                   if (!res.ok) throw new Error(json?.error || `Could not read ${file.name}`)
+                  if (json.storeProblem) kept.push(`${file.name} was read but not filed (${json.storeProblem})`)
+                  else if (json.stored) kept.push(`${file.name} filed`)
                   for (const [k, v] of Object.entries(json.fields || {})) {
                     const empty = merged[k] === undefined || merged[k] === null || merged[k] === ''
                       || (Array.isArray(merged[k]) && merged[k].length === 0)
@@ -189,7 +192,7 @@ export default function WelcomePack({ clientId, canManage }) {
                   setBriefDraft(merged)
                   const m = `Filled in from ${files.length === 1 ? 'the document' : `${files.length} documents`}: ${
                     [...new Set(filled)].map((k) => FIELD_NAMES[k] || k).join(', ')
-                  }. Check it, then save the brief.`
+                  }. Check it, then save the brief.${kept.length ? ` ${kept.join('. ')}.` : ''}`
                   setNote(m); setTorSaid({ ok: true, text: m })
                 }
               } catch (e2) {
