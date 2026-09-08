@@ -459,6 +459,9 @@ export default function WelcomePack({ clientId, canManage }) {
                     // has to be read rather than assumed to be a success.
                     if (r && r.emailConfigured === false) {
                       setErr(r.message || r.reason || 'Email is not switched on for this environment, so nothing was sent.')
+                    } else if (r && r.reason) {
+                      // A partial send is not a success. Name who missed out.
+                      setErr(r.reason)
                     } else {
                       setNote(`The welcome email went to ${to.length} ${to.length === 1 ? 'person' : 'people'}.`)
                     }

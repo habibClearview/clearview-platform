@@ -28,6 +28,8 @@ export const FROM_ADDRESS = 'Canvas Coach <notifications@habibonifade.com>'
 
 export interface SendEmailInput {
   to: string | string[]
+  /** A blind copy. Used to put a record of a client letter in Habib's own inbox. */
+  bcc?: string | string[]
   subject: string
   html: string
   /** The plain-text alternative. Screen readers, text clients and archives. */
@@ -66,6 +68,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         subject: input.subject,
         html: input.html,
         ...(input.text ? { text: input.text } : {}),
+        ...(input.bcc ? { bcc: Array.isArray(input.bcc) ? input.bcc : [input.bcc] } : {}),
         ...(input.replyTo ? { reply_to: input.replyTo } : {}),
       }),
       signal: abort.signal,

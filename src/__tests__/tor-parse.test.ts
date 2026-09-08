@@ -249,7 +249,7 @@ describe('one email, with the way in inside it', () => {
 
   it('reports the addresses it could not do, instead of claiming them all', () => {
     expect(ROUTE2).toContain('failed.push')
-    expect(ROUTE2).toContain('failed }')
+    expect(ROUTE2).toMatch(/sentTo, failed/)
   })
 
   it('is on by default on the screen', () => {
@@ -294,5 +294,51 @@ describe('a sign-in link arrives with a role attached', () => {
   it('never changes a role somebody already has', () => {
     // A second copy of the welcome must not demote a super_coach to a funder.
     expect(R).toContain('if (linked.userId && !already)')
+  })
+})
+
+describe('the database agrees with the code about who can exist', () => {
+  it('has a migration adding funder to the role constraint', () => {
+    const m = fs.readFileSync('supabase/migrations/2026_09_08_funder_role_allowed.sql', 'utf8')
+    expect(m).toContain("'funder'")
+    expect(m).toContain("'co_implementer'")
+    expect(m).toContain('drop constraint if exists user_profiles_role_check')
+    expect(m).not.toMatch(/drop table/i)
+  })
+})
+
+describe('a failed send says what failed', () => {
+  const ACT = fs.readFileSync('src/lib/engagement-actions.ts', 'utf8')
+  const R = fs.readFileSync('app/api/engagement-email/route.ts', 'utf8')
+  const PACK = fs.readFileSync('src/components/gtcv/WelcomePack.tsx', 'utf8')
+
+  it('reads the reason, not only the error', () => {
+    // "Try again" is advice, not information, and it sent Habib back to press
+    // the same button on the same broken thing.
+    expect(ACT).toContain("data?.error || data?.reason")
+  })
+
+  it('never reports a partial send as a whole one', () => {
+    expect(R).toContain('Not sent to')
+    expect(PACK).toContain('r.reason')
+  })
+
+  it('one recipient failing does not lose the rest', () => {
+    expect(R).toContain('for (const person of list)')
+    expect(R).toContain('failed.push')
+  })
+})
+
+describe('a copy of every letter reaches the sender', () => {
+  const R = fs.readFileSync('app/api/engagement-email/route.ts', 'utf8')
+  const E = fs.readFileSync('src/lib/email.ts', 'utf8')
+
+  it('is blind, so no recipient sees it or the rest of the list', () => {
+    // The letters go out through the provider under the platform's address, so
+    // they never appear in the sender's Sent folder.
+    expect(E).toContain('bcc?: string | string[]')
+    expect(R).toContain('bcc: replyAddress')
+    // A plain cc would show every recipient to every other one.
+    expect(R).not.toMatch(/(?<!b)cc: replyAddress/)
   })
 })

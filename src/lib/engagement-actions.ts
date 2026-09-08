@@ -99,7 +99,12 @@ export async function sendEngagementEmail(input: {
   // never come. The one case that is not a failure is email being switched
   // off, which the route answers with 200 and emailConfigured false.
   if (!res.ok) {
-    throw new Error(data?.error || 'The email could not be sent. Try again.')
+    // SAY WHAT WENT WRONG. The route answers a partial or total failure with
+    // `reason`, naming the addresses and what happened to each, and this read
+    // only `error` — so a constraint violation on one recipient surfaced as
+    // "Try again", which is advice rather than information and sent Habib back
+    // to press the same button.
+    throw new Error(data?.error || data?.reason || 'The email could not be sent. Try again.')
   }
   return data as {
     ok?: boolean; emailConfigured?: boolean; message?: string; reason?: string

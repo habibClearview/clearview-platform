@@ -270,8 +270,10 @@ export async function POST(req: NextRequest) {
                 status: 'invited',
               })
               if (profErr) {
-                // Sending anyway would hand somebody a working link into an
-                // empty account, which is worse than not sending.
+                // Sending anyway would hand this person a working link into an
+                // empty account, which is worse than not sending to them. It is
+                // only a reason to skip THIS recipient: the loop below records
+                // it against their address and carries on with the rest.
                 throw new Error(`the login could not be set up (${profErr.message})`)
               }
             }
@@ -287,6 +289,13 @@ export async function POST(req: NextRequest) {
           const one = await sendEmail({
             to: person.email, subject: personal.subject, html: personal.html,
             replyTo: replyAddress, text: letterText({ ...cfg, audience: person.audience }),
+            // A COPY IN THE SENDER'S OWN INBOX. These letters go out through
+            // the email provider under the platform's own address, so they
+            // never appear in Habib's Sent folder and he has no record of what
+            // each person actually received. A blind copy to the lead
+            // consultant is that record, and it is blind so no recipient sees
+            // it or sees the rest of the list.
+            bcc: replyAddress,
           })
           if (one.sent) sentTo.push(person.email)
           else failed.push({ email: person.email, reason: one.reason || 'the provider refused it' })
@@ -300,7 +309,13 @@ export async function POST(req: NextRequest) {
           reason: failed.map((f) => `${f.email}: ${f.reason}`).join('; ') || 'nothing was sent',
         }, { status: 502 })
       }
-      return NextResponse.json({ ok: true, stage, recipients: sentTo.length, sentTo, failed })
+      return NextResponse.json({
+        ok: true, stage, recipients: sentTo.length, sentTo, failed,
+        // Named, so a partial send is never reported as a whole one.
+        reason: failed.length
+          ? `Sent to ${sentTo.length}. Not sent to ${failed.map((f) => `${f.email} (${f.reason})`).join('; ')}`
+          : undefined,
+      })
     }
 
     // ONE MESSAGE PER PERSON, ALWAYS. A shared To: header on the tri-party

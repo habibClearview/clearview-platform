@@ -269,7 +269,7 @@ describe('everyone gets it, by name, at the same time', () => {
   })
 
   it('names the addresses it could not do rather than counting them as sent', () => {
-    expect(ROUTE3).toContain('sentTo, failed')
+    expect(ROUTE3).toMatch(/sentTo, failed/)
   })
 
   it('keeps a recipient list on the brief, deduplicated', () => {
