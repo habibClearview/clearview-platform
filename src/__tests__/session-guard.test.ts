@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'fs'
-import { isIdle, IDLE_MS, sessionIsStale, HEARTBEAT_MS, screenRunsUnattended, isSafeReturnPath, shouldWarnIdle, secondsUntilSignOut } from '@/lib/auth/session-guard'
+import { isIdle, IDLE_MS, sessionIsStale, screenIsAuthFlow, HEARTBEAT_MS, screenRunsUnattended, isSafeReturnPath, shouldWarnIdle, secondsUntilSignOut } from '@/lib/auth/session-guard'
 
 describe('isIdle', () => {
   const now = 1_000_000_000_000
@@ -222,5 +222,47 @@ describe('signing in must survive the staleness rule', () => {
   it('cannot prove staleness means stay signed in, never the reverse', () => {
     const hook = fs.readFileSync('src/lib/auth/useSessionGuard.ts', 'utf8')
     expect(hook).toMatch(/catch \(\) => \{ \/\* cannot prove it is stale[\s\S]{0,80}\*\/ \}|cannot prove it is stale/)
+  })
+})
+
+
+// ============================================================
+// THE GUARD WAS LOCKING PEOPLE OUT OF THE PAGE THEY WERE TYPING INTO.
+// 8 September 2026.
+//
+// Setting a password happens inside a short-lived recovery session. The idle
+// guard runs wherever there is a user, so on /reset-password it read a clock
+// left over from days ago, called the session stale, and signed the person out
+// mid-form. They pressed "Set new password" against nothing and were told the
+// link had expired. Habib hit it setting his own password, minutes after
+// sending the first client letters.
+// ============================================================
+describe('the idle rule stands down on a password screen', () => {
+  const GUARD = fs.readFileSync('src/lib/auth/useSessionGuard.ts', 'utf8')
+  const SHARED = fs.readFileSync('src/lib/auth/session-guard.ts', 'utf8')
+  const RESET = fs.readFileSync('app/reset-password/page.tsx', 'utf8')
+
+  it('names the screens it must never touch', () => {
+    expect(SHARED).toContain("AUTH_FLOW_SCREENS = ['/reset-password', '/welcome']")
+    expect(screenIsAuthFlow('/reset-password')).toBe(true)
+    expect(screenIsAuthFlow('/welcome')).toBe(true)
+  })
+
+  it('still guards everywhere else', () => {
+    expect(screenIsAuthFlow('/coach')).toBe(false)
+    expect(screenIsAuthFlow('/engagement/ikore')).toBe(false)
+    expect(screenIsAuthFlow(null)).toBe(false)
+  })
+
+  it('leaves before it can do anything, not merely skips the timeout', () => {
+    // A partial exemption would still let the mount-time staleness check end
+    // the session, which is the one that was firing.
+    expect(GUARD).toContain('if (screenIsAuthFlow(window.location.pathname)) return')
+  })
+
+  it('stamps the clock when a recovery session appears', () => {
+    // Belt and braces: nothing downstream can read a stale value either.
+    expect(RESET).toContain('markSignedIn()')
+    expect(RESET).toContain('PASSWORD_RECOVERY')
   })
 })

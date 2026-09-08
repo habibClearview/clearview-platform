@@ -21,7 +21,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ACTIVITY_EVENTS, HEARTBEAT_MS, IDLE_MS, LAST_ACTIVITY_KEY,
-  sessionIsStale, RETURN_TO_KEY, isIdle, isSafeReturnPath, screenRunsUnattended, shouldWarnIdle, secondsUntilSignOut } from './session-guard'
+  sessionIsStale, RETURN_TO_KEY, isIdle, isSafeReturnPath, screenRunsUnattended, screenIsAuthFlow, shouldWarnIdle, secondsUntilSignOut } from './session-guard'
 
 export function useSessionGuard(active: boolean) {
   // NEVER A SURPRISE. 2 September 2026. The sign-out used to happen with no
@@ -38,6 +38,9 @@ export function useSessionGuard(active: boolean) {
     // A screen meant to be left running does not time itself out. Read once,
     // here, because this tab does not change what it is while it is open.
     const unattended = screenRunsUnattended(window.location.pathname)
+    // On a password-setting page the guard stands down completely. See
+    // AUTH_FLOW_SCREENS for what it was doing there.
+    if (screenIsAuthFlow(window.location.pathname)) return
 
     function markActivity() {
       if (ended) return

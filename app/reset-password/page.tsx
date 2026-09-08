@@ -10,6 +10,7 @@
 // out everywhere so they log back in fresh with the new password.
 // ============================================================
 import { useEffect, useState } from 'react'
+import { markSignedIn } from '@/lib/auth/session-guard'
 import { supabase } from '@/lib/supabase'
 
 const C = {
@@ -32,11 +33,17 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     // Supabase fires PASSWORD_RECOVERY once it has parsed the token from the URL.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') { setReady(true); setChecking(false) }
+      if (event === 'PASSWORD_RECOVERY') {
+        // A recovery session is somebody who has just proved they own the
+        // address. Stamp the shared activity clock so no guard anywhere can
+        // read a stale value and end it under them.
+        markSignedIn()
+        setReady(true); setChecking(false)
+      }
     })
     // Also catch the case where the recovery session is already in place on mount.
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setReady(true)
+      if (session) { markSignedIn(); setReady(true) }
       setChecking(false)
     })
     return () => subscription.unsubscribe()

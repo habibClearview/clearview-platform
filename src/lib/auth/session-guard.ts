@@ -84,6 +84,29 @@ export const ACTIVITY_EVENTS = [
  */
 export const UNATTENDED_SCREENS = ['/coach/facilitate'] as const
 
+/**
+ * SCREENS THE IDLE RULE MUST NEVER TOUCH. 8 September 2026.
+ *
+ * Setting a password happens inside a short-lived recovery session. The idle
+ * guard runs wherever there is a user, so on this page it read a clock left
+ * over from days ago, decided the session was stale, and signed the person out
+ * mid-form. They then pressed "Set new password" against nothing and were told
+ * the link had expired, which is what a recovery session that has just been
+ * destroyed looks like from the outside.
+ *
+ * That is a rule doing exactly the opposite of its job: it exists to protect an
+ * unattended screen, and here it was locking somebody out of the screen they
+ * were actively typing into. Habib hit it while trying to set his own password.
+ *
+ * These are the paths where the guard stands down entirely.
+ */
+export const AUTH_FLOW_SCREENS = ['/reset-password', '/welcome'] as const
+
+export function screenIsAuthFlow(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return AUTH_FLOW_SCREENS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+}
+
 /** Is this path a screen that is meant to be left running unattended? */
 export function screenRunsUnattended(pathname: string | null | undefined): boolean {
   if (!pathname) return false
