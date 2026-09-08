@@ -1630,6 +1630,29 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   const isSuperCoach=userRole==='super_coach'
   const isFunder=userRole==='funder'
   const isCoImplementer=userRole==='coach'
+  // ──────────────────────────────────────────────────────────────
+  // THE CLIENT'S OWN DASHBOARD WAS BUILT AND HAD NO ADDRESS.
+  // 8 September 2026.
+  //
+  // This component has always rendered the client's dashboard. canEdit,
+  // canViewCoachGuidance and canRunTheEngagement strip the guidance, the fee,
+  // the setup screens and the diagnostic; CANVAS_TABS filters on them; and
+  // loadClients is an unfiltered query that row-level security scopes to the
+  // one engagement a client belongs to. It is exactly what the "The client"
+  // option in the view dropdown renders, through the real functions.
+  //
+  // No client could ever reach it. /coach was the only route that renders this
+  // component and it admitted super_coach and coach alone, so the dashboard
+  // existed, could be previewed, and was served to nobody. The welcome letter
+  // and the sign-in page both sent a canvas client to the journey page
+  // instead, which is one view of the engagement rather than their dashboard.
+  //
+  // /client is that address. Nothing about what a client may see or do changes
+  // here: the same role functions decide it and row-level security decides the
+  // data. What changes is that the screen is now reachable, opens straight on
+  // their engagement rather than on a list of one, and stops describing itself
+  // as the coach's dashboard to the person whose engagement it is.
+  const isClient=!isSuperCoach&&!isFunder&&!isCoImplementer
   // Both non-super_coach roles land here through the exact same data path
   // (loadClients/loadProgrammes/loadCoImplementers -- unfiltered queries
   // that RLS scopes down automatically), reusing the same Clients/
@@ -1643,7 +1666,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   const [timesheets,setTimesheets]=useState([])
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState(null)
-  const [view,setView]=useState(()=>isSuperCoach?'overview':'clients')
+  const [view,setView]=useState(()=>isSuperCoach?'overview':isClient?'client':'clients')
   const [selClientId,setSelClientId]=useState(null)
   const [selProgId,setSelProgId]=useState(null)
   const [showDeleteConfirm,setShowDeleteConfirm]=useState(false)
@@ -1746,6 +1769,17 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     }
     load()
   },[])
+
+  // A client belongs to one engagement, and row-level security has already
+  // reduced the list to it. Opening a list of one and asking them to press it
+  // is a step with no decision in it, so the engagement is selected as soon as
+  // it arrives. If more than one ever comes back the list is shown instead,
+  // rather than choosing on their behalf.
+  useEffect(()=>{
+    if(!isClient||selClientId)return
+    if(clients.length===1)setSelClientId(clients[0].id)
+    else if(clients.length>1)setView('clients')
+  },[isClient,clients,selClientId])
 
   // Load full client data when a client is selected
   useEffect(()=>{
@@ -2752,7 +2786,15 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     :isCoImplementer
     ?[['clients','Clients'],['mypayments','My Timesheet & Expenses']]
     :[['clients','Clients']]
-  const roleBadgeLabel=isSuperCoach?'Super Coach':isFunder?'Funder':'Co-Implementer'
+  const roleBadgeLabel=isSuperCoach?'Super Coach':isFunder?'Funder':isClient?(canSignOff(userRole)?'Client':'Client team'):'Co-Implementer'
+  // A client has one engagement and no other section to move between, so the
+  // navigation strip is nothing but a row they cannot use.
+  const showMainNav=!isClient||clients.length>1
+  // WHOSE DASHBOARD THIS IS, IN ITS OWN HEADING. The eyebrow, the name, the
+  // summary line and the footer all announced the coach's dashboard. A client
+  // signing in to their own engagement was told, at the top of every screen,
+  // that they were looking at somebody else's.
+  const clientOrgName=(clients.find(c=>c.id===selClientId)||clients[0])?.name||''
   return(
     <div style={{fontFamily:"var(--cv-font)",background:C.cream,color:C.navy,minHeight:'100vh'}}>
       <BuildStamp/>
@@ -2773,9 +2815,13 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       <header style={{background:'var(--cv-header)',borderBottom:`3px solid ${C.cyan}`}}>
         <div style={{maxWidth:1320,margin:'0 auto',padding:'1.25rem 1.5rem',display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
           <div>
-            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>CANVAS COACH — COACH DASHBOARD</div>
-            <h1 style={{fontFamily:'var(--cv-font)',fontSize:'1.5rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0.1rem 0 0.15rem'}}>{userName}</h1>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',letterSpacing:'0.15em',color:C.cyan,marginBottom:'0.28rem'}}>{isClient?'CANVAS COACH — YOUR ENGAGEMENT':'CANVAS COACH — COACH DASHBOARD'}</div>
+            <h1 style={{fontFamily:'var(--cv-font)',fontSize:'1.5rem',fontWeight:700,color:'var(--cv-on-accent)',margin:'0.1rem 0 0.15rem'}}>{isClient?(clientOrgName||userName):userName}</h1>
+            {isClient?(
+              <div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>Signed in as {userName}</div>
+            ):(
             <div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{activeClients.length} active · {programmes.length} programme{programmes.length!==1?'s':''} · {clearviewLive.length} Clearview live · {canvasClients.length} canvas engagement{canvasClients.length!==1?'s':''}{pausedClients.length>0&&<span style={{marginLeft:8,color:C.red}}>· {pausedClients.length} paused</span>}{pending>0&&<span style={{marginLeft:8,color:C.amber}}>· ⏳ {pending} pending</span>}</div>
+            )}
           </div>
           <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}>
             <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.cyan,border:`1px solid var(--cv-cyan-40)`,borderRadius:4,padding:'0.18rem 0.5rem'}}>{roleBadgeLabel}</span>
@@ -2795,11 +2841,13 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           </div>
         </div>
       </header>
+      {showMainNav?(
       <nav style={{background:'var(--cv-nav)',borderBottom:`1px solid var(--cv-cyan-dim)`}}>
         <div style={{maxWidth:1320,margin:'0 auto',padding:'0 1.5rem',display:'flex',flexWrap:'wrap'}}>
           {mainNavTabs.map(([id,label])=><button key={id} style={navBtn(view===id||(view==='client'&&id==='clients'))} onClick={()=>{if(id!=='client')setSelClientId(null);setView(id)}}>{label}</button>)}
         </div>
       </nav>
+      ):null}
       <main style={{maxWidth:1320,margin:'0 auto',padding:'1.5rem'}}>
         <ErrorBoundary key={view} label={String(view)}>
         {view==='overview'&&<OverviewTab/>}
@@ -2811,7 +2859,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         {view==='portfolio'&&<PortfolioIntelligenceHub clients={clients} programmes={programmes}/>}
         </ErrorBoundary>
       </main>
-      <footer style={{textAlign:'center',padding:'1.5rem',fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach · Coach Dashboard · habibonifade.com · Confidential</footer>
+      <footer style={{textAlign:'center',padding:'1.5rem',fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,borderTop:`1px solid ${C.border}`,marginTop:'2rem'}}>Canvas Coach · {isClient?'Your engagement':'Coach Dashboard'} · habibonifade.com · Confidential</footer>
     </div>
   )
 }

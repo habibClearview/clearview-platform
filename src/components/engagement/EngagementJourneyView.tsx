@@ -387,6 +387,14 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
           }}>
             <span>Signed in{who ? <> as <b style={{ color: 'var(--ink)' }}>{who}</b></> : null}{programme ? <> &middot; {programme}</> : null}</span>
             <span style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+              {/* THE WAY IN TO THE REST OF IT. 8 September 2026. This page is
+                  where the welcome letter lands somebody before the engagement
+                  starts, and from here they need their dashboard: the blocks,
+                  the charter, the record, the evidence. Without this link the
+                  letter's arrival is also a dead end. */}
+              {role && role !== 'super_coach' && role !== 'coach' && role !== 'funder' ? (
+                <a href="/client" style={{ color: 'var(--teal)', fontWeight: 600, textDecoration: 'none' }}>Your dashboard</a>
+              ) : null}
               <a href={`/engagement/${slug}/charter`} style={{ color: 'var(--teal)', fontWeight: 600, textDecoration: 'none' }}>Engagement Charter</a>
               {view.client?.engagement_mode === 'financial' ? (
                 <a href={`/dashboard/${slug}`} style={{ color: 'var(--teal)', fontWeight: 600, textDecoration: 'none' }}>Financial dashboard</a>

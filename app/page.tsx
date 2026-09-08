@@ -51,13 +51,18 @@ export default function LoginPage() {
           if (data.role === 'super_coach' || data.role === 'coach' || data.role === 'funder') {
             return landingFor(data.role)
           }
-          // A client's own person goes to their engagement.
+          // A client's own person goes to their dashboard.
+          //
+          // THIS SENT THEM TO ONE VIEW OF THEIR ENGAGEMENT, NOT TO IT.
+          // 8 September 2026. A canvas client landed on /engagement/[slug],
+          // the journey canvas, which is a picture of the engagement and not
+          // the place the work is done. Their dashboard existed the whole
+          // time and had no address; /client is that address.
           if (data.engagement_client_id) {
             const { data: c } = await supabase.from('engagement_clients')
               .select('slug, engagement_mode').eq('id', data.engagement_client_id).maybeSingle()
-            if (c?.slug) {
-              return c.engagement_mode === 'financial' ? `/dashboard/${c.slug}` : `/engagement/${c.slug}`
-            }
+            if (c?.engagement_mode === 'financial' && c?.slug) return `/dashboard/${c.slug}`
+            return '/client'
           }
         }
       }
