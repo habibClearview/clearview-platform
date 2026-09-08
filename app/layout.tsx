@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/lib/auth/context'
 import EnvBanner from '@/components/common/EnvBanner'
+import LinkProblem from '@/components/auth/LinkProblem'
 
 export const metadata: Metadata = {
   title: 'Clearview Planner — Canvas Coach',
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <a href="#main" className="cv-skip">Skip to the main content</a>
         <EnvBanner />
+        <LinkProblem />
         <AuthProvider>
           <div id="main">{children}</div>
         </AuthProvider>
