@@ -26,6 +26,7 @@ import EngagementPartiesPanel from '@/components/gtcv/EngagementPartiesPanel'
 import ShowcaseSharing from '@/components/gtcv/ShowcaseSharing'
 import EngagementSettings from '@/components/gtcv/EngagementSettings'
 import WelcomePack from '@/components/gtcv/WelcomePack'
+import TestEngagementPanel from '@/components/coach/TestEngagementPanel'
 import WhatNeedsYou from '@/components/gtcv/WhatNeedsYou'
 import EvidenceLibraryPanel from '@/components/gtcv/EvidenceLibraryPanel'
 import InterviewBriefing from '@/components/gtcv/InterviewBriefing'
@@ -2129,6 +2130,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             style={{...addBtn(true,C.teal),marginLeft:'auto',textDecoration:'none',display:'inline-flex',alignItems:'center'}}>⬇ Download Template</a>}
           {isSuperCoach&&<button style={addBtn(true,C.teal)} onClick={()=>{setShowUpload(!showUpload);setShowNew(false)}}>⬆ Upload Spreadsheet</button>}
           {isSuperCoach&&<NewIntakeLink/>}
+          {/* NOTHING IS PROVED ON A REAL CLIENT. 8 September 2026. */}
+          {isSuperCoach&&<TestEngagementPanel/>}
           {isSuperCoach&&<button style={addBtn()} onClick={()=>{setShowNew(!showNew);setShowUpload(false);setNewClientPrefill(null)}}>+ New Client</button>}
         </div>
         {isSuperCoach&&<div style={{fontSize:'0.8rem',color:C.slate,marginBottom:'1.25rem'}}>

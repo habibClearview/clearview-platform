@@ -66,16 +66,50 @@ function Setting({ label, help, children }) {
   )
 }
 
-async function api(method, body, query) {
+// "FAILED TO FETCH" IS THE BROWSER, NOT THE SERVER. 8 September 2026.
+//
+// Habib opened the welcome pack while previewing a co-implementer and saw
+// "Failed to fetch" where the engagement brief should be, and reasonably read
+// it as the preview being denied something his own view is allowed. It is not:
+// the preview changes which controls are drawn and nothing else, the request
+// carries his own session either way, and the server never saw this one.
+//
+// "Failed to fetch" is the exact wording the browser uses when a request never
+// completes at all: the connection dropped, the request was cancelled by the
+// page moving on, or something in the browser stopped it. It is thrown before
+// there is a status to read, which is why it says nothing useful. A refusal
+// looks completely different and now says so.
+//
+// So: one silent retry, because a dropped request usually succeeds a moment
+// later and there is no reason to show anybody the first one. If the second
+// also fails, the message says the request did not reach the server, which is
+// what happened, and the panel offers to try again rather than leaving a red
+// line that can only be cleared by reloading the page.
+class NetworkFailure extends Error {}
+
+async function api(method, body, query, { retries = 1 } = {}) {
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
-  const res = await fetch(`/api/engagement-config${query || ''}`, {
-    method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  })
+  let res
+  try {
+    res = await fetch(`/api/engagement-config${query || ''}`, {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    })
+  } catch (e) {
+    // Never retry a write. A save whose reply was lost may well have been
+    // applied, and sending it twice is how one gets applied twice.
+    if (retries > 0 && method === 'GET') {
+      await new Promise((r) => setTimeout(r, 400))
+      return api(method, body, query, { retries: retries - 1 })
+    }
+    throw new NetworkFailure(
+      'The request did not reach the server. This is the connection rather than a permission: nothing was refused and nothing was changed.',
+    )
+  }
   const json = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(json?.error || `Request failed (${res.status})`)
+  if (!res.ok) throw new Error(json?.error || `The server refused this (${res.status})`)
   return json
 }
 
@@ -138,7 +172,23 @@ export default function WelcomePack({ clientId, canManage }) {
         What the signed contract says, and the two letters written from it — one to the
         organisation paying, one to the organisation being served. Read either before it goes.
       </p>
-      {err ? <div style={{ color: C.red, fontSize: '0.95rem', marginTop: '0.7rem' }}>{err}</div> : null}
+      {err ? (
+        <div style={{ color: C.red, fontSize: '0.95rem', marginTop: '0.7rem' }}>
+          {err}
+          {' '}
+          {/* A red line that can only be cleared by reloading the whole page
+              makes somebody reload the whole page. */}
+          <button
+            type="button"
+            onClick={() => load()}
+            style={{
+              marginLeft: 6, border: `1px solid ${C.red}`, borderRadius: 4,
+              background: 'transparent', color: C.red, cursor: 'pointer',
+              padding: '0.1rem 0.5rem', font: 'inherit',
+            }}
+          >Try again</button>
+        </div>
+      ) : null}
       {note ? <div style={{ color: C.green, fontSize: '0.95rem', marginTop: '0.7rem' }}>{note}</div> : null}
 
       <Setting
