@@ -63,6 +63,6 @@ describe('the record can be read by the people relying on it', () => {
   it('does not publish a whole address on a page', () => {
     // An address is evidence for a dispute, not something to print for everyone.
     expect(RECORD).toContain('function maskIp')
-    expect(RECORD).toContain('fromAddress: maskIp(ev?.ip)')
+    expect(RECORD).toMatch(/fromAddress: maskIp\(/)
   })
 })

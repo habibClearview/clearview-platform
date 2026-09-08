@@ -120,8 +120,16 @@ describe('the whole read', () => {
 describe('the route that reads the document', () => {
   const ROUTE = fs.readFileSync('app/api/tor-extract/route.ts', 'utf8')
 
-  it('stores nothing', () => {
-    expect(ROUTE).not.toMatch(/storage\.from|\.upload\(/)
+  it('keeps the document, in one folder per client', () => {
+    // Until 8 September there was no bucket, so the file was read and
+    // discarded. There is one now, and a contract belongs beside its engagement.
+    expect(ROUTE).toContain("storage.from('contracts')")
+    expect(ROUTE).toContain('`${clientId}/${Date.now()}-${safeName}`')
+  })
+
+  it('does not let a failure to store cost the coach the extraction', () => {
+    expect(ROUTE).toContain('storeProblem')
+    expect(ROUTE).toContain('fields: parseTor(text), stored, storeProblem')
   })
 
   it('is manager-only, on a client they manage', () => {

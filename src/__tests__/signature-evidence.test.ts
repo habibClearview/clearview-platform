@@ -25,8 +25,12 @@ describe('what the signature captures', () => {
   })
 
   it('records where it came from and what it was made on', () => {
-    expect(SIGN).toContain('ip: auditIp(req.headers)')
-    expect(SIGN).toContain("user_agent")
+    // On the signature row itself since the 8 September migration, and in the
+    // audit log as a corroborating second copy.
+    expect(SIGN).toContain('ip_address: signerIp')
+    expect(SIGN).toContain('user_agent: userAgent')
+    expect(SIGN).toContain('content_sha256: contentSha256')
+    expect(SIGN).toContain('auditIp(req.headers)')
   })
 
   it('binds the signature to the exact wording that was signed', () => {
