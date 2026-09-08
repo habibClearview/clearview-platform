@@ -175,6 +175,28 @@
    --cv-font is the one name the whole app uses. Anything still naming a font
    stack directly is a leftover to be swept into this.
    ============================================================ */
+/* ============================================================
+   WHY THE PAGE JUMPED. 8 September 2026.
+
+   Poppins is self-hosted and loads with font-display: swap, so every block of
+   text is first drawn in the system font and then redrawn in Poppins. Poppins
+   is geometrically wider, so the second draw moves everything: Habib described
+   the left navigation and the page jumping around as he clicked.
+
+   This face is never downloaded. It is the local system font with its metrics
+   adjusted to match Poppins, so the first draw already occupies the space the
+   real font will need and the swap is invisible.
+   ============================================================ */
+@font-face {
+  font-family: 'Poppins Fallback';
+  src: local('Arial'), local('Helvetica'), local('Liberation Sans');
+  size-adjust: 112%;
+  ascent-override: 92%;
+  descent-override: 24%;
+  line-gap-override: 0%;
+  font-display: swap;
+}
+
 @font-face {
   font-family: 'Poppins';
   font-style: normal;
@@ -241,7 +263,7 @@
 }
 
 :root {
-  --cv-font: 'Poppins', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --cv-font: 'Poppins', 'Poppins Fallback', system-ui, -apple-system, 'Segoe UI', sans-serif;
   /* Kept as a name so a table of figures can still line its digits up. It
      resolves to Poppins with tabular numerals rather than to a typewriter
      face, so numbers align without the page looking like a terminal. */
@@ -254,6 +276,27 @@ input, select, button, textarea { font-family: inherit; }
 /* Figures line up column to column without a second typeface. */
 table, .cv-figures { font-variant-numeric: tabular-nums; }
 input:focus, select:focus { outline: 2px solid var(--cv-cyan); outline-offset: 1px; }
+
+/* ============================================================
+   KEYBOARD FOCUS. Only inputs and selects had a focus ring, so every button,
+   link, tab and decision-point node in the platform could be focused with no
+   way to see where you were. WCAG 2.4.7 asks for a visible indicator and 2.4.11
+   asks for it to be distinguishable; :focus-visible shows it for the keyboard
+   without ringing every mouse click.
+   ============================================================ */
+:where(a, button, [role="button"], [role="tab"], summary, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--cv-focus, #0077A3);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* The first thing a keyboard reaches: a way past the navigation. */
+.cv-skip {
+  position: absolute; left: -9999px; top: 0; z-index: 2147483647;
+  background: var(--cv-navy); color: #fff; padding: 0.7rem 1.1rem;
+  border-radius: 0 0 6px 0; text-decoration: none; font-weight: 600;
+}
+.cv-skip:focus { left: 0; }
 
 /* ============================================================
    RESPONSIVE DASHBOARD GRIDS

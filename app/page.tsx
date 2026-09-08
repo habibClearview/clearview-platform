@@ -119,14 +119,16 @@ export default function LoginPage() {
       setError('Enter your email address first, then press Forgot your password.')
       return
     }
-    setResetting(true); setError('')
-    await supabase.auth.resetPasswordForEmail(address, {
+    setError('')
+    // The answer does not depend on the request, so it does not wait for it.
+    // The same words appear whether or not the address is registered, because
+    // "no such account" is how an attacker enumerates who has a login. Waiting
+    // on the provider only bought a spinner that sat there when the network was
+    // slow, which is what browser testing found it doing.
+    setSentReset(true)
+    supabase.auth.resetPasswordForEmail(address, {
       redirectTo: `${window.location.origin}/reset-password`,
     }).catch(() => undefined)
-    // The same answer whether or not the address is registered. Saying "no
-    // such account" here is how an attacker enumerates who has a login.
-    setResetting(false)
-    setSentReset(true)
   }
 
   if (checking) return (

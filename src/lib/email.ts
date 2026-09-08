@@ -113,6 +113,8 @@ export interface BrandedEmailInput {
   ctaLabel?: string
   ctaUrl?: string
   footNote?: EmailText
+  /** The preview line shown beside the subject in an inbox. */
+  preheader?: string
 }
 
 export function brandedEmail(input: BrandedEmailInput): string {
@@ -130,7 +132,15 @@ export function brandedEmail(input: BrandedEmailInput): string {
   const foot = input.footNote
     ? `<p style="color:#4A5A6A;font-size:13px;margin:18px 0 0;">${render(input.footNote)}</p>`
     : ''
-  return `
+  // THE SECOND LINE IN THE INBOX. Without one, Gmail previews the first text
+  // in the body, which is the salutation, so the list shows "Dear Mr Mercer,"
+  // and nothing about why the letter is worth opening.
+  const preheader = input.preheader
+    ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(input.preheader)}${
+        '&#8203;&nbsp;'.repeat(60)
+      }</div>`
+    : ''
+  return `${preheader}
     <div style="font-family:'Poppins','Segoe UI',Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">
       <div style="background:#1B2A41;padding:20px 24px;border-radius:8px 8px 0 0;border-bottom:3px solid #00CCCC;">
         <p style="margin:0;font-size:12.5px;color:#00CCCC;letter-spacing:1px;text-transform:uppercase;">The Canvas Coach</p>
@@ -353,6 +363,9 @@ export function buildScopeEmail(cfg: EngagementEmailConfig): { subject: string; 
     heading: salutation(cfg.recipientName, cfg.recipientTitle) || 'Dear colleague,',
     paragraphs,
     ctaLabel: cfg.signInIncluded ? 'Set your password and open the engagement' : 'Open the engagement',
+    preheader: audience === 'payer'
+      ? 'How the engagement runs, what you will be able to see, and your access.'
+      : 'How we will work, what the nine decision points ask of you, and your access.',
     ctaUrl: cfg.journeyUrl,
     footNote: raw(`${escapeHtml(cfg.coachName)}<br/>Lead Practitioner, The Canvas Coach${
       brief.reference ? `<br/><span style="color:#8A94A0;">${escapeHtml(brief.reference)}</span>` : ''

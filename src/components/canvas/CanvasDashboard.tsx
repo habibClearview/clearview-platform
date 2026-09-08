@@ -202,7 +202,13 @@ export default function CanvasDashboard({ userRole, userName }: CanvasDashboardP
 
   const isCoach = userRole === 'super_coach' || userRole === 'co_implementer'
   const isCEO = userRole === 'ceo'
-  const isFunder = userRole === 'ignite_funder'
+  // TWO NAMES FOR ONE ROLE, AND THE FUNDER VIEW NEVER RAN. 8 September 2026.
+  // user_profiles.role stores 'funder'. This tested for 'ignite_funder', which
+  // nothing writes, so the whole funder branch below was dead: a paying client
+  // reaching this page fell through to the working view meant for the
+  // organisation being coached. Both names are accepted here, and 'funder' is
+  // the one the rest of the platform writes.
+  const isFunder = userRole === 'funder' || userRole === 'ignite_funder'
 
   const order = getPhaseOrder()
 
