@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { sendEngagementEmail } from '@/lib/engagement-actions'
-import { SERVICE_TYPES, SERVICE_LABEL } from '@/lib/engagement-brief'
+import { SERVICE_TYPES, SERVICE_LABEL, cleanEmail, emailLooksSendable } from '@/lib/engagement-brief'
 
 const C = {
   card: 'var(--cv-card)', alt: 'var(--cv-alt)', border: 'var(--cv-border)',
@@ -388,6 +388,21 @@ export default function WelcomePack({ clientId, canManage }) {
                 <button
                   type="button" style={smallBtn(C.teal, true)} disabled={busy === 'people' || !briefDraft}
                   onClick={async () => {
+                    // A ROW THAT CANNOT BE SENT TO IS NAMED, NOT DROPPED.
+                    // 8 September 2026. An address with a stray bracket on it
+                    // used to be saved and fail at the moment of sending, with
+                    // the provider's own wording, which reads as nonsense
+                    // beside three working addresses at the same domain. It is
+                    // now cleaned on the way in, and anything still wrong is
+                    // said here, before it is saved, naming the row.
+                    const bad = (rows || [])
+                      .map((r) => (r.email || '').trim())
+                      .filter(Boolean)
+                      .filter((e) => !emailLooksSendable(cleanEmail(e)))
+                    if (bad.length) {
+                      setErr(`${bad.join(', ')} ${bad.length === 1 ? 'is not an address that can be sent to' : 'are not addresses that can be sent to'}. Check for a stray bracket, comma or space.`)
+                      return
+                    }
                     setBusy('people'); setNote(null); setErr(null)
                     try {
                       await api('PATCH', { clientId, brief: briefDraft })

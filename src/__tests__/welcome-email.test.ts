@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import { buildScopeEmail, buildTriPartyEmail } from '@/lib/email'
-import { briefFromConfig, briefIntoConfig } from '@/lib/engagement-brief'
+import { briefFromConfig, briefIntoConfig, cleanEmail, emailLooksSendable } from '@/lib/engagement-brief'
 import { readFileSync } from 'node:fs'
 
 // ============================================================
@@ -331,5 +331,70 @@ describe('sending to one person', () => {
 
   it('one send at a time, so two presses cannot overlap', () => {
     expect(PACK).toContain('disabled={!!busy || !journeyUrl}')
+  })
+})
+
+// ============================================================
+// AN ADDRESS PASTED OUT OF A MAIL CLIENT
+//
+// Habib pasted kemiasuni@tanagerintl.org and the send came back "Unable to
+// validate email address: invalid format", beside three working addresses at
+// the same domain. What was actually stored was "kemiasuni@tanagerintl.org>",
+// with a closing angle bracket: copying a name and address out of a mail
+// client gives "Kemi Asuni <kemiasuni@tanagerintl.org>", and the tail of it
+// survived the paste. The address really was malformed and nothing said which
+// character was the problem.
+// ============================================================
+describe('an address is cleaned on the way in', () => {
+  it('takes off the bracket that survives a half-copied paste', () => {
+    expect(cleanEmail('kemiasuni@tanagerintl.org>')).toBe('kemiasuni@tanagerintl.org')
+    expect(cleanEmail('<kemiasuni@tanagerintl.org')).toBe('kemiasuni@tanagerintl.org')
+  })
+
+  it('reads a name and address as the address', () => {
+    expect(cleanEmail('Kemi Asuni <kemiasuni@tanagerintl.org>')).toBe('kemiasuni@tanagerintl.org')
+    expect(cleanEmail('"Onuoha, Nkemjika" <nkemjika.onuoha@ikore.org>')).toBe('nkemjika.onuoha@ikore.org')
+  })
+
+  it('takes off a trailing comma, semicolon, full stop or space', () => {
+    for (const messy of ['ovo@ikore.org,', 'ovo@ikore.org;', 'ovo@ikore.org.', '  ovo@ikore.org  ']) {
+      expect(cleanEmail(messy)).toBe('ovo@ikore.org')
+    }
+  })
+
+  it('lowercases, because an address is not case sensitive and a list is', () => {
+    expect(cleanEmail('Ovo@Ikore.Org')).toBe('ovo@ikore.org')
+  })
+})
+
+describe('what can actually be sent to', () => {
+  it('accepts the real ones', () => {
+    for (const good of ['ovo@ikore.org', 'nkemjika.onuoha@ikore.org', 'kemiasuni@tanagerintl.org', 'habib@habibonifade.com']) {
+      expect(emailLooksSendable(good)).toBe(true)
+    }
+  })
+
+  it('refuses what a person can see is wrong', () => {
+    for (const bad of [
+      'kemiasuni@tanagerintl.org>', 'ovo@ikore', 'ovo@', '@ikore.org', 'ovo ikore.org',
+      'two people@ikore.org', 'ovo@ikore.org, nkemjika@ikore.org', '', 'a@b.c'.repeat(60),
+    ]) {
+      expect(emailLooksSendable(bad)).toBe(false)
+    }
+  })
+
+  it('a saved recipient list drops nothing silently that the screen has not named', () => {
+    // The list refuses a malformed address; the screen names it before saving,
+    // so nobody discovers a missing recipient by counting the list.
+    const brief = briefFromConfig({
+      brief: {
+        recipients: [
+          { email: 'Kemi Asuni <kemiasuni@tanagerintl.org>', name: 'Oluwakemi Asuni', audience: 'payer' },
+          { email: 'ovo@ikore.org', role: 'Managing Partner', audience: 'served' },
+          { email: 'not an address', name: 'Nobody', audience: 'served' },
+        ],
+      },
+    })
+    expect(brief.recipients?.map((r) => r.email)).toEqual(['kemiasuni@tanagerintl.org', 'ovo@ikore.org'])
   })
 })

@@ -122,6 +122,47 @@ function str(v: unknown, max: number): string | undefined {
  * The recipient list, believing none of it. A row with no usable address is
  * dropped rather than kept as an empty line that later sends to nobody.
  */
+/**
+ * AN ADDRESS PASTED OUT OF A MAIL CLIENT. 8 September 2026.
+ *
+ * Habib pasted kemiasuni@tanagerintl.org and the send came back "Unable to
+ * validate email address: invalid format", which reads as nonsense next to
+ * three addresses at the same domain that work. What was saved was
+ * "kemiasuni@tanagerintl.org>", with a closing angle bracket on the end:
+ * copying a name and address out of a mail client gives
+ * "Kemi Asuni <kemiasuni@tanagerintl.org>", and what survived the paste was
+ * the tail of it.
+ *
+ * The address was genuinely malformed. Nothing here said which character was
+ * the problem, and the provider's own wording is no help to the person holding
+ * the screen.
+ *
+ * So the brackets, quotes, stray commas and semicolons that come with a pasted
+ * address are taken off before it is stored, and a display name in front of an
+ * address in angle brackets is read as the address it contains rather than
+ * refused.
+ */
+export function cleanEmail(raw: string): string {
+  let e = raw.trim()
+  // "Kemi Asuni <kemiasuni@tanagerintl.org>" is one address with a name on it.
+  const angled = e.match(/<([^<>]+)>/)
+  if (angled) e = angled[1]
+  // Anything left over from a partial paste, at either end.
+  e = e.replace(/^[\s<>"',;]+/, '').replace(/[\s<>"',;.]+$/, '')
+  return e.toLowerCase()
+}
+
+/**
+ * True for something that can actually be sent to. Deliberately plain: one @,
+ * something either side, a dot in the domain, and no whitespace or brackets
+ * anywhere. It is not trying to be the full grammar of an address, only to
+ * catch what a person can see is wrong.
+ */
+export function emailLooksSendable(email: string): boolean {
+  if (!email || email.length > 254) return false
+  return /^[^\s<>@",;]+@[^\s<>@",;]+\.[^\s<>@",;]{2,}$/.test(email)
+}
+
 function readRecipients(v: unknown): Recipient[] | undefined {
   if (!Array.isArray(v)) return undefined
   const out: Recipient[] = []
@@ -129,8 +170,9 @@ function readRecipients(v: unknown): Recipient[] | undefined {
   for (const r of v.slice(0, 50)) {
     if (!r || typeof r !== 'object') continue
     const row = r as Record<string, unknown>
-    const email = str(row.email, 254)?.toLowerCase()
-    if (!email || !email.includes('@') || seen.has(email)) continue
+    const raw = str(row.email, 254)
+    const email = raw ? cleanEmail(raw) : undefined
+    if (!email || !emailLooksSendable(email) || seen.has(email)) continue
     seen.add(email)
     out.push({
       email,

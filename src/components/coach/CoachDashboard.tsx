@@ -2270,10 +2270,17 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           {CLIENT_SERVICE_TABS.map(t=><button key={t.key} style={subPill(service===t.key)} onClick={()=>setService(t.key)}>{t.label}</button>)}
         </div>
 
+        {/* THE CLIENT WAS ADDED AND DID NOT APPEAR. 8 September 2026. This
+            branch drew the subscription table and nothing else, so a client
+            whose own record says Market Intelligence, with no subscription
+            logged under Services yet, was calculated into a block that was
+            never rendered. Habib added one and it was simply not there. The
+            blocks are drawn under the table now, whether or not there is a
+            table. */}
         {service==='portfolio_intelligence'?(
-          subscriptionRows.length===0?(
+          subscriptionRows.length===0&&blocks.length===0?(
             <div style={{...card,color:C.slate}}>No subscribers yet.</div>
-          ):(
+          ):(<>{subscriptionRows.length>0&&(
             <div style={{...card,padding:0,overflow:'hidden'}}>
               <div style={{overflowX:'auto'}}>
                 <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
@@ -2295,6 +2302,18 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 </table>
               </div>
             </div>
+          )}
+          {blocks.map((b,i)=>(
+            <div key={i} style={{...card,padding:0,overflow:'hidden'}}>
+              <div style={{background:'var(--cv-alt)',padding:'0.85rem 1.1rem',borderBottom:'1px solid var(--cv-border-soft)'}}>
+                <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>{b.title}</div>
+                <div style={{fontSize:'0.86rem',color:C.slate}}>{b.meta}</div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))',gap:'0.75rem',padding:'1rem 1.1rem'}}>
+                {b.clients.map(c=><ServedClientCard key={c.id} client={c} seStatus={c.__seStatus} hasActuals={hasActuals.has(c.id)}/>)}
+              </div>
+            </div>
+          ))}</>
           )
         ):blocks.length===0?(
           <div style={{...card,color:C.slate}}>No clients on {CLIENT_SERVICE_TABS.find(t=>t.key===service)?.label} yet.</div>

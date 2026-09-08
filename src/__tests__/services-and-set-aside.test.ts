@@ -155,3 +155,18 @@ describe('a flagged client can be set aside on the Clients screen', () => {
     expect(sql).toContain('add column if not exists health_flag_dismissed_at')
   })
 })
+
+describe('a Market Intelligence client appears the moment it is added', () => {
+  it('the subscription branch draws the client blocks as well as the table', () => {
+    // It drew the subscription table and nothing else, so a client whose own
+    // record says Market Intelligence, with nothing logged under Services yet,
+    // was calculated into a block that was never rendered. Habib added one and
+    // it was simply not there.
+    expect(DASH).toContain('subscriptionRows.length===0&&blocks.length===0?(')
+    expect(DASH).toContain('):(<>{subscriptionRows.length>0&&(')
+  })
+
+  it('still says so when there is genuinely nobody', () => {
+    expect(DASH).toContain('No subscribers yet.')
+  })
+})
