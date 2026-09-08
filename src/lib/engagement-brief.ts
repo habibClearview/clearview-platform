@@ -72,6 +72,25 @@ export interface EngagementBrief {
    */
   letterPayer?: string
   letterServed?: string
+  /**
+   * EVERYONE WHO GETS THE LETTER, BY NAME.
+   *
+   * An engagement is not two people. Tanager alone has the overall lead, the
+   * procurement lead, the country representative and the finance lead for
+   * invoicing, and all of them should receive it at the same time rather than
+   * one of them forwarding it on. Each row carries who they are and which of
+   * the two letters they get, because a funder's finance lead and the served
+   * organisation's chief executive must not be sent the same words.
+   */
+  recipients?: Recipient[]
+}
+
+export interface Recipient {
+  title?: string
+  name?: string
+  email: string
+  role?: string
+  audience: 'payer' | 'served'
 }
 
 const CAP = { text: 300, list: 20, item: 400, intro: 2000, letter: 20000 }
@@ -80,6 +99,31 @@ function str(v: unknown, max: number): string | undefined {
   if (typeof v !== 'string') return undefined
   const s = v.trim().slice(0, max)
   return s || undefined
+}
+
+/**
+ * The recipient list, believing none of it. A row with no usable address is
+ * dropped rather than kept as an empty line that later sends to nobody.
+ */
+function readRecipients(v: unknown): Recipient[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const out: Recipient[] = []
+  const seen = new Set<string>()
+  for (const r of v.slice(0, 50)) {
+    if (!r || typeof r !== 'object') continue
+    const row = r as Record<string, unknown>
+    const email = str(row.email, 254)?.toLowerCase()
+    if (!email || !email.includes('@') || seen.has(email)) continue
+    seen.add(email)
+    out.push({
+      email,
+      title: str(row.title, 16),
+      name: str(row.name, 120),
+      role: str(row.role, 120),
+      audience: row.audience === 'payer' ? 'payer' : 'served',
+    })
+  }
+  return out.length ? out : undefined
 }
 
 /** A date the purchase order stated, or nothing. Never a guess. */
@@ -118,6 +162,7 @@ export function briefFromConfig(brandOverrides: unknown): EngagementBrief {
     welcomeIntro: str(b.welcomeIntro, CAP.intro),
     letterPayer: str(b.letterPayer, CAP.letter),
     letterServed: str(b.letterServed, CAP.letter),
+    recipients: readRecipients(b.recipients),
   }
 }
 

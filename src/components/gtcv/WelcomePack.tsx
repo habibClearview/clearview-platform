@@ -286,6 +286,63 @@ export default function WelcomePack({ clientId, canManage }) {
       </Setting>
 
       <Setting
+        label="Who receives it"
+        help={`Everyone who should get the letter, by name. Each person receives their own copy: their salutation, the letter for their side of the engagement, and their own sign-in link. Nobody is put in the To or CC line with somebody else, so no recipient sees the rest of the list and no two people share a link.`}
+      >
+        {(() => {
+          const d = briefDraft || brief || {}
+          const rows = d.recipients || []
+          const setRows = (next) => setBriefDraft({ ...d, recipients: next })
+          const cell = { ...field, padding: '0.34rem 0.45rem', fontSize: '0.88rem' }
+          return (
+            <div>
+              {rows.length === 0
+                ? <p style={{ ...hint, margin: '0 0 0.5rem' }}>Nobody added yet. Add the people at both organisations who should receive this.</p>
+                : null}
+              {rows.map((r, i) => (
+                <div key={i} style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <input style={{ ...cell, maxWidth: 70 }} placeholder="Mr" value={r.title || ''}
+                    onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, title: e.target.value } : x))} />
+                  <input style={{ ...cell, maxWidth: 175 }} placeholder="Full name" value={r.name || ''}
+                    onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
+                  <input style={{ ...cell, maxWidth: 215 }} placeholder="email@organisation.org" value={r.email || ''}
+                    onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, email: e.target.value } : x))} />
+                  <input style={{ ...cell, maxWidth: 155 }} placeholder="Their role" value={r.role || ''}
+                    onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, role: e.target.value } : x))} />
+                  <select style={{ ...cell, maxWidth: 165 }} value={r.audience || 'payer'}
+                    onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, audience: e.target.value } : x))}>
+                    <option value="payer">Paying client letter</option>
+                    <option value="served">Served client letter</option>
+                  </select>
+                  <button type="button" style={{ ...smallBtn(C.red), padding: '0.2rem 0.5rem' }}
+                    onClick={() => setRows(rows.filter((_, j) => j !== i))}>Remove</button>
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.45rem', flexWrap: 'wrap' }}>
+                <button type="button" style={smallBtn(C.slate)}
+                  onClick={() => setRows([...rows, { title: '', name: '', email: '', role: '', audience: 'payer' }])}>
+                  Add someone
+                </button>
+                <button
+                  type="button" style={smallBtn(C.teal, true)} disabled={busy === 'people' || !briefDraft}
+                  onClick={async () => {
+                    setBusy('people'); setNote(null); setErr(null)
+                    try {
+                      await api('PATCH', { clientId, brief: briefDraft })
+                      setBriefDraft(null); setEmailPreview(null)
+                      setNote('The recipients are saved.')
+                      await load()
+                    } catch (e) { setErr(e.message || 'That did not save') }
+                    setBusy(null)
+                  }}
+                >{busy === 'people' ? 'Saving...' : 'Save the recipients'}</button>
+              </div>
+            </div>
+          )
+        })()}
+      </Setting>
+
+      <Setting
         label="The letter"
         help={`Two letters, written from the brief above: one to the organisation paying and one to the organisation being served. Read either at any time. Sending needs an address on the client or on a party; reading does not.`}
       >
@@ -293,8 +350,12 @@ export default function WelcomePack({ clientId, canManage }) {
           // The client contact first, then the parties; one person listed twice
           // is one email, and an engagement with nobody on it says so rather
           // than offering a button that would send to no one.
-          const to = [...new Set([client?.contact_email, ...partyEmails]
-            .map((e) => (e || '').trim()).filter(Boolean))]
+          // The named list is the list. The client contact and the parties are
+          // only a fallback for an engagement where nobody has been named yet.
+          const named = (brief.recipients || []).map((r) => r.email).filter(Boolean)
+          const to = named.length
+            ? named
+            : [...new Set([client?.contact_email, ...partyEmails].map((e) => (e || '').trim()).filter(Boolean))]
           // The route refuses a link that is not a web address, so a client
           // with no slug yet would fail the preview on a technicality. Fall
           // back to the platform's front door: still true, still openable.
@@ -311,8 +372,8 @@ export default function WelcomePack({ clientId, canManage }) {
             <div>
               <p style={{ ...hint, margin: '0 0 0.5rem' }}>
                 {to.length
-                  ? <>Goes to {to.join(', ')}. The button in it opens {journeyUrl || 'the journey'}.</>
-                  : <>Nobody has an email address on this engagement yet, so it can be read but not sent. Add the client contact or a party when you are ready to send.</>}
+                  ? <>Goes to {to.length} {to.length === 1 ? 'person' : 'people'}, each with their own copy: {to.join(', ')}.</>
+                  : <>Nobody is on the list yet, so the letter can be read but not sent. Add people above.</>}
               </p>
               {/* THE PAYER AND THE SERVED ORGANISATION DO NOT DO THE SAME THING.
                   One is doing the work, the other is watching it and paying for
@@ -410,13 +471,17 @@ export default function WelcomePack({ clientId, canManage }) {
                       onClick={() => setEmailPreview(null)}
                     >Close</button>
                   </div>
-                  {/* The email's own HTML, rendered in a sandbox: it is a document
-                      to look at, not code to run on this page. */}
-                  <iframe
-                    title="The welcome email as it will arrive"
-                    srcDoc={emailPreview.html}
-                    sandbox=""
-                    style={{ width: '100%', height: 620, border: 0, background: '#fff', display: 'block' }}
+                  {/* THE PREVIEW WAS BLANK, AND THE APP DID IT TO ITSELF.
+                      This was an iframe. The app sends frame-ancestors 'none'
+                      and a default-src of 'self', so the browser refused to
+                      render the app's own srcdoc frame and drew "refused to
+                      connect" instead of the letter. Rendered inline there is
+                      no frame to refuse. It is safe to do so: every word a
+                      person typed is escaped on the way into this markup, so
+                      the letter is text and never code. */}
+                  <div
+                    style={{ background: '#fff', padding: '4px 0', maxHeight: 620, overflowY: 'auto' }}
+                    dangerouslySetInnerHTML={{ __html: emailPreview.html }}
                   />
                 </div>
               ) : null}

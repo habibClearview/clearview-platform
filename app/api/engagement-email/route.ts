@@ -151,6 +151,7 @@ export async function POST(req: NextRequest) {
       programmeName = programme?.name ?? null
     }
 
+    const brief = briefFromConfig(config?.brand_overrides)
     const brand = (config?.brand_overrides as Record<string, unknown> | null) || null
     const brandTitle = typeof brand?.engagement_title === 'string' ? brand.engagement_title : null
     const leadConsultant = (parties || []).find((p) => p.party_role === 'lead_consultant')
@@ -165,7 +166,7 @@ export async function POST(req: NextRequest) {
       coachName,
       journeyUrl,
       engagementMode: (client as { engagement_mode?: string }).engagement_mode || 'canvas',
-      brief: briefFromConfig(config?.brand_overrides),
+      brief,
       signInIncluded: includeSignIn === true,
       audience: audience === 'payer' ? 'payer' : 'served',
       recipientName: typeof recipientName === 'string' ? recipientName.trim().slice(0, 120) || undefined : undefined,
@@ -201,24 +202,49 @@ export async function POST(req: NextRequest) {
     // sender, is the opposite of the first impression this is for. When the
     // sign-in is included, each recipient gets their own one-time link as the
     // button, so the letter has to be built and sent per person.
-    if (includeSignIn && stage === 'scope') {
+    // EVERYONE, BY NAME, AT THE SAME TIME.
+    //
+    // An engagement is not two people. Tanager alone has the overall lead, the
+    // procurement lead, the country representative and the finance lead, and
+    // all of them should receive this together rather than one forwarding it.
+    // Each person is sent their own letter: their salutation, the copy for
+    // their side of the engagement, and their own one-time sign-in link. That
+    // rules out To/CC, which would put one salutation and one link in front of
+    // everybody and expose the whole list to each of them.
+    const list = (brief.recipients && brief.recipients.length)
+      ? brief.recipients
+      : cleaned.recipients.map((email) => ({
+          email,
+          name: recipientName,
+          title: recipientTitle,
+          audience: (audience === 'payer' ? 'payer' : 'served') as 'payer' | 'served',
+        }))
+
+    if (stage === 'scope' && (includeSignIn || (brief.recipients && brief.recipients.length))) {
       const sentTo: string[] = []
       const failed: { email: string; reason: string }[] = []
-      for (const address of cleaned.recipients) {
+      for (const person of list) {
         try {
-          const linked = await signInLinkFor(admin, address, journeyUrl as string, {
-            full_name: recipientName || null,
-          })
+          let cta = journeyUrl as string
+          if (includeSignIn) {
+            const linked = await signInLinkFor(admin, person.email, journeyUrl as string, {
+              full_name: person.name || null,
+            })
+            cta = linked.link
+          }
           const personal = buildScopeEmail({
             ...cfg,
-            journeyUrl: linked.link,
-            signInIncluded: true,
+            audience: person.audience,
+            recipientName: person.name,
+            recipientTitle: person.title,
+            journeyUrl: cta,
+            signInIncluded: includeSignIn === true,
           })
-          const one = await sendEmail({ to: address, subject: personal.subject, html: personal.html })
-          if (one.sent) sentTo.push(address)
-          else failed.push({ email: address, reason: one.reason || 'the provider refused it' })
+          const one = await sendEmail({ to: person.email, subject: personal.subject, html: personal.html })
+          if (one.sent) sentTo.push(person.email)
+          else failed.push({ email: person.email, reason: one.reason || 'the provider refused it' })
         } catch (e: unknown) {
-          failed.push({ email: address, reason: (e as Error)?.message || 'no sign-in link could be made' })
+          failed.push({ email: person.email, reason: (e as Error)?.message || 'no sign-in link could be made' })
         }
       }
       if (!sentTo.length) {
@@ -227,7 +253,7 @@ export async function POST(req: NextRequest) {
           reason: failed.map((f) => `${f.email}: ${f.reason}`).join('; ') || 'nothing was sent',
         }, { status: 502 })
       }
-      return NextResponse.json({ ok: true, stage, recipients: sentTo.length, failed })
+      return NextResponse.json({ ok: true, stage, recipients: sentTo.length, sentTo, failed })
     }
 
     const result = await sendEmail({ to: cleaned.recipients, subject, html })

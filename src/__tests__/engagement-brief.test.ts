@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import fs from 'fs'
 import {
   briefFromConfig, briefIntoConfig, periodInWords, durationInWords, salutation,
   SERVICE_TYPES, SERVICE_LABEL,
@@ -234,5 +235,57 @@ describe('the letter can be rewritten', () => {
   it('a letter someone typed markup into is still text', () => {
     const m = buildScopeEmail({ ...base, audience: 'served', brief: { ...BRIEF, letterServed: '<script>x</script>' } } as never)
     expect(m.html).not.toContain('<script>x</script>')
+  })
+})
+
+describe('everyone gets it, by name, at the same time', () => {
+  const ROUTE3 = fs.readFileSync('app/api/engagement-email/route.ts', 'utf8')
+  const PACK2 = fs.readFileSync('src/components/gtcv/WelcomePack.tsx', 'utf8')
+
+  it('sends one letter per person, never a To or CC line', () => {
+    // A shared To line puts one salutation and one sign-in link in front of
+    // everybody, and shows each recipient the whole list.
+    expect(ROUTE3).toContain('for (const person of list)')
+    expect(ROUTE3).toContain('sendEmail({ to: person.email')
+    expect(ROUTE3).toContain('audience: person.audience')
+    expect(ROUTE3).toContain('recipientName: person.name')
+  })
+
+  it('lets a funder lead and a served CEO get different letters in one send', () => {
+    expect(ROUTE3).toContain("audience: person.audience")
+    expect(PACK2).toContain('Paying client letter')
+    expect(PACK2).toContain('Served client letter')
+  })
+
+  it('names the addresses it could not do rather than counting them as sent', () => {
+    expect(ROUTE3).toContain('sentTo, failed')
+  })
+
+  it('keeps a recipient list on the brief, deduplicated', () => {
+    const brief = briefFromConfig({ brief: { recipients: [
+      { email: 'A@x.org', name: 'One', audience: 'payer' },
+      { email: 'a@x.org', name: 'Duplicate', audience: 'served' },
+      { email: 'no-at-sign', name: 'Bad' },
+      { name: 'No address' },
+    ] } })
+    expect(brief.recipients).toHaveLength(1)
+    expect(brief.recipients?.[0].email).toBe('a@x.org')
+    expect(brief.recipients?.[0].audience).toBe('payer')
+  })
+
+  it('defaults an unknown audience to the served letter', () => {
+    const brief = briefFromConfig({ brief: { recipients: [{ email: 'x@y.org', audience: 'nonsense' }] } })
+    expect(brief.recipients?.[0].audience).toBe('served')
+  })
+})
+
+describe('the preview is visible', () => {
+  const PACK3 = fs.readFileSync('src/components/gtcv/WelcomePack.tsx', 'utf8')
+
+  it('is not an iframe the app own security headers refuse', () => {
+    // frame-ancestors none and default-src self meant the browser drew
+    // "refused to connect" where the letter should have been.
+    expect(PACK3).not.toContain('srcDoc')
+    expect(PACK3).toContain('dangerouslySetInnerHTML={{ __html: emailPreview.html }}')
   })
 })
