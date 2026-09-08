@@ -415,13 +415,20 @@ export default function WelcomePack({ clientId, canManage }) {
           const to = named.length
             ? named
             : [...new Set([client?.contact_email, ...partyEmails].map((e) => (e || '').trim()).filter(Boolean))]
-          // The route refuses a link that is not a web address, so a client
-          // with no slug yet would fail the preview on a technicality. Fall
-          // back to the platform's front door: still true, still openable.
+          // WHERE THE LETTER LANDS SOMEBODY. 8 September 2026.
+          //
+          // It landed them on /engagement/[slug], the journey canvas. That is a
+          // picture of the engagement and not the place the work is done, and
+          // it is the same page for everybody, so a client who had just set a
+          // password arrived at something that read as a brochure and had no
+          // sign they were signed in.
+          //
+          // It lands them on their dashboard now. /client resolves who they are
+          // from their own session and serves the dashboard their role gets:
+          // the client's own, or the funder's if the letter went to the paying
+          // side. The journey canvas is a tab inside it, where it belongs.
           const origin = typeof window !== 'undefined' ? window.location.origin : ''
-          const journeyUrl = client?.slug && origin
-            ? `${origin}/engagement/${client.slug}`
-            : origin
+          const journeyUrl = origin ? `${origin}/client` : ''
           // READING IS NOT SENDING. 7 September 2026. This whole block used to
           // collapse to "no email address yet" when nobody was on the client,
           // so on a fresh engagement there was no way to read the letter at

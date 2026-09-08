@@ -81,6 +81,18 @@ describe('no engagement content is kept in the browser', () => {
     expect(offenders).toEqual([])
   })
 
+  it('nothing but the field capture tool uses IndexedDB', () => {
+    // IndexedDB is the other place a record can be kept in a browser, and a
+    // grep for localStorage does not find it. The field capture tool is the one
+    // deliberate user: an outbox of sales and costs typed on a phone with no
+    // signal, drained and cleared once the server accepts them, plus the app
+    // shell so the page opens at all. Anything else appearing here is a record
+    // being kept somewhere it cannot be governed.
+    const users = FILES.filter((f) => /indexedDB|openDB\(/.test(readFileSync(f, 'utf8')))
+      .map((f) => f.replace(ROOT + '/', ''))
+    expect(users).toEqual(['src/lib/field-db.ts'])
+  })
+
   it('the funder route reads the database rather than the browser', () => {
     const text = readFileSync(join(ROOT, 'app/dashboard/funder/page.tsx'), 'utf8')
     expect(text).toContain('CoachDashboard')

@@ -156,3 +156,54 @@ describe('the send screen', () => {
     expect(SETTINGS).toContain('the letter can be read but not sent')
   })
 })
+
+// ============================================================
+// THE LETTER LANDS ON THEIR DASHBOARD
+//
+// It used to land on /engagement/[slug], the journey canvas: a picture of the
+// engagement rather than the place the work is done, identical for everybody,
+// with nothing on it saying the reader was signed in. A client who had just
+// set a password arrived at what read as a brochure, three times over, and
+// each time I looked for a routing fault instead of opening the page.
+//
+// The destination is now /client, which resolves who the reader is from their
+// own session and serves the dashboard their role gets. These tests hold the
+// button's wording to the same promise, because a button that says one thing
+// and does another is how the last three hours were spent.
+// ============================================================
+describe('the welcome letter opens the reader’s dashboard', () => {
+  const cfg = {
+    engagementTitle: 'Test engagement',
+    clientName: 'Test Organisation',
+    coachName: 'Habib Onifade',
+    journeyUrl: 'https://clearview.habibonifade.com/client',
+    engagementMode: 'canvas' as const,
+    brief: {},
+    audience: 'served' as const,
+  }
+
+  it('the button goes where the letter says it goes', () => {
+    const { html } = buildScopeEmail({ ...cfg, signInIncluded: true })
+    expect(html).toContain('https://clearview.habibonifade.com/client')
+    expect(html).toContain('open your dashboard')
+  })
+
+  it('says so whether or not it carries the sign-in', () => {
+    const withSignIn = buildScopeEmail({ ...cfg, signInIncluded: true }).html
+    const without = buildScopeEmail({ ...cfg, signInIncluded: false }).html
+    expect(withSignIn).toContain('Set your password and open your dashboard')
+    expect(without).toContain('Open your dashboard')
+  })
+
+  it('the payer’s letter lands in the same place, and their own role decides what they get', () => {
+    const { html } = buildScopeEmail({ ...cfg, audience: 'payer', signInIncluded: true })
+    expect(html).toContain('https://clearview.habibonifade.com/client')
+  })
+
+  it('no letter still points at the journey canvas', () => {
+    for (const audience of ['payer', 'served'] as const) {
+      const { html } = buildScopeEmail({ ...cfg, audience, signInIncluded: true })
+      expect(html).not.toMatch(/href="[^"]*\/engagement\//)
+    }
+  })
+})

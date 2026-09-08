@@ -421,7 +421,10 @@ export function buildScopeEmail(cfg: EngagementEmailConfig): { subject: string; 
   const html = brandedEmail({
     heading: salutation(cfg.recipientName, cfg.recipientTitle) || 'Dear colleague,',
     paragraphs,
-    ctaLabel: cfg.signInIncluded ? 'Set your password and open the engagement' : 'Open the engagement',
+    // IT SAYS WHERE IT GOES. The button lands on their dashboard, so it says
+    // dashboard. "Open the engagement" described a page and left the reader to
+    // work out that the page was theirs.
+    ctaLabel: cfg.signInIncluded ? 'Set your password and open your dashboard' : 'Open your dashboard',
     preheader: audience === 'payer'
       ? 'How the engagement runs, what you will be able to see, and your access.'
       : 'How we will work, what the nine decision points ask of you, and your access.',
