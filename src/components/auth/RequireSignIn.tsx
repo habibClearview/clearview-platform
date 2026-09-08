@@ -17,7 +17,7 @@
 // ============================================================
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { RETURN_TO_KEY, isSafeReturnPath } from '@/lib/auth/session-guard'
+import { RETURN_TO_KEY, RETURN_TO_AT_KEY, isSafeReturnPath } from '@/lib/auth/session-guard'
 
 export default function RequireSignIn({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false)
@@ -61,7 +61,11 @@ export default function RequireSignIn({ children }: { children: React.ReactNode 
         // Back here once they are in, rather than dropped on a dashboard and
         // left to find their own engagement again.
         const here = window.location.pathname + window.location.search
-        if (isSafeReturnPath(here)) localStorage.setItem(RETURN_TO_KEY, here)
+        if (isSafeReturnPath(here)) {
+          localStorage.setItem(RETURN_TO_KEY, here)
+          // Stamped, because a return path is only followed while it is fresh.
+          localStorage.setItem(RETURN_TO_AT_KEY, String(Date.now()))
+        }
       } catch { /* storage refused; signing in still works */ }
       window.location.href = '/'
     }

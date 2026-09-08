@@ -392,7 +392,11 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
                   starts, and from here they need their dashboard: the blocks,
                   the charter, the record, the evidence. Without this link the
                   letter's arrival is also a dead end. */}
-              {role && role !== 'super_coach' && role !== 'coach' && role !== 'funder' ? (
+              {role === 'super_coach' || role === 'coach' ? (
+                <a href="/coach" style={{ color: 'var(--teal)', fontWeight: 600, textDecoration: 'none' }}>&larr; Coach Dashboard</a>
+              ) : role === 'funder' ? (
+                <a href="/dashboard/funder" style={{ color: 'var(--teal)', fontWeight: 600, textDecoration: 'none' }}>Your dashboard</a>
+              ) : role ? (
                 <a href="/client" style={{ color: 'var(--teal)', fontWeight: 600, textDecoration: 'none' }}>Your dashboard</a>
               ) : null}
               <a href={`/engagement/${slug}/charter`} style={{ color: 'var(--teal)', fontWeight: 600, textDecoration: 'none' }}>Engagement Charter</a>

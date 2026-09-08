@@ -26,7 +26,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import CoachDashboard from '@/components/coach/CoachDashboard'
-import { markSignedIn, RETURN_TO_KEY } from '@/lib/auth/session-guard'
+import { markSignedIn, RETURN_TO_KEY, RETURN_TO_AT_KEY } from '@/lib/auth/session-guard'
 
 export default function FunderPage() {
   const [status, setStatus] = useState('checking')
@@ -35,7 +35,10 @@ export default function FunderPage() {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
-        try { localStorage.setItem(RETURN_TO_KEY, '/dashboard/funder') } catch { /* not essential */ }
+        try {
+          localStorage.setItem(RETURN_TO_KEY, '/dashboard/funder')
+          localStorage.setItem(RETURN_TO_AT_KEY, String(Date.now()))
+        } catch { /* not essential */ }
         window.location.href = '/'
         return
       }

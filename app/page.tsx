@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { landingFor, RETURN_TO_KEY, isSafeReturnPath, sessionIsStale, markSignedIn, LAST_ACTIVITY_KEY } from '@/lib/auth/session-guard'
+import { landingFor, RETURN_TO_KEY, RETURN_TO_AT_KEY, returnPathIsFresh, isSafeReturnPath, sessionIsStale, markSignedIn, LAST_ACTIVITY_KEY } from '@/lib/auth/session-guard'
 
 const C = {
   navy:'#1B2A4A', cyan:'#00B4D8', cream:'#F8F4EE', white:'#FFFFFF',
@@ -36,9 +36,14 @@ export default function LoginPage() {
 
   async function landingPage() {
     try {
+      // A PATH FROM ANOTHER DAY IS NOT WHERE YOU WERE. 8 September 2026.
+      // Read and removed together, so it is followed once whatever happens,
+      // and only followed at all when it was written recently.
       const saved = localStorage.getItem(RETURN_TO_KEY)
+      const savedAt = localStorage.getItem(RETURN_TO_AT_KEY)
       localStorage.removeItem(RETURN_TO_KEY)
-      if (isSafeReturnPath(saved)) return saved as string
+      localStorage.removeItem(RETURN_TO_AT_KEY)
+      if (isSafeReturnPath(saved) && returnPathIsFresh(Date.now(), savedAt)) return saved as string
     } catch { /* storage refused; the role's own landing is always safe */ }
     // Where somebody belongs depends on who they are. Sending everybody to
     // /coach put paying clients on the consultant's dashboard.

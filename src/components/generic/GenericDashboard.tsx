@@ -1034,6 +1034,18 @@ export default function GenericDashboard({
                 Engagement Charter — the things a canvas client was actually
                 sold — had no link anywhere on it, so unless somebody pasted the
                 URL, a client could sign in every day and never find them. */}
+            {/* NO WAY BACK. 8 September 2026. A coach opening a client's
+                dashboard arrived at a screen with a sign-out and nothing else:
+                no link to their own dashboard, and the client's name in the
+                header rather than theirs. Getting back meant typing the
+                address or closing the tab. Shown to the coaching team only,
+                because a client has no coach dashboard to return to. */}
+            {['super_coach','coach'].includes(P.role) ? (
+              <a
+                href="/coach"
+                style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.88rem',background:'transparent',border:`1px solid var(--cv-cyan-40)`,borderRadius:4,color:C.cyan,cursor:'pointer',padding:'0.18rem 0.5rem',textDecoration:'none'}}
+              >&larr; Coach Dashboard</a>
+            ) : null}
             {P.slug ? (
               <a
                 href={`/engagement/${P.slug}`}

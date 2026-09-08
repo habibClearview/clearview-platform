@@ -208,6 +208,32 @@ export function sessionIsStale(
  */
 export const RETURN_TO_KEY = 'cv:return-to'
 
+/** When the return path was written. See returnPathIsFresh. */
+export const RETURN_TO_AT_KEY = 'cv:return-to-at'
+
+/**
+ * How long a return path is worth honouring.
+ *
+ * Long enough to cover being signed out mid-task and coming straight back,
+ * short enough that yesterday's page cannot decide where this morning's
+ * sign-in lands. Habib was signed out while working and sent to a client's
+ * dashboard he had not chosen; a stale path is the other half of that.
+ */
+export const RETURN_TO_MAX_AGE_MS = 30 * 60 * 1000
+
+/** True when the stored return path is recent enough to follow. */
+export function returnPathIsFresh(
+  now: number,
+  stamp: string | null | undefined,
+  maxAge: number = RETURN_TO_MAX_AGE_MS,
+): boolean {
+  const at = Number(stamp)
+  if (!Number.isFinite(at) || at <= 0) return false
+  const age = now - at
+  // A stamp from the future means the clock moved, not that it is fresh.
+  return age >= 0 && age <= maxAge
+}
+
 export function isSafeReturnPath(path: string | null | undefined): boolean {
   if (!path) return false
   // A single leading slash, and no scheme or host. "//evil.com" and

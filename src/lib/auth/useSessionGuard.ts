@@ -21,7 +21,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ACTIVITY_EVENTS, HEARTBEAT_MS, IDLE_MS, LAST_ACTIVITY_KEY,
-  sessionIsStale, RETURN_TO_KEY, isIdle, isSafeReturnPath, screenRunsUnattended, screenIsAuthFlow, shouldWarnIdle, secondsUntilSignOut } from './session-guard'
+  sessionIsStale, RETURN_TO_KEY, RETURN_TO_AT_KEY, isIdle, isSafeReturnPath, screenRunsUnattended, screenIsAuthFlow, shouldWarnIdle, secondsUntilSignOut } from './session-guard'
 
 export function useSessionGuard(active: boolean) {
   // NEVER A SURPRISE. 2 September 2026. The sign-out used to happen with no
@@ -66,9 +66,27 @@ export function useSessionGuard(active: boolean) {
       // Remember the page, so signing back in returns here instead of the
       // dashboard. Written before the sign-out, because the redirect follows
       // immediately and there is no second chance.
+      // SENT TO A CLIENT'S DASHBOARD WITHOUT PRESSING ANYTHING.
+      // 8 September 2026.
+      //
+      // The return path is shared across every tab, and every tab wrote it.
+      // Open a client's dashboard from the coach screen, which opens in a new
+      // tab, leave it in the background, and when the idle rule fires it is
+      // that tab which decides where you come back to. Habib was signed out
+      // while working and landed on Bwayele Vet's dashboard, a client he had
+      // not chosen and could not get back from.
+      //
+      // Only the tab somebody is actually looking at may claim it. A tab
+      // sitting in the background is not where they were.
       try {
         const here = window.location.pathname + window.location.search
-        if (isSafeReturnPath(here) && here !== '/') localStorage.setItem(RETURN_TO_KEY, here)
+        const looking = typeof document === 'undefined' || document.visibilityState === 'visible'
+        if (looking && isSafeReturnPath(here) && here !== '/') {
+          localStorage.setItem(RETURN_TO_KEY, here)
+          // Stamped, so a path left over from days ago cannot decide where
+          // this morning's sign-in lands. See RETURN_TO_MAX_AGE_MS.
+          localStorage.setItem(RETURN_TO_AT_KEY, String(Date.now()))
+        }
       } catch { /* a browser refusing storage is not a reason to stay signed in */ }
       try {
         await supabase.auth.signOut({ scope: 'local' })

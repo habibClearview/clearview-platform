@@ -23,7 +23,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import CoachDashboard from '@/components/coach/CoachDashboard'
-import { markSignedIn, RETURN_TO_KEY } from '@/lib/auth/session-guard'
+import { markSignedIn, RETURN_TO_KEY, RETURN_TO_AT_KEY } from '@/lib/auth/session-guard'
 
 const CLIENT_ROLES = ['ceo', 'finance_manager', 'unit_head', 'accounts_assistant']
 
@@ -36,7 +36,10 @@ export default function ClientPage() {
       if (!session) {
         // Come back here after signing in, rather than to a dashboard they then
         // have to find their own engagement from.
-        try { localStorage.setItem(RETURN_TO_KEY, '/client') } catch { /* not essential */ }
+        try {
+          localStorage.setItem(RETURN_TO_KEY, '/client')
+          localStorage.setItem(RETURN_TO_AT_KEY, String(Date.now()))
+        } catch { /* not essential */ }
         window.location.href = '/'
         return
       }
