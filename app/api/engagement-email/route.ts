@@ -23,6 +23,7 @@ import { getBearerToken } from '@/lib/auth/api-authz'
 import { resolveClientAccess } from '@/lib/auth/engagement-access'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { briefFromConfig } from '@/lib/engagement-brief'
+import { signInLinkFor } from '@/lib/signin-link'
 import {
   emailAvailable,
   sendEmail,
@@ -43,7 +44,7 @@ function getAdminClient() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { clientId, stage, recipients, journeyUrl, preview, audience, recipientName, recipientTitle, wantText } = (await req.json()) as {
+    const { clientId, stage, recipients, journeyUrl, preview, audience, recipientName, recipientTitle, wantText, includeSignIn } = (await req.json()) as {
       clientId?: string
       stage?: Stage
       recipients?: string[]
@@ -53,6 +54,7 @@ export async function POST(req: NextRequest) {
       recipientName?: string
       recipientTitle?: string
       wantText?: boolean
+      includeSignIn?: boolean
     }
     // A PREVIEW IS THE SAME EMAIL, NOT A SECOND COPY OF IT. 4 September 2026.
     // Habib asked where he could read the welcome before it went to a client.
@@ -164,6 +166,7 @@ export async function POST(req: NextRequest) {
       journeyUrl,
       engagementMode: (client as { engagement_mode?: string }).engagement_mode || 'canvas',
       brief: briefFromConfig(config?.brand_overrides),
+      signInIncluded: includeSignIn === true,
       audience: audience === 'payer' ? 'payer' : 'served',
       recipientName: typeof recipientName === 'string' ? recipientName.trim().slice(0, 120) || undefined : undefined,
       recipientTitle: typeof recipientTitle === 'string' ? recipientTitle.trim().slice(0, 16) || undefined : undefined,
@@ -191,6 +194,40 @@ export async function POST(req: NextRequest) {
         emailConfigured: false,
         message: 'Email is not configured on this environment. Share the journey link directly instead.',
       })
+    }
+
+    // ONE LETTER, WITH THE WAY IN INSIDE IT. A client holding a letter about a
+    // platform they cannot open, waiting on a second message from a different
+    // sender, is the opposite of the first impression this is for. When the
+    // sign-in is included, each recipient gets their own one-time link as the
+    // button, so the letter has to be built and sent per person.
+    if (includeSignIn && stage === 'scope') {
+      const sentTo: string[] = []
+      const failed: { email: string; reason: string }[] = []
+      for (const address of cleaned.recipients) {
+        try {
+          const linked = await signInLinkFor(admin, address, journeyUrl as string, {
+            full_name: recipientName || null,
+          })
+          const personal = buildScopeEmail({
+            ...cfg,
+            journeyUrl: linked.link,
+            signInIncluded: true,
+          })
+          const one = await sendEmail({ to: address, subject: personal.subject, html: personal.html })
+          if (one.sent) sentTo.push(address)
+          else failed.push({ email: address, reason: one.reason || 'the provider refused it' })
+        } catch (e: unknown) {
+          failed.push({ email: address, reason: (e as Error)?.message || 'no sign-in link could be made' })
+        }
+      }
+      if (!sentTo.length) {
+        return NextResponse.json({
+          ok: false, emailConfigured: true,
+          reason: failed.map((f) => `${f.email}: ${f.reason}`).join('; ') || 'nothing was sent',
+        }, { status: 502 })
+      }
+      return NextResponse.json({ ok: true, stage, recipients: sentTo.length, failed })
     }
 
     const result = await sendEmail({ to: cleaned.recipients, subject, html })

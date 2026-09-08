@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'fs'
-import { parseTor, parseLongDate, findPeriod, findReference, findDeliverables } from '@/lib/tor-parse'
+import { parseTor, parseLongDate, findPeriod, findReference, findDeliverables, findParties } from '@/lib/tor-parse'
 
 // ============================================================
 // READING PURCHASE ORDER 149 AND ITS SCOPE OF WORK.
@@ -173,5 +173,96 @@ describe('reading the letter is not sending it', () => {
 
   it('says what an upload did, beside the upload', () => {
     expect(PACK).toContain('torSaid')
+  })
+})
+
+describe('the upload fills the brief, not three fields of it', () => {
+  it('reads the payer, the served client and the programme', () => {
+    const po = 'TANAGER CHARGE CODE: J6008-04 Tanager will book and pay for all approved travel'
+    expect(findParties(po).payerName).toBe('Tanager')
+    const sow = 'helping Ikore International Development Ltd. (LSP) sharpen what they already do, under IGNITE+, Tanager works'
+    const p = findParties(sow)
+    expect(p.servedName).toContain('Ikore International Development Ltd')
+    expect(p.payerProgramme).toBe('IGNITE+')
+  })
+
+  it('keeps the plus on a programme name', () => {
+    // A trailing word boundary refuses it: the character after + is a comma,
+    // and two non-word characters are not a boundary, so the engine backtracks
+    // and hands back IGNITE.
+    expect(findParties('under IGNITE+, Tanager works').payerProgramme).toBe('IGNITE+')
+  })
+
+  it('offers neither name when a rule matched the same organisation twice', () => {
+    const both = findParties('TANAGER CHARGE CODE: J1 helping Tanager (LSP) do the work')
+    expect(both.servedName).toBeUndefined()
+  })
+
+  it('says nothing about parties a document does not name', () => {
+    const p = findParties('A contract between two unnamed parties for services.')
+    expect(p.payerName).toBeUndefined()
+    expect(p.servedName).toBeUndefined()
+    expect(p.payerProgramme).toBeUndefined()
+  })
+})
+
+describe('a second document does not undo the first', () => {
+  const PACK = fs.readFileSync('src/components/gtcv/WelcomePack.tsx', 'utf8')
+
+  it('takes both documents at once', () => {
+    expect(PACK).toContain('multiple accept=".pdf')
+  })
+
+  it('fills only what is still empty', () => {
+    // The purchase order names the payer and the scope of work names the
+    // organisation served. Attaching both has to get further than either.
+    expect(PACK).toContain('&& empty) { merged[k] = v; filled.push(k) }')
+  })
+
+  it('ticks the service rather than asking for it again', () => {
+    expect(PACK).toContain("merged.services = ['canvas']")
+  })
+})
+
+describe('one email, with the way in inside it', () => {
+  const ROUTE2 = fs.readFileSync('app/api/engagement-email/route.ts', 'utf8')
+  const PACK = fs.readFileSync('src/components/gtcv/WelcomePack.tsx', 'utf8')
+
+  it('generates a link instead of letting Supabase send its own email', () => {
+    const lib = fs.readFileSync('src/lib/signin-link.ts', 'utf8')
+    expect(lib).toContain('generateLink')
+    expect(lib).not.toContain('inviteUserByEmail')
+  })
+
+  it('gives each recipient their own link, so it sends one letter per person', () => {
+    expect(ROUTE2).toContain('for (const address of cleaned.recipients)')
+    expect(ROUTE2).toContain('signInLinkFor(admin, address')
+  })
+
+  it('reports the addresses it could not do, instead of claiming them all', () => {
+    expect(ROUTE2).toContain('failed.push')
+    expect(ROUTE2).toContain('failed }')
+  })
+
+  it('is on by default on the screen', () => {
+    expect(PACK).toContain('useState(true)')
+    expect(PACK).toContain('so no second email is needed')
+  })
+})
+
+describe('a forgotten password', () => {
+  const SIGNIN = fs.readFileSync('app/page.tsx', 'utf8')
+
+  it('has a way back in from the sign-in page', () => {
+    // /reset-password has existed for weeks and nothing linked to it, so a
+    // forgotten password meant asking Habib, and Habib forgetting meant
+    // nothing at all.
+    expect(SIGNIN).toContain('Forgot your password?')
+    expect(SIGNIN).toContain('resetPasswordForEmail')
+    expect(SIGNIN).toContain('/reset-password')
+  })
+
+  it('does not say whether the address has an account', () => {
+    expect(SIGNIN).toContain('If that address has an account')
   })
 })

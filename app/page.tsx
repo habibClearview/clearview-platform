@@ -6,7 +6,7 @@ import { DEFAULT_LANDING, RETURN_TO_KEY, isSafeReturnPath, sessionIsStale, markS
 
 const C = {
   navy:'#1B2A4A', cyan:'#00B4D8', cream:'#F8F4EE', white:'#FFFFFF',
-  slate:'#4A5A6A', border:'#D8E0E8', red:'#C0392B',
+  slate:'#4A5A6A', border:'#D8E0E8', red:'#C0392B', green:'#1A7A4A',
 }
 
 export default function LoginPage() {
@@ -15,6 +15,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
   const [error, setError] = useState('')
+  // NOBODY COULD GET BACK IN. 8 September 2026. /reset-password has existed for
+  // weeks, and its own comment says the "Forgot password?" email links here.
+  // Nothing sent anybody there: there was no such link anywhere in the app, so
+  // a forgotten password meant asking Habib, and a forgotten password of
+  // Habib's meant nothing at all.
+  const [sentReset, setSentReset] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   /**
    * Back to the page the session ended on, once. Read and REMOVED in the same
@@ -84,6 +91,22 @@ export default function LoginPage() {
     }
   }
 
+  async function handleForgot() {
+    const address = email.trim()
+    if (!address) {
+      setError('Enter your email address first, then press Forgot your password.')
+      return
+    }
+    setResetting(true); setError('')
+    await supabase.auth.resetPasswordForEmail(address, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    }).catch(() => undefined)
+    // The same answer whether or not the address is registered. Saying "no
+    // such account" here is how an attacker enumerates who has a login.
+    setResetting(false)
+    setSentReset(true)
+  }
+
   if (checking) return (
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:C.cream}}>
       <div style={{color:C.slate,fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem'}}>Loading...</div>
@@ -134,6 +157,19 @@ export default function LoginPage() {
             style={{width:'100%',padding:'0.75rem',border:'none',borderRadius:6,background:loading?C.slate:C.navy,color:C.white,fontSize:'0.9rem',fontWeight:600,cursor:loading?'not-allowed':'pointer',fontFamily:'inherit'}}>
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
+          {sentReset ? (
+            <div style={{marginTop:'1rem',background:'#EEF7F1',border:`1px solid ${C.green}`,borderRadius:6,padding:'0.7rem 0.9rem',fontSize:'0.83rem',color:C.navy}}>
+              If that address has an account, a link to set a new password is on its way. It expires within the hour. Check the spam folder if it does not arrive.
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleForgot}
+              disabled={resetting}
+              style={{display:'block',margin:'1rem auto 0',background:'none',border:'none',padding:0,color:C.slate,fontSize:'0.83rem',textDecoration:'underline',cursor:resetting?'default':'pointer',fontFamily:'inherit'}}>
+              {resetting ? 'Sending...' : 'Forgot your password?'}
+            </button>
+          )}
         </div>
         <div style={{textAlign:'center',marginTop:'1.5rem',fontSize:'0.78rem',color:C.slate}}>
           Canvas Coach · habibonifade.com · Confidential

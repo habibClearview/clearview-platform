@@ -79,6 +79,14 @@ async function api(method, body, query) {
   return json
 }
 
+// The fields, named the way the form names them, so the message after an
+// upload reads as English instead of as a list of column names.
+const FIELD_NAMES = {
+  payerName: 'paying client', servedName: 'served client', payerProgramme: 'programme',
+  reference: 'reference', periodStart: 'start date', periodEnd: 'end date',
+  deliverables: 'what it produces', services: 'services',
+}
+
 export default function WelcomePack({ clientId, canManage }) {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
@@ -97,6 +105,7 @@ export default function WelcomePack({ clientId, canManage }) {
   const [torSaid, setTorSaid] = useState(null)
   // The letter itself, as text. Null until it is loaded for editing.
   const [letterDraft, setLetterDraft] = useState(null)
+  const [includeSignIn, setIncludeSignIn] = useState(true)
 
   const load = useCallback(async () => {
     if (!clientId) { setLoading(false); return }
@@ -134,38 +143,53 @@ export default function WelcomePack({ clientId, canManage }) {
 
       <Setting
         label="Read it from the contract"
-        help={`Attach the signed Scope of Work or Purchase Order and the fields below are filled in from it — the reference, the period of performance and the deliverables in the document's own words. Nothing is stored: the file is read and discarded, and everything it found is yours to correct before you save.`}
+        help={`Attach the signed Purchase Order and Scope of Work together. The paying client, the served client, the programme, the reference, the period and the deliverables are filled in from them. Each document fills only what is still empty, so attaching both gets you further than either alone. Nothing is stored: the files are read and discarded, and every field is yours to correct before you save.`}
       >
         <div>
           <input
-            type="file" accept=".pdf,.txt,application/pdf,text/plain"
+            type="file" multiple accept=".pdf,.txt,application/pdf,text/plain"
             disabled={busy === 'tor'}
             style={{ ...hint, marginBottom: '0.4rem' }}
             onChange={async (e) => {
-              const file = e.target.files && e.target.files[0]
-              if (!file) return
+              const files = Array.from(e.target.files || [])
+              if (!files.length) return
               setBusy('tor'); setNote(null); setErr(null); setTorSaid(null)
               try {
                 const { data } = await supabase.auth.getSession()
-                const body = new FormData()
-                body.append('clientId', clientId)
-                body.append('file', file)
-                const res = await fetch('/api/tor-extract', {
-                  method: 'POST',
-                  headers: data.session?.access_token
-                    ? { Authorization: `Bearer ${data.session.access_token}` } : {},
-                  body,
-                })
-                const json = await res.json().catch(() => ({}))
-                if (!res.ok) throw new Error(json?.error || 'Could not read that document')
-                const f = json.fields || {}
-                const found = Object.keys(f).filter((k) => f[k] !== undefined && f[k] !== null)
-                if (!found.length) {
-                  const m = json.note || 'Nothing recognisable came out of that document. Type the details in instead.'
+                const auth = data.session?.access_token
+                  ? { Authorization: `Bearer ${data.session.access_token}` } : {}
+                // A purchase order names the payer; a scope of work names the
+                // organisation served. Both can be attached at once, and each
+                // one only fills what is still empty, so the second never
+                // overwrites what the first got right.
+                let merged = { ...(briefDraft || brief || {}) }
+                const filled = []
+                for (const file of files) {
+                  const body = new FormData()
+                  body.append('clientId', clientId)
+                  body.append('file', file)
+                  const res = await fetch('/api/tor-extract', { method: 'POST', headers: auth, body })
+                  const json = await res.json().catch(() => ({}))
+                  if (!res.ok) throw new Error(json?.error || `Could not read ${file.name}`)
+                  for (const [k, v] of Object.entries(json.fields || {})) {
+                    const empty = merged[k] === undefined || merged[k] === null || merged[k] === ''
+                      || (Array.isArray(merged[k]) && merged[k].length === 0)
+                    if (v !== undefined && v !== null && empty) { merged[k] = v; filled.push(k) }
+                  }
+                }
+                // A GtCV contract is a GtCV engagement. Ticking the service by
+                // hand every time is exactly the friction the upload is for.
+                if (!merged.services || !merged.services.length) {
+                  merged.services = ['canvas']; filled.push('services')
+                }
+                if (!filled.length) {
+                  const m = 'Nothing new came out of that. Every field it can read is already filled in.'
                   setErr(m); setTorSaid({ ok: false, text: m })
                 } else {
-                  setBriefDraft({ ...(briefDraft || brief || {}), ...f })
-                  const m = `Read from the document: ${found.join(', ')}. Check it, then save the brief.`
+                  setBriefDraft(merged)
+                  const m = `Filled in from ${files.length === 1 ? 'the document' : `${files.length} documents`}: ${
+                    [...new Set(filled)].map((k) => FIELD_NAMES[k] || k).join(', ')
+                  }. Check it, then save the brief.`
                   setNote(m); setTorSaid({ ok: true, text: m })
                 }
               } catch (e2) {
@@ -308,6 +332,15 @@ export default function WelcomePack({ clientId, canManage }) {
                   child. A client gets their title and their full name, and if
                   neither is given the letter opens "Dear colleague," rather
                   than guessing at one. */}
+              {/* ONE EMAIL, NOT TWO. A client holding a letter about a platform
+                  they cannot open, waiting on a second message from a different
+                  sender, is the opposite of the impression this is for. */}
+              <label style={{ ...hint, display: 'flex', gap: '0.35rem', alignItems: 'center', cursor: 'pointer', margin: '0 0 0.6rem' }}>
+                <input
+                  type="checkbox" checked={includeSignIn}
+                  onChange={() => { setIncludeSignIn((v) => !v); setEmailPreview(null) }}
+                />Put their sign-in in this letter, so no second email is needed
+              </label>
               <p style={{ display: 'flex', gap: '0.4rem', margin: '0 0 0.6rem', flexWrap: 'wrap' }}>
                 <input
                   style={{ ...field, maxWidth: 90 }} placeholder="Mr / Ms"
@@ -328,7 +361,7 @@ export default function WelcomePack({ clientId, canManage }) {
                     const r = await sendEngagementEmail({
                       clientId, stage: 'scope', recipients: to, journeyUrl,
                       preview: true, audience: welcomeAudience, wantText: true,
-                      recipientName: toName, recipientTitle: toTitle,
+                      recipientName: toName, recipientTitle: toTitle, includeSignIn,
                     })
                     if (r?.html) {
                       setEmailPreview({ subject: r.subject, html: r.html })
@@ -352,7 +385,7 @@ export default function WelcomePack({ clientId, canManage }) {
                   try {
                     const r = await sendEngagementEmail({
                       clientId, stage: 'scope', recipients: to, journeyUrl,
-                      audience: welcomeAudience,
+                      audience: welcomeAudience, includeSignIn,
                       recipientName: toName, recipientTitle: toTitle,
                     })
                     // Email being switched off is answered with a 200, so it

@@ -163,8 +163,10 @@ export interface EngagementEmailConfig {
   brief?: EngagementBrief
   /** Who this copy is addressed to: the organisation paying, or the one served. */
   audience?: 'payer' | 'served'
-  /** Mr, Ms, Dr — whatever they are addressed as. */
+  /** Mr, Ms, Dr, whatever they are addressed as. */
   recipientTitle?: string
+  /** True when the journey link IS this person's one-time sign-in link. */
+  signInIncluded?: boolean
 }
 
 /**
@@ -251,10 +253,13 @@ function payerBlocks(cfg: EngagementEmailConfig, brief: EngagementBrief): Block[
   ] })
 
   b.push({ kind: 'h', text: 'Your access' })
-  b.push({ kind: 'p', text:
-    `Go to ${SIGN_IN_HOME.replace('https://', '')} and press Clearview sign in. A separate email provides a `
-    + 'temporary password for you to replace. You may look around immediately. The working sections open when '
-    + 'the engagement begins.' })
+  b.push({ kind: 'p', text: cfg.signInIncluded
+    ? 'The button below signs you in and asks you to set a password. You may look around immediately. '
+      + `The working sections open when the engagement begins. The platform is at ${SIGN_IN_HOME.replace('https://', '')} `
+      + 'whenever you return to it.'
+    : `Go to ${SIGN_IN_HOME.replace('https://', '')} and press Clearview sign in. A separate email provides a `
+      + 'temporary password for you to replace. You may look around immediately. The working sections open when '
+      + 'the engagement begins.' })
 
   return b
 }
@@ -304,10 +309,13 @@ function servedBlocks(cfg: EngagementEmailConfig, brief: EngagementBrief): Block
     + (payer ? ` ${payer} sees the same record in read only form, so progress does not have to be written up for them.` : '') })
 
   b.push({ kind: 'h', text: 'Your access' })
-  b.push({ kind: 'p', text:
-    `Go to ${SIGN_IN_HOME.replace('https://', '')} and press Clearview sign in. A separate email provides a `
-    + 'temporary password for you to replace. The pre-engagement material is available to read now. The '
-    + 'remaining sections open as the work proceeds.' })
+  b.push({ kind: 'p', text: cfg.signInIncluded
+    ? 'The button below signs you in and asks you to set a password. The pre-engagement material is available '
+      + `to read now, and the remaining sections open as the work proceeds. The platform is at `
+      + `${SIGN_IN_HOME.replace('https://', '')} whenever you return to it.`
+    : `Go to ${SIGN_IN_HOME.replace('https://', '')} and press Clearview sign in. A separate email provides a `
+      + 'temporary password for you to replace. The pre-engagement material is available to read now. The '
+      + 'remaining sections open as the work proceeds.' })
 
   return b
 }
@@ -338,7 +346,7 @@ export function buildScopeEmail(cfg: EngagementEmailConfig): { subject: string; 
   const html = brandedEmail({
     heading: salutation(cfg.recipientName, cfg.recipientTitle) || 'Dear colleague,',
     paragraphs,
-    ctaLabel: 'Open the engagement',
+    ctaLabel: cfg.signInIncluded ? 'Set your password and open the engagement' : 'Open the engagement',
     ctaUrl: cfg.journeyUrl,
     footNote: raw(`${escapeHtml(cfg.coachName)}<br/>Lead Practitioner, The Canvas Coach${
       brief.reference ? `<br/><span style="color:#8A94A0;">${escapeHtml(brief.reference)}</span>` : ''

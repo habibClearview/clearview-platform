@@ -13,6 +13,9 @@
 // ============================================================
 
 export interface TorFields {
+  payerName?: string
+  servedName?: string
+  payerProgramme?: string
   reference?: string
   periodStart?: string
   periodEnd?: string
@@ -103,6 +106,74 @@ export function findDeliverables(text: string): string[] {
   return items
 }
 
+
+/**
+ * WHO IS ON THIS CONTRACT.
+ *
+ * A purchase order names the organisation issuing it in several places, and a
+ * scope of work names the organisation the work is delivered to. Between them
+ * that is the payer and the served client, which is most of the brief.
+ *
+ * Every rule here is anchored on wording that only appears in one role, so a
+ * document that does not say it plainly returns nothing for that field. The
+ * screen shows what was found and the coach corrects it before saving, so a
+ * miss costs one line of typing and a wrong guess costs a client's name in a
+ * letter.
+ */
+export function findParties(text: string): { payerName?: string; servedName?: string; payerProgramme?: string } {
+  const flat = (text || '').replace(/\s+/g, ' ')
+  const out: { payerName?: string; servedName?: string; payerProgramme?: string } = {}
+
+  // The payer. A purchase order repeats its own issuer as a charge code owner
+  // ("TANAGER CHARGE CODE"), as the party the vendor contracts with, and in the
+  // terms. The charge-code form is the least ambiguous.
+  const chargeCode = /\b([A-Z][A-Za-z&.'-]{2,30})\s+(?:CHARGE\s+CODE|JOB\s+CODE)\b/.exec(flat)
+  if (chargeCode) out.payerName = titleCase(chargeCode[1])
+  if (!out.payerName) {
+    const willBook = /\b([A-Z][A-Za-z&.'-]{2,30})\s+will\s+book\s+and\s+pay\b/i.exec(flat)
+    if (willBook) out.payerName = titleCase(willBook[1])
+  }
+
+  // The served organisation. A scope of work says who the consultancy helps,
+  // and an LSP contract marks it explicitly.
+  const lsp = /\b([A-Z][\w&.,'-]*(?:\s+[A-Z][\w&.,'-]*){0,5}?)\s*\(\s*LSP\s*\)/.exec(flat)
+  if (lsp) out.servedName = cleanOrg(lsp[1])
+  if (!out.servedName) {
+    const support = /(?:walk\s+alongside|support(?:ing)?\s+the\s+LSP,?|helping)\s+([A-Z][\w&.,'-]*(?:\s+[A-Z][\w&.,'-]*){0,5})/.exec(flat)
+    if (support) out.servedName = cleanOrg(support[1])
+  }
+
+  // The programme the work sits under. Written in capitals with a plus or a
+  // roman numeral more often than not.
+  // No trailing \b: it would refuse the + on the end of IGNITE+, because the
+  // character after it is a comma and two non-word characters are not a word
+  // boundary, so the engine backtracks and hands back IGNITE.
+  const prog = /\bunder\s+([A-Z][A-Z0-9]{2,19}\+?)(?![A-Za-z0-9])/.exec(flat)
+  if (prog && prog[1] !== 'THE') out.payerProgramme = prog[1]
+
+  // A payer and a served client that came out the same is a rule that matched
+  // the wrong sentence. Neither is trustworthy, so neither is offered.
+  if (out.payerName && out.servedName
+    && out.payerName.toLowerCase() === out.servedName.toLowerCase()) {
+    delete out.servedName
+  }
+  return out
+}
+
+function titleCase(v: string): string {
+  const s = v.trim()
+  if (!/[a-z]/.test(s)) return s.charAt(0) + s.slice(1).toLowerCase()
+  return s
+}
+
+/** Trim the trailing noise a name picks up from running text. */
+function cleanOrg(v: string): string {
+  return v.replace(/\s+/g, ' ').trim()
+    .replace(/[.,;:]+$/, '')
+    .replace(/\s+(?:International|Ltd|Limited)$/i, (m) => m)
+    .slice(0, 120)
+}
+
 /** Everything the letter needs, or as much of it as the document actually says. */
 export function parseTor(text: string): TorFields {
   const flat = (text || '').replace(/\r/g, '')
@@ -113,5 +184,6 @@ export function parseTor(text: string): TorFields {
     periodStart,
     periodEnd,
     deliverables: deliverables.length ? deliverables : undefined,
+    ...findParties(flat),
   }
 }
