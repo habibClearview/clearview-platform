@@ -2106,6 +2106,28 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           if(!error&&data){
             const cameFromAWonDeal=!!newClientPrefill
             setClients(prev=>[...prev,data]);setShowNew(false);setNewClientPrefill(null)
+            // A CANVAS CLIENT IS SET UP THE MOMENT IT EXISTS. 8 September 2026.
+            //
+            // Creating the client and scaffolding the engagement were two
+            // steps, and the second was a button on a different tab. Miss it
+            // and the client signs in to an engagement with no decision
+            // points, no Charter and nobody on it: signed in, correctly
+            // scoped, and looking at nothing. An end-to-end run as a real
+            // client caught exactly that.
+            //
+            // The route is idempotent and only adds what is missing, so doing
+            // it here costs nothing and the button stays for anything older.
+            if(data.engagement_mode==='canvas'){
+              try{
+                const {data:sess}=await supabase.auth.getSession()
+                const tok=sess.session?.access_token
+                await fetch('/api/engagement-setup',{
+                  method:'POST',
+                  headers:{'Content-Type':'application/json',...(tok?{Authorization:`Bearer ${tok}`}:{})},
+                  body:JSON.stringify({clientId:data.id}),
+                })
+              }catch{/* the button on the settings tab is still there */}
+            }
             // WON MEANS SET THEM UP, NOT "A CLIENT ROW NOW EXISTS". 5 Sept 2026.
             // Marking a deal Won pre-filled this form and then stopped, leaving
             // the coach on a list with nothing telling them what came next. It
