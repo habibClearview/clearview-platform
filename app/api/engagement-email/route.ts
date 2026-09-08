@@ -22,7 +22,7 @@ import { cleanRecipients, isWebUrl } from '@/lib/validate-input'
 import { getBearerToken } from '@/lib/auth/api-authz'
 import { resolveClientAccess } from '@/lib/auth/engagement-access'
 import { checkRateLimit } from '@/lib/rate-limit'
-import { briefFromConfig } from '@/lib/engagement-brief'
+import { briefFromConfig, briefIntoConfig } from '@/lib/engagement-brief'
 import { signInLinkFor } from '@/lib/signin-link'
 import {
   emailAvailable,
@@ -44,7 +44,7 @@ function getAdminClient() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { clientId, stage, recipients, journeyUrl, preview, audience, recipientName, recipientTitle, wantText, includeSignIn } = (await req.json()) as {
+    const { clientId, stage, recipients, journeyUrl, preview, audience, recipientName, recipientTitle, wantText, includeSignIn, onlyEmails } = (await req.json()) as {
       clientId?: string
       stage?: Stage
       recipients?: string[]
@@ -55,6 +55,20 @@ export async function POST(req: NextRequest) {
       recipientTitle?: string
       wantText?: boolean
       includeSignIn?: boolean
+      /**
+       * SENDING TO ONE PERSON WITHOUT WRITING TO EVERYBODY AGAIN.
+       * 8 September 2026.
+       *
+       * Somebody added to an engagement after the letters have gone needs the
+       * letter. There was no way to send it to them alone: the send walked
+       * every saved recipient, so the only way to reach the new person was to
+       * post a second copy to the people who already had one.
+       *
+       * These addresses narrow the send. They never widen it: each one has to
+       * already be a saved recipient on this engagement, so this cannot become
+       * a way to send the platform's letter to an arbitrary address.
+       */
+      onlyEmails?: string[]
     }
     // A PREVIEW IS THE SAME EMAIL, NOT A SECOND COPY OF IT. 4 September 2026.
     // Habib asked where he could read the welcome before it went to a client.
@@ -215,7 +229,7 @@ export async function POST(req: NextRequest) {
     // their side of the engagement, and their own one-time sign-in link. That
     // rules out To/CC, which would put one salutation and one link in front of
     // everybody and expose the whole list to each of them.
-    const list = (brief.recipients && brief.recipients.length)
+    const saved = (brief.recipients && brief.recipients.length)
       ? brief.recipients
       : cleaned.recipients.map((email) => ({
           email,
@@ -223,6 +237,25 @@ export async function POST(req: NextRequest) {
           title: recipientTitle,
           audience: (audience === 'payer' ? 'payer' : 'served') as 'payer' | 'served',
         }))
+
+    // Narrowed, never widened. An address that is not already on this
+    // engagement is refused by name rather than silently dropped, because
+    // silently sending to fewer people than asked is how somebody is missed.
+    let list = saved
+    if (Array.isArray(onlyEmails) && onlyEmails.length) {
+      const wanted = new Set(onlyEmails.map((e) => String(e || '').trim().toLowerCase()).filter(Boolean))
+      const known = new Set(saved.map((p) => p.email.toLowerCase()))
+      const strangers = Array.from(wanted).filter((e) => !known.has(e))
+      if (strangers.length) {
+        return NextResponse.json({
+          error: `${strangers.join(', ')} ${strangers.length === 1 ? 'is not' : 'are not'} on this engagement. Add them to the recipients and save before sending.`,
+        }, { status: 400 })
+      }
+      list = saved.filter((p) => wanted.has(p.email.toLowerCase()))
+      if (!list.length) {
+        return NextResponse.json({ error: 'Nobody was chosen to send to' }, { status: 400 })
+      }
+    }
 
     if (stage === 'scope' && (includeSignIn || (brief.recipients && brief.recipients.length))) {
       const sentTo: string[] = []
@@ -303,6 +336,25 @@ export async function POST(req: NextRequest) {
           failed.push({ email: person.email, reason: (e as Error)?.message || 'no sign-in link could be made' })
         }
       }
+      // WRITE DOWN WHO ACTUALLY GOT IT. Only the addresses the provider
+      // accepted, and only on the saved list, so the record is of what
+      // happened rather than of what was attempted. A person sent to twice
+      // keeps the later stamp, which is the one that answers "when did they
+      // last hear from us".
+      if (sentTo.length && brief.recipients && brief.recipients.length) {
+        const justSent = new Set(sentTo.map((e) => e.toLowerCase()))
+        const stamped = brief.recipients.map((p) => (
+          justSent.has(p.email.toLowerCase()) ? { ...p, sentAt: new Date().toISOString() } : p
+        ))
+        const { error: stampError } = await admin
+          .from('engagement_config')
+          .update({ brand_overrides: briefIntoConfig(brand, { ...brief, recipients: stamped }) })
+          .eq('client_id', clientId)
+        // A letter that went out and a note that did not is worth saying out
+        // loud: the next send will offer to write to that person again.
+        if (stampError) console.error('engagement-email: could not record who was sent to', stampError)
+      }
+
       if (!sentTo.length) {
         return NextResponse.json({
           ok: false, emailConfigured: true,

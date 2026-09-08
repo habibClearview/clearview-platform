@@ -175,8 +175,14 @@ describe('reading the letter is not sending it', () => {
   })
 
   it('gates only the send button on having somewhere to send it', () => {
-    expect(PACK).toContain("disabled={busy === 'welcome' || !journeyUrl || to.length === 0}")
+    // Reading the letter never depends on there being anybody to send it to.
     expect(PACK).toContain("disabled={busy === 'preview'}")
+    // Sending needs a destination and at least one person chosen. The second
+    // clause arrived with per-person sending: everybody on the list having
+    // already had the letter is a reason not to send, and saying so on the
+    // button is better than sending a second copy to four people.
+    expect(PACK).toContain("busy === 'welcome' || !journeyUrl || to.length === 0")
+    expect(PACK).toContain('people.length > 0 && sendTo.length === 0')
   })
 
   it('says what an upload did, beside the upload', () => {

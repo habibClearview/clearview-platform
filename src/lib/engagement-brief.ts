@@ -96,6 +96,18 @@ export interface Recipient {
   email: string
   role?: string
   audience: 'payer' | 'served'
+  /**
+   * WHO HAS ACTUALLY HAD THE LETTER. 8 September 2026.
+   *
+   * Nothing recorded this, so adding one person to an engagement and pressing
+   * send posted a second copy to everybody who already had it, and there was
+   * no way to know who those people were. Written by the send itself, as an
+   * ISO timestamp, only when the provider accepted that person's letter.
+   *
+   * Absent means not sent, which is also the honest answer for every
+   * recipient saved before this existed.
+   */
+  sentAt?: string
 }
 
 const CAP = { text: 300, list: 20, item: 400, intro: 2000, letter: 20000 }
@@ -126,9 +138,22 @@ function readRecipients(v: unknown): Recipient[] | undefined {
       name: str(row.name, 120),
       role: str(row.role, 120),
       audience: row.audience === 'payer' ? 'payer' : 'served',
+      sentAt: isoStamp(row.sentAt),
     })
   }
   return out.length ? out : undefined
+}
+
+/**
+ * A moment something happened, or nothing. Kept as the full timestamp rather
+ * than a date, because two sends on the same day are a thing that happens and
+ * "sent today" is not an answer to "did this person get it".
+ */
+function isoStamp(v: unknown): string | undefined {
+  const s = str(v, 40)
+  if (!s) return undefined
+  const t = Date.parse(s)
+  return Number.isNaN(t) ? undefined : new Date(t).toISOString()
 }
 
 /** A date the purchase order stated, or nothing. Never a guess. */

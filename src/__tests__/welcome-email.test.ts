@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import { buildScopeEmail, buildTriPartyEmail } from '@/lib/email'
+import { briefFromConfig, briefIntoConfig } from '@/lib/engagement-brief'
+import { readFileSync } from 'node:fs'
 
 // ============================================================
 // THE MECHANISM AROUND THE WELCOME LETTER.
@@ -205,5 +207,87 @@ describe('the welcome letter opens the reader’s dashboard', () => {
       const { html } = buildScopeEmail({ ...cfg, audience, signInIncluded: true })
       expect(html).not.toMatch(/href="[^"]*\/engagement\//)
     }
+  })
+})
+
+// ============================================================
+// ADDING SOMEBODY AFTER THE LETTERS HAVE GONE
+//
+// Habib asked what happens if he adds a recipient once the first email has
+// already been sent. The answer was that he could not send to that person
+// alone: the send walked every saved recipient, so reaching the new person
+// meant posting a second copy to everybody who already had one, and nothing
+// anywhere recorded who those people were.
+//
+// A recipient now carries the moment their letter was accepted. These tests
+// hold the two rules that make it safe: the record is of what happened rather
+// than what was attempted, and it can never be read as a licence to write to
+// an address that is not on the engagement.
+// ============================================================
+describe('the record of who has had the letter', () => {
+  it('keeps the moment a letter was accepted', () => {
+    const brief = briefFromConfig({
+      brief: {
+        recipients: [
+          { email: 'first@example.com', name: 'First Person', audience: 'served', sentAt: '2026-09-08T09:15:00.000Z' },
+          { email: 'second@example.com', name: 'Second Person', audience: 'served' },
+        ],
+      },
+    })
+    expect(brief.recipients?.[0].sentAt).toBe('2026-09-08T09:15:00.000Z')
+    expect(brief.recipients?.[1].sentAt).toBeUndefined()
+  })
+
+  it('treats a recipient saved before this existed as not sent to', () => {
+    const brief = briefFromConfig({
+      brief: { recipients: [{ email: 'old@example.com', audience: 'served' }] },
+    })
+    expect(brief.recipients?.[0].sentAt).toBeUndefined()
+  })
+
+  it('refuses a stamp that is not a real moment, rather than storing nonsense', () => {
+    for (const bad of ['soon', '', 'yesterday', 42, null]) {
+      const brief = briefFromConfig({
+        brief: { recipients: [{ email: 'a@example.com', audience: 'served', sentAt: bad }] },
+      })
+      expect(brief.recipients?.[0].sentAt).toBeUndefined()
+    }
+  })
+
+  it('normalises whatever shape a date arrives in', () => {
+    const brief = briefFromConfig({
+      brief: { recipients: [{ email: 'a@example.com', audience: 'served', sentAt: '2026-09-08' }] },
+    })
+    expect(brief.recipients?.[0].sentAt).toBe('2026-09-08T00:00:00.000Z')
+  })
+
+  it('survives a round trip through the config it is stored in', () => {
+    const original = briefFromConfig({
+      brief: { recipients: [{ email: 'a@example.com', audience: 'payer', sentAt: '2026-09-08T09:15:00.000Z' }] },
+    })
+    const stored = briefIntoConfig({ somethingElse: true }, original)
+    const back = briefFromConfig(stored)
+    expect(back.recipients?.[0].sentAt).toBe('2026-09-08T09:15:00.000Z')
+    expect((stored as Record<string, unknown>).somethingElse).toBe(true)
+  })
+})
+
+describe('a narrowed send can never become a wider one', () => {
+  const ROUTE = readFileSync('app/api/engagement-email/route.ts', 'utf8')
+
+  it('sends only to people already saved on the engagement', () => {
+    expect(ROUTE).toContain('onlyEmails')
+    expect(ROUTE).toContain('const known = new Set(saved.map((p) => p.email.toLowerCase()))')
+    expect(ROUTE).toContain('list = saved.filter((p) => wanted.has(p.email.toLowerCase()))')
+  })
+
+  it('refuses an unknown address by name instead of quietly dropping it', () => {
+    expect(ROUTE).toContain('is not')
+    expect(ROUTE).toContain('Add them to the recipients and save before sending')
+  })
+
+  it('records only the addresses the provider accepted', () => {
+    expect(ROUTE).toContain('const justSent = new Set(sentTo.map((e) => e.toLowerCase()))')
+    expect(ROUTE).toContain('sentAt: new Date().toISOString()')
   })
 })
