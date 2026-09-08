@@ -225,6 +225,8 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
   const [saving, setSaving] = useState<string | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   const [role, setRole] = useState<string | null>(null)
+  // WHOSE PAGE IS THIS. 8 September 2026. See the header below.
+  const [who, setWho] = useState<string | null>(null)
 
   async function setGate(dpId, status, label) {
     setSaving(status)
@@ -258,9 +260,10 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
       if (cancelled) return
       if (!session) { setHasSession(false); setChecking(false); return }
       setHasSession(true)
-      const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', session.user.id).single()
+      const { data: profile } = await supabase.from('user_profiles').select('role, full_name').eq('id', session.user.id).single()
       if (cancelled) return
       setRole(profile?.role || null)
+      setWho(profile?.full_name || session.user.email || null)
       const v = await loadEngagementView(slug)
       if (cancelled) return
       setView(v)
@@ -355,12 +358,52 @@ export default function EngagementJourneyView({ slugOverride }: any = {}) {
         ) : null}
         <style dangerouslySetInnerHTML={{ __html: CSS }} />
 
+      {/* IT DID NOT LOOK LIKE THEIR PAGE. 8 September 2026.
+          The welcome letter's button says "open the engagement" and it opened
+          this. What arrived was a page headed "The Canvas Coach / The Journey"
+          with a hero sentence and nothing else: no name of the organisation in
+          the header, no sign that the reader was signed in, nobody's name, and
+          no way to sign out. A client holding that reads a brochure, not their
+          own workspace, and says so. Habib said so three times and I went
+          looking for a routing fault instead of opening the page.
+
+          The bar below is the fix. The engagement is named, the person signed
+          in is named, and the Charter and the way out are where anybody
+          expects them. It is hidden inside the coach dashboard, which has its
+          own header and its own sign-out. */}
       <header className="top">
         <div className="top-in">
-          <div className="brand"><span className="k">The Canvas Coach</span><span className="w">The Journey</span></div>
+          <div className="brand"><span className="k">{client}</span><span className="w">Your engagement</span></div>
           {funder ? <span className="tag">With {funder}</span> : null}
         </div>
       </header>
+
+      {!slugOverride ? (
+        <div style={{ background: 'var(--card)', borderBottom: '1px solid var(--line)' }}>
+          <div style={{
+            maxWidth: 1220, margin: '0 auto', padding: '9px 20px', display: 'flex',
+            justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+            fontSize: 13.5, color: 'var(--ink-soft)',
+          }}>
+            <span>Signed in{who ? <> as <b style={{ color: 'var(--ink)' }}>{who}</b></> : null}{programme ? <> &middot; {programme}</> : null}</span>
+            <span style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+              <a href={`/engagement/${slug}/charter`} style={{ color: 'var(--teal)', fontWeight: 600, textDecoration: 'none' }}>Engagement Charter</a>
+              {view.client?.engagement_mode === 'financial' ? (
+                <a href={`/dashboard/${slug}`} style={{ color: 'var(--teal)', fontWeight: 600, textDecoration: 'none' }}>Financial dashboard</a>
+              ) : null}
+              <button
+                type="button"
+                onClick={async () => { await supabase.auth.signOut(); window.location.href = '/' }}
+                style={{
+                  background: 'transparent', border: '1px solid var(--line)', borderRadius: 4,
+                  color: 'var(--ink-soft)', cursor: 'pointer', padding: '3px 10px', fontSize: 13,
+                  fontFamily: 'inherit',
+                }}
+              >Sign out</button>
+            </span>
+          </div>
+        </div>
+      ) : null}
 
       <div className="wrap">
 
