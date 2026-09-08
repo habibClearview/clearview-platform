@@ -426,6 +426,47 @@ export default function WelcomePack({ clientId, canManage }) {
           const sendTo = people.length
             ? (chosen ? people.filter((r) => chosen.has(r.email)) : people.filter((r) => !r.sentAt)).map((r) => r.email)
             : to
+
+          // ONE PERSON, ONE PRESS. 8 September 2026. Adding somebody after the
+          // letters have gone is the ordinary case, and ticking three boxes to
+          // untick two of them is not a way to do it. Every row carries its own
+          // send. The bulk button is still here for the first send of all, and
+          // both go through this, so they cannot behave differently.
+          async function sendWelcome(emails, label) {
+            const again = people.filter((r) => r.sentAt && emails.includes(r.email))
+            if (again.length && !window.confirm(
+              `${again.map((r) => r.name || r.email).join(', ')} ${again.length === 1 ? 'has' : 'have'} already had this letter. Send it again?`,
+            )) return
+            setBusy(label); setNote(null); setErr(null)
+            try {
+              const r = await sendEngagementEmail({
+                clientId, stage: 'scope', recipients: to, journeyUrl,
+                // Sending walks the saved list and addresses each person
+                // itself; these only matter for an engagement with nobody
+                // named on it yet.
+                audience: welcomeAudience, includeSignIn,
+                // Narrows the send to the people chosen. Never widens it: the
+                // route refuses an address that is not saved here.
+                ...(people.length ? { onlyEmails: emails } : {}),
+              })
+              // Email being switched off is answered with a 200, so it has to
+              // be read rather than assumed to be a success.
+              if (r && r.emailConfigured === false) {
+                setErr(r.message || r.reason || 'Email is not switched on for this environment, so nothing was sent.')
+              } else if (r && r.reason) {
+                // A partial send is not a success. Name who missed out.
+                setErr(r.reason)
+              } else {
+                // Named, because "went to 4 people" leaves the sender counting
+                // the list to work out whether the new person was one of them.
+                const went = (r?.sentTo && r.sentTo.length) ? r.sentTo : emails
+                setNote(`The welcome email went to ${went.join(', ')}.`)
+                setChosen(null)
+                load()
+              }
+            } catch (e) { setErr(e.message || 'That did not send') }
+            setBusy(null)
+          }
           // WHERE THE LETTER LANDS SOMEBODY. 8 September 2026.
           //
           // It landed them on /engagement/[slug], the journey canvas. That is a
@@ -500,30 +541,63 @@ export default function WelcomePack({ clientId, canManage }) {
                   one person and pressing send posted a second copy to
                   everybody. Each person now carries the moment their letter
                   was accepted, and the send goes to the ones ticked. */}
+              {/* A PERSON WHO HAS BEEN TYPED IS NOT YET A RECIPIENT.
+                  8 September 2026. Add someone, type their details, and their
+                  row is only in the form: the send list reads the saved list,
+                  and the route refuses an address that is not on the
+                  engagement. So the new person had no send button and no
+                  explanation, which reads as the platform refusing to add
+                  them. It now says which of them, and what to press. */}
+              {(() => {
+                const savedEmails = new Set(people.map((r) => (r.email || '').toLowerCase()))
+                const typed = ((briefDraft && briefDraft.recipients) || [])
+                  .map((r) => (r.email || '').trim())
+                  .filter((e) => e && !savedEmails.has(e.toLowerCase()))
+                return typed.length ? (
+                  <p style={{ ...hint, margin: '0 0 0.6rem', color: C.red }}>
+                    {typed.join(', ')} {typed.length === 1 ? 'is' : 'are'} not saved yet, so
+                    {typed.length === 1 ? ' they cannot' : ' they cannot'} be sent to. Press
+                    <b> Save the recipients</b> above first.
+                  </p>
+                ) : null
+              })()}
               {people.length ? (
                 <div style={{ margin: '0 0 0.7rem' }}>
-                  <p style={{ ...hint, margin: '0 0 0.35rem' }}>Send this letter to</p>
+                  <p style={{ ...hint, margin: '0 0 0.35rem' }}>Send this letter to. Each person gets their own letter and their own sign-in.</p>
                   {people.map((r) => {
                     const ticked = chosen ? chosen.has(r.email) : !r.sentAt
                     return (
-                      <label key={r.email} style={{ display: 'flex', gap: '0.4rem', alignItems: 'baseline', cursor: 'pointer', padding: '0.12rem 0' }}>
-                        <input
-                          type="checkbox"
-                          checked={ticked}
-                          onChange={() => {
-                            const next = new Set(chosen || people.filter((p) => !p.sentAt).map((p) => p.email))
-                            if (next.has(r.email)) next.delete(r.email); else next.add(r.email)
-                            setChosen(next)
+                      <div key={r.email} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', padding: '0.18rem 0', flexWrap: 'wrap' }}>
+                        <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'baseline', cursor: 'pointer', flex: '1 1 320px', minWidth: 240 }}>
+                          <input
+                            type="checkbox"
+                            checked={ticked}
+                            onChange={() => {
+                              const next = new Set(chosen || people.filter((p) => !p.sentAt).map((p) => p.email))
+                              if (next.has(r.email)) next.delete(r.email); else next.add(r.email)
+                              setChosen(next)
+                            }}
+                          />
+                          <span style={{ fontSize: '0.9rem' }}>
+                            {r.name || r.email}
+                            {r.name ? <span style={{ color: C.slate }}> · {r.email}</span> : null}
+                            {r.sentAt
+                              ? <span style={{ color: C.slate }}> · sent {new Date(r.sentAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                              : <span style={{ color: C.teal }}> · not sent yet</span>}
+                          </span>
+                        </label>
+                        <button
+                          type="button"
+                          disabled={!!busy || !journeyUrl}
+                          onClick={() => sendWelcome([r.email], `one:${r.email}`)}
+                          title={`Send the welcome letter to ${r.name || r.email} and nobody else`}
+                          style={{
+                            ...mono, fontSize: '0.8rem', fontWeight: 600, padding: '0.25rem 0.7rem',
+                            border: `1px solid ${C.teal}`, borderRadius: 7, background: 'transparent',
+                            color: C.teal, cursor: busy ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
                           }}
-                        />
-                        <span style={{ fontSize: '0.9rem' }}>
-                          {r.name || r.email}
-                          {r.name ? <span style={{ color: C.slate }}> · {r.email}</span> : null}
-                          {r.sentAt
-                            ? <span style={{ color: C.slate }}> · sent {new Date(r.sentAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-                            : <span style={{ color: C.teal }}> · not sent yet</span>}
-                        </span>
-                      </label>
+                        >{busy === `one:${r.email}` ? 'Sending...' : r.sentAt ? 'Send again' : 'Send to them'}</button>
+                      </div>
                     )
                   })}
                   {chosen ? (
@@ -576,46 +650,7 @@ export default function WelcomePack({ clientId, canManage }) {
                 type="button"
                 style={smallBtn(C.teal)}
                 disabled={busy === 'welcome' || !journeyUrl || to.length === 0 || (people.length > 0 && sendTo.length === 0)}
-                onClick={async () => {
-                  // Writing to somebody a second time is a decision, so it is
-                  // asked out loud and names them. Nobody should discover they
-                  // sent a client the same letter twice by reading their own
-                  // blind copy afterwards.
-                  const again = people.filter((r) => r.sentAt && sendTo.includes(r.email))
-                  if (again.length && !window.confirm(
-                    `${again.map((r) => r.name || r.email).join(', ')} ${again.length === 1 ? 'has' : 'have'} already had this letter. Send it again?`,
-                  )) return
-                  setBusy('welcome'); setNote(null); setErr(null)
-                  try {
-                    const r = await sendEngagementEmail({
-                      clientId, stage: 'scope', recipients: to, journeyUrl,
-                      // Sending walks the saved list and addresses each person
-                      // itself; these only matter for an engagement with nobody
-                      // named on it yet.
-                      audience: welcomeAudience, includeSignIn,
-                      // Narrows the send to the people ticked. Never widens it:
-                      // the route refuses an address that is not saved here.
-                      ...(people.length ? { onlyEmails: sendTo } : {}),
-                    })
-                    // Email being switched off is answered with a 200, so it
-                    // has to be read rather than assumed to be a success.
-                    if (r && r.emailConfigured === false) {
-                      setErr(r.message || r.reason || 'Email is not switched on for this environment, so nothing was sent.')
-                    } else if (r && r.reason) {
-                      // A partial send is not a success. Name who missed out.
-                      setErr(r.reason)
-                    } else {
-                      // Named, because "went to 4 people" leaves the sender
-                      // counting the list to work out whether the new person
-                      // was one of them.
-                      const went = (r?.sentTo && r.sentTo.length) ? r.sentTo : sendTo
-                      setNote(`The welcome email went to ${went.join(', ')}.`)
-                      setChosen(null)
-                      load()
-                    }
-                  } catch (e) { setErr(e.message || 'That did not send') }
-                  setBusy(null)
-                }}
+                onClick={() => sendWelcome(sendTo, 'welcome')}
               >{busy === 'welcome'
                 ? 'Sending...'
                 : people.length === 0

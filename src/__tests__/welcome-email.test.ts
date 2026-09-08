@@ -291,3 +291,45 @@ describe('a narrowed send can never become a wider one', () => {
     expect(ROUTE).toContain('sentAt: new Date().toISOString()')
   })
 })
+
+// ============================================================
+// ONE PERSON, ONE PRESS
+//
+// Habib added a recipient and could not send to that person alone. Ticking
+// three boxes to untick two of them is not a way to write to one person, and a
+// row that has been typed but not saved had no send button and no explanation,
+// which reads as the platform refusing to add them at all.
+// ============================================================
+describe('sending to one person', () => {
+  const PACK = readFileSync('src/components/gtcv/WelcomePack.tsx', 'utf8')
+
+  it('every recipient carries their own send', () => {
+    expect(PACK).toContain('onClick={() => sendWelcome([r.email], `one:${r.email}`)}')
+    expect(PACK).toContain("'Send to them'")
+    expect(PACK).toContain("'Send again'")
+  })
+
+  it('the row button and the bulk button go through the same routine', () => {
+    // Two copies of a send is two ways for it to behave differently.
+    expect(PACK).toContain('async function sendWelcome(emails, label)')
+    expect(PACK).toContain("onClick={() => sendWelcome(sendTo, 'welcome')}")
+  })
+
+  it('sending to one person names only that person', () => {
+    expect(PACK).toContain('...(people.length ? { onlyEmails: emails } : {})')
+  })
+
+  it('a second copy is asked for out loud, whichever button is pressed', () => {
+    expect(PACK).toContain('has' + "' : '" + 'have')
+    expect(PACK).toContain('already had this letter. Send it again?')
+  })
+
+  it('a typed but unsaved recipient is named, with what to press', () => {
+    expect(PACK).toContain('not saved yet, so')
+    expect(PACK).toContain('Save the recipients</b> above first')
+  })
+
+  it('one send at a time, so two presses cannot overlap', () => {
+    expect(PACK).toContain('disabled={!!busy || !journeyUrl}')
+  })
+})
