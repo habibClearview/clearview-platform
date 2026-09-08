@@ -2076,8 +2076,15 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 
     let blocks=[]
     let subscriptionRows=[]
+    // A CLIENT WHOSE SERVICE IS ON THEIR OWN RECORD. 8 September 2026.
+    // Advisory and Market Intelligence used to be readable only from
+    // service_engagements, because they were not offerable when a client was
+    // created. They are now, so a client can carry either as their own
+    // service, and one carrying it with no service row yet would otherwise
+    // appear under no service at all and look deleted.
+    const ownMode=clients.filter(c=>c.engagement_mode===service)
     if(service==='financial'||service==='canvas'){
-      const inService=clients.filter(c=>c.engagement_mode===service)
+      const inService=ownMode
       const byPayer=new Map()
       inService.forEach(c=>{
         const prog=c.programme_id?programmesById[c.programme_id]:null
@@ -2099,6 +2106,11 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         const ben=se.beneficiary_client_id?clientsById[se.beneficiary_client_id]:payerClient
         return {se,client:ben}
       }).filter(r=>r.client)
+      // Anybody whose own record says Market Intelligence and who has no
+      // subscription row yet, so adding the client is enough to see them.
+      const listed=new Set(subscriptionRows.map(r=>r.client.id))
+      const orphans=ownMode.filter(c=>!listed.has(c.id))
+      if(orphans.length)blocks=[{title:'No subscription recorded yet',meta:'Added as a client, nothing logged under Services',clients:orphans}]
     }else{
       const inService=serviceEngagements.filter(se=>se.service_type===service)
       const byPayer=new Map()
@@ -2113,6 +2125,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         if(ben)byPayer.get(key).clients.push({...ben,__seStatus:se.status})
       })
       blocks=Array.from(byPayer.values())
+      const listed=new Set(blocks.flatMap(b=>b.clients.map(c=>c.id)))
+      const orphans=ownMode.filter(c=>!listed.has(c.id))
+      if(orphans.length)blocks=[...blocks,{title:'No service engagement recorded yet',meta:'Added as a client, nothing logged under Services',clients:orphans}]
     }
 
     async function refreshClients(){
@@ -2286,13 +2301,17 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         <div style={{...card,background:'var(--cv-header)',color:'var(--cv-on-accent)',marginBottom:'1.25rem'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'1rem'}}>
             <div>
-              <div style={{fontSize:'0.8rem',fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase',color:C.cyan,marginBottom:'0.45rem',opacity:0.9}}>{CLIENT_TYPE_LABELS[selClient.type]} · {prog?.name||'—'} · Clearview Financial Model</div>
+              <div style={{fontSize:'0.8rem',fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase',color:C.cyan,marginBottom:'0.45rem',opacity:0.9}}>{CLIENT_TYPE_LABELS[selClient.type]} · {prog?.name||'—'} · {SERVICE_NAME[selClient.engagement_mode]||'Clearview Financial Model'}</div>
               <h2 style={{fontFamily:'var(--cv-font)',fontSize:'2.1rem',fontWeight:600,lineHeight:1.15,letterSpacing:'-0.015em',color:'var(--cv-on-accent)',margin:'0 0 0.35rem'}}>{selClient.name}</h2>
               <div style={{fontSize:'1.01rem',color:'var(--cv-wa-60)'}}>{selClient.contact_name&&`${selClient.contact_name} · `}{selClient.country} · {selClient.sector}</div>
             </div>
             <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
               <Badge text={statusLabel(selClient.status)} color={statusColor(selClient.status)}/>
-              <a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',padding:'0.4rem 1rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none',fontWeight:700}}>Open Clearview Financial Model ↗</a>
+              {/* ONLY THE SERVICE THEY BOUGHT. An Advisory or Market
+                  Intelligence client has no financial model to open, and
+                  offering one sends them into a service they are not paying
+                  for and have no data in. */}
+              {selClient.engagement_mode==='financial'&&<a href={`/dashboard/${selClient.slug}`} target="_blank" rel="noreferrer" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',padding:'0.4rem 1rem',borderRadius:4,background:C.teal,color:'var(--cv-on-accent)',textDecoration:'none',fontWeight:700}}>Open Clearview Financial Model ↗</a>}
               {isSuperCoach&&<CopyIntakeLink client={selClient}/>}
               {isSuperCoach&&<button onClick={()=>setShowEditClient(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',fontWeight:700,padding:'0.4rem 0.85rem',borderRadius:4,background:C.navy,border:'none',color:'var(--cv-on-accent)',cursor:'pointer'}}>Edit name, stage and programme</button>}
               {isSuperCoach&&<button onClick={()=>setShowDeleteConfirm(true)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:'pointer'}}>Delete Client</button>}
@@ -2314,16 +2333,22 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             onDeleted={()=>{setClients(prev=>prev.filter(c=>c.id!==selClient.id));setSelClientId(null);setView('overview')}}
           />
         )}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'1rem',marginBottom:'1.25rem'}}>
+        {selClient.engagement_mode==='financial'&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'1rem',marginBottom:'1.25rem'}}>
           <div style={{...card,marginBottom:0}}><div style={{fontFamily:'var(--cv-font)',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 1 — Open Clearview</div><p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.7,margin:0}}>Click "Open Clearview Financial Model" above. Go to Settings to define business units and revenue lines.</p></div>
           <div style={{...card,marginBottom:0}}><div style={{fontFamily:'var(--cv-font)',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 2 — Define Business Units</div><p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.7,margin:0}}>In Settings, add business units. Set each unit type: product, service, or aggregator.</p></div>
           <div style={{...card,marginBottom:0}}><div style={{fontFamily:'var(--cv-font)',fontSize:'1.16rem',fontWeight:700,color:C.navy,marginBottom:'0.5rem'}}>Step 3 — Enter the Plan</div><p style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.7,margin:0}}>Go to Planning to add revenue and cost lines. Enter monthly figures for the full planning period.</p></div>
-        </div>
+        </div>}
         {isSuperCoach&&<ClientTeamInvite client={selClient}/>}
         {mayPreview(userRole)&&<ViewAsBar realRole={userRole} viewingAs={viewingAs||userRole} onChange={v=>setViewingAs(v===userRole?null:v)}/>}
 
         <div style={card}><TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/></div>
-        {!selClient.programme_id&&<ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>}
+        {/* ON EVERY CLIENT, NOT ONLY THE SELF-PAYING ONES. 8 September 2026.
+                  This was hidden behind !selClient.programme_id, so a client
+                  under a programme could not be given a service they pay for
+                  themselves. A programme paying for the canvas does not stop
+                  the same organisation buying Market Intelligence with its own
+                  money, and that was unrecordable. */}
+              <ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>
       </div>
     )
 
@@ -2446,7 +2471,13 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             ):null}
             {shownTab==='cover'&&<>{mayRun?<WelcomePack clientId={selClient.id} canManage={canEdit(previewRoleId)}/>:null}{mayRun?<WhatNeedsYou clientId={selClient.id} canManage={canEdit(previewRoleId)} onGoTo={setActiveTab}/>:null}<CoverPanel slug={selClient.slug}/><div style={{height:18}}/>
               <TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/>
-              {!selClient.programme_id&&<ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>}
+              {/* ON EVERY CLIENT, NOT ONLY THE SELF-PAYING ONES. 8 September 2026.
+                  This was hidden behind !selClient.programme_id, so a client
+                  under a programme could not be given a service they pay for
+                  themselves. A programme paying for the canvas does not stop
+                  the same organisation buying Market Intelligence with its own
+                  money, and that was unrecordable. */}
+              <ServicesSection payerType="client" payerId={selClient.id} clients={clients}/>
             </>}
             {/* Part K, C67 to C70. The drawing of the canvas is unchanged and
                 sits where it always did; what each gate DECIDED, the evidence,
@@ -2929,6 +2960,10 @@ function TabCover({client,prog,programmes,onUpdate}){
 // until the migration is applied, and that must never block the whole
 // page from loading.
 const SERVICE_TYPE_LABELS={advisory:'Advisory',canvas:'GtCV Canvas',financial:'Clearview Financial Model',portfolio_intelligence:'Portfolio Intelligence Subscription'}
+// What a client's own service is called on their screen. Separate from the
+// labels above, which name a service somebody is PAYING for; this names the
+// one the client in front of you is receiving.
+const SERVICE_NAME={canvas:'Grant-to-Commercial Viability',financial:'Clearview Financial Model',advisory:'Advisory',portfolio_intelligence:'Market Intelligence'}
 function ServicesSection({payerType,payerId,clients}){
   const [rows,setRows]=useState([])
   const [loading,setLoading]=useState(true)
@@ -3746,7 +3781,15 @@ function ClientSetupFields({f,setF,programmes,showStatus}){
     <div style={fGrid}>
       <div><label style={lbl}>Name *</label><input style={inp} value={f.name} onChange={e=>setF(x=>({...x,name:e.target.value}))}/></div>
       <div><label style={lbl}>Type *</label><select style={inp} value={f.type} onChange={e=>setF(x=>({...x,type:e.target.value}))}><option value="crop_aggregator">Crop Aggregator</option><option value="livestock_aggregator">Livestock Aggregator</option><option value="farmer_group_enterprise">Farmer Group Enterprise</option><option value="service_lsp">Service LSP</option></select></div>
-      <div><label style={lbl}>Engagement Mode *</label><select style={inp} value={f.engagement_mode} onChange={e=>setF(x=>({...x,engagement_mode:e.target.value}))}><option value="canvas">Full GtCV Canvas</option><option value="financial">Clearview Financial Only</option></select></div>
+      {/* ALL FOUR SERVICES, NOT TWO. 8 September 2026. Habib went to add a
+          Market Intelligence client and the only choices were the two services
+          that happen to have a dashboard of their own. Advisory and Market
+          Intelligence were reachable only by first giving the organisation a
+          canvas or a financial model they had not bought, then adding the real
+          service underneath. There is no constraint on this column in the
+          database, checked before this was changed, so the two new values are
+          simply values. */}
+      <div><label style={lbl}>Service *</label><select style={inp} value={f.engagement_mode} onChange={e=>setF(x=>({...x,engagement_mode:e.target.value}))}><option value="canvas">Grant-to-Commercial Viability (full canvas)</option><option value="financial">Clearview financial model</option><option value="advisory">Advisory</option><option value="portfolio_intelligence">Market Intelligence</option></select></div>
       <div><label style={lbl}>Programme</label><select style={inp} value={f.programme_id||''} onChange={e=>setF(x=>({...x,programme_id:e.target.value||null}))}><option value="">No programme (independent · self-paying)</option>{programmes.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
       <div><label style={lbl}>Country</label><input style={inp} value={f.country} onChange={e=>setF(x=>({...x,country:e.target.value}))}/></div>
       <div><label style={lbl}>Sector</label><input style={inp} value={f.sector} onChange={e=>setF(x=>({...x,sector:e.target.value}))}/></div>

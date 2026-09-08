@@ -75,7 +75,13 @@ export async function GET(req: NextRequest) {
 
     // The brief is read out of brand_overrides rather than handed over raw, so
     // the screen and the email agree on its shape and neither has to trust it.
-    return NextResponse.json({ config: data || null, brief: briefFromConfig(data?.brand_overrides) })
+    const overrides = (data?.brand_overrides && typeof data.brand_overrides === 'object' && !Array.isArray(data.brand_overrides))
+      ? (data.brand_overrides as Record<string, unknown>)
+      : {}
+    const dismissed = Array.isArray(overrides.dismissed)
+      ? (overrides.dismissed as unknown[]).filter((k): k is string => typeof k === 'string')
+      : []
+    return NextResponse.json({ config: data || null, brief: briefFromConfig(data?.brand_overrides), dismissed })
   } catch (e: any) {
     console.error('engagement-config GET: unexpected error', e)
     return NextResponse.json({ error: 'Could not load the settings' }, { status: 500 })
@@ -158,6 +164,36 @@ export async function PATCH(req: NextRequest) {
         .eq('client_id', clientId)
         .maybeSingle()
       patch.brand_overrides = briefIntoConfig(existing?.brand_overrides, body.brief)
+    }
+
+    // SETTING A FLAG ASIDE. 8 September 2026. "What needs you" says what is
+    // blocking a next step, and some of it is blocked on somebody else, or on
+    // a date, or on a decision already taken off the platform. With no way to
+    // set one aside the list grows a permanent resident, and a list with a
+    // permanent resident stops being read at all.
+    //
+    // Kept in the database beside the engagement rather than in the browser,
+    // so it holds for whoever opens the engagement next and on whatever
+    // machine. Nothing is deleted: the flag is still calculated and can be
+    // brought back, because a dismissal is a judgement about now and not a
+    // statement that the work is done.
+    if (body.dismissed !== undefined) {
+      const keys = Array.isArray(body.dismissed)
+        ? body.dismissed
+            .map((k: unknown) => (typeof k === 'string' ? k.trim().slice(0, 200) : ''))
+            .filter(Boolean)
+            .slice(0, 200)
+        : []
+      const { data: existing } = await admin
+        .from('engagement_config')
+        .select('brand_overrides')
+        .eq('client_id', clientId)
+        .maybeSingle()
+      const base = (existing?.brand_overrides && typeof existing.brand_overrides === 'object' && !Array.isArray(existing.brand_overrides))
+        ? { ...(existing.brand_overrides as Record<string, unknown>) }
+        : {}
+      base.dismissed = Array.from(new Set(keys))
+      patch.brand_overrides = base
     }
 
     if (typeof body.torReference === 'string') {

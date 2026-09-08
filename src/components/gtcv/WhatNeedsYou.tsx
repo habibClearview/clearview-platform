@@ -49,10 +49,42 @@ function daysAgo(iso) {
   return Math.floor((Date.now() - then) / 86400000)
 }
 
+/** The engagement's own record of what has been set aside. */
+async function loadDismissed(clientId) {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  const res = await fetch(`/api/engagement-config?clientId=${encodeURIComponent(clientId)}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) return []
+  const json = await res.json().catch(() => ({}))
+  return Array.isArray(json?.dismissed) ? json.dismissed : []
+}
+
+async function saveDismissed(clientId, keys) {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  const res = await fetch(`/api/engagement-config?clientId=${encodeURIComponent(clientId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ dismissed: keys }),
+  })
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(json?.error || 'That could not be saved')
+}
+
 export default function WhatNeedsYou({ clientId, canManage, onGoTo }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
+  // SET ASIDE, NOT DELETED. 8 September 2026. Habib asked to be able to
+  // dismiss a flag. Something can be genuinely blocked on somebody else, on a
+  // date, or on a decision already taken off the platform, and a list carrying
+  // a permanent resident stops being read at all. Kept in the database beside
+  // the engagement, so it holds for whoever opens it next on whatever machine,
+  // and everything set aside can be brought back.
+  const [dismissed, setDismissed] = useState([])
+  const [showSetAside, setShowSetAside] = useState(false)
 
   const load = useCallback(async () => {
     if (!clientId) { setItems([]); setLoading(false); return }
@@ -197,11 +229,35 @@ export default function WhatNeedsYou({ clientId, canManage, onGoTo }) {
 
   useEffect(() => { load() }, [load])
 
+  useEffect(() => {
+    let cancelled = false
+    if (!clientId) { setDismissed([]); return }
+    loadDismissed(clientId).then((d) => { if (!cancelled) setDismissed(d) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [clientId])
+
+  /** Set a flag aside, or bring it back. Written before it is shown, so a
+   *  failed save never leaves the screen disagreeing with the record. */
+  async function setAside(key, aside) {
+    const next = aside ? [...new Set([...dismissed, key])] : dismissed.filter((k) => k !== key)
+    try {
+      await saveDismissed(clientId, next)
+      setDismissed(next)
+      setErr(null)
+    } catch (e) {
+      setErr(e.message || 'That could not be saved, so nothing was set aside')
+    }
+  }
+
   if (loading) return null
+
+  const setAsideKeys = new Set(dismissed)
+  const showing = items.filter((i) => !setAsideKeys.has(i.key))
+  const held = items.filter((i) => setAsideKeys.has(i.key))
 
   return (
     <div style={{
-      border: `1px solid ${items.length ? C.amber : C.border}`, borderRadius: 12,
+      border: `1px solid ${showing.length ? C.amber : C.border}`, borderRadius: 12,
       padding: '0.95rem 1.1rem', background: C.card, marginBottom: '1.1rem',
     }}>
       <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
@@ -210,14 +266,15 @@ export default function WhatNeedsYou({ clientId, canManage, onGoTo }) {
 
       {err ? <div style={{ color: C.red, fontSize: '0.95rem', marginTop: '0.5rem' }}>{err}</div> : null}
 
-      {items.length === 0 ? (
+      {showing.length === 0 ? (
         <p style={{ ...hint, margin: '0.45rem 0 0' }}>
-          Nothing is waiting on you. Every gate that has been signed has been authorised, no proposal
-          or claim is sitting unread, and no conversation is stuck in draft.
+          {held.length
+            ? `Nothing is waiting on you, and ${held.length} ${held.length === 1 ? 'flag has' : 'flags have'} been set aside.`
+            : 'Nothing is waiting on you. Every gate that has been signed has been authorised, no proposal or claim is sitting unread, and no conversation is stuck in draft.'}
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginTop: '0.7rem' }}>
-          {items.map((i) => (
+          {showing.map((i) => (
             <div key={i.key} style={{
               borderLeft: `3px solid ${i.tone}`, background: C.alt,
               borderRadius: '0 9px 9px 0', padding: '0.55rem 0.8rem',
@@ -239,10 +296,61 @@ export default function WhatNeedsYou({ clientId, canManage, onGoTo }) {
                   }}
                 >Open it</button>
               ) : null}
+              {canManage ? (
+                <button
+                  type="button"
+                  onClick={() => setAside(i.key, true)}
+                  title="Set this aside. It stays calculated and can be brought back."
+                  style={{
+                    ...mono, fontSize: '0.82rem', padding: '0.32rem 0.7rem',
+                    border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent',
+                    color: C.slate, cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}
+                >Set aside</button>
+              ) : null}
             </div>
           ))}
         </div>
       )}
+
+      {/* NOTHING IS HIDDEN FOR GOOD. What has been set aside is one press
+          away, and each one can be brought back, because a dismissal is a
+          judgement about now and not a statement that the work is done. */}
+      {held.length ? (
+        <div style={{ marginTop: '0.7rem' }}>
+          <button
+            type="button"
+            onClick={() => setShowSetAside((v) => !v)}
+            style={{ ...hint, border: 'none', background: 'transparent', color: C.teal, cursor: 'pointer', padding: 0 }}
+          >{showSetAside ? 'Hide' : 'Show'} {held.length} set aside</button>
+          {showSetAside ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.45rem' }}>
+              {held.map((i) => (
+                <div key={i.key} style={{
+                  borderLeft: `3px solid ${C.border}`, background: C.alt, borderRadius: '0 9px 9px 0',
+                  padding: '0.45rem 0.75rem', display: 'flex', gap: '0.7rem',
+                  justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap',
+                }}>
+                  <div style={{ flex: '1 1 320px', minWidth: 240 }}>
+                    <div style={{ fontSize: '0.94rem', color: C.slate }}>{i.what}</div>
+                  </div>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      onClick={() => setAside(i.key, false)}
+                      style={{
+                        ...mono, fontSize: '0.82rem', padding: '0.28rem 0.7rem',
+                        border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent',
+                        color: C.teal, cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}
+                    >Bring it back</button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }
