@@ -2046,10 +2046,41 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       }).catch(()=>{})
       return ()=>{cancelled=true}
     },[clients])
-    const flagged=financialClients.filter(c=>{
+    // SET ASIDE UNTIL THE NEXT HEALTH CHECK. 8 September 2026. There was no
+    // way to acknowledge a flag, so a client who is amber for a reason the
+    // coach already knows about sat at the top of this screen indefinitely,
+    // and a list with a permanent resident stops being read, which is how a
+    // genuinely new flag gets missed.
+    //
+    // Hidden only while the moment it was set aside is later than the health
+    // check being shown. A new check brings the client straight back, because
+    // the coach acknowledged what they had read and not everything that would
+    // ever be written.
+    const flagIsSetAside=(c)=>{
+      const at=Date.parse(c.health_flag_dismissed_at||'')
+      if(!Number.isFinite(at))return false
+      const report=reportByClient[c.id]
+      const generated=Date.parse(report?.generated_at||'')
+      return !Number.isFinite(generated)||at>=generated
+    }
+    async function setFlagAside(client,aside){
+      const value=aside?new Date().toISOString():null
+      setClients(prev=>prev.map(c=>c.id!==client.id?c:{...c,health_flag_dismissed_at:value}))
+      const {error}=await supabase.from('engagement_clients')
+        .update({health_flag_dismissed_at:value}).eq('id',client.id)
+      // Put the screen back if the write did not land, rather than showing a
+      // list that disagrees with the record.
+      if(error){
+        setClients(prev=>prev.map(c=>c.id!==client.id?c:{...c,health_flag_dismissed_at:client.health_flag_dismissed_at}))
+        setSaveError('That flag could not be set aside: '+error.message)
+      }
+    }
+    const flaggedAll=financialClients.filter(c=>{
       const label=healthStatusFromReportText(reportByClient[c.id]?.report_text).label
       return label==='Needs attention'||label==='Watch'
-    }).sort((a,b)=>{
+    })
+    const setAsideFlags=flaggedAll.filter(flagIsSetAside)
+    const flagged=flaggedAll.filter(c=>!flagIsSetAside(c)).sort((a,b)=>{
       const rank={'Needs attention':0,'Watch':1}
       const la=healthStatusFromReportText(reportByClient[a.id]?.report_text).label
       const lb=healthStatusFromReportText(reportByClient[b.id]?.report_text).label
@@ -2190,9 +2221,12 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         }} onCancel={()=>{setShowNew(false);setNewClientPrefill(null)}}/>}
         {newClientPrefill&&<div style={{fontSize:'0.85rem',color:C.teal,marginTop:'-0.9rem',marginBottom:'1rem'}}>Pre-filled from the Pipeline deal you just marked Won.</div>}
 
-        {flagged.length>0&&(
-          <div style={{...card,border:'1px solid #F1C9C2',borderLeft:`4px solid ${C.red}`}}>
-            <div style={{fontWeight:700,fontSize:'1.02rem',color:C.red,marginBottom:'0.7rem'}}>⚠ {flagged.length} flagged this week <span style={{fontWeight:400,fontSize:'0.85rem',color:C.slate}}>· Financial Model clients only for now</span></div>
+        {(flagged.length>0||setAsideFlags.length>0)&&(
+          <div style={{...card,border:`1px solid ${flagged.length?'#F1C9C2':C.border}`,borderLeft:`4px solid ${flagged.length?C.red:C.border}`}}>
+            <div style={{fontWeight:700,fontSize:'1.02rem',color:flagged.length?C.red:C.slate,marginBottom:'0.7rem'}}>
+              {flagged.length?<>⚠ {flagged.length} flagged this week</>:<>Nothing flagged this week</>}
+              <span style={{fontWeight:400,fontSize:'0.85rem',color:C.slate}}> · Financial Model clients only for now</span>
+            </div>
             {flagged.map(c=>{
               const report=reportByClient[c.id]
               const status=healthStatusFromReportText(report?.report_text)
@@ -2202,9 +2236,33 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                   <Badge text={status.label} color={HEALTH_COLOR[status.label]}/>
                   <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700}}>{c.name}</div><div style={{fontSize:'1.07rem',color:C.slate}}>{why}</div></div>
                   <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',fontWeight:700,color:C.red,flexShrink:0}}>Open →</span>
+                  <button
+                    type="button"
+                    onClick={e=>{e.stopPropagation();setFlagAside(c,true)}}
+                    title="Set this aside. It comes back as soon as a newer health check is generated."
+                    style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.85rem',padding:'0.25rem 0.65rem',border:`1px solid ${C.border}`,borderRadius:6,background:'transparent',color:C.slate,cursor:'pointer',flexShrink:0,whiteSpace:'nowrap'}}
+                  >Set aside</button>
                 </div>
               )
             })}
+            {/* NOTHING IS HIDDEN FOR GOOD. What has been set aside is named
+                here and can be brought back, and it returns by itself the
+                moment a newer health check is generated. */}
+            {setAsideFlags.length>0&&(
+              <div style={{borderTop:'1px solid #F4F1F0',paddingTop:'0.6rem',marginTop:'0.4rem'}}>
+                <div style={{fontSize:'0.85rem',color:C.slate,marginBottom:'0.35rem'}}>Set aside until the next health check</div>
+                {setAsideFlags.map(c=>(
+                  <div key={c.id} style={{display:'flex',alignItems:'center',gap:'0.9rem',padding:'0.35rem 0'}}>
+                    <div style={{flex:1,minWidth:0,fontSize:'0.95rem',color:C.slate}}>{c.name}</div>
+                    <button
+                      type="button"
+                      onClick={()=>setFlagAside(c,false)}
+                      style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.85rem',padding:'0.22rem 0.65rem',border:`1px solid ${C.border}`,borderRadius:6,background:'transparent',color:C.teal,cursor:'pointer',flexShrink:0,whiteSpace:'nowrap'}}
+                    >Bring it back</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

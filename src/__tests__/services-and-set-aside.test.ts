@@ -105,3 +105,53 @@ describe('a flag can be set aside and brought back', () => {
     expect(shown).toBeGreaterThan(order)
   })
 })
+
+// ============================================================
+// THE FLAG ON THE CLIENTS SCREEN, WHICH IS THE ONE HE MEANT
+//
+// I added dismissal to "What needs you" on a client's Cover tab. The flags
+// Habib was looking at are the "flagged this week" panel that opens the
+// Clients screen, which is a different list in a different component, and it
+// still had no way to acknowledge anything. Fixing the wrong panel and saying
+// it was done is worse than not fixing it.
+// ============================================================
+describe('a flagged client can be set aside on the Clients screen', () => {
+  it('offers to set aside, and to bring back', () => {
+    expect(DASH).toContain('Set aside')
+    expect(DASH).toContain('Bring it back')
+    expect(DASH).toContain('Set aside until the next health check')
+  })
+
+  it('comes back by itself when a newer health check is generated', () => {
+    // Hidden only while the moment it was set aside is later than the check
+    // being shown, so acknowledging what you read never hides what comes next.
+    expect(DASH).toContain('const flagIsSetAside=(c)=>{')
+    expect(DASH).toContain('return !Number.isFinite(generated)||at>=generated')
+  })
+
+  it('keeps the panel visible when everything in it has been set aside', () => {
+    // A panel that disappears entirely leaves no way to bring anything back.
+    expect(DASH).toContain('{(flagged.length>0||setAsideFlags.length>0)&&(')
+    expect(DASH).toContain('Nothing flagged this week')
+  })
+
+  it('puts the screen back if the write does not land', () => {
+    expect(DASH).toContain('That flag could not be set aside: ')
+  })
+
+  it('is kept in the database, on the client, never in the browser', () => {
+    expect(DASH).toContain("supabase.from('engagement_clients')")
+    expect(DASH).toContain('health_flag_dismissed_at')
+  })
+
+  it('setting one aside does not also open the client', () => {
+    // The whole row is a link to the client's dashboard, so the button has to
+    // stop the press reaching it.
+    expect(DASH).toContain('onClick={e=>{e.stopPropagation();setFlagAside(c,true)}}')
+  })
+
+  it('the column it needs is recorded as a migration', () => {
+    const sql = readFileSync('supabase/migrations/2026_09_08_health_flag_dismissed_at.sql', 'utf8')
+    expect(sql).toContain('add column if not exists health_flag_dismissed_at')
+  })
+})
