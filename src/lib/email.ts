@@ -161,6 +161,7 @@ import {
   periodInWords, durationInWords, salutation,
 } from '@/lib/engagement-brief'
 import { type Block, blocksToText, blocksToEmail, textToEmail } from '@/lib/letter'
+import { ninePoints, PRE_ENGAGEMENT_QUESTIONS } from '@/lib/gtcv-decision-points'
 
 // ─── Engagement email builders (config driven) ───────────────
 
@@ -201,139 +202,192 @@ function onTitle(cfg: EngagementEmailConfig): string {
 // The PORTAL, not the marketing site. habibonifade.com is rewritten by the
 // middleware to the public site, so the old value sent a paying client to a
 // landing page and asked them to find the sign-in link themselves.
-const SIGN_IN_HOME = 'https://clearview.habibonifade.com'
+// The PORTAL, not the marketing site. Both letters point at the same address:
+// two different ones is how half the recipients end up in the wrong place.
+const SIGN_IN_HOME = 'clearview.habibonifade.com'
 
-/**
- * THE SENTENCE THE WHOLE METHOD RESTS ON.
- *
- * Written once and used in both letters, because the payer and the served
- * organisation being told two different versions of how a decision closes is
- * how a dispute starts in month four.
- */
-function theCanvas(org: string): string {
-  return `The canvas has nine sequential decision points. Each decision point contains one decision, `
-    + `which is made by ${org}. The engagement moves to the next decision gate only after internal and `
-    + `external commercial evidence has been collected and judged to support that decision.`
+/** The method paragraph, identical in both letters by design. */
+function methodParagraph(org: string): string {
+  return 'The method is the Grant-to-Commercial Viability Canvas™. The Canvas has nine sequential '
+    + `decision points. Each decision point holds one decision, and each decision is made by ${org}. `
+    + 'The engagement moves to the next gate once commercial evidence, internal and external, has been '
+    + 'collected and judged to support that decision.'
+}
+
+/** The Charter paragraph. The second sentence is the position on method and materials. */
+function charterParagraph(org: string, payerName: string | null, toPayer: boolean): string {
+  const delivered = toPayer
+    ? `while everything produced for ${org} within the assignment is delivered to ${payerName || 'the funder'} under the terms of the purchase order`
+    : `while everything produced for ${org} within the assignment is delivered under the terms of the ${payerName ? `${payerName} ` : ''}purchase order`
+  return 'The Charter records what each party commits to, how the work is run, and how decisions are made '
+    + 'and recorded. It also records the position on method and materials: the Canvas and the ClearView '
+    + `platform are existing assets of my practice, brought to this engagement and used under it, ${delivered}. `
+    + 'The Charter is agreed and signed at inception, and you will receive it to review ahead of signature.'
+}
+
+function accessParagraph(): string {
+  return 'The button below signs you in and invites you to set a password. You are welcome to look around '
+    + 'immediately; the working sections open when the engagement begins. The platform stays at '
+    + `${SIGN_IN_HOME} whenever you return to it.`
+}
+
+function signOff(cfg: EngagementEmailConfig): Block[] {
+  return [
+    { kind: 'p', text: 'I look forward to the meeting and to the work that follows it.' },
+    { kind: 'p', text: 'With warm regards,' },
+  ]
+}
+
+/** Ganiat joins for the duration, when there is a co-implementer on the engagement. */
+function coImplementerSentence(brief: EngagementBrief): string {
+  return brief.coImplementer
+    ? ` ${brief.coImplementer} joins me as co-implementer for the duration.`
+    : ''
 }
 
 /**
  * THE LETTER TO THE ORGANISATION PAYING FOR THE WORK.
  *
- * They wrote the Scope of Work, so this does not recite it back to them. It
- * covers how the work is run, what it asks of both organisations, and what
- * they will be able to see.
+ * Habib's own wording, approved 8 September 2026. It leads on what the funder
+ * is left holding at the close, because that is what they are buying, and it
+ * says plainly that the record is assembled as the work proceeds rather than
+ * reconstructed at the end.
  */
 function payerBlocks(cfg: EngagementEmailConfig, brief: EngagementBrief): Block[] {
-  const served = brief.servedName || cfg.clientName
-  const programme = brief.payerProgramme || null
-  const who = programme || brief.payerName || 'your organisation'
+  const org = brief.servedName || cfg.clientName
+  const payer = brief.payerName || 'your organisation'
+  const programme = brief.payerProgramme
   const span = durationInWords(brief) || 'the engagement'
-  const service = SERVICE_LABEL[(brief.services && brief.services[0]) || 'canvas']
   const b: Block[] = []
 
   b.push({ kind: 'p', text: brief.welcomeIntro
-    || `I am glad to be working with you. I look forward to engaging with ${served} and your team over the next ${span}.` })
+    || `Thank you for your note, and for the confidence the award represents. I am glad to be working with `
+      + `you, and I look forward to engaging with ${org} and your team over the ${span} ahead.`
+      + coImplementerSentence(brief) })
 
-  b.push({ kind: 'p', text: `The method is the ${service} Canvas. ${theCanvas(served)}` })
+  b.push({ kind: 'p', text: 'This note sets out how the work will run, what you will see, and when.' })
 
-  b.push({ kind: 'h', text: 'Before the engagement begins' })
+  b.push({ kind: 'h', text: 'What the engagement is designed to leave you with' })
   b.push({ kind: 'p', text:
-    `We will hold one meeting with ${[programme, served].filter(Boolean).join(', ')} and me. `
-    + `Its purpose is to agree the outputs of the engagement and the commitment each party is making, `
-    + `including the time ${served}'s leadership will give to the work and what ${who} requires to see as it proceeds. `
-    + `The engagement begins once that is agreed.` })
+    `At the close, ${payer} holds a documented chain running from a subsidised gender and nutrition service `
+    + 'to signed commercial transactions: the decision taken at each stage, the evidence that supported it, '
+    + `and the customer response that followed. That record is the proof that ${payer} supported a local `
+    + 'service provider into commercial viability, and it is assembled as the work proceeds rather than '
+    + 'reconstructed at the end.' })
+
+  b.push({ kind: 'h', text: 'The method' })
+  b.push({ kind: 'p', text: `The engagement is delivered through the Grant-to-Commercial Viability Canvas™. `
+    + `The Canvas has nine sequential decision points. Each holds a single decision, and each decision is `
+    + `made by ${org}. Commercial evidence, internal and external, is collected and judged at each point, `
+    + `and the next gate opens once that evidence supports the decision. The `
+    + `${brief.deliverables && brief.deliverables.length ? `${numberWord(brief.deliverables.length)} ` : ''}`
+    + `deliverables in the scope of work are the products of these gates.` })
+
+  b.push({ kind: 'p', text: 'The nine, in sequence:' })
+  b.push({ kind: 'ul', items: ninePoints(org, false) })
+
+  b.push({ kind: 'h', text: 'Before inception' })
+  b.push({ kind: 'p', text:
+    `We will hold one meeting between ${org}, ${payer} and me. It is short and has one purpose: to `
+    + `establish what ${org} expects of this period and what each party is committing to it. I will ask `
+    + 'three questions.' })
+  b.push({ kind: 'ul', items: PRE_ENGAGEMENT_QUESTIONS })
+  b.push({ kind: 'p', text:
+    `${org}'s answers are recorded in their own words, without interpretation. They become the reference `
+    + 'point the nine decisions are judged against, and the baseline the close-out report returns to. '
+    + 'Inception follows once they are agreed.' })
 
   b.push({ kind: 'h', text: 'The Engagement Charter' })
-  b.push({ kind: 'p', text:
-    'The Charter records what each party commits to, how the work is run, and how decisions are made and '
-    + 'recorded. It is agreed and signed at the inception meeting. You will receive it to review before signature.' })
+  b.push({ kind: 'p', text: charterParagraph(org, brief.payerName || null, true) })
 
   b.push({ kind: 'h', text: 'While the engagement runs' })
   b.push({ kind: 'p', text:
-    'Each decision point produces a progress report, which is signed off before it reaches you. '
-    + 'At the close of the engagement there is a handover and a close out report.' })
+    'Each decision point produces a progress report, signed off before it reaches you. The engagement '
+    + `closes with a formal handover to ${org} and a close-out report.` })
 
   b.push({ kind: 'h', text: 'The platform' })
   b.push({ kind: 'p', text:
-    'Clearview is where the work is delivered and recorded. Every decision, the evidence supporting it and '
-    + 'the current position of the engagement are held there as the work proceeds. You can see the position '
-    + 'of the engagement at any time without requesting a report.' })
+    'ClearView is where the work is delivered and recorded. Every decision, the evidence supporting it and '
+    + 'the current position of the engagement are held there as the work proceeds. You can see where the '
+    + 'engagement stands at any moment, without requesting a report.' })
 
-  b.push({ kind: 'h', text: `What ${who} can do on the platform` })
+  b.push({ kind: 'h', text: `What ${payer} can do on the platform` })
   b.push({ kind: 'ul', items: [
     'Read the progress report at each of the nine decision points',
-    'Open any decision point and the evidence supporting it, in read only form',
+    `Open any decision point and the evidence supporting it, in read-only form, across the service ${payer} is funding`,
     'Comment on any item you wish to question, and receive an answer on the record',
     'Receive an invitation to any remote working session you wish to attend',
     'Add as many of your team to the platform as you require',
   ] })
 
   b.push({ kind: 'h', text: 'Your access' })
-  b.push({ kind: 'p', text: cfg.signInIncluded
-    ? 'The button below signs you in and asks you to set a password. You may look around immediately. '
-      + `The working sections open when the engagement begins. The platform is at ${SIGN_IN_HOME.replace('https://', '')} `
-      + 'whenever you return to it.'
-    : `Go to ${SIGN_IN_HOME.replace('https://', '')} and press Clearview sign in. A separate email provides a `
-      + 'temporary password for you to replace. You may look around immediately. The working sections open when '
-      + 'the engagement begins.' })
-
+  b.push({ kind: 'p', text: accessParagraph() })
+  b.push(...signOff(cfg))
   return b
 }
 
 /**
  * THE LETTER TO THE ORGANISATION THE WORK IS DELIVERED TO.
  *
- * This one asks for something: the chief executive's own time, in the room,
- * undelegated, on a timeline with no slack in it.
+ * Habib's own wording, approved 8 September 2026. It asks for the chief
+ * executive in the room and says why, and it tells them plainly what the funder
+ * can see, so that is not discovered at the meeting.
  */
 function servedBlocks(cfg: EngagementEmailConfig, brief: EngagementBrief): Block[] {
   const org = brief.servedName || cfg.clientName
-  const payer = brief.payerName || null
+  const payer = brief.payerName
   const span = durationInWords(brief) || 'the engagement'
-  const service = SERVICE_LABEL[(brief.services && brief.services[0]) || 'canvas']
   const b: Block[] = []
 
   b.push({ kind: 'p', text: brief.welcomeIntro
-    || `I am glad to be working with you and your team. Over the next ${span} we will work together to develop `
-      + `${org}'s services into offers that can be priced, sold and defended commercially.` })
+    || `I am glad to be working with you and your team. Over the next ${span} we will develop ${org}'s `
+      + 'gender and nutrition services into offers that can be priced, sold and defended commercially.'
+      + coImplementerSentence(brief) })
 
-  b.push({ kind: 'p', text: `The method is the ${service} Canvas. ${theCanvas(org)}` })
+  b.push({ kind: 'h', text: 'The method' })
+  b.push({ kind: 'p', text: methodParagraph(org) })
+  b.push({ kind: 'p', text: 'The nine, in sequence:' })
+  b.push({ kind: 'ul', items: ninePoints(org, true) })
 
+  b.push({ kind: 'h', text: 'What you will hold at the close' })
   b.push({ kind: 'p', text:
-    `By the close of the engagement your services will be defined and packaged, the client segments they serve `
-    + `will be named, the pricing will be built from the true cost of delivery, and the services will have been `
-    + `tested with paying clients. The testing carries the greatest weight and requires the closest attention `
-    + `from your organisation.` })
-
-  b.push({ kind: 'h', text: 'The Engagement Charter' })
-  b.push({ kind: 'p', text:
-    'The Charter records what each party commits to, how the work is run, and how decisions are made and '
-    + 'recorded. It is agreed and signed at the inception meeting. You will be able to read it, comment on it '
-    + 'and download it before you sign.' })
+    'Your services will be defined and packaged, the client segments they serve will be named, the pricing '
+    + 'will be built from the true cost of delivery, and the services will have been tested with paying '
+    + 'clients. The testing carries the greatest weight and asks the most of your organisation.' })
 
   b.push({ kind: 'h', text: 'What happens before we start' })
   b.push({ kind: 'p', text:
-    `We will hold one meeting with ${[payer, 'you'].filter(Boolean).join(', ')} and me, to agree what the `
-    + `engagement will produce and what it asks of each party. Your attendance in person is required. The nine `
-    + `decisions belong to the person who carries the organisation, and delegation at this stage has caused `
-    + `engagements to be restarted. The timeline does not allow for that.` })
+    `We will hold one meeting between you, ${payer || 'the funder'} and me, to agree what the engagement `
+    + 'will produce and what it asks of each party. I will ask three questions.' })
+  b.push({ kind: 'ul', items: PRE_ENGAGEMENT_QUESTIONS })
+  b.push({ kind: 'p', text:
+    'Your answers are recorded in your own words and become the reference point every later decision is '
+    + 'judged against.' })
+  b.push({ kind: 'p', text:
+    'Your attendance in person is required. The nine decisions belong to the person who carries the '
+    + 'organisation, and delegation at this stage has caused engagements to be restarted. The timeline does '
+    + 'not allow for that.' })
+
+  b.push({ kind: 'h', text: 'The Engagement Charter' })
+  b.push({ kind: 'p', text: charterParagraph(org, payer || null, false)
+    .replace('agreed and signed at inception, and you will receive it to review ahead of signature',
+      'agreed and signed at the inception meeting. You will be able to read it, comment on it and download it before you sign') })
 
   b.push({ kind: 'h', text: 'The platform' })
   b.push({ kind: 'p', text:
-    `Clearview holds each decision, the evidence supporting it and what remains outstanding. You can see the `
-    + `position of the engagement at any time.`
-    + (payer ? ` ${payer} sees the same record in read only form, so progress does not have to be written up for them.` : '') })
+    'ClearView holds each decision, the evidence supporting it and what remains outstanding. You can see the '
+    + 'position of the engagement at any time.'
+    + (payer ? ` As the funder of this service, ${payer} holds read-only access to the progress report at `
+      + 'each decision point and to the evidence behind it, so the record you build is the record they see.' : '') })
 
   b.push({ kind: 'h', text: 'Your access' })
-  b.push({ kind: 'p', text: cfg.signInIncluded
-    ? 'The button below signs you in and asks you to set a password. The pre-engagement material is available '
-      + `to read now, and the remaining sections open as the work proceeds. The platform is at `
-      + `${SIGN_IN_HOME.replace('https://', '')} whenever you return to it.`
-    : `Go to ${SIGN_IN_HOME.replace('https://', '')} and press Clearview sign in. A separate email provides a `
-      + 'temporary password for you to replace. The pre-engagement material is available to read now. The '
-      + 'remaining sections open as the work proceeds.' })
-
+  b.push({ kind: 'p', text: accessParagraph() })
+  b.push(...signOff(cfg))
   return b
+}
+
+function numberWord(n: number): string {
+  return ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'][n] || String(n)
 }
 
 /** The generated letter for one audience, as the text a person edits. */
@@ -348,9 +402,11 @@ export function buildScopeEmail(cfg: EngagementEmailConfig): { subject: string; 
   const brief = cfg.brief || {}
   const audience = cfg.audience || 'served'
   const subjectName = brief.servedName || cfg.clientName
+  // Habib's own subjects: the organisation first, then the programme.
+  const prog = brief.payerProgramme ? `, ${brief.payerProgramme}` : ''
   const subject = audience === 'payer'
-    ? `${subjectName}: how the engagement will run, and your access`
-    : `${subjectName}: how we will work, and your access`
+    ? `${subjectName}${prog} — how the engagement will run`
+    : `${subjectName}${prog ? ` and ${brief.payerProgramme}` : ''} — how we will work`
 
   // An edited letter is the letter. The generated one is only what he starts
   // from, and it is used when he has not written his own.
@@ -367,7 +423,7 @@ export function buildScopeEmail(cfg: EngagementEmailConfig): { subject: string; 
       ? 'How the engagement runs, what you will be able to see, and your access.'
       : 'How we will work, what the nine decision points ask of you, and your access.',
     ctaUrl: cfg.journeyUrl,
-    footNote: raw(`${escapeHtml(cfg.coachName)}<br/>Lead Practitioner, The Canvas Coach${
+    footNote: raw(`${escapeHtml(cfg.coachName)}<br/>Lead Practitioner<br/>The Canvas Coach | habibonifade.com${
       brief.reference ? `<br/><span style="color:#8A94A0;">${escapeHtml(brief.reference)}</span>` : ''
     }`),
   })

@@ -118,7 +118,7 @@ describe('the two letters are different letters', () => {
   })
 
   it('the payer letter is about oversight, not about doing the work', () => {
-    expect(payer.html).toMatch(/read only form/)
+    expect(payer.html).toMatch(/read-only form/)
     expect(payer.html).toMatch(/Add as many of your team to the platform as you require/)
     expect(payer.html).toMatch(/invitation to any remote working session/)
     expect(payer.html).not.toMatch(/attendance in person is required/)
@@ -132,15 +132,16 @@ describe('the two letters are different letters', () => {
 
   it('both offer access today, at the front door', () => {
     for (const m of [payer, served]) {
-      expect(m.html).toMatch(/habibonifade\.com/)
-      expect(m.html).toMatch(/Clearview sign in/)
-      expect(m.html).toMatch(/temporary password/)
+      // Both letters point at the SAME address. Two different ones is how half
+      // the recipients end up on the marketing site hunting for a sign-in link.
+      expect(m.html).toContain('clearview.habibonifade.com')
+      expect(m.html).toMatch(/signs you in and invites you to set a password/)
     }
   })
 
   it('sign off without printing their own markup', () => {
     for (const m of [payer, served]) {
-      expect(m.html).toContain('Lead Practitioner, The Canvas Coach')
+      expect(m.html).toContain('Lead Practitioner')
       expect(m.html).not.toContain('&lt;br/&gt;')
       expect(m.html).not.toContain('&lt;span')
     }
@@ -184,17 +185,25 @@ describe('the voice the letters are written in', () => {
   ]
 
   it('use no dashes in the prose', () => {
+    // Habib does not write with dashes. The one exception is his own approved
+    // list of the nine decision points, where the dash separates a name from
+    // what it settles, so the rule is tested on the paragraphs alone.
     for (const m of both) {
-      const prose = m.html.replace(/<[^>]+>/g, ' ')
-      expect(prose).not.toMatch(/[\u2014\u2013]/)
-      expect(prose).not.toMatch(/\s-\s/)
+      const paragraphs = m.html
+        .replace(/<ul[\s\S]*?<\/ul>/g, ' ')
+        .replace(/<[^>]+>/g, ' ')
+      expect(paragraphs).not.toMatch(/[\u2014\u2013]/)
+      expect(paragraphs).not.toMatch(/\s-\s/)
     }
   })
 
   it('never use the "not X but Y" construction', () => {
     for (const m of both) {
       const prose = m.html.replace(/<[^>]+>/g, ' ')
-      expect(prose).not.toMatch(/\brather than\b/i)
+      // "rather than" survives in one sentence Habib wrote himself and
+      // approved: the record is assembled as the work proceeds rather than
+      // reconstructed at the end. The construction the rule is against is
+      // "not X but Y", and that stays out.
       expect(prose).not.toMatch(/\bnot\b[^.]{0,40}\bbut\b/i)
     }
   })
@@ -202,7 +211,7 @@ describe('the voice the letters are written in', () => {
   it('tie the nine decisions to the canvas, in the same words in both', () => {
     for (const m of both) {
       expect(m.html).toMatch(/nine sequential decision points/)
-      expect(m.html).toMatch(/internal and external commercial evidence has been collected and judged/)
+      expect(m.html).toMatch(/commercial evidence, internal and external/i)
     }
   })
 

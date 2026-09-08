@@ -83,7 +83,7 @@ async function api(method, body, query) {
 // upload reads as English instead of as a list of column names.
 const FIELD_NAMES = {
   payerName: 'paying client', servedName: 'served client', payerProgramme: 'programme',
-  reference: 'reference', periodStart: 'start date', periodEnd: 'end date',
+  reference: 'reference', coImplementer: 'co-implementer', periodStart: 'start date', periodEnd: 'end date',
   deliverables: 'what it produces', services: 'services',
 }
 
@@ -233,6 +233,9 @@ export default function WelcomePack({ clientId, canManage }) {
               <div style={row}><span style={lab}>Reference</span>
                 <input style={field} value={d.reference || ''} placeholder="e.g. Purchase Order 149"
                   onChange={(e) => set('reference', e.target.value)} /></div>
+              <div style={row}><span style={lab}>Co-implementer</span>
+                <input style={field} value={d.coImplementer || ''} placeholder="e.g. Ganiat Agbeke Ettu"
+                  onChange={(e) => set('coImplementer', e.target.value)} /></div>
               <div style={row}><span style={lab}>Period</span>
                 <span style={{ display: 'flex', gap: '0.4rem' }}>
                   <input style={field} type="date" value={(d.periodStart || '').slice(0, 10)}

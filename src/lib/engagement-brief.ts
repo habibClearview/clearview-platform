@@ -57,6 +57,11 @@ export interface EngagementBrief {
   periodEnd?: string
   /** The contract or ToR this came from, e.g. "Purchase Order 149". */
   reference?: string
+  /**
+   * The co-implementer working alongside the lead practitioner, named in both
+   * letters. Empty when the engagement is delivered by the lead alone.
+   */
+  coImplementer?: string
   /** The deliverables the ToR lists, in its own words. */
   deliverables?: string[]
   /**
@@ -158,6 +163,7 @@ export function briefFromConfig(brandOverrides: unknown): EngagementBrief {
     periodStart: isoDate(b.periodStart),
     periodEnd: isoDate(b.periodEnd),
     reference: str(b.reference, CAP.text),
+    coImplementer: str(b.coImplementer, CAP.text),
     deliverables: deliverables && deliverables.length ? deliverables : undefined,
     welcomeIntro: str(b.welcomeIntro, CAP.intro),
     letterPayer: str(b.letterPayer, CAP.letter),
