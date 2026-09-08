@@ -601,6 +601,45 @@ export default function WelcomePack({ clientId, canManage }) {
                               : <span style={{ color: C.teal }}> · not sent yet</span>}
                           </span>
                         </label>
+                        {/* THE LETTERS THAT WENT BEFORE ANYTHING RECORDED IT.
+                            8 September 2026. Habib knows at least two of the
+                            funders received theirs, and the platform does not,
+                            because nothing was writing it down when those went
+                            out. Guessing on his behalf would put a date on a
+                            letter I cannot see. This lets him say so, and
+                            change his mind, without sending anything. */}
+                        <button
+                          type="button"
+                          disabled={!!busy}
+                          onClick={async () => {
+                            const already = !!r.sentAt
+                            if (already && !window.confirm(`Clear the record that ${r.name || r.email} has had this letter? Nothing is sent either way.`)) return
+                            setBusy(`mark:${r.email}`); setNote(null); setErr(null)
+                            try {
+                              const next = people.map((p) => (
+                                p.email === r.email
+                                  ? { ...p, sentAt: already ? undefined : new Date().toISOString() }
+                                  : p
+                              ))
+                              await api('PATCH', { clientId, brief: { ...brief, recipients: next } })
+                              setNote(already
+                                ? `${r.name || r.email} is back on the list to be written to.`
+                                : `${r.name || r.email} is recorded as already having had it. Nothing was sent.`)
+                              await load()
+                            } catch (e) { setErr(e.message || 'That could not be recorded') }
+                            setBusy(null)
+                          }}
+                          title={r.sentAt
+                            ? 'Clear the record that they have had it. Nothing is sent.'
+                            : 'Record that they already had this letter, without sending anything'}
+                          style={{
+                            ...mono, fontSize: '0.78rem', padding: '0.25rem 0.6rem',
+                            border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent',
+                            color: C.slate, cursor: busy ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
+                          }}
+                        >{busy === `mark:${r.email}`
+                          ? 'Saving...'
+                          : r.sentAt ? 'Not actually sent' : 'Already had it'}</button>
                         <button
                           type="button"
                           disabled={!!busy || !journeyUrl}

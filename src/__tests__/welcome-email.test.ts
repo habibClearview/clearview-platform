@@ -398,3 +398,38 @@ describe('what can actually be sent to', () => {
     expect(brief.recipients?.map((r) => r.email)).toEqual(['kemiasuni@tanagerintl.org', 'ovo@ikore.org'])
   })
 })
+
+// ============================================================
+// THE LETTERS THAT WENT BEFORE ANYTHING RECORDED THEM
+//
+// Habib knows at least two of the funders received theirs. The platform does
+// not, because nothing was writing it down when those letters went out. Putting
+// a date on a letter I cannot see would be inventing a record, so this lets him
+// say so himself, and take it back, without sending anything.
+// ============================================================
+describe('recording a letter that went before the record existed', () => {
+  const PACK = readFileSync('src/components/gtcv/WelcomePack.tsx', 'utf8')
+
+  it('every recipient can be marked as already having had it', () => {
+    expect(PACK).toContain("'Already had it'")
+    expect(PACK).toContain('is recorded as already having had it. Nothing was sent.')
+  })
+
+  it('says plainly that nothing is sent, because the button sits beside one that does', () => {
+    expect(PACK).toContain('Record that they already had this letter, without sending anything')
+  })
+
+  it('can be taken back, and asks first', () => {
+    expect(PACK).toContain("'Not actually sent'")
+    expect(PACK).toContain('Nothing is sent either way.')
+    expect(PACK).toContain('is back on the list to be written to.')
+  })
+
+  it('writes to the saved list, not to the browser', () => {
+    expect(PACK).toContain("await api('PATCH', { clientId, brief: { ...brief, recipients: next } })")
+  })
+
+  it('one at a time, so a mark and a send cannot overlap', () => {
+    expect(PACK).toContain('disabled={!!busy}')
+  })
+})
