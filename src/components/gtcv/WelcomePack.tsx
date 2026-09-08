@@ -98,8 +98,8 @@ export default function WelcomePack({ clientId, canManage }) {
   const [brief, setBrief] = useState({})
   const [briefDraft, setBriefDraft] = useState(null)
   const [welcomeAudience, setWelcomeAudience] = useState('served')
-  const [toTitle, setToTitle] = useState('')
-  const [toName, setToName] = useState('')
+  // Which of the saved recipients the preview is read as.
+  const [previewIdx, setPreviewIdx] = useState(0)
   // What the last upload did, said beside the upload rather than only at
   // the top of a long panel where it can be scrolled past.
   const [torSaid, setTorSaid] = useState(null)
@@ -358,7 +358,10 @@ export default function WelcomePack({ clientId, canManage }) {
           // than offering a button that would send to no one.
           // The named list is the list. The client contact and the parties are
           // only a fallback for an engagement where nobody has been named yet.
-          const named = (brief.recipients || []).map((r) => r.email).filter(Boolean)
+          const people = brief.recipients || []
+          const previewing = people[Math.min(previewIdx, Math.max(0, people.length - 1))] || null
+          const nameless = people.filter((r) => !r.name).map((r) => r.email)
+          const named = people.map((r) => r.email).filter(Boolean)
           const to = named.length
             ? named
             : [...new Set([client?.contact_email, ...partyEmails].map((e) => (e || '').trim()).filter(Boolean))]
@@ -381,24 +384,49 @@ export default function WelcomePack({ clientId, canManage }) {
                   ? <>Goes to {to.length} {to.length === 1 ? 'person' : 'people'}, each with their own copy: {to.join(', ')}.</>
                   : <>Nobody is on the list yet, so the letter can be read but not sent. Add people above.</>}
               </p>
-              {/* THE PAYER AND THE SERVED ORGANISATION DO NOT DO THE SAME THING.
-                  One is doing the work, the other is watching it and paying for
-                  it, so they get different access paragraphs and the welcome is
-                  sent twice — once to each — rather than once to everybody. */}
-              <p style={{ ...hint, margin: '0 0 0.6rem', display: 'flex', gap: '0.9rem', flexWrap: 'wrap' }}>
-                {[['served', 'the organisation being served'], ['payer', 'the paying client']].map(([v, l]) => (
-                  <label key={v} style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', cursor: 'pointer' }}>
-                    <input
-                      type="radio" name="welcome-audience" checked={welcomeAudience === v}
-                      onChange={() => { setWelcomeAudience(v); setEmailPreview(null) }}
-                    />This letter is for {l}
-                  </label>
-                ))}
-              </p>
-              {/* ADDRESSED TO A PERSON. "Dear Morgan," is how you write to a
-                  child. A client gets their title and their full name, and if
-                  neither is given the letter opens "Dear colleague," rather
-                  than guessing at one. */}
+              {/* PREVIEW AS A REAL PERSON. 8 September 2026. The preview used
+                  its own name and title boxes, separate from the recipient
+                  list, so leaving them empty produced "Dear colleague," and
+                  Habib reasonably read that as the letter he was about to
+                  send. It is now read as one of the people on the list: their
+                  salutation, and the letter for their side of the engagement.
+                  Nothing to fill in twice and nothing to disagree with. */}
+              {people.length ? (
+                <p style={{ ...hint, margin: '0 0 0.6rem', display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span>Read it as</span>
+                  <select
+                    style={{ ...field, maxWidth: 330 }}
+                    value={previewIdx}
+                    onChange={(e) => { setPreviewIdx(Number(e.target.value)); setEmailPreview(null) }}
+                  >
+                    {people.map((r, i) => (
+                      <option key={i} value={i}>
+                        {[r.title, r.name].filter(Boolean).join(' ') || r.email}
+                        {` — ${r.audience === 'payer' ? 'paying client' : 'served client'} letter`}
+                        {r.name ? '' : ' — NO NAME'}
+                      </option>
+                    ))}
+                  </select>
+                </p>
+              ) : (
+                <p style={{ ...hint, margin: '0 0 0.6rem', display: 'flex', gap: '0.9rem', flexWrap: 'wrap' }}>
+                  {[['served', 'the organisation being served'], ['payer', 'the paying client']].map(([v, l]) => (
+                    <label key={v} style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', cursor: 'pointer' }}>
+                      <input
+                        type="radio" name="welcome-audience" checked={welcomeAudience === v}
+                        onChange={() => { setWelcomeAudience(v); setEmailPreview(null) }}
+                      />Read the letter for {l}
+                    </label>
+                  ))}
+                </p>
+              )}
+              {nameless.length ? (
+                <p style={{ ...hint, margin: '0 0 0.6rem', color: C.red }}>
+                  {nameless.join(', ')} {nameless.length === 1 ? 'has' : 'have'} no name on the list, so
+                  {nameless.length === 1 ? ' their letter' : ' their letters'} would open “Dear colleague,”.
+                  Add the name above and save the recipients.
+                </p>
+              ) : null}
               {/* ONE EMAIL, NOT TWO. A client holding a letter about a platform
                   they cannot open, waiting on a second message from a different
                   sender, is the opposite of the impression this is for. */}
@@ -408,16 +436,6 @@ export default function WelcomePack({ clientId, canManage }) {
                   onChange={() => { setIncludeSignIn((v) => !v); setEmailPreview(null) }}
                 />Put their sign-in in this letter, so no second email is needed
               </label>
-              <p style={{ display: 'flex', gap: '0.4rem', margin: '0 0 0.6rem', flexWrap: 'wrap' }}>
-                <input
-                  style={{ ...field, maxWidth: 90 }} placeholder="Mr / Ms"
-                  value={toTitle} onChange={(e) => { setToTitle(e.target.value); setEmailPreview(null) }}
-                />
-                <input
-                  style={{ ...field, maxWidth: 280 }} placeholder="Full name, e.g. Morgan Mercer"
-                  value={toName} onChange={(e) => { setToName(e.target.value); setEmailPreview(null) }}
-                />
-              </p>
               <button
                 type="button"
                 style={smallBtn(C.slate)}
@@ -427,14 +445,17 @@ export default function WelcomePack({ clientId, canManage }) {
                   try {
                     const r = await sendEngagementEmail({
                       clientId, stage: 'scope', recipients: to, journeyUrl,
-                      preview: true, audience: welcomeAudience, wantText: true,
-                      recipientName: toName, recipientTitle: toTitle, includeSignIn,
+                      preview: true, wantText: true, includeSignIn,
+                      audience: previewing ? previewing.audience : welcomeAudience,
+                      recipientName: previewing ? previewing.name : '',
+                      recipientTitle: previewing ? previewing.title : '',
                     })
                     if (r?.html) {
                       setEmailPreview({ subject: r.subject, html: r.html })
                       // Load the letter for editing at the same time, so the
                       // words on screen are the words that can be changed.
-                      const saved = welcomeAudience === 'payer' ? brief.letterPayer : brief.letterServed
+                      const aud = previewing ? previewing.audience : welcomeAudience
+                      const saved = aud === 'payer' ? brief.letterPayer : brief.letterServed
                       setLetterDraft(saved && saved.trim() ? saved : (r.text || ''))
                     }
                     else setErr('The preview came back empty.')
@@ -452,8 +473,10 @@ export default function WelcomePack({ clientId, canManage }) {
                   try {
                     const r = await sendEngagementEmail({
                       clientId, stage: 'scope', recipients: to, journeyUrl,
+                      // Sending walks the saved list and addresses each person
+                      // itself; these only matter for an engagement with nobody
+                      // named on it yet.
                       audience: welcomeAudience, includeSignIn,
-                      recipientName: toName, recipientTitle: toTitle,
                     })
                     // Email being switched off is answered with a 200, so it
                     // has to be read rather than assumed to be a success.
@@ -513,7 +536,8 @@ export default function WelcomePack({ clientId, canManage }) {
                       onClick={async () => {
                         setBusy('letter'); setNote(null); setErr(null)
                         try {
-                          const key = welcomeAudience === 'payer' ? 'letterPayer' : 'letterServed'
+                          const key = (previewing ? previewing.audience : welcomeAudience) === 'payer'
+                            ? 'letterPayer' : 'letterServed'
                           const next = { ...(briefDraft || brief || {}), [key]: letterDraft }
                           await api('PATCH', { clientId, brief: next })
                           setBriefDraft(null); setEmailPreview(null)
@@ -529,7 +553,8 @@ export default function WelcomePack({ clientId, canManage }) {
                         // Back to the generated letter, discarding the edit.
                         setBusy('letter'); setNote(null); setErr(null)
                         try {
-                          const key = welcomeAudience === 'payer' ? 'letterPayer' : 'letterServed'
+                          const key = (previewing ? previewing.audience : welcomeAudience) === 'payer'
+                            ? 'letterPayer' : 'letterServed'
                           const next = { ...(briefDraft || brief || {}), [key]: '' }
                           await api('PATCH', { clientId, brief: next })
                           setBriefDraft(null); setEmailPreview(null); setLetterDraft(null)

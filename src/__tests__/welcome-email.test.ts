@@ -96,7 +96,7 @@ describe('the letter can be edited on the screen', () => {
     // letter he can send over his own name.
     expect(SETTINGS).toContain('Edit the letter')
     expect(SETTINGS).toContain('Save the letter')
-    expect(SETTINGS).toContain("welcomeAudience === 'payer' ? 'letterPayer' : 'letterServed'")
+    expect(SETTINGS).toMatch(/\? 'letterPayer' : 'letterServed'/)
   })
 
   it('can be put back to the generated letter', () => {
@@ -123,10 +123,23 @@ describe('the stage of the engagement is findable', () => {
 })
 
 describe('the send screen', () => {
-  it('asks who the letter is to, and which of the two letters it is', () => {
-    expect(SETTINGS).toContain('recipientName: toName, recipientTitle: toTitle')
-    expect(SETTINGS).toContain('audience: welcomeAudience')
-    expect(SETTINGS).toContain('the paying client')
+  it('reads the letter as one of the people who will receive it', () => {
+    // It used to have its own name and title boxes, separate from the
+    // recipient list, so leaving them empty produced "Dear colleague," and
+    // that read as the letter about to be sent.
+    expect(SETTINGS).toContain('Read it as')
+    expect(SETTINGS).toContain('recipientName: previewing ? previewing.name')
+    expect(SETTINGS).toContain('audience: previewing ? previewing.audience')
+    expect(SETTINGS).not.toContain('recipientName: toName')
+  })
+
+  it('says which recipients would open "Dear colleague,"', () => {
+    expect(SETTINGS).toContain('nameless')
+    expect(SETTINGS).toContain('no name on the list')
+  })
+
+  it('edits the letter for whichever side is being read', () => {
+    expect(SETTINGS).toContain("(previewing ? previewing.audience : welcomeAudience) === 'payer'")
   })
 
   it('reads the client contact and the parties, without duplicates', () => {
