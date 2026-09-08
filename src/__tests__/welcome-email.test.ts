@@ -412,7 +412,20 @@ describe('recording a letter that went before the record existed', () => {
 
   it('every recipient can be marked as already having had it', () => {
     expect(PACK).toContain("'Already had it'")
-    expect(PACK).toContain('is recorded as already having had it. Nothing was sent.')
+    expect(PACK).toContain('is recorded as having had it on ')
+    expect(PACK).toContain('Nothing was sent.')
+  })
+
+  it('asks which day it went, rather than recording today', () => {
+    // A letter sent last week marked with today's date is a wrong date, not a
+    // missing one, and a wrong date is worse than none.
+    expect(PACK).toContain('What day did ')
+    expect(PACK).toContain('Your email outbox has the date. Nothing is sent.')
+  })
+
+  it('refuses a day that is not a date, and one that has not happened', () => {
+    expect(PACK).toContain('is not a date. Write it as yyyy-mm-dd')
+    expect(PACK).toContain('That day has not happened yet, so a letter cannot have arrived on it.')
   })
 
   it('says plainly that nothing is sent, because the button sits beside one that does', () => {

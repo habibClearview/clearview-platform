@@ -614,17 +614,43 @@ export default function WelcomePack({ clientId, canManage }) {
                           onClick={async () => {
                             const already = !!r.sentAt
                             if (already && !window.confirm(`Clear the record that ${r.name || r.email} has had this letter? Nothing is sent either way.`)) return
+                            // THE DAY IT ACTUALLY WENT. 8 September 2026.
+                            // Marking somebody used to record today, which for
+                            // a letter sent last week is a wrong date rather
+                            // than a missing one, and a wrong date is worse.
+                            // The day is asked for, defaulting to today, and
+                            // read from the sender's own outbox.
+                            let when = null
+                            if (!already) {
+                              const today = new Date().toISOString().slice(0, 10)
+                              const typed = window.prompt(
+                                `What day did ${r.name || r.email} receive this letter?\n\nAs yyyy-mm-dd. Your email outbox has the date. Nothing is sent.`,
+                                today,
+                              )
+                              if (typed === null) return
+                              const day = typed.trim()
+                              const parsed = /^\d{4}-\d{2}-\d{2}$/.test(day) ? new Date(`${day}T12:00:00Z`) : null
+                              if (!parsed || Number.isNaN(parsed.getTime())) {
+                                setErr(`"${day}" is not a date. Write it as yyyy-mm-dd, for example ${today}.`)
+                                return
+                              }
+                              if (parsed.getTime() > Date.now()) {
+                                setErr('That day has not happened yet, so a letter cannot have arrived on it.')
+                                return
+                              }
+                              when = parsed.toISOString()
+                            }
                             setBusy(`mark:${r.email}`); setNote(null); setErr(null)
                             try {
                               const next = people.map((p) => (
                                 p.email === r.email
-                                  ? { ...p, sentAt: already ? undefined : new Date().toISOString() }
+                                  ? { ...p, sentAt: already ? undefined : when }
                                   : p
                               ))
                               await api('PATCH', { clientId, brief: { ...brief, recipients: next } })
                               setNote(already
                                 ? `${r.name || r.email} is back on the list to be written to.`
-                                : `${r.name || r.email} is recorded as already having had it. Nothing was sent.`)
+                                : `${r.name || r.email} is recorded as having had it on ${new Date(when).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}. Nothing was sent.`)
                               await load()
                             } catch (e) { setErr(e.message || 'That could not be recorded') }
                             setBusy(null)
