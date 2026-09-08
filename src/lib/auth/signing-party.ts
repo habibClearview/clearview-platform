@@ -103,7 +103,56 @@ export async function resolveSigner(
     return { party, mode: 'in_room', recordedBy: userId, signerUserId: party.user_id }
   }
 
-  const own = list.find((p) => p.user_id === userId)
+  let own = list.find((p) => p.user_id === userId)
+
+  // A PARTY WITH NO ACCOUNT ATTACHED COULD NOT SIGN. 8 September 2026.
+  //
+  // A party row carries user_id only when it was created with a login already
+  // attached. Ovo Ugbebor was added to Ikore as the Managing Partner and
+  // primary signatory, and has a login, and the two had never been introduced,
+  // so signing in and pressing Sign here answered "you are not recorded as a
+  // party on this engagement". The engagement's only signatory could not sign
+  // its Charter.
+  //
+  // The account is matched to the party by email when user_id is not set yet.
+  // The address used is the one on the AUTHENTICATION record, which the
+  // provider verified at sign-in, never anything the request or a profile row
+  // could carry, and it is compared against the address the lead consultant
+  // typed onto the party. That is the same trust that sent this person their
+  // sign-in link in the first place.
+  //
+  // Exactly one match, or none. Two parties sharing an address is a real
+  // possibility on a small team and there is no honest way to choose between
+  // them, so it refuses and says so rather than signing as the wrong person.
+  //
+  // The match is then written onto the party, so this happens once per person
+  // and every later signature resolves by user_id like any other.
+  if (!own) {
+    const { data: account } = await admin.auth.admin.getUserById(userId)
+    const signedInAs = (account?.user?.email || '').trim().toLowerCase()
+    if (signedInAs) {
+      const byEmail = list.filter((p) => (p.email || '').trim().toLowerCase() === signedInAs)
+      if (byEmail.length > 1) {
+        return {
+          error: 'More than one party on this engagement uses your email address, so it is not clear which of them is signing. The lead consultant can correct the addresses in Engagement Setup.',
+          status: 403,
+        }
+      }
+      if (byEmail.length === 1 && !byEmail[0].user_id) {
+        const { error: adoptError } = await admin
+          .from('engagement_parties')
+          .update({ user_id: userId, updated_at: new Date().toISOString() })
+          .eq('id', byEmail[0].id)
+          .is('user_id', null)
+        // Failing to write the link is not a reason to refuse a signature the
+        // person is entitled to give. It only means the next one matches by
+        // email again.
+        if (adoptError) console.error('signing-party: could not attach the account to the party', adoptError)
+        own = { ...byEmail[0], user_id: userId }
+      }
+    }
+  }
+
   if (!own) {
     return {
       error: 'You are not recorded as a party on this engagement, so you cannot sign. The lead consultant can add you in Engagement Setup.',

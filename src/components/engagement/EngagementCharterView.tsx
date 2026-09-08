@@ -239,6 +239,11 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
   const [hasSession, setHasSession] = useState(false)
   const [view, setView] = useState<any>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  // THE SCREEN GREYED THE BUTTON BEFORE THE SERVER WAS ASKED. 8 September 2026.
+  // A signatory whose party row has no account attached matched nothing here,
+  // so the only person who could sign was told "only Ovo Ugbebor can sign this
+  // line" while being Ovo Ugbebor. The address is the one the session carries.
+  const [signedInAs, setSignedInAs] = useState<string | null>(null)
   const [role, setRole] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Action state: busy blocks double submits, notice reports the outcome in
@@ -353,6 +358,7 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
       if (!session) { setHasSession(false); setChecking(false); return }
       setHasSession(true)
       setUserId(session.user.id)
+      setSignedInAs((session.user.email || '').trim().toLowerCase() || null)
       const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', session.user.id).single()
       if (cancelled) return
       setRole(profile?.role || null)
@@ -827,7 +833,11 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
                   const sig = sigByParty.get(p.id)
                   const roleLabel = PARTY_ROLE_LABELS[p.party_role] || p.party_role
                   const forWho = p.organisation || (p.party_role === 'client_funder' ? funder : client)
-                  const isSelf = !!p.user_id && p.user_id === userId
+                  // Matched by account, or by the address they signed in with
+                  // when the two have not been introduced yet. The server
+                  // decides for real; this only decides which button to draw.
+                  const isSelf = (!!p.user_id && p.user_id === userId)
+                    || (!p.user_id && !!signedInAs && (p.email || '').trim().toLowerCase() === signedInAs)
                   return (
                     <div className="sigcard" key={p.id}>
                       <span className="sname">{p.name}{p.title ? ` (${p.title})` : ''}</span>
