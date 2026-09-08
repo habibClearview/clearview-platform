@@ -7,6 +7,7 @@ import {
   clearSyncedSales, clearSyncedCosts, clearSyncedUncategorizedCosts,
   setStoredToken, type QueuedSale, type QueuedCost, type QueuedUncategorizedCost,
 } from '@/lib/field-db'
+import { wrapSnapshot, readSnapshot, SNAPSHOT_EXPIRED_OFFLINE } from '@/lib/field-snapshot'
 import BuildStamp from '@/components/BuildStamp'
 
 const C = {
@@ -141,7 +142,20 @@ export default function FieldCapturePage() {
     if (savedToken) {
       setToken(savedToken)
       if (urlToken) localStorage.setItem(STORAGE_TOKEN, urlToken)
-      if (savedAuth) { try { setAuth(JSON.parse(savedAuth)) } catch {} }
+      // THE PHONE FORGETS WHAT IT DOES NOT NEED. 8 September 2026. The price
+      // list, the customers, the staff and the operator's own details used to
+      // sit here for ever. They are kept for a working day and a night now and
+      // dropped after that. See src/lib/field-snapshot.ts. authenticate() runs
+      // on the next line and replaces it, so this is felt only by somebody
+      // opening the app offline after a day away.
+      const held = readSnapshot<AuthData>(savedAuth)
+      if (held.data) setAuth(held.data)
+      else {
+        try { localStorage.removeItem(STORAGE_AUTH) } catch {}
+        if (held.expired && typeof navigator !== 'undefined' && navigator.onLine === false) {
+          setAuthError(SNAPSHOT_EXPIRED_OFFLINE)
+        }
+      }
       authenticate(savedToken)
     } else {
       setLoading(false)
@@ -207,7 +221,9 @@ export default function FieldCapturePage() {
       setAuth(data)
       setToken(t)
       localStorage.setItem(STORAGE_TOKEN, t)
-      localStorage.setItem(STORAGE_AUTH, JSON.stringify(data))
+      // Stamped with the moment it arrived, so it can be dropped once it is no
+      // longer this piece of work's data.
+      localStorage.setItem(STORAGE_AUTH, wrapSnapshot(data))
       // Service Workers can't read localStorage -- mirror the token into
       // IndexedDB so the Background Sync handler in public/field-sw.js can
       // authenticate a sync that happens while this tab is closed.
@@ -596,6 +612,28 @@ export default function FieldCapturePage() {
             <button onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle light/dark theme"
               style={{background:D.card,border:`1px solid ${D.border}`,color:D.text,borderRadius:10,padding:'0.55rem 0.7rem',fontSize:'0.86rem',cursor:'pointer',whiteSpace:'nowrap'}}>
               {theme==='dark'?'☀':'☾'} Theme
+            </button>
+            {/* CLEARING THE PHONE ON PURPOSE. 8 September 2026. The snapshot
+                clears itself after a working day and a night, and somebody
+                handing the phone over, finishing a season or losing sight of
+                it should not have to wait. It refuses while there is unsent
+                work, because clearing the link is how that work stops being
+                sendable. */}
+            <button
+              onClick={()=>{
+                const unsent = salesQueue.length + costsQueue.length + uncategorizedCostsQueue.length
+                if (unsent > 0) {
+                  window.alert(`There ${unsent===1?'is':'are'} still ${unsent} record${unsent===1?'':'s'} on this phone waiting to be sent. Connect and send ${unsent===1?'it':'them'} first, then clear the phone.`)
+                  return
+                }
+                if (!window.confirm('Clear this phone?\n\nThe price list, the customers and your details are removed and the link is forgotten. You will need the link again to record anything. Nothing already sent is affected.')) return
+                try { localStorage.removeItem(STORAGE_AUTH); localStorage.removeItem(STORAGE_TOKEN) } catch {}
+                setStoredToken('').catch(()=>{})
+                window.location.href = '/field'
+              }}
+              title="Remove everything this phone is holding"
+              style={{background:D.card,border:`1px solid ${D.border}`,color:D.text,borderRadius:10,padding:'0.55rem 0.8rem',fontSize:'0.86rem',cursor:'pointer',whiteSpace:'nowrap'}}>
+              Clear phone
             </button>
             {(mode==='grid' || mode==='history' || mode==='stock') && (
               <>
