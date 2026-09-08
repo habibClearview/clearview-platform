@@ -25,6 +25,8 @@
 // are handled through the access-grant token flow, not here.
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
+import { createHash } from 'crypto'
+import { writeAuditLog, auditIp } from '@/lib/audit-log'
 import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
 import { isRefusal, resolveSigner } from '@/lib/auth/signing-party'
 import { isCharterFullyExecuted } from '@/lib/engagement-types'
@@ -59,7 +61,7 @@ export async function POST(req: NextRequest) {
     // The charter must belong to this client and must be open for signature.
     const { data: charter } = await admin
       .from('engagement_charters')
-      .select('id, client_id, status, version')
+      .select('id, client_id, status, version, content, title')
       .eq('id', body.charterId)
       .maybeSingle()
     if (!charter || charter.client_id !== body.clientId) {
@@ -115,6 +117,54 @@ export async function POST(req: NextRequest) {
       })
       .select('id')
       .single()
+
+    if (!error && data) {
+      // ============================================================
+      // WHAT WAS SIGNED, BY WHOM, FROM WHERE. 8 September 2026.
+      //
+      // The signature row already recorded who signed, in what capacity, by
+      // which method, when, and against which version. That is a real
+      // electronic signature. What it could not do was prove WHAT they signed
+      // or FROM WHERE, which is the difference between a record and evidence.
+      //
+      // The hash is taken over the exact stored wording of the version at the
+      // moment of signing. Reproduce the wording later, hash it again, and
+      // either it matches or the document changed. The version itself cannot
+      // be edited once issued, so the two facts corroborate each other.
+      //
+      // It goes to admin_audit_log rather than to new columns because new
+      // columns need a migration, and a signature taken today should carry its
+      // evidence today. The migration is written and waiting in
+      // supabase/migrations for when it can be run.
+      // ============================================================
+      const signedBytes = JSON.stringify({
+        title: charter.title ?? null,
+        version: charter.version,
+        content: charter.content ?? null,
+      })
+      const contentSha256 = createHash('sha256').update(signedBytes, 'utf8').digest('hex')
+      await writeAuditLog(admin, {
+        actorId: signer.signerUserId ?? null,
+        actorEmail: signer.party.email ?? null,
+        actorRole: signer.party.party_role,
+        action: 'charter.signed',
+        targetId: body.charterId,
+        targetEmail: signer.party.email ?? null,
+        ip: auditIp(req.headers),
+        detail: {
+          signature_id: data.id,
+          client_id: body.clientId,
+          charter_version: charter.version,
+          signer_name: signer.party.name,
+          signature_method: signer.mode === 'in_room' ? 'in_room' : method,
+          typed_name: method === 'typed' ? body.typedName : null,
+          recorded_by_user_id: signer.recordedBy ?? null,
+          user_agent: (req.headers.get('user-agent') || '').slice(0, 400),
+          content_sha256: contentSha256,
+          signed_at: new Date().toISOString(),
+        },
+      })
+    }
 
     if (error) {
       // The unique index is the authority on duplicates, so a second attempt
