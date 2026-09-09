@@ -94,7 +94,11 @@ export async function POST(req: NextRequest) {
 
     // A typed signature is the signer writing their own name. If the typed
     // name is not theirs, it is not their signature.
-    if (method === 'typed' && body.typedName!.trim().toLowerCase() !== signer.party.name.trim().toLowerCase()) {
+    // Compared on the letters alone, so a double space or a full stop after an
+    // initial is not a refusal. It still has to be their name: this is the
+    // check that stops one person signing as another.
+    const loosely = (s: string) => String(s).toLowerCase().replace(/[^a-z]/g, '')
+    if (method === 'typed' && loosely(body.typedName!) !== loosely(signer.party.name)) {
       return NextResponse.json(
         { error: `Type your name exactly as it appears on the engagement: ${signer.party.name}` },
         { status: 400 },

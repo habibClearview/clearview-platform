@@ -249,6 +249,10 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
   // Action state: busy blocks double submits, notice reports the outcome in
   // plain language just above the document.
   const [busy, setBusy] = useState<string | null>(null)
+  // What each person has typed on their own signature line. Held per party, so
+  // a coach looking at a Charter with four signatories does not have one box
+  // shared between them.
+  const [typedName, setTypedName] = useState<Record<string, string>>({})
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null)
   // Toolbar panels: the adjustable specifics editor and the version list.
   const [editing, setEditing] = useState(false)
@@ -333,6 +337,31 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
       setNotice({ tone: 'warn', text: e?.message || 'Could not refresh the Charter' })
     }
   }
+
+  // EVERYBODY SEES THE SIGNING AS IT HAPPENS. 9 September 2026. Habib: on the
+  // Charter all signatory signing should be seen by all. A signature landing
+  // while somebody has the Charter open used to be invisible until they
+  // reloaded, so a coach sitting with an Executive Director on a call could
+  // not tell whether the funder had signed. This re-reads every fifteen
+  // seconds and redraws only when something has actually changed, so a page
+  // somebody is reading does not move under them.
+  useEffect(() => {
+    if (!slug) return
+    let cancelled = false
+    const t = setInterval(async () => {
+      try {
+        const v = await loadEngagementView(slug)
+        if (cancelled || !v) return
+        setView((prev: any) => (
+          JSON.stringify(prev?.signatures || []) === JSON.stringify(v.signatures || []) ? prev : v
+        ))
+      } catch {
+        // A poll that fails changes nothing on screen and says nothing. The
+        // next one catches up.
+      }
+    }, 15000)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [slug])
 
   // One wrapper so every action reports the same way: busy while it runs, a
   // plain message afterwards, and a refresh so the saved result is visible.
@@ -853,56 +882,86 @@ export default function EngagementCharterView({ slugOverride }: any = {}) {
                           </>
                         ) : isSelf ? (
                           <>
-                            <button
-                              className="signbtn"
-                              type="button"
-                              data-action="sign"
-                              disabled={busy === `sign:${p.id}` || !charter?.id || status === 'draft'}
-                              title={status === 'draft' ? 'The Charter has to be issued for signature first' : 'Sign this version of the Charter'}
-                              onClick={() => {
-                                // A BUTTON THAT SILENTLY WRITES A ROW RECORDS A
-                                // CLICK, NOT CONSENT. The signer is shown the
-                                // exact words they are agreeing to, and the same
-                                // words are stored with the signature.
-                                if (!window.confirm(attestationText(
-                                  charter?.title || 'Engagement Charter', version, p.name,
-                                ))) return
-                                run(`sign:${p.id}`, () => signCharter({
-                                  clientId: view.client.id,
-                                  charterId: charter.id,
-                                  signerRole: p.party_role,
-                                  signatureMethod: 'click',
-                                }), 'Your signature has been recorded on this version.')
-                              }}
-                            >{busy === `sign:${p.id}` ? 'Signing...' : 'Sign here'}</button>
-                            <span className="signdate">
-                              {status === 'draft'
-                                ? 'This version is still a draft. It has to be issued for signature before anyone can sign.'
-                                : ''}
-                            </span>
+                            {/* A SIGNATURE IS A NAME, NOT A BUTTON PRESS.
+                                9 September 2026. Habib asked where the
+                                electronic signature is. Pressing a button
+                                labelled Sign here records a click; typing your
+                                own name is the act every jurisdiction that
+                                recognises electronic signature actually
+                                describes, and it is what a person recognises as
+                                signing. The name has to match the one recorded
+                                on this engagement, so nobody signs as anybody
+                                else, and the words being agreed to are on
+                                screen above the box rather than in a dialog
+                                that is pressed past. */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 260 }}>
+                              <span className="signdate" style={{ maxWidth: '52ch' }}>
+                                {status === 'draft'
+                                  ? 'This version is still a draft. It has to be issued for signature before anyone can sign.'
+                                  : attestationText(charter?.title || 'Engagement Charter', version, p.name)}
+                              </span>
+                              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                                <input
+                                  aria-label={`Type your name to sign as ${p.name}`}
+                                  placeholder="Type your full name"
+                                  value={typedName[p.id] || ''}
+                                  disabled={status === 'draft'}
+                                  onChange={(e) => setTypedName((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                                  style={{
+                                    font: 'inherit', fontSize: 15, padding: '6px 9px', borderRadius: 7,
+                                    border: '1px solid var(--line)', background: 'var(--box)', color: 'var(--ink)',
+                                    minWidth: 180,
+                                  }}
+                                />
+                                <button
+                                  className="signbtn"
+                                  type="button"
+                                  data-action="sign"
+                                  disabled={busy === `sign:${p.id}` || !charter?.id || status === 'draft' || !(typedName[p.id] || '').trim()}
+                                  title={status === 'draft' ? 'The Charter has to be issued for signature first' : 'Sign this version of the Charter'}
+                                  onClick={() => {
+                                    run(`sign:${p.id}`, () => signCharter({
+                                      clientId: view.client.id,
+                                      charterId: charter.id,
+                                      signerRole: p.party_role,
+                                      signatureMethod: 'typed',
+                                      typedName: (typedName[p.id] || '').trim(),
+                                    }), 'Your signature has been recorded on this version.')
+                                  }}
+                                >{busy === `sign:${p.id}` ? 'Signing...' : 'Sign'}</button>
+                              </div>
+                            </div>
                           </>
                         ) : canEdit ? (
                           <>
-                            <button
-                              className="signbtn"
-                              type="button"
-                              data-action="record-signature"
-                              disabled={busy === `sign:${p.id}` || !charter?.id}
-                              title={`Record the signature ${p.name} gave on paper. The record will show that you entered it.`}
-                              onClick={() => {
-                                if (typeof window !== 'undefined' && !window.confirm(
-                                  `Record the signature given in the room by ${p.name}? The record will show that you entered it, not that ${p.name} signed in.`,
-                                )) return
-                                run(`sign:${p.id}`, () => signCharter({
-                                  clientId: view.client.id,
-                                  charterId: charter.id,
-                                  signerRole: p.party_role,
-                                  onBehalfOfPartyId: p.id,
-                                }), `Recorded. The Charter shows ${p.name} as signed, and shows that you entered it.`)
-                              }}
-                              style={{ background: 'var(--card)', color: 'var(--ink)', border: '1px solid var(--line)' }}
-                            >{busy === `sign:${p.id}` ? 'Recording...' : 'Record signature given in the room'}</button>
-                            <span className="signdate"></span>
+                            {/* THE PAPER ROUTE IS SMALL PRINT. It exists because
+                                a board chair who never logs in still signs, and
+                                it must never look like the ordinary way to sign
+                                somebody else's line. */}
+                            <span className="signdate" style={{ maxWidth: '46ch' }}>
+                              {p.name || 'This signatory'} signs this line. If they signed on paper,{' '}
+                              <button
+                                type="button"
+                                data-action="record-signature"
+                                disabled={busy === `sign:${p.id}` || !charter?.id}
+                                onClick={() => {
+                                  if (typeof window !== 'undefined' && !window.confirm(
+                                    `Record the signature given in the room by ${p.name}? The record will show that you entered it, not that ${p.name} signed in.`,
+                                  )) return
+                                  run(`sign:${p.id}`, () => signCharter({
+                                    clientId: view.client.id,
+                                    charterId: charter.id,
+                                    signerRole: p.party_role,
+                                    onBehalfOfPartyId: p.id,
+                                  }), `Recorded. The Charter shows ${p.name} as signed, and shows that you entered it.`)
+                                }}
+                                style={{
+                                  font: 'inherit', fontSize: 'inherit', color: 'var(--teal)', background: 'none',
+                                  border: 'none', padding: 0, textDecoration: 'underline', cursor: 'pointer',
+                                }}
+                              >{busy === `sign:${p.id}` ? 'recording...' : 'record it here'}</button>
+                              . The record will show that you entered it.
+                            </span>
                           </>
                         ) : (
                           <>

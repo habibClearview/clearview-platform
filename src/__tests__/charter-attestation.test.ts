@@ -17,10 +17,35 @@ describe('pressing the button is consent, not a click', () => {
     expect(t).toContain('same effect as signing it by hand')
   })
 
-  it('is shown before the signature is taken', () => {
-    expect(VIEW).toContain('attestationText(')
-    // and the signature only happens if they accept it
-    expect(VIEW).toMatch(/if \(!window\.confirm\(attestationText\([\s\S]{0,140}\)\) return/)
+  it('is on the screen above the box, not in a dialog that is pressed past', () => {
+    // A SIGNATURE IS A NAME, NOT A BUTTON PRESS. 9 September 2026. The words
+    // being agreed to now sit beside the signature line where they are read,
+    // rather than in a confirm box, and the signature is the person typing
+    // their own name.
+    expect(VIEW).toContain('attestationText(charter?.title')
+    expect(VIEW).toContain('Type your full name')
+    expect(VIEW).toContain("signatureMethod: 'typed'")
+    expect(VIEW).not.toContain('window.confirm(attestationText')
+  })
+
+  it('will not send a signature until a name has been typed', () => {
+    expect(VIEW).toContain("!(typedName[p.id] || '').trim()")
+  })
+
+  it('still has to be their own name, on the letters alone', () => {
+    // A double space or a full stop after an initial is not somebody else.
+    expect(SIGN).toContain("replace(/[^a-z]/g, '')")
+    expect(SIGN).toContain('stops one person signing as another')
+  })
+
+  it('keeps the paper route, as small print rather than as the way to sign', () => {
+    expect(VIEW).toContain('record it here')
+    expect(VIEW).toContain('If they signed on paper')
+  })
+
+  it('shows a signature to everybody as it lands, without a reload', () => {
+    expect(VIEW).toContain('EVERYBODY SEES THE SIGNING AS IT HAPPENS')
+    expect(VIEW).toContain('setInterval')
   })
 
   it('is stored with the signature, not looked up later', () => {
