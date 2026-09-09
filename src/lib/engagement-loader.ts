@@ -68,7 +68,11 @@ async function resolveClient(slugOrId: string): Promise<EngagementClientSummary 
   // Every column the Cover shows. The three at the end were missing, so the
   // Cover reported "Not set" about dates and a country the client row had held
   // since the day it was created. See EngagementClientSummary.
-  const cols = 'id,slug,name,status,programme_id,engagement_mode,country,start_date,expected_close'
+  // The Cover is now edited on the Cover, so it reads every field the separate
+  // form used to hold. A column missing here is a field that reads "Not set"
+  // about something the row has held since the day it was created, which is
+  // exactly what happened to the dates and the country.
+  const cols = 'id,slug,name,status,programme_id,engagement_mode,country,start_date,expected_close,type,sector,contact_name,contact_email,notes'
   const bySlug = await supabase
     .from('engagement_clients')
     .select(cols)

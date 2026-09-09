@@ -303,6 +303,19 @@ export interface EngagementClientSummary {
   country: string | null
   start_date: string | null
   expected_close: string | null
+
+  /**
+   * THE COVER IS NOW WHERE THE COVER IS EDITED. 9 September 2026.
+   *
+   * Habib: it is really dumb to create a separate place to edit when each of
+   * the elements on the cover can be edited on the cover. These are the rest
+   * of what that separate form held, so nothing is lost by removing it.
+   */
+  type?: string | null
+  sector?: string | null
+  contact_name?: string | null
+  contact_email?: string | null
+  notes?: string | null
 }
 
 export interface EngagementView {

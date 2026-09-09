@@ -2418,7 +2418,15 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         {isSuperCoach&&<ClientTeamInvite client={selClient}/>}
         {mayPreview(userRole)&&<ViewAsBar realRole={userRole} viewingAs={viewingAs||userRole} onChange={v=>setViewingAs(v===userRole?null:v)}/>}
 
-        <div style={card}><TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/></div>
+        {/* The same Cover, edited in the same place. A financial model client
+            had its own copy of the separate editor, so the fix had to reach
+            here too or half the clients would keep the form Habib objected to. */}
+        <div style={card}>
+          <CoverPanel slug={selClient.slug} canManage={canEdit(previewRoleId)}/>
+          <div style={{display:'flex',justifyContent:'flex-end',marginTop:14}}>
+            <button style={addBtn(true)} onClick={()=>window.print()}>Print the cover</button>
+          </div>
+        </div>
         {/* ON EVERY CLIENT, NOT ONLY THE SELF-PAYING ONES. 8 September 2026.
                   This was hidden behind !selClient.programme_id, so a client
                   under a programme could not be given a service they pay for
@@ -2546,8 +2554,16 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 <button type="button" onClick={()=>setFlashLocked(null)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',padding:'0.25rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,background:'transparent',color:C.slate,cursor:'pointer'}}>Close</button>
               </div>
             ):null}
-            {shownTab==='cover'&&<>{mayRun?<WelcomePack clientId={selClient.id} canManage={canEdit(previewRoleId)}/>:null}{mayRun?<WhatNeedsYou clientId={selClient.id} canManage={canEdit(previewRoleId)} onGoTo={setActiveTab}/>:null}<CoverPanel slug={selClient.slug}/><div style={{height:18}}/>
-              <TabCover client={selClient} prog={prog} programmes={programmes} onUpdate={updates=>updateClient(selClient.id,updates)}/>
+            {shownTab==='cover'&&<>{mayRun?<WelcomePack clientId={selClient.id} canManage={canEdit(previewRoleId)}/>:null}{mayRun?<WhatNeedsYou clientId={selClient.id} canManage={canEdit(previewRoleId)} onGoTo={setActiveTab}/>:null}<CoverPanel slug={selClient.slug} canManage={canEdit(previewRoleId)}/><div style={{height:18}}/>
+              {/* THE SEPARATE EDITOR IS GONE. 9 September 2026. Habib: it is
+                  really dumb to create a separate place to edit when each of
+                  the elements on the cover can be edited on the cover. Every
+                  field it held is now edited on the Cover itself, including the
+                  lead consultant, which that form could never change because it
+                  is a party and the form held the client record. */}
+              <div style={{display:'flex',justifyContent:'flex-end'}}>
+                <button style={addBtn(true)} onClick={()=>window.print()}>Print the cover</button>
+              </div>
               {/* ON EVERY CLIENT, NOT ONLY THE SELF-PAYING ONES. 8 September 2026.
                   This was hidden behind !selClient.programme_id, so a client
                   under a programme could not be given a service they pay for
@@ -2985,48 +3001,6 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 // TAB CONTENT COMPONENTS
 // ═══════════════════════════════════════════════════════════════
 
-function TabCover({client,prog,programmes,onUpdate}){
-  // THE SAME ELEVEN FIELDS, TWICE, ON ONE TAB. 9 September 2026.
-  //
-  // This drew a read-only grid of the organisation, programme, type, contact,
-  // country, sector, dates, status and mode, directly under the Cover panel
-  // that had just drawn all of them, followed by a second copy of the
-  // attribution the same panel carries. Two readings of one record on one
-  // screen, and the only thing here that was not a repeat was the form behind
-  // the Edit button.
-  //
-  // What is left is that form. The Cover panel above is the reading; this is
-  // where it is changed, which is what the panel now says.
-  const [editing,setEditing]=useState(false)
-  const [form,setForm]=useState({...client})
-  return(
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem',gap:'0.5rem',flexWrap:'wrap'}}>
-        <h3 style={secH}>Change the cover</h3>
-        <div style={{display:'flex',gap:'0.5rem'}}>
-          <button style={addBtn(true)} onClick={()=>{setForm({...client});setEditing(!editing)}}>{editing?'Cancel':'Edit'}</button>
-          <button style={addBtn(true)} onClick={()=>window.print()}>Print</button>
-        </div>
-      </div>
-      {editing?(
-        <div style={card}>
-          <ClientSetupFields f={form} setF={setForm} programmes={programmes} showStatus/>
-          <div style={fGrid}>
-            <div><label style={lbl}>Start Date</label><input type="date" style={inp} value={form.start_date||''} onChange={e=>setForm(f=>({...f,start_date:e.target.value}))}/></div>
-            <div><label style={lbl}>Target Handover</label><input type="date" style={inp} value={form.expected_close||''} onChange={e=>setForm(f=>({...f,expected_close:e.target.value}))}/></div>
-            <div style={{gridColumn:'1/-1'}}><label style={lbl}>Notes</label><textarea style={{...inp,minHeight:72,resize:'vertical'}} value={form.notes||''} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/></div>
-          </div>
-          <button style={{...solidBtn(),marginTop:'0.85rem'}} onClick={()=>{onUpdate(form);setEditing(false)}}>Save</button>
-        </div>
-      ):(
-        <p style={{fontSize:'0.95rem',color:C.slate,margin:0}}>
-          Everything on the cover above is changed here: the organisation, the programme, the
-          service, the dates, the stage and the notes.
-        </p>
-      )}
-    </div>
-  )
-}
 // A payer (a programme, or an independent client paying for itself) can hold
 // more than one service at once: a programme paying for the financial model
 // for several clients today does not stop it also paying for a GtCV canvas

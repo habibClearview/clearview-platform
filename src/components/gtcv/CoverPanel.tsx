@@ -1,17 +1,32 @@
 // @ts-nocheck
 'use client'
 // ============================================================
-// Cover.
+// COVER
 //
-// The workbook's first tab: who this engagement is, who is on it, where it
-// stands, and the intellectual property notice. In the app the Cover tab
-// rendered nothing at all, so opening a client landed on an empty pane.
+// Who this engagement is, who is on it, where it stands, and the intellectual
+// property notice.
 //
-// Everything shown is configuration, read from the engagement. The
-// attribution line is fixed and must not be removed, since the licence
+// EVERY ELEMENT IS EDITED WHERE IT IS READ. 9 September 2026.
+//
+// Habib: it is really dumb to create a separate place to edit when each of the
+// elements on the cover can be edited on the cover, so the "change the cover"
+// here is dumb. He was right, and the separate form had a second failure: the
+// lead consultant could not be changed at all, because that form held the
+// client record and the lead consultant is a party.
+//
+// So there is no editor. A card's value IS the field. It reads as text until
+// you put the cursor in it, and it saves when you leave it. Nothing is edited
+// in two places, because there is only one place, and it is the place the fact
+// is read.
+//
+// A person who cannot manage the engagement sees exactly what was here before:
+// a reading, with no inputs at all.
+//
+// The attribution line is fixed and must not be removed, since the licence
 // terms treat stripping it as a breach.
 // ============================================================
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
 import { loadEngagementView } from '@/lib/engagement-loader'
 import { PARTY_ROLE_LABELS } from '@/lib/engagement-types'
 
@@ -28,6 +43,27 @@ const PHASE_LABEL = {
   dp07: 'Decision Point 7', dp08: 'Decision Point 8', dp09: 'Decision Point 9',
   complete: 'Complete', paused: 'Paused', handover: 'Handover',
 }
+const PHASE_KEYS = ['setup', 'phase_0', 'dp01', 'dp02', 'dp03', 'dp04', 'dp05', 'dp06', 'dp07', 'dp08', 'dp09', 'complete', 'paused']
+
+const MOMENTUM = [
+  { v: 'green', l: 'On track', note: 'Continue as planned' },
+  { v: 'amber', l: 'Slipping', note: 'Catch up within five working days' },
+  { v: 'red', l: 'Paused', note: 'Recovery plan needed before resuming' },
+]
+
+const TYPES = [
+  { v: 'crop_aggregator', l: 'Crop aggregator' },
+  { v: 'livestock_aggregator', l: 'Livestock aggregator' },
+  { v: 'farmer_group_enterprise', l: 'Farmer group enterprise' },
+  { v: 'service_lsp', l: 'Service LSP' },
+]
+
+const SERVICES = [
+  { v: 'canvas', l: 'Grant-to-Commercial Viability' },
+  { v: 'financial', l: 'Clearview financial model' },
+  { v: 'advisory', l: 'Advisory' },
+  { v: 'portfolio_intelligence', l: 'Market Intelligence' },
+]
 
 function momentumColour(m) {
   if (m === 'red') return C.crit
@@ -35,47 +71,89 @@ function momentumColour(m) {
   return C.good
 }
 
-/**
- * WHERE EACH THING ON THE COVER IS ACTUALLY EDITED. 9 September 2026.
- *
- * Habib asked why the Cover carries things that cannot be changed on the
- * Cover. This panel is a reading of the engagement and has never had a single
- * input on it, which is right: the same fact edited in two places drifts. What
- * was wrong is that it never said where the one place is, so a card reading
- * "Not named" was a dead end.
- *
- * Each card now names its home. The Cover stays read-only and stops being a
- * puzzle.
- */
-const EDITED_AT = {
-  stands: 'Set on this tab, under Cover, with Edit',
-  momentum: 'Set under Who is on it, and settings',
-  people: 'Set under Who is on it, and settings',
-  dates: 'Set on this tab, under Cover, with Edit',
+function monthYear(d) {
+  if (!d) return ''
+  const parsed = new Date(d)
+  return Number.isNaN(parsed.getTime()) ? '' : parsed.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
 }
 
-export default function CoverPanel({ slug }) {
+export default function CoverPanel({ slug, canManage = false }) {
   const [view, setView] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [programmes, setProgrammes] = useState([])
+  const [saving, setSaving] = useState(null)
+  const [err, setErr] = useState(null)
+
+  const load = useCallback(async () => {
+    try {
+      const v = await loadEngagementView(slug)
+      setView(v)
+    } catch { setView(null) }
+    setLoading(false)
+  }, [slug])
+
+  useEffect(() => { if (slug) load() }, [slug, load])
 
   useEffect(() => {
-    let off = false
-    async function go() {
-      try {
-        const v = await loadEngagementView(slug)
-        if (!off) { setView(v); setLoading(false) }
-      } catch { if (!off) setLoading(false) }
+    if (!canManage) return
+    supabase.from('programmes').select('id,name').order('name')
+      .then(({ data }) => setProgrammes(data || []))
+  }, [canManage])
+
+  const client = view?.client || {}
+  const cfg = view?.config || {}
+  const parties = view?.parties || []
+
+  /** Change one field on the engagement record, where it is read. */
+  async function saveClient(field, value) {
+    if (!client.id) return
+    setSaving(field); setErr(null)
+    const patch = { [field]: value === '' ? null : value, updated_at: new Date().toISOString() }
+    const { error } = await supabase.from('engagement_clients').update(patch).eq('id', client.id)
+    if (error) setErr(`Could not save ${field.replace(/_/g, ' ')}. Your change is still on screen, try again.`)
+    else setView((v) => ({ ...v, client: { ...v.client, [field]: value === '' ? null : value } }))
+    setSaving(null)
+  }
+
+  /** Momentum lives on the engagement's own settings rather than the client row. */
+  async function saveMomentum(value) {
+    if (!client.id) return
+    setSaving('momentum'); setErr(null)
+    const { error } = await supabase.from('engagement_config')
+      .upsert({ client_id: client.id, momentum_status: value, updated_at: new Date().toISOString() }, { onConflict: 'client_id' })
+    if (error) setErr('Could not save the momentum. Try again.')
+    else setView((v) => ({ ...v, config: { ...(v.config || {}), momentum_status: value } }))
+    setSaving(null)
+  }
+
+  /**
+   * The lead consultant and the co-implementer are people, not fields on the
+   * client record, which is why the old form could not change them however
+   * many times somebody tried. Naming one here creates or renames that party.
+   */
+  async function savePartyName(role, name) {
+    if (!client.id) return
+    setSaving(role); setErr(null)
+    const existing = parties.find((p) => p.party_role === role)
+    const trimmed = String(name || '').trim()
+    let error = null
+    if (existing && !trimmed) {
+      ({ error } = await supabase.from('engagement_parties').delete().eq('id', existing.id))
+    } else if (existing) {
+      ({ error } = await supabase.from('engagement_parties')
+        .update({ name: trimmed, updated_at: new Date().toISOString() }).eq('id', existing.id))
+    } else if (trimmed) {
+      ({ error } = await supabase.from('engagement_parties')
+        .insert({ client_id: client.id, party_role: role, name: trimmed, is_signatory: role === 'lead_consultant' }))
     }
-    if (slug) go()
-    return () => { off = true }
-  }, [slug])
+    if (error) setErr('Could not save that name. Try again.')
+    else await load()
+    setSaving(null)
+  }
 
   if (loading) return <p style={{ color: C.faint, fontSize: 14 }}>Loading the engagement...</p>
   if (!view) return <p style={{ color: C.faint, fontSize: 14 }}>This engagement could not be loaded.</p>
 
-  const client = view.client || {}
-  const cfg = view.config || {}
-  const parties = view.parties || []
   const gs = view.gate_status || {}
   const done = Object.values(gs).filter((s) => s === 'complete').length
   // Counted from the engagement's own gates rather than fixed at twelve, so an
@@ -94,9 +172,48 @@ export default function CoverPanel({ slug }) {
     fontFamily: 'var(--cv-font-mono)', fontSize: 12.5, letterSpacing: '.13em',
     textTransform: 'uppercase', color: C.faint, margin: '0 0 5px',
   }
-  const editedAt = {
-    margin: '10px 0 0', fontSize: 11.5, color: C.faint, fontStyle: 'italic',
-  }
+  // A field that reads as the thing it says until somebody puts a cursor in
+  // it. An input styled as a box on every card would turn a cover into a form.
+  const inline = (size = 18) => ({
+    font: 'inherit', fontFamily: 'var(--cv-font)', fontSize: size, color: C.ink,
+    width: '100%', padding: '2px 4px', margin: '-2px -4px',
+    background: 'transparent', border: '1px solid transparent', borderRadius: 6,
+  })
+  const small = { ...inline(12.5), color: C.soft }
+
+  /** One editable value, or the same value as plain text when it is not yours to change. */
+  const Text = ({ field, size = 18, placeholder, style }) => (
+    canManage ? (
+      <input
+        aria-label={placeholder || field}
+        defaultValue={client[field] || ''}
+        placeholder={placeholder}
+        style={{ ...inline(size), ...style }}
+        onFocus={(e) => { e.target.style.borderColor = C.line; e.target.style.background = C.box }}
+        onBlur={(e) => {
+          e.target.style.borderColor = 'transparent'; e.target.style.background = 'transparent'
+          if ((client[field] || '') !== e.target.value) saveClient(field, e.target.value)
+        }}
+      />
+    ) : <span style={{ fontSize: size }}>{client[field] || placeholder}</span>
+  )
+
+  const Choice = ({ field, options, size = 18, onSave, value }) => (
+    canManage ? (
+      <select
+        aria-label={field}
+        value={value ?? (client[field] || '')}
+        style={{ ...inline(size), cursor: 'pointer' }}
+        onChange={(e) => (onSave ? onSave(e.target.value) : saveClient(field, e.target.value))}
+      >
+        {options.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
+      </select>
+    ) : (
+      <span style={{ fontSize: size }}>
+        {(options.find((o) => o.v === (value ?? client[field]))?.l) || 'Not set'}
+      </span>
+    )
+  )
 
   return (
     <div style={{ fontFamily: "var(--cv-font)", color: C.ink }}>
@@ -108,80 +225,188 @@ export default function CoverPanel({ slug }) {
           fontFamily: 'var(--cv-font-mono)', fontSize: 12.5, letterSpacing: '.24em',
           textTransform: 'uppercase', color: C.gold, margin: 0,
         }}>Grant-to-Commercial Viability Canvas</p>
-        <h2 style={{ fontFamily: 'var(--cv-font)', fontSize: 28, margin: '8px 0 0', fontWeight: 600 }}>
-          {client.name || 'This engagement'}
-        </h2>
+        {canManage ? (
+          <input
+            aria-label="The organisation's name"
+            defaultValue={client.name || ''}
+            style={{
+              font: 'inherit', fontFamily: 'var(--cv-font)', fontSize: 28, fontWeight: 600,
+              color: '#F3ECDE', background: 'transparent', border: '1px solid transparent',
+              borderRadius: 6, width: '100%', padding: '2px 4px', margin: '6px -4px 0',
+            }}
+            onFocus={(e) => { e.target.style.borderColor = 'rgba(243,236,222,.4)' }}
+            onBlur={(e) => {
+              e.target.style.borderColor = 'transparent'
+              if ((client.name || '') !== e.target.value && e.target.value.trim()) saveClient('name', e.target.value.trim())
+            }}
+          />
+        ) : (
+          <h2 style={{ fontFamily: 'var(--cv-font)', fontSize: 28, margin: '8px 0 0', fontWeight: 600 }}>
+            {client.name || 'This engagement'}
+          </h2>
+        )}
         <p style={{ margin: '10px 0 0', fontSize: 14, color: 'rgba(243,236,222,.85)' }}>
           {view.programme_name ? view.programme_name : 'Engagement'}
           {funder ? ` with ${funder.organisation || funder.name}` : ''}
         </p>
       </div>
 
+      {err ? <p style={{ color: C.crit, fontSize: 13.5, margin: '0 0 10px' }}>{err}</p> : null}
+      {saving ? <p style={{ color: C.faint, fontSize: 12.5, margin: '0 0 10px' }}>Saving...</p> : null}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 12 }}>
         <div style={box}>
           <p style={label}>Where it stands</p>
-          <p style={{ fontFamily: 'var(--cv-font)', fontSize: 20, margin: 0 }}>
-            {PHASE_LABEL[client.status] || client.status || 'Not started'}
-          </p>
+          <Choice field="status" size={20} options={PHASE_KEYS.map((k) => ({ v: k, l: PHASE_LABEL[k] }))} />
           <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.soft }}>
             {done} of {total} gates complete
           </p>
-          <p style={editedAt}>{EDITED_AT.stands}</p>
         </div>
 
         <div style={box}>
           <p style={label}>Momentum</p>
-          <p style={{
-            fontFamily: 'var(--cv-font)', fontSize: 20, margin: 0,
-            color: momentumColour(cfg.momentum_status),
-          }}>
-            {(cfg.momentum_status || 'green') === 'green' ? 'On track'
-              : cfg.momentum_status === 'amber' ? 'Slipping' : 'Paused'}
-          </p>
+          <div style={{ color: momentumColour(cfg.momentum_status) }}>
+            <Choice
+              field="momentum_status" size={20} options={MOMENTUM}
+              value={cfg.momentum_status || 'green'} onSave={saveMomentum}
+            />
+          </div>
           <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.soft }}>
-            {(cfg.momentum_status || 'green') === 'green'
-              ? 'Continue as planned'
-              : cfg.momentum_status === 'amber'
-                ? 'Catch up within five working days'
-                : 'Recovery plan needed before resuming'}
+            {(MOMENTUM.find((m) => m.v === (cfg.momentum_status || 'green')) || MOMENTUM[0]).note}
           </p>
-          <p style={editedAt}>{EDITED_AT.momentum}</p>
         </div>
 
+        {/* THE LEAD CONSULTANT CAN NOW BE CHANGED. Habib: the lead consultant
+            cannot be edited because it is not included in the cover that is
+            editable. It never could be from that form, because it is a party
+            and the form held the client record. */}
         <div style={box}>
           <p style={label}>Lead consultant</p>
-          <p style={{ fontFamily: 'var(--cv-font)', fontSize: 18, margin: 0 }}>{lead?.name || 'Not named yet'}</p>
-          {co ? (
-            <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.soft }}>
-              with {co.name} as co-implementer
-            </p>
+          {canManage ? (
+            <input
+              aria-label="Lead consultant"
+              defaultValue={lead?.name || ''}
+              placeholder="Not named yet"
+              style={inline(18)}
+              onFocus={(e) => { e.target.style.borderColor = C.line; e.target.style.background = C.box }}
+              onBlur={(e) => {
+                e.target.style.borderColor = 'transparent'; e.target.style.background = 'transparent'
+                if ((lead?.name || '') !== e.target.value) savePartyName('lead_consultant', e.target.value)
+              }}
+            />
+          ) : <p style={{ fontSize: 18, margin: 0 }}>{lead?.name || 'Not named yet'}</p>}
+
+          {canManage ? (
+            <input
+              aria-label="Co-implementer"
+              defaultValue={co?.name || ''}
+              placeholder="No co-implementer recorded"
+              style={{ ...small, marginTop: 6 }}
+              onFocus={(e) => { e.target.style.borderColor = C.line; e.target.style.background = C.box }}
+              onBlur={(e) => {
+                e.target.style.borderColor = 'transparent'; e.target.style.background = 'transparent'
+                if ((co?.name || '') !== e.target.value) savePartyName('co_implementer', e.target.value)
+              }}
+            />
           ) : (
-            <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.faint }}>
+            <p style={{ margin: '6px 0 0', fontSize: 12.5, color: co ? C.soft : C.faint }}>
               {/* This card used to assert that the engagement was delivered
                   alone. That is a claim, and the absence of a co-implementer
-                  party is not the same as nobody helping: the brief on this
-                  same tab can name one, and this card has never read it. */}
-              No co-implementer recorded
+                  party is not the same as nobody helping. */}
+              {co ? `with ${co.name} as co-implementer` : 'No co-implementer recorded'}
             </p>
           )}
-          <p style={editedAt}>{EDITED_AT.people}</p>
         </div>
 
         <div style={box}>
           <p style={label}>Dates</p>
-          <p style={{ fontFamily: 'var(--cv-font)', fontSize: 18, margin: 0 }}>
-            {client.start_date ? new Date(client.start_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : 'Not set'}
-            {client.expected_close ? ' to ' + new Date(client.expected_close).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : ''}
-          </p>
-          <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.soft }}>
-            {client.country || 'Location not set'}
-          </p>
-          <p style={editedAt}>{EDITED_AT.dates}</p>
+          {canManage ? (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              <input
+                type="date" aria-label="Start date" defaultValue={client.start_date || ''}
+                style={{ ...inline(14), width: 'auto' }}
+                onBlur={(e) => { if ((client.start_date || '') !== e.target.value) saveClient('start_date', e.target.value) }}
+              />
+              <span style={{ fontSize: 13, color: C.faint }}>to</span>
+              <input
+                type="date" aria-label="Target handover" defaultValue={client.expected_close || ''}
+                style={{ ...inline(14), width: 'auto' }}
+                onBlur={(e) => { if ((client.expected_close || '') !== e.target.value) saveClient('expected_close', e.target.value) }}
+              />
+            </div>
+          ) : (
+            <p style={{ fontSize: 18, margin: 0 }}>
+              {monthYear(client.start_date) || 'Not set'}
+              {client.expected_close ? ` to ${monthYear(client.expected_close)}` : ''}
+            </p>
+          )}
+          <div style={{ marginTop: 6 }}>
+            <Text field="country" size={12.5} placeholder="Location not set" style={{ color: C.soft }} />
+          </div>
+        </div>
+      </div>
+
+      {/* THE REST OF WHAT THE SEPARATE FORM HELD, on the cover, where it is
+          read. Nothing is lost by that form being gone. */}
+      <div style={{ ...box, marginTop: 14 }}>
+        <p style={label}>The engagement</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
+          <div>
+            <p style={{ ...label, fontSize: 11.5 }}>Service</p>
+            <Choice field="engagement_mode" size={15} options={SERVICES} />
+          </div>
+          <div>
+            <p style={{ ...label, fontSize: 11.5 }}>Organisation type</p>
+            <Choice field="type" size={15} options={TYPES} />
+          </div>
+          <div>
+            <p style={{ ...label, fontSize: 11.5 }}>Programme</p>
+            {canManage ? (
+              <select
+                aria-label="Programme"
+                value={client.programme_id || ''}
+                style={{ ...inline(15), cursor: 'pointer' }}
+                onChange={(e) => saveClient('programme_id', e.target.value)}
+              >
+                <option value="">No programme, paying for itself</option>
+                {programmes.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            ) : <p style={{ fontSize: 15, margin: 0 }}>{view.programme_name || 'No programme, paying for itself'}</p>}
+          </div>
+          <div>
+            <p style={{ ...label, fontSize: 11.5 }}>Sector</p>
+            <Text field="sector" size={15} placeholder="Not set" />
+          </div>
+          <div>
+            <p style={{ ...label, fontSize: 11.5 }}>Chief executive</p>
+            <Text field="contact_name" size={15} placeholder="Not named" />
+          </div>
+          <div>
+            <p style={{ ...label, fontSize: 11.5 }}>Their email</p>
+            <Text field="contact_email" size={15} placeholder="Not recorded" />
+          </div>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <p style={{ ...label, fontSize: 11.5 }}>Notes</p>
+          {canManage ? (
+            <textarea
+              aria-label="Notes"
+              defaultValue={client.notes || ''}
+              placeholder="Anything that belongs on the cover of this engagement"
+              style={{ ...inline(14), minHeight: 64, resize: 'vertical', borderColor: C.line, background: C.box }}
+              onBlur={(e) => { if ((client.notes || '') !== e.target.value) saveClient('notes', e.target.value) }}
+            />
+          ) : <p style={{ fontSize: 14, margin: 0, color: C.soft, whiteSpace: 'pre-wrap' }}>{client.notes || ''}</p>}
         </div>
       </div>
 
       <div style={{ ...box, marginTop: 14 }}>
-        <p style={label}>Who is on this engagement</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+          <p style={label}>Who is on this engagement</p>
+          <span style={{ fontSize: 11.5, color: C.faint, fontStyle: 'italic' }}>
+            Added and removed under Who is on it, and settings
+          </span>
+        </div>
         {parties.length === 0 ? (
           <p style={{ margin: 0, fontSize: 13.5, color: C.faint }}>
             No parties recorded yet. Add them under Who is on it, and settings.
@@ -220,7 +445,7 @@ export default function CoverPanel({ slug }) {
       </div>
 
       <p style={{ marginTop: 18, fontSize: 12.5, color: C.faint, fontFamily: 'var(--cv-font)', textAlign: 'center' }}>
-        Grant-to-Commercial Viability Canvas&trade; · The Canvas Coach · habibonifade.com
+        Grant-to-Commercial Viability Canvas&trade; &middot; The Canvas Coach &middot; habibonifade.com
       </p>
     </div>
   )

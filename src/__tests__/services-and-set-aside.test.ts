@@ -185,30 +185,57 @@ describe('the Cover reads everything it shows', () => {
   const COVER = readFileSync('src/components/gtcv/CoverPanel.tsx', 'utf8')
 
   it('fetches every column the Cover puts on screen', () => {
-    for (const col of ['country', 'start_date', 'expected_close']) {
+    for (const col of ['country', 'start_date', 'expected_close', 'sector', 'contact_name', 'notes']) {
       expect(LOADER).toContain(col)
-      expect(COVER).toContain(`client.${col}`)
+      expect(COVER).toContain(col)
     }
   })
 
   it('the column list is one string, so a card cannot outrun it silently', () => {
-    expect(LOADER).toContain("'id,slug,name,status,programme_id,engagement_mode,country,start_date,expected_close'")
+    expect(LOADER).toContain("'id,slug,name,status,programme_id,engagement_mode,country,start_date,expected_close,type,sector,contact_name,contact_email,notes'")
   })
 })
 
-describe('a read-only Cover says where each thing is edited', () => {
+// ============================================================
+// EVERY ELEMENT OF THE COVER IS EDITED ON THE COVER
+//
+// Habib: it is really dumb to create a separate place to edit when each of the
+// elements on the cover can be edited on the cover, so the "change the cover"
+// here is dumb. The separate form had a second failure he also named: the lead
+// consultant could not be changed at all from it, because that form held the
+// client record and the lead consultant is a party.
+// ============================================================
+describe('the Cover is where the Cover is changed', () => {
   const COVER = readFileSync('src/components/gtcv/CoverPanel.tsx', 'utf8')
+  const DASH3 = readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
 
-  it('every card names its home', () => {
-    expect(COVER).toContain('EDITED_AT.stands')
-    expect(COVER).toContain('EDITED_AT.momentum')
-    expect(COVER).toContain('EDITED_AT.people')
-    expect(COVER).toContain('EDITED_AT.dates')
+  it('the separate editor is gone from the codebase', () => {
+    expect(DASH3).not.toContain('function TabCover(')
+    expect(DASH3).not.toContain('Change the cover')
   })
 
-  it('points at screens that exist, by the names on the menu', () => {
-    expect(COVER).toContain('Who is on it, and settings')
-    expect(COVER).toContain('under Cover, with Edit')
+  it('no card sends somebody somewhere else to change it', () => {
+    expect(COVER).not.toContain('EDITED_AT')
+    expect(COVER).not.toContain('under Cover, with Edit')
+  })
+
+  it('writes each field back to where it is actually held', () => {
+    // The client record, the engagement settings and the party list are three
+    // different tables, which is exactly why one form could never cover them.
+    expect(COVER).toContain("from('engagement_clients').update")
+    expect(COVER).toContain("from('engagement_config')")
+    expect(COVER).toContain("from('engagement_parties')")
+  })
+
+  it('lets the lead consultant and the co-implementer be named here', () => {
+    expect(COVER).toContain("savePartyName('lead_consultant'")
+    expect(COVER).toContain("savePartyName('co_implementer'")
+  })
+
+  it('keeps every field the separate form held', () => {
+    for (const field of ['engagement_mode', 'type', 'programme_id', 'sector', 'contact_name', 'contact_email', 'notes', 'start_date', 'expected_close', 'status']) {
+      expect(COVER).toContain(field)
+    }
   })
 
   it('stops claiming an engagement is delivered solo', () => {
@@ -218,8 +245,17 @@ describe('a read-only Cover says where each thing is edited', () => {
     expect(COVER).toContain('No co-implementer recorded')
   })
 
-  it('has no inputs of its own, so nothing on it can drift from its home', () => {
-    expect(COVER).not.toMatch(/<input|<textarea|<select/)
+  it('shows a reading and no inputs to somebody who cannot manage it', () => {
+    expect(COVER).toContain('canManage ? (')
+    expect(COVER).toContain('canManage = false')
+  })
+
+  it('reaches the financial model client too, not only the canvas one', () => {
+    // A financial model client had its own copy of the separate editor. Half
+    // the clients keeping the form is not the form being gone.
+    const uses = DASH3.match(/<CoverPanel /g) || []
+    expect(uses.length).toBe(2)
+    expect(DASH3).not.toContain('<TabCover')
   })
 })
 
@@ -313,16 +349,15 @@ describe('no screen draws the same record twice', () => {
     expect(DASH2).not.toContain('<TabEvidence')
   })
 
-  it('the Cover keeps the editor and drops its second reading of the record', () => {
-    // The panel above is the reading. This is where it is changed.
-    expect(DASH2).toContain('Change the cover')
+  it('the Cover draws the record once, and that one drawing is editable', () => {
+    // It used to draw eleven fields read only and then the same eleven again
+    // inside an Edit form. Now there is one drawing, and it is the form.
     expect(DASH2).not.toContain("[['Organisation',client.name]")
+    expect(DASH2).not.toContain('Change the cover')
   })
 
-  it('and the editor covers every field the panel shows', () => {
-    expect(DASH2).toContain('<ClientSetupFields f={form} setF={setForm} programmes={programmes} showStatus/>')
-    expect(DASH2).toContain('value={form.start_date')
-    expect(DASH2).toContain('value={form.expected_close')
+  it('printing the cover survived the editor being removed', () => {
+    expect(DASH2).toContain('Print the cover')
   })
 
   it('Engagement Setup no longer keeps its own copy of the client’s people', () => {
