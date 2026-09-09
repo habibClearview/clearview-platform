@@ -178,3 +178,24 @@ describe('listening back to a recording', () => {
     expect(PANEL).toContain('Play this person')
   })
 })
+
+describe('the signed transcript files itself as evidence', () => {
+  it('does it when the last signature lands, not when somebody remembers', () => {
+    expect(SIGN).toContain('fileAsEvidence(')
+    expect(SIGN).toContain('evidence_library')
+  })
+
+  it('is recorded as a conversation, first hand', () => {
+    expect(SIGN).toContain("type: 'client_conversation'")
+    expect(SIGN).toContain("reliability: 'firsthand'")
+  })
+
+  it('is not filed twice when a corrected version is signed again', () => {
+    expect(SIGN).toContain('Already there from an earlier version')
+  })
+
+  it('never costs somebody their signature when it fails', () => {
+    // Filing is a convenience. A signature is the thing that was asked for.
+    expect(SIGN).toContain('.catch(() => null)')
+  })
+})

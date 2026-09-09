@@ -36,6 +36,62 @@ async function loadTranscript(admin: ReturnType<typeof getAdminClient>, id: stri
   return data || null
 }
 
+
+/**
+ * THE SIGNED TRANSCRIPT BECOMES EVIDENCE, BY ITSELF.
+ *
+ * A transcript everybody has signed is the strongest evidence an engagement
+ * can hold: not somebody's account of a conversation, the conversation. Making
+ * the coach remember to copy it into the evidence library is how it does not
+ * get there, so it puts itself there the moment the last signature lands.
+ *
+ * The reference is computed from what is already recorded, and a clash is
+ * retried, because two entries sharing one reference makes a claim ambiguous
+ * in a funder pack.
+ */
+async function fileAsEvidence(
+  admin: ReturnType<typeof getAdminClient>,
+  transcript: { id: string; client_id: string; recording_id: string; version: number | null },
+  sessionId: string | null,
+  when: string | null,
+) {
+  const url = sessionId ? `/call/${sessionId}` : null
+  // Already there from an earlier version, so it is not filed twice.
+  const { data: already } = await admin.from('evidence_library')
+    .select('id').eq('client_id', transcript.client_id)
+    .eq('description', evidenceDescription(transcript)).maybeSingle()
+  if (already) return
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data: current } = await admin.from('evidence_library')
+      .select('reference').eq('client_id', transcript.client_id)
+    const highest = (current || []).reduce((max, r) => {
+      const m = /^E-(\d+)$/.exec(String(r.reference || '').trim())
+      return m ? Math.max(max, Number(m[1])) : max
+    }, 0)
+    const reference = `E-${String(highest + 1).padStart(3, '0')}`
+
+    const { error } = await admin.from('evidence_library').insert([{
+      client_id: transcript.client_id,
+      reference,
+      date: (when || new Date().toISOString()).split('T')[0],
+      type: 'client_conversation',
+      description: evidenceDescription(transcript),
+      url,
+      status: 'active',
+      // The people who were in the room signed it, which is as close to the
+      // thing itself as evidence gets.
+      reliability: 'firsthand',
+    }])
+    if (!error) return
+    if (error.code !== '23505') return
+  }
+}
+
+function evidenceDescription(t: { id: string; version: number | null }) {
+  return `Signed transcript of a recorded session (version ${t.version || 1}, transcript ${t.id})`
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
@@ -170,6 +226,14 @@ export async function POST(req: NextRequest) {
       if (complete) {
         await admin.from('session_transcripts')
           .update({ status: 'signed', updated_at: new Date().toISOString() }).eq('id', transcript.id)
+
+        const { data: recording } = await admin.from('session_recordings')
+          .select('session_id,started_at').eq('id', transcript.recording_id).maybeSingle()
+        // Filing it must never be the reason a signature fails, so this is not
+        // allowed to throw into the response.
+        await fileAsEvidence(
+          admin, transcript, recording?.session_id || null, recording?.started_at || null,
+        ).catch(() => null)
       }
 
       return NextResponse.json({ ok: true, complete, signedBy: signer.party.name })

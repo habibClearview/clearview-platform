@@ -35,6 +35,15 @@ export interface SendEmailInput {
   /** The plain-text alternative. Screen readers, text clients and archives. */
   text?: string
   replyTo?: string
+  /**
+   * Files sent with the message, content base64 encoded.
+   *
+   * Used for the calendar invitation, which has to arrive as a file the
+   * calendar recognises. A link to an invitation is a thing somebody has to
+   * act on; an invitation attached to the message is one their calendar
+   * offers to accept.
+   */
+  attachments?: { filename: string; content: string; contentType?: string }[]
 }
 
 export interface SendEmailResult {
@@ -70,6 +79,15 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         ...(input.text ? { text: input.text } : {}),
         ...(input.bcc ? { bcc: Array.isArray(input.bcc) ? input.bcc : [input.bcc] } : {}),
         ...(input.replyTo ? { reply_to: input.replyTo } : {}),
+        ...(input.attachments?.length
+          ? {
+            attachments: input.attachments.map((a) => ({
+              filename: a.filename,
+              content: a.content,
+              ...(a.contentType ? { content_type: a.contentType } : {}),
+            })),
+          }
+          : {}),
       }),
       signal: abort.signal,
     })

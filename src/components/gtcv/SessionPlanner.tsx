@@ -68,6 +68,28 @@ const ghostBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.91rem', paddi
 const solidBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.95rem', fontWeight: 700, padding: '0.38rem 0.9rem', border: 'none', borderRadius: 6, background: C.cyan, color: 'var(--cv-on-accent)', cursor: 'pointer' }
 const delBtn = { fontFamily: 'var(--cv-font-mono)', fontSize: '0.91rem', padding: '0.25rem 0.5rem', border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.red, cursor: 'pointer' }
 
+
+/**
+ * A moment as the browser's own date and time box wants it, in the reader's
+ * time. The box has no idea of time zones, so the conversion happens here
+ * rather than being left to the string.
+ */
+function localInputValue(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const two = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}T${two(d.getHours())}:${two(d.getMinutes())}`
+}
+
+/** The same moment, written out for somebody reading rather than typing. */
+function whenLabel(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
 // ─── Party roles, as engagement_parties stores them ──────────
 const ROLE_LABEL = {
   client_funder: 'Programme funder',
@@ -343,6 +365,9 @@ export default function SessionPlanner({ clientId, canManage }) {
   const [sessions, setSessions] = useState([])
   const [parties, setParties] = useState([])
   const [attendance, setAttendance] = useState([])   // flat rows, grouped in render
+  // Which session's invitation is going, and what happened to the last one.
+  const [inviteBusy, setInviteBusy] = useState(null)
+  const [inviteNote, setInviteNote] = useState({})
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
   const [status, setStatus] = useState('idle')       // idle | saving | saved
@@ -456,6 +481,41 @@ export default function SessionPlanner({ clientId, canManage }) {
   function reportError(what, error) {
     console.error('SessionPlanner: ' + what, error)
     setErr(what + '. Try again.')
+  }
+
+  /**
+   * Send the calendar invitation for one session.
+   *
+   * It refuses rather than guesses: a session with a date and no time cannot
+   * be sent, because putting nine in the morning into somebody's diary because
+   * nobody said otherwise is worse than sending nothing. Anybody attending
+   * without an address is named, so it can be fixed rather than wondered about.
+   */
+  async function sendInvite(session) {
+    setInviteBusy(session.id)
+    setInviteNote((prev) => ({ ...prev, [session.id]: null }))
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      const res = await fetch('/api/session-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ sessionId: session.id }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || `It did not send (${res.status})`)
+      const missing = (json.withoutAddress || []).length
+        ? ` ${json.withoutAddress.join(', ')} ${json.withoutAddress.length === 1 ? 'has' : 'have'} no address, so ${json.withoutAddress.length === 1 ? 'they were' : 'they were'} left out.`
+        : ''
+      setInviteNote((prev) => ({
+        ...prev,
+        [session.id]: { text: `Sent to ${(json.sentTo || []).join(', ')}.${missing}` },
+      }))
+      setSessions((prev) => prev.map((r) => (r.id === session.id ? { ...r, invite_sent_at: new Date().toISOString() } : r)))
+    } catch (e) {
+      setInviteNote((prev) => ({ ...prev, [session.id]: { text: e.message, bad: true } }))
+    }
+    setInviteBusy(null)
   }
 
   async function saveSession(id) {
@@ -811,6 +871,33 @@ export default function SessionPlanner({ clientId, canManage }) {
             ) : <div style={readCell}>{session.planned_date || ''}</div>}
           </div>
 
+          {/* A SESSION NEEDS A TIME, NOT ONLY A DAY. 9 September 2026.
+              Habib asked whether the planned dates send a calendar invitation.
+              They could not, and the reason was in the table: a session had a
+              date and a length and no time of day. An engagement across three
+              countries cannot be told "the morning", because nine in Lagos is
+              a different moment from nine in Nairobi and the difference is a
+              missed session. This writes one absolute moment; everybody sees
+              it in their own time. */}
+          <div style={{ flex: '0 1 190px', minWidth: 175 }}>
+            <div style={mono}>Start time</div>
+            {canManage ? (
+              <input
+                type="datetime-local" style={cell}
+                aria-label="When the session starts"
+                value={localInputValue(session.planned_at)}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setField(session.id, 'planned_at', v ? new Date(v).toISOString() : '')
+                  // The day stays in step with the moment, so nothing that
+                  // already reads planned_date starts disagreeing with it.
+                  if (v) setField(session.id, 'planned_date', v.slice(0, 10))
+                }}
+                onBlur={() => saveSession(session.id)}
+              />
+            ) : <div style={readCell}>{whenLabel(session.planned_at)}</div>}
+          </div>
+
           <div style={{ flex: '0 1 140px', minWidth: 130 }}>
             <div style={mono}>Held</div>
             {canManage ? (
@@ -888,6 +975,35 @@ export default function SessionPlanner({ clientId, canManage }) {
           />
           <span style={hint}>The call, the recording and the transcript are all on that page.</span>
         </div>
+
+        {/* THE CALENDAR INVITATION. 9 September 2026. It goes to the people
+            ticked as attending this session and nobody else, carries one
+            absolute moment so three countries read it the same way, and puts
+            the session's own page in the calendar entry so it is a thing you
+            press at the right moment. Sending it again updates what is already
+            in their diary rather than leaving two. */}
+        {canManage && (
+          <div style={{ marginTop: '0.45rem', display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              style={{ ...ghostBtn, borderColor: C.teal, color: C.teal }}
+              disabled={inviteBusy === session.id}
+              onClick={() => sendInvite(session)}
+            >
+              {inviteBusy === session.id
+                ? 'Sending...'
+                : session.invite_sent_at ? 'Send the invitation again' : 'Send the calendar invitation'}
+            </button>
+            {session.invite_sent_at && (
+              <span style={hint}>Sent {whenLabel(session.invite_sent_at)}.</span>
+            )}
+            {inviteNote[session.id] && (
+              <span style={{ ...hint, color: inviteNote[session.id].bad ? C.red : C.green }}>
+                {inviteNote[session.id].text}
+              </span>
+            )}
+          </div>
+        )}
 
         <div style={{ marginTop: '0.5rem' }}>
           <div style={mono}>Purpose</div>
