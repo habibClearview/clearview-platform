@@ -138,10 +138,25 @@ export class DeviceRecorder {
 
     const mimeType = pickMimeType()
     try {
-      this.rec = mimeType ? new MediaRecorder(this.stream, { mimeType }) : new MediaRecorder(this.stream)
+      // 32 kilobits a second. Chrome's own default is roughly four times that,
+      // which is wasted on speech and has a real consequence: the transcription
+      // service takes a file of a certain size, and at the default a session of
+      // any length has to be cut into parts to be sent at all. At this rate two
+      // hours of one voice is about thirty megabytes, speech is clear, and the
+      // upload works on a field phone's connection.
+      this.rec = new MediaRecorder(this.stream, {
+        ...(mimeType ? { mimeType } : {}),
+        audioBitsPerSecond: 32_000,
+      })
     } catch {
-      await this.fail('their browser could not start a recorder')
-      throw new Error('recorder could not start')
+      // A browser that will not take those settings still records. Losing the
+      // bitrate costs disk; refusing to record costs the session.
+      try {
+        this.rec = new MediaRecorder(this.stream)
+      } catch {
+        await this.fail('their browser could not start a recorder')
+        throw new Error('recorder could not start')
+      }
     }
 
     this.startedAt = Date.now()
