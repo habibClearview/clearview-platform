@@ -35,6 +35,25 @@ function momentumColour(m) {
   return C.good
 }
 
+/**
+ * WHERE EACH THING ON THE COVER IS ACTUALLY EDITED. 9 September 2026.
+ *
+ * Habib asked why the Cover carries things that cannot be changed on the
+ * Cover. This panel is a reading of the engagement and has never had a single
+ * input on it, which is right: the same fact edited in two places drifts. What
+ * was wrong is that it never said where the one place is, so a card reading
+ * "Not named" was a dead end.
+ *
+ * Each card now names its home. The Cover stays read-only and stops being a
+ * puzzle.
+ */
+const EDITED_AT = {
+  stands: 'Set on this tab, under Cover, with Edit',
+  momentum: 'Set under Who is on it, and settings',
+  people: 'Set under Who is on it, and settings',
+  dates: 'Set on this tab, under Cover, with Edit',
+}
+
 export default function CoverPanel({ slug }) {
   const [view, setView] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -75,6 +94,9 @@ export default function CoverPanel({ slug }) {
     fontFamily: 'var(--cv-font-mono)', fontSize: 12.5, letterSpacing: '.13em',
     textTransform: 'uppercase', color: C.faint, margin: '0 0 5px',
   }
+  const editedAt = {
+    margin: '10px 0 0', fontSize: 11.5, color: C.faint, fontStyle: 'italic',
+  }
 
   return (
     <div style={{ fontFamily: "var(--cv-font)", color: C.ink }}>
@@ -104,6 +126,7 @@ export default function CoverPanel({ slug }) {
           <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.soft }}>
             {done} of {total} gates complete
           </p>
+          <p style={editedAt}>{EDITED_AT.stands}</p>
         </div>
 
         <div style={box}>
@@ -122,18 +145,26 @@ export default function CoverPanel({ slug }) {
                 ? 'Catch up within five working days'
                 : 'Recovery plan needed before resuming'}
           </p>
+          <p style={editedAt}>{EDITED_AT.momentum}</p>
         </div>
 
         <div style={box}>
           <p style={label}>Lead consultant</p>
-          <p style={{ fontFamily: 'var(--cv-font)', fontSize: 18, margin: 0 }}>{lead?.name || 'Not named'}</p>
+          <p style={{ fontFamily: 'var(--cv-font)', fontSize: 18, margin: 0 }}>{lead?.name || 'Not named yet'}</p>
           {co ? (
             <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.soft }}>
               with {co.name} as co-implementer
             </p>
           ) : (
-            <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.faint }}>Delivered solo</p>
+            <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.faint }}>
+              {/* This card used to assert that the engagement was delivered
+                  alone. That is a claim, and the absence of a co-implementer
+                  party is not the same as nobody helping: the brief on this
+                  same tab can name one, and this card has never read it. */}
+              No co-implementer recorded
+            </p>
           )}
+          <p style={editedAt}>{EDITED_AT.people}</p>
         </div>
 
         <div style={box}>
@@ -145,6 +176,7 @@ export default function CoverPanel({ slug }) {
           <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.soft }}>
             {client.country || 'Location not set'}
           </p>
+          <p style={editedAt}>{EDITED_AT.dates}</p>
         </div>
       </div>
 
@@ -152,7 +184,7 @@ export default function CoverPanel({ slug }) {
         <p style={label}>Who is on this engagement</p>
         {parties.length === 0 ? (
           <p style={{ margin: 0, fontSize: 13.5, color: C.faint }}>
-            No parties recorded yet. Add them in Engagement Setup.
+            No parties recorded yet. Add them under Who is on it, and settings.
           </p>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(230px,1fr))', gap: 10 }}>

@@ -283,6 +283,18 @@ export interface EngagementClientSummary {
   name: string
   status: string | null
   programme_id: string | null
+  /**
+   * THE COVER SAID "NOT SET" ABOUT THINGS THAT WERE SET. 9 September 2026.
+   *
+   * The Cover reads the engagement's dates and where it is delivered from
+   * these three. They were recorded on Ikore the day it was created, and the
+   * loader's column list did not include them, so the card read "Not set" and
+   * "Location not set" about a client whose row held 21 September 2026 to
+   * 22 March 2027 and Nigeria. Nothing was missing. Nothing was fetched.
+   */
+  country: string | null
+  start_date: string | null
+  expected_close: string | null
 }
 
 export interface EngagementView {

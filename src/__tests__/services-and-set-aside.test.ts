@@ -170,3 +170,55 @@ describe('a Market Intelligence client appears the moment it is added', () => {
     expect(DASH).toContain('No subscribers yet.')
   })
 })
+
+// ============================================================
+// THE COVER SAID "NOT SET" ABOUT THINGS THAT WERE SET
+//
+// Habib asked why the Lead consultant and the Dates on the Cover are not
+// populated. The dates and the country were recorded on Ikore the day it was
+// created, 21 September 2026 to 22 March 2027, in Nigeria. The loader's column
+// list did not include them, so the card read "Not set" and "Location not set"
+// about a record that held both. Nothing was missing. Nothing was fetched.
+// ============================================================
+describe('the Cover reads everything it shows', () => {
+  const LOADER = readFileSync('src/lib/engagement-loader.ts', 'utf8')
+  const COVER = readFileSync('src/components/gtcv/CoverPanel.tsx', 'utf8')
+
+  it('fetches every column the Cover puts on screen', () => {
+    for (const col of ['country', 'start_date', 'expected_close']) {
+      expect(LOADER).toContain(col)
+      expect(COVER).toContain(`client.${col}`)
+    }
+  })
+
+  it('the column list is one string, so a card cannot outrun it silently', () => {
+    expect(LOADER).toContain("'id,slug,name,status,programme_id,engagement_mode,country,start_date,expected_close'")
+  })
+})
+
+describe('a read-only Cover says where each thing is edited', () => {
+  const COVER = readFileSync('src/components/gtcv/CoverPanel.tsx', 'utf8')
+
+  it('every card names its home', () => {
+    expect(COVER).toContain('EDITED_AT.stands')
+    expect(COVER).toContain('EDITED_AT.momentum')
+    expect(COVER).toContain('EDITED_AT.people')
+    expect(COVER).toContain('EDITED_AT.dates')
+  })
+
+  it('points at screens that exist, by the names on the menu', () => {
+    expect(COVER).toContain('Who is on it, and settings')
+    expect(COVER).toContain('under Cover, with Edit')
+  })
+
+  it('stops claiming an engagement is delivered solo', () => {
+    // No co-implementer party is not the same as nobody helping, and the brief
+    // on the same tab can name one this card has never read.
+    expect(COVER).not.toContain('Delivered solo')
+    expect(COVER).toContain('No co-implementer recorded')
+  })
+
+  it('has no inputs of its own, so nothing on it can drift from its home', () => {
+    expect(COVER).not.toMatch(/<input|<textarea|<select/)
+  })
+})

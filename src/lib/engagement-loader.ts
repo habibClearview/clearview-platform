@@ -65,7 +65,10 @@ function deriveCurrentDp(status: Record<DpId, GateStatusValue>): DpId | null {
  * Tries slug first, then id, so a caller can pass whichever it holds.
  */
 async function resolveClient(slugOrId: string): Promise<EngagementClientSummary | null> {
-  const cols = 'id,slug,name,status,programme_id,engagement_mode'
+  // Every column the Cover shows. The three at the end were missing, so the
+  // Cover reported "Not set" about dates and a country the client row had held
+  // since the day it was created. See EngagementClientSummary.
+  const cols = 'id,slug,name,status,programme_id,engagement_mode,country,start_date,expected_close'
   const bySlug = await supabase
     .from('engagement_clients')
     .select(cols)
