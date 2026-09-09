@@ -342,6 +342,17 @@ export default function EvidenceLibraryPanel({ clientId, canManage, dpId }) {
 
   return (
     <div style={card}>
+      {/* The printing the older duplicate table offered, kept here so
+          removing the duplicate lost nothing. */}
+      <button
+        type="button"
+        onClick={() => window.print()}
+        style={{
+          fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', padding: '0.28rem 0.7rem',
+          border: '1px solid var(--cv-border)', borderRadius: 7, background: 'transparent',
+          color: 'var(--cv-slate)', cursor: 'pointer', float: 'right',
+        }}
+      >Print</button>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div>
           <div style={secH}>Evidence Library</div>

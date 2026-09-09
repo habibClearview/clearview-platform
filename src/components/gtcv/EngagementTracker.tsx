@@ -133,6 +133,17 @@ export default function EngagementTracker({ clientId, canManage }) {
 
   return (
     <div style={{ fontFamily: "var(--cv-font)", color: C.ink }}>
+      {/* The printing the older duplicate table offered, kept here so
+          removing the duplicate lost nothing. */}
+      <button
+        type="button"
+        onClick={() => window.print()}
+        style={{
+          fontFamily: 'var(--cv-font-mono)', fontSize: '0.82rem', padding: '0.28rem 0.7rem',
+          border: '1px solid var(--cv-border)', borderRadius: 7, background: 'transparent',
+          color: 'var(--cv-slate)', cursor: 'pointer', float: 'right',
+        }}
+      >Print</button>
       <h2 style={{ fontFamily: 'var(--cv-font)', fontSize: 22, margin: '0 0 4px', fontWeight: 600 }}>
         Engagement Tracker
       </h2>

@@ -177,6 +177,16 @@ export default function HandoverIndependence({ clientId, canManage }) {
     <div style={{
       border: `1px solid ${C.border}`, borderRadius: 12, padding: '1rem 1.1rem', background: C.card,
     }}>
+      {/* The printing the older Handover Record table offered, kept here so
+          removing the duplicate lost nothing. */}
+      <button
+        type="button"
+        onClick={() => window.print()}
+        style={{
+          ...mono, fontSize: '0.82rem', padding: '0.28rem 0.7rem', border: `1px solid ${C.border}`,
+          borderRadius: 7, background: 'transparent', color: C.slate, cursor: 'pointer', float: 'right',
+        }}
+      >Print</button>
       <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
         The five independence tests
       </div>

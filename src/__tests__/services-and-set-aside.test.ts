@@ -284,3 +284,60 @@ describe('the second list of the same people is gone', () => {
     expect(sql).toContain("check (letter is null or letter in ('payer', 'served'))")
   })
 })
+
+// ============================================================
+// ONE PANEL PER FACT
+//
+// Habib: there are multiple pages of the same information, and there is no
+// need to have the same information in multiple places; it is very confusing
+// and creates unnecessary complication and friction.
+//
+// Five tabs drew the same rows twice, an original table and a later panel over
+// the same table. The Cover drew eleven fields of the client record directly
+// under the panel that had just drawn all eleven. Engagement Setup held the
+// client's chief executive by name, email and phone directly under the party
+// list that holds every person on the engagement.
+// ============================================================
+describe('no screen draws the same record twice', () => {
+  const DASH2 = readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
+
+  it('the duplicate tab components are gone from the codebase', () => {
+    for (const dead of ['function TabTracker(', 'function TabEvidence(', 'function TabHandover(']) {
+      expect(DASH2).not.toContain(dead)
+    }
+  })
+
+  it('each of those tabs renders exactly one panel', () => {
+    expect(DASH2).toContain("{shownTab==='tracker'&&<GtcvEngagementTracker")
+    expect(DASH2).toContain("{shownTab==='handover'&&<><HandoverIndependence")
+    expect(DASH2).not.toContain('<TabEvidence')
+  })
+
+  it('the Cover keeps the editor and drops its second reading of the record', () => {
+    // The panel above is the reading. This is where it is changed.
+    expect(DASH2).toContain('Change the cover')
+    expect(DASH2).not.toContain("[['Organisation',client.name]")
+  })
+
+  it('and the editor covers every field the panel shows', () => {
+    expect(DASH2).toContain('<ClientSetupFields f={form} setF={setForm} programmes={programmes} showStatus/>')
+    expect(DASH2).toContain('value={form.start_date')
+    expect(DASH2).toContain('value={form.expected_close')
+  })
+
+  it('Engagement Setup no longer keeps its own copy of the client’s people', () => {
+    expect(DASH2).not.toContain('<div style={secH}>Engagement Team</div>')
+    expect(DASH2).not.toContain('Client CEO')
+    expect(DASH2).not.toContain('CEO Phone')
+  })
+
+  it('the printing the removed tables offered moved onto the panels that stayed', () => {
+    for (const file of [
+      'src/components/gtcv/EngagementTracker.tsx',
+      'src/components/gtcv/EvidenceLibraryPanel.tsx',
+      'src/components/gtcv/HandoverIndependence.tsx',
+    ]) {
+      expect(readFileSync(file, 'utf8')).toContain('window.print()')
+    }
+  })
+})

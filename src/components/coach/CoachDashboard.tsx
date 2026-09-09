@@ -2573,11 +2573,17 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             {shownTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
             {shownTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={previewRoleId} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
             {shownTab==='sessions'&&<><SessionPlanner clientId={selClient.id} canManage={canEdit(previewRoleId)}/></>}
-            {shownTab==='tracker'&&<><GtcvEngagementTracker clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><TabTracker client={selClient} canvas={canvas}/></>}
+            {/* ONE PANEL PER FACT. 9 September 2026. Each of these tabs drew
+                the same rows twice: an original table and a later panel over
+                the same table. Habib: there is no need to have the same
+                information in multiple places, it is very confusing and
+                creates unnecessary friction. The later panel is kept because
+                it does more; the printing the older one offered moved onto it,
+                so nothing is lost. */}
+            {shownTab==='tracker'&&<GtcvEngagementTracker clientId={selClient.id} canManage={canEdit(previewRoleId)}/>}
             {shownTab==='decisions'&&<TabDecisions client={selClient} decisions={decisions} userRole={previewRoleId} userName={userName} onAdd={async(d)=>{const {data}=await supabase.from('canvas_decisions').insert([{...d,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:[...decisions,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`decisions:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,decisions:decisions.map(d=>d.id!==id?d:{...d,...updates})}})),()=>supabase.from('canvas_decisions').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
-            {shownTab==='evidence'&&<><EvidenceLibraryPanel clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><TabEvidence client={selClient} evidence={evidence} onAdd={async(e)=>{const ref=`E-${String(evidence.length+1).padStart(3,'0')}`;const {data}=await supabase.from('evidence_library').insert([{...e,client_id:selClient.id,reference:ref}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:[...evidence,data]}}))}} onUpdate={(id,updates)=>optimisticWrite(`evidence:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,evidence:evidence.map(e=>e.id!==id?e:{...e,...updates})}})),()=>supabase.from('evidence_library').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/></>}
+            {shownTab==='evidence'&&<><EvidenceLibraryPanel clientId={selClient.id} canManage={canEdit(previewRoleId)}/></>}
             {shownTab==='handover'&&<><HandoverIndependence clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
-            {shownTab==='handover'&&<TabHandover client={selClient} handover={handover} canvas={canvas} userRole={previewRoleId} onUpdate={(id,updates)=>optimisticWrite(`handover:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,handover:handover.map(h=>h.id!==id?h:{...h,...updates})}})),()=>supabase.from('handover_record').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/>}
             {shownTab==='phase0'&&<><TabDP client={selClient} dp={canvas.find(d=>d.dp_id==='phase_0')} userRole={previewRoleId} onUpdateDP={u=>updateDP(selClient.id,'phase_0',u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,'phase_0',cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId="phase_0" clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/></div></>}
             {['dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09'].map(dpKey=>(
               // One condition per tab. The same nine keys used to be mapped
@@ -2980,67 +2986,59 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 // ═══════════════════════════════════════════════════════════════
 
 function TabCover({client,prog,programmes,onUpdate}){
+  // THE SAME ELEVEN FIELDS, TWICE, ON ONE TAB. 9 September 2026.
+  //
+  // This drew a read-only grid of the organisation, programme, type, contact,
+  // country, sector, dates, status and mode, directly under the Cover panel
+  // that had just drawn all of them, followed by a second copy of the
+  // attribution the same panel carries. Two readings of one record on one
+  // screen, and the only thing here that was not a repeat was the form behind
+  // the Edit button.
+  //
+  // What is left is that form. The Cover panel above is the reading; this is
+  // where it is changed, which is what the panel now says.
   const [editing,setEditing]=useState(false)
   const [form,setForm]=useState({...client})
   return(
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>{client.engagement_mode==='canvas'?'Cover':'Cover'}</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn(true)} onClick={()=>{setForm({...client});setEditing(!editing)}}>{editing?'Cancel':'Edit'}</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem',gap:'0.5rem',flexWrap:'wrap'}}>
+        <h3 style={secH}>Change the cover</h3>
+        <div style={{display:'flex',gap:'0.5rem'}}>
+          <button style={addBtn(true)} onClick={()=>{setForm({...client});setEditing(!editing)}}>{editing?'Cancel':'Edit'}</button>
+          <button style={addBtn(true)} onClick={()=>window.print()}>Print</button>
+        </div>
+      </div>
       {editing?(
         <div style={card}>
+          <ClientSetupFields f={form} setF={setForm} programmes={programmes} showStatus/>
           <div style={fGrid}>
-            <div><label style={lbl}>Organisation Name</label><input style={inp} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></div>
-            <div><label style={lbl}>Programme</label><select style={inp} value={form.programme_id||''} onChange={e=>setForm(f=>({...f,programme_id:e.target.value||null}))}><option value="">No programme (independent · self-paying)</option>{(programmes||[]).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
-            <div><label style={lbl}>Contact Name</label><input style={inp} value={form.contact_name} onChange={e=>setForm(f=>({...f,contact_name:e.target.value}))}/></div>
-            <div><label style={lbl}>Contact Email</label><input style={inp} value={form.contact_email} onChange={e=>setForm(f=>({...f,contact_email:e.target.value}))}/></div>
-            <div><label style={lbl}>Country</label><input style={inp} value={form.country} onChange={e=>setForm(f=>({...f,country:e.target.value}))}/></div>
-            <div><label style={lbl}>Sector</label><input style={inp} value={form.sector} onChange={e=>setForm(f=>({...f,sector:e.target.value}))}/></div>
-            <div><label style={lbl}>Client Type</label><select style={inp} value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}><option value="crop_aggregator">Crop Aggregator</option><option value="livestock_aggregator">Livestock Aggregator</option><option value="farmer_group_enterprise">Farmer Group Enterprise</option><option value="service_lsp">Service LSP</option></select></div>
-            <div><label style={lbl}>Engagement Mode</label><select style={inp} value={form.engagement_mode} onChange={e=>setForm(f=>({...f,engagement_mode:e.target.value}))}><option value="canvas">Full GtCV Canvas</option><option value="financial">Clearview Financial Only</option></select></div>
-            <div><label style={lbl}>Status</label><select style={inp} value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>{['setup','phase_0','dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09','complete','paused'].map(s=><option key={s} value={s}>{statusLabel(s)}</option>)}</select></div>
             <div><label style={lbl}>Start Date</label><input type="date" style={inp} value={form.start_date||''} onChange={e=>setForm(f=>({...f,start_date:e.target.value}))}/></div>
             <div><label style={lbl}>Target Handover</label><input type="date" style={inp} value={form.expected_close||''} onChange={e=>setForm(f=>({...f,expected_close:e.target.value}))}/></div>
-            <div style={{gridColumn:'1/-1'}}><label style={lbl}>Notes</label><textarea style={{...inp,minHeight:72,resize:'vertical'}} value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/></div>
+            <div style={{gridColumn:'1/-1'}}><label style={lbl}>Notes</label><textarea style={{...inp,minHeight:72,resize:'vertical'}} value={form.notes||''} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/></div>
           </div>
           <button style={{...solidBtn(),marginTop:'0.85rem'}} onClick={()=>{onUpdate(form);setEditing(false)}}>Save</button>
         </div>
       ):(
-        <div style={card}>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
-            {[['Organisation',client.name],['Programme',prog?.name||'—'],['Type',CLIENT_TYPE_LABELS[client.type]||'—'],['Contact',client.contact_name||'—'],['Email',client.contact_email||'—'],['Country',client.country],['Sector',client.sector],['Start Date',client.start_date||'—'],['Target Handover',client.expected_close||'—'],['Status',statusLabel(client.status)],['Engagement Mode',client.engagement_mode==='canvas'?'Full GtCV Canvas':'Clearview Financial']].map(([k,v])=>(
-              <div key={k} style={{padding:'0.75rem 1rem',background:C.lightBg,borderRadius:6}}>
-                <div style={{fontSize:'0.93rem',color:C.slate,marginBottom:'0.2rem',textTransform:'uppercase',letterSpacing:'0.05em'}}>{k}</div>
-                <div style={{fontSize:'1.11rem',fontWeight:600,color:C.navy}}>{v}</div>
-              </div>
-            ))}
-          </div>
-          {client.notes&&<div style={{...card,background:C.cream}}><p style={{margin:0,fontSize:'1.07rem',color:C.slate,fontStyle:'italic'}}>{client.notes}</p></div>}
-          <div style={{textAlign:'center',padding:'1.5rem',borderTop:`1px solid ${C.border}`,marginTop:'1rem'}}>
-            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.cyan,letterSpacing:'0.1em',marginBottom:'0.3rem'}}>CANVAS COACH</div>
-            <div style={{fontFamily:'var(--cv-font)',fontSize:'1.2rem',fontWeight:700,color:C.navy}}>Grant-to-Commercial Viability Canvas</div>
-            <div style={{fontSize:'1.01rem',color:C.slate,marginTop:'0.3rem'}}>habibonifade.com</div>
-          </div>
-        </div>
+        <p style={{fontSize:'0.95rem',color:C.slate,margin:0}}>
+          Everything on the cover above is changed here: the organisation, the programme, the
+          service, the dates, the stage and the notes.
+        </p>
       )}
     </div>
   )
 }
-
-// A payer (a programme, or an independent client paying for itself) can
-// hold more than one service at once -- e.g. a programme paying for the
-// Clearview financial model for several clients today does not mean
-// it can't ALSO pay for GtCV canvas for a different client, direct
-// advisory, or a Portfolio Intelligence subscription. This is additive to
-// (not a replacement for) the single engagement_mode already on each
-// client's own client record -- nothing that already works reads
-// from this table. Loads and fails independently of the rest of the
-// dashboard: service_engagements is a brand-new table that won't exist
-// until the migration is applied, and that must never block the whole
-// page from loading.
+// A payer (a programme, or an independent client paying for itself) can hold
+// more than one service at once: a programme paying for the financial model
+// for several clients today does not stop it also paying for a GtCV canvas
+// for a different client, direct advisory, or a Portfolio Intelligence
+// subscription. Additive to the single engagement_mode on each client's own
+// record. Loads and fails independently of the rest of the dashboard.
 const SERVICE_TYPE_LABELS={advisory:'Advisory',canvas:'GtCV Canvas',financial:'Clearview Financial Model',portfolio_intelligence:'Portfolio Intelligence Subscription'}
 // What a client's own service is called on their screen. Separate from the
 // labels above, which name a service somebody is PAYING for; this names the
 // one the client in front of you is receiving.
 const SERVICE_NAME={canvas:'Grant-to-Commercial Viability',financial:'Clearview Financial Model',advisory:'Advisory',portfolio_intelligence:'Market Intelligence'}
+
 function ServicesSection({payerType,payerId,clients}){
   const [rows,setRows]=useState([])
   const [loading,setLoading]=useState(true)
@@ -3265,15 +3263,14 @@ function TabEngagementSetup({client,fileLinks,notifications,onUpdate,onUpdateFil
   return(
     <div>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Engagement Setup</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={solidBtn('var(--cv-header)',true)} disabled={saving} onClick={save}>{saving?'Saving…':'Save'}</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
-      <div style={card}>
-        <div style={secH}>Engagement Team</div>
-        <div style={fGrid}>
-          <div><label style={lbl}>Lead Consultant</label><input style={inp} defaultValue="The Canvas Coach" readOnly/></div>
-          <div><label style={lbl}>Client CEO</label><input style={inp} value={client.contact_name} onChange={e=>onUpdate({contact_name:e.target.value})}/></div>
-          <div><label style={lbl}>CEO Email</label><input style={inp} value={client.contact_email} onChange={e=>onUpdate({contact_email:e.target.value})}/></div>
-          <div><label style={lbl}>CEO Phone</label><input style={inp} value={client.contact_phone} onChange={e=>onUpdate({contact_phone:e.target.value})}/></div>
-        </div>
-      </div>
+      {/* THE THIRD COPY OF THE SAME PEOPLE. 9 September 2026. An "Engagement
+          Team" block sat here holding a read-only Lead Consultant that always
+          said the same words, and the client's chief executive by name, email
+          and phone, directly under the party list on this same tab which holds
+          every person on the engagement with their role, organisation, title,
+          address, mobile, whether they sign and which letter they get. The
+          same person typed in two boxes on one screen, with no way for either
+          to know about the other. The party list above is the list. */}
       <div style={card}>
         <div style={secH}>Document Links</div>
         <p style={{fontSize:'1.07rem',color:C.slate,marginBottom:'1rem'}}>Add links to Google Drive, Dropbox, or any URL for key documents.</p>
@@ -3382,38 +3379,6 @@ function TabDiagnostic({client,diagnostic,userRole,userName,onUpdate}){
   )
 }
 
-function TabTracker({client,canvas}){
-  const dpOrder=['phase_0','dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09']
-  const dpLabels={'phase_0':'Phase 0','dp01':'Decision Point 1','dp02':'Decision Point 2','dp03':'Decision Point 3','dp04':'Decision Point 4','dp05':'Decision Point 5','dp06':'Decision Point 6','dp07':'Decision Point 7','dp08':'Decision Point 8','dp09':'Decision Point 9'}
-  return(
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Engagement Tracker</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
-      <div style={{overflowX:'auto'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.07rem',fontFamily:"var(--cv-font)"}}>
-          <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Phase','Zone / Decision Point','Core Question','Status','Components','CEO Sign-Off'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left',fontWeight:600,whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
-          <tbody>
-            {dpOrder.map((dpId,i)=>{
-              const dp=canvas.find(d=>d.dp_id===dpId)
-              const completedComps=dp?.components?.filter(c=>c.status==='✓').length||0
-              const totalComps=dp?.components?.length||0
-              return(
-                <tr key={dpId} style={{background:i%2===0?C.cream:C.white}}>
-                  <td style={{padding:'9px 12px',fontWeight:700,color:C.cyan,fontFamily: 'var(--cv-font-mono)'}}>{dpLabels[dpId]}</td>
-                  <td style={{padding:'9px 12px',fontWeight:600,color:C.navy}}>{dp?.label||dpId}</td>
-                  <td style={{padding:'9px 12px',color:C.slate,maxWidth:220,fontSize:'1.01rem'}}>{dp?.core_question||'—'}</td>
-                  <td style={{padding:'9px 12px'}}>{dp?<div style={{display:'flex',alignItems:'center',gap:'0.4rem'}}><DPDot status={dp.status}/><span style={{fontSize:'1.01rem'}}>{dp.status}</span></div>:<Badge text="Not started" color={C.slate}/>}</td>
-                  <td style={{padding:'9px 12px',fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem'}}>{dp?`${completedComps}/${totalComps}`:'—'}</td>
-                  <td style={{padding:'9px 12px'}}>{dp?.ceo_signed_off?<Badge text={`CEO ✓ ${dp.ceo_signed_off_at?.split('T')[0]||''}`} color={C.green}/>:'—'}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
 function TabDecisions({client,decisions,userRole,userName,onAdd,onUpdate}){
   const [form,setForm]=useState({date:new Date().toISOString().split('T')[0],dp_id:'',decision:'',made_by:userName,evidence_ref:'',authorised_by:''})
   const [adding,setAdding]=useState(false)
@@ -3449,79 +3414,6 @@ function TabDecisions({client,decisions,userRole,userName,onAdd,onUpdate}){
             {d.authorised_by&&<span>Authorised by: <strong style={{color:C.navy}}>{d.authorised_by}</strong></span>}
             {d.evidence_ref&&<span>Evidence: <strong style={{color:C.cyan}}>{d.evidence_ref}</strong></span>}
           </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function TabEvidence({client,evidence,onAdd,onUpdate}){
-  const [adding,setAdding]=useState(false)
-  const [form,setForm]=useState({date:new Date().toISOString().split('T')[0],dp_id:'',type:'document',description:'',url:'',uploaded_by:'',status:'submitted'})
-  return(
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Evidence Library</h3><div style={{display:'flex',gap:'0.5rem'}}><button style={addBtn()} onClick={()=>setAdding(!adding)}>+ Add Evidence</button><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div></div>
-      {adding&&(
-        <div style={{...card,border:`1px solid ${C.cyan}`}}>
-          <div style={fGrid}>
-            <div><label style={lbl}>Date</label><input type="date" style={inp} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/></div>
-            <div><label style={lbl}>Decision Point</label><select style={inp} value={form.dp_id} onChange={e=>setForm(f=>({...f,dp_id:e.target.value}))}><option value="">—</option>{['phase_0','dp01','dp02','dp03','dp04','dp05','dp06','dp07','dp08','dp09'].map(d=><option key={d} value={d}>{d}</option>)}</select></div>
-            <div><label style={lbl}>Type</label><select style={inp} value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}>{['document','interview','observation','financial_data','other'].map(t=><option key={t} value={t}>{t}</option>)}</select></div>
-            <div><label style={lbl}>Uploaded by</label><input style={inp} value={form.uploaded_by} onChange={e=>setForm(f=>({...f,uploaded_by:e.target.value}))}/></div>
-            <div style={{gridColumn:'1/-1'}}><label style={lbl}>Description</label><input style={inp} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="What is this evidence?"/></div>
-            <div style={{gridColumn:'1/-1'}}><label style={lbl}>URL or file link</label><input style={inp} value={form.url} onChange={e=>setForm(f=>({...f,url:e.target.value}))} placeholder="https://..."/></div>
-          </div>
-          <div style={{display:'flex',gap:'0.6rem',marginTop:'0.75rem'}}>
-            <button style={solidBtn()} onClick={()=>{onAdd({...form,id:`ev_${Date.now()}`});setAdding(false)}}>Save</button>
-            <button style={addBtn(true,C.slate)} onClick={()=>setAdding(false)}>Cancel</button>
-          </div>
-        </div>
-      )}
-      <div style={{overflowX:'auto'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
-          <thead><tr style={{background:'var(--cv-header)',color:'var(--cv-on-accent)'}}>{['Ref','Date','DP','Type','Description','Status','Link'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:'left',fontWeight:600,whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
-          <tbody>{evidence.length===0?<tr><td colSpan={7} style={{padding:'2rem',textAlign:'center',color:C.slate}}>No evidence recorded yet.</td></tr>:evidence.map((e,i)=>(
-            <tr key={e.id} style={{background:i%2===0?C.cream:C.white}}>
-              <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.cyan}}>{e.reference}</td>
-              <td style={{padding:'8px 10px'}}>{e.date}</td>
-              <td style={{padding:'8px 10px',fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem'}}>{e.dp_id||'—'}</td>
-              <td style={{padding:'8px 10px'}}>{e.type}</td>
-              <td style={{padding:'8px 10px',maxWidth:240}}>{e.description}</td>
-              <td style={{padding:'8px 10px'}}><Badge text={e.status} color={e.status==='accepted'?C.green:e.status==='queried'?C.amber:C.slate}/></td>
-              <td style={{padding:'8px 10px'}}>{e.url?<a href={e.url} target="_blank" rel="noopener noreferrer" style={{color:C.cyan,fontSize:'1.01rem'}}>Open</a>:'—'}</td>
-            </tr>
-          ))}</tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-function TabHandover({client,handover,canvas,userRole,onUpdate}){
-  const dp09=canvas.find(d=>d.dp_id==='dp09')
-  const locked=!dp09?.ceo_signed_off
-  return(
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Handover Record</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
-      {locked&&<div style={{background:'var(--cv-tint-amber-2)',padding:14,borderRadius:8,marginBottom:16,color:C.amber,fontWeight:600}}>This tab unlocks when Decision Point 9 CEO sign-off is complete.</div>}
-      {handover.map(test=>(
-        <div key={test.id} style={{...card,opacity:locked?0.6:1}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.75rem',flexWrap:'wrap',gap:'0.5rem'}}>
-            <p style={{fontFamily:'var(--cv-font)',fontSize:'1.16rem',fontWeight:700,color:C.navy,margin:0}}>Test {test.test_number}: {test.test_description}</p>
-            <Badge text={test.status.replace('_',' ')} color={test.status==='yes'?C.green:test.status==='no'?C.red:test.status==='partial'?C.amber:C.slate}/>
-          </div>
-          {!locked&&canViewCoachGuidance(userRole)&&(
-            <div style={{display:'flex',gap:'0.5rem',marginBottom:'0.75rem',flexWrap:'wrap'}}>
-              {['yes','no','partial','not_assessed'].map(s=>(
-                <button key={s} style={{padding:'4px 12px',borderRadius:5,fontSize:'1.01rem',cursor:'pointer',background:test.status===s?'var(--cv-header)':C.white,color:test.status===s?'var(--cv-on-accent)':C.slate,border:`1px solid ${C.border}`}} onClick={()=>onUpdate(test.id,{status:s})}>{s.replace('_',' ')}</button>
-              ))}
-            </div>
-          )}
-          <div><label style={lbl}>Evidence</label><textarea style={{...inp,minHeight:60,resize:'vertical'}} value={test.evidence||''} disabled={locked||!canEdit(userRole)} onChange={e=>onUpdate(test.id,{evidence:e.target.value})} placeholder="What evidence confirms this test is passed?"/></div>
-          {test.status==='yes'&&!test.ceo_confirmed&&canSignOff(userRole)&&!locked&&(
-            <button style={{...solidBtn(C.green),marginTop:'0.5rem'}} onClick={()=>onUpdate(test.id,{ceo_confirmed:true,ceo_confirmed_at:new Date().toISOString()})}>CEO Confirms Test Passed</button>
-          )}
-          {test.ceo_confirmed&&<div style={{marginTop:'0.5rem'}}><Badge text={`CEO confirmed ${test.ceo_confirmed_at?.split('T')[0]||''}`} color={C.green}/></div>}
         </div>
       ))}
     </div>
