@@ -26,6 +26,7 @@
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient, refuseAccess, requireAccess } from '@/lib/auth/api-authz'
+import { cleanEmail } from '@/lib/engagement-brief'
 
 const PARTY_ROLES = [
   'client_funder', 'funder_rep',
@@ -70,7 +71,10 @@ function readBody(body: any) {
   const patch: Record<string, unknown> = {}
   if (typeof body.partyRole === 'string') patch.party_role = body.partyRole
   if (typeof body.name === 'string') patch.name = body.name.trim()
-  if (typeof body.email === 'string') patch.email = body.email.trim() || null
+  // Cleaned the way a pasted address needs to be: "Name <a@b.org>" is one
+  // address with a name on it, and a stray bracket is what made a real send
+  // fail on 8 September. See cleanEmail.
+  if (typeof body.email === 'string') patch.email = cleanEmail(body.email) || null
   if (typeof body.organisation === 'string') patch.organisation = body.organisation.trim() || null
   if (typeof body.title === 'string') patch.title = body.title.trim() || null
   // R33. The mobile number, so a personal link can reach somebody who has no
@@ -78,6 +82,21 @@ function readBody(body: any) {
   // connects a person to an account and that is left exactly as it was.
   if (typeof body.mobile === 'string') patch.mobile = body.mobile.trim() || null
   if (typeof body.isSignatory === 'boolean') patch.is_signatory = body.isSignatory
+  // ONE LIST OF PEOPLE. 9 September 2026. Which welcome letter a person
+  // receives is an attribute of the person on the engagement, not a second
+  // list of the same names kept beside this one. Three states, and null is a
+  // real one: on the engagement and not written to.
+  if ('letter' in body) {
+    const l = body.letter
+    patch.letter = l === 'payer' || l === 'served' ? l : null
+  }
+  // When their letter went. Set by the send itself, and settable by hand for a
+  // letter that went before the platform was recording it. Null clears it.
+  if ('letterSentAt' in body) {
+    const raw = typeof body.letterSentAt === 'string' ? body.letterSentAt : ''
+    const t = raw ? Date.parse(raw) : NaN
+    patch.letter_sent_at = Number.isFinite(t) ? new Date(t).toISOString() : null
+  }
   if (Number.isFinite(body.sortOrder)) patch.sort_order = Math.trunc(body.sortOrder)
   return patch
 }

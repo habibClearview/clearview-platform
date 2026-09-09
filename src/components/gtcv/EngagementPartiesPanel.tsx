@@ -57,7 +57,13 @@ const USUALLY_SIGNS = ['lsp_ed', 'funder_rep', 'lsp_board', 'lead_consultant', '
 
 const BLANK = {
   party_role: 'lsp_ed', name: '', email: '', mobile: '', organisation: '', title: '', is_signatory: true,
+  // ONE LIST OF PEOPLE. 9 September 2026. Which welcome letter this person
+  // gets, held on the person rather than in a second list of the same names.
+  letter: '',
 }
+
+/** What each letter is called on screen, and what no letter means. */
+const LETTER_LABEL = { payer: 'Paying client letter', served: 'Served client letter', '': 'No letter' }
 
 async function call(method, body) {
   const { data } = await supabase.auth.getSession()
@@ -86,7 +92,7 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
     setLoading(true)
     const { data, error } = await supabase
       .from('engagement_parties')
-      .select('id, party_role, name, email, mobile, organisation, title, is_signatory, user_id, sort_order')
+      .select('id, party_role, name, email, mobile, organisation, title, is_signatory, user_id, sort_order, letter, letter_sent_at')
       .eq('client_id', clientId)
       .order('sort_order', { ascending: true })
     if (error) setErr('Could not load the parties: ' + error.message)
@@ -116,6 +122,7 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
         organisation: draft.organisation,
         title: draft.title,
         isSignatory: draft.is_signatory,
+        letter: draft.letter || null,
         sortOrder: rows.length + 1,
       })
       setDraft(BLANK); setAdding(false)
@@ -134,6 +141,7 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
         organisation: e.organisation || '',
         title: e.title || '',
         isSignatory: !!e.is_signatory,
+        letter: e.letter || null,
       })
       setEditing(null)
     })
@@ -235,6 +243,15 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
                     Signs
                   </span>
                 ) : null}
+                {/* On the same line as the person, because it is a fact about
+                    them. It used to be a second list of the same names. */}
+                <span style={{ ...mono, fontSize: '0.79rem', color: r.letter ? C.teal : C.slate }}>
+                  {r.letter
+                    ? `${LETTER_LABEL[r.letter]}${r.letter_sent_at
+                      ? ` · sent ${new Date(r.letter_sent_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+                      : ' · not sent yet'}`
+                    : 'No letter'}
+                </span>
                 <span style={{ ...mono, fontSize: '0.79rem', color: r.user_id ? C.green : C.amber }}>
                   {r.user_id ? 'Can sign from their own login' : 'No account here'}
                 </span>
@@ -280,6 +297,16 @@ function PartyFields({ value, onChange }) {
       <div>
         <label style={lab}>Name</label>
         <input aria-label="Full name" style={field} value={value.name || ''} onChange={set('name')} placeholder="Full name" />
+      </div>
+      <div>
+        {/* Beside the person, on the same form. The welcome pack used to keep a
+            second list of these same names purely to hold this one choice. */}
+        <label style={lab}>Welcome letter</label>
+        <select aria-label="Which welcome letter they receive" style={field} value={value.letter || ''} onChange={set('letter')}>
+          <option value="">No letter</option>
+          <option value="served">Served client letter</option>
+          <option value="payer">Paying client letter</option>
+        </select>
       </div>
       <div>
         <label style={lab}>Job title</label>

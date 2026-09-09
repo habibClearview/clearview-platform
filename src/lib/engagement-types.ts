@@ -86,6 +86,14 @@ export interface EngagementParty {
   is_signatory: boolean
   user_id: string | null
   sort_order: number
+  /**
+   * ONE LIST OF PEOPLE. 9 September 2026. Which welcome letter this person
+   * receives, and when it went. Both were held in a second list of the same
+   * names beside this one, with the same attributes on a different line. Null
+   * letter is a real state: on the engagement and not written to.
+   */
+  letter?: 'payer' | 'served' | null
+  letter_sent_at?: string | null
   created_at: string
   updated_at: string
 }

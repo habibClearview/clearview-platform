@@ -222,3 +222,65 @@ describe('a read-only Cover says where each thing is edited', () => {
     expect(COVER).not.toMatch(/<input|<textarea|<select/)
   })
 })
+
+// ============================================================
+// ONE LIST OF THE PEOPLE ON AN ENGAGEMENT
+//
+// Habib: there is no need to have two lists of the same names with attributes
+// that can be on the same line, and it clutters the whole system. He was
+// right. The Cover carried "Who receives it" with a title, a name, an address,
+// a role and which letter, and "Who is on this engagement" with a role, a
+// name, an organisation, a title, an address and whether they sign. The same
+// people, typed twice, corrected twice, and neither list knew about the other.
+// ============================================================
+describe('the second list of the same people is gone', () => {
+  const PACK = readFileSync('src/components/gtcv/WelcomePack.tsx', 'utf8')
+  const PARTIES = readFileSync('src/components/gtcv/EngagementPartiesPanel.tsx', 'utf8')
+  const EMAIL_ROUTE = readFileSync('app/api/engagement-email/route.ts', 'utf8')
+  const PARTY_ROUTE = readFileSync('app/api/engagement-party/route.ts', 'utf8')
+
+  it('the welcome pack no longer keeps its own list of people', () => {
+    expect(PACK).not.toContain('label="Who receives it"')
+    expect(PACK).not.toContain('Save the recipients')
+    expect(PACK).not.toContain('Add someone')
+  })
+
+  it('it reads the people off the engagement instead', () => {
+    expect(PACK).toContain("from('engagement_parties')")
+    expect(PACK).toContain("p.letter === 'payer' || p.letter === 'served'")
+  })
+
+  it('which letter somebody gets is chosen beside the person', () => {
+    expect(PARTIES).toContain('Welcome letter')
+    expect(PARTIES).toContain('<option value="served">Served client letter</option>')
+    expect(PARTIES).toContain('<option value="payer">Paying client letter</option>')
+  })
+
+  it('and is shown on the same line as the person, with when it went', () => {
+    expect(PARTIES).toContain('LETTER_LABEL[r.letter]')
+    expect(PARTIES).toContain('not sent yet')
+  })
+
+  it('no letter is a real state, not a missing one', () => {
+    // A field team member is on the engagement and is not written to.
+    expect(PARTIES).toContain('<option value="">No letter</option>')
+    expect(PARTY_ROUTE).toContain("patch.letter = l === 'payer' || l === 'served' ? l : null")
+  })
+
+  it('the send reads the same one list', () => {
+    expect(EMAIL_ROUTE).toContain("from('engagement_parties')")
+    expect(EMAIL_ROUTE).toContain('const saved = fromParties.length')
+  })
+
+  it('an address typed onto a person is cleaned the way a pasted one needs', () => {
+    // The same treatment the recipient list had, now that there is one list.
+    expect(PARTY_ROUTE).toContain('cleanEmail(body.email)')
+  })
+
+  it('the columns it needs are recorded as a migration', () => {
+    const sql = readFileSync('supabase/migrations/2026_09_09_one_list_of_people.sql', 'utf8')
+    expect(sql).toContain('add column if not exists letter text')
+    expect(sql).toContain('letter_sent_at timestamptz')
+    expect(sql).toContain("check (letter is null or letter in ('payer', 'served'))")
+  })
+})

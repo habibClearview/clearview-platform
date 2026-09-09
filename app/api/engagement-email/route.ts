@@ -229,8 +229,26 @@ export async function POST(req: NextRequest) {
     // their side of the engagement, and their own one-time sign-in link. That
     // rules out To/CC, which would put one salutation and one link in front of
     // everybody and expose the whole list to each of them.
-    const saved = (brief.recipients && brief.recipients.length)
-      ? brief.recipients
+    // ONE LIST OF PEOPLE. 9 September 2026. Who gets a letter is read off the
+    // engagement's party list, where their name, title and address already
+    // live, instead of a second list of the same names kept in the brief.
+    const { data: partyRows } = await admin
+      .from('engagement_parties')
+      .select('id, name, title, email, letter')
+      .eq('client_id', clientId)
+      .order('sort_order', { ascending: true })
+    const fromParties = (partyRows || [])
+      .filter((p) => (p.letter === 'payer' || p.letter === 'served') && p.email)
+      .map((p) => ({
+        id: p.id as string,
+        email: p.email as string,
+        name: (p.name as string) || undefined,
+        title: (p.title as string) || undefined,
+        audience: p.letter as 'payer' | 'served',
+      }))
+
+    const saved = fromParties.length
+      ? fromParties
       : cleaned.recipients.map((email) => ({
           email,
           name: recipientName,
@@ -337,22 +355,22 @@ export async function POST(req: NextRequest) {
         }
       }
       // WRITE DOWN WHO ACTUALLY GOT IT. Only the addresses the provider
-      // accepted, and only on the saved list, so the record is of what
-      // happened rather than of what was attempted. A person sent to twice
-      // keeps the later stamp, which is the one that answers "when did they
-      // last hear from us".
-      if (sentTo.length && brief.recipients && brief.recipients.length) {
+      // accepted, and on the person themselves, so the record sits beside
+      // every other fact about them. A person sent to twice keeps the later
+      // stamp, which is the one that answers "when did they last hear from us".
+      if (sentTo.length && fromParties.length) {
         const justSent = new Set(sentTo.map((e) => e.toLowerCase()))
-        const stamped = brief.recipients.map((p) => (
-          justSent.has(p.email.toLowerCase()) ? { ...p, sentAt: new Date().toISOString() } : p
-        ))
-        const { error: stampError } = await admin
-          .from('engagement_config')
-          .update({ brand_overrides: briefIntoConfig(brand, { ...brief, recipients: stamped }) })
-          .eq('client_id', clientId)
-        // A letter that went out and a note that did not is worth saying out
-        // loud: the next send will offer to write to that person again.
-        if (stampError) console.error('engagement-email: could not record who was sent to', stampError)
+        const stampedAt = new Date().toISOString()
+        for (const person of fromParties) {
+          if (!justSent.has(person.email.toLowerCase())) continue
+          const { error: stampError } = await admin
+            .from('engagement_parties')
+            .update({ letter_sent_at: stampedAt, updated_at: stampedAt })
+            .eq('id', person.id)
+          // A letter that went out and a note that did not is worth saying out
+          // loud: the next send will offer to write to that person again.
+          if (stampError) console.error('engagement-email: could not record the send against', person.email, stampError)
+        }
       }
 
       if (!sentTo.length) {

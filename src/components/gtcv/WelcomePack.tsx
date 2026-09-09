@@ -128,6 +128,8 @@ export default function WelcomePack({ clientId, canManage }) {
   const [busy, setBusy] = useState(null)
   const [client, setClient] = useState(null)
   const [partyEmails, setPartyEmails] = useState([])
+  // Everyone on the engagement. The recipients are the ones with a letter.
+  const [parties, setParties] = useState([])
   const [emailPreview, setEmailPreview] = useState(null)
   const [brief, setBrief] = useState({})
   const [briefDraft, setBriefDraft] = useState(null)
@@ -158,9 +160,16 @@ export default function WelcomePack({ clientId, canManage }) {
         .select('id,name,slug,contact_name,contact_email')
         .eq('id', clientId).single()
       setClient(cl || null)
+      // THE ONE LIST. Everything the letter needs about a person is here:
+      // their name, their title, their address, and which of the two letters
+      // they get. There is no second list any more.
       const { data: parties } = await supabase
-        .from('engagement_parties').select('email').eq('client_id', clientId)
+        .from('engagement_parties')
+        .select('id, name, title, email, letter, letter_sent_at, party_role')
+        .eq('client_id', clientId)
+        .order('sort_order', { ascending: true })
       setPartyEmails((parties || []).map((x) => x.email).filter(Boolean))
+      setParties(parties || [])
       setErr(null)
     } catch (e) { setErr(e.message) }
     setLoading(false)
@@ -347,77 +356,18 @@ export default function WelcomePack({ clientId, canManage }) {
         })()}
       </Setting>
 
-      <Setting
-        label="Who receives it"
-        help={`Everyone who should get the letter, by name. Each person receives their own copy: their salutation, the letter for their side of the engagement, and their own sign-in link. Nobody is put in the To or CC line with somebody else, so no recipient sees the rest of the list and no two people share a link.`}
-      >
-        {(() => {
-          const d = briefDraft || brief || {}
-          const rows = d.recipients || []
-          const setRows = (next) => setBriefDraft({ ...d, recipients: next })
-          const cell = { ...field, padding: '0.34rem 0.45rem', fontSize: '0.88rem' }
-          return (
-            <div>
-              {rows.length === 0
-                ? <p style={{ ...hint, margin: '0 0 0.5rem' }}>Nobody added yet. Add the people at both organisations who should receive this.</p>
-                : null}
-              {rows.map((r, i) => (
-                <div key={i} style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <input style={{ ...cell, maxWidth: 70 }} placeholder="Mr" value={r.title || ''}
-                    onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, title: e.target.value } : x))} />
-                  <input style={{ ...cell, maxWidth: 175 }} placeholder="Full name" value={r.name || ''}
-                    onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
-                  <input style={{ ...cell, maxWidth: 215 }} placeholder="email@organisation.org" value={r.email || ''}
-                    onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, email: e.target.value } : x))} />
-                  <input style={{ ...cell, maxWidth: 155 }} placeholder="Their role" value={r.role || ''}
-                    onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, role: e.target.value } : x))} />
-                  <select style={{ ...cell, maxWidth: 165 }} value={r.audience || 'payer'}
-                    onChange={(e) => setRows(rows.map((x, j) => j === i ? { ...x, audience: e.target.value } : x))}>
-                    <option value="payer">Paying client letter</option>
-                    <option value="served">Served client letter</option>
-                  </select>
-                  <button type="button" style={{ ...smallBtn(C.red), padding: '0.2rem 0.5rem' }}
-                    onClick={() => setRows(rows.filter((_, j) => j !== i))}>Remove</button>
-                </div>
-              ))}
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.45rem', flexWrap: 'wrap' }}>
-                <button type="button" style={smallBtn(C.slate)}
-                  onClick={() => setRows([...rows, { title: '', name: '', email: '', role: '', audience: 'payer' }])}>
-                  Add someone
-                </button>
-                <button
-                  type="button" style={smallBtn(C.teal, true)} disabled={busy === 'people' || !briefDraft}
-                  onClick={async () => {
-                    // A ROW THAT CANNOT BE SENT TO IS NAMED, NOT DROPPED.
-                    // 8 September 2026. An address with a stray bracket on it
-                    // used to be saved and fail at the moment of sending, with
-                    // the provider's own wording, which reads as nonsense
-                    // beside three working addresses at the same domain. It is
-                    // now cleaned on the way in, and anything still wrong is
-                    // said here, before it is saved, naming the row.
-                    const bad = (rows || [])
-                      .map((r) => (r.email || '').trim())
-                      .filter(Boolean)
-                      .filter((e) => !emailLooksSendable(cleanEmail(e)))
-                    if (bad.length) {
-                      setErr(`${bad.join(', ')} ${bad.length === 1 ? 'is not an address that can be sent to' : 'are not addresses that can be sent to'}. Check for a stray bracket, comma or space.`)
-                      return
-                    }
-                    setBusy('people'); setNote(null); setErr(null)
-                    try {
-                      await api('PATCH', { clientId, brief: briefDraft })
-                      setBriefDraft(null); setEmailPreview(null)
-                      setNote('The recipients are saved.')
-                      await load()
-                    } catch (e) { setErr(e.message || 'That did not save') }
-                    setBusy(null)
-                  }}
-                >{busy === 'people' ? 'Saving...' : 'Save the recipients'}</button>
-              </div>
-            </div>
-          )
-        })()}
-      </Setting>
+      {/* ONE LIST OF PEOPLE. 9 September 2026.
+          ─────────────────────────────────────────────────────
+          This carried a second list of the same names: title, name, address,
+          role and which letter, typed here and nowhere else, beside a list of
+          the same people under Who is on it, and settings that already held a
+          role, a name, an organisation, a title, an address and whether they
+          sign. Two places to type somebody, two to correct them, and no way
+          for either to know about the other.
+
+          Which letter a person receives is now an attribute of the person on
+          the engagement, chosen where the person is. This screen reads that
+          list and sends to it. */}
 
       <Setting
         label="The letter"
@@ -429,7 +379,18 @@ export default function WelcomePack({ clientId, canManage }) {
           // than offering a button that would send to no one.
           // The named list is the list. The client contact and the parties are
           // only a fallback for an engagement where nobody has been named yet.
-          const people = brief.recipients || []
+          // The people who get a letter, read off the engagement's one list.
+          const people = parties
+            .filter((p) => p.letter === 'payer' || p.letter === 'served')
+            .map((p) => ({
+              id: p.id,
+              name: p.name,
+              title: p.title,
+              email: p.email,
+              audience: p.letter,
+              sentAt: p.letter_sent_at || undefined,
+            }))
+            .filter((p) => p.email)
           const previewing = people[Math.min(previewIdx, Math.max(0, people.length - 1))] || null
           const nameless = people.filter((r) => !r.name).map((r) => r.email)
           const named = people.map((r) => r.email).filter(Boolean)
@@ -548,7 +509,7 @@ export default function WelcomePack({ clientId, canManage }) {
                 <p style={{ ...hint, margin: '0 0 0.6rem', color: C.red }}>
                   {nameless.join(', ')} {nameless.length === 1 ? 'has' : 'have'} no name on the list, so
                   {nameless.length === 1 ? ' their letter' : ' their letters'} would open “Dear colleague,”.
-                  Add the name above and save the recipients.
+                  Add the name under Who is on it, and settings.
                 </p>
               ) : null}
               {/* WHO HAS HAD IT, AND WHO THIS SEND IS FOR. 8 September 2026.
@@ -556,26 +517,10 @@ export default function WelcomePack({ clientId, canManage }) {
                   one person and pressing send posted a second copy to
                   everybody. Each person now carries the moment their letter
                   was accepted, and the send goes to the ones ticked. */}
-              {/* A PERSON WHO HAS BEEN TYPED IS NOT YET A RECIPIENT.
-                  8 September 2026. Add someone, type their details, and their
-                  row is only in the form: the send list reads the saved list,
-                  and the route refuses an address that is not on the
-                  engagement. So the new person had no send button and no
-                  explanation, which reads as the platform refusing to add
-                  them. It now says which of them, and what to press. */}
-              {(() => {
-                const savedEmails = new Set(people.map((r) => (r.email || '').toLowerCase()))
-                const typed = ((briefDraft && briefDraft.recipients) || [])
-                  .map((r) => (r.email || '').trim())
-                  .filter((e) => e && !savedEmails.has(e.toLowerCase()))
-                return typed.length ? (
-                  <p style={{ ...hint, margin: '0 0 0.6rem', color: C.red }}>
-                    {typed.join(', ')} {typed.length === 1 ? 'is' : 'are'} not saved yet, so
-                    {typed.length === 1 ? ' they cannot' : ' they cannot'} be sent to. Press
-                    <b> Save the recipients</b> above first.
-                  </p>
-                ) : null
-              })()}
+              {/* The half-typed recipient warning that stood here is gone with
+                  the list it belonged to. A person is added under Who is on
+                  it, and settings, saved there like everything else about
+                  them, and appears here the moment they have a letter. */}
               {people.length ? (
                 <div style={{ margin: '0 0 0.7rem' }}>
                   <p style={{ ...hint, margin: '0 0 0.35rem' }}>Send this letter to. Each person gets their own letter and their own sign-in.</p>
@@ -642,12 +587,17 @@ export default function WelcomePack({ clientId, canManage }) {
                             }
                             setBusy(`mark:${r.email}`); setNote(null); setErr(null)
                             try {
-                              const next = people.map((p) => (
-                                p.email === r.email
-                                  ? { ...p, sentAt: already ? undefined : when }
-                                  : p
-                              ))
-                              await api('PATCH', { clientId, brief: { ...brief, recipients: next } })
+                              // Written on the person, where every other fact
+                              // about them lives.
+                              const { data: sess } = await supabase.auth.getSession()
+                              const token = sess.session?.access_token
+                              const res = await fetch('/api/engagement-party', {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                                body: JSON.stringify({ clientId, id: r.id, letterSentAt: already ? null : when }),
+                              })
+                              const json = await res.json().catch(() => ({}))
+                              if (!res.ok) throw new Error(json?.error || 'That could not be recorded')
                               setNote(already
                                 ? `${r.name || r.email} is back on the list to be written to.`
                                 : `${r.name || r.email} is recorded as having had it on ${new Date(when).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}. Nothing was sent.`)

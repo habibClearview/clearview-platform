@@ -286,9 +286,17 @@ describe('a narrowed send can never become a wider one', () => {
     expect(ROUTE).toContain('Add them to the recipients and save before sending')
   })
 
-  it('records only the addresses the provider accepted', () => {
+  it('records only the addresses the provider accepted, on the person', () => {
     expect(ROUTE).toContain('const justSent = new Set(sentTo.map((e) => e.toLowerCase()))')
-    expect(ROUTE).toContain('sentAt: new Date().toISOString()')
+    expect(ROUTE).toContain("from('engagement_parties')")
+    expect(ROUTE).toContain('letter_sent_at: stampedAt')
+  })
+
+  it('reads who gets a letter off the engagement’s one list of people', () => {
+    // The brief used to carry a second list of the same names purely to hold
+    // a title, an address and which of the two letters each person gets.
+    expect(ROUTE).toContain("(p.letter === 'payer' || p.letter === 'served') && p.email")
+    expect(ROUTE).toContain('const saved = fromParties.length')
   })
 })
 
@@ -324,9 +332,12 @@ describe('sending to one person', () => {
     expect(PACK).toContain('already had this letter. Send it again?')
   })
 
-  it('a typed but unsaved recipient is named, with what to press', () => {
-    expect(PACK).toContain('not saved yet, so')
-    expect(PACK).toContain('Save the recipients</b> above first')
+  it('a person with no name is named, and points at where they live', () => {
+    // The half-typed recipient warning went with the list it belonged to.
+    // Somebody is added once, under Who is on it, and settings, and appears
+    // here the moment they have a letter.
+    expect(PACK).toContain('Add the name under Who is on it, and settings.')
+    expect(PACK).not.toContain('Save the recipients')
   })
 
   it('one send at a time, so two presses cannot overlap', () => {
@@ -438,8 +449,10 @@ describe('recording a letter that went before the record existed', () => {
     expect(PACK).toContain('is back on the list to be written to.')
   })
 
-  it('writes to the saved list, not to the browser', () => {
-    expect(PACK).toContain("await api('PATCH', { clientId, brief: { ...brief, recipients: next } })")
+  it('writes to the person on the engagement, not to the browser', () => {
+    expect(PACK).not.toMatch(/localStorage|sessionStorage/)
+    expect(PACK).toContain("fetch('/api/engagement-party'")
+    expect(PACK).toContain('letterSentAt: already ? null : when')
   })
 
   it('one at a time, so a mark and a send cannot overlap', () => {

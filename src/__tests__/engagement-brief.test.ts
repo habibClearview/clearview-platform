@@ -264,8 +264,13 @@ describe('everyone gets it, by name, at the same time', () => {
 
   it('lets a funder lead and a served CEO get different letters in one send', () => {
     expect(ROUTE3).toContain("audience: person.audience")
-    expect(PACK2).toContain('Paying client letter')
-    expect(PACK2).toContain('Served client letter')
+    // ONE LIST OF PEOPLE. 9 September 2026. Which letter somebody gets is
+    // chosen where the person is, on the engagement's party list, rather than
+    // in a second list of the same names inside the welcome pack.
+    const PARTIES = fs.readFileSync('src/components/gtcv/EngagementPartiesPanel.tsx', 'utf8')
+    expect(PARTIES).toContain('Paying client letter')
+    expect(PARTIES).toContain('Served client letter')
+    expect(PACK2).toContain("p.letter === 'payer' || p.letter === 'served'")
   })
 
   it('names the addresses it could not do rather than counting them as sent', () => {
