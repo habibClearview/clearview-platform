@@ -46,6 +46,7 @@
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import CopyLink from '@/components/common/CopyLink'
 
 const SESSIONS_TABLE = 'gtcv_sessions'
 const ATTENDANCE_TABLE = 'gtcv_session_attendance'
@@ -861,6 +862,32 @@ export default function SessionPlanner({ clientId, canManage }) {
         </div>
 
         {def && <div style={{ ...hint, marginTop: '0.45rem' }}>{def.blurb}</div>}
+
+        {/* THE SESSION ROOM. 9 September 2026. One link for the whole session:
+            the call the platform carries, the recording, and the transcript
+            afterwards. It is here, on the session it belongs to, rather than on
+            a second list of the same sessions somewhere else. Send it to
+            everybody who is attending and they are in; they already have a
+            login on this platform and there is no second account anywhere. */}
+        <div style={{
+          marginTop: '0.5rem', display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap',
+        }}>
+          <a
+            href={`/call/${session.id}`}
+            style={{
+              fontFamily: 'var(--cv-font-mono)', fontSize: '0.9rem', fontWeight: 700,
+              padding: '0.3rem 0.75rem', border: `1px solid ${C.teal}`, borderRadius: 6,
+              color: C.teal, textDecoration: 'none',
+            }}
+          >
+            Open the session room
+          </a>
+          <CopyLink
+            url={`${typeof window === 'undefined' ? '' : window.location.origin}/call/${session.id}`}
+            label="Copy the link for the attendees"
+          />
+          <span style={hint}>The call, the recording and the transcript are all on that page.</span>
+        </div>
 
         <div style={{ marginTop: '0.5rem' }}>
           <div style={mono}>Purpose</div>

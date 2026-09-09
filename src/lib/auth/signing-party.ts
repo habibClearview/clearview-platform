@@ -78,9 +78,21 @@ export async function resolveSigner(
      * answer without the extra check.
      */
     expectedRole?: string | null
+    /**
+     * Whether only the engagement's named signatories may sign this.
+     *
+     * True for a Charter or a gate, where signing is an office: the Executive
+     * Director signs and the field team does not. False for a transcript,
+     * where signing means "these are my words", so it is open to everybody who
+     * was in the room and to nobody who was not.
+     *
+     * Defaults to true, so nothing that already calls this changes.
+     */
+    requireSignatory?: boolean
   },
 ): Promise<ResolvedSigner | SignerRefusal> {
   const { clientId, userId, canManage, onBehalfOfPartyId, expectedRole } = opts
+  const requireSignatory = opts.requireSignatory !== false
 
   const { data: parties, error } = await admin
     .from('engagement_parties')
@@ -96,7 +108,7 @@ export async function resolveSigner(
     }
     const party = list.find((p) => p.id === onBehalfOfPartyId)
     if (!party) return { error: 'That party is not on this engagement', status: 404 }
-    if (!party.is_signatory) return { error: 'That party does not sign', status: 403 }
+    if (requireSignatory && !party.is_signatory) return { error: 'That party does not sign', status: 403 }
     if (expectedRole && expectedRole !== party.party_role) {
       return { error: 'The role does not match that party', status: 400 }
     }
@@ -159,7 +171,7 @@ export async function resolveSigner(
       status: 403,
     }
   }
-  if (!own.is_signatory) {
+  if (requireSignatory && !own.is_signatory) {
     return { error: 'You are on this engagement but you are not a signatory', status: 403 }
   }
   if (expectedRole && expectedRole !== own.party_role) {

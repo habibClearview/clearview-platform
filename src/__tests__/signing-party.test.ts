@@ -144,6 +144,43 @@ describe('what matching by address must never do', () => {
   })
 })
 
+describe('a transcript is signed by whoever was in the room', () => {
+  // A Charter is signed by the people whose office is to sign it. A transcript
+  // is signed by the people whose words it is, which is not the same list: the
+  // field team member who answered three questions signs their own words and
+  // signs nothing else.
+  it('lets somebody who is not a named signatory sign', async () => {
+    const r = await resolveSigner(fakeAdmin([{ ...OVO, is_signatory: false }], 'ovo@ikore.org'), {
+      clientId: CLIENT, userId: ACCOUNT, canManage: false, requireSignatory: false,
+    })
+    expect(isRefusal(r)).toBe(false)
+  })
+
+  it('still refuses somebody who is not on the engagement at all', async () => {
+    const r = await resolveSigner(fakeAdmin([OVO], 'stranger@example.com'), {
+      clientId: CLIENT, userId: 'user-stranger', canManage: false, requireSignatory: false,
+    })
+    expect(isRefusal(r)).toBe(true)
+  })
+
+  it('lets the lead consultant record a non-signatory answering in the room', async () => {
+    const r = await resolveSigner(fakeAdmin([{ ...OVO, is_signatory: false }], 'coach@example.com'), {
+      clientId: CLIENT, userId: 'user-coach', canManage: true,
+      onBehalfOfPartyId: 'party-ovo', requireSignatory: false,
+    })
+    expect(isRefusal(r)).toBe(false)
+    if (isRefusal(r)) return
+    expect(r.mode).toBe('in_room')
+  })
+
+  it('keeps the signatory rule everywhere it is not switched off', async () => {
+    // The default has to stay strict, or one new caller quietly opens the
+    // Charter to everybody on the engagement.
+    const r = await self(fakeAdmin([{ ...OVO, is_signatory: false }], 'ovo@ikore.org'))
+    expect(isRefusal(r)).toBe(true)
+  })
+})
+
 describe('recording a signature given on paper is unchanged', () => {
   it('needs manage rights', async () => {
     const r = await resolveSigner(fakeAdmin([OVO], 'coach@example.com'), {

@@ -2594,7 +2594,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                     how Decision Point 2 gets its evidence and observation is how Decision Point 7 gets
                     its, and both used to sit ten and seven places away in a flat
                     list where you had to know where to look. */}
-                {dpKey==='dp02'&&<div style={{marginTop:26}}><InterviewBriefing/><div style={{height:22}}/><InterviewCaptureForm clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/><InterviewReporting clientId={selClient.id}/></div>}
+                {dpKey==='dp02'&&<div style={{marginTop:26}}><InterviewBriefing/><div style={{height:22}}/><InterviewCaptureForm clientId={selClient.id} canManage={canEdit(previewRoleId)} clientName={selClient.name}/><div style={{height:22}}/><InterviewReporting clientId={selClient.id}/></div>}
                 {dpKey==='dp07'&&<div style={{marginTop:26}}><TabPilotObservation client={selClient} pilots={pilots} onAdd={async(p)=>{const {data}=await supabase.from('pilot_observations').insert([{...p,client_id:selClient.id}]).select().single();if(data)setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,pilots:[...pilots,data]}}))} } onUpdate={(id,updates)=>optimisticWrite(`pilots:${id}`,()=>setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,pilots:pilots.map(p=>p.id!==id?p:{...p,...updates})}})),()=>supabase.from('pilot_observations').update({...updates,updated_at:new Date().toISOString()}).eq('id',id))}/></div>}
               </div>
             ))}

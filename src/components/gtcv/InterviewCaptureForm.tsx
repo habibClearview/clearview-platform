@@ -39,6 +39,8 @@
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import SessionRecorder from '@/components/gtcv/SessionRecorder'
+import TranscriptPanel from '@/components/gtcv/TranscriptPanel'
 
 const TABLE = 'gtcv_interview_captures'
 const WINDOW_MINUTES = 30
@@ -130,7 +132,7 @@ function elapsedState(row, nowMs) {
   return { mins, color: C.teal, text: `${mins} minutes since the conversation. Complete this capture within 30 minutes, before memory degrades.` }
 }
 
-export default function InterviewCaptureForm({ clientId, canManage }) {
+export default function InterviewCaptureForm({ clientId, canManage, clientName = 'this engagement' }) {
   const [rows, setRows] = useState([])
   const [openId, setOpenId] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -139,6 +141,8 @@ export default function InterviewCaptureForm({ clientId, canManage }) {
   const [dirty, setDirty] = useState({})       // { rowId: { field: true } }
   const [busy, setBusy] = useState(false)
   const [nowMs, setNowMs] = useState(() => Date.now())
+  // The recording this conversation produced, so the transcript sits with it.
+  const [recordingId, setRecordingId] = useState(null)
 
   // Refs so a blur handler always reads the current values, never the ones
   // captured when the input first rendered.
@@ -505,6 +509,41 @@ export default function InterviewCaptureForm({ clientId, canManage }) {
               change anything.
             </div>
           )}
+
+          {/* RECORDING THE CONVERSATION. 9 September 2026.
+
+              Habib: on the verbatim, we built something to capture the field
+              interviews, recorded audio and transcription when the field team
+              go out to interview potential customers.
+
+              It had never been built. The verbatim boxes below are somebody
+              typing what they remember, thirty minutes of conversation
+              reconstructed afterwards, and the method's whole value is that the
+              words are the customer's own rather than the interviewer's memory
+              of them.
+
+              This is the same recorder used for a session held on a call, and
+              it works the same way: the interviewer's phone records, the audio
+              is uploaded in half minute pieces so a walk out of signal costs
+              nothing, and the transcript comes back with the words in it. The
+              customer's spoken consent is asked for first, and it is the first
+              thing on the recording. */}
+          <div style={{ marginBottom: '1.2rem' }}>
+            <SessionRecorder
+              clientId={clientId}
+              interviewId={open.id}
+              dpId="dp02"
+              canManage={canManage}
+              clientName={clientName}
+              title={open.customer_name || open.segment || 'Customer conversation'}
+              onRecording={setRecordingId}
+            />
+            {recordingId && (
+              <div style={{ marginTop: '0.9rem' }}>
+                <TranscriptPanel recordingId={recordingId} canManage={canManage} />
+              </div>
+            )}
+          </div>
 
           {/* Interview details */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '0.75rem', marginBottom: '1.2rem' }}>

@@ -13,9 +13,13 @@
     "lint:hooks": "eslint --no-eslintrc -c .eslintrc.hooks.json 'src/**/*.{ts,tsx}' 'app/**/*.{ts,tsx}'"
   },
   "dependencies": {
+    "@livekit/components-react": "^2.9.24",
+    "@livekit/components-styles": "^1.2.0",
     "@supabase/supabase-js": "^2.39.0",
     "dexie": "^4.4.4",
     "docx": "^9.0.2",
+    "livekit-client": "^2.22.3",
+    "livekit-server-sdk": "^2.19.0",
     "next": "14.2.29",
     "pdfjs-dist": "^4.10.38",
     "qrcode": "^1.5.4",
