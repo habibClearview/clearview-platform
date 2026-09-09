@@ -22,7 +22,7 @@ import { cleanRecipients, isWebUrl } from '@/lib/validate-input'
 import { getBearerToken } from '@/lib/auth/api-authz'
 import { resolveClientAccess } from '@/lib/auth/engagement-access'
 import { checkRateLimit } from '@/lib/rate-limit'
-import { briefFromConfig, briefIntoConfig } from '@/lib/engagement-brief'
+import { briefFromConfig, briefIntoConfig, engagementPeriod } from '@/lib/engagement-brief'
 import { signInLinkFor } from '@/lib/signin-link'
 import {
   emailAvailable,
@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
     //   coachName       -- the lead consultant party, else the sender's name.
     const { data: client, error: clientErr } = await admin
       .from('engagement_clients')
-      .select('name, programme_id, engagement_mode')
+      .select('name, programme_id, engagement_mode, start_date, expected_close')
       .eq('id', clientId)
       .single()
     if (clientErr || !client) {
@@ -165,7 +165,14 @@ export async function POST(req: NextRequest) {
       programmeName = programme?.name ?? null
     }
 
-    const brief = briefFromConfig(config?.brand_overrides)
+    // ONE ANSWER TO WHEN THIS ENGAGEMENT RUNS. 9 September 2026. The period was
+    // stored twice, on the client record and in the brief read out of the
+    // purchase order, and on Ikore they disagreed. A letter quoting one closing
+    // date while the Cover shows another is the kind of thing a funder notices.
+    // The record wins because it is the one a person can change; the document
+    // fills a gap rather than contradicting an answer.
+    const stored = briefFromConfig(config?.brand_overrides)
+    const brief = { ...stored, ...engagementPeriod(client, stored) }
     const brand = (config?.brand_overrides as Record<string, unknown> | null) || null
     const brandTitle = typeof brand?.engagement_title === 'string' ? brand.engagement_title : null
     const leadConsultant = (parties || []).find((p) => p.party_role === 'lead_consultant')

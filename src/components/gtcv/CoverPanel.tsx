@@ -29,6 +29,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { loadEngagementView } from '@/lib/engagement-loader'
 import { PARTY_ROLE_LABELS } from '@/lib/engagement-types'
+import { briefFromConfig, periodDisagreement } from '@/lib/engagement-brief'
 
 const C = {
   card: '#FBF7EE', box: '#FFFDF8', ink: '#1B2A41', soft: '#4C5A6B', faint: '#8B8272',
@@ -160,6 +161,11 @@ export default function CoverPanel({ slug, canManage = false }) {
   // engagement that runs a different set does not report against a number that
   // has nothing to do with it.
   const total = Object.keys(gs).length || 12
+
+  // What the signed document says, against what the record says.
+  const brief = briefFromConfig(view.config?.brand_overrides)
+  const clash = periodDisagreement(client, brief)
+  const reference = brief?.reference || 'the signed document'
 
   const lead = parties.find((p) => p.party_role === 'lead_consultant')
   const co = parties.find((p) => p.party_role === 'co_implementer')
@@ -343,6 +349,45 @@ export default function CoverPanel({ slug, canManage = false }) {
           <div style={{ marginTop: 6 }}>
             <Text field="country" size={12.5} placeholder="Location not set" style={{ color: C.soft }} />
           </div>
+
+          {/* THE SAME FACT, STORED TWICE, DISAGREEING. 9 September 2026.
+              Habib: there are repetitions of data, presentation of the same
+              information that we do not need to have in multiple places. The
+              period was the clearest case and it was not presentation, it was
+              two stores: this record, and the brief read out of the signed
+              purchase order. On Ikore they disagreed and no screen said so, so
+              the Cover and the welcome letter could give a funder two
+              different closing dates. Which is right is not something code can
+              decide, because a start can genuinely move after an order is
+              raised, so it is named and settled in one press. */}
+          {clash.length > 0 && (
+            <div style={{
+              marginTop: 8, padding: '8px 10px', border: `1px solid ${C.warn}`, borderRadius: 8,
+              fontSize: 12, color: C.soft, lineHeight: 1.5,
+            }}>
+              <b style={{ color: C.warn }}>These dates do not match the signed document.</b>
+              {clash.map((d) => (
+                <div key={d.field} style={{ marginTop: 3 }}>
+                  The {d.field === 'start' ? 'start' : 'close'} is {monthYear(d.recorded) || d.recorded} here
+                  and {monthYear(d.document) || d.document} on {reference}.
+                </div>
+              ))}
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const patch = {}
+                    clash.forEach((d) => { patch[d.field === 'start' ? 'start_date' : 'expected_close'] = d.document })
+                    Object.entries(patch).forEach(([f, v]) => saveClient(f, v))
+                  }}
+                  style={{
+                    marginTop: 6, font: 'inherit', fontSize: 12, color: C.teal, background: 'none',
+                    border: 'none', padding: 0, textDecoration: 'underline', cursor: 'pointer',
+                  }}
+                >Use the dates on {reference}</button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

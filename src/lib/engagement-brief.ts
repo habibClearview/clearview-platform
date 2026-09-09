@@ -300,3 +300,77 @@ export function salutation(fullName?: string, title?: string): string | undefine
   const t = (title || '').trim().replace(/\.$/, '')
   return `Dear ${t ? `${t} ` : ''}${name},`
 }
+
+// ============================================================
+// THE SAME FACT, STORED TWICE, DISAGREEING
+//
+// Habib: there are repetitions of data, presentation of the same information
+// that we do not need to have in multiple places.
+//
+// The engagement's period is the clearest case, and it is not a presentation
+// problem, it is two stores. The client record holds start_date and
+// expected_close, typed when the client was created. The brief holds
+// periodStart and periodEnd, read out of the signed purchase order. On Ikore
+// they disagree: the record says 21 September 2026 to 22 March 2027 and the
+// document says something else, and nothing on any screen said so.
+//
+// Which is right is not a thing code can decide. The document is the contract
+// and the record is what somebody typed, and a person typing a date is not
+// always wrong: a start can genuinely move after a purchase order is raised.
+// So the disagreement is shown, both dates are named, and it is settled in one
+// press by the person who knows.
+//
+// Once settled there is one store. The record is what every screen and every
+// letter reads, and the document's dates are evidence of what was agreed
+// rather than a second answer to the same question.
+// ============================================================
+
+export interface PeriodDisagreement {
+  field: 'start' | 'end'
+  /** What the client record says. */
+  recorded: string
+  /** What the signed document says. */
+  document: string
+}
+
+/**
+ * Where the record and the document disagree about the engagement's period.
+ *
+ * Silent when either side is missing, because a date nobody has given is not a
+ * disagreement, and silent when they match, which is the ordinary case.
+ */
+export function periodDisagreement(
+  client: { start_date?: string | null; expected_close?: string | null },
+  brief: EngagementBrief | null | undefined,
+): PeriodDisagreement[] {
+  const out: PeriodDisagreement[] = []
+  if (!brief) return out
+  const same = (a?: string | null, b?: string | null) =>
+    String(a || '').slice(0, 10) === String(b || '').slice(0, 10)
+
+  if (client.start_date && brief.periodStart && !same(client.start_date, brief.periodStart)) {
+    out.push({ field: 'start', recorded: client.start_date.slice(0, 10), document: brief.periodStart.slice(0, 10) })
+  }
+  if (client.expected_close && brief.periodEnd && !same(client.expected_close, brief.periodEnd)) {
+    out.push({ field: 'end', recorded: client.expected_close.slice(0, 10), document: brief.periodEnd.slice(0, 10) })
+  }
+  return out
+}
+
+/**
+ * The period every screen and every letter reads.
+ *
+ * The client record wins where it has an answer, because it is the one a
+ * person can change and the one the Cover edits. The document fills a gap
+ * rather than contradicting an answer, so a client created without dates still
+ * gets the period out of its purchase order.
+ */
+export function engagementPeriod(
+  client: { start_date?: string | null; expected_close?: string | null },
+  brief: EngagementBrief | null | undefined,
+): { periodStart?: string; periodEnd?: string } {
+  return {
+    periodStart: (client.start_date || brief?.periodStart || undefined) ?? undefined,
+    periodEnd: (client.expected_close || brief?.periodEnd || undefined) ?? undefined,
+  }
+}
