@@ -63,6 +63,12 @@ export default function TranscriptPanel({ recordingId, canManage = false }) {
   const [transcript, setTranscript] = useState(null)
   const [signatures, setSignatures] = useState([])
   const [inTheRoom, setInTheRoom] = useState([])
+  // Each person's own audio, so the transcript can be checked against what
+  // was actually said rather than trusted.
+  const [tracks, setTracks] = useState([])
+  // Fetched only when somebody asks for it. A session is a large file and
+  // loading three of them because a page opened would be rude on a phone.
+  const [audio, setAudio] = useState({})
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(null)
   const [progress, setProgress] = useState(null)
@@ -76,6 +82,9 @@ export default function TranscriptPanel({ recordingId, canManage = false }) {
       const r = await api('/api/session-transcribe', 'GET', null, `?recordingId=${encodeURIComponent(recordingId)}`)
       setTranscript(r.transcript || null)
       setDraft(r.transcript?.body || '')
+
+      const rec = await api('/api/session-recording', 'GET', null, `?recordingId=${encodeURIComponent(recordingId)}`)
+      setTracks((rec.tracks || []).filter((t) => t.storage_path))
       if (r.transcript?.id) {
         const s = await api('/api/transcript-sign', 'GET', null, `?transcriptId=${encodeURIComponent(r.transcript.id)}`)
         setSignatures(s.signatures || [])
@@ -107,6 +116,38 @@ export default function TranscriptPanel({ recordingId, canManage = false }) {
     }
     setBusy(null); setProgress(null)
   }
+
+  /**
+   * Fetch one person's audio and hand it to the player.
+   *
+   * It goes through the platform rather than being an address the browser can
+   * open on its own, because a recording of somebody's voice must not have a
+   * link that works for anybody holding it. That means the sign in has to be
+   * carried on the request, which a plain audio tag cannot do, so the file is
+   * fetched here and played from the browser's own memory.
+   */
+  async function fetchAudio(trackId) {
+    setBusy(`audio:${trackId}`); setErr(null)
+    try {
+      const { data } = await supabase.auth.getSession()
+      const res = await fetch(`/api/session-recording/audio?trackId=${encodeURIComponent(trackId)}`, {
+        headers: data.session?.access_token ? { Authorization: `Bearer ${data.session.access_token}` } : {},
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j?.error || `Could not fetch the audio (${res.status})`)
+      }
+      const blob = await res.blob()
+      setAudio((prev) => ({ ...prev, [trackId]: URL.createObjectURL(blob) }))
+    } catch (e) { setErr(e.message) }
+    setBusy(null)
+  }
+
+  // Audio held in the browser's memory is given back when the panel closes.
+  useEffect(() => () => {
+    Object.values(audio).forEach((u) => { try { URL.revokeObjectURL(u) } catch { /* already gone */ } })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function save() {
     setBusy('save'); setErr(null); setNote(null)
@@ -260,6 +301,38 @@ export default function TranscriptPanel({ recordingId, canManage = false }) {
             <button onClick={sign} disabled={busy === 'sign' || !typed.trim()} style={btn(C.green, true)}>
               {busy === 'sign' ? 'Signing...' : 'Sign'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── LISTENING BACK ──────────────────────────────────
+          A recording nobody can play is a bill for storage. Each person's own
+          track, playable here, so a passage that reads oddly can be checked
+          against what was actually said before it is corrected. The audio
+          never leaves the platform's own address, so there is no link to a
+          recording of somebody's voice that keeps working after they are taken
+          off the engagement. */}
+      {tracks.length > 0 && (
+        <div style={{ marginTop: '0.9rem', paddingTop: '0.8rem', borderTop: `1px solid ${C.border}` }}>
+          <div style={{ ...mono, fontSize: '0.76rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
+            Listen back
+          </div>
+          {tracks.map((t) => (
+            <div key={t.id} style={{ marginTop: '0.5rem' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.92rem', marginBottom: '0.2rem' }}>
+                {t.speaker_name || 'Unnamed speaker'}
+              </div>
+              {audio[t.id]
+                ? <audio controls autoPlay style={{ width: '100%' }} src={audio[t.id]} />
+                : (
+                  <button onClick={() => fetchAudio(t.id)} disabled={busy === `audio:${t.id}`} style={btn(C.navy)}>
+                    {busy === `audio:${t.id}` ? 'Fetching...' : 'Play this person'}
+                  </button>
+                )}
+            </div>
+          ))}
+          <div style={{ ...hint, marginTop: '0.4rem' }}>
+            One track per person, at full quality, whatever the call was doing at the time.
           </div>
         </div>
       )}

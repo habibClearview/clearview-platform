@@ -20,6 +20,8 @@ const CHUNK = fs.readFileSync('app/api/session-recording/chunk/route.ts', 'utf8'
 const CALL = fs.readFileSync('app/api/call-token/route.ts', 'utf8')
 const TRANSCRIBE = fs.readFileSync('app/api/session-transcribe/route.ts', 'utf8')
 const SIGN = fs.readFileSync('app/api/transcript-sign/route.ts', 'utf8')
+const AUDIO = fs.readFileSync('app/api/session-recording/audio/route.ts', 'utf8')
+const PANEL = fs.readFileSync('src/components/gtcv/TranscriptPanel.tsx', 'utf8')
 
 describe('who may start and stop a recording', () => {
   it('takes manage rights to open one, and to close one', () => {
@@ -143,5 +145,36 @@ describe('signing what was said', () => {
 
   it('will not sign a transcript that has not been issued', () => {
     expect(SIGN).toContain('not open for signature yet')
+  })
+})
+
+describe('listening back to a recording', () => {
+  it('checks the listener is on the engagement before sending a byte', () => {
+    const authorised = AUDIO.indexOf('requireAccess')
+    const send = AUDIO.indexOf('new NextResponse(joined')
+    expect(authorised).toBeGreaterThan(-1)
+    expect(send).toBeGreaterThan(authorised)
+  })
+
+  it('never hands out an address that works without signing in', () => {
+    // A signed storage link to somebody's voice keeps working after they are
+    // taken off the engagement, and can be forwarded to anybody.
+    expect(AUDIO).not.toContain('createSignedUrl')
+    expect(AUDIO).not.toContain('getPublicUrl')
+  })
+
+  it('is never cached by anything in between', () => {
+    expect(AUDIO).toContain("'Cache-Control': 'private, no-store'")
+  })
+
+  it('is fetched with the sign in carried on the request', () => {
+    // An audio tag cannot carry one, which is why the file is fetched and
+    // played from the browser's own memory instead.
+    expect(PANEL).toContain('Bearer ${data.session.access_token}')
+    expect(PANEL).toContain('URL.createObjectURL')
+  })
+
+  it('is only fetched when somebody asks for it', () => {
+    expect(PANEL).toContain('Play this person')
   })
 })
