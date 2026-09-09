@@ -66,18 +66,22 @@ describe('reading it before it is sent', () => {
 })
 
 describe('where the welcome pack lives', () => {
-  it('is on the Cover tab, the screen opening a client lands on', () => {
-    // It was five tabs deep beside the momentum flag, which is where Habib
-    // looked for it and did not find it.
-    expect(DASH).toContain("shownTab==='cover'&&<>{mayRun?<WelcomePack")
+  it('sits with the people it is sent to', () => {
+    // 9 September 2026. It was on the Cover, which is the reading of the
+    // engagement, while the list of who receives it is under Who is on it.
+    // Sending somebody a letter meant holding two screens in your head. It is
+    // one job, so it is one place.
     expect(DASH).toContain("import WelcomePack from '@/components/gtcv/WelcomePack'")
+    const setup = DASH.slice(DASH.indexOf("shownTab==='eng_setup'"))
+    expect(setup.slice(0, 900)).toContain('<WelcomePack')
+    expect(DASH).not.toContain("shownTab==='cover'&&<>{mayRun?<WelcomePack")
   })
 
   it('is where a won deal lands you', () => {
     // Marking a deal Won pre-filled the client form and then stopped. It now
     // opens the client it just made, on the tab the welcome pack is on.
     expect(DASH).toContain('cameFromAWonDeal')
-    expect(DASH).toMatch(/cameFromAWonDeal\)\{setSelClientId\(data\.id\);setActiveTab\('cover'\)/)
+    expect(DASH).toMatch(/cameFromAWonDeal\)\{setSelClientId\(data\.id\);setActiveTab\('eng_setup'\)/)
   })
 
   it('takes the contract straight off the signed document', () => {
@@ -98,7 +102,13 @@ describe('the letter can be edited on the screen', () => {
     // letter he can send over his own name.
     expect(SETTINGS).toContain('Edit the letter')
     expect(SETTINGS).toContain('Save the letter')
-    expect(SETTINGS).toMatch(/\? 'letterPayer' : 'letterServed'/)
+    // 9 September 2026. Three letters now, because the three parties are in
+    // three different positions. One helper decides which, so a fourth is one
+    // line rather than four places to remember.
+    expect(SETTINGS).toContain('letterKeyFor(')
+    for (const key of ['letterPayer', 'letterServed', 'letterCoImplementer']) {
+      expect(SETTINGS).toContain(key)
+    }
   })
 
   it('can be put back to the generated letter', () => {
@@ -141,7 +151,26 @@ describe('the send screen', () => {
   })
 
   it('edits the letter for whichever side is being read', () => {
-    expect(SETTINGS).toContain("(previewing ? previewing.audience : welcomeAudience) === 'payer'")
+    expect(SETTINGS).toContain('letterKeyFor(previewing ? previewing.audience : welcomeAudience)')
+  })
+
+  it('offers the co-implementer letter beside the other two', () => {
+    // Habib asked whether there is an email that shows the onboarding of a
+    // co-implementer, just like the funders and served clients. There was not,
+    // so the one person joining as a professional peer received the platform's
+    // stock invite and nothing about the work.
+    const PARTIES = fs.readFileSync('src/components/gtcv/EngagementPartiesPanel.tsx', 'utf8')
+    expect(PARTIES).toContain('<option value="co_implementer">Co-implementer letter</option>')
+    expect(SETTINGS).toContain("p.letter === 'co_implementer'")
+    expect(fs.readFileSync('src/lib/email.ts', 'utf8')).toContain('function coImplementerBlocks(')
+  })
+
+  it('does not turn sending a letter into a grant of manage rights', () => {
+    // A co-implementer manages the clients assigned to them, which is the
+    // strongest access short of the lead consultant's own. It is granted where
+    // somebody is choosing to grant it, and the letter follows.
+    expect(ROUTE).toContain('A CO-IMPLEMENTER IS NOT GIVEN ACCESS BY BEING SENT A LETTER')
+    expect(ROUTE).toContain('Add them under the co-implementer screen first')
   })
 
   it('reads the client contact and the parties, without duplicates', () => {

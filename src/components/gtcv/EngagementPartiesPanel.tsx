@@ -63,7 +63,15 @@ const BLANK = {
 }
 
 /** What each letter is called on screen, and what no letter means. */
-const LETTER_LABEL = { payer: 'Paying client letter', served: 'Served client letter', '': 'No letter' }
+const LETTER_LABEL = {
+  payer: 'Paying client letter',
+  served: 'Served client letter',
+  // A CO-IMPLEMENTER GOT SUPABASE'S STOCK INVITE. 9 September 2026. Habib asked
+  // whether there is an email that shows the onboarding of a co-implementer,
+  // just like the funders and the served clients. There was not.
+  co_implementer: 'Co-implementer letter',
+  '': 'No letter',
+}
 
 async function call(method, body) {
   const { data } = await supabase.auth.getSession()
@@ -306,6 +314,7 @@ function PartyFields({ value, onChange }) {
           <option value="">No letter</option>
           <option value="served">Served client letter</option>
           <option value="payer">Paying client letter</option>
+          <option value="co_implementer">Co-implementer letter</option>
         </select>
       </div>
       <div>

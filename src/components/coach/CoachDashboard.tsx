@@ -2216,7 +2216,12 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             // the coach on a list with nothing telling them what came next. It
             // now opens the client it just made, on Cover, which is where the
             // welcome pack and the contract upload are.
-            if(cameFromAWonDeal){setSelClientId(data.id);setActiveTab('cover');setView('client')}
+            // A WON DEAL LANDS WHERE THE FIRST JOB IS. 9 September 2026. It
+            // used to land on the Cover because that is where the welcome pack
+            // was. The pack now sits with the people it is sent to, and the
+            // first thing to do with a new client is say who is on it, so that
+            // is where it lands.
+            if(cameFromAWonDeal){setSelClientId(data.id);setActiveTab('eng_setup');setView('client')}
           }
         }} onCancel={()=>{setShowNew(false);setNewClientPrefill(null)}}/>}
         {newClientPrefill&&<div style={{fontSize:'0.85rem',color:C.teal,marginTop:'-0.9rem',marginBottom:'1rem'}}>Pre-filled from the Pipeline deal you just marked Won.</div>}
@@ -2554,7 +2559,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 <button type="button" onClick={()=>setFlashLocked(null)} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',padding:'0.25rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,background:'transparent',color:C.slate,cursor:'pointer'}}>Close</button>
               </div>
             ):null}
-            {shownTab==='cover'&&<>{mayRun?<WelcomePack clientId={selClient.id} canManage={canEdit(previewRoleId)}/>:null}{mayRun?<WhatNeedsYou clientId={selClient.id} canManage={canEdit(previewRoleId)} onGoTo={setActiveTab}/>:null}<CoverPanel slug={selClient.slug} canManage={canEdit(previewRoleId)}/><div style={{height:18}}/>
+            {shownTab==='cover'&&<>{mayRun?<WhatNeedsYou clientId={selClient.id} canManage={canEdit(previewRoleId)} onGoTo={setActiveTab}/>:null}<CoverPanel slug={selClient.slug} canManage={canEdit(previewRoleId)}/><div style={{height:18}}/>
               {/* THE SEPARATE EDITOR IS GONE. 9 September 2026. Habib: it is
                   really dumb to create a separate place to edit when each of
                   the elements on the cover can be edited on the cover. Every
@@ -2585,7 +2590,14 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 logins, then how the engagement runs. Sharing a canvas with a
                 prospect is selling, not delivery, so it is not on a client's
                 page; it moves to the coach side. */}
-            {shownTab==='eng_setup'&&<><EngagementPartiesPanel clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/>{isSuperCoach&&<><ClientTeamInvite client={selClient}/><div style={{height:22}}/></>}<EngagementSettings clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
+            {shownTab==='eng_setup'&&<><EngagementPartiesPanel clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/>
+              {/* THE WELCOME PACK SITS WITH THE PEOPLE IT IS SENT TO.
+                  9 September 2026. It was on the Cover, which is the reading of
+                  the engagement, while the list of who receives it is here.
+                  Sending somebody a letter meant holding two screens in your
+                  head and moving between them. It is one job, so it is one
+                  place: the people, then what goes to them. */}
+              {mayRun?<><WelcomePack clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>:null}{isSuperCoach&&<><ClientTeamInvite client={selClient}/><div style={{height:22}}/></>}<EngagementSettings clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
             {shownTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
             {shownTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={previewRoleId} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
             {shownTab==='sessions'&&<><SessionPlanner clientId={selClient.id} canManage={canEdit(previewRoleId)}/></>}

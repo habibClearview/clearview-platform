@@ -121,6 +121,20 @@ const FIELD_NAMES = {
   deliverables: 'what it produces', services: 'services',
 }
 
+/**
+ * Which of the three letters an audience edits.
+ *
+ * Three letters, because the three parties are in three different positions: a
+ * funder is being reported to, a served organisation is being worked with, and
+ * a co-implementer is delivering alongside. One letter to all three says the
+ * wrong thing to two of them.
+ */
+function letterKeyFor(audience) {
+  if (audience === 'payer') return 'letterPayer'
+  if (audience === 'co_implementer') return 'letterCoImplementer'
+  return 'letterServed'
+}
+
 export default function WelcomePack({ clientId, canManage }) {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
@@ -381,7 +395,7 @@ export default function WelcomePack({ clientId, canManage }) {
           // only a fallback for an engagement where nobody has been named yet.
           // The people who get a letter, read off the engagement's one list.
           const people = parties
-            .filter((p) => p.letter === 'payer' || p.letter === 'served')
+            .filter((p) => p.letter === 'payer' || p.letter === 'served' || p.letter === 'co_implementer')
             .map((p) => ({
               id: p.id,
               name: p.name,
@@ -487,7 +501,7 @@ export default function WelcomePack({ clientId, canManage }) {
                     {people.map((r, i) => (
                       <option key={i} value={i}>
                         {[r.title, r.name].filter(Boolean).join(' ') || r.email}
-                        {` — ${r.audience === 'payer' ? 'paying client' : 'served client'} letter`}
+                        {` — ${r.audience === 'payer' ? 'paying client' : r.audience === 'co_implementer' ? 'co-implementer' : 'served client'} letter`}
                         {r.name ? '' : ' — NO NAME'}
                       </option>
                     ))}
@@ -495,7 +509,7 @@ export default function WelcomePack({ clientId, canManage }) {
                 </p>
               ) : (
                 <p style={{ ...hint, margin: '0 0 0.6rem', display: 'flex', gap: '0.9rem', flexWrap: 'wrap' }}>
-                  {[['served', 'the organisation being served'], ['payer', 'the paying client']].map(([v, l]) => (
+                  {[['served', 'the organisation being served'], ['payer', 'the paying client'], ['co_implementer', 'the co-implementer']].map(([v, l]) => (
                     <label key={v} style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', cursor: 'pointer' }}>
                       <input
                         type="radio" name="welcome-audience" checked={welcomeAudience === v}
@@ -667,7 +681,9 @@ export default function WelcomePack({ clientId, canManage }) {
                       // Load the letter for editing at the same time, so the
                       // words on screen are the words that can be changed.
                       const aud = previewing ? previewing.audience : welcomeAudience
-                      const saved = aud === 'payer' ? brief.letterPayer : brief.letterServed
+                      const saved = aud === 'payer' ? brief.letterPayer
+                        : aud === 'co_implementer' ? brief.letterCoImplementer
+                          : brief.letterServed
                       setLetterDraft(saved && saved.trim() ? saved : (r.text || ''))
                     }
                     else setErr('The preview came back empty.')
@@ -732,8 +748,7 @@ export default function WelcomePack({ clientId, canManage }) {
                       onClick={async () => {
                         setBusy('letter'); setNote(null); setErr(null)
                         try {
-                          const key = (previewing ? previewing.audience : welcomeAudience) === 'payer'
-                            ? 'letterPayer' : 'letterServed'
+                          const key = letterKeyFor(previewing ? previewing.audience : welcomeAudience)
                           const next = { ...(briefDraft || brief || {}), [key]: letterDraft }
                           await api('PATCH', { clientId, brief: next })
                           setBriefDraft(null); setEmailPreview(null)
@@ -749,8 +764,7 @@ export default function WelcomePack({ clientId, canManage }) {
                         // Back to the generated letter, discarding the edit.
                         setBusy('letter'); setNote(null); setErr(null)
                         try {
-                          const key = (previewing ? previewing.audience : welcomeAudience) === 'payer'
-                            ? 'letterPayer' : 'letterServed'
+                          const key = letterKeyFor(previewing ? previewing.audience : welcomeAudience)
                           const next = { ...(briefDraft || brief || {}), [key]: '' }
                           await api('PATCH', { clientId, brief: next })
                           setBriefDraft(null); setEmailPreview(null); setLetterDraft(null)

@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       recipients?: string[]
       journeyUrl?: string
       preview?: boolean
-      audience?: 'payer' | 'served'
+      audience?: 'payer' | 'served' | 'co_implementer'
       recipientName?: string
       recipientTitle?: string
       wantText?: boolean
@@ -186,7 +186,7 @@ export async function POST(req: NextRequest) {
       engagementMode: (client as { engagement_mode?: string }).engagement_mode || 'canvas',
       brief,
       signInIncluded: includeSignIn === true,
-      audience: audience === 'payer' ? 'payer' : 'served',
+      audience: audience === 'payer' ? 'payer' : audience === 'co_implementer' ? 'co_implementer' : 'served',
       recipientName: typeof recipientName === 'string' ? recipientName.trim().slice(0, 120) || undefined : undefined,
       recipientTitle: typeof recipientTitle === 'string' ? recipientTitle.trim().slice(0, 16) || undefined : undefined,
     }
@@ -244,7 +244,7 @@ export async function POST(req: NextRequest) {
         email: p.email as string,
         name: (p.name as string) || undefined,
         title: (p.title as string) || undefined,
-        audience: p.letter as 'payer' | 'served',
+        audience: p.letter as 'payer' | 'served' | 'co_implementer',
       }))
 
     const saved = fromParties.length
@@ -253,7 +253,7 @@ export async function POST(req: NextRequest) {
           email,
           name: recipientName,
           title: recipientTitle,
-          audience: (audience === 'payer' ? 'payer' : 'served') as 'payer' | 'served',
+          audience: (audience === 'payer' ? 'payer' : audience === 'co_implementer' ? 'co_implementer' : 'served') as 'payer' | 'served' | 'co_implementer',
         }))
 
     // Narrowed, never widened. An address that is not already on this
@@ -307,6 +307,19 @@ export async function POST(req: NextRequest) {
             // welcome cannot demote a super_coach to a funder.
             const { data: already } = await admin
               .from('user_profiles').select('id, role').eq('id', linked.userId || '').maybeSingle()
+            // A CO-IMPLEMENTER IS NOT GIVEN ACCESS BY BEING SENT A LETTER.
+            // 9 September 2026. A co-implementer manages the clients assigned
+            // to them, which is the strongest access this platform hands out
+            // short of the lead consultant's own. Creating that from "send the
+            // welcome letter" would make an email into a grant of manage
+            // rights. They are added under the co-implementer screen, which is
+            // where somebody is choosing to give it, and the letter follows.
+            if (linked.userId && !already && person.audience === 'co_implementer') {
+              throw new Error(
+                'they do not have a login yet. Add them under the co-implementer screen first, '
+                + 'which is where their access is granted, then send this letter',
+              )
+            }
             if (linked.userId && !already) {
               const isPayer = person.audience === 'payer'
               const { error: profErr } = await admin.from('user_profiles').insert({

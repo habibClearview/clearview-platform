@@ -78,6 +78,15 @@ export interface EngagementBrief {
   letterPayer?: string
   letterServed?: string
   /**
+   * A CO-IMPLEMENTER GOT SUPABASE'S STOCK INVITE. 9 September 2026.
+   *
+   * Habib asked whether there is an email that shows the onboarding of a
+   * co-implementer, just like the funders and served clients. There was not,
+   * so the one person joining the engagement as a professional peer received
+   * the platform's default "you have been invited" and nothing about the work.
+   */
+  letterCoImplementer?: string
+  /**
    * EVERYONE WHO GETS THE LETTER, BY NAME.
    *
    * An engagement is not two people. Tanager alone has the overall lead, the
@@ -95,7 +104,7 @@ export interface Recipient {
   name?: string
   email: string
   role?: string
-  audience: 'payer' | 'served'
+  audience: 'payer' | 'served' | 'co_implementer'
   /**
    * WHO HAS ACTUALLY HAD THE LETTER. 8 September 2026.
    *
@@ -179,7 +188,7 @@ function readRecipients(v: unknown): Recipient[] | undefined {
       title: str(row.title, 16),
       name: str(row.name, 120),
       role: str(row.role, 120),
-      audience: row.audience === 'payer' ? 'payer' : 'served',
+      audience: row.audience === 'payer' ? 'payer' : row.audience === 'co_implementer' ? 'co_implementer' : 'served',
       sentAt: isoStamp(row.sentAt),
     })
   }
@@ -235,6 +244,7 @@ export function briefFromConfig(brandOverrides: unknown): EngagementBrief {
     welcomeIntro: str(b.welcomeIntro, CAP.intro),
     letterPayer: str(b.letterPayer, CAP.letter),
     letterServed: str(b.letterServed, CAP.letter),
+    letterCoImplementer: str(b.letterCoImplementer, CAP.letter),
     recipients: readRecipients(b.recipients),
   }
 }

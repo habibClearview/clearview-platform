@@ -197,7 +197,7 @@ export interface EngagementEmailConfig {
   /** What the signed Scope of Work and Purchase Order say. */
   brief?: EngagementBrief
   /** Who this copy is addressed to: the organisation paying, or the one served. */
-  audience?: 'payer' | 'served'
+  audience?: 'payer' | 'served' | 'co_implementer'
   /** Mr, Ms, Dr, whatever they are addressed as. */
   recipientTitle?: string
   /** True when the journey link IS this person's one-time sign-in link. */
@@ -411,12 +411,77 @@ function numberWord(n: number): string {
   return ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'][n] || String(n)
 }
 
+
+/**
+ * THE CO-IMPLEMENTER'S LETTER. 9 September 2026.
+ *
+ * Habib asked whether there is an email that shows the onboarding of a
+ * co-implementer, just like the funders and the served clients. There was not.
+ * The one person joining as a professional peer received the platform's stock
+ * "you have been invited" and nothing about the work, which is the worst first
+ * impression of the three.
+ *
+ * It is a different letter because they are in a different position. They are
+ * not being sold to and they are not being served: they are delivering
+ * alongside, so what they need is what the engagement is, what part of it is
+ * theirs, what the method will not let them do, and what they can see. The
+ * method paragraph and the nine points are shared with the other two letters
+ * deliberately, because all three parties should be reading the same
+ * description of the same work.
+ */
+function coImplementerBlocks(cfg: EngagementEmailConfig, brief: EngagementBrief): Block[] {
+  const org = brief.servedName || cfg.clientName
+  const payer = brief.payerName
+  const span = durationInWords(brief) || 'the engagement'
+  const b: Block[] = []
+
+  b.push({ kind: 'p', text:
+    `Thank you for agreeing to work on this engagement with me. Over the next ${span} we will develop `
+    + `${org}'s services into offers that can be priced, sold and defended commercially, and you are `
+    + 'delivering it alongside me.' })
+
+  b.push({ kind: 'h', text: 'The method' })
+  b.push({ kind: 'p', text: methodParagraph(org) })
+  b.push({ kind: 'p', text: 'The nine, in sequence:' })
+  b.push({ kind: 'ul', items: ninePoints(org, true) })
+
+  b.push({ kind: 'h', text: 'What the method asks of you' })
+  b.push({ kind: 'p', text:
+    'Every decision rests on evidence recorded in the client\'s own words, so nothing is written up from '
+    + 'memory afterwards and nothing is tidied. Where a session is recorded, the recording and the '
+    + 'transcript belong to the engagement and are read and signed by the people who were there.' })
+  b.push({ kind: 'p', text:
+    'A gate closes when the evidence behind it is on the platform and the decision is signed. It does not '
+    + 'close because the work was done.' })
+
+  b.push({ kind: 'h', text: 'What you can see, and what you cannot' })
+  b.push({ kind: 'p', text:
+    `You have the same view of ${org}'s engagement as I do: the decisions, the evidence, the sessions and `
+    + 'what is outstanding. The commercial terms between me and '
+    + `${payer || 'the funder'} are not part of that view, and the cost mapping sessions are held under the `
+    + 'method\'s own privacy protocol, which restricts them to the organisation\'s finance, human resources '
+    + 'and leadership.' })
+
+  b.push({ kind: 'h', text: 'The platform' })
+  b.push({ kind: 'p', text:
+    'ClearView holds each decision, the evidence supporting it and what remains outstanding. Your sign-in '
+    + 'is below. There is nothing to install, and the sessions are held on the platform itself.' })
+
+  b.push({ kind: 'p', text:
+    'If anything here does not match what we agreed, tell me before the engagement opens rather than after.' })
+
+  return b
+}
+
 /** The generated letter for one audience, as the text a person edits. */
 export function letterText(cfg: EngagementEmailConfig): string {
   const brief = cfg.brief || {}
-  return blocksToText((cfg.audience || 'served') === 'payer'
-    ? payerBlocks(cfg, brief)
-    : servedBlocks(cfg, brief))
+  const audience = cfg.audience || 'served'
+  return blocksToText(
+    audience === 'payer' ? payerBlocks(cfg, brief)
+      : audience === 'co_implementer' ? coImplementerBlocks(cfg, brief)
+        : servedBlocks(cfg, brief),
+  )
 }
 
 export function buildScopeEmail(cfg: EngagementEmailConfig): { subject: string; html: string } {
@@ -427,14 +492,22 @@ export function buildScopeEmail(cfg: EngagementEmailConfig): { subject: string; 
   const prog = brief.payerProgramme ? `, ${brief.payerProgramme}` : ''
   const subject = audience === 'payer'
     ? `${subjectName}${prog} — how the engagement will run`
-    : `${subjectName}${prog ? ` and ${brief.payerProgramme}` : ''} — how we will work`
+    : audience === 'co_implementer'
+      ? `${subjectName}${prog} — the engagement you are delivering with me`
+      : `${subjectName}${prog ? ` and ${brief.payerProgramme}` : ''} — how we will work`
 
   // An edited letter is the letter. The generated one is only what he starts
   // from, and it is used when he has not written his own.
-  const edited = audience === 'payer' ? brief.letterPayer : brief.letterServed
+  const edited = audience === 'payer' ? brief.letterPayer
+    : audience === 'co_implementer' ? brief.letterCoImplementer
+      : brief.letterServed
   const paragraphs = edited && edited.trim()
     ? textToEmail(edited)
-    : blocksToEmail(audience === 'payer' ? payerBlocks(cfg, brief) : servedBlocks(cfg, brief))
+    : blocksToEmail(
+      audience === 'payer' ? payerBlocks(cfg, brief)
+        : audience === 'co_implementer' ? coImplementerBlocks(cfg, brief)
+          : servedBlocks(cfg, brief),
+    )
 
   const html = brandedEmail({
     heading: salutation(cfg.recipientName, cfg.recipientTitle) || 'Dear colleague,',
@@ -445,7 +518,9 @@ export function buildScopeEmail(cfg: EngagementEmailConfig): { subject: string; 
     ctaLabel: cfg.signInIncluded ? 'Set your password and open your dashboard' : 'Open your dashboard',
     preheader: audience === 'payer'
       ? 'How the engagement runs, what you will be able to see, and your access.'
-      : 'How we will work, what the nine decision points ask of you, and your access.',
+      : audience === 'co_implementer'
+        ? 'What the engagement is, what the method asks of you, and your access.'
+        : 'How we will work, what the nine decision points ask of you, and your access.',
     ctaUrl: cfg.journeyUrl,
     footNote: raw(`${escapeHtml(cfg.coachName)}<br/>Lead Practitioner<br/>The Canvas Coach | habibonifade.com${
       brief.reference ? `<br/><span style="color:#8A94A0;">${escapeHtml(brief.reference)}</span>` : ''
