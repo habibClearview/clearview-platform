@@ -198,4 +198,13 @@ describe('the page fits the screen it is on', () => {
     expect(CSS).toContain('.cv-client-shell')
     expect(CSS).toContain('grid-template-columns: 1fr !important')
   })
+
+  it('does not lay the navigation out sideways, which broke it on a real phone', () => {
+    // The tabs are each wrapped in a div, so a rule aimed at the buttons
+    // matched only the collapse control and every tab was squeezed to its
+    // narrowest and printed one letter per line. Reverted the same day.
+    const phone = CSS.slice(CSS.indexOf('THE CLIENT SCREEN ON A PHONE'))
+    expect(phone).not.toContain('display: flex !important')
+    expect(phone).not.toContain('overflow-x: auto !important')
+  })
 })
