@@ -21,6 +21,8 @@ const CALL = fs.readFileSync('app/api/call-token/route.ts', 'utf8')
 const TRANSCRIBE = fs.readFileSync('app/api/session-transcribe/route.ts', 'utf8')
 const SIGN = fs.readFileSync('app/api/transcript-sign/route.ts', 'utf8')
 const AUDIO = fs.readFileSync('app/api/session-recording/audio/route.ts', 'utf8')
+const CALLUI = fs.readFileSync('src/components/gtcv/SessionCall.tsx', 'utf8')
+const PAGE = fs.readFileSync('app/call/[sessionId]/page.tsx', 'utf8')
 const PANEL = fs.readFileSync('src/components/gtcv/TranscriptPanel.tsx', 'utf8')
 
 describe('who may start and stop a recording', () => {
@@ -95,8 +97,13 @@ describe('who is let into a call', () => {
   })
 
   it('names the person from their account and never from the request', () => {
-    expect(CALL).toContain('identity: access.userId')
+    // The identity is built from the verified session. 10 September 2026 added
+    // a device to the end of it, because identity is unique in a room and the
+    // account alone meant a phone threw the laptop out. The front of it is
+    // still server derived, so it can never be somebody else.
+    expect(CALL).toContain('${access.userId}::')
     expect(CALL).not.toMatch(/identity:\s*body\./)
+    expect(CALL).not.toMatch(/identity:\s*`?\$?\{?body/)
   })
 
   it('says plainly when the call has not been switched on', () => {
@@ -197,5 +204,81 @@ describe('the signed transcript files itself as evidence', () => {
   it('never costs somebody their signature when it fails', () => {
     // Filing is a convenience. A signature is the thing that was asked for.
     expect(SIGN).toContain('.catch(() => null)')
+  })
+})
+
+// ============================================================
+// THE THINGS A SERVER TEST CANNOT SEE
+//
+// 10 September 2026. The session room was opened by a real person for the
+// first time and three faults appeared at once, none of which any of the 1,712
+// tests could have caught, because all of them tested answers rather than
+// screens.
+// ============================================================
+describe('the button that starts a recording', () => {
+  it('is offered before the first recording exists', () => {
+    // The room reads canManage from the very call that answers "nothing is
+    // open". That answer left canManage out, so it was always false, so the
+    // button never appeared, so the feature was unreachable from the screen
+    // built for it.
+    const get = OPEN.slice(OPEN.indexOf('export async function GET'))
+    const branch = get.slice(get.indexOf('if (!recording) {'), get.indexOf('const { data: tracks }'))
+    expect(branch).toContain('canManage: access.canManage')
+  })
+
+  it('never quietly reports manage rights nobody checked', () => {
+    // The one path that answers without asking says so explicitly.
+    expect(OPEN).toContain('canManage: false')
+  })
+
+  it('is the value the room actually reads', () => {
+    expect(PAGE).toContain('setCanManage(Boolean(json?.canManage))')
+  })
+})
+
+describe('one person on two devices', () => {
+  it('does not let a second device throw the first out', () => {
+    // The media service treats identity as unique in a room and removes the
+    // older connection. On the account id alone, joining on a phone silently
+    // ended the call on the laptop.
+    expect(CALL).toContain('identity: `${access.userId}::${device}`')
+    expect(CALL).not.toContain('identity: access.userId,')
+  })
+
+  it('still builds the identity from the verified session, never the request', () => {
+    // The device only separates one of a person's own connections from
+    // another. It can never make them somebody else.
+    expect(CALL).toContain('access.userId')
+    expect(CALL).toContain("replace(/[^A-Za-z0-9_-]/g, '')")
+  })
+
+  it('sends the device from the browser that is joining', () => {
+    expect(CALLUI).toContain('deviceId: deviceId()')
+  })
+})
+
+describe('a call that ends says why', () => {
+  it('does not put the join button back with nothing said', () => {
+    // A failure that looks exactly like a click that did nothing is the worst
+    // of both: no call, and no reason to look for one.
+    expect(CALLUI).toContain('setErr(disconnectReason(reason))')
+  })
+
+  it('says the one that actually happened, in words', () => {
+    expect(CALLUI).toContain('You joined this call on another device')
+  })
+})
+
+describe('what is reachable on a call', () => {
+  it('offers the camera and screen sharing, not the minimal bar', () => {
+    expect(CALLUI).toContain('screenShare: true')
+    expect(CALLUI).not.toContain('variation="minimal"')
+  })
+
+  it('says who is on the call in words, not only as tiles', () => {
+    // On an audio call every tile is a grey placeholder, so "is the funder here
+    // yet" cannot be answered by looking at them.
+    expect(CALLUI).toContain('On the call:')
+    expect(CALLUI).toContain('You are the only one here so far')
   })
 })

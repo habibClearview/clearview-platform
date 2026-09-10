@@ -306,12 +306,21 @@ export async function GET(req: NextRequest) {
     }
 
     if (!recording) {
-      // Nothing open. Say so against the engagement the caller named, having
-      // first checked they may see it at all.
-      if (!clientId) return NextResponse.json({ recording: null, tracks: [] })
+      // NOTHING OPEN IS NOT NOTHING TO SAY. 10 September 2026.
+      //
+      // This returned the empty answer without canManage, and the session room
+      // reads canManage from exactly this call to decide whether to offer Start
+      // recording. Before the first recording exists there is no recording, so
+      // this branch always answered, so canManage was always false, so the
+      // button never appeared and the whole feature was unreachable from the
+      // screen built for it. The lead consultant opened a session room and was
+      // shown a heading with nothing under it.
+      if (!clientId) return NextResponse.json({ recording: null, tracks: [], canManage: false })
       const access = await requireAccess(req, admin, clientId, 'view')
       if (!access.ok) return refuseAccess(access)
-      return NextResponse.json({ recording: null, tracks: [] })
+      return NextResponse.json({
+        recording: null, tracks: [], live: [], seconds: 0, canManage: access.canManage,
+      })
     }
 
     const access = await requireAccess(req, admin, recording.client_id, 'view')

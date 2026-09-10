@@ -52,10 +52,25 @@ export async function POST(req: NextRequest) {
 
     const room = callRoomName(clientId, sessionId)
 
-    // The identity is the account, so one person cannot appear twice and a
-    // name in the request cannot impersonate anybody.
+    // ONE PERSON, TWO DEVICES. 10 September 2026.
+    //
+    // This was the account id alone, and the comment here called that a feature:
+    // one person cannot appear twice. It is not a feature, it is the bug. The
+    // media service treats identity as unique in a room and removes the older
+    // connection when a second one arrives with the same one. So joining on a
+    // phone silently threw the laptop out, and a page that reconnected threw
+    // itself out, which is why pressing Join the call put the button straight
+    // back with nothing said.
+    //
+    // The account id still comes from the verified session and is still the
+    // front of the identity, so nobody can present as anybody else. The device
+    // only distinguishes one of that person's own connections from another.
+    const device = String(body.deviceId || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40)
+      || Math.random().toString(36).slice(2, 12)
+
     const at = new AccessToken(process.env.LIVEKIT_API_KEY!, process.env.LIVEKIT_API_SECRET!, {
-      identity: access.userId,
+      identity: `${access.userId}::${device}`,
+      // What everybody in the room actually sees. The identity is plumbing.
       name: access.fullName || 'Participant',
       // Two hours. A session is an afternoon, and the page renews it quietly.
       ttl: 60 * 60 * 2,

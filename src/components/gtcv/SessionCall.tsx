@@ -31,17 +31,56 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   LiveKitRoom, RoomAudioRenderer, ControlBar, GridLayout, ParticipantTile,
-  useTracks, ConnectionStateToast,
+  useTracks, useParticipants, ConnectionStateToast,
 } from '@livekit/components-react'
 import { Track } from 'livekit-client'
 import '@livekit/components-styles'
 import { supabase } from '@/lib/supabase'
+import { deviceId } from '@/lib/recorder-client'
 
 const C = {
   card: 'var(--cv-card)', border: 'var(--cv-border)', slate: 'var(--cv-slate)',
   navy: 'var(--cv-navy)', teal: 'var(--cv-teal)', red: 'var(--cv-red)', amber: 'var(--cv-amber)',
 }
 const hint = { fontSize: '0.9rem', color: C.slate, lineHeight: 1.5 }
+
+/**
+ * Why the call ended, in words somebody can act on.
+ *
+ * The service reports a number. "Disconnected: 2" tells a person nothing, and
+ * the one that matters here is DUPLICATE_IDENTITY, which is what happens when
+ * the same person joins twice and is the failure that wasted an afternoon.
+ */
+function disconnectReason(reason) {
+  switch (reason) {
+    case 1: return 'The lead consultant ended the call.'
+    case 2: return 'You were removed from the call.'
+    case 3: return 'You joined this call on another device, so this one left. Only one is needed.'
+    case 4: return 'The call was closed by the service.'
+    case 5: return 'The connection to the call was lost. Press Join the call to come back.'
+    case 6: return 'The room was closed.'
+    default: return 'The call ended. Press Join the call to come back.'
+  }
+}
+
+/**
+ * WHO IS ON THE CALL, IN WORDS.
+ *
+ * Habib: I am not able to see if anyone else joined. On an audio call the tiles
+ * are placeholders and it is genuinely hard to tell one grey square from an
+ * empty room, so the names are also written out. This is the answer to "is the
+ * funder here yet", which is asked at the start of every session.
+ */
+function WhoIsHere() {
+  const people = useParticipants()
+  return (
+    <div style={{ ...hint, padding: '0.55rem 0.9rem', borderTop: `1px solid ${C.border}` }}>
+      {people.length <= 1
+        ? 'You are the only one here so far. Send them the link to this page.'
+        : `On the call: ${people.map((p) => p.name || p.identity.split('::')[0]).join(', ')}.`}
+    </div>
+  )
+}
 
 /** Everybody in the room, camera or shared screen, laid out evenly. */
 function Faces() {
@@ -71,7 +110,7 @@ export default function SessionCall({ clientId, sessionId = null, onConnected = 
       const res = await fetch('/api/call-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ clientId, sessionId }),
+        body: JSON.stringify({ clientId, sessionId, deviceId: deviceId() }),
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -132,7 +171,14 @@ export default function SessionCall({ clientId, sessionId = null, onConnected = 
         connect
         audio
         video={false}
-        onDisconnected={() => setConn(null)}
+        onDisconnected={(reason) => {
+          // A CALL THAT DROPS MUST SAY SO. 10 September 2026. This put the Join
+          // the call button straight back with nothing on screen, so a failure
+          // was indistinguishable from a click that did nothing, which is
+          // exactly what it looked like.
+          setConn(null)
+          setErr(disconnectReason(reason))
+        }}
         onError={(e) => setErr(e?.message || 'The call dropped')}
         data-lk-theme="default"
         style={{ height: 'auto' }}
@@ -140,8 +186,11 @@ export default function SessionCall({ clientId, sessionId = null, onConnected = 
         <Faces />
         {/* Every voice, played out. Without this the call is silent. */}
         <RoomAudioRenderer />
-        <ControlBar variation="minimal" controls={{ microphone: true, camera: true, screenShare: true, leave: true }} />
+        {/* The full bar, not the minimal one: camera and screen share are on
+            it, and Habib could not find either. */}
+        <ControlBar controls={{ microphone: true, camera: true, screenShare: true, leave: true }} />
         <ConnectionStateToast />
+        <WhoIsHere />
       </LiveKitRoom>
       <div style={{ ...hint, padding: '0.6rem 0.9rem', borderTop: `1px solid ${C.border}` }}>
         Muting yourself here stops the others hearing you. It does not stop your own device recording your words,
