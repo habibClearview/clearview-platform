@@ -124,3 +124,57 @@ describe('every host the app talks to is in the policy', () => {
     expect(csp['connect-src']).toContain(host)
   })
 })
+
+// ============================================================
+// A PHONE IS A NARROW SCREEN, NOT A SMALL DESKTOP
+//
+// 10 September 2026. Habib: it was impossible to join on the phone because of
+// the mobile responsiveness, it does not change with the size of the screen, I
+// could not read the site.
+//
+// The responsive rules had been written months earlier and had never once
+// applied, because the application declared no viewport. A phone that is not
+// told the width of the device lays the page out at a virtual 980 pixels and
+// shrinks the result, so no max-width rule ever matches and every word arrives
+// at a third of its size.
+//
+// This is the same class of fault as the headers: something the server never
+// sees and no server test can reach.
+// ============================================================
+describe('the page fits the screen it is on', () => {
+  const fs = require('fs')
+  const LAYOUT = fs.readFileSync('app/layout.tsx', 'utf8')
+  const CSS = fs.readFileSync('app/globals.css', 'utf8')
+
+  it('declares the viewport, which is what switches the rest on', () => {
+    expect(LAYOUT).toContain('export const viewport')
+    expect(LAYOUT).toContain("width: 'device-width'")
+    expect(LAYOUT).toContain('initialScale: 1')
+  })
+
+  it('does not take zooming away', () => {
+    // Locking zoom is a habit of app-like sites and it shuts out anybody who
+    // enlarges text to read it.
+    expect(LAYOUT).not.toContain('maximumScale')
+    expect(LAYOUT).not.toContain('userScalable: false')
+  })
+
+  it('stops one wide element making every screen scroll sideways', () => {
+    expect(CSS).toContain('overflow-x: hidden')
+    expect(CSS).toMatch(/table, pre \{[^}]*overflow-x: auto/)
+  })
+
+  it('makes fields large enough to touch, and large enough not to trigger a zoom', () => {
+    expect(CSS).toContain('min-height: 40px')
+    expect(CSS).toContain('font-size: 16px')
+  })
+
+  it('changes nothing on a wide screen', () => {
+    // Every rule added for phones sits inside a max-width query. A rule outside
+    // one would silently redesign the desktop the whole platform is used on.
+    const added = CSS.slice(CSS.indexOf('A PHONE IS A NARROW SCREEN'))
+    const braces = added.split('@media (max-width: 720px)')
+    expect(braces.length).toBe(2)
+    expect(added).not.toMatch(/\n(html|body|button|table)\s*[,{]/)
+  })
+})

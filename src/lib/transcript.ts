@@ -192,3 +192,39 @@ export function transcriptionHint(clientName: string, names: string[] = [], extr
   if (!unique.length) return ''
   return `This is a business conversation. Names and terms used: ${unique.join(', ')}.`
 }
+
+
+/**
+ * WHETHER A TRACK IS SILENCE, JUDGED BY ITS OWN SIZE.
+ *
+ * 10 September 2026. A session was recorded, uploaded and transcribed, and
+ * every second of it was silence. What came back was "For more UN videos visit
+ * www.un.org", which is what the transcription service produces when handed
+ * nothing, and it was written into the record as though somebody had said it.
+ * That is worse than an error: it is a false record of a conversation.
+ *
+ * Speech at the rate this platform records runs at tens of kilobits a second.
+ * The encoder drops to one or two when there is nothing to encode, so thirty
+ * seconds of silence is about seven kilobytes where speech is about a hundred
+ * and twenty. The gap is an order of magnitude, so the test does not need to be
+ * clever, and the threshold sits far below any real speech.
+ *
+ * Deliberately silent about short pieces. A four second answer has too little
+ * to judge, and refusing to transcribe something real is worse than paying to
+ * transcribe a little silence.
+ */
+export const SILENT_BITS_PER_SECOND = 4_000
+
+export function soundsLikeSilence(bytes: number, seconds: number): boolean {
+  if (!Number.isFinite(bytes) || !Number.isFinite(seconds)) return false
+  if (seconds < 10) return false
+  if (bytes <= 0) return true
+  return (bytes * 8) / seconds < SILENT_BITS_PER_SECOND
+}
+
+/** What the record says instead of a machine's guess at silence. */
+export function silenceNote(speaker: string): string {
+  return `${speaker}: no audible sound was captured on this device. `
+    + 'Nothing has been transcribed for it, because a transcript of silence is a false record '
+    + 'rather than an empty one.'
+}

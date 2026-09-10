@@ -17,6 +17,7 @@ import { describe, it, expect } from 'vitest'
 import {
   webmHeaderLength, planTranscriptionParts, placeSegments, mergeSegments,
   stamp, formatTranscript, transcriptionHint, MAX_TRANSCRIBE_BYTES,
+  soundsLikeSilence, silenceNote, SILENT_BITS_PER_SECOND,
 } from '@/lib/transcript'
 
 describe('finding the header at the front of a recording', () => {
@@ -166,5 +167,58 @@ describe('telling the service the names before it starts', () => {
 
   it('is empty when there is nothing worth saying', () => {
     expect(transcriptionHint('', [])).toBe('')
+  })
+})
+
+// ============================================================
+// A TRANSCRIPT OF SILENCE IS A FALSE RECORD, NOT AN EMPTY ONE
+//
+// 10 September 2026. A whole session recorded silence. Every part reported
+// success and the transcript came back reading "For more UN videos visit
+// www.un.org", which is what the service emits when handed nothing, and it was
+// written into the engagement as though somebody had said it.
+// ============================================================
+describe('recognising a track that has no sound in it', () => {
+  // The real numbers, from the recordings that caused this: thirty seconds of
+  // silence was 7,016 bytes. Thirty seconds of speech is about 120,000.
+  it('knows the silence that actually happened', () => {
+    expect(soundsLikeSilence(7016, 30)).toBe(true)
+  })
+
+  it('leaves real speech alone', () => {
+    expect(soundsLikeSilence(120_000, 30)).toBe(false)
+    expect(soundsLikeSilence(29_580, 6 * 5)).toBe(false)
+  })
+
+  it('treats an empty file as silence', () => {
+    expect(soundsLikeSilence(0, 60)).toBe(true)
+  })
+
+  it('says nothing about a piece too short to judge', () => {
+    // A four second answer has too little to go on, and refusing to transcribe
+    // something real is worse than paying to transcribe a little silence.
+    expect(soundsLikeSilence(500, 4)).toBe(false)
+  })
+
+  it('sits far below any real speech', () => {
+    expect(SILENT_BITS_PER_SECOND).toBeLessThan(16_000)
+  })
+
+  it('survives numbers that are not numbers', () => {
+    expect(soundsLikeSilence(NaN, 30)).toBe(false)
+    expect(soundsLikeSilence(1000, NaN)).toBe(false)
+  })
+})
+
+describe('what the record says instead', () => {
+  const note = silenceNote('Ovo Ugbebor')
+
+  it('names whose device it was', () => {
+    expect(note).toContain('Ovo Ugbebor')
+  })
+
+  it('says nothing was captured, and why nothing was invented', () => {
+    expect(note).toContain('no audible sound')
+    expect(note).toContain('false record')
   })
 })

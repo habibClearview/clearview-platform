@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/lib/auth/context'
 import EnvBanner from '@/components/common/EnvBanner'
@@ -8,6 +8,29 @@ import PurgeBrowserCopy from '@/components/auth/PurgeBrowserCopy'
 export const metadata: Metadata = {
   title: 'Clearview Planner — Canvas Coach',
   description: 'Live financial planning infrastructure for GtCV engagements',
+}
+
+/**
+ * THE SITE DID NOT FIT A PHONE, AND THIS IS WHY. 10 September 2026.
+ *
+ * Habib: it was impossible to join on the phone, it does not change with the
+ * size of the screen, I could not read the site.
+ *
+ * There was no viewport declaration anywhere in the application. Without one a
+ * phone does not render the page at the width of the phone. It renders it at a
+ * virtual 980 pixels, the width of a desktop window, and then shrinks the whole
+ * thing to fit, so every word is a third of its proper size and no layout rule
+ * written for a narrow screen ever applies, because as far as the page is
+ * concerned the screen is not narrow.
+ *
+ * This is the one line that makes a phone a phone. Zooming is deliberately left
+ * available: taking it away is a habit of app-like sites and it locks out
+ * anybody who needs to enlarge text to read it.
+ */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

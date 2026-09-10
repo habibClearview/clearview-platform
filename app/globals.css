@@ -327,3 +327,40 @@ input:focus, select:focus { outline: 2px solid var(--cv-cyan); outline-offset: 1
   .cv-dim-grid,.cv-gc-grid{grid-template-columns:1fr}
   .cv-dim-grid .cv-dim-radar,.cv-gc-grid .cv-dim-radar{grid-column:auto;grid-row:auto}
 }
+
+/* ============================================================
+   A PHONE IS A NARROW SCREEN, NOT A SMALL DESKTOP. 10 Sept 2026.
+
+   The responsive rules above were written and were never reached,
+   because the application declared no viewport. A phone that is not
+   told the width of the device lays the page out at a virtual 980
+   pixels and shrinks the result, so no max-width rule ever matched
+   and every word arrived at a third of its size. The declaration is
+   now in app/layout.tsx and these are the rules that were missing
+   under it.
+
+   Nothing here changes a wide screen. Every rule is inside a
+   max-width query.
+   ============================================================ */
+@media (max-width: 720px) {
+  /* Nothing may push the page wider than the phone. A single element
+     that does makes every screen scroll sideways, which is what makes
+     a site feel broken before anybody has read a word of it. */
+  html, body { max-width: 100%; overflow-x: hidden; }
+
+  /* Wide content scrolls inside its own box instead of stretching the
+     page: a table of figures, a long code line, a pre block. */
+  table, pre { display: block; max-width: 100%; overflow-x: auto; }
+
+  /* Buttons and fields on a phone are touched, not clicked. Anything
+     smaller than this is missed as often as it is hit. */
+  button, select, input, textarea, a[role="button"] { min-height: 40px; }
+  input, select, textarea {
+    /* 16px or larger, or iOS zooms the whole page in on focus and
+       leaves it there, which reads as the layout jumping. */
+    font-size: 16px;
+  }
+
+  /* Anything laid out in columns falls into one on a phone. */
+  .cv-grid-4, .cv-grid-3, .cv-grid-2 { grid-template-columns: 1fr; }
+}

@@ -26,7 +26,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient, requireAccess, refuseAccess } from '@/lib/auth/api-authz'
 import {
   webmHeaderLength, planTranscriptionParts, placeSegments, mergeSegments,
-  formatTranscript, transcriptionHint, type Segment,
+  formatTranscript, transcriptionHint, soundsLikeSilence, silenceNote, type Segment,
 } from '@/lib/transcript'
 import { AUDIO_MIME } from '@/lib/recording'
 
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
     if (!access.ok) return refuseAccess(access)
 
     const { data: tracks } = await admin.from('recording_tracks')
-      .select('id,speaker_name,offset_ms,storage_path,status').eq('recording_id', recording.id).order('offset_ms')
+      .select('id,speaker_name,offset_ms,duration_seconds,storage_path,status').eq('recording_id', recording.id).order('offset_ms')
     const usable = (tracks || []).filter((t) => t.storage_path && t.status !== 'failed')
     if (!usable.length) {
       return NextResponse.json({ error: 'There is no audio on this recording to transcribe' }, { status: 409 })
@@ -146,6 +146,27 @@ export async function POST(req: NextRequest) {
       // cannot stall the rest of the recording for ever.
       done.push(next.id)
     } else {
+      // A TRACK WITH NO SOUND IN IT IS NOT SENT. 10 September 2026. The service
+      // answers silence with whatever its training makes of nothing, and what
+      // came back was "For more UN videos visit www.un.org", written into an
+      // engagement as though a person had said it. That is a false record, and
+      // a false record is worse than a missing one. It also costs money to buy.
+      const totalBytes = pieces.reduce((n, p) => n + p.length, 0)
+      const heardSeconds = next.duration_seconds || 0
+      if (soundsLikeSilence(totalBytes, heardSeconds)) {
+        items.push({
+          start: (next.offset_ms || 0) / 1000,
+          end: (next.offset_ms || 0) / 1000 + heardSeconds,
+          speaker: next.speaker_name || 'Unnamed speaker',
+          text: silenceNote(next.speaker_name || 'This device'),
+        })
+        await admin.from('recording_tracks').update({
+          status: 'failed',
+          failure_reason: 'no audible sound was captured on this device',
+          updated_at: new Date().toISOString(),
+        }).eq('id', next.id)
+        done.push(next.id)
+      } else {
       const headerLength = webmHeaderLength(pieces[0])
       const header = headerLength > 0 ? pieces[0].slice(0, headerLength) : undefined
       const parts = planTranscriptionParts(pieces.map((p) => p.length), header?.length || 0)
@@ -160,6 +181,7 @@ export async function POST(req: NextRequest) {
         items.push(...placeSegments(raw, speaker, next.offset_ms || 0, part.offsetMs))
       }
       done.push(next.id)
+      }
     }
 
     const merged = mergeSegments([items])

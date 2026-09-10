@@ -71,8 +71,33 @@ export interface RecorderOptions {
   token: string | null
   speakerName?: string | null
   partyId?: string | null
+  /** Which microphone. Absent means whichever one the browser calls default. */
+  microphoneId?: string | null
   /** Called whenever something changes, so a screen can redraw. */
   onChange?: (s: RecorderState) => void
+}
+
+/** Below this, nothing audible is arriving. Room tone sits well above it. */
+export const SILENCE_LEVEL = 0.006
+
+/**
+ * How long silence has to last before it is worth interrupting somebody.
+ *
+ * Ten seconds. Long enough that a pause for thought is not an alarm, short
+ * enough that the sentence being missed can still be repeated.
+ */
+export const SILENCE_ALARM_SECONDS = 10
+
+/** The microphones this browser can offer, for when the default is the wrong one. */
+export async function listMicrophones(): Promise<{ id: string; label: string }[]> {
+  try {
+    const all = await navigator.mediaDevices.enumerateDevices()
+    return all
+      .filter((d) => d.kind === 'audioinput')
+      .map((d, i) => ({ id: d.deviceId, label: d.label || `Microphone ${i + 1}` }))
+  } catch {
+    return []
+  }
 }
 
 export interface RecorderState {
@@ -82,6 +107,23 @@ export interface RecorderState {
   uploaded: number
   waiting: number
   problem?: string
+  /**
+   * HOW LOUD THIS MICROPHONE ACTUALLY IS, 0 to 1.
+   *
+   * 10 September 2026. A whole session was recorded, uploaded and transcribed
+   * and every second of it was silence. Everything reported success, because
+   * everything had succeeded: the device was open, the encoder ran, the pieces
+   * uploaded. Nothing anywhere was listening to whether there was any sound in
+   * them, and the first sign of trouble was a transcript that said "For more UN
+   * videos visit www.un.org", which is what the transcription service says when
+   * handed nothing.
+   *
+   * A recorder that cannot say whether it is hearing anything is not a
+   * recorder, it is a hope. This is measured off the live stream itself.
+   */
+  level: number
+  /** How long this microphone has been silent while it was meant to be recording. */
+  silentSeconds: number
 }
 
 export class DeviceRecorder {
@@ -93,7 +135,12 @@ export class DeviceRecorder {
   private nextIndex = 0
   private queue: { index: number; blob: Blob }[] = []
   private sending = false
-  private state: RecorderState = { status: 'idle', seconds: 0, uploaded: 0, waiting: 0 }
+  private state: RecorderState = {
+    status: 'idle', seconds: 0, uploaded: 0, waiting: 0, level: 0, silentSeconds: 0,
+  }
+  private audio: AudioContext | null = null
+  private analyser: AnalyserNode | null = null
+  private levelTimer: ReturnType<typeof setInterval> | null = null
   readonly device = deviceId()
 
   constructor(opts: RecorderOptions) { this.opts = opts }
@@ -128,6 +175,7 @@ export class DeviceRecorder {
           // Speech in a room, on a laptop, with other people talking. These
           // three are what make one voice usable rather than a hum.
           echoCancellation: true, noiseSuppression: true, autoGainControl: true,
+          ...(this.opts.microphoneId ? { deviceId: { exact: this.opts.microphoneId } } : {}),
         },
       })
     } catch {
@@ -176,8 +224,9 @@ export class DeviceRecorder {
     }
     this.rec.onerror = () => { void this.fail('their device stopped recording unexpectedly') }
 
+    this.listen()
     this.rec.start(CHUNK_MS)
-    this.set({ status: 'recording', seconds: 0 })
+    this.set({ status: 'recording', seconds: 0, level: 0, silentSeconds: 0 })
 
     this.timer = setInterval(() => {
       const seconds = Math.floor((Date.now() - this.startedAt) / 1000)
@@ -187,6 +236,48 @@ export class DeviceRecorder {
       if (seconds % 30 === 0) void this.post('progress', { durationSeconds: seconds }).catch(() => null)
     }, 1000)
   }
+
+  /**
+   * WATCH WHETHER ANY SOUND IS ACTUALLY ARRIVING.
+   *
+   * Five times a second, the loudest sample in the current window. That is
+   * enough to move a meter smoothly and to notice a microphone that is open,
+   * encoding, uploading and completely silent, which is the failure that cost a
+   * whole session and reported success at every step.
+   */
+  private listen() {
+    try {
+      const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      this.audio = new Ctx()
+      const source = this.audio.createMediaStreamSource(this.stream!)
+      this.analyser = this.audio.createAnalyser()
+      this.analyser.fftSize = 1024
+      source.connect(this.analyser)
+      const buf = new Float32Array(this.analyser.fftSize)
+
+      this.levelTimer = setInterval(() => {
+        if (!this.analyser) return
+        this.analyser.getFloatTimeDomainData(buf)
+        let peak = 0
+        for (let i = 0; i < buf.length; i++) {
+          const v = Math.abs(buf[i])
+          if (v > peak) peak = v
+        }
+        const quiet = peak < SILENCE_LEVEL
+        this.set({
+          level: peak,
+          silentSeconds: quiet ? this.state.silentSeconds + 0.2 : 0,
+        })
+      }, 200)
+    } catch {
+      // A browser that will not measure still records. The meter simply sits at
+      // zero, and the screen says it cannot tell rather than claiming silence.
+      this.analyser = null
+    }
+  }
+
+  /** True when the browser can actually measure this microphone. */
+  canMeasure(): boolean { return this.analyser !== null }
 
   /** Send what is waiting, oldest first, and keep anything that will not go. */
   private async drain(): Promise<void> {
@@ -229,6 +320,9 @@ export class DeviceRecorder {
   async stop(): Promise<void> {
     this.set({ status: 'stopping' })
     if (this.timer) { clearInterval(this.timer); this.timer = null }
+    if (this.levelTimer) { clearInterval(this.levelTimer); this.levelTimer = null }
+    try { this.audio?.close() } catch { /* already closed */ }
+    this.analyser = null
     try { this.rec?.stop() } catch { /* already stopped */ }
     try { this.stream?.getTracks().forEach((t) => t.stop()) } catch { /* already released */ }
 

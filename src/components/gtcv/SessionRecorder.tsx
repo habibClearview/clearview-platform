@@ -42,7 +42,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { consentSentence } from '@/lib/recording'
-import { DeviceRecorder, recordingSupport } from '@/lib/recorder-client'
+import { DeviceRecorder, recordingSupport, listMicrophones, SILENCE_LEVEL, SILENCE_ALARM_SECONDS } from '@/lib/recorder-client'
 
 const C = {
   card: 'var(--cv-card)', border: 'var(--cv-border)', slate: 'var(--cv-slate)',
@@ -88,7 +88,11 @@ export default function SessionRecorder({
   const [recording, setRecording] = useState(null)
   const [live, setLive] = useState([])
   const [seconds, setSeconds] = useState(0)
-  const [mine, setMine] = useState({ status: 'idle', seconds: 0, uploaded: 0, waiting: 0 })
+  const [mine, setMine] = useState({ status: 'idle', seconds: 0, uploaded: 0, waiting: 0, level: 0, silentSeconds: 0 })
+  // Which microphone, for when the default one is the wrong one. This is the
+  // fix for a device that is open, encoding and completely silent.
+  const [mics, setMics] = useState([])
+  const [micId, setMicId] = useState(null)
   const [err, setErr] = useState(null)
   const [note, setNote] = useState(null)
   const [busy, setBusy] = useState(null)
@@ -120,7 +124,16 @@ export default function SessionRecorder({
     try {
       const r = await api('GET', null, query)
       const open = r.recording && r.recording.status === 'opening' ? r.recording : null
-      setRecording(open)
+      // THE COUNTER STOPPED AFTER FIVE SECONDS. 10 September 2026. This poll
+      // handed back a brand new object every time, even when nothing had
+      // changed. That new object restarted the effect below, whose cleanup
+      // switches off the callback feeding the counter, so the seconds froze
+      // while the recording carried on. Replace it only when it is genuinely
+      // different and the effect stays put.
+      setRecording((prev) => {
+        if (prev?.id === open?.id && prev?.status === open?.status) return prev
+        return open
+      })
       onRecording?.(r.recording?.id || null)
       setLive(r.live || [])
       setSeconds(r.seconds || 0)
@@ -151,13 +164,14 @@ export default function SessionRecorder({
         recordingId: recording.id,
         token: data.session?.access_token || null,
         speakerName,
+        microphoneId: micId,
         onChange: (s) => { if (!cancelled) setMine(s) },
       })
       recorderRef.current = rec
       try { await rec.start(); setAllowed(true) } catch (e) { setErr(e.message) }
     })()
     return () => { cancelled = true }
-  }, [recording, allowed, support.ok, speakerName])
+  }, [recording?.id, allowed, support.ok, speakerName, micId])
 
   // When the recording closes, this device stops itself and flushes what it
   // is still holding.
@@ -174,6 +188,13 @@ export default function SessionRecorder({
     window.addEventListener('pagehide', leave)
     return () => { window.removeEventListener('pagehide', leave); leave() }
   }, [])
+
+  // The list of microphones only carries names once permission has been given,
+  // which is why it is read after allowing rather than on load.
+  useEffect(() => {
+    if (allowed !== true) return
+    listMicrophones().then(setMics)
+  }, [allowed])
 
   async function loadParties() {
     const { data } = await supabase.from('engagement_parties')
@@ -223,6 +244,7 @@ export default function SessionRecorder({
       const s = await navigator.mediaDevices.getUserMedia({ audio: true })
       s.getTracks().forEach((t) => t.stop())
       setAllowed(true)
+      setMics(await listMicrophones())
       setNote('This device will now record whenever a session it is in is being recorded.')
     } catch {
       setErr('The microphone was refused. Press the padlock in the address bar and allow the microphone for this site.')
@@ -247,7 +269,10 @@ export default function SessionRecorder({
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           {recording && (
             <span style={{ ...mono, fontSize: '1.05rem', fontWeight: 700, color: C.red }}>
-              ● {clock(seconds || mine.seconds)}
+              {/* This device's own count, which ticks every second. The server's
+                  figure only moves every half minute, so preferring it made the
+                  timer look stopped even when it was not. */}
+              ● {clock(mine.seconds || seconds)}
             </span>
           )}
           {canManage && !recording && (
@@ -277,6 +302,74 @@ export default function SessionRecorder({
           <button onClick={allowMicrophone} style={{ ...btn(C.amber, true), marginTop: '0.5rem' }}>
             Allow my microphone
           </button>
+        </div>
+      )}
+
+      {/* ─── IS ANY SOUND ACTUALLY ARRIVING ──────────────────
+          10 September 2026. A whole session was recorded, uploaded and
+          transcribed, and every second of it was silence. Every part reported
+          success, because every part had succeeded: the device opened, the
+          encoder ran, the pieces uploaded. Nothing was listening to whether
+          there was any sound in them. The first sign of trouble was a
+          transcript reading "For more UN videos visit www.un.org", which is
+          what the transcription service says when handed nothing.
+
+          A meter that moves when you speak is the whole answer, and it belongs
+          next to the timer where somebody watching the session can see it
+          without looking for it. */}
+      {recording && (
+        <div style={{ marginTop: '0.7rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <span style={{ ...mono, fontSize: '0.76rem', letterSpacing: '.08em', textTransform: 'uppercase', color: C.slate }}>
+              Your microphone
+            </span>
+            <div style={{
+              flex: '1 1 160px', minWidth: 120, height: 10, borderRadius: 5,
+              background: 'var(--cv-bg-2)', border: `1px solid ${C.border}`, overflow: 'hidden',
+            }}>
+              <div style={{
+                width: `${Math.min(100, Math.round(mine.level * 320))}%`,
+                height: '100%',
+                background: mine.level < SILENCE_LEVEL ? C.red : C.green,
+                transition: 'width 120ms linear',
+              }} />
+            </div>
+            <span style={{ ...mono, fontSize: '0.8rem', color: mine.level < SILENCE_LEVEL ? C.red : C.green }}>
+              {mine.level < SILENCE_LEVEL ? 'no sound' : 'hearing you'}
+            </span>
+          </div>
+
+          {mine.silentSeconds >= SILENCE_ALARM_SECONDS && (
+            <div style={{
+              marginTop: '0.5rem', padding: '0.6rem 0.75rem', border: `1px solid ${C.red}`,
+              borderRadius: 8, color: C.red, fontSize: '0.88rem', lineHeight: 1.5,
+            }}>
+              <b>Nothing is reaching this microphone.</b> It has been silent for{' '}
+              {Math.round(mine.silentSeconds)} seconds. The recording is running and it is capturing
+              silence, so stop now rather than at the end of the session. Check that the right
+              microphone is chosen below, that it is not muted on the device itself, and on a Mac that
+              Chrome is allowed the microphone under System Settings, Privacy and Security, Microphone.
+            </div>
+          )}
+
+          {mics.length > 1 && (
+            <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ ...hint, margin: 0 }}>Microphone</span>
+              <select
+                value={micId || ''}
+                onChange={(e) => setMicId(e.target.value || null)}
+                style={{
+                  flex: '1 1 200px', minWidth: 160, padding: '0.35rem 0.5rem', borderRadius: 7,
+                  border: `1px solid ${C.border}`, background: 'var(--cv-card)', color: 'inherit',
+                  fontSize: '0.88rem',
+                }}
+              >
+                <option value="">Whichever this device calls default</option>
+                {mics.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              </select>
+              <span style={{ ...hint, margin: 0 }}>Changing this restarts your own track.</span>
+            </div>
+          )}
         </div>
       )}
 
