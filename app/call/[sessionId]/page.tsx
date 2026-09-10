@@ -126,6 +126,20 @@ export default function SessionCallPage({ params }) {
 
   return (
     <div style={{ maxWidth: 980, margin: '0 auto', padding: '1.6rem 1.2rem 3rem' }}>
+      {/* A WAY BACK. 10 September 2026. Habib: there is no way of getting back
+          to the client page after the recording, and I assume this is what
+          would happen to the client as well. There was not: this page is opened
+          from a link and had nothing on it pointing anywhere. */}
+      <a
+        href={canManage ? `/coach?client=${encodeURIComponent(session.client_id)}&zone=sessions` : '/client'}
+        style={{
+          fontFamily: 'var(--cv-font-mono)', fontSize: '0.85rem', color: C.navy,
+          textDecoration: 'none', display: 'inline-block', marginBottom: '0.9rem',
+        }}
+      >
+        &larr; Back to {client?.name || 'the engagement'}
+      </a>
+
       <div style={{ marginBottom: '1.1rem' }}>
         <div style={{ fontFamily: 'var(--cv-font-mono)', fontSize: '0.76rem', letterSpacing: '.12em', textTransform: 'uppercase', color: C.slate }}>
           {client?.name || 'Engagement'}

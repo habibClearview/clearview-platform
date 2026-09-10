@@ -137,7 +137,15 @@ export default function SessionRecorder({
       onRecording?.(r.recording?.id || null)
       setLive(r.live || [])
       setSeconds(r.seconds || 0)
-    } catch (e) { setErr(e.message) }
+      setErr(null)
+    } catch {
+      // A POLL THAT FAILS SAYS NOTHING. 10 September 2026. This wrote the raw
+      // browser error onto the recording panel, so one moment of bad signal
+      // during a session put "Failed to fetch" in red under the timer while the
+      // recording was running perfectly well. The next poll catches up. A
+      // failure that actually matters, a device that stopped capturing, is
+      // reported by the device itself and is not this.
+    }
   }, [query, onRecording])
 
   useEffect(() => { read() }, [read])

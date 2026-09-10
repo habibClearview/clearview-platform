@@ -282,3 +282,68 @@ describe('what is reachable on a call', () => {
     expect(CALLUI).toContain('You are the only one here so far')
   })
 })
+
+// ============================================================
+// THE PERSON WHOSE WORDS THEY ARE COULD NOT SIGN THEM
+//
+// 10 September 2026. Habib recorded a session, read his own words back, typed
+// his name, and was told he is not recorded as a party on this engagement and
+// cannot sign. He was in the room. He was the only one in it.
+// ============================================================
+describe('signing a transcript of a session you were on', () => {
+  it('accepts somebody who recorded on it, party or not', () => {
+    // Being in the room means having recorded a track, which nobody can fake:
+    // the track is written by the server from the verified session at the
+    // moment the device joins.
+    expect(SIGN).toContain("from('recording_tracks')")
+    expect(SIGN).toContain(".eq('user_id', access.userId)")
+  })
+
+  it('still refuses somebody who was neither a party nor in the room', () => {
+    expect(SIGN).toContain('this account has no recording on it')
+  })
+
+  it('records the account rather than inventing a party', () => {
+    expect(SIGN).toContain('party_id: null')
+    expect(SIGN).toContain('signer_user_id: access.userId')
+  })
+
+  it('counts who still has to sign by the room, not by the party list', () => {
+    // Counting parties only meant a room where nobody held a party row wanted
+    // nobody, so the transcript never became signed and never reached the
+    // evidence library.
+    expect(SIGN).toContain('r.party_id || r.user_id || r.signer_user_id')
+  })
+
+  it('writes the account onto the track when a device joins', () => {
+    expect(OPEN).toContain('user_id: access.userId,')
+  })
+})
+
+describe('finding a recording afterwards', () => {
+  const PANEL = fs.readFileSync('src/components/gtcv/RecordingsPanel.tsx', 'utf8')
+  const DASH = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
+  const CALLPAGE = fs.readFileSync('app/call/[sessionId]/page.tsx', 'utf8')
+
+  it('lists every recording on the engagement, with who was on it', () => {
+    // A recording that can only be found by remembering which session it
+    // belonged to is a record that exists and cannot be found.
+    expect(OPEN).toContain("url.searchParams.get('list') === '1'")
+    expect(PANEL).toContain('Who was on it')
+    expect(DASH).toContain('<RecordingsPanel')
+  })
+
+  it('says which devices captured nothing, rather than only who attended', () => {
+    expect(PANEL).toContain('their device failed')
+  })
+
+  it('gives the session room a way back to the engagement', () => {
+    expect(CALLPAGE).toContain('Back to')
+    expect(CALLPAGE).toContain('zone=sessions')
+  })
+
+  it('does not put a raw browser error under a running recording', () => {
+    const REC = fs.readFileSync('src/components/gtcv/SessionRecorder.tsx', 'utf8')
+    expect(REC).toContain('A POLL THAT FAILS SAYS NOTHING')
+  })
+})

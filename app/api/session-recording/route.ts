@@ -163,6 +163,11 @@ export async function POST(req: NextRequest) {
         recording_id: recording.id,
         device_id: deviceId,
         party_id: body.partyId ? String(body.partyId) : null,
+        // WHO WAS IN THE ROOM, AS AN ACCOUNT. The room is the list of devices
+        // that recorded, and a transcript is signed by the people whose words
+        // it is. Without this the lead consultant, who is always in the room
+        // and is not always a party, could not sign his own words.
+        user_id: access.userId,
         speaker_name: body.speakerName ? String(body.speakerName).slice(0, 160) : (access.fullName || null),
         offset_ms: offset,
         status: 'recording',
@@ -289,6 +294,44 @@ export async function GET(req: NextRequest) {
     const sessionId = url.searchParams.get('sessionId') || ''
     const interviewId = url.searchParams.get('interviewId') || ''
     const clientId = url.searchParams.get('clientId') || ''
+
+    // EVERY RECORDING ON THIS ENGAGEMENT, IN ONE LIST. 10 September 2026.
+    // Habib: there is no list anywhere on the page or on the client page to
+    // show what has been recorded and who was on it. There was not, so a
+    // recording could only be found by remembering which session it belonged
+    // to and opening that session's room.
+    if (url.searchParams.get('list') === '1') {
+      const forClient = url.searchParams.get('clientId') || ''
+      if (!forClient) return NextResponse.json({ error: 'Which engagement?' }, { status: 400 })
+      const access = await requireAccess(req, admin, forClient, 'view')
+      if (!access.ok) return refuseAccess(access)
+
+      const { data: rows } = await admin.from('session_recordings')
+        .select('id,session_id,interview_id,dp_id,title,status,started_at,ended_at,merged_seconds')
+        .eq('client_id', forClient).order('started_at', { ascending: false }).limit(200)
+
+      const ids = (rows || []).map((r) => r.id)
+      const [{ data: tracks }, { data: transcripts }, { data: sessions }] = await Promise.all([
+        ids.length
+          ? admin.from('recording_tracks').select('recording_id,speaker_name,duration_seconds,status')
+            .in('recording_id', ids)
+          : Promise.resolve({ data: [] as never[] }),
+        ids.length
+          ? admin.from('session_transcripts').select('id,recording_id,status,version').in('recording_id', ids)
+          : Promise.resolve({ data: [] as never[] }),
+        admin.from('gtcv_sessions').select('id,title').eq('client_id', forClient),
+      ])
+
+      const titleFor = new Map((sessions || []).map((x) => [x.id, x.title]))
+      const recordings = (rows || []).map((r) => ({
+        ...r,
+        heading: r.title || titleFor.get(r.session_id) || (r.interview_id ? 'Customer conversation' : 'Working session'),
+        who: (tracks || []).filter((t) => t.recording_id === r.id)
+          .map((t) => ({ name: t.speaker_name || 'Unnamed', minutes: Math.floor((t.duration_seconds || 0) / 60), ok: t.status !== 'failed' })),
+        transcript: (transcripts || []).find((t) => t.recording_id === r.id) || null,
+      }))
+      return NextResponse.json({ recordings, canManage: access.canManage })
+    }
 
     let recording = recordingId ? await loadRecording(admin, recordingId) : null
 

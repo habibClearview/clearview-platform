@@ -195,8 +195,13 @@ export default function TranscriptPanel({ recordingId, canManage = false }) {
   if (!recordingId) return null
 
   const status = transcript?.status || null
+  // A person in the room is a party when they have one and an account when
+  // they do not. Counting parties only meant a room of people with no party
+  // rows was reported as nobody left to sign, and the transcript never became
+  // signed and so never reached the evidence library.
+  const whoIs = (r) => r.party_id || r.user_id || r.signer_user_id || null
   const stillToSign = inTheRoom
-    .filter((t) => t.party_id && !signatures.some((s) => s.party_id === t.party_id))
+    .filter((t) => whoIs(t) && !signatures.some((s) => whoIs(s) === whoIs(t)))
     .map((t) => t.speaker_name || 'somebody')
 
   return (

@@ -177,12 +177,41 @@ export async function POST(req: NextRequest) {
         // A transcript is signed by whoever was in the room.
         requireSignatory: false,
       })
-      if (isRefusal(signer)) return NextResponse.json({ error: signer.error }, { status: signer.status })
+
+      // THE PERSON WHO WAS IN THE ROOM COULD NOT SIGN. 10 September 2026.
+      //
+      // Signing resolved the signer against the engagement's party list, which
+      // is right for a Charter: it is signed by people holding an office. A
+      // transcript is signed by the people whose words it is, and that is a
+      // different list. The lead consultant recorded the session, spoke on it,
+      // read his own words back, and was told he is not recorded as a party on
+      // this engagement and cannot sign.
+      //
+      // Being in the room is now enough, and being in the room means having
+      // recorded a track on this recording, which nobody can fake: the track
+      // was written by the server from the verified session at the moment the
+      // device joined.
+      let inTheRoom: { name: string } | null = null
+      if (isRefusal(signer) && !body.onBehalfOfPartyId) {
+        const { data: ownTrack } = await admin.from('recording_tracks')
+          .select('id,speaker_name').eq('recording_id', transcript.recording_id)
+          .eq('user_id', access.userId).maybeSingle()
+        if (ownTrack) {
+          inTheRoom = { name: ownTrack.speaker_name || access.fullName || 'A participant' }
+        }
+      }
+      if (isRefusal(signer) && !inTheRoom) {
+        return NextResponse.json({
+          error: `${signer.error} You can also sign a transcript of a session you recorded on, and this account has no recording on it.`,
+        }, { status: signer.status })
+      }
+      // Either the party list resolved somebody, or they were in the room.
+      const party = isRefusal(signer) ? null : signer
 
       // The name they typed has to be their own. Anything else is somebody
       // signing as somebody else, whatever they intended by it.
       const typed = String(body.typedName || '').trim()
-      const expected = (signer.party.name || '').trim()
+      const expected = (inTheRoom ? inTheRoom.name : party!.party.name || '').trim()
       const loosely = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '')
       if (!typed) return NextResponse.json({ error: 'Type your name to sign' }, { status: 400 })
       if (loosely(typed) !== loosely(expected)) {
@@ -191,18 +220,29 @@ export async function POST(req: NextRequest) {
         }, { status: 400 })
       }
 
-      const { error } = await admin.from('transcript_signatures').insert({
+      const { error } = await admin.from('transcript_signatures').insert(inTheRoom ? {
         transcript_id: transcript.id,
         client_id: transcript.client_id,
-        party_id: signer.party.id,
+        party_id: null,
         version: transcript.version || 1,
-        signer_role: signer.party.party_role,
-        signer_name: signer.party.name,
-        signer_email: signer.party.email,
-        signer_user_id: signer.signerUserId,
-        signature_method: signer.mode === 'in_room' ? 'in_room' : 'typed',
+        signer_role: access.role,
+        signer_name: inTheRoom.name,
+        signer_user_id: access.userId,
+        signature_method: 'typed',
         typed_name: typed,
-        recorded_by: signer.recordedBy,
+        recorded_by: access.userId,
+      } : {
+        transcript_id: transcript.id,
+        client_id: transcript.client_id,
+        party_id: party!.party.id,
+        version: transcript.version || 1,
+        signer_role: party!.party.party_role,
+        signer_name: party!.party.name,
+        signer_email: party!.party.email,
+        signer_user_id: party!.signerUserId,
+        signature_method: party!.mode === 'in_room' ? 'in_room' : 'typed',
+        typed_name: typed,
+        recorded_by: party!.recordedBy,
       })
       if (error) {
         // Signing twice is a mistake rather than a stronger signature, and the
@@ -215,13 +255,20 @@ export async function POST(req: NextRequest) {
 
       // Everybody on the engagement who was in the room has signed, so the
       // transcript is no longer waiting on anybody.
+      // WHO STILL HAS TO SIGN IS THE ROOM, COUNTED HONESTLY. This counted
+      // parties only, so a room where nobody was a formal party wanted nobody,
+      // and the transcript could never become signed and so never reached the
+      // evidence library. A person in the room is a party when they have one
+      // and an account when they do not.
       const [{ data: signatures }, { data: tracks }] = await Promise.all([
-        admin.from('transcript_signatures').select('party_id')
+        admin.from('transcript_signatures').select('party_id,signer_user_id')
           .eq('transcript_id', transcript.id).eq('version', transcript.version || 1),
-        admin.from('recording_tracks').select('party_id').eq('recording_id', transcript.recording_id),
+        admin.from('recording_tracks').select('party_id,user_id').eq('recording_id', transcript.recording_id),
       ])
-      const wanted = new Set((tracks || []).map((t) => t.party_id).filter(Boolean))
-      const have = new Set((signatures || []).map((s) => s.party_id).filter(Boolean))
+      const who = (r: { party_id?: string | null; user_id?: string | null; signer_user_id?: string | null }) =>
+        r.party_id || r.user_id || r.signer_user_id || null
+      const wanted = new Set((tracks || []).map(who).filter(Boolean))
+      const have = new Set((signatures || []).map(who).filter(Boolean))
       const complete = wanted.size > 0 && Array.from(wanted).every((p) => have.has(p))
       if (complete) {
         await admin.from('session_transcripts')
@@ -236,7 +283,7 @@ export async function POST(req: NextRequest) {
         ).catch(() => null)
       }
 
-      return NextResponse.json({ ok: true, complete, signedBy: signer.party.name })
+      return NextResponse.json({ ok: true, complete, signedBy: inTheRoom ? inTheRoom.name : party!.party.name })
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
@@ -262,12 +309,12 @@ export async function GET(req: NextRequest) {
     if (!access.ok) return refuseAccess(access)
 
     const { data: signatures } = await admin.from('transcript_signatures')
-      .select('id,party_id,signer_name,signer_role,signature_method,signed_at,version')
+      .select('id,party_id,signer_user_id,signer_name,signer_role,signature_method,signed_at,version')
       .eq('transcript_id', transcript.id).eq('version', transcript.version || 1)
       .order('signed_at')
 
     const { data: tracks } = await admin.from('recording_tracks')
-      .select('party_id,speaker_name').eq('recording_id', transcript.recording_id)
+      .select('party_id,user_id,speaker_name').eq('recording_id', transcript.recording_id)
 
     return NextResponse.json({
       transcript, signatures: signatures || [], wereInTheRoom: tracks || [], canManage: access.canManage,

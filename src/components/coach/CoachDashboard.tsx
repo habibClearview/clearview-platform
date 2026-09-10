@@ -19,6 +19,7 @@ import { gateIsOpen, gateShutBecause } from '@/lib/gtcv-gates'
 import CurrencyField from '@/components/common/CurrencyField'
 import { formatMoneyShort } from '@/lib/currency'
 import SessionPlanner from '@/components/gtcv/SessionPlanner'
+import RecordingsPanel from '@/components/gtcv/RecordingsPanel'
 import DeliverablesPanel from '@/components/gtcv/DeliverablesPanel'
 import HandoverIndependence from '@/components/gtcv/HandoverIndependence'
 import InterviewReporting from '@/components/gtcv/InterviewReporting'
@@ -2608,7 +2609,13 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               {mayRun?<><WelcomePack clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>:null}{isSuperCoach&&<><ClientTeamInvite client={selClient}/><div style={{height:22}}/></>}<EngagementSettings clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
             {shownTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
             {shownTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={previewRoleId} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
-            {shownTab==='sessions'&&<><SessionPlanner clientId={selClient.id} canManage={canEdit(previewRoleId)}/></>}
+            {shownTab==='sessions'&&<><SessionPlanner clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/>
+              {/* WHAT HAS BEEN RECORDED, WHERE THE SESSIONS ARE. 10 September
+                  2026. Habib: there is no list anywhere to show what has been
+                  recorded and who was on it. A recording could only be found by
+                  remembering which session it belonged to, which is a record
+                  that exists and cannot be found. */}
+              <RecordingsPanel clientId={selClient.id}/></>}
             {/* ONE PANEL PER FACT. 9 September 2026. Each of these tabs drew
                 the same rows twice: an original table and a later panel over
                 the same table. Habib: there is no need to have the same
