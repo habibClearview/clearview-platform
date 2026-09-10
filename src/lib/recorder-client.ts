@@ -136,6 +136,19 @@ export interface RecorderState {
    * meter, because it sends somebody to fix a device that is not broken.
    */
   measuring: boolean
+  /** What the browser says about the microphone it actually opened. */
+  deviceReport?: DeviceReport
+}
+
+export interface DeviceReport {
+  /** The device the operating system handed over, which is often not the one expected. */
+  device: string
+  /** The track saying its source is not delivering samples. Not a person pressing mute. */
+  trackMuted: boolean
+  ready: string
+  sampleRate: number | null
+  channels: number | null
+  askedFor: string
 }
 
 export class DeviceRecorder {
@@ -149,6 +162,9 @@ export class DeviceRecorder {
   private sending = false
   private state: RecorderState = {
     status: 'idle', seconds: 0, uploaded: 0, waiting: 0, level: 0, silentSeconds: 0, measuring: false,
+  }
+  private report: DeviceReport = {
+    device: '', trackMuted: false, ready: 'unknown', sampleRate: null, channels: null, askedFor: '',
   }
   private audio: AudioContext | null = null
   private analyser: AnalyserNode | null = null
@@ -210,6 +226,38 @@ export class DeviceRecorder {
       throw new Error(why)
     }
 
+    // WHICH MICROPHONE DID THE BROWSER ACTUALLY OPEN. 10 September 2026.
+    //
+    // Four sessions recorded silence from a device that reported success at
+    // every step, and nobody could say which microphone had been opened. A
+    // request for "whichever this device calls default" is answered by the
+    // operating system, and the answer is often not the one on the lid: a
+    // headset that is connected but routing elsewhere, a virtual device left
+    // behind by a screen recorder or a noise-cancelling tool, an input whose
+    // volume is at zero. Every one of those produces a live track carrying
+    // nothing, which is exactly what happened.
+    //
+    // muted here is not a person pressing mute. It is the track saying the
+    // source is not delivering samples, which is the definitive answer to
+    // whether the fault is the platform or the machine.
+    const track = this.stream.getAudioTracks()[0]
+    const settings = track?.getSettings?.() || {}
+    this.report = {
+      device: track?.label || 'unnamed device',
+      trackMuted: Boolean(track?.muted),
+      ready: track?.readyState || 'unknown',
+      sampleRate: settings.sampleRate ?? null,
+      channels: settings.channelCount ?? null,
+      askedFor: this.opts.microphoneId ? 'a chosen device' : 'the default device',
+    }
+    // A source that stops delivering part way through is the same fault
+    // arriving later, and it must not be silent about it either.
+    if (track) {
+      track.onmute = () => { this.report.trackMuted = true; this.set({ deviceReport: { ...this.report } }) }
+      track.onunmute = () => { this.report.trackMuted = false; this.set({ deviceReport: { ...this.report } }) }
+    }
+    this.set({ deviceReport: { ...this.report } })
+
     const mimeType = pickMimeType()
     try {
       // 32 kilobits a second. Chrome's own default is roughly four times that,
@@ -240,6 +288,7 @@ export class DeviceRecorder {
       startedAt: new Date(this.startedAt).toISOString(),
       speakerName: this.opts.speakerName || null,
       partyId: this.opts.partyId || null,
+      deviceReport: this.report,
     }).catch(() => null)
 
     this.rec.ondataavailable = (e: BlobEvent) => {

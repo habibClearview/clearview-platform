@@ -167,6 +167,10 @@ export async function POST(req: NextRequest) {
         offset_ms: offset,
         status: 'recording',
         failure_reason: null,
+        // What the browser says it actually opened. Kept on the record, not
+        // only on a screen, so a session that captured nothing can be
+        // explained afterwards instead of argued about.
+        device_report: body.deviceReport && typeof body.deviceReport === 'object' ? body.deviceReport : null,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'recording_id,device_id' })
         .select('id,device_id,speaker_name,offset_ms,status').single()

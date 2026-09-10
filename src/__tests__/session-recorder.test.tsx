@@ -26,6 +26,8 @@ let recorders: FakeRecorder[] = []
 let level = 0
 let audioStartsAsleep = false
 let audioWillWake = true
+let trackLabel = 'MacBook Pro Microphone'
+let trackMuted = false
 
 class FakeRecorder {
   ondataavailable: ((e: { data: Blob }) => void) | null = null
@@ -38,13 +40,25 @@ class FakeRecorder {
 
 function installBrowser() {
   started = []; recorders = []; level = 0; audioStartsAsleep = false; audioWillWake = true
+  trackLabel = 'MacBook Pro Microphone'; trackMuted = false
 
   Object.defineProperty(globalThis.navigator, 'mediaDevices', {
     configurable: true,
     value: {
       getUserMedia: vi.fn(async (c: MediaStreamConstraints) => {
         started.push(c)
-        return { getTracks: () => [{ stop: () => {} }] } as unknown as MediaStream
+        const track = {
+          stop: () => {},
+          label: trackLabel,
+          muted: trackMuted,
+          readyState: 'live',
+          getSettings: () => ({ sampleRate: 48000, channelCount: 1 }),
+          onmute: null, onunmute: null,
+        }
+        return {
+          getTracks: () => [track],
+          getAudioTracks: () => [track],
+        } as unknown as MediaStream
       }),
       enumerateDevices: vi.fn(async () => [
         { kind: 'audioinput', deviceId: 'built-in', label: 'MacBook Pro Microphone' },
@@ -222,5 +236,46 @@ describe('a meter that cannot measure says so', () => {
     await tick(100)
     await tick(1000)
     expect(screen.getByText('no sound')).toBeTruthy()
+  })
+})
+
+describe('naming the microphone that was actually opened', () => {
+  it('says which device the browser gave it', async () => {
+    // A request for "whichever this device calls default" is answered by the
+    // operating system, and the answer is often not the one on the lid. Four
+    // sessions recorded silence and nobody could say which device that was.
+    trackLabel = 'Krisp Microphone'
+    render(<SessionRecorder clientId="c1" sessionId="s1" canManage clientName="Test" />)
+    await tick(200)
+    expect(screen.getByText('Krisp Microphone')).toBeTruthy()
+  })
+
+  it('says plainly when the device is sending nothing at all', async () => {
+    // muted on a track is not a person pressing mute. It is the source saying
+    // it is delivering no samples, which settles whether the fault is the
+    // platform or the machine.
+    trackMuted = true
+    render(<SessionRecorder clientId="c1" sessionId="s1" canManage clientName="Test" />)
+    await tick(200)
+    expect(screen.getByText(/not sending any audio at all/)).toBeTruthy()
+  })
+
+  it('sends the report to the platform, so it is on the record', async () => {
+    trackLabel = 'Some Virtual Device'
+    render(<SessionRecorder clientId="c1" sessionId="s1" canManage clientName="Test" />)
+    await tick(200)
+    const joins = (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls
+      .map((c) => c[1] as RequestInit)
+      .filter((o) => o && typeof o.body === 'string' && (o.body as string).includes('"join"'))
+    expect(joins.length).toBeGreaterThan(0)
+    expect(joins[0].body as string).toContain('Some Virtual Device')
+  })
+
+  it('offers the chooser even when only one device has a name', async () => {
+    // It was hidden below two devices, which hid it on exactly the machines
+    // that needed it.
+    render(<SessionRecorder clientId="c1" sessionId="s1" canManage clientName="Test" />)
+    await tick(200)
+    expect(screen.getByText('Microphone')).toBeTruthy()
   })
 })

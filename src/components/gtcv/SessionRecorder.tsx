@@ -88,7 +88,7 @@ export default function SessionRecorder({
   const [recording, setRecording] = useState(null)
   const [live, setLive] = useState([])
   const [seconds, setSeconds] = useState(0)
-  const [mine, setMine] = useState({ status: 'idle', seconds: 0, uploaded: 0, waiting: 0, level: 0, silentSeconds: 0, measuring: false })
+  const [mine, setMine] = useState({ status: 'idle', seconds: 0, uploaded: 0, waiting: 0, level: 0, silentSeconds: 0, measuring: false, deviceReport: null })
   // Which microphone, for when the default one is the wrong one. This is the
   // fix for a device that is open, encoding and completely silent.
   const [mics, setMics] = useState([])
@@ -192,9 +192,12 @@ export default function SessionRecorder({
   // The list of microphones only carries names once permission has been given,
   // which is why it is read after allowing rather than on load.
   useEffect(() => {
-    if (allowed !== true) return
+    // Names only appear once permission exists, and permission exists once a
+    // recording has started, so this runs on both rather than on one. Without
+    // it the chooser stayed hidden on exactly the machines that needed it.
+    if (allowed !== true && mine.status !== 'recording') return
     listMicrophones().then(setMics)
-  }, [allowed])
+  }, [allowed, mine.status])
 
   async function loadParties() {
     const { data } = await supabase.from('engagement_parties')
@@ -357,6 +360,25 @@ export default function SessionRecorder({
             </div>
           )}
 
+          {/* WHICH MICROPHONE THIS ACTUALLY IS. A request for "whichever this
+              device calls default" is answered by the operating system, and the
+              answer is often not the one on the lid. Naming it turns "nothing
+              is recording" into something a person can act on in one look. */}
+          {mine.deviceReport?.device && (
+            <div style={{ ...hint, marginTop: '0.4rem' }}>
+              Recording from <b>{mine.deviceReport.device}</b>
+              {mine.deviceReport.sampleRate ? `, ${Math.round(mine.deviceReport.sampleRate / 1000)}kHz` : ''}
+              {mine.deviceReport.channels ? `, ${mine.deviceReport.channels === 1 ? 'mono' : 'stereo'}` : ''}.
+              {mine.deviceReport.trackMuted && (
+                <b style={{ color: C.red }}>
+                  {' '}This device is not sending any audio at all. That is the machine, not the platform:
+                  the input is muted or its volume is at zero in the system sound settings, or another
+                  program has taken it.
+                </b>
+              )}
+            </div>
+          )}
+
           {!mine.measuring && mine.status === 'recording' && (
             <div style={{ ...hint, marginTop: '0.45rem', color: C.amber }}>
               This browser will not let the meter listen until you have touched the page, so it cannot
@@ -365,7 +387,7 @@ export default function SessionRecorder({
             </div>
           )}
 
-          {mics.length > 1 && (
+          {mics.length > 0 && (
             <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ ...hint, margin: 0 }}>Microphone</span>
               <select
