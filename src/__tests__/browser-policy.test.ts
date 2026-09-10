@@ -170,11 +170,32 @@ describe('the page fits the screen it is on', () => {
   })
 
   it('changes nothing on a wide screen', () => {
-    // Every rule added for phones sits inside a max-width query. A rule outside
-    // one would silently redesign the desktop the whole platform is used on.
+    // THE RULE, STATED PROPERLY: every declaration added for phones lives
+    // inside a max-width query. One outside would silently redesign the desktop
+    // the whole platform is worked on, which is a far more expensive mistake
+    // than a phone that does not fit.
+    //
+    // This is checked by looking for a style block before the first query
+    // rather than by counting queries, because counting them meant the test
+    // failed the moment a second, entirely correct, query was added. It caught
+    // that on the day it was written, which is the right kind of wrong.
     const added = CSS.slice(CSS.indexOf('A PHONE IS A NARROW SCREEN'))
-    const braces = added.split('@media (max-width: 720px)')
-    expect(braces.length).toBe(2)
-    expect(added).not.toMatch(/\n(html|body|button|table)\s*[,{]/)
+    const sections = added.split('@media (max-width:')
+    // Anything before the first query must be comment only, so no braces.
+    expect(sections[0].replace(/\/\*[\s\S]*?\*\//g, '')).not.toContain('{')
+    // And every query added is a narrow-screen one.
+    expect(added).not.toMatch(/@media\s*\(min-width/)
+    expect(sections.length).toBeGreaterThan(1)
+  })
+
+  it('gives the client screen its whole width on a phone', () => {
+    // A 220 pixel sidebar beside the work leaves 170 pixels on a phone, which
+    // is why the session list could not be reached. The sidebar becomes a strip
+    // that scrolls sideways above the work instead.
+    const DASH = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
+    expect(DASH).toContain('className="cv-client-shell"')
+    expect(DASH).toContain('className="cv-client-nav"')
+    expect(CSS).toContain('.cv-client-shell')
+    expect(CSS).toContain('grid-template-columns: 1fr !important')
   })
 })

@@ -2495,10 +2495,18 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             sideways scrolling and the text running off the right edge, and it
             was not a matter of taste: the page was genuinely wider than the
             screen it was being read on. */}
-        <div style={{display:'grid',gridTemplateColumns:navCollapsed?'62px minmax(0,1fr)':'220px minmax(0,1fr)',gap:'1.5rem',alignItems:'start'}}>
+        {/* THE CLASS NAMES ARE HOW THIS REACHES A PHONE. 10 September 2026.
+            A two column grid of 220 pixels and the rest leaves 170 pixels for
+            the work on a phone, which is why Habib could not read the site or
+            get to the session list. These styles are written inline, and an
+            inline style beats a stylesheet, so the narrow screen rules in
+            globals.css are the one place that is allowed to override them. */}
+        <div className="cv-client-shell" style={{display:'grid',gridTemplateColumns:navCollapsed?'62px minmax(0,1fr)':'220px minmax(0,1fr)',gap:'1.5rem',alignItems:'start'}}>
 
-          {/* Sidebar — 25 tabs */}
-          <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',position:'sticky',top:'1rem'}}>
+          {/* Sidebar — 25 tabs. On a phone this becomes a strip that scrolls
+              sideways above the work, rather than 25 rows to scroll past
+              before reaching anything. */}
+          <div className="cv-client-nav" style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',position:'sticky',top:'1rem'}}>
             <button
               type="button"
               onClick={()=>setNavCollapsed(v=>!v)}

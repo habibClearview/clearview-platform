@@ -88,7 +88,7 @@ export default function SessionRecorder({
   const [recording, setRecording] = useState(null)
   const [live, setLive] = useState([])
   const [seconds, setSeconds] = useState(0)
-  const [mine, setMine] = useState({ status: 'idle', seconds: 0, uploaded: 0, waiting: 0, level: 0, silentSeconds: 0 })
+  const [mine, setMine] = useState({ status: 'idle', seconds: 0, uploaded: 0, waiting: 0, level: 0, silentSeconds: 0, measuring: false })
   // Which microphone, for when the default one is the wrong one. This is the
   // fix for a device that is open, encoding and completely silent.
   const [mics, setMics] = useState([])
@@ -330,16 +330,21 @@ export default function SessionRecorder({
               <div style={{
                 width: `${Math.min(100, Math.round(mine.level * 320))}%`,
                 height: '100%',
-                background: mine.level < SILENCE_LEVEL ? C.red : C.green,
+                background: !mine.measuring ? C.amber : mine.level < SILENCE_LEVEL ? C.red : C.green,
                 transition: 'width 120ms linear',
               }} />
             </div>
-            <span style={{ ...mono, fontSize: '0.8rem', color: mine.level < SILENCE_LEVEL ? C.red : C.green }}>
-              {mine.level < SILENCE_LEVEL ? 'no sound' : 'hearing you'}
+            <span style={{
+              ...mono, fontSize: '0.8rem',
+              color: !mine.measuring ? C.amber : mine.level < SILENCE_LEVEL ? C.red : C.green,
+            }}>
+              {/* A meter that says silence when it means "I cannot tell" sends
+                  somebody to fix a device that is not broken. */}
+              {!mine.measuring ? 'cannot tell' : mine.level < SILENCE_LEVEL ? 'no sound' : 'hearing you'}
             </span>
           </div>
 
-          {mine.silentSeconds >= SILENCE_ALARM_SECONDS && (
+          {mine.measuring && mine.silentSeconds >= SILENCE_ALARM_SECONDS && (
             <div style={{
               marginTop: '0.5rem', padding: '0.6rem 0.75rem', border: `1px solid ${C.red}`,
               borderRadius: 8, color: C.red, fontSize: '0.88rem', lineHeight: 1.5,
@@ -349,6 +354,14 @@ export default function SessionRecorder({
               silence, so stop now rather than at the end of the session. Check that the right
               microphone is chosen below, that it is not muted on the device itself, and on a Mac that
               Chrome is allowed the microphone under System Settings, Privacy and Security, Microphone.
+            </div>
+          )}
+
+          {!mine.measuring && mine.status === 'recording' && (
+            <div style={{ ...hint, marginTop: '0.45rem', color: C.amber }}>
+              This browser will not let the meter listen until you have touched the page, so it cannot
+              tell you whether sound is arriving. Click anywhere on this page once and it will start.
+              The recording itself is unaffected.
             </div>
           )}
 

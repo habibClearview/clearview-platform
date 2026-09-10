@@ -124,6 +124,18 @@ export interface RecorderState {
   level: number
   /** How long this microphone has been silent while it was meant to be recording. */
   silentSeconds: number
+  /**
+   * WHETHER THE METER CAN BE BELIEVED.
+   *
+   * A browser will not start measuring audio without a gesture from the person,
+   * and this recorder starts itself when the room opens, which is not a
+   * gesture. So the measuring can be asleep, in which case it reports zero for
+   * everything and a working microphone looks exactly like a dead one.
+   *
+   * A meter that says silence when it means "I cannot tell" is worse than no
+   * meter, because it sends somebody to fix a device that is not broken.
+   */
+  measuring: boolean
 }
 
 export class DeviceRecorder {
@@ -136,7 +148,7 @@ export class DeviceRecorder {
   private queue: { index: number; blob: Blob }[] = []
   private sending = false
   private state: RecorderState = {
-    status: 'idle', seconds: 0, uploaded: 0, waiting: 0, level: 0, silentSeconds: 0,
+    status: 'idle', seconds: 0, uploaded: 0, waiting: 0, level: 0, silentSeconds: 0, measuring: false,
   }
   private audio: AudioContext | null = null
   private analyser: AnalyserNode | null = null
@@ -170,11 +182,25 @@ export class DeviceRecorder {
 
     this.set({ status: 'starting', problem: undefined })
     try {
+      // NO PROCESSING ON THE RECORDING. 10 September 2026.
+      //
+      // This asked for echo cancellation, noise suppression and automatic gain,
+      // which is right for a call and wrong here, and on a machine that is also
+      // in a call it is worse than wrong. The call already holds this
+      // microphone with echo cancellation on. A second stream opened on the same
+      // device with the same processing goes through the same chain, and what
+      // that chain is built to remove is exactly the sound the call is already
+      // handling, so the second stream can come back as silence. That is the
+      // shape of the failure: a device open, an encoder running, pieces
+      // uploading, and two kilobits a second of nothing in them.
+      //
+      // Raw is also the better input for transcription. Noise suppression
+      // chews the start of quiet words and automatic gain lifts room noise
+      // between sentences, and both cost accuracy on the accents this platform
+      // was built for.
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          // Speech in a room, on a laptop, with other people talking. These
-          // three are what make one voice usable rather than a hum.
-          echoCancellation: true, noiseSuppression: true, autoGainControl: true,
+          echoCancellation: false, noiseSuppression: false, autoGainControl: false,
           ...(this.opts.microphoneId ? { deviceId: { exact: this.opts.microphoneId } } : {}),
         },
       })
@@ -224,7 +250,7 @@ export class DeviceRecorder {
     }
     this.rec.onerror = () => { void this.fail('their device stopped recording unexpectedly') }
 
-    this.listen()
+    void this.listen()
     this.rec.start(CHUNK_MS)
     this.set({ status: 'recording', seconds: 0, level: 0, silentSeconds: 0 })
 
@@ -245,18 +271,29 @@ export class DeviceRecorder {
    * encoding, uploading and completely silent, which is the failure that cost a
    * whole session and reported success at every step.
    */
-  private listen() {
+  private async listen() {
     try {
       const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
       this.audio = new Ctx()
+      // Started without a gesture, so it arrives asleep and reports zero for
+      // everything until it is woken.
+      if (this.audio.state === 'suspended') {
+        try { await this.audio.resume() } catch { /* said below */ }
+      }
       const source = this.audio.createMediaStreamSource(this.stream!)
       this.analyser = this.audio.createAnalyser()
       this.analyser.fftSize = 1024
       source.connect(this.analyser)
       const buf = new Float32Array(this.analyser.fftSize)
 
+      this.set({ measuring: this.audio.state === 'running' })
+
       this.levelTimer = setInterval(() => {
         if (!this.analyser) return
+        // It can be suspended again at any point, for example when the tab goes
+        // to the background, and a stale true is the same lie.
+        const awake = this.audio?.state === 'running'
+        if (!awake) { this.set({ measuring: false, level: 0, silentSeconds: 0 }); return }
         this.analyser.getFloatTimeDomainData(buf)
         let peak = 0
         for (let i = 0; i < buf.length; i++) {
@@ -265,14 +302,16 @@ export class DeviceRecorder {
         }
         const quiet = peak < SILENCE_LEVEL
         this.set({
+          measuring: true,
           level: peak,
           silentSeconds: quiet ? this.state.silentSeconds + 0.2 : 0,
         })
       }, 200)
     } catch {
-      // A browser that will not measure still records. The meter simply sits at
-      // zero, and the screen says it cannot tell rather than claiming silence.
+      // A browser that will not measure still records. The screen then says it
+      // cannot tell, rather than claiming silence.
       this.analyser = null
+      this.set({ measuring: false })
     }
   }
 

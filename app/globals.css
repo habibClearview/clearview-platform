@@ -364,3 +364,49 @@ input:focus, select:focus { outline: 2px solid var(--cv-cyan); outline-offset: 1
   /* Anything laid out in columns falls into one on a phone. */
   .cv-grid-4, .cv-grid-3, .cv-grid-2 { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   THE CLIENT SCREEN ON A PHONE. 10 September 2026.
+
+   Habib: it was impossible to join on the phone, I could not read
+   the site so I could get to the session list. This is especially
+   important for the field work.
+
+   The client screen is a grid of a 220 pixel sidebar and the rest.
+   On a 390 pixel phone that leaves 170 pixels for the work itself.
+   Below, the sidebar stops being a column and becomes a strip that
+   scrolls sideways above the work, so every tab is still reachable
+   in one gesture and the work gets the whole width.
+
+   These carry !important because the dashboard writes its layout as
+   inline styles, and an inline style beats a stylesheet. This block
+   is the only place allowed to do that, and every rule is inside a
+   max-width query, so a wide screen is untouched.
+   ============================================================ */
+@media (max-width: 720px) {
+  .cv-client-shell {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .cv-client-nav {
+    position: static !important;
+    display: flex !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  /* Each tab keeps its own width and its words on one line, so the
+     strip scrolls instead of the labels wrapping into a wall. */
+  .cv-client-nav > button {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+    border-bottom: none !important;
+    border-right: 1px solid var(--cv-border) !important;
+  }
+
+  /* Collapsing a strip means nothing, so the control goes. */
+  .cv-client-nav > button[aria-expanded] { display: none !important; }
+}
