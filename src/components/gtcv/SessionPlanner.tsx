@@ -381,11 +381,24 @@ export default function SessionPlanner({ clientId, canManage }) {
   useEffect(() => { sessionsRef.current = sessions }, [sessions])
   useEffect(() => { dirtyRef.current = dirty }, [dirty])
 
+  // ONE DROPPED REQUEST EMPTIED THE WHOLE PLAN. 10 September 2026.
+  //
+  // This asked once. A single moment of bad connection threw
+  // "TypeError: Failed to fetch", and the screen then sat there reading
+  // 0 sessions against every decision point, which is indistinguishable from
+  // an engagement that has none. Habib read it as his work having been
+  // deleted, which is exactly what it looked like, and nothing was: the
+  // sessions were on the record the whole time.
+  //
+  // It now asks three times before giving up, and if it still cannot it says
+  // the sessions are safe and offers a button, rather than showing a browser
+  // error and an empty plan. On field connections this is not an edge case.
+  const [reloadKey, setReloadKey] = useState(0)
+
   useEffect(() => {
     let cancelled = false
-    async function load() {
-      if (!clientId) { setSessions([]); setParties([]); setAttendance([]); setLoading(false); return }
-      setLoading(true)
+
+    async function attempt() {
       const [sRes, pRes, aRes] = await Promise.all([
         supabase.from(SESSIONS_TABLE).select('*').eq('client_id', clientId)
           .order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
@@ -393,18 +406,50 @@ export default function SessionPlanner({ clientId, canManage }) {
           .eq('client_id', clientId).order('sort_order', { ascending: true }),
         supabase.from(ATTENDANCE_TABLE).select('*').eq('client_id', clientId),
       ])
+      return { sRes, pRes, aRes, error: sRes.error || pRes.error || aRes.error }
+    }
+
+    async function load() {
+      if (!clientId) { setSessions([]); setParties([]); setAttendance([]); setLoading(false); return }
+      setLoading(true)
+
+      let last = null
+      for (let go = 0; go < 3; go++) {
+        if (cancelled) return
+        try {
+          const r = await attempt()
+          if (cancelled) return
+          if (!r.error) {
+            setSessions(r.sRes.data || [])
+            setParties(r.pRes.data || [])
+            setAttendance(r.aRes.data || [])
+            setErr(null)
+            setLoading(false)
+            return
+          }
+          last = r.error
+        } catch (e) {
+          // A dropped connection throws rather than answering, which is the
+          // case that produced the empty plan.
+          last = e
+        }
+        // A second, then two. Long enough for a connection to come back,
+        // short enough that nobody walks away from the screen.
+        await new Promise((r) => setTimeout(r, 1000 * (go + 1)))
+      }
+
       if (cancelled) return
-      const firstErr = sRes.error || pRes.error || aRes.error
-      if (firstErr) setErr('Could not load the session plan: ' + firstErr.message)
-      else setErr(null)
-      setSessions(sRes.data || [])
-      setParties(pRes.data || [])
-      setAttendance(aRes.data || [])
+      // WHAT IS LEFT ON SCREEN MATTERS. The lists are not emptied, so if this
+      // is a refresh of a plan already loaded, the coach keeps what they had.
+      setErr('The session plan could not be loaded. Your sessions are safe on the record, '
+        + 'this is a connection problem rather than lost work.'
+        + (last?.message ? ` (${last.message})` : ''))
       setLoading(false)
     }
+
     load()
     return () => { cancelled = true }
-  }, [clientId])
+  }, [clientId, reloadKey])
 
   // Attendance rows keyed by session, so each card reads its own list.
   const attBySession = useMemo(() => {
@@ -1114,7 +1159,17 @@ export default function SessionPlanner({ clientId, canManage }) {
         </div>
       </div>
 
-      {err && <div style={{ fontSize: '1.01rem', color: C.red, margin: '0.5rem 0' }}>{err}</div>}
+      {err && (
+        <div style={{ fontSize: '1.01rem', color: C.red, margin: '0.5rem 0' }}>
+          {err}
+          {' '}
+          <button
+            type="button"
+            onClick={() => setReloadKey((k) => k + 1)}
+            style={{ ...ghostBtn, borderColor: C.red, color: C.red, marginLeft: '0.4rem' }}
+          >Try again</button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', margin: '0.85rem 0 1.1rem' }}>
         {KINDS.map((k) => (
