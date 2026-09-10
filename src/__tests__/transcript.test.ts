@@ -19,6 +19,7 @@ import {
   stamp, formatTranscript, transcriptionHint, MAX_TRANSCRIBE_BYTES,
   soundsLikeSilence, silenceNote, SILENT_BITS_PER_SECOND,
 } from '@/lib/transcript'
+import { extensionFor, baseMime, canBeSplit, trackStoragePath } from '@/lib/recording'
 
 describe('finding the header at the front of a recording', () => {
   it('finds where the audio starts', () => {
@@ -220,5 +221,72 @@ describe('what the record says instead', () => {
   it('says nothing was captured, and why nothing was invented', () => {
     expect(note).toContain('no audible sound')
     expect(note).toContain('false record')
+  })
+})
+
+// ============================================================
+// AN IPHONE DOES NOT RECORD WEBM
+//
+// 10 September 2026. Habib: people would use this for interview capture on the
+// phone, and that is the field work this platform exists for. Safari on iOS
+// records mp4 and nothing else, so an interview captured on an iPhone produced
+// mp4 audio stored under a .webm name and offered to the transcription service
+// as WebM. Every one of those steps was wrong, and none of them said so.
+// ============================================================
+describe('the format a device actually produced', () => {
+  it('names an iPhone recording mp4, not webm', () => {
+    expect(extensionFor('audio/mp4')).toBe('mp4')
+    expect(extensionFor('audio/mp4;codecs=mp4a.40.2')).toBe('mp4')
+  })
+
+  it('still names a desktop recording webm', () => {
+    expect(extensionFor('audio/webm;codecs=opus')).toBe('webm')
+    expect(extensionFor('')).toBe('webm')
+    expect(extensionFor(null)).toBe('webm')
+  })
+
+  it('strips the codec note a browser adds, which no service wants', () => {
+    expect(baseMime('audio/webm;codecs=opus')).toBe('audio/webm')
+    expect(baseMime('audio/mp4; codecs="mp4a.40.2"')).toBe('audio/mp4')
+  })
+
+  it('refuses to cut an mp4 into parts', () => {
+    // Mp4 keeps what it needs to be read in one piece. Cutting it produces
+    // something no player will open, and nothing would have said so.
+    expect(canBeSplit('audio/mp4')).toBe(false)
+    expect(canBeSplit('audio/webm;codecs=opus')).toBe(true)
+  })
+
+  it('keeps a track in its own folder whatever the format', () => {
+    expect(trackStoragePath('c', 'r', 'd', 0, 'audio/mp4')).toBe('c/r/d/00000.mp4')
+    expect(trackStoragePath('c', 'r', 'd', 0, 'audio/webm')).toBe('c/r/d/00000.webm')
+  })
+})
+
+describe('what the routes do with it', () => {
+  const fs = require('fs')
+  const TR = fs.readFileSync('app/api/session-transcribe/route.ts', 'utf8')
+  const CH = fs.readFileSync('app/api/session-recording/chunk/route.ts', 'utf8')
+  const AU = fs.readFileSync('app/api/session-recording/audio/route.ts', 'utf8')
+
+  it('offers the file to the service under its real name', () => {
+    expect(TR).toContain('`audio.${extensionFor(mime)}`')
+  })
+
+  it('reads every audio a device might have produced, not only webm', () => {
+    // Filtering to .webm silently ignored every iPhone recording, and the
+    // track then looked like it had no audio at all.
+    for (const f of [TR, AU]) expect(f).toContain('webm|mp4|m4a|ogg|wav')
+  })
+
+  it('stores a chunk as what it is', () => {
+    expect(CH).toContain('contentType: mime')
+    expect(CH).toContain('mime_type: mime')
+  })
+
+  it('sends the format up with the audio', () => {
+    const REC = fs.readFileSync('src/lib/recorder-client.ts', 'utf8')
+    expect(REC).toContain("form.append('mimeType'")
+    expect(REC).toContain('mimeType: this.mime')
   })
 })

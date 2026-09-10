@@ -29,7 +29,12 @@
 import { chromium } from 'playwright'
 
 const BASE = process.argv[2] || 'http://127.0.0.1:3999'
-const PAGES = ['/', '/welcome', '/join', '/site', '/site/what-i-do/market-intelligence']
+const PAGES = [
+  '/', '/welcome', '/join', '/site', '/site/what-i-do/market-intelligence',
+  // The two that matter for field work. Signed out they render their shell and
+  // then send you to sign in, which still proves the shell fits.
+  '/coach', '/call/695d06c3-ef3c-4b6a-a9ef-4759ccecd9d8',
+]
 // The narrowest phone still in wide use, a large phone, and a tablet held
 // upright, which is what a field team actually carries.
 const WIDTHS = [390, 414, 768]
@@ -46,7 +51,8 @@ for (const width of WIDTHS) {
   const page = await ctx.newPage()
   for (const path of PAGES) {
     try {
-      await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle', timeout: 20000 })
+      await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded', timeout: 20000 })
+      await page.waitForTimeout(1200)
       const r = await page.evaluate(() => {
         const de = document.documentElement
         const over = [...document.querySelectorAll('*')]

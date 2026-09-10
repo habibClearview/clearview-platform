@@ -22,7 +22,7 @@
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient, requireAccess, refuseAccess } from '@/lib/auth/api-authz'
-import { trackStoragePath, AUDIO_MIME } from '@/lib/recording'
+import { trackStoragePath, baseMime } from '@/lib/recording'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,16 +60,19 @@ export async function POST(req: NextRequest) {
     if (!access.ok) return refuseAccess(access)
 
     const { data: track } = await admin.from('recording_tracks')
-      .select('id,storage_path').eq('recording_id', recording.id).eq('device_id', deviceId).maybeSingle()
+      .select('id,storage_path,mime_type').eq('recording_id', recording.id).eq('device_id', deviceId).maybeSingle()
     if (!track) {
       return NextResponse.json({ error: 'This device has not joined the recording' }, { status: 409 })
     }
 
-    const path = trackStoragePath(recording.client_id, recording.id, deviceId, chunkIndex)
+    // The format the device actually produced, not the one this platform
+    // prefers. Safari on iOS records mp4 and nothing else.
+    const mime = baseMime(String(form.get('mimeType') || '') || track.mime_type || (file as Blob).type)
+    const path = trackStoragePath(recording.client_id, recording.id, deviceId, chunkIndex, mime)
     const bytes = new Uint8Array(await file.arrayBuffer())
 
     const { error: upErr } = await admin.storage.from('recordings')
-      .upload(path, bytes, { contentType: AUDIO_MIME, upsert: true })
+      .upload(path, bytes, { contentType: mime, upsert: true })
     if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
 
     // The track remembers its folder, so the pieces can be found without
@@ -77,7 +80,8 @@ export async function POST(req: NextRequest) {
     if (!track.storage_path) {
       const folder = path.slice(0, path.lastIndexOf('/'))
       await admin.from('recording_tracks')
-        .update({ storage_path: folder, updated_at: new Date().toISOString() }).eq('id', track.id)
+        .update({ storage_path: folder, mime_type: mime, updated_at: new Date().toISOString() })
+        .eq('id', track.id)
     }
 
     return NextResponse.json({ ok: true, path, bytes: bytes.length })

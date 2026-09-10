@@ -28,7 +28,7 @@ import {
   webmHeaderLength, planTranscriptionParts, placeSegments, mergeSegments,
   formatTranscript, transcriptionHint, soundsLikeSilence, silenceNote, type Segment,
 } from '@/lib/transcript'
-import { AUDIO_MIME } from '@/lib/recording'
+import { baseMime, extensionFor, canBeSplit } from '@/lib/recording'
 
 export const dynamic = 'force-dynamic'
 // A track of an hour takes a few minutes to come back. This is the ceiling the
@@ -44,7 +44,10 @@ async function loadTrackAudio(admin: ReturnType<typeof getAdminClient>, folder: 
     limit: 1000, sortBy: { column: 'name', order: 'asc' },
   })
   if (error) throw new Error(error.message)
-  const names = (listed || []).map((f) => f.name).filter((n) => n.endsWith('.webm')).sort()
+  // Any audio the device produced, whatever the format, in the order it was
+  // spoken. Filtering to .webm silently ignored every iPhone recording.
+  const names = (listed || []).map((f) => f.name)
+    .filter((n) => /\.(webm|mp4|m4a|ogg|wav)$/i.test(n)).sort()
   const pieces: Uint8Array[] = []
   for (const name of names) {
     const { data, error: dlErr } = await admin.storage.from('recordings').download(`${folder}/${name}`)
@@ -64,11 +67,17 @@ function join(pieces: Uint8Array[], header?: Uint8Array): Uint8Array {
 }
 
 /** Send one part of one track and get back its passages, with their timings. */
-async function transcribePart(bytes: Uint8Array, hint: string): Promise<{ start: number; end: number; text: string }[]> {
+async function transcribePart(
+  bytes: Uint8Array, hint: string, mime: string,
+): Promise<{ start: number; end: number; text: string }[]> {
   const form = new FormData()
   // join() always allocates an array of exactly the right length, so the
   // underlying buffer is the audio and nothing else.
-  form.append('file', new Blob([bytes.buffer as ArrayBuffer], { type: AUDIO_MIME }), 'audio.webm')
+  // NAMED FOR WHAT IT IS. The service decides how to read a file from its
+  // name and its type, so an iPhone's mp4 offered as audio.webm is refused or,
+  // worse, misread. Safari on iOS records mp4 and nothing else, and interview
+  // capture on a phone is the point of this.
+  form.append('file', new Blob([bytes.buffer as ArrayBuffer], { type: mime }), `audio.${extensionFor(mime)}`)
   form.append('model', MODEL)
   form.append('response_format', 'verbose_json')
   form.append('timestamp_granularities[]', 'segment')
@@ -114,7 +123,7 @@ export async function POST(req: NextRequest) {
     if (!access.ok) return refuseAccess(access)
 
     const { data: tracks } = await admin.from('recording_tracks')
-      .select('id,speaker_name,offset_ms,duration_seconds,storage_path,status').eq('recording_id', recording.id).order('offset_ms')
+      .select('id,speaker_name,offset_ms,duration_seconds,storage_path,status,mime_type').eq('recording_id', recording.id).order('offset_ms')
     const usable = (tracks || []).filter((t) => t.storage_path && t.status !== 'failed')
     if (!usable.length) {
       return NextResponse.json({ error: 'There is no audio on this recording to transcribe' }, { status: 409 })
@@ -167,18 +176,27 @@ export async function POST(req: NextRequest) {
         }).eq('id', next.id)
         done.push(next.id)
       } else {
-      const headerLength = webmHeaderLength(pieces[0])
-      const header = headerLength > 0 ? pieces[0].slice(0, headerLength) : undefined
-      const parts = planTranscriptionParts(pieces.map((p) => p.length), header?.length || 0)
-
+      const mime = baseMime(next.mime_type)
       const speaker = next.speaker_name || 'Unnamed speaker'
-      for (const part of parts) {
-        const audio = join(
-          part.chunkIndexes.map((i) => pieces[i]),
-          part.needsHeader ? header : undefined,
-        )
-        const raw = await transcribePart(audio, hint)
-        items.push(...placeSegments(raw, speaker, next.offset_ms || 0, part.offsetMs))
+
+      if (!canBeSplit(mime)) {
+        // Mp4 keeps what it needs to be read in one piece, so cutting it makes
+        // something no player will open. It goes whole, and if it is too large
+        // the service says so, which is an answer somebody can act on.
+        const raw = await transcribePart(join(pieces), hint, mime)
+        items.push(...placeSegments(raw, speaker, next.offset_ms || 0, 0))
+      } else {
+        const headerLength = webmHeaderLength(pieces[0])
+        const header = headerLength > 0 ? pieces[0].slice(0, headerLength) : undefined
+        const parts = planTranscriptionParts(pieces.map((p) => p.length), header?.length || 0)
+        for (const part of parts) {
+          const audio = join(
+            part.chunkIndexes.map((i) => pieces[i]),
+            part.needsHeader ? header : undefined,
+          )
+          const raw = await transcribePart(audio, hint, mime)
+          items.push(...placeSegments(raw, speaker, next.offset_ms || 0, part.offsetMs))
+        }
       }
       done.push(next.id)
       }

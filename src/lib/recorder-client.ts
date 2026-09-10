@@ -170,6 +170,8 @@ export class DeviceRecorder {
   private analyser: AnalyserNode | null = null
   private levelTimer: ReturnType<typeof setInterval> | null = null
   readonly device = deviceId()
+  /** What this browser actually recorded. An iPhone gives mp4, not WebM. */
+  private mime = ''
 
   constructor(opts: RecorderOptions) { this.opts = opts }
 
@@ -270,11 +272,13 @@ export class DeviceRecorder {
         ...(mimeType ? { mimeType } : {}),
         audioBitsPerSecond: 32_000,
       })
+      this.mime = this.rec.mimeType || mimeType || ''
     } catch {
       // A browser that will not take those settings still records. Losing the
       // bitrate costs disk; refusing to record costs the session.
       try {
         this.rec = new MediaRecorder(this.stream)
+        this.mime = this.rec.mimeType || ''
       } catch {
         await this.fail('their browser could not start a recorder')
         throw new Error('recorder could not start')
@@ -289,6 +293,7 @@ export class DeviceRecorder {
       speakerName: this.opts.speakerName || null,
       partyId: this.opts.partyId || null,
       deviceReport: this.report,
+      mimeType: this.mime,
     }).catch(() => null)
 
     this.rec.ondataavailable = (e: BlobEvent) => {
@@ -378,7 +383,10 @@ export class DeviceRecorder {
         form.append('recordingId', this.opts.recordingId)
         form.append('deviceId', this.device)
         form.append('chunkIndex', String(piece.index))
-        form.append('file', piece.blob, `${piece.index}.webm`)
+        // The format travels with the piece, because an iPhone records mp4 and
+        // storing it under a WebM name made it unplayable and untranscribable.
+        form.append('mimeType', this.mime || piece.blob.type || '')
+        form.append('file', piece.blob, String(piece.index))
         let ok = false
         try {
           const res = await fetch('/api/session-recording/chunk', {

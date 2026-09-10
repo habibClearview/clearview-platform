@@ -53,7 +53,7 @@ describe('who may start and stop a recording', () => {
 
 describe('where a piece of audio is allowed to land', () => {
   it('builds the path itself and never takes one from the browser', () => {
-    expect(CHUNK).toContain('trackStoragePath(recording.client_id, recording.id, deviceId, chunkIndex)')
+    expect(CHUNK).toContain('trackStoragePath(recording.client_id, recording.id, deviceId, chunkIndex, mime)')
     expect(CHUNK).not.toMatch(/form\.get\(['"](path|storagePath)['"]\)/)
   })
 

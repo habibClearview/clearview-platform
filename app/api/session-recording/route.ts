@@ -176,6 +176,9 @@ export async function POST(req: NextRequest) {
         // only on a screen, so a session that captured nothing can be
         // explained afterwards instead of argued about.
         device_report: body.deviceReport && typeof body.deviceReport === 'object' ? body.deviceReport : null,
+        // Safari on iOS records mp4 and nothing else, so the format has to
+        // travel with the track rather than be assumed downstream.
+        mime_type: body.mimeType ? String(body.mimeType).slice(0, 80) : null,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'recording_id,device_id' })
         .select('id,device_id,speaker_name,offset_ms,status').single()

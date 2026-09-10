@@ -18,7 +18,7 @@
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient, requireAccess, refuseAccess } from '@/lib/auth/api-authz'
-import { AUDIO_MIME } from '@/lib/recording'
+import { baseMime, extensionFor } from '@/lib/recording'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 
     const admin = getAdminClient()
     const { data: track } = await admin.from('recording_tracks')
-      .select('id,recording_id,speaker_name,storage_path').eq('id', trackId).maybeSingle()
+      .select('id,recording_id,speaker_name,storage_path,mime_type').eq('id', trackId).maybeSingle()
     if (!track?.storage_path) return NextResponse.json({ error: 'That track has no audio' }, { status: 404 })
 
     const { data: recording } = await admin.from('session_recordings')
@@ -49,7 +49,8 @@ export async function GET(req: NextRequest) {
       .list(track.storage_path, { limit: 1000, sortBy: { column: 'name', order: 'asc' } })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    const names = (listed || []).map((f) => f.name).filter((n) => n.endsWith('.webm')).sort()
+    const names = (listed || []).map((f) => f.name)
+      .filter((n) => /\.(webm|mp4|m4a|ogg|wav)$/i.test(n)).sort()
     if (!names.length) return NextResponse.json({ error: 'That track has no audio' }, { status: 404 })
 
     const pieces: Uint8Array[] = []
@@ -64,9 +65,9 @@ export async function GET(req: NextRequest) {
 
     return new NextResponse(joined, {
       headers: {
-        'Content-Type': AUDIO_MIME,
+        'Content-Type': baseMime(track.mime_type),
         'Content-Length': String(total),
-        'Content-Disposition': `inline; filename="${(track.speaker_name || 'track').replace(/[^A-Za-z0-9 _.-]/g, '')}.webm"`,
+        'Content-Disposition': `inline; filename="${(track.speaker_name || 'track').replace(/[^A-Za-z0-9 _.-]/g, '')}.${extensionFor(track.mime_type)}"`,
         // A recording of somebody's voice is never cached by anything in
         // between, and never by a shared cache at all.
         'Cache-Control': 'private, no-store',

@@ -20,6 +20,7 @@ import CurrencyField from '@/components/common/CurrencyField'
 import { formatMoneyShort } from '@/lib/currency'
 import SessionPlanner from '@/components/gtcv/SessionPlanner'
 import RecordingsPanel from '@/components/gtcv/RecordingsPanel'
+import { useNarrowScreen } from '@/lib/narrow-screen'
 import DeliverablesPanel from '@/components/gtcv/DeliverablesPanel'
 import HandoverIndependence from '@/components/gtcv/HandoverIndependence'
 import InterviewReporting from '@/components/gtcv/InterviewReporting'
@@ -2370,6 +2371,11 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     // setup, session planning, the diagnostic (teamOnly). The organisation
     // being coached answers no to both.
     const mayRun=canRunTheEngagement(previewRoleId)
+    // A PHONE IS NOT A NARROW DESKTOP. 10 September 2026. Twenty five tabs in a
+    // column beside the work is right on a laptop and unusable on a phone,
+    // where it is either 170 pixels of work or twenty five rows to scroll past
+    // before reaching any. On a phone the same tabs become one control.
+    const onAPhone=useNarrowScreen()
     const visibleTabs=isCanvas
       ? CANVAS_TABS.filter(t=>(!t.coachOnly||canViewCoachGuidance(previewRoleId))&&(!t.teamOnly||mayRun))
       : []
@@ -2507,12 +2513,41 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             get to the session list. These styles are written inline, and an
             inline style beats a stylesheet, so the narrow screen rules in
             globals.css are the one place that is allowed to override them. */}
-        <div className="cv-client-shell" style={{display:'grid',gridTemplateColumns:navCollapsed?'62px minmax(0,1fr)':'220px minmax(0,1fr)',gap:'1.5rem',alignItems:'start'}}>
+        <div className="cv-client-shell" style={onAPhone
+          ?{display:'block'}
+          :{display:'grid',gridTemplateColumns:navCollapsed?'62px minmax(0,1fr)':'220px minmax(0,1fr)',gap:'1.5rem',alignItems:'start'}}>
+
+          {/* ON A PHONE, ONE CONTROL INSTEAD OF TWENTY FIVE ROWS. It is the
+              same list, in the same order, with the same group headings, and it
+              is what a phone already knows how to show full screen. */}
+          {onAPhone&&(
+            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:'0.6rem 0.75rem',marginBottom:'0.9rem'}}>
+              <label htmlFor="cv-phone-tab" style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.74rem',letterSpacing:'.1em',textTransform:'uppercase',color:C.slate,display:'block',marginBottom:'0.3rem'}}>
+                Where you are
+              </label>
+              <select
+                id="cv-phone-tab"
+                value={shownTab}
+                onChange={e=>setActiveTab(e.target.value)}
+                style={{width:'100%',padding:'0.6rem 0.5rem',fontSize:16,borderRadius:7,border:`1px solid ${C.border}`,background:C.white,color:C.navy,minHeight:44}}
+              >
+                {TAB_GROUPS.map(g=>{
+                  const inGroup=visibleTabs.filter(t=>t.group===g.id)
+                  if(!inGroup.length)return null
+                  return(
+                    <optgroup key={g.id} label={g.label}>
+                      {inGroup.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
+                    </optgroup>
+                  )
+                })}
+              </select>
+            </div>
+          )}
 
           {/* Sidebar — 25 tabs. On a phone this becomes a strip that scrolls
               sideways above the work, rather than 25 rows to scroll past
               before reaching anything. */}
-          <div className="cv-client-nav" style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',position:'sticky',top:'1rem'}}>
+          <div className="cv-client-nav" style={{display:onAPhone?'none':'block',background:C.white,border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',position:'sticky',top:'1rem'}}>
             <button
               type="button"
               onClick={()=>setNavCollapsed(v=>!v)}

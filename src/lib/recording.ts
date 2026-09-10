@@ -61,11 +61,49 @@ export const CHUNK_MS = 30_000
 
 /** Where a track's audio lives. One folder per engagement, then per recording,
  *  so a recording can be found and removed as a whole. */
+/**
+ * AN IPHONE DOES NOT RECORD WEBM. 10 September 2026.
+ *
+ * Habib: people would use this for interview capture on the phone, and that is
+ * the field work this platform exists for. Safari on iOS records mp4 and
+ * nothing else, so an interview captured on an iPhone produced mp4 audio
+ * stored under a .webm name and offered to the transcription service as WebM.
+ *
+ * The format a device actually produced therefore travels with the track, and
+ * everything downstream reads it rather than assuming.
+ */
+export function extensionFor(mimeType: string | null | undefined): string {
+  const m = String(mimeType || '').toLowerCase()
+  if (m.includes('mp4') || m.includes('m4a') || m.includes('aac')) return 'mp4'
+  if (m.includes('ogg')) return 'ogg'
+  if (m.includes('wav')) return 'wav'
+  return AUDIO_EXTENSION
+}
+
+/** The plain type, without the codec note a browser adds. */
+export function baseMime(mimeType: string | null | undefined): string {
+  const m = String(mimeType || '').split(';')[0].trim().toLowerCase()
+  return m || AUDIO_MIME
+}
+
+/**
+ * Whether this format can be cut into parts and still be playable.
+ *
+ * WebM can, by carrying its header forward. Mp4 keeps what it needs to be read
+ * in one piece, so cutting it produces something no player will open. A long
+ * mp4 recording is sent whole and refused by the service if it is too large,
+ * which is an answer somebody can act on; a silently unplayable file is not.
+ */
+export function canBeSplit(mimeType: string | null | undefined): boolean {
+  return baseMime(mimeType).includes('webm')
+}
+
 export function trackStoragePath(
   clientId: string,
   recordingId: string,
   deviceId: string,
   chunkIndex: number,
+  mimeType?: string | null,
 ): string {
   // A dot is allowed inside a name and never at the start, and two dots in a
   // row are never allowed at all. Without that ".." survives the sanitiser and
@@ -76,7 +114,7 @@ export function trackStoragePath(
     .replace(/^[.]+/, '_')
     .slice(0, 80)
   const n = String(Math.max(0, Math.trunc(chunkIndex))).padStart(5, '0')
-  return `${safe(clientId)}/${safe(recordingId)}/${safe(deviceId)}/${n}.${AUDIO_EXTENSION}`
+  return `${safe(clientId)}/${safe(recordingId)}/${safe(deviceId)}/${n}.${extensionFor(mimeType)}`
 }
 
 /**
