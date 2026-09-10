@@ -1699,7 +1699,12 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       const p=new URLSearchParams(window.location.search)
       const client=p.get('client')
       const zone=p.get('zone')
-      if(client){setSelClientId(client);setView('clients')}
+      // 'client' is that client's own page. 'clients' is the list of every
+      // client. This read the address, found the client, and then showed the
+      // list, so every link into an engagement landed on the dashboard
+      // instead: the way back from a session room, and any link sent to
+      // somebody. One letter. 10 September 2026.
+      if(client){setSelClientId(client);setView('client')}
       if(zone)setActiveTab(zone)
     }catch{/* an address that cannot be parsed is not a reason to fail to load */}
   },[])

@@ -342,6 +342,13 @@ describe('finding a recording afterwards', () => {
     expect(CALLPAGE).toContain('zone=sessions')
   })
 
+  it('and that way back opens the engagement, not the list of every client', () => {
+    // 'client' is that client's own page. 'clients' is the list of all of
+    // them. Reading the address and then showing the list meant every link
+    // into an engagement landed on the dashboard.
+    expect(DASH).toContain("if(client){setSelClientId(client);setView('client')}")
+  })
+
   it('does not put a raw browser error under a running recording', () => {
     const REC = fs.readFileSync('src/components/gtcv/SessionRecorder.tsx', 'utf8')
     expect(REC).toContain('A POLL THAT FAILS SAYS NOTHING')
