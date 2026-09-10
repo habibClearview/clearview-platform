@@ -30,12 +30,50 @@ const supabaseWs = supabaseOrigin ? supabaseOrigin.replace(/^https:/, 'wss:') : 
 // Include the exact project host (from env) AND the *.supabase.co wildcard as a
 // safety net, so realtime/REST keep working even if the env value is absent at
 // build time.
+// ---------------------------------------------------------------------------
+// THE CALL WAS BLOCKED BY OUR OWN HEADER. 10 September 2026.
+//
+// The first time a real browser opened a session room it said "could not
+// establish signal connection: Failed to fetch". Nothing was wrong with the
+// LiveKit key, the secret or the address. connect-src listed only ourselves and
+// Supabase, so the browser refused to open the WebSocket to the media service,
+// exactly as instructed.
+//
+// Every test until then had been against the server, and a server has no
+// Content Security Policy. That is the gap: a policy can only be checked from
+// the browser's side, so it is now checked in src/__tests__/browser-policy.test.ts.
+// ---------------------------------------------------------------------------
+const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || ''
+let livekitWs = ''
+let livekitHttp = ''
+try {
+  if (livekitUrl) {
+    const u = new URL(livekitUrl)
+    livekitWs = `wss://${u.host}`
+    // The client checks the room over https before it opens the socket, so both
+    // schemes are needed. Allowing only the socket still fails, and fails with
+    // the same unhelpful "Failed to fetch".
+    livekitHttp = `https://${u.host}`
+  }
+} catch {
+  livekitWs = ''
+  livekitHttp = ''
+}
+
 const connectSrc = [
   "'self'",
   supabaseOrigin,
   supabaseWs,
   'https://*.supabase.co',
   'wss://*.supabase.co',
+  livekitHttp,
+  livekitWs,
+  // The media service answers from regional hosts under the same domain, and
+  // relays through TURN on others. The exact host from the environment is above;
+  // this is the safety net, the same shape as the Supabase wildcard, so a
+  // region change is not an outage nobody can explain.
+  'https://*.livekit.cloud',
+  'wss://*.livekit.cloud',
 ].filter(Boolean).join(' ')
 
 const csp = [
@@ -45,6 +83,10 @@ const csp = [
   "frame-ancestors 'none'",
   "form-action 'self'",
   "img-src 'self' data: blob:",
+  // A recording is fetched with the sign in on the request and then played from
+  // the browser's own memory, which is a blob: address. Without this it falls
+  // through to default-src and the player is silently refused.
+  "media-src 'self' blob:",
   "font-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
@@ -92,8 +134,20 @@ const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   // Send only the origin (not the full path/query) on cross-origin requests.
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  // Turn off powerful features the app never uses.
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()' },
+  // WHAT THE APP MAY ASK THE DEVICE FOR. 10 September 2026.
+  //
+  // This read microphone=() until a real browser tried to record, which told
+  // the browser to forbid the microphone on this site for everybody, us
+  // included. "Allow my microphone" could never work: the refusal was ours, not
+  // Chrome's, and it looked exactly like a person declining.
+  //
+  // self means this site and nothing else. A page embedded from anywhere else
+  // still gets nothing, and the browser still asks the person first. Geolocation
+  // and topics stay off, because nothing here has any business with either.
+  {
+    key: 'Permissions-Policy',
+    value: 'camera=(self), microphone=(self), display-capture=(self), geolocation=(), browsing-topics=()',
+  },
 ]
 
 // On staging / preview only: tell search engines never to index the test copy.
