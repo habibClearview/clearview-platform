@@ -18,6 +18,7 @@
 // ============================================================
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { accountRoleForParty } from '@/lib/engagement-types'
 import { cleanRecipients, isWebUrl } from '@/lib/validate-input'
 import { getBearerToken } from '@/lib/auth/api-authz'
 import { resolveClientAccess } from '@/lib/auth/engagement-access'
@@ -241,7 +242,7 @@ export async function POST(req: NextRequest) {
     // live, instead of a second list of the same names kept in the brief.
     const { data: partyRows } = await admin
       .from('engagement_parties')
-      .select('id, name, title, email, letter')
+      .select('id, name, title, email, letter, party_role')
       .eq('client_id', clientId)
       .order('sort_order', { ascending: true })
     const fromParties = (partyRows || [])
@@ -329,13 +330,25 @@ export async function POST(req: NextRequest) {
             }
             if (linked.userId && !already) {
               const isPayer = person.audience === 'payer'
+              // THE ROLE COMES FROM THE ENGAGEMENT, NOT FROM THE LETTER.
+              // 11 September 2026. This read "funder if they got the payer's
+              // letter, otherwise chief executive", so a member of the served
+              // client's staff became a chief executive, which on this platform
+              // carries the right to edit the engagement and sign a gate off.
+              // Nobody asked for that. The party list says who each person is.
+              const onTheParty = (partyRows || []).find(
+                (p) => (p.email || '').trim().toLowerCase() === person.email.trim().toLowerCase(),
+              )
+              const accountRole = onTheParty
+                ? accountRoleForParty(onTheParty.party_role)
+                : (isPayer ? 'funder' : 'unit_head')
               const { error: profErr } = await admin.from('user_profiles').insert({
                 id: linked.userId,
-                role: isPayer ? 'funder' : 'ceo',
+                role: accountRole,
                 full_name: person.name || person.email,
                 email: person.email,
-                engagement_client_id: isPayer ? null : clientId,
-                funder_programme_id: isPayer ? (client.programme_id || null) : null,
+                engagement_client_id: accountRole === 'funder' ? null : clientId,
+                funder_programme_id: accountRole === 'funder' ? (client.programme_id || null) : null,
                 assigned_unit_ids: [],
                 co_implementer_id: null,
                 status: 'invited',

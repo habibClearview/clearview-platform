@@ -342,7 +342,7 @@ describe('sending to one person', () => {
 
   it('every recipient carries their own send', () => {
     expect(PACK).toContain('onClick={() => sendWelcome([r.email], `one:${r.email}`)}')
-    expect(PACK).toContain("'Send to them'")
+    expect(PACK).toContain("'Send it'")
     expect(PACK).toContain("'Send again'")
   })
 
@@ -451,7 +451,7 @@ describe('recording a letter that went before the record existed', () => {
   const PACK = readFileSync('src/components/gtcv/WelcomePack.tsx', 'utf8')
 
   it('every recipient can be marked as already having had it', () => {
-    expect(PACK).toContain("'Already had it'")
+    expect(PACK).toContain("'Correct this'")
     expect(PACK).toContain('is recorded as having had it on ')
     expect(PACK).toContain('Nothing was sent.')
   })
@@ -476,7 +476,7 @@ describe('recording a letter that went before the record existed', () => {
     // 11 September 2026. This label was "Not actually sent", which reads as
     // the platform reporting a failed send rather than as a thing the coach
     // is telling it. See the block at the end of this file.
-    expect(PACK).toContain("'They did not get it'")
+    expect(PACK).toContain("'Correct this'")
     expect(PACK).toContain('Nothing is sent either way.')
     expect(PACK).toContain('is back on the list to be written to.')
   })
@@ -499,11 +499,16 @@ describe('a control must not read as a report', () => {
     // letters had gone out and been replied to, it read as the platform
     // reporting a failure.
     expect(SETTINGS).not.toContain("'Not actually sent'")
-    expect(SETTINGS).toContain("'They did not get it'")
+    expect(SETTINGS).not.toContain("'They did not get it'")
+    // One quiet correction, in both directions. The state is said above it.
+    expect(SETTINGS).toContain("'Correct this'")
   })
 
-  it('both labels are something the coach tells the platform', () => {
-    expect(SETTINGS).toContain("'Already had it'")
-    expect(SETTINGS).toContain('Tell the platform they never received it')
+  it('says what happened, where it happened', () => {
+    // Habib: if an email is sent it should say sent on the platform, and Send
+    // again should be a button in case it is desired.
+    expect(SETTINGS).toContain('· Sent {new Date(r.sentAt)')
+    expect(SETTINGS).toContain("' · Not sent'".replace(/'/g, ''))
+    expect(SETTINGS).toContain("'Send again'")
   })
 })

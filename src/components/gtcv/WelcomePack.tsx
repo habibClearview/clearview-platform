@@ -555,9 +555,16 @@ export default function WelcomePack({ clientId, canManage }) {
                           <span style={{ fontSize: '0.9rem' }}>
                             {r.name || r.email}
                             {r.name ? <span style={{ color: C.slate }}> · {r.email}</span> : null}
+                            {/* SAY WHAT HAPPENED, PLAINLY. 11 September 2026.
+                                Habib: if an email is sent it should say sent
+                                on the platform, and Send again should be a
+                                button in case it is desired. The state was in
+                                grey after a middle dot, next to a control
+                                labelled like a status, and the two read as one
+                                confusing sentence. */}
                             {r.sentAt
-                              ? <span style={{ color: C.slate }}> · sent {new Date(r.sentAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-                              : <span style={{ color: C.teal }}> · not sent yet</span>}
+                              ? <b style={{ color: C.green }}> · Sent {new Date(r.sentAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</b>
+                              : <b style={{ color: C.amber }}> · Not sent</b>}
                           </span>
                         </label>
                         {/* THE LETTERS THAT WENT BEFORE ANYTHING RECORDED IT.
@@ -623,8 +630,8 @@ export default function WelcomePack({ clientId, canManage }) {
                             ? 'Tell the platform they never received it, so they go back on the list. Nothing is sent now.'
                             : 'Tell the platform they already had this letter, without sending anything'}
                           style={{
-                            ...mono, fontSize: '0.78rem', padding: '0.25rem 0.6rem',
-                            border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent',
+                            ...mono, fontSize: '0.74rem', padding: '0.25rem 0.2rem',
+                            border: 'none', background: 'transparent', textDecoration: 'underline',
                             color: C.slate, cursor: busy ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
                           }}
                         >{busy === `mark:${r.email}`
@@ -637,7 +644,10 @@ export default function WelcomePack({ clientId, canManage }) {
                           // had in fact gone and been replied to. Both labels
                           // are now plainly something the coach is telling the
                           // platform, not something it is telling them.
-                          : r.sentAt ? 'They did not get it' : 'Already had it'}</button>
+                          // One quiet correction, in both directions, so it
+                          // can never be mistaken for the platform reporting
+                          // something. The state above says what happened.
+                          : 'Correct this'}</button>
                         <button
                           type="button"
                           disabled={!!busy || !journeyUrl}
@@ -648,7 +658,7 @@ export default function WelcomePack({ clientId, canManage }) {
                             border: `1px solid ${C.teal}`, borderRadius: 7, background: 'transparent',
                             color: C.teal, cursor: busy ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
                           }}
-                        >{busy === `one:${r.email}` ? 'Sending...' : r.sentAt ? 'Send again' : 'Send to them'}</button>
+                        >{busy === `one:${r.email}` ? 'Sending...' : r.sentAt ? 'Send again' : 'Send it'}</button>
                       </div>
                     )
                   })}

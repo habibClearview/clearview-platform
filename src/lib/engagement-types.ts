@@ -420,3 +420,47 @@ export function isCharterFullyExecuted<P extends { id: string; is_signatory?: bo
   if (signatories.length === 0) return false
   return outstandingSignatories(parties, signaturesForThisVersion).length === 0
 }
+
+
+// ============================================================
+// WHAT A LOGIN IS ALLOWED TO DO, DECIDED BY THE ROLE ON THE ENGAGEMENT
+//
+// 11 September 2026. Habib: at no point did I assign right to sign or mention
+// that Nkemjika Onuoha is a CEO. This person was added as a staff member of the
+// served client and should not be given any signature right. Why is the system
+// assuming things rather than following very clear instructions.
+//
+// It was assuming. The login created alongside a welcome letter took its role
+// from WHICH LETTER the person received: the payer's letter made a funder, and
+// the served letter made a chief executive. Everybody on the served side
+// therefore became a chief executive, and on this platform that account role
+// carries the right to edit the engagement's working tables and to sign a gate
+// off.
+//
+// Nobody asked for that. The party role was sitting on the same record, set by
+// hand by the lead consultant, saying exactly who each person is. That is what
+// decides it now.
+// ============================================================
+
+/** The account role a person's role on the engagement earns them, and no more. */
+export function accountRoleForParty(partyRole: string | null | undefined): string {
+  switch (partyRole) {
+    // The one person who answers for the organisation. Signs a gate off, and
+    // the method is explicit that this cannot be delegated.
+    case 'lsp_ed': return 'ceo'
+
+    // The funder's side reads the engagement and never edits it.
+    case 'client_funder':
+    case 'funder_rep': return 'funder'
+
+    // Finance sees the cost work, which has its own privacy protocol.
+    case 'lsp_finance': return 'finance_manager'
+
+    // Everybody else on the served side: leadership, the board chair, the
+    // field team, and anybody added without a role. They read the engagement.
+    // They do not edit it and they do not sign anything off, unless the lead
+    // consultant says otherwise in the party list, which is a decision rather
+    // than a side effect of being emailed.
+    default: return 'unit_head'
+  }
+}

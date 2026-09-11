@@ -287,14 +287,20 @@ describe('a sign-in link arrives with a role attached', () => {
   it('creates the profile the link needs, or sends nothing', () => {
     // A link without a role is a door into an empty room: signed in, scoped to
     // nothing, and the first impression spent.
-    expect(R).toContain("role: isPayer ? 'funder' : 'ceo'")
+    // 11 September 2026. The role came from which letter somebody received,
+    // so everybody on the served side became a chief executive, which carries
+    // the right to edit the engagement and to sign a gate off. Habib: at no
+    // point did I mention that this person is a CEO, they were added as staff.
+    // It comes from their role on the engagement now.
+    expect(R).toContain('accountRoleForParty(onTheParty.party_role)')
+    expect(R).not.toContain("role: isPayer ? 'funder' : 'ceo'")
     expect(R).toContain('the login could not be set up')
     expect(R).toContain('throw new Error')
   })
 
   it('scopes the two sides to the two things they may see', () => {
-    expect(R).toContain('engagement_client_id: isPayer ? null : clientId')
-    expect(R).toContain('funder_programme_id: isPayer ? (client.programme_id || null) : null')
+    expect(R).toContain("engagement_client_id: accountRole === 'funder' ? null : clientId")
+    expect(R).toContain("funder_programme_id: accountRole === 'funder' ? (client.programme_id || null) : null")
   })
 
   it('never changes a role somebody already has', () => {
