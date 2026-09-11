@@ -118,7 +118,11 @@ export default function SessionRecorder({
     ? `?sessionId=${encodeURIComponent(sessionId)}&clientId=${encodeURIComponent(clientId)}`
     : interviewId
       ? `?interviewId=${encodeURIComponent(interviewId)}&clientId=${encodeURIComponent(clientId)}`
-      : `?clientId=${encodeURIComponent(clientId)}`
+      // A conversation that belongs to a block rather than a planned session:
+      // the pre-engagement three questions, asked before there is a plan.
+      : dpId
+        ? `?dpId=${encodeURIComponent(dpId)}&clientId=${encodeURIComponent(clientId)}`
+        : `?clientId=${encodeURIComponent(clientId)}`
 
   const read = useCallback(async () => {
     try {

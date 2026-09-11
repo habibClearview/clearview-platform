@@ -54,10 +54,12 @@ function length(seconds) {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} hr ${m % 60} min`
 }
 
-export default function RecordingsPanel({ clientId }) {
+export default function RecordingsPanel({ clientId, canManage = false }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
+  const [busy, setBusy] = useState(null)
+  const [note, setNote] = useState(null)
 
   const load = useCallback(async () => {
     if (!clientId) return
@@ -78,6 +80,36 @@ export default function RecordingsPanel({ clientId }) {
 
   useEffect(() => { load() }, [load])
 
+  /**
+   * Remove a recording and its audio.
+   *
+   * A platform holding people's voices that cannot delete one has it the wrong
+   * way round: a recording made in error, or one somebody withdraws consent
+   * for, would have to stay for ever. It asks first, because it cannot be
+   * undone and the audio is the only copy.
+   */
+  async function remove(r) {
+    const what = `${r.heading}, ${when(r.started_at)}`
+    if (typeof window !== 'undefined' && !window.confirm(
+      `Delete this recording?\n\n${what}\n\nThe audio, the transcript and the signatures on it go with it. This cannot be undone.`,
+    )) return
+    setBusy(r.id); setErr(null); setNote(null)
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      const res = await fetch('/api/session-recording', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ recordingId: r.id }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || `It could not be deleted (${res.status})`)
+      setNote(`Deleted. ${json.filesRemoved || 0} ${json.filesRemoved === 1 ? 'piece' : 'pieces'} of audio removed.`)
+      await load()
+    } catch (e) { setErr(e.message) }
+    setBusy(null)
+  }
+
   return (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '1rem 1.1rem' }}>
       <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
@@ -88,6 +120,7 @@ export default function RecordingsPanel({ clientId }) {
       </div>
 
       {loading && <div style={{ ...hint, marginTop: '0.6rem' }}>Reading...</div>}
+      {note && <div style={{ ...hint, marginTop: '0.6rem', color: C.green }}>{note}</div>}
       {err && (
         <div style={{ ...hint, marginTop: '0.6rem', color: C.red }}>
           {err}{' '}
@@ -132,6 +165,18 @@ export default function RecordingsPanel({ clientId }) {
               {t && <span style={{ ...mono, fontSize: '0.82rem', color: t.colour }}>{t.label}</span>}
               {!t && r.status !== 'opening' && (
                 <span style={{ ...mono, fontSize: '0.82rem', color: C.amber }}>No transcript yet</span>
+              )}
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => remove(r)}
+                  disabled={busy === r.id}
+                  style={{
+                    ...mono, fontSize: '0.8rem', marginLeft: 'auto', padding: '0.2rem 0.55rem',
+                    border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent',
+                    color: C.red, cursor: 'pointer',
+                  }}
+                >{busy === r.id ? 'Deleting...' : 'Delete'}</button>
               )}
             </div>
           </div>

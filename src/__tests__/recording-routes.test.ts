@@ -354,3 +354,77 @@ describe('finding a recording afterwards', () => {
     expect(REC).toContain('A POLL THAT FAILS SAYS NOTHING')
   })
 })
+
+describe('deleting a recording', () => {
+  const PANEL = fs.readFileSync('src/components/gtcv/RecordingsPanel.tsx', 'utf8')
+  const PARTIES = fs.readFileSync('src/components/gtcv/EngagementPartiesPanel.tsx', 'utf8')
+  const DASH2 = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
+
+  it('can be done at all, which it could not before', () => {
+    // A platform holding people's voices that cannot delete one has it the
+    // wrong way round: a recording made in error, or one somebody withdraws
+    // consent for, would have to stay for ever.
+    expect(OPEN).toContain('export async function DELETE')
+    expect(PANEL).toContain("method: 'DELETE'")
+  })
+
+  it('takes manage rights', () => {
+    expect(OPEN).toContain('Only the coaching team can delete a recording')
+  })
+
+  it('removes the audio before the record of it', () => {
+    // The other order leaves audio nobody can see or reach.
+    const del = OPEN.slice(OPEN.indexOf('export async function DELETE'))
+    expect(del.indexOf("storage.from('recordings').remove")).toBeLessThan(
+      del.indexOf("from('session_recordings').delete()"))
+  })
+
+  it('deletes nothing if the audio cannot be removed', () => {
+    expect(OPEN).toContain('so nothing has been deleted')
+  })
+
+  it('asks first, because it cannot be undone', () => {
+    expect(PANEL).toContain('This cannot be undone')
+  })
+})
+
+describe('one list of the people, not two', () => {
+  const PARTIES = fs.readFileSync('src/components/gtcv/EngagementPartiesPanel.tsx', 'utf8')
+  const DASH2 = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
+
+  it('carries the login on the person own line', () => {
+    // The invite panel repeated every name purely to hold this one fact and
+    // this one button, so the same person was typed and corrected twice.
+    expect(PARTIES).toContain('Has a login')
+    expect(PARTIES).toContain('Give them a login')
+  })
+
+  it('no longer draws the second list beside it', () => {
+    const setup = DASH2.slice(DASH2.indexOf("shownTab==='eng_setup'"))
+    expect(setup.slice(0, 1200)).not.toContain('<ClientTeamInvite')
+  })
+
+  it('gives an invited login the role their engagement role earns', () => {
+    // Not the role of whichever button was pressed.
+    expect(PARTIES).toContain('accountRoleForParty(r.party_role)')
+  })
+})
+
+describe('the pre-engagement conversation', () => {
+  const DASH2 = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
+
+  it('can be recorded where the three questions are', () => {
+    // The answers to those three questions are the thing being recorded and
+    // signed, and there was no way to record them on the tab that asks them.
+    const tab = DASH2.slice(DASH2.indexOf('function TabDiagnostic'))
+    expect(tab.slice(0, 4000)).toContain('<SessionRecorder')
+    expect(tab.slice(0, 4000)).toContain('dpId="setup"')
+  })
+
+  it('belongs to the block, because there is no session plan yet', () => {
+    // The three questions are asked once, before there is a plan to hang a
+    // session on.
+    expect(OPEN).toContain("url.searchParams.get('dpId')")
+    expect(OPEN).toContain(".is('session_id', null)")
+  })
+})

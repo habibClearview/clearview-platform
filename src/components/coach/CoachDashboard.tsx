@@ -20,6 +20,8 @@ import CurrencyField from '@/components/common/CurrencyField'
 import { formatMoneyShort } from '@/lib/currency'
 import SessionPlanner from '@/components/gtcv/SessionPlanner'
 import RecordingsPanel from '@/components/gtcv/RecordingsPanel'
+import SessionRecorder from '@/components/gtcv/SessionRecorder'
+import TranscriptPanel from '@/components/gtcv/TranscriptPanel'
 import { useNarrowScreen } from '@/lib/narrow-screen'
 import DeliverablesPanel from '@/components/gtcv/DeliverablesPanel'
 import HandoverIndependence from '@/components/gtcv/HandoverIndependence'
@@ -2646,7 +2648,12 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                   Sending somebody a letter meant holding two screens in your
                   head and moving between them. It is one job, so it is one
                   place: the people, then what goes to them. */}
-              {mayRun?<><WelcomePack clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>:null}{isSuperCoach&&<><ClientTeamInvite client={selClient}/><div style={{height:22}}/></>}<EngagementSettings clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
+              {mayRun?<><WelcomePack clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>:null}{/* THE SECOND LIST OF THE SAME NAMES IS GONE. 11 September 2026.
+                  Habib: why do we still have two lists of the names of the
+                  people on this assignment on this tab, the client invite and
+                  login can also be on one list. It repeated every name purely
+                  to carry whether they had a login and a button to give them
+                  one. Both are now on the person's own line above. */}<EngagementSettings clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/></>}
             {shownTab==='eng_setup'&&<TabEngagementSetup client={selClient} fileLinks={fileLinks} notifications={notifications} onUpdate={updates=>updateClient(selClient.id,updates)} onUpdateFileLinks={async(links)=>{await supabase.from('file_links').delete().eq('client_id',selClient.id);if(links.length>0)await supabase.from('file_links').insert(links.map((l,i)=>({...l,client_id:selClient.id,sort_order:i})));setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,fileLinks:links}}))}} onUpdateNotifications={async(n)=>{await supabase.from('notification_settings').upsert({client_id:selClient.id,...n,updated_at:new Date().toISOString()});setClientData(prev=>({...prev,[selClient.id]:{...selClientFullData,notifications:n}}))}}/>}
             {shownTab==='diagnostic'&&<TabDiagnostic client={selClient} diagnostic={diagnostic} userRole={previewRoleId} userName={userName} onUpdate={(updates)=>{const cid=selClient.id;optimisticWrite(`diagnostic:${cid}`,()=>setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...updates}}})),async()=>{const existingId=diagnosticIdRef.current[cid]||diagnostic?.id;if(existingId)return await supabase.from('engagement_diagnostic').update({...updates,updated_at:new Date().toISOString()}).eq('id',existingId);const res=await supabase.from('engagement_diagnostic').insert({client_id:cid,...updates}).select().single();if(!res.error&&res.data){diagnosticIdRef.current[cid]=res.data.id;setClientData(prev=>({...prev,[cid]:{...prev[cid],diagnostic:{...(prev[cid]?.diagnostic),...res.data}}}))}return res})}}/>}
             {shownTab==='sessions'&&<><SessionPlanner clientId={selClient.id} canManage={canEdit(previewRoleId)}/><div style={{height:22}}/>
@@ -2655,7 +2662,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                   recorded and who was on it. A recording could only be found by
                   remembering which session it belonged to, which is a record
                   that exists and cannot be found. */}
-              <RecordingsPanel clientId={selClient.id}/></>}
+              <RecordingsPanel clientId={selClient.id} canManage={canEdit(previewRoleId)}/></>}
             {/* ONE PANEL PER FACT. 9 September 2026. Each of these tabs drew
                 the same rows twice: an original table and a later panel over
                 the same table. Habib: there is no need to have the same
@@ -3353,6 +3360,8 @@ function TabEngagementSetup({client,fileLinks,notifications,onUpdate,onUpdateFil
 
 function TabDiagnostic({client,diagnostic,userRole,userName,onUpdate}){
   const d=diagnostic||{}
+  // The recording of the three questions, so the transcript sits under them.
+  const [preRecordingId,setPreRecordingId]=useState(null)
   const locked=d.ceo_signed&&d.coach_signed
   const answers=d.readiness_answers||READINESS_QUESTIONS.map(q=>({...q,answer:null}))
   const score=answers.filter(a=>a.answer===true).length
@@ -3360,8 +3369,38 @@ function TabDiagnostic({client,diagnostic,userRole,userName,onUpdate}){
     <div>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'1rem'}}><h3 style={secH}>Pre-Engagement Diagnostic</h3><button style={addBtn(true)} onClick={()=>window.print()}>Print</button></div>
       {locked&&<div style={{background:'var(--cv-tint-green)',padding:14,borderRadius:8,marginBottom:16,fontWeight:600,color:C.green}}>Signed and locked. CEO: {d.ceo_signed_name} on {d.ceo_signed_at?.split('T')[0]}. Coach confirmed {d.coach_signed_at?.split('T')[0]}.</div>}
+      {/* THE ANSWERS ARE WHAT IS BEING RECORDED. 11 September 2026.
+          Habib: the pre-engagement session is not listed and the recording
+          feature is not available on the pre-engagement tab, and the answers to
+          these questions are the ones we are recording and transcribing for
+          signature, so this should be shown clearly on the pre-engagement tab.
+
+          The three questions are asked once, before there is a session plan to
+          hang a session on, which is why the recording belongs to this block
+          rather than to a planned session. It sits above the questions, where
+          the conversation actually happens. */}
+      <div style={{marginBottom:'1.25rem'}}>
+        <SessionRecorder
+          clientId={client.id}
+          dpId="setup"
+          canManage={canEdit(userRole)}
+          clientName={client.name}
+          title="Pre-engagement conversation, the three questions"
+          onRecording={setPreRecordingId}
+        />
+        {preRecordingId&&(
+          <div style={{marginTop:'0.9rem'}}>
+            <TranscriptPanel recordingId={preRecordingId} canManage={canEdit(userRole)}/>
+          </div>
+        )}
+      </div>
+
       <div style={card}>
         <div style={secH}>Three Questions</div>
+        <p style={{...hint,marginBottom:'0.9rem'}}>
+          Record the conversation above and these three answers come back in the client&rsquo;s own words,
+          to be read, corrected and signed. Typing them here is for a conversation that was not recorded.
+        </p>
         {[['question_1','What does commercial success look like for your organisation in 18 months?'],['question_2','What is the biggest thing stopping you from earning commercial revenue right now?'],['question_3','What would have to be true for your organisation to stop needing grant funding?']].map(([field,question])=>(
           <div key={field} style={{marginBottom:'1.25rem'}}>
             <label style={lbl}>{question}</label>

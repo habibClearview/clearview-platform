@@ -22,7 +22,7 @@
 // ============================================================
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { PARTY_ROLE_LABELS } from '@/lib/engagement-types'
+import { PARTY_ROLE_LABELS, accountRoleForParty } from '@/lib/engagement-types'
 // R34, R36, R37. One person's permanent link, beside the person it belongs to.
 import PersonalLinkControls from '@/components/gtcv/PersonalLinkControls'
 
@@ -94,6 +94,41 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState(BLANK)
   const [editing, setEditing] = useState(null)
+
+  /**
+   * Create a login for somebody on the list.
+   *
+   * The role comes from their role on the engagement, the same rule the
+   * welcome letter now follows, so an invitation cannot quietly hand somebody
+   * the right to edit the engagement or sign a gate off because of which
+   * button was pressed.
+   */
+  async function invite(r) {
+    setBusy(`invite:${r.id}`); setErr(null)
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      const role = accountRoleForParty(r.party_role)
+      const res = await fetch('/api/invite-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: r.email,
+          fullName: r.name || r.email,
+          role,
+          clientId: role === 'funder' ? null : clientId,
+          assignedUnitIds: [],
+          coImplementerId: null,
+          funderProgrammeId: null,
+          inviterToken: token,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || `That invitation did not go (${res.status})`)
+      await load()
+    } catch (e) { setErr(e.message) }
+    setBusy(null)
+  }
 
   const load = useCallback(async () => {
     if (!clientId) { setRows([]); setLoading(false); return }
@@ -260,9 +295,25 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
                       : ' · not sent yet'}`
                     : 'No letter'}
                 </span>
+                {/* ONE LIST, WITH THE LOGIN ON IT. 11 September 2026.
+                    Habib: why do we still have two lists of the names of the
+                    people on this assignment on this tab, the client invite and
+                    login can also be on one list. The invite panel below this
+                    one repeated every name purely to carry this one fact and
+                    this one button, so the same person was typed, corrected and
+                    read twice. */}
                 <span style={{ ...mono, fontSize: '0.79rem', color: r.user_id ? C.green : C.amber }}>
-                  {r.user_id ? 'Can sign from their own login' : 'No account here'}
+                  {r.user_id ? 'Has a login' : 'No login yet'}
                 </span>
+                {canManage && !r.user_id && r.email ? (
+                  <button
+                    type="button"
+                    style={btn(C.teal)}
+                    disabled={busy === `invite:${r.id}`}
+                    onClick={() => invite(r)}
+                    title={`Create a login for ${r.name || r.email} and send them the link`}
+                  >{busy === `invite:${r.id}` ? 'Inviting...' : 'Give them a login'}</button>
+                ) : null}
                 {canManage ? (
                   <>
                     <PersonalLinkControls clientId={clientId} partyId={r.id} canManage={canManage} />

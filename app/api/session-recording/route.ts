@@ -284,6 +284,66 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// ─── REMOVING ONE ────────────────────────────────────────────
+//
+// 11 September 2026. Habib: on the test engagement I am not able to delete any
+// recordings, I want to be able to do so. It may be recorded, but I want to be
+// able to delete it.
+//
+// There was no way to, which for a platform holding people's voices is the
+// wrong way round: a recording made in error, or one somebody withdraws
+// consent for, had to stay for ever. The audio goes first and then the record
+// of it, so a failure half way through leaves a row pointing at nothing rather
+// than audio nobody can see or reach.
+//
+// Only the coaching team, and it says how much it removed rather than just
+// succeeding quietly.
+export async function DELETE(req: NextRequest) {
+  try {
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
+    const recordingId = String(body.recordingId || '')
+    if (!recordingId) return NextResponse.json({ error: 'Which recording?' }, { status: 400 })
+
+    const admin = getAdminClient()
+    const recording = await loadRecording(admin, recordingId)
+    if (!recording) return NextResponse.json({ error: 'That recording is not on file' }, { status: 404 })
+
+    const access = await requireAccess(req, admin, recording.client_id, 'manage', {
+      deniedMessage: 'Only the coaching team can delete a recording',
+    })
+    if (!access.ok) return refuseAccess(access)
+
+    const { data: tracks } = await admin.from('recording_tracks')
+      .select('id,storage_path').eq('recording_id', recording.id)
+
+    // The audio itself, folder by folder.
+    let removed = 0
+    for (const t of tracks || []) {
+      if (!t.storage_path) continue
+      const { data: files } = await admin.storage.from('recordings').list(t.storage_path, { limit: 1000 })
+      const paths = (files || []).map((f) => `${t.storage_path}/${f.name}`)
+      if (paths.length) {
+        const { error } = await admin.storage.from('recordings').remove(paths)
+        if (error) {
+          return NextResponse.json({
+            error: `The audio could not be removed, so nothing has been deleted. ${error.message}`,
+          }, { status: 500 })
+        }
+        removed += paths.length
+      }
+    }
+
+    // The tracks, the consent answers and the transcript go with it, because
+    // every one of them is about audio that no longer exists.
+    const { error: delErr } = await admin.from('session_recordings').delete().eq('id', recording.id)
+    if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 })
+
+    return NextResponse.json({ ok: true, filesRemoved: removed, tracks: (tracks || []).length })
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : 'Something went wrong' }, { status: 500 })
+  }
+}
+
 // ─── WHAT THE ROOM LOOKS LIKE RIGHT NOW ──────────────────────
 //
 // This is what the panel on screen polls. It is the answer to "what if
@@ -296,6 +356,7 @@ export async function GET(req: NextRequest) {
     const recordingId = url.searchParams.get('recordingId') || ''
     const sessionId = url.searchParams.get('sessionId') || ''
     const interviewId = url.searchParams.get('interviewId') || ''
+    const dpId = url.searchParams.get('dpId') || ''
     const clientId = url.searchParams.get('clientId') || ''
 
     // EVERY RECORDING ON THIS ENGAGEMENT, IN ONE LIST. 10 September 2026.
@@ -344,6 +405,17 @@ export async function GET(req: NextRequest) {
       const { data } = await admin.from('session_recordings')
         .select('id,client_id,started_at,ended_at,status,title,session_id,interview_id,dp_id')
         .eq('session_id', sessionId).order('started_at', { ascending: false }).limit(1).maybeSingle()
+      recording = data || null
+    }
+
+    // The pre-engagement conversation belongs to a block rather than to a
+    // planned session: the three questions are asked once, before there is a
+    // plan to hang a session on. 11 September 2026.
+    if (!recording && dpId && clientId) {
+      const { data } = await admin.from('session_recordings')
+        .select('id,client_id,started_at,ended_at,status,title,session_id,interview_id,dp_id')
+        .eq('client_id', clientId).eq('dp_id', dpId).is('session_id', null).is('interview_id', null)
+        .order('started_at', { ascending: false }).limit(1).maybeSingle()
       recording = data || null
     }
 
