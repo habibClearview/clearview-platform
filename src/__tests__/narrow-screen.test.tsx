@@ -117,3 +117,45 @@ describe('what the client screen does with it', () => {
     expect(phone).not.toContain('display: flex !important')
   })
 })
+
+// ============================================================
+// THE PHONE AND THE LAPTOP DO THE SAME THING
+//
+// 11 September 2026. Habib: the phone and the site should work the same, I
+// want something seamless and similar, and if the last block is better then
+// that is the way it should be on the laptop and phone.
+// ============================================================
+describe('the same behaviour on both', () => {
+  const fs = require('fs')
+  const DASH = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
+
+  it('opens on the block the engagement has actually reached', () => {
+    // Every route in landed on the Cover, which is the reading of the
+    // engagement and almost never where the work is.
+    expect(DASH).toContain('function openingTabFor(client)')
+    expect(DASH).toContain("setActiveTab(openingTabFor(c))")
+    expect(DASH).not.toContain("setActiveTab('cover');setView('client')")
+  })
+
+  it('gives the same answer wherever it is opened, because it reads the record', () => {
+    // Not a remembered preference in one browser, which is a different answer
+    // on a phone from the one on a laptop.
+    const fn = DASH.slice(DASH.indexOf('function openingTabFor'), DASH.indexOf('export default function CoachDashboard'))
+    expect(fn).toContain('client.status')
+    expect(fn).not.toMatch(/localStorage|sessionStorage/)
+  })
+
+  it('still lands on the Cover where there is no block to be at', () => {
+    const fn = DASH.slice(DASH.indexOf('function openingTabFor'), DASH.indexOf('export default function CoachDashboard'))
+    expect(fn).toContain("if (!at || at === 'setup') return 'cover'")
+    expect(fn).toContain("at === 'complete' || at === 'paused'")
+  })
+
+  it('offers every tab on a phone that a laptop has, in the same order', () => {
+    // The list, the order and the group headings are the same source on both.
+    // Only the shape differs, because a column of twenty five cannot fit a
+    // phone, and nothing is missing from either.
+    expect(DASH).toContain('{TAB_GROUPS.map(g=>{')
+    expect(DASH).toContain('const inGroup=visibleTabs.filter(t=>t.group===g.id)')
+  })
+})

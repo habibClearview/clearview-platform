@@ -1632,6 +1632,33 @@ function PortfolioIntelligenceHub({clients,programmes}){
   )
 }
 
+
+/**
+ * WHERE OPENING A CLIENT SHOULD LAND, ON EVERY DEVICE. 11 September 2026.
+ *
+ * Habib: the phone and the site should work the same, I want something
+ * seamless and similar, and if the last block is better then that is the way
+ * it should be on the laptop and phone.
+ *
+ * Every route in landed on the Cover, which is the reading of the engagement
+ * and almost never where the work is. It now lands on the block the engagement
+ * has actually reached, which is held on the client's own record and is
+ * therefore the same answer on a laptop, on a phone, and for anybody opening
+ * a link somebody sent them.
+ *
+ * The Cover is one press away and is still where a link with no block in it
+ * for a new engagement lands, because an engagement still being set up has no
+ * block to be at.
+ */
+function openingTabFor(client) {
+  const at = client && client.status
+  if (!at || at === 'setup') return 'cover'
+  if (at === 'complete' || at === 'paused') return 'cover'
+  if (at === 'phase_0') return 'phase0'
+  if (at === 'handover') return 'handover'
+  return /^dp0[1-9]$/.test(at) ? at : 'cover'
+}
+
 export default function CoachDashboard({onSignOut,userRole='super_coach',userName='Habib Onifade',coImplementerId=null,funderProgrammeId=null}){
   const isSuperCoach=userRole==='super_coach'
   const isFunder=userRole==='funder'
@@ -1991,7 +2018,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                   <div style={{fontWeight:600,fontSize:'1.07rem',color:C.navy}}>{c.name}</div>
                   <div style={{fontSize:'0.93rem',color:C.slate}}>{c.contact_name}{c.created_at?(' · submitted '+new Date(c.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})):''}</div>
                 </div>
-                <button style={addBtn(true,C.teal)} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}>Review {'→'}</button>
+                <button style={addBtn(true,C.teal)} onClick={()=>{setSelClientId(c.id);setActiveTab(openingTabFor(c));setView('client')}}>Review {'→'}</button>
               </div>
             ))}
           </div>
@@ -2018,7 +2045,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     const color=seStatus?({active:C.green,paused:C.amber,complete:C.slate}[seStatus]||C.slate):statusColor(client.status)
     return(
       <div style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.75rem 0.85rem',cursor:'pointer',background:C.white}}
-        onClick={()=>{setSelClientId(client.id);setActiveTab('cover');setView('client')}}>
+        onClick={()=>{setSelClientId(client.id);setActiveTab(openingTabFor(client));setView('client')}}>
         <div style={{fontWeight:700,fontSize:'0.95rem',marginBottom:'0.4rem'}}>{client.name}</div>
         <Badge text={label} color={color}/>
         {hasActuals&&<div onClick={e=>e.stopPropagation()}><ClientDocumentActions clientId={client.id} clientName={client.name} clients={clients} programmes={programmes}/></div>}
@@ -2305,7 +2332,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                       const dueSoon=se.paid_through_date&&new Date(se.paid_through_date)<new Date(Date.now()+14*86400000)
                       return(
                         <tr key={se.id} style={{borderBottom:'1px solid var(--cv-border-soft)'}}>
-                          <td style={{padding:'10px 12px',fontWeight:700,cursor:'pointer'}} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}>{c.name}</td>
+                          <td style={{padding:'10px 12px',fontWeight:700,cursor:'pointer'}} onClick={()=>{setSelClientId(c.id);setActiveTab(openingTabFor(c));setView('client')}}>{c.name}</td>
                           <td style={{padding:'10px 12px'}}><input style={{...inp,width:120,padding:'0.3rem 0.5rem'}} placeholder="e.g. Standard" value={se.subscription_level||''} onChange={e=>updateSubscription(se.id,{subscription_level:e.target.value})}/></td>
                           <td style={{padding:'10px 12px'}}><input type="date" style={{...inp,width:150,padding:'0.3rem 0.5rem'}} value={se.paid_through_date||''} onChange={e=>updateSubscription(se.id,{paid_through_date:e.target.value||null})}/></td>
                           <td style={{padding:'10px 12px'}}><select style={{...inp,width:110,padding:'0.3rem 0.5rem'}} value={se.billing_term||''} onChange={e=>updateSubscription(se.id,{billing_term:e.target.value||null})}><option value="">—</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select></td>
@@ -2755,7 +2782,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                 ?<InviteLoginButton email={prog.funder_email} fullName={prog.funder||'Funder'} role="funder" coImplementerId={null} funderProgrammeId={prog.id}/>
                 :<div style={{...hint,color:C.amber}}>Add a funder email via Edit before you can invite them.</div>}
             </div>
-            <div style={card}><div style={secH}>Client Organisations</div>{clients.filter(c=>c.programme_id===prog.id).map(c=><div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.75rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.45rem'}}><div><div style={{fontWeight:600,fontSize:'1.07rem'}}>{c.name}</div><div style={{fontSize:'0.93rem',color:C.slate}}>{CLIENT_TYPE_LABELS[c.type]} · {statusLabel(c.status)}</div></div><button style={addBtn(true)} onClick={()=>{setSelClientId(c.id);setActiveTab('cover');setView('client')}}>Open →</button></div>)}</div>
+            <div style={card}><div style={secH}>Client Organisations</div>{clients.filter(c=>c.programme_id===prog.id).map(c=><div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.75rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.45rem'}}><div><div style={{fontWeight:600,fontSize:'1.07rem'}}>{c.name}</div><div style={{fontSize:'0.93rem',color:C.slate}}>{CLIENT_TYPE_LABELS[c.type]} · {statusLabel(c.status)}</div></div><button style={addBtn(true)} onClick={()=>{setSelClientId(c.id);setActiveTab(openingTabFor(c));setView('client')}}>Open →</button></div>)}</div>
             <ServicesSection payerType="programme" payerId={prog.id} clients={clients}/>
             {prog.notes&&<div style={card}><div style={secH}>Notes</div><div style={{fontSize:'1.07rem',color:C.slate,lineHeight:1.6}}>{prog.notes}</div></div>}
           </div>

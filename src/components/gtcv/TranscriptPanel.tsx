@@ -149,6 +149,35 @@ export default function TranscriptPanel({ recordingId, canManage = false }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /**
+   * Take the transcript away as a document.
+   *
+   * Fetched with the sign in on the request rather than being a link, for the
+   * same reason the audio is: an address of its own keeps working for somebody
+   * who has left the engagement.
+   */
+  async function download() {
+    setBusy('download'); setErr(null)
+    try {
+      const { data } = await supabase.auth.getSession()
+      const res = await fetch(`/api/transcript-document?transcriptId=${encodeURIComponent(transcript.id)}`, {
+        headers: data.session?.access_token ? { Authorization: `Bearer ${data.session.access_token}` } : {},
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j?.error || `It could not be prepared (${res.status})`)
+      }
+      const blob = await res.blob()
+      const name = (res.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/)?.[1] || 'transcript.docx'
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = name
+      document.body.appendChild(a); a.click(); a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 30000)
+    } catch (e) { setErr(e.message) }
+    setBusy(null)
+  }
+
   async function save() {
     setBusy('save'); setErr(null); setNote(null)
     try {
@@ -230,6 +259,17 @@ export default function TranscriptPanel({ recordingId, canManage = false }) {
             <button onClick={save} disabled={busy === 'save'} style={btn(C.navy)}>Save corrections</button>
             <button onClick={issue} disabled={busy === 'issue'} style={btn(C.teal, true)}>Issue for signature</button>
           </div>
+        )}
+        {/* EVIDENCE HAS TO LEAVE THE PLATFORM. 11 September 2026. Habib: the
+            evidence should be downloadable or shareable so it can be presented
+            without the platform. A transcript behind a login is not something
+            a funder, an auditor or a board can be shown. Anybody on the
+            engagement may take it, because they were either in the room or
+            work under what was decided in it. */}
+        {status && (
+          <button onClick={download} disabled={busy === 'download'} style={btn(C.navy)}>
+            {busy === 'download' ? 'Preparing...' : 'Download it'}
+          </button>
         )}
         {canManage && status !== 'draft' && status && (
           <button onClick={reopen} disabled={busy === 'reopen'} style={btn(C.amber)}>Correct as a new version</button>

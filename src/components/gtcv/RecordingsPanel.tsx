@@ -72,7 +72,13 @@ export default function RecordingsPanel({ clientId, canManage = false }) {
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json?.error || `Could not read the recordings (${res.status})`)
-      setRows(json.recordings || [])
+      // ONLY WHAT HAS NO SESSION TO SIT ON. 11 September 2026. Habib: the
+      // evidence should be in the session box rather than at the bottom, by
+      // the time you do a lot of sessions it would be too cluttered. Every
+      // recording made in a session now appears on that session. What is left
+      // here is what has no session: a field interview, and the pre-engagement
+      // conversation, which happens before there is a plan.
+      setRows((json.recordings || []).filter((r) => !r.session_id))
       setErr(null)
     } catch (e) { setErr(e.message) }
     setLoading(false)
@@ -116,7 +122,8 @@ export default function RecordingsPanel({ clientId, canManage = false }) {
         What has been recorded
       </div>
       <div style={{ ...hint, marginTop: '0.2rem' }}>
-        Every recording on this engagement, who was on it, and what state its transcript is in.
+        Recordings that do not belong to a planned session: field interviews, and the pre-engagement
+        conversation. Everything recorded in a session is shown on that session in the plan above.
       </div>
 
       {loading && <div style={{ ...hint, marginTop: '0.6rem' }}>Reading...</div>}
@@ -130,7 +137,7 @@ export default function RecordingsPanel({ clientId, canManage = false }) {
 
       {!loading && !err && rows.length === 0 && (
         <div style={{ ...hint, marginTop: '0.6rem' }}>
-          Nothing has been recorded yet. Open a session room and press Start recording.
+          Nothing here. Recordings made in a planned session are shown on that session above.
         </div>
       )}
 

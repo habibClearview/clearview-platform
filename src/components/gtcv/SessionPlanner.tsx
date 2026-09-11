@@ -82,6 +82,23 @@ function localInputValue(iso) {
   return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}T${two(d.getHours())}:${two(d.getMinutes())}`
 }
 
+/** When a recording was made, for the line on its session. */
+function recWhen(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('en-GB', {
+    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  })
+}
+
+/** How long it ran, in words. */
+function recLength(seconds) {
+  const s = Math.max(0, Math.floor(seconds || 0))
+  if (s < 60) return `${s} sec`
+  const m = Math.round(s / 60)
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} hr ${m % 60} min`
+}
+
 /** The same moment, written out for somebody reading rather than typing. */
 function whenLabel(iso) {
   if (!iso) return ''
@@ -366,6 +383,11 @@ export default function SessionPlanner({ clientId, canManage }) {
   const [parties, setParties] = useState([])
   const [attendance, setAttendance] = useState([])   // flat rows, grouped in render
   // Which session's invitation is going, and what happened to the last one.
+  // WHAT WAS RECORDED, ON THE SESSION IT BELONGS TO. 11 September 2026.
+  // Habib: the evidence should be in the session box rather than at the
+  // bottom, by the time you do a lot of sessions it would be too cluttered.
+  // Agreed on 10 September and not built until now.
+  const [recordings, setRecordings] = useState([])
   const [inviteBusy, setInviteBusy] = useState(null)
   const [inviteNote, setInviteNote] = useState({})
   const [loading, setLoading] = useState(true)
@@ -448,6 +470,26 @@ export default function SessionPlanner({ clientId, canManage }) {
     }
 
     load()
+    return () => { cancelled = true }
+  }, [clientId, reloadKey])
+
+  // The recordings, read once for the whole plan and handed to the session
+  // each belongs to. A failure here leaves the plan working: a session whose
+  // recordings could not be read is still a session.
+  useEffect(() => {
+    if (!clientId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data } = await supabase.auth.getSession()
+        const token = data.session?.access_token
+        const res = await fetch(`/api/session-recording?list=1&clientId=${encodeURIComponent(clientId)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!cancelled && res.ok) setRecordings(json.recordings || [])
+      } catch { /* the plan is still the plan */ }
+    })()
     return () => { cancelled = true }
   }, [clientId, reloadKey])
 
@@ -1020,6 +1062,40 @@ export default function SessionPlanner({ clientId, canManage }) {
           />
           <span style={hint}>The call, the recording and the transcript are all on that page.</span>
         </div>
+
+        {/* WHAT THIS SESSION PRODUCED, ON THIS SESSION. 11 September 2026.
+            Habib: the evidence should be in the session box rather than at the
+            bottom, by the time you do a lot of sessions it would be too
+            cluttered, or think of a better way to make sure sessions that
+            belong to the session are linked to the session. Agreed, and this
+            is it: each session carries its own recordings, who was on them and
+            where the transcript has got to. */}
+        {recordings.filter((x) => x.session_id === session.id).map((rec) => (
+          <div key={rec.id} style={{
+            marginTop: '0.45rem', padding: '0.45rem 0.6rem', borderLeft: `3px solid ${C.teal}`,
+            background: 'var(--cv-alt)', borderRadius: 6,
+          }}>
+            <div style={{ display: 'flex', gap: '0.55rem', alignItems: 'baseline', flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: 600 }}>Recorded {recWhen(rec.started_at)}</span>
+              {rec.merged_seconds ? <span style={hint}>{recLength(rec.merged_seconds)}</span> : null}
+              <span style={{
+                ...mono, fontSize: '0.8rem', letterSpacing: 0, textTransform: 'none',
+                color: rec.transcript?.status === 'signed' ? C.green : C.amber,
+              }}>
+                {rec.transcript
+                  ? (rec.transcript.status === 'signed' ? 'Transcript signed and filed as evidence'
+                    : rec.transcript.status === 'issued' ? 'Transcript waiting for signatures'
+                      : 'Transcript is a draft')
+                  : rec.status === 'opening' ? 'Recording now' : 'Not transcribed yet'}
+              </span>
+            </div>
+            <div style={hint}>
+              {rec.who.length
+                ? `Who was on it: ${rec.who.map((w) => `${w.name}${w.ok ? '' : ' (their device failed)'}`).join(', ')}.`
+                : 'No device recorded on this one.'}
+            </div>
+          </div>
+        ))}
 
         {/* THE CALENDAR INVITATION. 9 September 2026. It goes to the people
             ticked as attending this session and nobody else, carries one
