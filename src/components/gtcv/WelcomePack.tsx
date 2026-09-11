@@ -408,6 +408,8 @@ export default function WelcomePack({ clientId, canManage }) {
           const previewing = people[Math.min(previewIdx, Math.max(0, people.length - 1))] || null
           const nameless = people.filter((r) => !r.name).map((r) => r.email)
           const named = people.map((r) => r.email).filter(Boolean)
+          // Who has not had it yet, which is what the send below goes to.
+          const waiting = people.filter((r) => !r.sentAt)
           const to = named.length
             ? named
             : [...new Set([client?.contact_email, ...partyEmails].map((e) => (e || '').trim()).filter(Boolean))]
@@ -535,141 +537,26 @@ export default function WelcomePack({ clientId, canManage }) {
                   the list it belonged to. A person is added under Who is on
                   it, and settings, saved there like everything else about
                   them, and appears here the moment they have a letter. */}
+              {/* THE THIRD LIST OF THE SAME NAMES. 11 September 2026.
+                  Habib, twice: the list of names is still showing more than
+                  once on the Who is on it tab.
+
+                  This held every person again, with a tick box, whether they
+                  had had the letter, a correction and a send. All of it is
+                  about a person, and the person already has a line on the list
+                  above with their role, their organisation, whether they sign,
+                  which letter they get and whether they have a login. So the
+                  sending moved onto that line, where the person is, and what
+                  is left here is the letter itself: read it, edit it, and send
+                  it to everybody still waiting. */}
               {people.length ? (
-                <div style={{ margin: '0 0 0.7rem' }}>
-                  <p style={{ ...hint, margin: '0 0 0.35rem' }}>Send this letter to. Each person gets their own letter and their own sign-in.</p>
-                  {people.map((r) => {
-                    const ticked = chosen ? chosen.has(r.email) : !r.sentAt
-                    return (
-                      <div key={r.email} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', padding: '0.18rem 0', flexWrap: 'wrap' }}>
-                        <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'baseline', cursor: 'pointer', flex: '1 1 320px', minWidth: 240 }}>
-                          <input
-                            type="checkbox"
-                            checked={ticked}
-                            onChange={() => {
-                              const next = new Set(chosen || people.filter((p) => !p.sentAt).map((p) => p.email))
-                              if (next.has(r.email)) next.delete(r.email); else next.add(r.email)
-                              setChosen(next)
-                            }}
-                          />
-                          <span style={{ fontSize: '0.9rem' }}>
-                            {r.name || r.email}
-                            {r.name ? <span style={{ color: C.slate }}> · {r.email}</span> : null}
-                            {/* SAY WHAT HAPPENED, PLAINLY. 11 September 2026.
-                                Habib: if an email is sent it should say sent
-                                on the platform, and Send again should be a
-                                button in case it is desired. The state was in
-                                grey after a middle dot, next to a control
-                                labelled like a status, and the two read as one
-                                confusing sentence. */}
-                            {r.sentAt
-                              ? <b style={{ color: C.green }}> · Sent {new Date(r.sentAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</b>
-                              : <b style={{ color: C.amber }}> · Not sent</b>}
-                          </span>
-                        </label>
-                        {/* THE LETTERS THAT WENT BEFORE ANYTHING RECORDED IT.
-                            8 September 2026. Habib knows at least two of the
-                            funders received theirs, and the platform does not,
-                            because nothing was writing it down when those went
-                            out. Guessing on his behalf would put a date on a
-                            letter I cannot see. This lets him say so, and
-                            change his mind, without sending anything. */}
-                        <button
-                          type="button"
-                          disabled={!!busy}
-                          onClick={async () => {
-                            const already = !!r.sentAt
-                            if (already && !window.confirm(`Clear the record that ${r.name || r.email} has had this letter? Nothing is sent either way.`)) return
-                            // THE DAY IT ACTUALLY WENT. 8 September 2026.
-                            // Marking somebody used to record today, which for
-                            // a letter sent last week is a wrong date rather
-                            // than a missing one, and a wrong date is worse.
-                            // The day is asked for, defaulting to today, and
-                            // read from the sender's own outbox.
-                            let when = null
-                            if (!already) {
-                              const today = new Date().toISOString().slice(0, 10)
-                              const typed = window.prompt(
-                                `What day did ${r.name || r.email} receive this letter?\n\nAs yyyy-mm-dd. Your email outbox has the date. Nothing is sent.`,
-                                today,
-                              )
-                              if (typed === null) return
-                              const day = typed.trim()
-                              const parsed = /^\d{4}-\d{2}-\d{2}$/.test(day) ? new Date(`${day}T12:00:00Z`) : null
-                              if (!parsed || Number.isNaN(parsed.getTime())) {
-                                setErr(`"${day}" is not a date. Write it as yyyy-mm-dd, for example ${today}.`)
-                                return
-                              }
-                              if (parsed.getTime() > Date.now()) {
-                                setErr('That day has not happened yet, so a letter cannot have arrived on it.')
-                                return
-                              }
-                              when = parsed.toISOString()
-                            }
-                            setBusy(`mark:${r.email}`); setNote(null); setErr(null)
-                            try {
-                              // Written on the person, where every other fact
-                              // about them lives.
-                              const { data: sess } = await supabase.auth.getSession()
-                              const token = sess.session?.access_token
-                              const res = await fetch('/api/engagement-party', {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                                body: JSON.stringify({ clientId, id: r.id, letterSentAt: already ? null : when }),
-                              })
-                              const json = await res.json().catch(() => ({}))
-                              if (!res.ok) throw new Error(json?.error || 'That could not be recorded')
-                              setNote(already
-                                ? `${r.name || r.email} is back on the list to be written to.`
-                                : `${r.name || r.email} is recorded as having had it on ${new Date(when).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}. Nothing was sent.`)
-                              await load()
-                            } catch (e) { setErr(e.message || 'That could not be recorded') }
-                            setBusy(null)
-                          }}
-                          title={r.sentAt
-                            ? 'Tell the platform they never received it, so they go back on the list. Nothing is sent now.'
-                            : 'Tell the platform they already had this letter, without sending anything'}
-                          style={{
-                            ...mono, fontSize: '0.74rem', padding: '0.25rem 0.2rem',
-                            border: 'none', background: 'transparent', textDecoration: 'underline',
-                            color: C.slate, cursor: busy ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
-                          }}
-                        >{busy === `mark:${r.email}`
-                          ? 'Saving...'
-                          // A BUTTON READ AS A FAILURE REPORT. 11 September 2026.
-                          // This said "Not actually sent", which is a statement
-                          // about what happened, sitting beside a Send button.
-                          // Habib read it as the platform telling him the letter
-                          // to a live client had failed, on a morning when it
-                          // had in fact gone and been replied to. Both labels
-                          // are now plainly something the coach is telling the
-                          // platform, not something it is telling them.
-                          // One quiet correction, in both directions, so it
-                          // can never be mistaken for the platform reporting
-                          // something. The state above says what happened.
-                          : 'Correct this'}</button>
-                        <button
-                          type="button"
-                          disabled={!!busy || !journeyUrl}
-                          onClick={() => sendWelcome([r.email], `one:${r.email}`)}
-                          title={`Send the welcome letter to ${r.name || r.email} and nobody else`}
-                          style={{
-                            ...mono, fontSize: '0.8rem', fontWeight: 600, padding: '0.25rem 0.7rem',
-                            border: `1px solid ${C.teal}`, borderRadius: 7, background: 'transparent',
-                            color: C.teal, cursor: busy ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
-                          }}
-                        >{busy === `one:${r.email}` ? 'Sending...' : r.sentAt ? 'Send again' : 'Send it'}</button>
-                      </div>
-                    )
-                  })}
-                  {chosen ? (
-                    <button
-                      type="button"
-                      onClick={() => setChosen(null)}
-                      style={{ ...hint, marginTop: '0.25rem', border: 'none', background: 'transparent', color: C.teal, cursor: 'pointer', padding: 0 }}
-                    >Back to just the people who have not had it</button>
-                  ) : null}
-                </div>
+                <p style={{ ...hint, margin: '0 0 0.7rem' }}>
+                  <b>{waiting.length === 0
+                    ? `All ${people.length} ${people.length === 1 ? 'person has' : 'people have'} had their letter.`
+                    : `${waiting.length} of ${people.length} still to receive it: ${waiting.map((r) => r.name || r.email).join(', ')}.`}</b>
+                  {' '}Each person is sent their own letter and their own sign-in. To send to one person, or to
+                  correct who has had it, use their own line under Who is on it, and settings.
+                </p>
               ) : null}
               {/* ONE EMAIL, NOT TWO. A client holding a letter about a platform
                   they cannot open, waiting on a second message from a different

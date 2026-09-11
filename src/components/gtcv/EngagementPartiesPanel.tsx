@@ -90,6 +90,7 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
+  const [note, setNote] = useState(null)
   const [busy, setBusy] = useState(null)
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState(BLANK)
@@ -127,6 +128,85 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
       if (!res.ok) throw new Error(json?.error || `That invitation did not go (${res.status})`)
       await load()
     } catch (e) { setErr(e.message) }
+    setBusy(null)
+  }
+
+  /**
+   * Send this person their welcome letter, and nobody else theirs.
+   *
+   * The letter itself, its wording and its preview live in the welcome pack.
+   * What belongs to a person is whether they get one and whether it has gone,
+   * and both of those are on this line, so the sending is here too.
+   */
+  async function sendLetter(r) {
+    if (r.letter_sent_at && typeof window !== 'undefined' && !window.confirm(
+      `${r.name || r.email} already had this letter on ${new Date(r.letter_sent_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}. Send it again?`,
+    )) return
+    setBusy(`letter:${r.id}`); setErr(null); setNote(null)
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      const origin = typeof window === 'undefined' ? '' : window.location.origin
+      const res = await fetch('/api/engagement-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          clientId, stage: 'scope', journeyUrl: `${origin}/client`,
+          includeSignIn: true, onlyEmails: [r.email],
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || json?.reason || `That did not send (${res.status})`)
+      if (json?.emailConfigured === false) throw new Error(json.message || 'Email is not switched on here, so nothing was sent.')
+      if (json?.reason) throw new Error(json.reason)
+      setNote(`The letter went to ${r.name || r.email}.`)
+      await load()
+    } catch (e) { setErr(e.message) }
+    setBusy(null)
+  }
+
+  /**
+   * Correct the record of whether this person has had their letter.
+   *
+   * Two letters went out before anything was writing it down, so this has to
+   * be able to say "they had it, on this day" without sending anything, and to
+   * take that back. The day is asked for rather than assumed: a letter sent
+   * last week recorded as today is a wrong date, and a wrong date is worse
+   * than a missing one.
+   */
+  async function correctLetter(r) {
+    const already = !!r.letter_sent_at
+    if (already && !window.confirm(
+      `Clear the record that ${r.name || r.email} has had this letter? Nothing is sent either way.`,
+    )) return
+    let when = null
+    if (!already) {
+      const today = new Date().toISOString().slice(0, 10)
+      const typed = window.prompt(
+        `What day did ${r.name || r.email} receive this letter?\n\nAs yyyy-mm-dd. Your email outbox has the date. Nothing is sent.`,
+        today,
+      )
+      if (typed === null) return
+      const day = typed.trim()
+      const parsed = /^\d{4}-\d{2}-\d{2}$/.test(day) ? new Date(`${day}T12:00:00Z`) : null
+      if (!parsed || Number.isNaN(parsed.getTime())) {
+        setErr(`"${day}" is not a date. Write it as yyyy-mm-dd, for example ${today}.`)
+        return
+      }
+      if (parsed.getTime() > Date.now()) {
+        setErr('That day has not happened yet, so a letter cannot have arrived on it.')
+        return
+      }
+      when = parsed.toISOString()
+    }
+    setBusy(`mark:${r.id}`); setNote(null); setErr(null)
+    try {
+      await call('PATCH', { clientId, id: r.id, letterSentAt: already ? null : when })
+      setNote(already
+        ? `${r.name || r.email} is back on the list to be written to.`
+        : `${r.name || r.email} is recorded as having had it on ${new Date(when).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}. Nothing was sent.`)
+      await load()
+    } catch (e) { setErr(e.message || 'That could not be recorded') }
     setBusy(null)
   }
 
@@ -220,6 +300,7 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
       </div>
 
       {err ? <div style={{ color: C.red, fontSize: '0.95rem', margin: '0.7rem 0' }}>{err}</div> : null}
+      {note ? <p style={{ ...hint, color: C.green, margin: '0 0 0.6rem' }}>{note}</p> : null}
 
       {unlinked.length > 0 ? (
         <div style={{
@@ -305,6 +386,37 @@ export default function EngagementPartiesPanel({ clientId, canManage }) {
                 <span style={{ ...mono, fontSize: '0.79rem', color: r.user_id ? C.green : C.amber }}>
                   {r.user_id ? 'Has a login' : 'No login yet'}
                 </span>
+                {/* SENDING THE LETTER, WHERE THE PERSON IS. 11 September
+                    2026. Habib, twice: the list of names is still showing more
+                    than once on this tab. The welcome pack held every one of
+                    these people again purely to carry a tick box, whether they
+                    had had the letter, and a send. All of that is about a
+                    person, and the person is already on this line. */}
+                {canManage && r.letter && r.email ? (
+                  <button
+                    type="button"
+                    style={btn(C.teal)}
+                    disabled={busy === `letter:${r.id}`}
+                    onClick={() => sendLetter(r)}
+                    title={`Send the ${LETTER_LABEL[r.letter]} to ${r.name || r.email} and nobody else`}
+                  >{busy === `letter:${r.id}`
+                    ? 'Sending...'
+                    : r.letter_sent_at ? 'Send again' : 'Send the letter'}</button>
+                ) : null}
+                {canManage && r.letter && r.email ? (
+                  <button
+                    type="button"
+                    disabled={busy === `mark:${r.id}`}
+                    onClick={() => correctLetter(r)}
+                    title={r.letter_sent_at
+                      ? 'Tell the platform they never received it, so they go back on the list. Nothing is sent now.'
+                      : 'Tell the platform they already had this letter, without sending anything'}
+                    style={{
+                      ...mono, fontSize: '0.74rem', padding: '0.25rem 0.2rem', border: 'none',
+                      background: 'transparent', textDecoration: 'underline', color: C.slate, cursor: 'pointer',
+                    }}
+                  >{busy === `mark:${r.id}` ? 'Saving...' : 'Correct this'}</button>
+                ) : null}
                 {canManage && !r.user_id && r.email ? (
                   <button
                     type="button"

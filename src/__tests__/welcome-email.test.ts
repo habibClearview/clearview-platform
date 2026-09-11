@@ -13,6 +13,9 @@ import { readFileSync } from 'node:fs'
 const SETTINGS = fs.readFileSync('src/components/gtcv/WelcomePack.tsx', 'utf8')
 const DASH = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
 const ROUTE = fs.readFileSync('app/api/engagement-email/route.ts', 'utf8')
+// 11 September 2026. Everything about one person moved onto that person's own
+// line, because the welcome pack was holding a third copy of the same names.
+const LINE = fs.readFileSync('src/components/gtcv/EngagementPartiesPanel.tsx', 'utf8')
 
 const cfg = {
   clientName: 'Tanager',
@@ -341,9 +344,9 @@ describe('sending to one person', () => {
   const PACK = readFileSync('src/components/gtcv/WelcomePack.tsx', 'utf8')
 
   it('every recipient carries their own send', () => {
-    expect(PACK).toContain('onClick={() => sendWelcome([r.email], `one:${r.email}`)}')
-    expect(PACK).toContain("'Send it'")
-    expect(PACK).toContain("'Send again'")
+    expect(LINE).toContain('onClick={() => sendLetter(r)}')
+    expect(LINE).toContain("'Send the letter'")
+    expect(LINE).toContain("'Send again'")
   })
 
   it('the row button and the bulk button go through the same routine', () => {
@@ -370,7 +373,7 @@ describe('sending to one person', () => {
   })
 
   it('one send at a time, so two presses cannot overlap', () => {
-    expect(PACK).toContain('disabled={!!busy || !journeyUrl}')
+    expect(LINE).toContain('disabled={busy === `letter:${r.id}`}')
   })
 })
 
@@ -451,44 +454,44 @@ describe('recording a letter that went before the record existed', () => {
   const PACK = readFileSync('src/components/gtcv/WelcomePack.tsx', 'utf8')
 
   it('every recipient can be marked as already having had it', () => {
-    expect(PACK).toContain("'Correct this'")
-    expect(PACK).toContain('is recorded as having had it on ')
-    expect(PACK).toContain('Nothing was sent.')
+    expect(LINE).toContain("'Correct this'")
+    expect(LINE).toContain('is recorded as having had it on')
+    expect(LINE).toContain('Nothing was sent.')
   })
 
   it('asks which day it went, rather than recording today', () => {
     // A letter sent last week marked with today's date is a wrong date, not a
     // missing one, and a wrong date is worse than none.
-    expect(PACK).toContain('What day did ')
-    expect(PACK).toContain('Your email outbox has the date. Nothing is sent.')
+    expect(LINE).toContain('What day did ')
+    expect(LINE).toContain('Your email outbox has the date. Nothing is sent.')
   })
 
   it('refuses a day that is not a date, and one that has not happened', () => {
-    expect(PACK).toContain('is not a date. Write it as yyyy-mm-dd')
-    expect(PACK).toContain('That day has not happened yet, so a letter cannot have arrived on it.')
+    expect(LINE).toContain('is not a date. Write it as yyyy-mm-dd')
+    expect(LINE).toContain('That day has not happened yet, so a letter cannot have arrived on it.')
   })
 
   it('says plainly that nothing is sent, because the button sits beside one that does', () => {
-    expect(PACK).toContain('Tell the platform they already had this letter, without sending anything')
+    expect(LINE).toContain('Tell the platform they already had this letter, without sending anything')
   })
 
   it('can be taken back, and asks first', () => {
     // 11 September 2026. This label was "Not actually sent", which reads as
     // the platform reporting a failed send rather than as a thing the coach
     // is telling it. See the block at the end of this file.
-    expect(PACK).toContain("'Correct this'")
-    expect(PACK).toContain('Nothing is sent either way.')
-    expect(PACK).toContain('is back on the list to be written to.')
+    expect(LINE).toContain("'Correct this'")
+    expect(LINE).toContain('Nothing is sent either way.')
+    expect(LINE).toContain('is back on the list to be written to.')
   })
 
   it('writes to the person on the engagement, not to the browser', () => {
-    expect(PACK).not.toMatch(/localStorage|sessionStorage/)
-    expect(PACK).toContain("fetch('/api/engagement-party'")
-    expect(PACK).toContain('letterSentAt: already ? null : when')
+    expect(LINE).not.toMatch(/localStorage|sessionStorage/)
+    expect(LINE).toContain("letterSentAt: already ? null : when")
+    expect(LINE).toContain('letterSentAt: already ? null : when')
   })
 
   it('one at a time, so a mark and a send cannot overlap', () => {
-    expect(PACK).toContain('disabled={!!busy}')
+    expect(LINE).toContain('disabled={busy === `mark:${r.id}`}')
   })
 })
 
@@ -498,17 +501,20 @@ describe('a control must not read as a report', () => {
     // "Not actually sent" and sat beside Send again. On a live client whose
     // letters had gone out and been replied to, it read as the platform
     // reporting a failure.
-    expect(SETTINGS).not.toContain("'Not actually sent'")
-    expect(SETTINGS).not.toContain("'They did not get it'")
+    expect(LINE).not.toContain("'Not actually sent'")
+    expect(LINE).not.toContain("'They did not get it'")
     // One quiet correction, in both directions. The state is said above it.
-    expect(SETTINGS).toContain("'Correct this'")
+    expect(LINE).toContain("'Correct this'")
   })
 
   it('says what happened, where it happened', () => {
     // Habib: if an email is sent it should say sent on the platform, and Send
     // again should be a button in case it is desired.
-    expect(SETTINGS).toContain('· Sent {new Date(r.sentAt)')
-    expect(SETTINGS).toContain("' · Not sent'".replace(/'/g, ''))
-    expect(SETTINGS).toContain("'Send again'")
+    expect(LINE).toContain('letter_sent_at')
+    // The state is on the person's line: which letter, and sent when, or not
+    // sent yet. The welcome pack now only says how many are still waiting.
+    expect(LINE).toContain('not sent yet')
+    expect(SETTINGS).toContain('still to receive it')
+    expect(LINE).toContain("'Send again'")
   })
 })
