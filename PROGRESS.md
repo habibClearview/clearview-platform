@@ -2022,3 +2022,48 @@ client waiting for.
   2. The phone questions above.
   3. Responsiveness beyond the public pages. npm run check:layout measures the
      pages that need no sign in; it cannot reach the coach dashboard.
+
+## 11 September 2026. The guidance library
+
+Habib asked where a co-implementer gets the guidance notes and manuals, and
+whether she should have access to his Gmail folder that holds them. She should
+not: a mail folder is reached through a mail account, and that account holds
+his commercial terms with the funder, his other clients and everything else.
+There is no way to give one without the other. He chose option 2, the library
+on the platform, and authorised it.
+
+BUILT. guidance_documents and a private guidance bucket. The coaching team
+reads the library, only the lead consultant changes it, and a client or a
+funder never sees it, held both in the route and in the row level security so
+a forgetful route cannot leak the fee model. Five sections in the order the
+work is done. A document is uploaded or linked, never both, and uploading is
+said on screen to be the better way because a link is only as good as somebody
+else's sharing settings and breaks quietly when they change. A file is fetched
+through the platform with the sign in on the request, so nothing keeps working
+for somebody who has left the team. It lives on the Coach quick reference tab,
+which is already the coaching team's own.
+
+Its own test caught that two uploads in the same millisecond would produce the
+same stored name and the second would overwrite the first.
+
+## Questions waiting for an answer (11 September)
+
+  Q. The client screen on a phone: what should a coach see first, the list of
+  blocks or the block they were last on? Still open, from 10 September.
+
+  Q. A downloadable, shareable signed transcript. Habib asked for my view and
+  I gave it: a PDF carrying the words, the signatures and a reference, with
+  the audio staying on the platform because a voice recording that can be
+  forwarded cannot be withdrawn. He has not yet said to build it.
+
+  Q. Moving a recording onto its own session card rather than a list at the
+  bottom. Agreed as the right shape, order not yet chosen.
+
+## Not finished, pick up first
+
+  1. The call has never successfully connected. Everything up to the point of
+     connection is verified; whether the LiveKit key and secret are a matching
+     pair can only be proved by a browser joining.
+  2. Habib's microphone recorded silence for four sessions, then worked. The
+     device it opens is now reported into recording_tracks.device_report.
+  3. The three questions above.

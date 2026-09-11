@@ -37,6 +37,7 @@ import InterviewBriefing from '@/components/gtcv/InterviewBriefing'
 import InterviewCaptureForm from '@/components/gtcv/InterviewCaptureForm'
 import CoverPanel from '@/components/gtcv/CoverPanel'
 import CoachQuickReference from '@/components/gtcv/CoachQuickReference'
+import GuidanceLibrary from '@/components/gtcv/GuidanceLibrary'
 import GtcvEngagementTracker from '@/components/gtcv/EngagementTracker'
 import EngagementCharterView from '@/components/engagement/EngagementCharterView'
 import ActiveSessionsButton from '@/components/auth/ActiveSessionsButton'
@@ -2635,7 +2636,17 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             {shownTab==='journey'&&<><EngagementJourneyView slugOverride={selClient.slug}/><div style={{height:22}}/><JourneyCanvasPanel clientId={selClient.id}/></>}
             {shownTab==='charter'&&<EngagementCharterView slugOverride={selClient.slug}/>}
             {shownTab==='how_to_start'&&<TabHowToStart client={selClient}/>}
-            {shownTab==='coach_ref'&&canViewCoachGuidance(previewRoleId)&&<CoachQuickReference showGuidance={canViewCoachGuidance(previewRoleId)}/>}
+            {shownTab==='coach_ref'&&canViewCoachGuidance(previewRoleId)&&<>
+              {/* THE MANUALS LIVE HERE, NOT IN A MAILBOX. 11 September 2026.
+                  Habib asked where a co-implementer gets the guidance notes and
+                  manuals, and whether she should have access to his Gmail
+                  folder that holds them. She should not: a mail folder is
+                  reached through a mail account, and that account holds his
+                  commercial terms and every other client. This tab is already
+                  the coaching team's own, and a client or a funder never sees
+                  it, so it is where the library belongs. */}
+              <GuidanceLibrary/><div style={{height:22}}/>
+              <CoachQuickReference showGuidance={canViewCoachGuidance(previewRoleId)}/></>}
             {shownTab==='ip_framework'&&<TabIPFramework/>}
             {/* Setup, in the order it is done: who is on the engagement, their
                 logins, then how the engagement runs. Sharing a canvas with a
