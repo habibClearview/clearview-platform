@@ -620,8 +620,8 @@ export default function WelcomePack({ clientId, canManage }) {
                             setBusy(null)
                           }}
                           title={r.sentAt
-                            ? 'Clear the record that they have had it. Nothing is sent.'
-                            : 'Record that they already had this letter, without sending anything'}
+                            ? 'Tell the platform they never received it, so they go back on the list. Nothing is sent now.'
+                            : 'Tell the platform they already had this letter, without sending anything'}
                           style={{
                             ...mono, fontSize: '0.78rem', padding: '0.25rem 0.6rem',
                             border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent',
@@ -629,7 +629,15 @@ export default function WelcomePack({ clientId, canManage }) {
                           }}
                         >{busy === `mark:${r.email}`
                           ? 'Saving...'
-                          : r.sentAt ? 'Not actually sent' : 'Already had it'}</button>
+                          // A BUTTON READ AS A FAILURE REPORT. 11 September 2026.
+                          // This said "Not actually sent", which is a statement
+                          // about what happened, sitting beside a Send button.
+                          // Habib read it as the platform telling him the letter
+                          // to a live client had failed, on a morning when it
+                          // had in fact gone and been replied to. Both labels
+                          // are now plainly something the coach is telling the
+                          // platform, not something it is telling them.
+                          : r.sentAt ? 'They did not get it' : 'Already had it'}</button>
                         <button
                           type="button"
                           disabled={!!busy || !journeyUrl}

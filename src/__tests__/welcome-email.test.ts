@@ -469,11 +469,14 @@ describe('recording a letter that went before the record existed', () => {
   })
 
   it('says plainly that nothing is sent, because the button sits beside one that does', () => {
-    expect(PACK).toContain('Record that they already had this letter, without sending anything')
+    expect(PACK).toContain('Tell the platform they already had this letter, without sending anything')
   })
 
   it('can be taken back, and asks first', () => {
-    expect(PACK).toContain("'Not actually sent'")
+    // 11 September 2026. This label was "Not actually sent", which reads as
+    // the platform reporting a failed send rather than as a thing the coach
+    // is telling it. See the block at the end of this file.
+    expect(PACK).toContain("'They did not get it'")
     expect(PACK).toContain('Nothing is sent either way.')
     expect(PACK).toContain('is back on the list to be written to.')
   })
@@ -486,5 +489,21 @@ describe('recording a letter that went before the record existed', () => {
 
   it('one at a time, so a mark and a send cannot overlap', () => {
     expect(PACK).toContain('disabled={!!busy}')
+  })
+})
+
+describe('a control must not read as a report', () => {
+  it('does not tell a coach a letter was not sent when it was', () => {
+    // 11 September 2026. The button that clears the sent record was labelled
+    // "Not actually sent" and sat beside Send again. On a live client whose
+    // letters had gone out and been replied to, it read as the platform
+    // reporting a failure.
+    expect(SETTINGS).not.toContain("'Not actually sent'")
+    expect(SETTINGS).toContain("'They did not get it'")
+  })
+
+  it('both labels are something the coach tells the platform', () => {
+    expect(SETTINGS).toContain("'Already had it'")
+    expect(SETTINGS).toContain('Tell the platform they never received it')
   })
 })
