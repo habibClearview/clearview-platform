@@ -855,6 +855,11 @@ export default function SessionPlanner({ clientId, canManage }) {
   // ─── Render ────────────────────────────────────────────────
   function renderAttendance(session) {
     const rows = attBySession[session.id] || []
+    const peopleLink = (
+      <a href={`/coach?client=${encodeURIComponent(clientId)}&zone=eng_setup`} style={{ color: C.teal }}>
+        Add them under Who is on it, and settings, and they appear here to tick.
+      </a>
+    )
     const required = requiredRolesFor(session)
     const excluded = excludedRolesFor(session)
     const w = warningsFor(session)
@@ -877,14 +882,22 @@ export default function SessionPlanner({ clientId, canManage }) {
             )}
             {w.unnamed.length > 0 && (
               <div style={{ ...hint, marginTop: '0.35rem' }}>
-                No one is named for {w.unnamed.map(roleLabel).join(', ')} in this engagement yet.
+                No one is named for {w.unnamed.map(roleLabel).join(', ')} in this engagement yet.{' '}
+                {peopleLink}
               </div>
             )}
           </div>
         )}
 
         {parties.length === 0 ? (
-          <div style={hint}>No parties are recorded for this engagement yet, so there is nobody to tick.</div>
+          // WHERE THE PEOPLE COME FROM. 12 September 2026. Habib, looking at
+          // this on the test engagement: this is confusing, where are the
+          // attendees to tick. They are the people on the engagement, and
+          // nobody had been added to this one, so the list was empty and the
+          // message said "tick" without saying where anything is ticked from.
+          <div style={hint}>
+            Nobody has been added to this engagement yet, so there is nobody to tick. {peopleLink}
+          </div>
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
             {parties.map((party) => {

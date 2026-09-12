@@ -162,6 +162,21 @@ describe('sending the invitation', () => {
     expect(ROUTE).toContain('Nobody is ticked as attending')
   })
 
+  // 12 September 2026. Habib, on an engagement nobody had been added to:
+  // this is confusing, where are the attendees to tick. Saying "nobody is
+  // ticked" is true and useless when the reason is that there is nobody to
+  // tick, so the refusal now says which of the two it is and where to go.
+  it('says whether nobody is ticked or nobody is on the engagement at all', () => {
+    expect(ROUTE).toContain('Nobody has been added to this engagement yet')
+    expect(ROUTE).toContain('Add them under Who is on it, and settings')
+    expect(ROUTE).toContain('Tick them under Attendance on this session')
+  })
+
+  it('sends the attendance panel to the page that holds the people', () => {
+    expect(PLANNER).toContain('zone=eng_setup')
+    expect(PLANNER).toContain('Add them under Who is on it, and settings, and they appear here to tick.')
+  })
+
   it('takes manage rights', () => {
     expect(ROUTE).toContain('Only the coaching team can send a session invitation')
   })

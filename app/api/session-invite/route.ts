@@ -72,8 +72,16 @@ export async function POST(req: NextRequest) {
       .select('party_id').eq('session_id', session.id)
     const partyIds = (attendance || []).map((a) => a.party_id).filter(Boolean)
     if (!partyIds.length) {
+      // WHICH OF THE TWO IT IS. 12 September 2026. Habib, on an engagement
+      // with nobody on it: this is confusing, where are the attendees to tick.
+      // The old message said nobody was ticked, which is true and useless when
+      // the real reason is that nobody is on the engagement to tick.
+      const { count } = await admin.from('engagement_parties')
+        .select('id', { count: 'exact', head: true }).eq('client_id', session.client_id)
       return NextResponse.json({
-        error: 'Nobody is ticked as attending this session, so there is nobody to invite.',
+        error: count
+          ? 'Nobody is ticked as attending this session, so there is nobody to invite. Tick them under Attendance on this session.'
+          : 'Nobody has been added to this engagement yet, so there is nobody to invite. Add them under Who is on it, and settings, then tick them under Attendance on this session.',
       }, { status: 409 })
     }
 
