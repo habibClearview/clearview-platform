@@ -168,6 +168,10 @@ export async function POST(req: NextRequest) {
           end: (next.offset_ms || 0) / 1000 + heardSeconds,
           speaker: next.speaker_name || 'Unnamed speaker',
           text: silenceNote(next.speaker_name || 'This device'),
+          // Not speech. Without this it was joined onto the end of the same
+          // person's words on their other device, which is a transcript
+          // putting words in somebody's mouth.
+          note: true,
         })
         await admin.from('recording_tracks').update({
           status: 'failed',

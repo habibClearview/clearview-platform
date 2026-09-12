@@ -96,6 +96,50 @@ export default function TranscriptPanel({ recordingId, canManage = false }) {
 
   useEffect(() => { load() }, [load])
 
+  // WHAT ONE DEVICE DOES, THE OTHER SHOULD SEE. 12 September 2026.
+  //
+  // Habib produced the transcript on his phone and the laptop went on showing
+  // "Produce the transcript" as though nothing had happened. Stopping the
+  // recording did reach the laptop, because the recorder polls; the transcript
+  // did not, because this panel read once when it opened and never again.
+  //
+  // On a session with three people in three countries, one of them pressing a
+  // button has to be visible to the others without anybody reloading. It
+  // re-reads every ten seconds and redraws only when something has actually
+  // changed, so a transcript being read or corrected does not move under
+  // somebody's hands.
+  useEffect(() => {
+    if (!recordingId) return
+    const t = setInterval(async () => {
+      try {
+        const r = await api('/api/session-transcribe', 'GET', null, `?recordingId=${encodeURIComponent(recordingId)}`)
+        const next = r.transcript || null
+        setTranscript((prev) => {
+          const same = prev?.id === next?.id
+            && prev?.status === next?.status
+            && prev?.version === next?.version
+            && prev?.body === next?.body
+          if (same) return prev
+          // A correction being typed here is not thrown away by a poll: the
+          // editable draft is only replaced when this screen is not the one
+          // that changed it.
+          if (!next || next.status !== 'draft') setDraft(next?.body || '')
+          return next
+        })
+        if (next?.id) {
+          const sig = await api('/api/transcript-sign', 'GET', null, `?transcriptId=${encodeURIComponent(next.id)}`)
+          setSignatures((prev) => {
+            const a = JSON.stringify(prev), b = JSON.stringify(sig.signatures || [])
+            return a === b ? prev : (sig.signatures || [])
+          })
+        }
+      } catch {
+        // A poll that fails says nothing. The next one catches up.
+      }
+    }, 10000)
+    return () => clearInterval(t)
+  }, [recordingId])
+
   /** Ask for the next track, and keep asking until there are none left. */
   async function produce() {
     setBusy('produce'); setErr(null); setNote(null)

@@ -107,6 +107,20 @@ export interface Segment {
   end: number
   speaker: string
   text: string
+  /**
+   * A remark about the recording rather than something anybody said.
+   *
+   * 12 September 2026. A device that captured nothing had its note written in
+   * as a passage of speech, and because the note carried the same speaker name
+   * as the person's other device, it was joined onto the end of their words:
+   * "Really good responses. Habib Onifade: no audible sound was captured on
+   * this device."
+   *
+   * That is a transcript putting words in somebody's mouth, on the one
+   * document this platform asks people to sign. A note is kept apart from
+   * speech and printed apart from it.
+   */
+  note?: boolean
 }
 
 /**
@@ -170,11 +184,21 @@ export function formatTranscript(segments: Segment[]): string {
     buffer = []
   }
 
+  // Speech first, in the order the room heard it. A note about the recording
+  // is not speech and is never joined onto the end of anybody's words.
   for (const s of segments) {
+    if (s.note) continue
     if (s.speaker !== speaker) { flush(); speaker = s.speaker; started = s.start }
     buffer.push(s.text)
   }
   flush()
+
+  const notes = segments.filter((s) => s.note).map((s) => s.text)
+  if (notes.length) {
+    out.push('About this recording')
+    for (const n of notes) out.push(n)
+  }
+
   return out.join('\n\n')
 }
 

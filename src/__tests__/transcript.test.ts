@@ -290,3 +290,72 @@ describe('what the routes do with it', () => {
     expect(REC).toContain('mimeType: this.mime')
   })
 })
+
+// ============================================================
+// A NOTE ABOUT THE RECORDING IS NOT SOMETHING SOMEBODY SAID
+//
+// 12 September 2026. Habib joined the same session on his laptop and his
+// phone. The laptop captured nothing, so its note was written into the
+// transcript as a passage of speech, and because both devices carried his
+// name it was joined onto the end of his own words:
+//
+//   "Really good responses. Habib Onifade: no audible sound was captured on
+//    this device."
+//
+// That is a transcript putting words in somebody's mouth, on the one document
+// this platform asks people to read and sign.
+// ============================================================
+describe('a remark about the recording is kept apart from speech', () => {
+  const spoken = { start: 0, end: 3, speaker: 'Habib Onifade', text: 'Really good responses.' }
+  const note = {
+    start: 0, end: 15, speaker: 'Habib Onifade', note: true,
+    text: 'Habib Onifade: no audible sound was captured on this device.',
+  }
+
+  it('never joins a note onto the end of somebody words', () => {
+    const body = formatTranscript([spoken, note])
+    expect(body).toContain('[00:00] Habib Onifade: Really good responses.')
+    expect(body).not.toContain('Really good responses. Habib Onifade: no audible sound')
+  })
+
+  it('prints notes under their own heading, after the words', () => {
+    const body = formatTranscript([spoken, note])
+    expect(body.indexOf('About this recording')).toBeGreaterThan(body.indexOf('Really good responses'))
+    expect(body).toContain('no audible sound was captured')
+  })
+
+  it('says nothing extra when every device worked', () => {
+    expect(formatTranscript([spoken])).not.toContain('About this recording')
+  })
+
+  it('still produces a readable transcript when every device was silent', () => {
+    const body = formatTranscript([note])
+    expect(body).toContain('About this recording')
+    expect(body.startsWith('About this recording')).toBe(true)
+  })
+
+  it('is marked as a note by the route, not guessed at by its wording', () => {
+    const fs = require('fs')
+    expect(fs.readFileSync('app/api/session-transcribe/route.ts', 'utf8')).toContain('note: true')
+  })
+})
+
+describe('what one device does, the other sees', () => {
+  const fs = require('fs')
+  const PANEL = fs.readFileSync('src/components/gtcv/TranscriptPanel.tsx', 'utf8')
+
+  it('keeps itself current instead of reading once', () => {
+    // The transcript produced on a phone left the laptop showing "Produce the
+    // transcript" as though nothing had happened.
+    expect(PANEL).toContain('WHAT ONE DEVICE DOES, THE OTHER SHOULD SEE')
+    expect(PANEL).toContain('setInterval')
+  })
+
+  it('does not move under the hands of somebody correcting it', () => {
+    expect(PANEL).toContain("if (!next || next.status !== 'draft') setDraft(next?.body || '')")
+  })
+
+  it('redraws only when something actually changed', () => {
+    expect(PANEL).toContain('if (same) return prev')
+  })
+})
