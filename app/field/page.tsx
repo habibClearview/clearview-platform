@@ -9,6 +9,7 @@ import {
 } from '@/lib/field-db'
 import { wrapSnapshot, readSnapshot, SNAPSHOT_EXPIRED_OFFLINE } from '@/lib/field-snapshot'
 import BuildStamp from '@/components/BuildStamp'
+import { attributeLine } from '@/lib/catalogue-item'
 
 const C = {
   navy:'var(--cv-navy)', cyan:'var(--cv-cyan)', cream:'var(--cv-cream)', white:'var(--cv-card)',
@@ -37,7 +38,7 @@ const D = {
   redDim:'var(--cv-red-dim)',
 }
 
-interface CatalogueItem { id:string; name:string; item_type:'product'|'service'; price:number; unit_label?:string; plan_line_id:string; image?:string; image_url?:string }
+interface CatalogueItem { id:string; name:string; item_type:'product'|'service'; price:number; unit_label?:string; plan_line_id:string; image?:string; image_url?:string; attributes?:{label:string;value:string}[] }
 interface CostLine { id:string; name:string; category:string }
 interface Customer { id:string; name:string; phone?:string; village?:string }
 interface HistoryEntry {
@@ -757,6 +758,13 @@ export default function FieldCapturePage() {
                       <button key={item.id} onClick={()=>openSaleDetail(item)} style={tileStyle}>
                         <div style={tileImgStyle}>{itemThumb(item,120)}</div>
                         <div style={{fontWeight:700,fontSize:'1rem',lineHeight:1.15}}>{item.name}</div>
+                        {/* WHAT TELLS TWO SIMILAR ITEMS APART. 12 September
+                            2026. A 50kg sack beside a 25kg sack of the same
+                            brand looks the same on a small screen, and the
+                            name alone often does not say which is which. */}
+                        {attributeLine(item.attributes) && (
+                          <div style={{fontSize:'0.82rem',color:D.muted,lineHeight:1.25}}>{attributeLine(item.attributes)}</div>
+                        )}
                         <div style={{fontSize:'0.92rem',color:D.cyan,fontWeight:700}}>{fmt(item.price,currency)}{item.unit_label?` / ${item.unit_label}`:''}</div>
                       </button>
                     ))}

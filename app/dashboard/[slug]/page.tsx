@@ -77,7 +77,7 @@ export default function GenericClientPage() {
       if (!session) { setChecking(false); return }
       // Load user profile
       const {data:profile} = await supabase.from('user_profiles')
-        .select('id,role,full_name,email,client_id,engagement_client_id,assigned_unit_ids,can_manage_catalogue,co_implementer_id,funder_programme_id')
+        .select('id,role,full_name,email,client_id,engagement_client_id,assigned_unit_ids,can_manage_catalogue,can_add_catalogue_products,can_add_catalogue_pictures,co_implementer_id,funder_programme_id')
         .eq('id',session.user.id).single()
       if (profile) setUser({...profile, email:session.user.email})
       // Find client by slug from engagement_clients. This query is
@@ -179,6 +179,15 @@ export default function GenericClientPage() {
     // The CEO and Finance Manager always have this; anyone else needs it
     // explicitly delegated via the "Manage Field Catalogue" toggle in Team.
     canManageCatalogue: ['super_coach','ceo','finance_manager'].includes(user.role) || !!user.can_manage_catalogue,
+    // THE CATALOGUE RIGHT, SPLIT IN THREE. 12 September 2026. Habib: let
+    // adding a photo or product be a right or permission that can be assigned
+    // to a field operator. Managing the catalogue still means everything,
+    // price included. These two are the narrow halves, and neither carries any
+    // right to set a price.
+    canAddCatalogueProducts: ['super_coach','ceo','finance_manager'].includes(user.role)
+      || !!user.can_manage_catalogue || !!user.can_add_catalogue_products,
+    canAddCataloguePictures: ['super_coach','ceo','finance_manager'].includes(user.role)
+      || !!user.can_manage_catalogue || !!user.can_add_catalogue_products || !!user.can_add_catalogue_pictures,
     canViewAI: ['super_coach','coach','ceo'].includes(user.role),
     // Only meaningful for role==='funder' -- see GenericDashboard's tab
     // filtering. Every other role always gets full access regardless of

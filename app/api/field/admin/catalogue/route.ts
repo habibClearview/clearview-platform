@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isPlanLineValidForUnit } from '@/lib/catalogue-validation'
 import { getFieldSupabase as getSupabase } from '@/lib/field-auth'
-import { resolveFieldAdminActor, actorMayAccessClient, actorMayManageCatalogue } from '@/lib/auth/field-admin-authz'
+import { resolveFieldAdminActor, actorMayAccessClient, actorMayManageCatalogue, actorMayAddCatalogueProducts, actorMayAddCataloguePictures } from '@/lib/auth/field-admin-authz'
+import { cleanAttributes } from '@/lib/catalogue-item'
 
 // ── GET: list catalogue items for a client (optionally one unit) ──
 export async function GET(req: NextRequest) {
@@ -31,14 +32,24 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { client_id, business_unit_id, plan_line_id, name, item_type, price, unit_label, created_by, cost_price, cogs_plan_line_id } = body
+    const { client_id, business_unit_id, plan_line_id, name, item_type, price, unit_label, created_by, cost_price, cogs_plan_line_id, image_url, attributes } = body
 
     if (!client_id) return NextResponse.json({ error: 'client_id required' }, { status: 400 })
     if (!business_unit_id) return NextResponse.json({ error: 'business_unit_id required' }, { status: 400 })
     if (!plan_line_id) return NextResponse.json({ error: 'plan_line_id required -- every catalogue item must roll up into a revenue line' }, { status: 400 })
     if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 })
-    const parsedPrice = Number(price)
-    if (price === undefined || price === null || !Number.isFinite(parsedPrice) || parsedPrice < 0) return NextResponse.json({ error: 'A valid price is required -- this is the number field operators will never have to enter themselves' }, { status: 400 })
+
+    // AN ITEM THAT IS NOT PRICED YET. 12 September 2026. Habib asked for
+    // adding a product to be a right that can be granted to a field operator.
+    // The rule the catalogue rests on is that an operator never sets what
+    // something sells for, so an operator who may add a product adds it
+    // WITHOUT one: the item is created inactive and marked as needing a
+    // price, and cannot be sold until somebody who may price it sets one.
+    const priceGiven = price !== undefined && price !== null && String(price) !== ''
+    const parsedPrice = priceGiven ? Number(price) : 0
+    if (priceGiven && (!Number.isFinite(parsedPrice) || parsedPrice < 0)) {
+      return NextResponse.json({ error: 'A valid price is required -- this is the number field operators will never have to enter themselves' }, { status: 400 })
+    }
     // cost_price is optional -- if provided, a matching cogs_plan_line_id
     // is required too, since automatic COGS entries need somewhere to post
     // (see docs/ACCOUNTING_ARCHITECTURE.md section 3). If cost_price is
@@ -56,7 +67,19 @@ export async function POST(req: NextRequest) {
     if (!actorMayAccessClient(actor, client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     // Write-role gate (tenant scope alone is not enough): managing the field
     // catalogue matches the dashboard's canManageCatalogue capability.
-    if (!actorMayManageCatalogue(actor)) return NextResponse.json({ error: 'You do not have permission to manage the catalogue.' }, { status: 403 })
+    const mayPrice = actorMayManageCatalogue(actor)
+    if (!mayPrice && !actorMayAddCatalogueProducts(actor)) {
+      return NextResponse.json({ error: 'You do not have permission to add to the catalogue.' }, { status: 403 })
+    }
+    // Somebody who may add a product but not price one cannot smuggle a price
+    // in by sending the field anyway.
+    if (!mayPrice && priceGiven) {
+      return NextResponse.json({ error: 'You can add an item, but only the catalogue manager can set its price. Leave the price blank and it will be added waiting for one.' }, { status: 403 })
+    }
+    if (!mayPrice && (cost_price !== undefined && cost_price !== null && String(cost_price) !== '')) {
+      return NextResponse.json({ error: 'Only the catalogue manager can set a cost price.' }, { status: 403 })
+    }
+    const needsPrice = !priceGiven
 
     const { data: item, error } = await supabase
       .from('field_catalogue')
@@ -65,8 +88,13 @@ export async function POST(req: NextRequest) {
         name: String(name).trim(),
         item_type: item_type === 'service' ? 'service' : 'product',
         price: parsedPrice,
+        needs_price: needsPrice,
+        image_url: image_url ? String(image_url) : null,
+        attributes: cleanAttributes(attributes),
         unit_label: unit_label || null,
-        active: true,
+        // An unpriced item is not sellable, so it is not offered to the field
+        // until somebody prices it.
+        active: !needsPrice,
         created_by: created_by || null,
         cost_price: parsedCostPrice,
         cogs_plan_line_id: cogs_plan_line_id || null,
@@ -87,7 +115,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json()
-    const { id, name, price, unit_label, active, cost_price, cogs_plan_line_id, item_type, plan_line_id, business_unit_id } = body
+    const { id, name, price, unit_label, active, cost_price, cogs_plan_line_id, item_type, plan_line_id, business_unit_id, image_url, attributes } = body
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
     const supabase = getSupabase()
@@ -105,14 +133,42 @@ export async function PATCH(req: NextRequest) {
     if (fetchErr) return NextResponse.json({ error: 'Catalogue item not found' }, { status: 404 })
     // Authorize against the item's OWN business (this PATCH takes only the item id).
     if (!actorMayAccessClient(actor, existing.client_id)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    if (!actorMayManageCatalogue(actor)) return NextResponse.json({ error: 'You do not have permission to manage the catalogue.' }, { status: 403 })
+
+    // THREE RIGHTS, NOT ONE. 12 September 2026. Habib asked for adding a photo
+    // or a product to be a permission that can be granted to a field operator.
+    //
+    // So this route now answers two questions rather than one: may this person
+    // change the item at all, and may they change THIS field. Somebody with
+    // only the picture right may change the picture and nothing else, which is
+    // enforced by naming the fields they are allowed to send rather than by
+    // hoping the screen only offers them one control.
+    const mayManage = actorMayManageCatalogue(actor)
+    const mayPicture = actorMayAddCataloguePictures(actor)
+    if (!mayManage && !mayPicture) {
+      return NextResponse.json({ error: 'You do not have permission to change the catalogue.' }, { status: 403 })
+    }
+    if (!mayManage) {
+      const allowed = new Set(['id', 'image_url'])
+      const overreach = Object.keys(body).filter((k) => !allowed.has(k) && body[k] !== undefined)
+      if (overreach.length) {
+        return NextResponse.json({
+          error: 'You can change the picture on an item. Everything else about it is set by the catalogue manager.',
+        }, { status: 403 })
+      }
+    }
 
     const updates: Record<string, any> = { updated_at: new Date().toISOString() }
+    if (image_url !== undefined) updates.image_url = image_url ? String(image_url) : null
+    if (attributes !== undefined) updates.attributes = cleanAttributes(attributes)
     if (name !== undefined) updates.name = String(name).trim()
     if (price !== undefined) {
       const parsedPrice = Number(price)
       if (!Number.isFinite(parsedPrice) || parsedPrice < 0) return NextResponse.json({ error: 'Price must be a valid, non-negative number' }, { status: 400 })
       updates.price = parsedPrice
+      // Pricing an item is what finishes it. The marker goes and it becomes
+      // sellable, which is the whole point of somebody else having added it.
+      updates.needs_price = false
+      if (active === undefined) updates.active = true
     }
     if (unit_label !== undefined) updates.unit_label = unit_label || null
     if (active !== undefined) updates.active = !!active

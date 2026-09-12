@@ -19,6 +19,17 @@ export interface FieldAdminActor {
   engagement_client_id: string | null
   /** The "Manage Field Catalogue" delegation flag a CEO can grant to a non-CEO/FM. */
   can_manage_catalogue?: boolean | null
+  /**
+   * THE CATALOGUE RIGHT, SPLIT. 12 September 2026. Habib: let adding a photo
+   * or product be a right or permission that can be assigned to a field
+   * operator, I think that makes it easier and more flexible.
+   *
+   * It was one flag covering everything, price included, so the only way to
+   * let an operator photograph a sack was to let them set what the sack sells
+   * for. These two are the narrow halves and carry no price rights at all.
+   */
+  can_add_catalogue_products?: boolean | null
+  can_add_catalogue_pictures?: boolean | null
 }
 
 /**
@@ -35,7 +46,7 @@ export async function resolveFieldAdminActor(admin: SupabaseClient, req: NextReq
   if (error || !user) return null
   const { data: profile } = await admin
     .from('user_profiles')
-    .select('role, engagement_client_id, can_manage_catalogue')
+    .select('role, engagement_client_id, can_manage_catalogue, can_add_catalogue_products, can_add_catalogue_pictures')
     .eq('id', user.id)
     .single()
   if (!profile) return null
@@ -80,6 +91,30 @@ export function actorMayManageTeam(actor: FieldAdminActor): boolean {
  */
 export function actorMayManageCatalogue(actor: FieldAdminActor): boolean {
   return CATALOGUE_ROLES.has(actor.role) || actor.can_manage_catalogue === true
+}
+
+/**
+ * Add an item to the catalogue WITHOUT the right to price it.
+ *
+ * Anybody who may manage the catalogue can obviously do this too. The point of
+ * the separate flag is the person who cannot: they create the item with its
+ * name, its details and its picture, it is marked as needing a price and it
+ * cannot be sold until somebody who may price it does. The rule the whole
+ * catalogue rests on is that a field operator never sets what something sells
+ * for, and that rule is not weakened by this.
+ */
+export function actorMayAddCatalogueProducts(actor: FieldAdminActor): boolean {
+  return actorMayManageCatalogue(actor) || actor.can_add_catalogue_products === true
+}
+
+/**
+ * Photograph an item that is already in the catalogue, and nothing else.
+ *
+ * The narrowest of the three. It changes one field on a row that already
+ * exists: no name, no price, no category, no new items.
+ */
+export function actorMayAddCataloguePictures(actor: FieldAdminActor): boolean {
+  return actorMayAddCatalogueProducts(actor) || actor.can_add_catalogue_pictures === true
 }
 
 /** Enter / categorise actuals & costs — page.tsx canEnterActuals. */

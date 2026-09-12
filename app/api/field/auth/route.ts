@@ -34,12 +34,34 @@ export async function POST(req: NextRequest) {
     // entered by the operator. See supabase/migrations/2026_07_04_field_catalogue.sql.
     const { data: catalogueItems, error: catalogueErr } = await supabase
       .from('field_catalogue')
-      .select('id, name, item_type, price, unit_label, plan_line_id')
+      .select('id, name, item_type, price, unit_label, plan_line_id, image_url, attributes')
       .eq('client_id', operator.client_id)
       .eq('business_unit_id', operator.business_unit_id)
       .eq('active', true)
+      // An item nobody has priced yet is not sellable, so it is never offered
+      // to a field operator. 12 September 2026.
+      .eq('needs_price', false)
       .order('name')
     if (catalogueErr) throw catalogueErr
+
+    // THE PICTURE ON EACH ITEM. 12 September 2026. Habib asked for pictures on
+    // catalogue items, especially on the field operation app.
+    //
+    // The field app signs in with an operator token rather than a user
+    // account, so it cannot ask the platform for a picture the way the
+    // dashboard does. Instead each address is signed here and travels down
+    // with the catalogue, which is also what makes a picture survive a day
+    // with no signal: the snapshot the phone keeps already holds it.
+    //
+    // A week, because that is the outside of how long an operator might work
+    // between one sign in and the next, and a stale address simply fails to
+    // draw and falls back to the symbol that stood there before.
+    const withPictures = await Promise.all((catalogueItems || []).map(async (item: any) => {
+      if (!item.image_url) return item
+      const { data: signed } = await supabase.storage
+        .from('catalogue-images').createSignedUrl(item.image_url, 60 * 60 * 24 * 7)
+      return { ...item, image_url: signed?.signedUrl || null }
+    }))
 
     // Cost/expense lines: still sourced directly from the plan, unchanged --
     // pricing the cost side of the catalogue is a separate, later piece of
@@ -101,7 +123,7 @@ export async function POST(req: NextRequest) {
         start_date: config.start_date,
       },
       unit: unit || { id: operator.business_unit_id, name: 'My Unit' },
-      catalogue: catalogueItems || [],
+      catalogue: withPictures,
       cost_lines: costLines,
       customers: customers || [],
       segments: segments || [],

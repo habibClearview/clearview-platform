@@ -20,6 +20,8 @@ import { computeLiquidityReadinessScore, computeLRSTimeSeries, computeFitScore, 
 import { computePathwayToReadiness } from '@/lib/pathway-to-readiness'
 import { computeWorkingCapitalStatement } from '@/lib/working-capital-statement'
 import { combinedActual, computeActualsTotals, applyPeriodActual, buildHybridConsolidated, computeCatalogueLineTotal } from '@/lib/actuals'
+import { CatalogueThumb, DetailChips, PhotoControl, DetailsEditor } from '@/components/generic/CatalogueMedia'
+import { cleanAttributes, NEEDS_PRICE_LABEL } from '@/lib/catalogue-item'
 import { computeExceptionReport, canClosePeriod, periodForMonthIndex, monthIndexForPeriod, type UnitRevenueCheck } from '@/lib/month-end-close'
 import { yearStartPeriod, canCloseCalendarYear, computeYearEndBalanceSheet } from '@/lib/annual-close'
 import BuildStamp from '@/components/BuildStamp'
@@ -567,6 +569,8 @@ export interface GenericPermissions {
   canEnterActuals: boolean
   canManageTeam: boolean
   canManageCatalogue: boolean
+  canAddCatalogueProducts?: boolean
+  canAddCataloguePictures?: boolean
   canViewAI: boolean
   // Only read when role === 'funder': the coach-configurable level of
   // detail set per programme (Programmes -> a programme -> Edit, "Funder
@@ -578,7 +582,8 @@ export interface GenericPermissions {
 const FULL_PERMISSIONS: GenericPermissions = {
   role:'super_coach', userId:'', fullName:'Coach', clientId:'',
   unitIds:[], canEditPlan:true, canApprove:true, canSubmitRequest:true,
-  canEnterActuals:true, canManageTeam:true, canManageCatalogue:true, canViewAI:true, onSignOut:()=>{},
+  canEnterActuals:true, canManageTeam:true, canManageCatalogue:true,
+  canAddCatalogueProducts:true, canAddCataloguePictures:true, canViewAI:true, onSignOut:()=>{},
 }
 
 // ── Main dashboard component ─────────────────────────────────
@@ -3977,7 +3982,7 @@ function TeamTab({clientId,config,P}) {
   const [saving, setSaving] = useState(false)
 
   useEffect(()=>{
-    supabase.from('user_profiles').select('id,role,full_name,email,assigned_unit_ids,status,can_manage_catalogue')
+    supabase.from('user_profiles').select('id,role,full_name,email,assigned_unit_ids,status,can_manage_catalogue,can_add_catalogue_products,can_add_catalogue_pictures')
       .eq('engagement_client_id',clientId)
       .then(({data})=>{ setMembers(data||[]); setLoading(false) })
   },[clientId])
@@ -4012,7 +4017,7 @@ function TeamTab({clientId,config,P}) {
         // Only replace the roster if the refresh actually succeeded — a transient
         // read failure must not blank out the existing list.
         const { data: rows, error: refreshErr } = await supabase.from('user_profiles')
-          .select('id,role,full_name,email,assigned_unit_ids,status,can_manage_catalogue')
+          .select('id,role,full_name,email,assigned_unit_ids,status,can_manage_catalogue,can_add_catalogue_products,can_add_catalogue_pictures')
           .eq('engagement_client_id', clientId)
         if (!refreshErr) setMembers(rows||[])
         notify(data.message || `Invitation sent to ${inviteForm.email.trim()}. They'll get an email to set their password.`)
@@ -4096,8 +4101,24 @@ function TeamTab({clientId,config,P}) {
                       notify('Could not save that permission change. Please check your connection and try again.')
                     }
                   }}/>
-                Can manage Field Catalogue (prices & products)
+                Can manage Field Catalogue (prices &amp; products)
               </label>
+            )}
+            {/* THE RIGHT, SPLIT. 12 September 2026. Habib: let adding a photo
+                or product be a right or permission that can be assigned to a
+                field operator, I think that makes it easier and more flexible.
+                It was one flag covering everything, price included, so the
+                only way to let somebody photograph a sack was to let them set
+                what the sack sells for. */}
+            {(P.role==='ceo'||P.role==='finance_manager'||P.canManageTeam)&&m.role!=='ceo'&&m.role!=='finance_manager'&&(
+              <CataloguePermission member={m} field="can_add_catalogue_products" setMembers={setMembers} notify={notify}
+                label="Can add products to the catalogue"
+                note="Adds an item with its name, details and picture. The item waits for a price before it can be sold, so no price is ever set by this person."/>
+            )}
+            {(P.role==='ceo'||P.role==='finance_manager'||P.canManageTeam)&&m.role!=='ceo'&&m.role!=='finance_manager'&&(
+              <CataloguePermission member={m} field="can_add_catalogue_pictures" setMembers={setMembers} notify={notify}
+                label="Can add pictures to catalogue items"
+                note="Photographs an item that is already in the catalogue and changes nothing else about it."/>
             )}
           </div>
           </div>
@@ -4333,6 +4354,41 @@ function SegmentManager({clientId,config,P}) {
   )
 }
 
+/**
+ * One grantable catalogue right, on one person's line in Team.
+ *
+ * The same optimistic flip the existing "Manage Field Catalogue" toggle uses:
+ * the tick moves at once, because waiting on the database and snapping back on
+ * a slow link is how somebody ends up pressing it twice, and a failure is
+ * surfaced rather than swallowed so a lost permission change is visible.
+ */
+function CataloguePermission({member, field, label, note, setMembers, notify}:any){
+  const [busy,setBusy]=useState(false)
+  return (
+    <label style={{display:'flex',alignItems:'flex-start',gap:'0.4rem',fontSize:'1.0rem',color:C.slate,marginTop:'0.35rem',cursor:busy?'wait':'pointer'}}>
+      <input type="checkbox" disabled={busy} checked={!!member[field]} style={{marginTop:'0.28rem'}}
+        onChange={async e=>{
+          const next=e.target.checked
+          setBusy(true)
+          setMembers((ms:any[])=>ms.map(x=>x.id!==member.id?x:{...x,[field]:next}))
+          try {
+            const {error}=await supabase.from('user_profiles')
+              .update({[field]:next,updated_at:new Date().toISOString()}).eq('id',member.id)
+            if (error) throw error
+          } catch {
+            setMembers((ms:any[])=>ms.map(x=>x.id!==member.id?x:{...x,[field]:!next}))
+            notify('Could not save that permission change. Please check your connection and try again.')
+          }
+          setBusy(false)
+        }}/>
+      <span>
+        {label}
+        <span style={{display:'block',fontSize:'0.92rem',color:C.slate,opacity:0.85}}>{note}</span>
+      </span>
+    </label>
+  )
+}
+
 function CatalogueManager({clientId,config,P}) {
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -4347,6 +4403,19 @@ function CatalogueManager({clientId,config,P}) {
   const [editFull, setEditFull] = useState({name:'',item_type:'product',unit_label:'',business_unit_id:'',plan_line_id:''})
   const [savingFull, setSavingFull] = useState(false)
   const [form, setForm] = useState({name:'',item_type:'product',price:'',unit_label:'',business_unit_id:'',plan_line_id:'',cost_price:'',cogs_plan_line_id:''})
+  // The picture and the details on the item being added, and on the one being
+  // edited. Held apart from the rest of the form because the picture is
+  // uploaded the moment it is taken rather than when the form is saved: a
+  // photograph somebody takes standing in a store should not be lost because
+  // they wandered off before pressing Save.
+  const [formAttrs, setFormAttrs] = useState([])
+  const [formImage, setFormImage] = useState(null)
+  const [editAttrs, setEditAttrs] = useState([])
+  // Managing the catalogue means everything, price included. These two are the
+  // narrow halves a CEO can grant to a field operator.
+  const canPrice = P.canManageCatalogue
+  const canAddProducts = P.canAddCatalogueProducts ?? P.canManageCatalogue
+  const canPhoto = P.canAddCataloguePictures ?? P.canManageCatalogue
 
   async function load() {
     setLoading(true)
@@ -4373,13 +4442,23 @@ function CatalogueManager({clientId,config,P}) {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           client_id: clientId, business_unit_id: form.business_unit_id, plan_line_id: form.plan_line_id,
-          name: form.name, item_type: form.item_type, price: Number(form.price), unit_label: form.unit_label||null,
+          name: form.name, item_type: form.item_type, unit_label: form.unit_label||null,
+          // Somebody without the right to price an item sends no price at all,
+          // and the route marks it as waiting for one. Sending an empty string
+          // or a zero would set the price to zero, which is a real price and
+          // the wrong one.
+          ...(canPrice ? {
+            price: Number(form.price),
+            cost_price: form.cost_price===''?null:Number(form.cost_price),
+            cogs_plan_line_id: form.cogs_plan_line_id||null,
+          } : {}),
+          image_url: formImage || null,
+          attributes: cleanAttributes(formAttrs),
           created_by: P.userId,
-          cost_price: form.cost_price===''?null:Number(form.cost_price),
-          cogs_plan_line_id: form.cogs_plan_line_id||null,
         }),
       })
       setForm({name:'',item_type:'product',price:'',unit_label:'',business_unit_id:'',plan_line_id:'',cost_price:'',cogs_plan_line_id:''})
+      setFormAttrs([]); setFormImage(null)
       setShowAdd(false)
       await load()
     } catch { notify('Could not save this catalogue item. Please try again.') }
@@ -4399,6 +4478,18 @@ function CatalogueManager({clientId,config,P}) {
   function startFullEdit(item:any) {
     setEditingFullId(item.id)
     setEditFull({name:item.name, item_type:item.item_type, unit_label:item.unit_label||'', business_unit_id:item.business_unit_id, plan_line_id:item.plan_line_id})
+    setEditAttrs(cleanAttributes(item.attributes))
+  }
+
+  /**
+   * The picture changed on an item that already exists.
+   *
+   * The upload route has already written it to the row, so this only refreshes
+   * what is on screen. Reloading the whole catalogue for one thumbnail would
+   * throw away an edit somebody has half typed elsewhere on the page.
+   */
+  function pictureChanged(id:string, path:string|null) {
+    setItems((list:any[])=>list.map(x=>x.id!==id?x:{...x, image_url:path}))
   }
 
   async function saveFullEdit(id:string) {
@@ -4411,6 +4502,7 @@ function CatalogueManager({clientId,config,P}) {
         body: JSON.stringify({
           id, name: editFull.name.trim(), item_type: editFull.item_type,
           unit_label: editFull.unit_label || null,
+          attributes: cleanAttributes(editAttrs),
           business_unit_id: editFull.business_unit_id, plan_line_id: editFull.plan_line_id,
         }),
       })
@@ -4462,13 +4554,15 @@ function CatalogueManager({clientId,config,P}) {
     <div>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
         <div style={secH}>Catalogue — Products &amp; Services</div>
-        {canEdit&&<button style={addBtn()} onClick={()=>setShowAdd(!showAdd)}>+ Add Item</button>}
+        {(canEdit||canAddProducts)&&<button style={addBtn()} onClick={()=>setShowAdd(!showAdd)}>+ Add Item</button>}
       </div>
       <p style={{fontSize:'1.06rem',color:C.slate,lineHeight:1.6,marginBottom:'1.1rem'}}>
         This is your price list. Field operators pick an item from here and record how much was sold -- the price shown here is what's used automatically. They never enter a price themselves. The CEO or Finance Manager can grant other staff permission to edit this list from the Team tab.
       </p>
 
-      {!canEdit && <div style={{...card,background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,fontSize:'1.06rem',color:C.navy,marginBottom:'1rem'}}>You can view the catalogue but don't have permission to edit it. Ask your CEO or Finance Manager to grant you "Manage Field Catalogue" access in Team if you need to make changes.</div>}
+      {!canEdit && !canAddProducts && !canPhoto && <div style={{...card,background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,fontSize:'1.06rem',color:C.navy,marginBottom:'1rem'}}>You can view the catalogue but don't have permission to edit it. Ask your CEO or Finance Manager to grant you "Manage Field Catalogue" access in Team if you need to make changes.</div>}
+      {!canEdit && canAddProducts && <div style={{...card,background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,fontSize:'1.06rem',color:C.navy,marginBottom:'1rem'}}>You can add an item with its details and its picture. The price is set by the catalogue manager, so anything you add is held as &ldquo;{NEEDS_PRICE_LABEL}&rdquo; until they set one and it cannot be sold before then.</div>}
+      {!canEdit && !canAddProducts && canPhoto && <div style={{...card,background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,fontSize:'1.06rem',color:C.navy,marginBottom:'1rem'}}>You can add a picture to any item here. Everything else about an item is set by the catalogue manager.</div>}
 
       {showAdd&&canEdit&&(
         <div style={{...card,border:`1px solid ${C.cyan}`}}>
@@ -4493,12 +4587,26 @@ function CatalogueManager({clientId,config,P}) {
               </select>
               <div style={{fontSize:'0.96rem',color:C.slate,marginTop:'0.25rem'}}>Different brands or sizes of the same thing (e.g. two fertiliser brands) should share one category -- that's what rolls up into a single revenue figure.</div>
             </div>
-            <div><label style={lbl}>Price</label><input type="number" style={inp} value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} placeholder="0"/></div>
+            {canPrice
+              ? <div><label style={lbl}>Price</label><input type="number" style={inp} value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} placeholder="0"/></div>
+              : <div><label style={lbl}>Price</label>
+                  <div style={{...inp,display:'flex',alignItems:'center',color:C.slate}}>{NEEDS_PRICE_LABEL}</div>
+                  <div style={{fontSize:'0.96rem',color:C.slate,marginTop:'0.25rem'}}>The catalogue manager sets this. The item cannot be sold until they do.</div>
+                </div>}
             <div><label style={lbl}>Unit Label (optional)</label><input style={inp} value={form.unit_label} onChange={e=>setForm(f=>({...f,unit_label:e.target.value}))} placeholder="e.g. bag, kg, session"/></div>
-            <div><label htmlFor="new-item-cost-price" style={lbl}>Cost Price (optional)</label><input id="new-item-cost-price" type="number" style={inp} value={form.cost_price} onChange={e=>setForm(f=>({...f,cost_price:e.target.value}))} placeholder="Leave blank if unknown"/>
-              <div style={{fontSize:'0.96rem',color:C.slate,marginTop:'0.25rem'}}>What this actually costs to procure. Never shown to field operators -- when set, every sale automatically books a matching cost-of-sales entry.</div>
+            {canPhoto && (
+              <div style={{gridColumn:'1 / -1'}}><label style={lbl}>Picture (optional)</label>
+                <PhotoControl clientId={clientId} itemId={null} path={formImage} onChange={setFormImage}/>
+              </div>
+            )}
+            <div style={{gridColumn:'1 / -1'}}><label style={lbl}>Details (optional)</label>
+              <DetailsEditor value={formAttrs} onChange={setFormAttrs} allItems={items}/>
+              <div style={{fontSize:'0.96rem',color:C.slate,marginTop:'0.25rem'}}>Size, colour, brand, anything that tells two similar items apart. These show under the name on the field operator&rsquo;s phone.</div>
             </div>
-            {form.cost_price!=='' && (
+            {canPrice && <div><label htmlFor="new-item-cost-price" style={lbl}>Cost Price (optional)</label><input id="new-item-cost-price" type="number" style={inp} value={form.cost_price} onChange={e=>setForm(f=>({...f,cost_price:e.target.value}))} placeholder="Leave blank if unknown"/>
+              <div style={{fontSize:'0.96rem',color:C.slate,marginTop:'0.25rem'}}>What this actually costs to procure. Never shown to field operators -- when set, every sale automatically books a matching cost-of-sales entry.</div>
+            </div>}
+            {canPrice && form.cost_price!=='' && (
               <div><label htmlFor="new-item-cogs-line" style={lbl}>COGS Category</label>
                 <select id="new-item-cogs-line" style={inp} disabled={!form.business_unit_id} value={form.cogs_plan_line_id} onChange={e=>setForm(f=>({...f,cogs_plan_line_id:e.target.value}))}>
                   <option value="">{form.business_unit_id?'Select a COGS category...':'Select a unit first'}</option>
@@ -4530,12 +4638,20 @@ function CatalogueManager({clientId,config,P}) {
                   <div style={{fontSize:'1.0rem',color:C.teal,fontWeight:600,marginBottom:'0.4rem'}}>{line?.name||catId} <span style={{color:C.slate,fontWeight:400}}>({catItems.length} {catItems.length===1?'brand':'brands'})</span></div>
                   {catItems.map((item:any)=>(
                     <div key={item.id} style={{...card,opacity:item.active?1:0.55,marginLeft:'0.75rem'}}>
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem'}}>
-                        <div>
-                          <div style={{fontWeight:700,color:C.navy}}>{item.name}{!item.active&&<span style={{marginLeft:8}}><Badge text="Inactive" color={C.red}/></span>}</div>
-                          <div style={{fontSize:'1.0rem',color:C.slate}}>{item.item_type==='service'?'Service':'Product'}</div>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'0.6rem'}}>
+                        {/* The thumbnail takes the space that was empty at the
+                            left of every row. An item with no picture shows
+                            the symbol that stood there before, so nothing
+                            already in the catalogue has to be revisited. */}
+                        <div style={{display:'flex',gap:'0.7rem',alignItems:'flex-start',minWidth:0,flex:'1 1 260px'}}>
+                          <CatalogueThumb path={item.image_url} itemType={item.item_type}/>
+                          <div style={{minWidth:0}}>
+                            <div style={{fontWeight:700,color:C.navy}}>{item.name}{!item.active&&<span style={{marginLeft:8}}><Badge text="Inactive" color={C.red}/></span>}</div>
+                            <div style={{fontSize:'1.0rem',color:C.slate}}>{item.item_type==='service'?'Service':'Product'}</div>
+                            <DetailChips attributes={item.attributes}/>
+                          </div>
                         </div>
-                        <div style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap'}}>
                           {editingId===item.id ? (
                             <>
                               <input type="number" style={{...inp,width:110,marginBottom:0}} value={editPrice} onChange={e=>setEditPrice(e.target.value)} autoFocus/>
@@ -4544,8 +4660,10 @@ function CatalogueManager({clientId,config,P}) {
                             </>
                           ) : (
                             <>
-                              <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.navy}}>{fmt(item.price,config.currency)}{item.unit_label?<span style={{color:C.slate,fontWeight:400}}> / {item.unit_label}</span>:null}</div>
-                              {canEdit&&<button style={addBtn(true)} onClick={()=>{setEditingId(item.id);setEditPrice(String(item.price))}}>Edit Price</button>}
+                              {item.needs_price
+                                ? <div style={{fontFamily:'var(--cv-font-mono)',fontWeight:700,color:C.amber}}>{NEEDS_PRICE_LABEL}</div>
+                                : <div style={{fontFamily: 'var(--cv-font-mono)',fontWeight:700,color:C.navy}}>{fmt(item.price,config.currency)}{item.unit_label?<span style={{color:C.slate,fontWeight:400}}> / {item.unit_label}</span>:null}</div>}
+                              {canEdit&&<button style={addBtn(true)} onClick={()=>{setEditingId(item.id);setEditPrice(item.needs_price?'':String(item.price))}}>{item.needs_price?'Set the price':'Edit Price'}</button>}
                               {canEdit&&<button style={addBtn(true)} onClick={()=>startFullEdit(item)}>Edit Item</button>}
                               {canEdit&&(item.active
                                 ? <button style={addBtn(true,C.red)} onClick={()=>toggleActive(item.id,false)}>Deactivate</button>
@@ -4555,6 +4673,16 @@ function CatalogueManager({clientId,config,P}) {
                           )}
                         </div>
                       </div>
+
+                      {/* Photographing an item is its own right, so the control
+                          is on the row rather than buried inside Edit Item,
+                          which somebody with only this right cannot open. */}
+                      {canPhoto && editingFullId!==item.id && (
+                        <div style={{marginTop:'0.6rem'}}>
+                          <PhotoControl clientId={clientId} itemId={item.id} path={item.image_url}
+                            onChange={(path:any)=>pictureChanged(item.id,path)}/>
+                        </div>
+                      )}
                       {/* Cost price -- for automatic Gross Profit / COGS
                           (docs/ACCOUNTING_ARCHITECTURE.md section 3). Never
                           shown to field operators; this view is only ever
@@ -4605,6 +4733,16 @@ function CatalogueManager({clientId,config,P}) {
                               </select>
                             </div>
                             <div><label htmlFor={`edit-unitlabel-${item.id}`} style={lbl}>Unit Label (optional)</label><input id={`edit-unitlabel-${item.id}`} style={inp} value={editFull.unit_label} onChange={e=>setEditFull(f=>({...f,unit_label:e.target.value}))} placeholder="e.g. bag, kg, session"/></div>
+                            {canPhoto && (
+                              <div style={{gridColumn:'1 / -1'}}><label style={lbl}>Picture</label>
+                                <PhotoControl clientId={clientId} itemId={item.id} path={item.image_url}
+                                  onChange={(path:any)=>pictureChanged(item.id,path)}/>
+                              </div>
+                            )}
+                            <div style={{gridColumn:'1 / -1'}}><label style={lbl}>Details</label>
+                              <DetailsEditor value={editAttrs} onChange={setEditAttrs} allItems={items}/>
+                              <div style={{fontSize:'0.96rem',color:C.slate,marginTop:'0.25rem'}}>Size, colour, brand, anything that tells two similar items apart. These show under the name on the field operator&rsquo;s phone.</div>
+                            </div>
                           </div>
                           <div style={{display:'flex',gap:'0.6rem',marginTop:'0.6rem'}}>
                             <button style={solidBtn()} disabled={savingFull} onClick={()=>saveFullEdit(item.id)}>{savingFull?'Saving...':'Save Changes'}</button>
