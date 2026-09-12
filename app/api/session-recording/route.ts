@@ -29,7 +29,7 @@
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient, requireAccess, refuseAccess } from '@/lib/auth/api-authz'
-import { trackOffsetMs, consentCheck, liveTrackState, recordingSpanSeconds, type ConsentMethod } from '@/lib/recording'
+import { trackOffsetMs, consentCheck, liveTrackState, recordingSpanSeconds, clientFolder, storageSafe, type ConsentMethod } from '@/lib/recording'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,6 +43,47 @@ async function loadRecording(admin: ReturnType<typeof getAdminClient>, recording
     .select('id,client_id,started_at,ended_at,status,title,session_id,interview_id,dp_id')
     .eq('id', recordingId).maybeSingle()
   return data || null
+}
+
+// ─── AUDIO THAT NO RECORDING POINTS AT ───────────────────────
+//
+// 12 September 2026. Deleting a recording removes its audio first and its row
+// second, so a half-finished delete leaves a row pointing at nothing rather
+// than audio nobody can reach. That order held until I removed rows straight
+// from the database instead of through this route, which left the audio behind
+// with nothing on screen to show it was there.
+//
+// Voices of named people sitting in storage that the platform no longer admits
+// to holding is the worst of both: it cannot be found, played or accounted
+// for, and it has not gone. So the platform counts it and offers to remove it.
+//
+// A folder under the engagement is named after the recording it belongs to. If
+// there is no such recording any more, everything beneath it is leftover.
+async function leftoverAudio(admin: ReturnType<typeof getAdminClient>, clientId: string) {
+  const folder = clientFolder(clientId)
+  const store = admin.storage.from('recordings')
+
+  const { data: known } = await admin.from('session_recordings').select('id').eq('client_id', clientId)
+  const live = new Set((known || []).map((r) => storageSafe(r.id)))
+
+  const files: string[] = []
+  let bytes = 0
+  const gather = async (prefix: string) => {
+    const { data: entries } = await store.list(prefix, { limit: 1000 })
+    for (const e of entries || []) {
+      const path = `${prefix}/${e.name}`
+      // A folder comes back without an id; a file comes back with one.
+      if (e.id) { files.push(path); bytes += Number(e?.metadata?.size || 0) } else { await gather(path) }
+    }
+  }
+
+  const { data: recFolders } = await store.list(folder, { limit: 1000 })
+  for (const rec of recFolders || []) {
+    if (live.has(rec.name)) continue
+    if (rec.id) { files.push(`${folder}/${rec.name}`); bytes += Number(rec?.metadata?.size || 0); continue }
+    await gather(`${folder}/${rec.name}`)
+  }
+  return { files, bytes }
 }
 
 export async function POST(req: NextRequest) {
@@ -301,10 +342,29 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
+    const admin = getAdminClient()
+
+    // Clearing out audio that no recording points at any more.
+    const sweepClientId = String(body.sweepClientId || '')
+    if (sweepClientId) {
+      const access = await requireAccess(req, admin, sweepClientId, 'manage', {
+        deniedMessage: 'Only the coaching team can remove leftover audio',
+      })
+      if (!access.ok) return refuseAccess(access)
+
+      const { files } = await leftoverAudio(admin, sweepClientId)
+      if (!files.length) return NextResponse.json({ ok: true, filesRemoved: 0 })
+      const { error } = await admin.storage.from('recordings').remove(files)
+      if (error) {
+        return NextResponse.json({
+          error: `The leftover audio could not be removed. ${error.message}`,
+        }, { status: 500 })
+      }
+      return NextResponse.json({ ok: true, filesRemoved: files.length })
+    }
+
     const recordingId = String(body.recordingId || '')
     if (!recordingId) return NextResponse.json({ error: 'Which recording?' }, { status: 400 })
-
-    const admin = getAdminClient()
     const recording = await loadRecording(admin, recordingId)
     if (!recording) return NextResponse.json({ error: 'That recording is not on file' }, { status: 404 })
 
@@ -358,6 +418,15 @@ export async function GET(req: NextRequest) {
     const interviewId = url.searchParams.get('interviewId') || ''
     const dpId = url.searchParams.get('dpId') || ''
     const clientId = url.searchParams.get('clientId') || ''
+
+    // How much audio is sitting there that no recording points at.
+    if (url.searchParams.get('leftover') === '1') {
+      if (!clientId) return NextResponse.json({ error: 'Which engagement?' }, { status: 400 })
+      const access = await requireAccess(req, admin, clientId, 'manage')
+      if (!access.ok) return refuseAccess(access)
+      const { files, bytes } = await leftoverAudio(admin, clientId)
+      return NextResponse.json({ files: files.length, bytes })
+    }
 
     // EVERY RECORDING ON THIS ENGAGEMENT, IN ONE LIST. 10 September 2026.
     // Habib: there is no list anywhere on the page or on the client page to

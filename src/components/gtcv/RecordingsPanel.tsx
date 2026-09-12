@@ -47,6 +47,13 @@ function when(iso) {
   })
 }
 
+function readableBytes(n) {
+  const b = Math.max(0, Number(n) || 0)
+  if (b < 1024) return `${b} bytes`
+  if (b < 1024 * 1024) return `${Math.round(b / 1024)} KB`
+  return `${(b / (1024 * 1024)).toFixed(1)} MB`
+}
+
 function length(seconds) {
   const s = Math.max(0, Math.floor(seconds || 0))
   if (s < 60) return `${s} sec`
@@ -60,6 +67,7 @@ export default function RecordingsPanel({ clientId, canManage = false }) {
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(null)
   const [note, setNote] = useState(null)
+  const [leftover, setLeftover] = useState(null)
 
   const load = useCallback(async () => {
     if (!clientId) return
@@ -80,9 +88,22 @@ export default function RecordingsPanel({ clientId, canManage = false }) {
       // conversation, which happens before there is a plan.
       setRows((json.recordings || []).filter((r) => !r.session_id))
       setErr(null)
+
+      // AUDIO NOTHING POINTS AT. 12 September 2026. Deleting a recording takes
+      // its audio first and its row second. When rows were removed straight
+      // from the database instead, the audio stayed behind with nothing on
+      // screen to say so. Voices of named people that the platform no longer
+      // admits to holding is the worst of both, so it says how much is there.
+      if (canManage) {
+        const lRes = await fetch(`/api/session-recording?leftover=1&clientId=${encodeURIComponent(clientId)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+        const lJson = await lRes.json().catch(() => ({}))
+        setLeftover(lRes.ok && lJson.files > 0 ? lJson : null)
+      }
     } catch (e) { setErr(e.message) }
     setLoading(false)
-  }, [clientId])
+  }, [clientId, canManage])
 
   useEffect(() => { load() }, [load])
 
@@ -116,6 +137,29 @@ export default function RecordingsPanel({ clientId, canManage = false }) {
     setBusy(null)
   }
 
+  /** Remove audio that no recording points at any more. */
+  async function sweep() {
+    if (typeof window !== 'undefined' && !window.confirm(
+      `Remove ${leftover.files} leftover audio ${leftover.files === 1 ? 'file' : 'files'}?\n\n`
+      + 'These belong to recordings that are no longer on the platform. This cannot be undone.',
+    )) return
+    setBusy('leftover'); setErr(null); setNote(null)
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      const res = await fetch('/api/session-recording', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ sweepClientId: clientId }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || `It could not be removed (${res.status})`)
+      setNote(`Removed ${json.filesRemoved || 0} leftover audio ${json.filesRemoved === 1 ? 'file' : 'files'}.`)
+      await load()
+    } catch (e) { setErr(e.message) }
+    setBusy(null)
+  }
+
   return (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '1rem 1.1rem' }}>
       <div style={{ ...mono, fontSize: '0.78rem', letterSpacing: '.1em', textTransform: 'uppercase', color: C.slate }}>
@@ -132,6 +176,29 @@ export default function RecordingsPanel({ clientId, canManage = false }) {
         <div style={{ ...hint, marginTop: '0.6rem', color: C.red }}>
           {err}{' '}
           <button onClick={load} style={{ ...mono, fontSize: '0.82rem', color: C.red, background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer' }}>Try again</button>
+        </div>
+      )}
+
+      {canManage && leftover && (
+        <div style={{
+          marginTop: '0.7rem', padding: '0.6rem 0.75rem', borderRadius: 8,
+          border: `1px solid ${C.amber}`, background: 'transparent',
+        }}>
+          <div style={{ ...hint, color: C.navy }}>
+            {leftover.files} audio {leftover.files === 1 ? 'file' : 'files'} ({readableBytes(leftover.bytes)}) are
+            still in storage for recordings that are no longer on the platform. Nothing on this page plays them
+            and nothing points at them.
+          </div>
+          <button
+            type="button"
+            onClick={sweep}
+            disabled={busy === 'leftover'}
+            style={{
+              ...mono, fontSize: '0.8rem', marginTop: '0.45rem', padding: '0.25rem 0.6rem',
+              border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent',
+              color: C.red, cursor: 'pointer',
+            }}
+          >{busy === 'leftover' ? 'Removing...' : 'Remove them'}</button>
         </div>
       )}
 

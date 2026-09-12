@@ -98,6 +98,26 @@ export function canBeSplit(mimeType: string | null | undefined): boolean {
   return baseMime(mimeType).includes('webm')
 }
 
+/**
+ * One segment of a storage path, made safe.
+ *
+ * A dot is allowed inside a name and never at the start, and two dots in a row
+ * are never allowed at all. Without that ".." survives the sanitiser and a
+ * client id could climb out of its own folder. Caught by its own test.
+ */
+export function storageSafe(s: string): string {
+  return String(s)
+    .replace(/[^A-Za-z0-9_.-]/g, '_')
+    .replace(/\.{2,}/g, '_')
+    .replace(/^[.]+/, '_')
+    .slice(0, 80)
+}
+
+/** The folder in the recordings bucket that holds one engagement's audio. */
+export function clientFolder(clientId: string): string {
+  return storageSafe(clientId)
+}
+
 export function trackStoragePath(
   clientId: string,
   recordingId: string,
@@ -105,16 +125,8 @@ export function trackStoragePath(
   chunkIndex: number,
   mimeType?: string | null,
 ): string {
-  // A dot is allowed inside a name and never at the start, and two dots in a
-  // row are never allowed at all. Without that ".." survives the sanitiser and
-  // a client id could climb out of its own folder. Caught by its own test.
-  const safe = (s: string) => String(s)
-    .replace(/[^A-Za-z0-9_.-]/g, '_')
-    .replace(/\.{2,}/g, '_')
-    .replace(/^[.]+/, '_')
-    .slice(0, 80)
   const n = String(Math.max(0, Math.trunc(chunkIndex))).padStart(5, '0')
-  return `${safe(clientId)}/${safe(recordingId)}/${safe(deviceId)}/${n}.${extensionFor(mimeType)}`
+  return `${clientFolder(clientId)}/${storageSafe(recordingId)}/${storageSafe(deviceId)}/${n}.${extensionFor(mimeType)}`
 }
 
 /**

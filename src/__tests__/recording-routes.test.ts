@@ -404,6 +404,47 @@ describe('deleting a recording', () => {
   })
 })
 
+describe('audio that no recording points at', () => {
+  const PANEL = fs.readFileSync('src/components/gtcv/RecordingsPanel.tsx', 'utf8')
+
+  // 12 September 2026. Deleting through the route takes the audio first and
+  // the row second, so a half-finished delete leaves a row pointing at nothing
+  // rather than audio nobody can reach. Rows removed straight from the
+  // database instead left the audio behind, held but not admitted to.
+
+  it('is counted, so the platform never holds a voice it does not own up to', () => {
+    expect(OPEN).toContain('async function leftoverAudio(')
+    expect(OPEN).toContain("url.searchParams.get('leftover') === '1'")
+    expect(PANEL).toContain('leftover=1&clientId=')
+  })
+
+  it('is only ever audio for a recording that is gone', () => {
+    // The folder is named after the recording. A folder whose recording is
+    // still on file is left alone, or deleting the leftovers would delete
+    // everything.
+    const fn = OPEN.slice(OPEN.indexOf('async function leftoverAudio('))
+    expect(fn).toContain('if (live.has(rec.name)) continue')
+    expect(fn).toContain("from('session_recordings').select('id').eq('client_id', clientId)")
+  })
+
+  it('never reaches outside the engagement it was asked about', () => {
+    const fn = OPEN.slice(OPEN.indexOf('async function leftoverAudio('))
+    expect(fn).toContain('const folder = clientFolder(clientId)')
+    expect(fn.slice(0, fn.indexOf('export async function POST'))).not.toContain("store.list('', ")
+  })
+
+  it('takes manage rights to count and to remove', () => {
+    expect(OPEN).toContain('Only the coaching team can remove leftover audio')
+    const get = OPEN.slice(OPEN.indexOf("url.searchParams.get('leftover') === '1'"))
+    expect(get.slice(0, 300)).toContain("'manage'")
+  })
+
+  it('asks first, because it cannot be undone', () => {
+    expect(PANEL).toContain('leftover audio')
+    expect(PANEL).toContain('This cannot be undone')
+  })
+})
+
 describe('one list of the people, not two', () => {
   const PARTIES = fs.readFileSync('src/components/gtcv/EngagementPartiesPanel.tsx', 'utf8')
   const DASH2 = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
