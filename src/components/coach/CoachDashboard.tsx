@@ -20,6 +20,7 @@ import CurrencyField from '@/components/common/CurrencyField'
 import { formatMoneyShort } from '@/lib/currency'
 import SessionPlanner from '@/components/gtcv/SessionPlanner'
 import RecordingsPanel from '@/components/gtcv/RecordingsPanel'
+import CopyLink from '@/components/common/CopyLink'
 import SessionRecorder from '@/components/gtcv/SessionRecorder'
 import TranscriptPanel from '@/components/gtcv/TranscriptPanel'
 import { useNarrowScreen } from '@/lib/narrow-screen'
@@ -951,8 +952,8 @@ function ClearviewHealthSummary({clients}){
 function CopyIntakeLink({client}){
   const [link,setLink]=useState(null)
   const [loading,setLoading]=useState(true)
-  const [copied,setCopied]=useState(false)
   const [creating,setCreating]=useState(false)
+  const [err,setErr]=useState('')
   const [showUpload,setShowUpload]=useState(false)
 
   useEffect(()=>{
@@ -961,38 +962,39 @@ function CopyIntakeLink({client}){
   },[client.id])
 
   async function generateLink(){
-    setCreating(true)
+    setCreating(true); setErr('')
     const {data,error}=await supabase.from('client_intake_links').insert([{
       client_name:client.name, client_id:client.id, programme_id:client.programme_id||null, created_by:'coach',
     }]).select('token').single()
     if(!error&&data) setLink(data.token)
+    // The failure used to be swallowed whole, so a link that could not be made
+    // looked the same as one nobody had pressed for yet.
+    else setErr(error?.message||'The link could not be created.')
     setCreating(false)
-  }
-
-  function copyToClipboard(){
-    if(!link)return
-    const url=`https://clearview.habibonifade.com/intake/${link}`
-    navigator.clipboard.writeText(url).then(()=>{
-      setCopied(true)
-      setTimeout(()=>setCopied(false),2000)
-    })
   }
 
   if(loading)return null
 
   if(!link){
     return(
-      <button onClick={generateLink} disabled={creating} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:'1px solid var(--cv-wa-40)',color:'var(--cv-wa-80)',cursor:creating?'not-allowed':'pointer'}}>
-        {creating?'Creating link...':`Generate ${client.name} Data Capture Link`}
-      </button>
+      <div style={{display:'flex',flexDirection:'column',gap:'0.3rem'}}>
+        <button onClick={generateLink} disabled={creating} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:'transparent',border:`1px solid ${err?C.red:'var(--cv-wa-40)'}`,color:err?C.red:'var(--cv-wa-80)',cursor:creating?'not-allowed':'pointer'}}>
+          {creating?'Creating link...':`Generate ${client.name} Data Capture Link`}
+        </button>
+        {err&&<span style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.82rem',color:C.red}}>{err}</span>}
+      </div>
     )
   }
 
   return(
     <>
-    <button onClick={copyToClipboard} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,background:copied?C.green:'transparent',border:`1px solid ${copied?C.green:'var(--cv-wa-40)'}`,color:'var(--cv-on-accent)',cursor:'pointer'}}>
-      {copied?'Copied!':`Copy ${client.name} Data Capture Link`}
-    </button>
+    <div style={{maxWidth:560,marginBottom:'0.6rem'}}>
+      <CopyLink
+        url={`${typeof window==='undefined'?'':window.location.origin}/intake/${link}`}
+        label={`The data capture link for ${client.name}`}
+        hint="Send this to the client. What they fill in comes back against this engagement."
+      />
+    </div>
     <a href="/Clearview_Data_Capture_Template_v8.xlsx" download="Clearview_Data_Capture_Template_v8.xlsx"
       style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.85rem',borderRadius:4,
         background:'transparent',border:'1px solid var(--cv-wa-40)',
@@ -1020,10 +1022,23 @@ function CopyIntakeLink({client}){
 // "New submissions" -- so the coach does NOT have to add the client first.
 // This is the top-of-list counterpart to CopyIntakeLink, which only works
 // for a client that already exists.
+// THE LINK WAS NEVER SHOWN. 12 September 2026. Habib: Generate a client
+// addition link does not appear to work, when you click there is nowhere to
+// copy the link from.
+//
+// There was not. Pressing Generate created the link and quietly relabelled the
+// same button from Generate to Copy, so the only sign anything had happened
+// was one word changing on a button, and the address itself never appeared
+// anywhere. Pressing it again called the clipboard, which a browser is allowed
+// to refuse and always refuses on an insecure page, with nothing written to
+// catch that, so a refusal looked exactly like a working button.
+//
+// CopyLink is the component that already solves this everywhere else on the
+// platform: the address is always on screen, always selectable, and when the
+// browser refuses to copy it says so and selects the text instead.
 function NewIntakeLink(){
   const [token,setToken]=useState(null)
   const [creating,setCreating]=useState(false)
-  const [copied,setCopied]=useState(false)
   const [err,setErr]=useState('')
   async function generate(){
     setCreating(true); setErr('')
@@ -1034,19 +1049,23 @@ function NewIntakeLink(){
     else setErr(error?.message||'Could not create the link.')
     setCreating(false)
   }
-  function copy(){
-    if(!token)return
-    navigator.clipboard.writeText(`https://clearview.habibonifade.com/intake/${token}`).then(()=>{
-      setCopied(true); setTimeout(()=>setCopied(false),2000)
-    })
-  }
-  if(err) return <button style={addBtn(true,C.red)} onClick={generate} title={err}>⚠ Retry intake link</button>
-  if(token) return <button style={{...addBtn(true,copied?C.green:C.teal),...(copied?{color:C.green,borderColor:C.green}:{})}} onClick={copy}
-    title="Send this link to a prospective client. When they submit it, a new client is created automatically and appears under New submissions — no need to add the client first.">
-    {copied?'Copied!':'🔗 Copy Intake Link'}</button>
-  return <button style={addBtn(true,C.teal)} onClick={generate} disabled={creating}
-    title="Create a shareable link a prospective client fills in themselves. On submit it creates the client automatically — no need to add them first.">
-    {creating?'Creating link...':'🔗 Generate Intake Link'}</button>
+  if(token) return (
+    <div style={{flexBasis:'100%',minWidth:0,marginTop:'0.5rem'}}>
+      <CopyLink
+        url={`${typeof window==='undefined'?'':window.location.origin}/intake/${token}`}
+        label="The link for a prospective client"
+        hint="Send this to somebody who is not on the platform yet. When they fill it in and submit it, the client is created automatically and appears under New submissions, so there is no need to add them first."
+      />
+    </div>
+  )
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:'0.3rem'}}>
+      <button style={addBtn(true,err?C.red:C.teal)} onClick={generate} disabled={creating}
+        title="Create a shareable link a prospective client fills in themselves. On submit it creates the client automatically, so there is no need to add them first.">
+        {creating?'Creating link...':err?'⚠ Try the intake link again':'🔗 Generate Intake Link'}</button>
+      {err&&<span style={{fontSize:'0.82rem',color:C.red}}>{err}</span>}
+    </div>
+  )
 }
 
 const LRS_DIM_LABELS={marketOpportunity:'Market Opportunity',visibility:'Visibility',trust:'Trust',profitability:'Profitability',capacity:'Capacity',resilience:'Resilience',compliance:'Compliance'}

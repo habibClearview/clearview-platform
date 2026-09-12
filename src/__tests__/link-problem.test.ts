@@ -47,3 +47,48 @@ describe('a link that does not work says so', () => {
     expect(LP).toContain('if (!code) return null')
   })
 })
+
+// ============================================================
+// A LINK YOU CANNOT GET AT. 12 September 2026.
+//
+// Habib: the Generate a client addition link does not appear to work, when you
+// click there is nowhere to copy the link from.
+//
+// There was not. Pressing Generate created the link and relabelled the same
+// button from Generate to Copy, so the only sign anything had happened was one
+// word changing, and the address itself never appeared anywhere. Pressing it
+// again called the clipboard, which a browser may refuse and always refuses on
+// an insecure page, with nothing written to catch the refusal, so a browser
+// saying no looked exactly like a button that worked.
+// ============================================================
+describe('an intake link somebody has to send', () => {
+  const DASH = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
+
+  it('shows the address instead of hiding it behind a button', () => {
+    expect(DASH).toContain("import CopyLink from '@/components/common/CopyLink'")
+    expect(DASH).toContain('label="The link for a prospective client"')
+    expect(DASH).toContain('The data capture link for ${client.name}')
+  })
+
+  it('never calls the clipboard without catching a refusal', () => {
+    // CopyLink is the one place that handles it, by selecting the address and
+    // saying to copy it by hand.
+    const copy = fs.readFileSync('src/components/common/CopyLink.tsx', 'utf8')
+    expect(copy).toContain('catch {')
+    expect(copy).toContain('would not let the page copy for you')
+    expect(DASH).not.toContain('navigator.clipboard.writeText(`https://clearview.habibonifade.com/intake/')
+  })
+
+  it('builds the address from the site it is actually on', () => {
+    // It was pinned to clearview.habibonifade.com, so a link copied from
+    // staging sent the client to production and the other way round.
+    expect(DASH).toContain("${typeof window==='undefined'?'':window.location.origin}/intake/")
+    expect(DASH).not.toContain("'https://clearview.habibonifade.com/intake/")
+  })
+
+  it('says so when the link cannot be created', () => {
+    // The failure used to be swallowed whole, so a link that could not be made
+    // looked the same as one nobody had pressed for yet.
+    expect(DASH).toContain("setErr(error?.message||'The link could not be created.')")
+  })
+})

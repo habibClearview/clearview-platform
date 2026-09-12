@@ -325,6 +325,22 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
         }).eq('token', intakeToken)
       }
 
+      // THE LETTER THAT SAYS IT ARRIVED. 12 September 2026. Habib: I would
+      // also like a similar email sent to the Clearview financial model when a
+      // client is created. Nothing went at all, so somebody filled in a long
+      // form about their business, saw a thank you and then heard nothing.
+      //
+      // Deliberately outside the try that wraps the submission. Everything
+      // above is already saved by this point, so a mail server having a bad
+      // afternoon must not surface as "submission failed" and invite somebody
+      // to send the whole form a second time.
+      try {
+        await fetch('/api/client-welcome', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ clientId: client.id }),
+        })
+      } catch { /* the model is made either way */ }
+
       setSubmitted(true)
     } catch(e:any) {
       console.error('Intake submission failed:', e)

@@ -169,6 +169,18 @@ export default function SpreadsheetUpload({intakeToken,programmeId,existingClien
         } catch (e) { console.error('Catalogue ingest request errored (non-fatal):', e) }
       }
 
+      // THE LETTER THAT SAYS IT ARRIVED. 12 September 2026. The same one the
+      // intake form sends, because a client created from a spreadsheet is
+      // just as new to the platform as one who filled the form in. The route
+      // sends once per client and refuses afterwards, so loading a sheet into
+      // a client who already has their letter changes nothing.
+      try {
+        await fetch('/api/client-welcome', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ clientId }),
+        })
+      } catch { /* the model is saved either way */ }
+
       setCreated({ id: clientId, email: business.contact_email || '', name: business.contact_name || '' })
       setSubmitted(true)
       if (onSuccess) onSuccess(clientId)
