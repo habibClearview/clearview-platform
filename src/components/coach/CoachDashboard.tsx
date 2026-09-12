@@ -2398,7 +2398,28 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 
   // ── CLIENT DETAIL — 25 TABS ────────────────────────────────
   function ClientDetailView(){
-    if(!selClient)return<div style={{color:C.slate,padding:'2rem'}}>Client not found.</div>
+    // A DEAD END WITH NOTHING TO PRESS. 12 September 2026. Habib: there is a
+    // situation that I cannot return from a client's page to the coach's
+    // dashboard.
+    //
+    // This is the worst of them. An address carrying a client this person
+    // cannot see, or one that has been deleted, or a list that has not
+    // finished loading, printed four words on an empty page with no button, no
+    // breadcrumb and no navigation. The only way out was the browser's own
+    // back button or retyping the address.
+    if(!selClient)return(
+      <div style={{padding:'2rem',display:'flex',flexDirection:'column',gap:'0.8rem',alignItems:'flex-start'}}>
+        <div style={{color:C.slate}}>
+          That engagement is not on this list. It may have been removed, or it may belong to
+          somebody else.
+        </div>
+        <button
+          type="button"
+          onClick={()=>{setSelClientId(null);setView(isSuperCoach?'overview':'clients')}}
+          style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.93rem',color:C.teal,background:'transparent',border:`1px solid ${C.teal}`,borderRadius:4,cursor:'pointer',padding:'0.35rem 0.8rem'}}
+        >{isSuperCoach?'← Coach Dashboard':'← All clients'}</button>
+      </div>
+    )
     if(clientLoading&&selClient.engagement_mode==='canvas')return<Spinner/>
     const prog=programmes.find(p=>p.id===selClient.programme_id)
     const isCanvas=selClient.engagement_mode==='canvas'
@@ -2435,10 +2456,40 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 
     function printSection(){window.print()}
 
+    // ─── THE WAY OUT OF AN ENGAGEMENT ──────────────────────
+    //
+    // 12 September 2026. Habib: there is a situation that I cannot return from
+    // a client's page to the coach's dashboard, this should not be.
+    //
+    // There was a button, at the very top of the breadcrumb. An engagement
+    // page is thousands of pixels long, so the moment you scroll into the work
+    // it is gone, and the one thing that does follow you down the page, the
+    // sticky tab sidebar, had no way out in it. So from anywhere below the
+    // fold there was no way back.
+    //
+    // Two faults went with it. It left the engagement selected, so the address
+    // still read ?client=...&zone=..., and reloading or sharing that address
+    // put you straight back inside the engagement you had just left. And it
+    // always went to the Coach Dashboard, which is a page only a super coach
+    // has, so for a co-implementer it was a button to nowhere.
+    function leaveEngagement(){
+      setSelClientId(null)
+      setView(isSuperCoach?'overview':'clients')
+    }
+    const leaveLabel=isSuperCoach?'← Coach Dashboard':'← All clients'
+    const leaveButton=(
+      <button
+        type="button"
+        onClick={leaveEngagement}
+        title="Leave this engagement and go back"
+        style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem',whiteSpace:'nowrap'}}
+      >{leaveLabel}</button>
+    )
+
     if(!isCanvas) return(
       <div>
         <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'1rem',fontSize:'1.01rem',color:C.slate}}>
-          <button style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem'}} onClick={()=>setView('overview')}>← Coach Dashboard</button>
+          {leaveButton}
           <span>/</span><span style={{color:C.navy,fontWeight:600}}>{selClient.name}</span>
         </div>
         <div style={{...card,background:'var(--cv-header)',color:'var(--cv-on-accent)',marginBottom:'1.25rem'}}>
@@ -2507,7 +2558,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       <div>
         {/* Breadcrumb */}
         <div style={{display:'flex',alignItems:'center',gap:'0.75rem',marginBottom:'1rem',fontSize:'1.01rem',color:C.slate}}>
-          <button style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:C.slate,background:'transparent',border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',padding:'0.22rem 0.6rem'}} onClick={()=>setView('overview')}>← Coach Dashboard</button>
+          {leaveButton}
           <span>/</span><span style={{color:C.navy,fontWeight:600}}>{selClient.name}</span>
         </div>
 
@@ -2574,6 +2625,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               <label htmlFor="cv-phone-tab" style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.74rem',letterSpacing:'.1em',textTransform:'uppercase',color:C.slate,display:'block',marginBottom:'0.3rem'}}>
                 Where you are
               </label>
+              {/* On a phone the sidebar is this one control, so the way out
+                  sits beside it rather than only at the top of the page. */}
+              <div style={{marginBottom:'0.5rem'}}>{leaveButton}</div>
               <select
                 id="cv-phone-tab"
                 value={shownTab}
@@ -2597,6 +2651,17 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               sideways above the work, rather than 25 rows to scroll past
               before reaching anything. */}
           <div className="cv-client-nav" style={{display:onAPhone?'none':'block',background:C.white,border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',position:'sticky',top:'1rem'}}>
+            {/* THE WAY OUT, WHERE IT FOLLOWS YOU. 12 September 2026. This
+                sidebar is sticky, so it is the only thing still on screen once
+                somebody has scrolled into the work, and it had no way back in
+                it. The breadcrumb at the top of the page might as well not
+                exist from two thousand pixels down. */}
+            <button
+              type="button"
+              onClick={leaveEngagement}
+              title={isSuperCoach?'Back to the coach dashboard':'Back to all clients'}
+              style={{width:'100%',textAlign:navCollapsed?'center':'left',padding:'0.5rem 0.85rem',border:'none',borderBottom:`1px solid ${C.border}`,background:C.white,color:C.teal,cursor:'pointer',fontFamily:'var(--cv-font-mono)',fontSize:'0.9rem'}}
+            >{navCollapsed?'←':leaveLabel}</button>
             <button
               type="button"
               onClick={()=>setNavCollapsed(v=>!v)}
