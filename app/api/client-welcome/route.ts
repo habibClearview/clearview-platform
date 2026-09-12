@@ -79,35 +79,64 @@ export async function POST(req: NextRequest) {
     const hello = salutation(client.contact_name || undefined)
 
     const html = brandedEmail({
-      preheader: `${business} is set up on Clearview. Here is what happens next.`,
-      heading: 'Your Clearview model is being built',
+      brand: 'clearview',
+      preheader: `${business} is being set up on Clearview. Here is what you will have.`,
+      heading: 'Your Clearview is being set up',
       paragraphs: [
         ...(hello ? [hello] : []),
-        raw(`Thank you. The details you sent for <b>${escapeHtml(business)}</b> have arrived and your Clearview financial model has been created from them.`),
-        raw('<b>What Clearview is.</b>'),
+        raw(`Thank you. The details you sent for <b>${escapeHtml(business)}</b> have arrived, and Clearview is being set up for the business from them.`),
+        'Clearview is one place that holds your price list, everything your team sells and spends, and a full set of accounts built from it. Here is what you will have.',
+
+        raw('<b>Your price list.</b>'),
         ...[
-          'One place that holds your plan and what actually happened, side by side, month by month.',
-          'Your field team records a sale or a cost on a phone, and it lands in the same set of books rather than in a notebook somebody has to type up later.',
-          'It shows profit, cash and margin as they stand, so a decision about price, stock or credit rests on this month rather than on last year.',
+          'Everything you sell, product or service, with its price and its unit, whether that is a bag, a kilo or a session.',
+          'Your team picks an item from the list and says how much went. Nobody types a price in, so the same thing cannot be sold at two prices by two people.',
+          'What each item costs you to buy can be held against it, out of sight of your team, so your margin is worked out for you on every sale.',
         ].map((point) => raw(
           `<span style="color:#00767A;">&#9656;</span>&nbsp;&nbsp;${escapeHtml(point)}`,
         )),
+
+        raw('<b>A full set of accounts, compiled for you.</b>'),
+        ...[
+          'Profit and Loss, Cash Flow and Balance Sheet, built from what your team records as they record it.',
+          'No bookkeeping evening and no spreadsheet to reconcile at the end of the month.',
+          'Your plan and what actually happened sit side by side, month by month, so you can see where the business is against where you said it would be.',
+          'Figures a member of staff enters can be sent for approval before they count, so the books are not changed by accident.',
+        ].map((point) => raw(
+          `<span style="color:#00767A;">&#9656;</span>&nbsp;&nbsp;${escapeHtml(point)}`,
+        )),
+
+        raw('<b>Your field team, on any phone.</b>'),
+        ...[
+          'They record a sale by tapping the item and the quantity, with the customer, how it was paid for and which member of staff brought it in.',
+          'They record a cost the same way, including one they cannot put a name to, so the money is captured now and sorted later rather than forgotten.',
+          'They receive stock and see what is left, so what is on the shelf and what is in the books are the same number.',
+          'It keeps working with no signal. Everything waits on the phone and goes up the moment there is a connection.',
+          'The buttons read the words out loud, so somebody who does not read easily can still use it.',
+          'Each operator gets their own link, which opens on any phone. There is no app to install and no password to remember.',
+        ].map((point) => raw(
+          `<span style="color:#00767A;">&#9656;</span>&nbsp;&nbsp;${escapeHtml(point)}`,
+        )),
+
+        raw('<b>And the rest of the business as you need it.</b> Customers and marketing, staff with attendance and scorecards, deliveries and complaints, and stores and stock.'),
+
         raw('<b>What happens next.</b>'),
         ...[
           'Your coach checks the figures you sent and sets up your business units, your price list and your revenue categories.',
           'You are then sent your own sign in, with a link that opens your dashboard. There is nothing to install.',
-          'Field operators are set up after that. Each one gets their own link, which works on any phone.',
+          'Your field operators are set up after that, and each one is sent their own link.',
         ].map((point) => raw(
           `<span style="color:#00767A;">&#9656;</span>&nbsp;&nbsp;${escapeHtml(point)}`,
         )),
-        'You do not need to do anything for now. If a figure you sent was wrong or something has changed, reply to this email and say so before the model is finished, because it is far easier to correct at this stage.',
+
+        'You do not need to do anything for now. If a figure you sent was wrong or something has changed, reply to this email and say so before the setup is finished, because it is far easier to correct at this stage.',
       ],
       footNote: 'Sent by The Canvas Coach. Reply to this email if anything here is wrong.',
     })
 
     const sent = await sendEmail({
       to: [to],
-      subject: `${business}: your Clearview model is being built`,
+      subject: `${business}: your Clearview is being set up`,
       html,
     })
     if (!sent.sent) {

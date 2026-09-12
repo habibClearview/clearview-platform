@@ -48,8 +48,47 @@ describe('an unauthenticated caller cannot misuse it', () => {
 })
 
 describe('what the letter says', () => {
-  it('says what Clearview is and what happens next', () => {
-    expect(ROUTE).toContain('What Clearview is.')
+  // 12 September 2026. Habib: the name of the product is wrong, this is not
+  // Grant-to-Commercial Viability, this is the Clearview financial model. And
+  // the letter should talk about the features, the catalogue, the full
+  // accounts compiled, and what the field operators can do.
+  it('carries the Clearview name and not the Canvas one', () => {
+    const EMAIL = fs.readFileSync('src/lib/email.ts', 'utf8')
+    expect(ROUTE).toContain("brand: 'clearview'")
+    expect(EMAIL).toContain("clearview: {")
+    expect(EMAIL).toContain("eyebrow: 'Clearview'")
+    // Not to be confused with the Viability Model decision point, which is a
+    // block inside the Canvas and a different thing entirely.
+    expect(ROUTE).not.toContain('Grant-to-Commercial Viability')
+  })
+
+  it('leaves every existing letter on the Canvas banner', () => {
+    // The brand defaults, so no letter that never asked for one changes.
+    const EMAIL = fs.readFileSync('src/lib/email.ts', 'utf8')
+    expect(EMAIL).toContain("BRANDS[input.brand || 'canvas']")
+    expect(EMAIL).toContain("name: 'Grant-to-Commercial Viability'")
+  })
+
+  it('names the price list and what it is for', () => {
+    expect(ROUTE).toContain('Your price list.')
+    expect(ROUTE).toContain('the same thing cannot be sold at two prices')
+  })
+
+  it('names the accounts that get compiled', () => {
+    expect(ROUTE).toContain('A full set of accounts, compiled for you.')
+    expect(ROUTE).toContain('Profit and Loss, Cash Flow and Balance Sheet')
+  })
+
+  it('says what a field operator can actually do', () => {
+    expect(ROUTE).toContain('Your field team, on any phone.')
+    expect(ROUTE).toContain('They record a sale')
+    expect(ROUTE).toContain('They record a cost')
+    expect(ROUTE).toContain('receive stock')
+    expect(ROUTE).toContain('keeps working with no signal')
+    expect(ROUTE).toContain('read the words out loud')
+  })
+
+  it('says what happens next', () => {
     expect(ROUTE).toContain('What happens next.')
   })
 

@@ -136,6 +136,36 @@ export interface BrandedEmailInput {
   footNote?: EmailText
   /** The preview line shown beside the subject in an inbox. */
   preheader?: string
+  /**
+   * WHICH PRODUCT THE LETTER COMES FROM. 12 September 2026.
+   *
+   * Habib: the name of the product is wrong, this is not Grant-to-Commercial
+   * Viability, this is the Clearview financial model.
+   *
+   * Every letter this platform sends carried the Canvas banner, because until
+   * now every letter was about a Canvas engagement. A business whose Clearview
+   * model has just been built is not on the Canvas at all, and a banner naming
+   * a method they have never heard of is the first thing they read.
+   *
+   * Not to be confused with the Viability Model decision point, which is a
+   * block inside the Canvas and a different thing entirely.
+   */
+  brand?: BrandKey
+}
+
+type BrandKey = 'canvas' | 'clearview'
+
+const BRANDS: Record<BrandKey, { eyebrow: string; name: string; foot: string }> = {
+  canvas: {
+    eyebrow: 'The Canvas Coach',
+    name: 'Grant-to-Commercial Viability',
+    foot: 'Grant-to-Commercial Viability Canvas™ · The Canvas Coach · habibonifade.com',
+  },
+  clearview: {
+    eyebrow: 'Clearview',
+    name: 'The financial model for your business',
+    foot: 'Clearview · The Canvas Coach · habibonifade.com',
+  },
 }
 
 export function brandedEmail(input: BrandedEmailInput): string {
@@ -161,11 +191,12 @@ export function brandedEmail(input: BrandedEmailInput): string {
         '&#8203;&nbsp;'.repeat(60)
       }</div>`
     : ''
+  const brand = BRANDS[input.brand || 'canvas']
   return `${preheader}
     <div style="font-family:'Poppins','Segoe UI',Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">
       <div style="background:#1B2A41;padding:20px 24px;border-radius:8px 8px 0 0;border-bottom:3px solid #00CCCC;">
-        <p style="margin:0;font-size:12.5px;color:#00CCCC;letter-spacing:1px;text-transform:uppercase;">The Canvas Coach</p>
-        <p style="margin:4px 0 0;font-size:20px;color:#F5F0E8;font-family:'Poppins','Segoe UI',Helvetica,Arial,sans-serif;">Grant-to-Commercial Viability</p>
+        <p style="margin:0;font-size:12.5px;color:#00CCCC;letter-spacing:1px;text-transform:uppercase;">${escapeHtml(brand.eyebrow)}</p>
+        <p style="margin:4px 0 0;font-size:20px;color:#F5F0E8;font-family:'Poppins','Segoe UI',Helvetica,Arial,sans-serif;">${escapeHtml(brand.name)}</p>
       </div>
       <div style="background:#F5F0E8;padding:26px 24px;border-radius:0 0 8px 8px;border:1px solid #D8E0E8;border-top:none;color:#1B2A41;line-height:1.6;">
         <h1 style="font-family:'Poppins','Segoe UI',Helvetica,Arial,sans-serif;font-size:22px;font-weight:600;margin:0 0 14px;">${render(input.heading)}</h1>
@@ -173,7 +204,7 @@ export function brandedEmail(input: BrandedEmailInput): string {
         ${cta}
         ${foot}
       </div>
-      <p style="text-align:center;color:#8A94A0;font-size:12.5px;margin:16px 0 0;">Grant-to-Commercial Viability Canvas™ · The Canvas Coach · habibonifade.com</p>
+      <p style="text-align:center;color:#8A94A0;font-size:12.5px;margin:16px 0 0;">${escapeHtml(brand.foot)}</p>
     </div>`
 }
 
