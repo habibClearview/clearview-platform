@@ -80,11 +80,11 @@ export async function POST(req: NextRequest) {
 
     const html = brandedEmail({
       brand: 'clearview',
-      preheader: `${business} is being set up on Clearview. Here is what you will have.`,
-      heading: 'Your Clearview is being set up',
+      preheader: `Set up ${business} in Clearview. Here is what you will have.`,
+      heading: 'Set up your business in Clearview',
       paragraphs: [
         ...(hello ? [hello] : []),
-        raw(`Thank you. The details you sent for <b>${escapeHtml(business)}</b> have arrived, and Clearview is being set up for the business from them.`),
+        raw(`You are invited to set up <b>${escapeHtml(business)}</b> in Clearview.`),
         'Clearview is one place that holds your price list, everything your team sells and spends, and a full set of accounts built from it. Here is what you will have.',
 
         raw('<b>Your price list.</b>'),
@@ -122,21 +122,27 @@ export async function POST(req: NextRequest) {
 
         raw('<b>What happens next.</b>'),
         ...[
-          'Your coach checks the figures you sent and sets up your business units, your price list and your revenue categories.',
+          'Your business units, your price list and your revenue categories are set up from the details you sent.',
           'You are then sent your own sign in, with a link that opens your dashboard. There is nothing to install.',
           'Your field operators are set up after that, and each one is sent their own link.',
         ].map((point) => raw(
           `<span style="color:#00767A;">&#9656;</span>&nbsp;&nbsp;${escapeHtml(point)}`,
         )),
 
-        'You do not need to do anything for now. If a figure you sent was wrong or something has changed, reply to this email and say so before the setup is finished, because it is far easier to correct at this stage.',
+        // WHAT THEY ACTUALLY HAVE TO DO. 12 September 2026. Habib: it should
+        // be telling the receiver that the field operator just needs to start
+        // entering every sale and money spent on to the app for all the good
+        // things to happen. It ended by inviting a correction to the figures,
+        // which puts paperwork in front of somebody at the moment they should
+        // be told how little there is to do.
+        raw('<b>Then there is one thing to do.</b> Your field operators enter every sale and every amount spent into the app as it happens. Everything above follows from that, on its own, with nothing else to keep up.'),
       ],
-      footNote: 'Sent by The Canvas Coach. Reply to this email if anything here is wrong.',
+      footNote: 'Reply to this email if anything here is wrong.',
     })
 
     const sent = await sendEmail({
       to: [to],
-      subject: `${business}: your Clearview is being set up`,
+      subject: `${business}: set up your business in Clearview`,
       html,
     })
     if (!sent.sent) {

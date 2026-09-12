@@ -104,8 +104,31 @@ describe('what the letter says', () => {
     expect(ROUTE).toContain('preheader:')
   })
 
-  it('invites a correction while one is still cheap', () => {
-    expect(ROUTE).toContain('easier to correct at this stage')
+  // 12 September 2026. Habib: the first paragraph is wrong, it should say you
+  // are invited to set up your business in Clearview. Remove any reference to
+  // the coach. And the last sentence about wrong figures should not be there,
+  // it should tell the receiver that the field operator just needs to start
+  // entering every sale and money spent into the app for all the good things
+  // to happen.
+  it('opens by inviting them to set the business up', () => {
+    expect(ROUTE).toContain('You are invited to set up')
+    expect(ROUTE).not.toContain('The details you sent')
+  })
+
+  it('never mentions a coach, because the letter is from Clearview', () => {
+    const body = ROUTE.slice(ROUTE.indexOf('const html = brandedEmail({'), ROUTE.indexOf('const sent = await sendEmail({'))
+    expect(body).not.toMatch(/coach/i)
+    const EMAIL = fs.readFileSync('src/lib/email.ts', 'utf8')
+    expect(EMAIL).toContain("foot: 'Clearview · habibonifade.com'")
+  })
+
+  it('ends on the one thing they have to do', () => {
+    // It used to end by inviting a correction to the figures, which puts
+    // paperwork in front of somebody at the moment they should be told how
+    // little there is to do.
+    expect(ROUTE).toContain('Then there is one thing to do.')
+    expect(ROUTE).toContain('enter every sale and every amount spent into the app')
+    expect(ROUTE).not.toContain('easier to correct at this stage')
   })
 })
 

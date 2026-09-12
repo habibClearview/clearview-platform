@@ -164,7 +164,7 @@ const BRANDS: Record<BrandKey, { eyebrow: string; name: string; foot: string }> 
   clearview: {
     eyebrow: 'Clearview',
     name: 'The financial model for your business',
-    foot: 'Clearview · The Canvas Coach · habibonifade.com',
+    foot: 'Clearview · habibonifade.com',
   },
 }
 
