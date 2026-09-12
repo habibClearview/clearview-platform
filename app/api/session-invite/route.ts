@@ -27,6 +27,7 @@ import { getAdminClient, requireAccess, refuseAccess } from '@/lib/auth/api-auth
 import { buildIcs, sessionUid } from '@/lib/calendar'
 import { sendEmail, emailAvailable, brandedEmail, escapeHtml, raw } from '@/lib/email'
 import { cleanEmail, emailLooksSendable } from '@/lib/engagement-brief'
+import { PARTY_ROLE_LABELS } from '@/lib/engagement-types'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,10 +87,14 @@ export async function POST(req: NextRequest) {
     }
 
     const { data: parties } = await admin.from('engagement_parties')
-      .select('id,name,email').eq('client_id', session.client_id).in('id', partyIds)
+      .select('id,name,email,party_role').eq('client_id', session.client_id).in('id', partyIds)
 
     const recipients = (parties || [])
-      .map((p) => ({ name: p.name as string | null, email: cleanEmail(p.email || '') }))
+      .map((p) => ({
+        name: p.name as string | null,
+        email: cleanEmail(p.email || ''),
+        role: (PARTY_ROLE_LABELS as Record<string, string>)[p.party_role as string] || '',
+      }))
       .filter((p) => emailLooksSendable(p.email))
     const withoutAddress = (parties || [])
       .filter((p) => !emailLooksSendable(cleanEmail(p.email || '')))
@@ -133,18 +138,51 @@ export async function POST(req: NextRequest) {
       }, { status: 503 })
     }
 
+    // WHAT THE INVITATION HAS TO SAY. 12 September 2026. Habib: the email sent
+    // as an invite does not really tell the invitee anything about what the
+    // invitation is or what to do when they get in.
+    //
+    // It did not. It named the session and gave a link, which is enough for
+    // somebody who already knows what this platform is and has used it before.
+    // The people on these invitations are an Executive Director, a funder
+    // representative and a field team, most of whom have never opened it.
+    //
+    // Four things were missing and each one is a reason somebody does not turn
+    // up, or turns up and cannot be heard. Who is asking and what it is for.
+    // Who else will be in the room. What actually happens when they press the
+    // link, including that the browser will ask for the microphone and that
+    // saying no leaves them silent. And that the session may be recorded and
+    // written up, which somebody deserves to know before they arrive rather
+    // than when a consent box appears in front of the room.
+    const others = recipients
+      .map((r) => `${escapeHtml(r.name || r.email)}${r.role ? ` (${escapeHtml(r.role)})` : ''}`)
+    const inviter = access.fullName || 'The Canvas Coach'
+
     const html = brandedEmail({
+      preheader: `${whenInWords(session.planned_at, minutes)}. Open the link at the time, there is nothing to install.`,
       heading: title,
       paragraphs: [
-        raw(`You are invited to a session${client?.name ? ` with <b>${escapeHtml(client.name)}</b>` : ''}.`),
-        whenInWords(session.planned_at, minutes),
-        ...(session.purpose ? [String(session.purpose)] : []),
-        'The session is held on the platform. Open the link below at the time and you are in it. There is nothing to install and no second sign in.',
-        'The invitation is attached, so it can be accepted into your calendar.',
+        raw(`<b>${escapeHtml(inviter)}</b> has invited you to a session${
+          client?.name ? ` with <b>${escapeHtml(client.name)}</b>` : ''
+        } on the Grant-to-Commercial Viability Canvas.`),
+        raw(`<b>${escapeHtml(whenInWords(session.planned_at, minutes))}</b>`),
+        ...(session.purpose ? [raw(`<b>What it is for.</b> ${escapeHtml(String(session.purpose))}`)] : []),
+        ...(others.length > 1 ? [raw(`<b>Who will be there.</b> ${others.join(', ')}.`)] : []),
+        raw('<b>What happens when you press the link.</b>'),
+        ...[
+          'The session room opens in your browser. There is nothing to install and no second sign in.',
+          'Your browser asks to use your microphone, and your camera if there is video. Choose Allow, or the room cannot hear you.',
+          'A phone works as well as a laptop. Headphones help if somebody else is in the room with you.',
+          'The session may be recorded and written up as a transcript. You are asked in the room before any recording starts, and you can say no.',
+        ].map((point) => raw(
+          `<span style="color:#00767A;">&#9656;</span>&nbsp;&nbsp;${escapeHtml(point)}`,
+        )),
+        'Open the link a few minutes early so there is time to sort the microphone out. The same link works every time, so it is worth keeping.',
+        'The calendar invitation is attached, so it can be accepted straight into your diary.',
       ],
       ctaLabel: 'Open the session',
       ctaUrl: url,
-      footNote: `Sent by ${access.fullName || 'The Canvas Coach'}.`,
+      footNote: raw(`Sent by ${escapeHtml(inviter)}. If you cannot make it, reply to this email and say so.`),
     })
 
     const sent = await sendEmail({

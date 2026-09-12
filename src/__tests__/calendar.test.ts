@@ -177,6 +177,39 @@ describe('sending the invitation', () => {
     expect(PLANNER).toContain('Add them under Who is on it, and settings, and they appear here to tick.')
   })
 
+  // WHAT THE INVITATION HAS TO SAY. 12 September 2026. Habib: the email sent
+  // as an invite does not really tell the invitee anything about what the
+  // invitation is or what to do when they get in. It named the session and
+  // gave a link, which is enough only for somebody who has used the platform
+  // before. Most people on these invitations never have.
+  it('says who is asking and what the session is for', () => {
+    expect(ROUTE).toContain('has invited you to a session')
+    expect(ROUTE).toContain('Grant-to-Commercial Viability Canvas')
+    expect(ROUTE).toContain('What it is for.')
+  })
+
+  it('says who else will be in the room', () => {
+    expect(ROUTE).toContain('Who will be there.')
+    expect(ROUTE).toContain('PARTY_ROLE_LABELS')
+  })
+
+  it('warns about the microphone, because saying no leaves somebody silent', () => {
+    expect(ROUTE).toContain('What happens when you press the link.')
+    expect(ROUTE).toContain('Choose Allow, or the room cannot hear you')
+  })
+
+  it('says a recording may be made before somebody arrives, not when the box appears', () => {
+    // Consent asked in front of a room is a worse moment to hear it for the
+    // first time than an email days earlier.
+    expect(ROUTE).toContain('may be recorded and written up as a transcript')
+    expect(ROUTE).toContain('you can say no')
+  })
+
+  it('gives the inbox a preview line of its own', () => {
+    // Without one, Gmail previews the first body text instead of the time.
+    expect(ROUTE).toContain('preheader:')
+  })
+
   it('takes manage rights', () => {
     expect(ROUTE).toContain('Only the coaching team can send a session invitation')
   })
