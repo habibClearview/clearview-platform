@@ -85,7 +85,17 @@ export default function FieldCapturePage() {
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string|null>(null)
   const [lastSync, setLastSync] = useState<string|null>(null)
-  const [mode, setMode] = useState<'grid'|'sale-detail'|'cost-form'|'history'|'stock'>('grid')
+  const [mode, setMode] = useState<'grid'|'sale-detail'|'cost-form'|'history'|'stock'|'new-item'>('grid')
+  // ADDING AN ITEM FROM THE PHONE. 12 September 2026. Habib: it should be
+  // both, able to add on the phone and the laptop. An operator holds a link
+  // rather than a login, so what they may do is read off their own record
+  // rather than off a user account, and asked for once when the app opens.
+  const [catRights, setCatRights] = useState<{canAddProducts:boolean;canAddPictures:boolean;categories:{id:string;name:string}[]}>({canAddProducts:false,canAddPictures:false,categories:[]})
+  const [newItem, setNewItem] = useState({name:'',item_type:'product',unit_label:'',plan_line_id:'',attributes:[] as {label:string;value:string}[]})
+  const [newItemPhoto, setNewItemPhoto] = useState<File|null>(null)
+  const [newItemBusy, setNewItemBusy] = useState(false)
+  const [newItemNote, setNewItemNote] = useState('')
+  const [newItemErr, setNewItemErr] = useState('')
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState('')
@@ -229,6 +239,7 @@ export default function FieldCapturePage() {
       // IndexedDB so the Background Sync handler in public/field-sw.js can
       // authenticate a sync that happens while this tab is closed.
       setStoredToken(t).catch(()=>{})
+      loadCatalogueRights(t)
     } catch {
       setAuthError('No connection right now. If you have used this link before on this phone, your data is still saved -- try again once you have signal.')
     }
@@ -248,6 +259,7 @@ export default function FieldCapturePage() {
     setSelectedItem(item)
     setEditingSaleId(null)
     setSaleForm({quantity:'', payment_method:'cash', customer_id:'', segment_id:'', referred_by_staff_id:'', notes:'', override:false, override_price:String(item.price)})
+    setNewItemNote(''); setNewItemErr('')
     setMode('sale-detail')
   }
 
@@ -532,13 +544,113 @@ export default function FieldCapturePage() {
 
   const pendingCount = salesQueue.length + costsQueue.length + uncategorizedCostsQueue.length
   const searchLower = search.trim().toLowerCase()
-  const products = auth.catalogue.filter(c=>c.item_type==='product' && (!searchLower || c.name.toLowerCase().includes(searchLower)))
-  const services = auth.catalogue.filter(c=>c.item_type==='service' && (!searchLower || c.name.toLowerCase().includes(searchLower)))
+  // SEARCHING BY A DETAIL, NOT ONLY BY A NAME. 12 September 2026. Two sacks of
+  // the same brand in 50kg and 25kg often share a name, so somebody looking
+  // for the 25kg one had nothing to type. The details are searched too.
+  const matches = (c:CatalogueItem) => !searchLower
+    || c.name.toLowerCase().includes(searchLower)
+    || attributeLine(c.attributes).toLowerCase().includes(searchLower)
+    || (c.attributes||[]).some(a=>String(a?.label||'').toLowerCase().includes(searchLower))
+  const products = auth.catalogue.filter(c=>c.item_type==='product' && matches(c))
+  const services = auth.catalogue.filter(c=>c.item_type==='service' && matches(c))
   const tiles = [...products, ...services]  // products first, then services
 
   const currency = auth.client.currency
   const effectivePrice = selectedItem ? (saleForm.override ? Number(saleForm.override_price||0) : selectedItem.price) : 0
   const qtyNum = Number(saleForm.quantity||0)
+
+  /**
+   * What this operator has been given permission to do with the catalogue.
+   *
+   * Asked for once, when the app opens and there is a connection. It fails
+   * quietly: an operator with no signal simply does not see the Add button,
+   * which is better than a button that cannot work.
+   */
+  async function loadCatalogueRights(t:string) {
+    try {
+      const res = await fetch(`/api/field/catalogue?token=${encodeURIComponent(t)}`)
+      if (!res.ok) return
+      const data = await res.json()
+      setCatRights({
+        canAddProducts: !!data.canAddProducts,
+        canAddPictures: !!data.canAddPictures,
+        categories: data.categories || [],
+      })
+    } catch { /* no signal, no button */ }
+  }
+
+  /**
+   * Make a photograph small enough to send over a weak connection.
+   *
+   * A raw phone photo is three to eight megabytes. These are cheap phones on
+   * metered data where the signal comes and goes, so sending the original is
+   * the difference between a picture that uploads and one that is abandoned.
+   * If any of this fails the original goes instead of nothing.
+   */
+  async function shrinkPhoto(file:File): Promise<File> {
+    try {
+      if (!file?.type?.startsWith?.('image/')) return file
+      const bitmap = await createImageBitmap(file)
+      const scale = Math.min(1, 900 / Math.max(bitmap.width, bitmap.height))
+      const w = Math.max(1, Math.round(bitmap.width*scale))
+      const h = Math.max(1, Math.round(bitmap.height*scale))
+      const canvas = document.createElement('canvas')
+      canvas.width = w; canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return file
+      ctx.drawImage(bitmap, 0, 0, w, h)
+      const blob: Blob|null = await new Promise(r=>canvas.toBlob(r,'image/jpeg',0.82))
+      if (!blob || blob.size >= file.size) return file
+      return new File([blob],'photo.jpg',{type:'image/jpeg'})
+    } catch { return file }
+  }
+
+  /**
+   * Send the new item up.
+   *
+   * Deliberately NOT queued for later like a sale is. A sale is a fact that
+   * already happened and must survive a dead signal; a new catalogue item is
+   * something somebody is setting up, and telling them it is saved when it is
+   * sitting on the phone would be a lie they find out about days later.
+   */
+  async function submitNewItem() {
+    if (!newItem.name.trim()) { setNewItemErr('Give it a name first.'); return }
+    if (!newItem.plan_line_id) { setNewItemErr('Choose what kind of sale this is.'); return }
+    setNewItemBusy(true); setNewItemErr(''); setNewItemNote('')
+    try {
+      const form = new FormData()
+      form.append('token', token || '')
+      form.append('name', newItem.name.trim())
+      form.append('item_type', newItem.item_type)
+      form.append('unit_label', newItem.unit_label)
+      form.append('plan_line_id', newItem.plan_line_id)
+      form.append('attributes', JSON.stringify(newItem.attributes.filter(a=>a.label&&a.value)))
+      if (newItemPhoto) form.append('file', await shrinkPhoto(newItemPhoto))
+      const res = await fetch('/api/field/catalogue', { method:'POST', body: form })
+      const data = await res.json().catch(()=>({}))
+      if (!res.ok) throw new Error(data?.error || 'It could not be added. Try again once you have signal.')
+      setNewItem({name:'',item_type:'product',unit_label:'',plan_line_id:'',attributes:[]})
+      setNewItemPhoto(null)
+      setNewItemNote(data.message || 'Added.')
+    } catch(e:any) { setNewItemErr(e.message) }
+    setNewItemBusy(false)
+  }
+
+  /** Photograph an item that is already on the price list. */
+  async function photographItem(item:CatalogueItem, file:File) {
+    setNewItemBusy(true); setNewItemErr(''); setNewItemNote('')
+    try {
+      const form = new FormData()
+      form.append('token', token || '')
+      form.append('itemId', item.id)
+      form.append('file', await shrinkPhoto(file))
+      const res = await fetch('/api/field/catalogue', { method:'POST', body: form })
+      const data = await res.json().catch(()=>({}))
+      if (!res.ok) throw new Error(data?.error || 'The picture could not be saved.')
+      setNewItemNote('Picture saved. It shows the next time the app opens.')
+    } catch(e:any) { setNewItemErr(e.message) }
+    setNewItemBusy(false)
+  }
 
   // Speaker button used next to labels for low-literacy operators.
   const speaker = (text:string) => (
@@ -605,7 +717,7 @@ export default function FieldCapturePage() {
           <div>
             <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',letterSpacing:'0.12em',color:D.cyan}}>CLEARVIEW FIELD</div>
             <div style={{fontFamily:'var(--cv-font)',fontSize:'2rem',fontWeight:700,marginTop:'0.1rem',lineHeight:1.1}}>
-              {mode==='history'?'History':mode==='stock'?'Stock':'Record'}
+              {mode==='history'?'History':mode==='stock'?'Stock':mode==='new-item'?'Something new':'Record'}
             </div>
             <div style={{fontSize:'0.92rem',color:D.muted,marginTop:'0.25rem'}}>{auth.operator.display_name} · {auth.unit.name}</div>
           </div>
@@ -748,7 +860,7 @@ export default function FieldCapturePage() {
                 </div>
                 <input
                   style={{...inp,marginBottom:'0.9rem'}}
-                  placeholder="🔍 Search products or services..."
+                  placeholder="🔍 Search by name, size or colour..."
                   aria-label="Search products or services"
                   value={search} onChange={e=>setSearch(e.target.value)}
                 />
@@ -775,6 +887,18 @@ export default function FieldCapturePage() {
                       ? `No products or services match "${search}".`
                       : 'No products or services set up for this unit yet. Ask your CEO or Finance Manager to add them to the Catalogue.'}
                   </div>
+                )}
+
+                {/* ADDING ONE FROM HERE. 12 September 2026. Habib: it should be
+                    both, able to add on the phone and the laptop. Only shown to
+                    an operator who has been given the permission. */}
+                {catRights.canAddProducts && (
+                  <button type="button" onClick={()=>{setMode('new-item');setNewItemErr('');setNewItemNote('')}}
+                    style={{width:'100%',padding:'0.85rem',background:'transparent',color:D.cyan,
+                      border:`1px dashed ${D.cyan}`,borderRadius:14,fontSize:'0.98rem',fontWeight:700,
+                      cursor:'pointer',marginBottom:'1.25rem'}}>
+                    + Something new that is not on this list
+                  </button>
                 )}
               </>
             ) : (
@@ -846,6 +970,27 @@ export default function FieldCapturePage() {
                   {selectedItem.name} sale {speaker(`${selectedItem.name} sale`)}
                 </div>
                 <div style={{fontSize:'0.92rem',color:D.cyan,marginTop:'0.2rem'}}>Money in</div>
+                {attributeLine(selectedItem.attributes) && (
+                  <div style={{fontSize:'0.85rem',color:D.muted,marginTop:'0.15rem'}}>{attributeLine(selectedItem.attributes)}</div>
+                )}
+                {/* PHOTOGRAPHING WHAT IS IN FRONT OF YOU. 12 September 2026.
+                    An operator holding the picture right is standing with the
+                    item in their hands at exactly this moment, which is the
+                    only moment the photograph is easy to take. */}
+                {catRights.canAddPictures && (
+                  <>
+                    <label htmlFor="sd-photo" style={{display:'inline-flex',alignItems:'center',gap:'0.35rem',
+                      marginTop:'0.4rem',background:'transparent',border:`1px solid ${D.border}`,borderRadius:10,
+                      padding:'0.3rem 0.6rem',fontSize:'0.82rem',color:D.cyan,cursor:'pointer'}}>
+                      📷 {selectedItem.image_url ? 'Change the photo' : 'Add a photo of this'}
+                    </label>
+                    <input id="sd-photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"
+                      style={{display:'none'}} disabled={newItemBusy}
+                      onChange={e=>{const f=e.target.files?.[0]; e.target.value=''; if(f) photographItem(selectedItem,f)}}/>
+                    {newItemNote && <div style={{fontSize:'0.82rem',color:'var(--cv-green-text)',marginTop:'0.3rem'}}>{newItemNote}</div>}
+                    {newItemErr && <div style={{fontSize:'0.82rem',color:'var(--cv-red-text)',marginTop:'0.3rem'}}>{newItemErr}</div>}
+                  </>
+                )}
               </div>
               <button onClick={()=>{setMode('grid');setSelectedItem(null);setEditingSaleId(null)}}
                 aria-label="Close" style={{background:D.bg2,border:'none',color:D.text,width:40,height:40,borderRadius:12,fontSize:'1.3rem',cursor:'pointer',flexShrink:0,lineHeight:1}}>×</button>
@@ -964,6 +1109,96 @@ export default function FieldCapturePage() {
                 {entry.price_alert && <div style={{fontSize:'0.8rem',color:D.amber,marginTop:'0.4rem'}}>⚠ Price was overridden from the standard catalogue price</div>}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ================= SOMETHING NEW ================= */}
+        {mode==='new-item' && (
+          <div>
+            <div style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'1.05rem',fontWeight:700,marginBottom:'0.25rem'}}>
+              Something new {speaker('Something new')}
+            </div>
+            <div style={{fontSize:'0.86rem',color:D.muted,lineHeight:1.4,marginBottom:'0.9rem'}}>
+              Add it here and it goes on the price list. It cannot be sold until the price is set,
+              which is done for you.
+            </div>
+
+            <div style={cardStyle}>
+              <label htmlFor="ni-name" style={{display:'block',fontSize:'0.86rem',fontWeight:700,marginBottom:'0.3rem'}}>
+                What is it called?
+              </label>
+              <input id="ni-name" style={{...inp,marginBottom:'0.9rem'}} value={newItem.name}
+                placeholder="e.g. Maize, 90kg bag"
+                onChange={e=>setNewItem(f=>({...f,name:e.target.value}))}/>
+
+              <label htmlFor="ni-kind" style={{display:'block',fontSize:'0.86rem',fontWeight:700,marginBottom:'0.3rem'}}>
+                What kind of sale is it?
+              </label>
+              <select id="ni-kind" style={{...inp,marginBottom:'0.9rem'}} value={newItem.plan_line_id}
+                onChange={e=>setNewItem(f=>({...f,plan_line_id:e.target.value}))}>
+                <option value="">Choose one...</option>
+                {catRights.categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+
+              <label htmlFor="ni-unit" style={{display:'block',fontSize:'0.86rem',fontWeight:700,marginBottom:'0.3rem'}}>
+                Sold by the what? (optional)
+              </label>
+              <input id="ni-unit" style={{...inp,marginBottom:'0.9rem'}} value={newItem.unit_label}
+                placeholder="bag, kg, litre, session"
+                onChange={e=>setNewItem(f=>({...f,unit_label:e.target.value}))}/>
+
+              <div style={{fontSize:'0.86rem',fontWeight:700,marginBottom:'0.3rem'}}>Details (optional)</div>
+              <div style={{fontSize:'0.8rem',color:D.muted,lineHeight:1.35,marginBottom:'0.5rem'}}>
+                Size, colour, brand. This is what tells it apart from one that looks the same.
+              </div>
+              {newItem.attributes.map((a,i)=>(
+                <div key={i} style={{display:'flex',gap:'0.4rem',marginBottom:'0.4rem'}}>
+                  <input style={{...inp,marginBottom:0,flex:1,minWidth:0}} placeholder="Size" value={a.label}
+                    aria-label="Detail name"
+                    onChange={e=>setNewItem(f=>({...f,attributes:f.attributes.map((x,j)=>j===i?{...x,label:e.target.value}:x)}))}/>
+                  <input style={{...inp,marginBottom:0,flex:1,minWidth:0}} placeholder="90kg" value={a.value}
+                    aria-label="Detail"
+                    onChange={e=>setNewItem(f=>({...f,attributes:f.attributes.map((x,j)=>j===i?{...x,value:e.target.value}:x)}))}/>
+                  <button type="button" aria-label="Remove this detail"
+                    onClick={()=>setNewItem(f=>({...f,attributes:f.attributes.filter((_,j)=>j!==i)}))}
+                    style={{background:D.bg2,border:`1px solid ${D.border}`,borderRadius:10,color:D.muted,width:40,flexShrink:0,cursor:'pointer'}}>×</button>
+                </div>
+              ))}
+              {newItem.attributes.length < 6 && (
+                <button type="button" onClick={()=>setNewItem(f=>({...f,attributes:f.attributes.concat([{label:'',value:''}])}))}
+                  style={{background:'transparent',border:`1px solid ${D.border}`,borderRadius:10,color:D.cyan,
+                    padding:'0.4rem 0.8rem',fontSize:'0.86rem',cursor:'pointer',marginBottom:'0.9rem'}}>
+                  + Add a detail
+                </button>
+              )}
+
+              {catRights.canAddPictures && (
+                <div style={{marginTop:'0.5rem',marginBottom:'0.9rem'}}>
+                  <label htmlFor="ni-photo" style={{display:'flex',alignItems:'center',gap:'0.6rem',
+                    background:D.bg2,border:`1px dashed ${D.cyan}`,borderRadius:12,padding:'0.75rem',cursor:'pointer'}}>
+                    <span style={{fontSize:'1.6rem'}}>📷</span>
+                    <span style={{fontSize:'0.9rem',fontWeight:700,color:D.cyan}}>
+                      {newItemPhoto ? 'Photo ready. Tap to take another.' : 'Take a photo of it'}
+                    </span>
+                  </label>
+                  <input id="ni-photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"
+                    style={{display:'none'}} onChange={e=>{setNewItemPhoto(e.target.files?.[0]||null); e.target.value=''}}/>
+                </div>
+              )}
+
+              {newItemErr && <div style={{background:D.redDim,border:`1px solid ${D.red}`,borderRadius:12,padding:'0.7rem',color:'var(--cv-red-text)',fontSize:'0.88rem',marginBottom:'0.7rem'}}>{newItemErr}</div>}
+              {newItemNote && <div style={{background:D.bg2,border:`1px solid ${D.green}`,borderRadius:12,padding:'0.7rem',color:'var(--cv-green-text)',fontSize:'0.88rem',marginBottom:'0.7rem'}}>{newItemNote}</div>}
+
+              <button type="button" style={{...primaryBtnStyle,opacity:newItemBusy?0.6:1}}
+                disabled={newItemBusy} onClick={submitNewItem}>
+                {newItemBusy?'Sending...':'Add it to the price list'}
+              </button>
+              <button type="button" onClick={()=>setMode('grid')}
+                style={{width:'100%',padding:'0.85rem',marginTop:'0.6rem',background:'transparent',
+                  color:D.muted,border:`1px solid ${D.border}`,borderRadius:14,fontSize:'0.95rem',cursor:'pointer'}}>
+                Done
+              </button>
+            </div>
           </div>
         )}
 

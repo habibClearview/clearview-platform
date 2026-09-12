@@ -4258,6 +4258,24 @@ function FieldOperatorManager({clientId,config,P}) {
                 )}
               </div>
             </div>
+
+            {/* THE CATALOGUE RIGHTS, ON AN OPERATOR. 12 September 2026. Habib:
+                let adding a photo or product be a right or permission that can
+                be assigned to a field operator. An operator has no login, so
+                they are granted here rather than in Team. Neither carries any
+                right to set a price. */}
+            {(P.canManageTeam||P.canManageCatalogue)&&(
+              <div style={{marginTop:'0.6rem',paddingTop:'0.6rem',borderTop:`1px solid ${C.border}`}}>
+                <OperatorCatalogueRight operator={op} field="can_add_catalogue_products"
+                  label="Can add something new to the price list"
+                  note={`From their own phone. It is held as "${NEEDS_PRICE_LABEL}" and cannot be sold until you set one.`}
+                  setOperators={setOperators} notify={notify}/>
+                <OperatorCatalogueRight operator={op} field="can_add_catalogue_pictures"
+                  label="Can photograph an item"
+                  note="Takes a photo of something already on the price list. Changes nothing else about it."
+                  setOperators={setOperators} notify={notify}/>
+              </div>
+            )}
             {latestToken&&(
               <div style={{marginTop:'0.6rem',fontSize:'0.96rem',color:C.slate,fontFamily: 'var(--cv-font-mono)',wordBreak:'break-all'}}>
                 {fieldLink(latestToken.token)}
@@ -4351,6 +4369,43 @@ function SegmentManager({clientId,config,P}) {
         )
       })}
     </div>
+  )
+}
+
+/**
+ * One grantable catalogue right, on one field operator's card.
+ *
+ * An operator holds a link rather than a login, so their rights live on their
+ * own record. The write goes through the operators route, which checks that
+ * the caller may manage this business's operators, rather than straight at the
+ * table from the browser.
+ */
+function OperatorCatalogueRight({operator, field, label, note, setOperators, notify}:any){
+  const [busy,setBusy]=useState(false)
+  return (
+    <label style={{display:'flex',alignItems:'flex-start',gap:'0.4rem',fontSize:'1.0rem',color:C.slate,marginTop:'0.3rem',cursor:busy?'wait':'pointer'}}>
+      <input type="checkbox" disabled={busy} checked={!!operator[field]} style={{marginTop:'0.28rem'}}
+        onChange={async e=>{
+          const next=e.target.checked
+          setBusy(true)
+          setOperators((os:any[])=>os.map(x=>x.id!==operator.id?x:{...x,[field]:next}))
+          try {
+            const res=await authedFetch('/api/field/admin/operators',{
+              method:'PATCH', headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({operator_id:operator.id, [field]:next}),
+            })
+            if(!res.ok) throw new Error('refused')
+          } catch {
+            setOperators((os:any[])=>os.map(x=>x.id!==operator.id?x:{...x,[field]:!next}))
+            notify('Could not save that permission change. Please check your connection and try again.')
+          }
+          setBusy(false)
+        }}/>
+      <span>
+        {label}
+        <span style={{display:'block',fontSize:'0.92rem',color:C.slate,opacity:0.85}}>{note}</span>
+      </span>
+    </label>
   )
 }
 

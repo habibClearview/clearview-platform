@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json()
-    const { operator_id, active, issue_new_token, expires_in_days } = body
+    const { operator_id, active, issue_new_token, expires_in_days, can_add_catalogue_products, can_add_catalogue_pictures } = body
     if (!operator_id) return NextResponse.json({ error: 'operator_id required' }, { status: 400 })
 
     const supabase = getSupabase()
@@ -128,6 +128,25 @@ export async function PATCH(req: NextRequest) {
       const { error } = await supabase
         .from('field_operators')
         .update({ active: !!active, updated_at: new Date().toISOString() })
+        .eq('id', operator_id)
+      if (error) throw error
+    }
+
+    // THE CATALOGUE RIGHTS, ON AN OPERATOR. 12 September 2026. Habib: let
+    // adding a photo or product be a right or permission that can be assigned
+    // to a field operator. An operator has no login, so the rights live on
+    // their own record rather than on a user account, and are granted here.
+    //
+    // Neither carries any right to set a price. An item an operator adds is
+    // marked as needing one and cannot be sold until somebody who may price it
+    // does, which is the rule the whole catalogue rests on.
+    const rights: Record<string, any> = {}
+    if (can_add_catalogue_products !== undefined) rights.can_add_catalogue_products = !!can_add_catalogue_products
+    if (can_add_catalogue_pictures !== undefined) rights.can_add_catalogue_pictures = !!can_add_catalogue_pictures
+    if (Object.keys(rights).length) {
+      const { error } = await supabase
+        .from('field_operators')
+        .update({ ...rights, updated_at: new Date().toISOString() })
         .eq('id', operator_id)
       if (error) throw error
     }
