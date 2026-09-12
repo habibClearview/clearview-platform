@@ -386,6 +386,22 @@ describe('deleting a recording', () => {
   it('asks first, because it cannot be undone', () => {
     expect(PANEL).toContain('This cannot be undone')
   })
+
+  it('can be deleted where the recording actually is, on its session', () => {
+    // 12 September 2026. The button existed, but on the list at the bottom,
+    // and that list was narrowed the day before to recordings with no session.
+    // So every recording made in a session lost the only way to delete it, on
+    // the same day it was moved onto the session card.
+    const PLAN = fs.readFileSync('src/components/gtcv/SessionPlanner.tsx', 'utf8')
+    expect(PLAN).toContain('async function removeRecording(rec)')
+    expect(PLAN).toContain("method: 'DELETE'")
+    expect(PLAN).toContain('The audio, the transcript and any signatures on it go with it')
+  })
+
+  it('offers it only to somebody who may manage the engagement', () => {
+    const PLAN = fs.readFileSync('src/components/gtcv/SessionPlanner.tsx', 'utf8')
+    expect(PLAN).toContain('{canManage && (\n                <button\n                  type="button"\n                  onClick={() => removeRecording(rec)}')
+  })
 })
 
 describe('one list of the people, not two', () => {

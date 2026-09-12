@@ -388,6 +388,7 @@ export default function SessionPlanner({ clientId, canManage }) {
   // bottom, by the time you do a lot of sessions it would be too cluttered.
   // Agreed on 10 September and not built until now.
   const [recordings, setRecordings] = useState([])
+  const [recBusy, setRecBusy] = useState(null)
   const [inviteBusy, setInviteBusy] = useState(null)
   const [inviteNote, setInviteNote] = useState({})
   const [loading, setLoading] = useState(true)
@@ -578,6 +579,34 @@ export default function SessionPlanner({ clientId, canManage }) {
    * nobody said otherwise is worse than sending nothing. Anybody attending
    * without an address is named, so it can be fixed rather than wondered about.
    */
+  /**
+   * Delete a recording made in this session.
+   *
+   * It asks first and it says what goes: a recording is the only copy of what
+   * somebody said, and the transcript and any signatures on it go with the
+   * audio, because all three are about a conversation that will no longer
+   * exist.
+   */
+  async function removeRecording(rec) {
+    if (typeof window !== 'undefined' && !window.confirm(
+      `Delete this recording?\n\n${rec.heading}, ${recWhen(rec.started_at)}\n\nThe audio, the transcript and any signatures on it go with it. This cannot be undone.`,
+    )) return
+    setRecBusy(rec.id); setErr(null)
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      const res = await fetch('/api/session-recording', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ recordingId: rec.id }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || `It could not be deleted (${res.status})`)
+      setRecordings((prev) => prev.filter((x) => x.id !== rec.id))
+    } catch (e) { setErr(e.message) }
+    setRecBusy(null)
+  }
+
   async function sendInvite(session) {
     setInviteBusy(session.id)
     setInviteNote((prev) => ({ ...prev, [session.id]: null }))
@@ -1089,10 +1118,28 @@ export default function SessionPlanner({ clientId, canManage }) {
                   : rec.status === 'opening' ? 'Recording now' : 'Not transcribed yet'}
               </span>
             </div>
-            <div style={hint}>
-              {rec.who.length
-                ? `Who was on it: ${rec.who.map((w) => `${w.name}${w.ok ? '' : ' (their device failed)'}`).join(', ')}.`
-                : 'No device recorded on this one.'}
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'baseline', flexWrap: 'wrap' }}>
+              <span style={hint}>
+                {rec.who.length
+                  ? `Who was on it: ${rec.who.map((w) => `${w.name}${w.ok ? '' : ' (their device failed)'}`).join(', ')}.`
+                  : 'No device recorded on this one.'}
+              </span>
+              {/* DELETING ONE, WHERE IT IS. 12 September 2026. Habib: there
+                  appears to be no delete button next to the recording, there
+                  may be a brief recording that does not require keeping. The
+                  button existed, but on the list at the bottom, and that list
+                  was narrowed yesterday to recordings with no session. So
+                  every recording made in a session lost the only way to
+                  delete it, the same day it was moved here. */}
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => removeRecording(rec)}
+                  disabled={recBusy === rec.id}
+                  style={{ ...delBtn, marginLeft: 'auto' }}
+                  title="Delete this recording, its transcript and its audio"
+                >{recBusy === rec.id ? 'Deleting...' : 'Delete'}</button>
+              )}
             </div>
           </div>
         ))}
