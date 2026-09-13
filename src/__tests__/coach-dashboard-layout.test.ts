@@ -228,6 +228,30 @@ describe('the welcome letter to a co-implementer', () => {
     }
   })
 
+  it('a database that will not answer never sends the generated letter instead', () => {
+    // CodeRabbit: any error at all used to select the generated letter, so a
+    // timeout would post the generated words in place of the coach's own AND
+    // claim the one send that is allowed. Only the table genuinely not
+    // existing yet is forgiven.
+    expect(LETTER).toContain('const tableNotThereYet =')
+    expect(LETTER).toContain('if (!tableNotThereYet) {')
+    expect(LETTER).toContain('return { ok: false }')
+    expect(LETTER).toContain('if (!read.ok) return LETTER_UNREADABLE')
+    // And the refusal comes before anything is claimed or sent.
+    expect(LETTER.indexOf('if (!read.ok) return LETTER_UNREADABLE'))
+      .toBeLessThan(LETTER.indexOf('.is(\'welcome_sent_at\', null)'))
+  })
+
+  it('what is typed while it saves is still there afterwards', () => {
+    expect(DASH).toContain('setDraft(current=>current===text?data.text:current)')
+    expect(DASH).toContain("disabled={busy==='save'}")
+  })
+
+  it('the letter box can be read out and does not shrink on a phone', () => {
+    expect(DASH).toContain('aria-label="The welcome letter sent to a new co-implementer"')
+    expect(DASH).toContain("fontSize:'1rem'")
+  })
+
   it('reading and saving it are held to a sensible number of knocks', () => {
     expect(LETTER).toContain("requireSuperCoach(req, admin, 'co-implementer-letter:read')")
     expect(LETTER).toContain("requireSuperCoach(req, admin, 'co-implementer-letter:save')")

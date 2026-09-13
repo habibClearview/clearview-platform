@@ -829,13 +829,19 @@ function CoImplementerLetterPanel(){
     }catch(e){setErr(e.message)}
     setBusy(null)
   }
+  // WHAT SOMEBODY TYPED WHILE IT WAS SAVING IS STILL THEIRS. CodeRabbit: the
+  // box stayed editable through the save and the read that follows it, so a
+  // sentence typed in those two seconds was quietly replaced by the copy that
+  // came back. The box is held while it saves, and even then the answer is
+  // only put into it when it still matches what was sent.
   async function save(text){
     setBusy('save');setErr(null);setMsg(null)
     try{
       const out=await call('PATCH',{text})
       setMsg(out.cleared?'Back to the generated letter.':'The letter is saved.')
       const data=await call('GET')
-      setPreview(data.html);setDraft(data.text);setEdited(!!data.edited)
+      setPreview(data.html);setEdited(!!data.edited)
+      setDraft(current=>current===text?data.text:current)
     }catch(e){setErr(e.message)}
     setBusy(null)
   }
@@ -879,7 +885,11 @@ function CoImplementerLetterPanel(){
             Save, then read it again to see it as it will arrive.
           </p>
           <textarea
-            style={{...inp,minHeight:340,fontFamily:'var(--cv-font-mono)',fontSize:'0.86rem',lineHeight:1.55}}
+            aria-label="The welcome letter sent to a new co-implementer"
+            disabled={busy==='save'}
+            // 16px, so a phone does not zoom the page the moment this is
+            // tapped and does not shrink the words below reading size.
+            style={{...inp,minHeight:340,fontFamily:'var(--cv-font-mono)',fontSize:'1rem',lineHeight:1.55,opacity:busy==='save'?0.6:1}}
             value={draft}
             onChange={e=>setDraft(e.target.value)}
           />

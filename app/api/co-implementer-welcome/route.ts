@@ -49,18 +49,45 @@ function getAdminClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
+/** What was read: the letter to use, and what was actually saved (if anything). */
+type LetterRead =
+  | { ok: true; body: string; saved: string; updatedAt: string | null }
+  | { ok: false }
+
 /**
  * The letter as it will be sent: whatever a super coach saved, or the generated
- * one when they have saved nothing. A missing coach_letters table means the
- * migration is not applied yet, which is the same thing as nothing saved.
+ * one when they have saved nothing.
+ *
+ * ONLY A MISSING TABLE COUNTS AS NOTHING SAVED. CodeRabbit: any database error
+ * at all used to select the generated letter, so a timeout or a permission
+ * problem would have posted the generated words to somebody in place of
+ * Habib's own, and then claimed the one send that is allowed, leaving no way to
+ * correct it. The table genuinely not existing yet is the one case where the
+ * generated letter is the right answer. Everything else stops the request.
  */
-async function letterBody(admin: ReturnType<typeof getAdminClient>): Promise<string> {
+async function readLetter(admin: ReturnType<typeof getAdminClient>): Promise<LetterRead> {
   const { data, error } = await admin.from('coach_letters')
-    .select('body').eq('key', CO_IMPLEMENTER_LETTER_KEY).maybeSingle()
-  if (error) return DEFAULT_CO_IMPLEMENTER_LETTER
+    .select('body,updated_at').eq('key', CO_IMPLEMENTER_LETTER_KEY).maybeSingle()
+
+  if (error) {
+    const why = `${error.code || ''} ${error.message || ''}`
+    const tableNotThereYet = /coach_letters/i.test(why)
+      && /(does not exist|schema cache|relation|42p01)/i.test(why)
+    if (!tableNotThereYet) {
+      console.error('co-implementer-welcome: could not read the letter', error)
+      return { ok: false }
+    }
+    return { ok: true, body: DEFAULT_CO_IMPLEMENTER_LETTER, saved: '', updatedAt: null }
+  }
+
   const saved = typeof data?.body === 'string' ? data.body.trim() : ''
-  return saved || DEFAULT_CO_IMPLEMENTER_LETTER
+  return { ok: true, body: saved || DEFAULT_CO_IMPLEMENTER_LETTER, saved, updatedAt: data?.updated_at || null }
 }
+
+const LETTER_UNREADABLE = NextResponse.json(
+  { ok: false, reason: 'The letter could not be read just now, so nothing was sent. Please try again in a moment.' },
+  { status: 503 },
+)
 
 /**
  * Authenticate, refuse anybody who may not manage the team, and hold the door
@@ -109,10 +136,9 @@ export async function GET(req: NextRequest) {
     const gate = await requireSuperCoach(req, admin, 'co-implementer-letter:read')
     if (!gate.ok) return gate.res
 
-    const { data } = await admin.from('coach_letters')
-      .select('body,updated_at').eq('key', CO_IMPLEMENTER_LETTER_KEY).maybeSingle()
-    const saved = typeof data?.body === 'string' ? data.body.trim() : ''
-    const body = saved || DEFAULT_CO_IMPLEMENTER_LETTER
+    const read = await readLetter(admin)
+    if (!read.ok) return LETTER_UNREADABLE
+    const { body, saved } = read
     const html = brandedEmail({
       brand: 'canvas',
       preheader: 'What your role is, who you report to, and how the platform works.',
@@ -127,7 +153,7 @@ export async function GET(req: NextRequest) {
       subject: CO_IMPLEMENTER_LETTER_SUBJECT,
       text: body,
       edited: !!saved,
-      updatedAt: data?.updated_at || null,
+      updatedAt: read.updatedAt,
       html,
     })
   } catch (e) {
@@ -227,7 +253,9 @@ export async function POST(req: NextRequest) {
     }
 
     const hello = salutation(ci.name || undefined)
-    const letter = await letterBody(admin)
+    const read = await readLetter(admin)
+    if (!read.ok) return LETTER_UNREADABLE
+    const letter = read.body
 
     const html = brandedEmail({
       brand: 'canvas',
