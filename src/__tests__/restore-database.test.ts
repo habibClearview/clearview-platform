@@ -251,7 +251,9 @@ describe('a backup nobody has opened is a belief', () => {
     await expect(restore(artifact, out, PASSPHRASE, { force: true })).rejects.toThrow()
     // The earlier restore is untouched, and no half finished one is left.
     expect(await readdir(out)).toEqual(['clients.json'])
-    expect(await readdir(work)).not.toContain('restored.restoring')
+    // By prefix, not by exact name: the staging folder carries a suffix, so
+    // an exact match would pass while a leftover sat right beside it.
+    expect((await readdir(work)).filter((n) => n.startsWith('restored.restoring'))).toEqual([])
   }, 30_000)
 
   it('leaves nothing behind it when it replaces an earlier restore', async () => {
