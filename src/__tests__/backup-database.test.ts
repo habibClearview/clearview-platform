@@ -337,11 +337,47 @@ describe('a table name can never build a path', () => {
   })
 })
 
-describe('nothing waits for ever', () => {
+describe('nothing waits for ever, and one blip is not a failure', () => {
   it('bounds every request, so a database that stops answering cannot hang the job', () => {
     expect(SCRIPT).toContain('AbortSignal.timeout(REQUEST_TIMEOUT_MS)')
-    // And every request goes through the one helper that applies it.
-    expect(SCRIPT).not.toMatch(/\bawait fetch\(/)
+    // And every request goes through the one helper that applies it, so a new
+    // call cannot forget. Exactly one bare fetch exists, inside that helper.
+    expect(SCRIPT.match(/\bfetch\(/g) || []).toHaveLength(1)
+  })
+
+  it('tries again when the database says it is having trouble', async () => {
+    // A dropped connection at half past two in the morning is not a fault
+    // worth waking up to, and failing the night's backup for one is a false
+    // alarm that teaches people to ignore the real ones.
+    let calls = 0
+    const rows = [{ id: 1 }]
+    globalThis.fetch = vi.fn(async (url: string, init: any) => {
+      const u = String(url)
+      if (u.endsWith('/rest/v1/')) {
+        return { ok: true, json: async () => ({ definitions: { t: { properties: { id: {} } } } }) }
+      }
+      calls += 1
+      if (calls === 1) return { ok: false, status: 503, text: async () => 'busy' }
+      if (init.headers?.Prefer === 'count=exact') {
+        return { ok: true, headers: { get: () => '0-0/1' }, json: async () => rows }
+      }
+      const [from, to] = String(init.headers.Range).split('-').map(Number)
+      return { ok: true, headers: { get: () => null }, json: async () => rows.slice(from, to + 1) }
+    }) as any
+    await run()
+    const manifest = JSON.parse(await readFile(path.join(await onlyRun(), '_manifest.json'), 'utf8'))
+    expect(manifest.counts.t).toBe(1)
+  })
+
+  it('does not keep asking when the answer is a refusal', async () => {
+    // A refusal is an answer. Asking again will not change it, and three
+    // attempts at every table would turn one permission problem into a very
+    // slow failure.
+    const server = serverWith({ locked: [{ id: 1 }] }, { refuse: ['locked'] })
+    globalThis.fetch = server as any
+    await expect(run()).rejects.toThrow(/could not be copied/)
+    const asked = server.mock.calls.filter((c: any[]) => String(c[0]).includes('locked'))
+    expect(asked.length).toBe(1)
   })
 })
 
@@ -404,10 +440,12 @@ describe('the records never leave in the clear', () => {
     expect(WORKFLOW).not.toContain('cp "$dir/_manifest.json" out/_manifest.json')
   })
 
-  it('writes a checksum beside the encrypted file, because encryption is not tamper evidence', () => {
-    // AES in this mode keeps a file private and says nothing about whether it
-    // is the file we wrote.
-    expect(WORKFLOW).toContain('sha256sum out/records.tar.gz.enc')
+  it('fingerprints the encrypted file with a key, not a bare checksum', () => {
+    // The review caught that my first attempt overclaimed. A plain sha256
+    // beside the file catches a corrupted download and nothing else, because
+    // anybody who can change the file can write a new sha256 next to it.
+    expect(WORKFLOW).toContain('openssl dgst -sha256 -hmac "$BACKUP_PASSPHRASE"')
+    expect(WORKFLOW).not.toContain('sha256sum out/records.tar.gz.enc')
   })
 
   it('keeps it for thirty days rather than ninety', () => {

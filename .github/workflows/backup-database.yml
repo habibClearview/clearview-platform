@@ -118,13 +118,17 @@ jobs:
               -in records.tar.gz -out out/records.tar.gz.enc \
               -pass env:BACKUP_PASSPHRASE
             rm -f records.tar.gz
-            # A CHECKSUM, BECAUSE THE ENCRYPTION ALONE PROVES NOTHING ABOUT
-            # TAMPERING. AES in this mode keeps a file private and says nothing
-            # about whether it is the file we wrote. The checksum sits beside
-            # it in the clear, so a changed backup is a changed number rather
-            # than a quiet surprise on the day it is opened.
-            sha256sum out/records.tar.gz.enc | awk '{print $1}' > out/records.tar.gz.enc.sha256
-            echo "Records kept, encrypted, with a checksum."
+            # A KEYED FINGERPRINT, NOT A BARE CHECKSUM. 13 September 2026: the
+            # review caught that my first attempt at this overclaimed, and it
+            # was right. A plain sha256 sitting beside the file catches a
+            # corrupted download and nothing else, because anybody who can
+            # change the file can write a new sha256 next to it. Only somebody
+            # holding the passphrase can produce this one, and the passphrase
+            # never appears in the artifact, so a backup that has been changed
+            # by anybody else will not match.
+            openssl dgst -sha256 -hmac "$BACKUP_PASSPHRASE" out/records.tar.gz.enc \
+              | awk '{print $NF}' > out/records.tar.gz.enc.hmac
+            echo "Records kept, encrypted, with a keyed fingerprint."
           else
             echo "::warning::No BACKUP_PASSPHRASE secret is set, so the records were read and"
             echo "::warning::checked but NOT kept. Only the manifest is stored. Set that secret"

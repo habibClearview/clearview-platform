@@ -84,9 +84,34 @@ function settings() {
   return { url, key, outDir: process.env.BACKUP_DIR || 'backup', headers: { apikey: key, Authorization: `Bearer ${key}` } }
 }
 
-/** One request, with a limit on how long it is allowed to hang. */
-function ask(target, headers) {
-  return fetch(target, { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+/**
+ * One request, with a limit on how long it may hang and a second chance.
+ *
+ * 13 September 2026, the review: one blip used to fail the whole night's
+ * backup. Failing loudly on a real fault is the right design and a dropped
+ * connection at half past two in the morning is not a real fault, so a
+ * request that fails for a reason that might pass is tried twice more, a
+ * little further apart each time.
+ *
+ * Only for the reasons that can pass: a connection that never landed, a
+ * timeout, or the server saying it is having trouble. A refusal is an answer,
+ * and asking a second time will not change it.
+ */
+async function ask(target, headers) {
+  let last
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (attempt) await new Promise((r) => setTimeout(r, attempt * 2000))
+    try {
+      const res = await fetch(target, { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+      // Only an explicit "I am having trouble" is worth asking again about.
+      // Anything else, a refusal included, is an answer.
+      if (!(res.status >= 500) || attempt === 2) return res
+      last = new Error(`the database answered ${res.status}`)
+    } catch (e) {
+      last = e
+    }
+  }
+  throw last
 }
 
 /**
