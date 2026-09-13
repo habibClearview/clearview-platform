@@ -57,10 +57,13 @@ import TeamPayments from '@/components/coach/TeamPayments'
 import DealsAndFees from '@/components/coach/DealsAndFees'
 import DeliverablesBusinessView from '@/components/coach/DeliverablesBusinessView'
 import {
-  outstandingInvoiced, dealWinRate, canvasProgress, healthStatusFromReportText,
-  pipelineSnapshot, recentMonthPeriods, monthlyFeeRevenue, monthlyTeamCost,
-  awaitingInvoice, clientTypeBreakdown, serviceTypeBreakdown, splitPipeline,
+  dealWinRate, canvasProgress, healthStatusFromReportText,
+  pipelineSnapshot, recentMonthPeriods, monthlyTeamCost, splitPipeline,
 } from '@/lib/coach-business-metrics'
+import {
+  practiceShape, moneyByPayer, moneyByService, assignmentMoney, monthlyAssignmentRevenue,
+  servicesOf, servedIdsOf, assignmentLabel,
+} from '@/lib/assignments'
 import {
   noticeFingerprint, noticeIsSetAside, noticeLiveIds, noticeDismissedIds, noticeWithDismissed,
   NOTICE_NEW_SUBMISSIONS, NOTICE_TIMESHEETS_AWAITING,
@@ -533,18 +536,13 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
   // No invented fallback. When no client has a fee currency set, the total
   // prints as a plain number rather than claiming a currency nobody chose.
   const feeCur=clients.find(c=>c.fee_currency)?.fee_currency||null
-  const outstanding=outstandingInvoiced(clients)
-  const awaitingIssue=awaitingInvoice(clients)
-  const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
   const winRate=dealWinRate(programmes)
 
   // Four periods, one selector -- every card on this tab that can honestly
-  // be period-scoped (client-type revenue, service-type revenue, fees paid
-  // up) uses the SAME selection, so numbers never silently disagree about
-  // which window they cover.
+  // be period-scoped uses the SAME selection, so numbers never silently
+  // disagree about which window they cover.
   const [period,setPeriod]=useState('month')
   const now=new Date()
-  const ctb=clientTypeBreakdown(clients,programmesById,period,now)
 
   // Real canvas progress + timesheet + invoice data, fetched once for the
   // whole list -- avoids an N+1 query per client. Empty/failed fetch
@@ -578,22 +576,43 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
   // swallow every error, so a table that was not there, a permission problem
   // or a dropped connection all printed a confident 0 with nothing to say
   // that the number had not been read at all. It says so now.
-  const [serviceEngagements,setServiceEngagements]=useState([])
+  // THE ASSIGNMENTS, AND WHO EACH ONE SERVES. 14 September 2026. See
+  // src/lib/assignments.ts for why the money lives here and not on a served
+  // organisation. Both reads are needed before any figure can be shown, so a
+  // failure in either one says so rather than printing a confident zero.
+  const [assignments,setAssignments]=useState([])
+  const [servedRows,setServedRows]=useState([])
   const [servicesUnread,setServicesUnread]=useState(null)
   useEffect(()=>{
     let cancelled=false
-    supabase.from('service_engagements').select('service_type,fee,status').then(({data,error})=>{
+    Promise.all([
+      supabase.from('service_engagements').select('*'),
+      supabase.from('service_engagement_clients').select('engagement_id,client_id'),
+    ]).then(([asg,srv])=>{
       if(cancelled)return
-      if(error){setServicesUnread(error.message);return}
+      if(asg.error){setServicesUnread(asg.error.message);return}
+      // The link table arrives with the assignments migration. Until it is
+      // applied an assignment simply serves nobody, which is honest and does
+      // not stop the money being shown.
       setServicesUnread(null)
-      setServiceEngagements(data||[])
+      setAssignments(asg.data||[])
+      setServedRows(srv.error?[]:(srv.data||[]))
     }).catch(e=>{if(!cancelled)setServicesUnread(e.message||String(e))})
     return ()=>{cancelled=true}
   },[])
-  const stb=serviceTypeBreakdown(clients,serviceEngagements,period,now)
+  const shape=practiceShape(assignments,servedRows)
+  const payerLines=moneyByPayer(assignments,servedRows,period,now)
+  const serviceSplit=moneyByService(assignments,period,now)
+  const asgMoney=assignmentMoney(assignments,period,now)
+  const payerName=(id)=>{
+    const prog=programmes.find(p=>p.id===id)
+    if(prog)return [prog.name,prog.funder].filter(Boolean).join(' · ')
+    const c=clients.find(x=>x.id===id)
+    return c?c.name:id
+  }
 
   const trendPeriods=recentMonthPeriods(6)
-  const revenueByPeriod=monthlyFeeRevenue(clients,trendPeriods)
+  const revenueByPeriod=monthlyAssignmentRevenue(assignments,trendPeriods)
   const costByPeriod=monthlyTeamCost(invoices,trendPeriods)
   const pipeline=pipelineSnapshot(programmes)
   const periodLabel=MB_PERIOD_LABELS[period]
@@ -605,35 +624,53 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
       }/>
       <PiBody>
 
-        <PiSectionHeading label="Client types" sub={`number and revenue per type, this ${periodLabel.toLowerCase()} -- to edit who's in which group, use the Clients tab`}/>
-        <PiKpiRow cols={ctb.other.count>0?5:4}>
-          <PiKpiCard total label="All Clients" value={String(ctb.total.count)} rev={fmtGlance(ctb.total.revenue,feeCur)} sub={`${ctb.running} active${ctb.paused?` · ${ctb.paused} paused`:''}${ctb.closed?` · ${ctb.closed} closed`:''} · revenue collected this ${periodLabel.toLowerCase()}`}/>
-          <PiKpiCard label="Donor Programmes" value={String(ctb.donorProgrammes.count)} rev={fmtGlance(ctb.donorProgrammes.revenue,feeCur)} sub={`${ctb.donorProgrammes.clientCount} client${ctb.donorProgrammes.clientCount===1?'':'s'} under them`}/>
-          <PiKpiCard label="Independent Clients" value={String(ctb.independentClients.count)} rev={fmtGlance(ctb.independentClients.revenue,feeCur)} sub="self-funded GtCV"/>
-          <PiKpiCard label="Subscribers" value={String(ctb.subscribers.count)} rev={fmtGlance(ctb.subscribers.revenue,feeCur)} sub="independent Clearview"/>
-          {ctb.other.count>0&&<PiKpiCard label="Everyone else" value={String(ctb.other.count)} rev={fmtGlance(ctb.other.revenue,feeCur)} color={C.slate} sub="on a programme that is not donor funded, or no service recorded yet"/>}
+        <PiSectionHeading label="The practice" sub="who pays, what they bought, and who the work is done with. Three different numbers, because they are three different things."/>
+        {servicesUnread&&<div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.6rem 0.9rem',marginBottom:'0.7rem',fontSize:'0.95rem',color:C.navy}}>The assignments could not be read just now, so every figure below is showing nothing rather than a real number: {servicesUnread}</div>}
+        <PiKpiRow cols={3}>
+          <PiKpiCard total label="Paying Clients" value={String(shape.payers)} sub="who the invoice is made out to"/>
+          <PiKpiCard label="Assignments" value={String(shape.assignments)} color={C.teal} sub={shape.assignmentsWithNobodyYet?`${shape.assignmentsWithNobodyYet} not yet serving anybody`:'each one is a fee you invoiced'}/>
+          <PiKpiCard label="Organisations Served" value={String(shape.organisationsServed)} color={C.purple} sub="who the work is done with"/>
         </PiKpiRow>
 
-        <PiSectionHeading label="Services" sub="number and revenue per service -- a client can hold more than one. The count is every service on record; the revenue is only what is live, because a paused service is not earning."/>
-        {servicesUnread&&<div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.6rem 0.9rem',marginBottom:'0.7rem',fontSize:'0.95rem',color:C.navy}}>Advisory and Market Intelligence could not be read just now, so those two are showing nothing rather than a real count: {servicesUnread}</div>}
-        <PiKpiRow cols={stb.other.count>0?6:5}>
-          <PiKpiCard total label="All Services" value={String(stb.total.count)} rev={fmtGlance(stb.total.revenue,feeCur)} sub={`service instances, this ${periodLabel.toLowerCase()}`}/>
-          <PiKpiCard label="Clearview Advisory" value={String(stb.advisory.count)} rev={fmtGlance(stb.advisory.revenue,feeCur)} color={C.slate}/>
-          <PiKpiCard label="Canvas Client (GtCV)" value={String(stb.canvas.count)} rev={fmtGlance(stb.canvas.revenue,feeCur)} color={C.purple}/>
-          <PiKpiCard label="Financial Model" value={String(stb.financial.count)} rev={fmtGlance(stb.financial.revenue,feeCur)} color={C.teal}/>
-          <PiKpiCard label="Market Intelligence Sub." value={String(stb.portfolioIntelligence.count)} rev={fmtGlance(stb.portfolioIntelligence.revenue,feeCur)} color={C.cyan}/>
-          {stb.other.count>0&&<PiKpiCard label="No service recorded" value={String(stb.other.count)} rev={fmtGlance(stb.other.revenue,feeCur)} color={C.slate}/>}
+        <PiSectionHeading label="Money by paying client" sub={`what each payer bought and where their money stands. Collected is this ${periodLabel.toLowerCase()}; the other two are where things stand today.`}/>
+        {payerLines.length===0
+          ?<div style={{...hint,padding:'0.6rem 0'}}>No assignments recorded yet. Open a paying client on the Clients tab and add one, and its fee appears here.</div>
+          :<div style={{overflowX:'auto'}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
+              <thead><tr style={{background:C.lightBg}}>{['Paying client','Assignments','Organisations','Collected','Invoiced, not paid','Awaiting issue'].map(h=><th key={h} style={{padding:'0.45rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
+              <tbody>{payerLines.map(l=>(
+                <tr key={l.payerId} style={{borderBottom:`1px solid var(--cv-border-soft)`}}>
+                  <td style={{padding:'0.45rem 0.6rem',fontWeight:600,color:C.navy}}>{payerName(l.payerId)}</td>
+                  <td style={{padding:'0.45rem 0.6rem'}}>{l.assignments}</td>
+                  <td style={{padding:'0.45rem 0.6rem'}}>{l.organisationsServed}</td>
+                  <td style={{padding:'0.45rem 0.6rem',color:C.green,fontWeight:600}}>{fmtGlance(l.collected,l.currency||feeCur)}</td>
+                  <td style={{padding:'0.45rem 0.6rem',color:C.amber}}>{fmtGlance(l.invoicedNotPaid,l.currency||feeCur)}</td>
+                  <td style={{padding:'0.45rem 0.6rem',color:C.red}}>{fmtGlance(l.awaitingIssue,l.currency||feeCur)}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>}
+
+        <PiSectionHeading label="Services" sub="how many assignments include each service, and the money on the ones that cover only that service"/>
+        <PiKpiRow cols={serviceSplit.combinedAssignments>0?5:4}>
+          {serviceSplit.services.map(l=>(
+            <PiKpiCard key={l.service} label={SERVICE_TYPE_LABELS[l.service]||l.service} value={String(l.assignments)} rev={fmtGlance(l.ownRevenue,feeCur)}
+              color={l.service==='canvas'?C.purple:l.service==='financial'?C.teal:l.service==='portfolio_intelligence'?C.cyan:C.slate}
+              sub={l.assignments===1?'1 assignment':`${l.assignments} assignments`}/>
+          ))}
+          {serviceSplit.combinedAssignments>0&&(
+            <PiKpiCard label="Covering more than one" value={String(serviceSplit.combinedAssignments)} rev={fmtGlance(serviceSplit.combinedRevenue,feeCur)} color={C.navy} sub="one fee across several services, not split"/>
+          )}
         </PiKpiRow>
         <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',color:C.slate,textAlign:'center',margin:'0.9rem 0 0'}}>
-          Services total always equals Client types total <b style={{color:C.cyan}}>&middot; {fmtGlance(stb.total.revenue,feeCur)} = {fmtGlance(ctb.total.revenue,feeCur)}</b> &mdash; same money, counted two ways
-          {stb.total.revenue!==ctb.total.revenue&&<span style={{color:C.amber}}> (once Advisory/Market Intelligence carry real paid revenue, these two can drift until that table gets its own collection date -- flagged, not hidden)</span>}
+          A fee covering more than one service is never divided between them &mdash; no record says how it splits, so it sits on its own line and the figures still add up to <b style={{color:C.cyan}}>{fmtGlance(serviceSplit.total,feeCur)}</b>.
         </div>
 
-        <PiSectionHeading label="Finance" sub="where the money actually stands, plus the trend behind it"/>
+        <PiSectionHeading label="Finance" sub="where the money actually stands, plus the trend behind it. Every figure is a fee on an assignment, which is a fee you invoiced."/>
         <PiKpiRow cols={4}>
-          <PiKpiCard label="Invoice Paid Up" value={fmtGlance(ctb.total.revenue,feeCur)} color={C.green} sub={`cleared this ${periodLabel.toLowerCase()}`}/>
-          <PiKpiCard label="Invoiced &middot; Not Paid" value={fmtGlance(outstanding,feeCur)} color={C.amber} sub="sent, awaiting payment (current)"/>
-          <PiKpiCard label="Awaiting Issue" value={fmtGlance(awaitingIssue,feeCur)} color={C.red} sub="fee agreed, not yet invoiced (current)"/>
+          <PiKpiCard label="Invoice Paid Up" value={fmtGlance(asgMoney.collected,asgMoney.currency||feeCur)} color={C.green} sub={`cleared this ${periodLabel.toLowerCase()}`}/>
+          <PiKpiCard label="Invoiced &middot; Not Paid" value={fmtGlance(asgMoney.invoicedNotPaid,asgMoney.currency||feeCur)} color={C.amber} sub="sent, awaiting payment (current)"/>
+          <PiKpiCard label="Awaiting Issue" value={fmtGlance(asgMoney.awaitingIssue,asgMoney.currency||feeCur)} color={C.red} sub="fee agreed, not yet invoiced (current)"/>
           <div style={{border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.9rem 1rem',background:'var(--cv-bg-2)'}}>
             <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate,marginBottom:'0.5rem'}}>Revenue vs. delivery cost &middot; last 6 months</div>
             <RevenueCostTrendChart periods={trendPeriods} revenueByPeriod={revenueByPeriod} costByPeriod={costByPeriod} cur={feeCur}/>
@@ -3496,10 +3533,29 @@ const SERVICE_TYPE_LABELS={advisory:'Advisory',canvas:'GtCV Canvas',financial:'C
 // one the client in front of you is receiving.
 const SERVICE_NAME={canvas:'Grant-to-Commercial Viability',financial:'Clearview Financial Model',advisory:'Advisory',portfolio_intelligence:'Market Intelligence'}
 
+// THE ASSIGNMENTS A PAYING CLIENT HAS BOUGHT. Rewritten 14 September 2026.
+//
+// Habib: "Climate Smart Jobs has employed my advisory services, including the
+// financial modelling service, for their served client Bwaeyale Vet and
+// Viester... The Climate Smart Job assignment that I entered as won is a new
+// advisory that has no financial model included and that is a different
+// assignment." And: "the fee should be on the client, it is the client I
+// invoiced."
+//
+// This used to be one row per service per organisation, with a single service
+// and a single organisation each, so the shape above could not be written
+// down at all. An assignment now holds several services and several
+// organisations, and carries the fee, because the fee is what was invoiced to
+// this payer for this piece of work.
+//
+// An assignment that serves nobody yet is a real assignment with real money,
+// which is exactly what the won advisory is.
 function ServicesSection({payerType,payerId,clients}){
   const [rows,setRows]=useState([])
+  const [served,setServed]=useState([])
   const [loading,setLoading]=useState(true)
   const [migrationNeeded,setMigrationNeeded]=useState(false)
+  const [linkTableMissing,setLinkTableMissing]=useState(false)
   const [showNew,setShowNew]=useState(false)
   const [msg,setMsg]=useState(null)
   const payerCol=payerType==='programme'?'payer_programme_id':'payer_client_id'
@@ -3508,66 +3564,158 @@ function ServicesSection({payerType,payerId,clients}){
     let cancelled=false
     setLoading(true)
     supabase.from('service_engagements').select('*').eq(payerCol,payerId).order('created_at',{ascending:false})
-      .then(({data,error})=>{
+      .then(async({data,error})=>{
         if(cancelled)return
         if(error){setMigrationNeeded(true);setLoading(false);return}
-        setRows(data||[])
-        setLoading(false)
+        const list=data||[]
+        setRows(list)
+        const ids=list.map(r=>r.id)
+        if(ids.length){
+          const {data:links,error:linkErr}=await supabase.from('service_engagement_clients')
+            .select('engagement_id,client_id').in('engagement_id',ids)
+          if(!cancelled){
+            setLinkTableMissing(!!linkErr)
+            setServed(linkErr?[]:(links||[]))
+          }
+        }
+        if(!cancelled)setLoading(false)
       })
     return ()=>{cancelled=true}
   },[payerCol,payerId])
 
-  async function addService(f){
-    const row={id:`svc_${Date.now()}`,[payerCol]:payerId,beneficiary_client_id:f.beneficiary_client_id||null,service_type:f.service_type,status:'active',fee:f.fee===''?null:Number(f.fee),fee_currency:f.fee_currency,notes:f.notes||null}
+  async function addAssignment(f){
+    const services=f.service_types
+    const row={
+      id:`svc_${Date.now()}`,[payerCol]:payerId,
+      name:f.name||null,
+      // service_type is kept as the first service so anything still reading
+      // the single column sees something true rather than nothing.
+      service_type:services[0],service_types:services,
+      beneficiary_client_id:f.client_ids[0]||null,
+      status:'active',
+      fee:f.fee===''?null:Number(f.fee),fee_currency:f.fee_currency,
+      fee_status:f.fee_status||null,
+      fee_invoiced_at:f.fee_invoiced_at||null,fee_paid_at:f.fee_paid_at||null,
+    }
     const {data,error}=await supabase.from('service_engagements').insert([row]).select().single()
-    if(error)return setMsg('Could not add service: '+error.message)
-    setRows(prev=>[data,...prev]);setShowNew(false);setMsg(null)
+    if(error)return setMsg('Could not add that assignment: '+error.message)
+    if(f.client_ids.length){
+      const links=f.client_ids.map(id=>({engagement_id:data.id,client_id:id}))
+      const {error:linkErr}=await supabase.from('service_engagement_clients').insert(links)
+      if(linkErr)setMsg('The assignment was saved, but who it serves was not: '+linkErr.message)
+      else setServed(prev=>[...prev,...links])
+    }
+    setRows(prev=>[data,...prev]);setShowNew(false)
   }
-  async function updateService(id,patch){
+  async function updateAssignment(id,patch){
     setRows(prev=>prev.map(r=>r.id!==id?r:{...r,...patch}))
     const {error}=await supabase.from('service_engagements').update({...patch,updated_at:new Date().toISOString()}).eq('id',id)
     if(error)setMsg('Could not save: '+error.message)
   }
-  async function removeService(id){
+  // Adding or removing an organisation writes one row, so a half-finished
+  // edit can never leave an assignment attached to somebody it does not serve.
+  async function setServes(id,clientId,on){
+    if(on){
+      const {error}=await supabase.from('service_engagement_clients').insert([{engagement_id:id,client_id:clientId}])
+      if(error)return setMsg('Could not add that organisation: '+error.message)
+      setServed(prev=>[...prev,{engagement_id:id,client_id:clientId}])
+    } else {
+      const {error}=await supabase.from('service_engagement_clients').delete()
+        .eq('engagement_id',id).eq('client_id',clientId)
+      if(error)return setMsg('Could not remove that organisation: '+error.message)
+      setServed(prev=>prev.filter(x=>!(x.engagement_id===id&&x.client_id===clientId)))
+    }
+    setMsg(null)
+  }
+  async function toggleService(row,key){
+    const current=servicesOf(row)
+    const next=current.includes(key)?current.filter(k=>k!==key):[...current,key]
+    if(next.length===0)return setMsg('An assignment has to include at least one service.')
+    updateAssignment(row.id,{service_types:next,service_type:next[0]})
+  }
+  async function removeAssignment(id){
+    if(typeof window!=='undefined'&&!window.confirm('Remove this assignment and its fee from the record?\n\nThis cannot be undone.'))return
     const {error}=await supabase.from('service_engagements').delete().eq('id',id)
     if(error)return setMsg('Could not remove: '+error.message)
     setRows(prev=>prev.filter(r=>r.id!==id))
+    setServed(prev=>prev.filter(x=>x.engagement_id!==id))
   }
 
   if(loading)return null
   if(migrationNeeded)return(
     <div style={{...card,border:`1px solid ${C.amber}`,background:'var(--cv-tint-amber)'}}>
-      <div style={secH}>Services</div>
-      <p style={hint}>This needs one additive database change first: apply <code>supabase/migrations/2026_07_14_service_engagements.sql</code> in the Supabase SQL editor, then reload. Nothing existing is affected.</p>
+      <div style={secH}>Assignments</div>
+      <p style={hint}>This needs one additive database change first: apply <code>supabase/migrations/2026_07_14_service_engagements.sql</code> and <code>supabase/migrations/2026_09_14_assignments.sql</code> in the Supabase SQL editor, then reload. Nothing existing is affected.</p>
     </div>
   )
 
   return(
     <div style={card}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.75rem'}}>
-        <div style={secH}>Services</div>
-        <button style={addBtn()} onClick={()=>setShowNew(!showNew)}>+ Add Service</button>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'0.75rem',gap:'0.6rem',flexWrap:'wrap'}}>
+        <div style={secH}>Assignments</div>
+        <button style={addBtn()} onClick={()=>setShowNew(!showNew)}>+ Add Assignment</button>
       </div>
-      <p style={{...hint,marginBottom:'0.75rem'}}>Every service this payer is engaged for -- can hold more than one at once, each with its own client, fee, and status.</p>
+      <p style={{...hint,marginBottom:'0.75rem'}}>One assignment is one thing this client bought and one fee you invoiced them. It can cover several services at once, and it can serve several organisations, or none yet.</p>
+      {linkTableMissing&&<div style={{...hint,color:C.amber,marginBottom:'0.6rem'}}>Who each assignment serves cannot be read or changed until <code>supabase/migrations/2026_09_14_assignments.sql</code> is applied. The fees below are correct either way.</div>}
       {msg&&<div style={{...hint,color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
-      {showNew&&<NewServiceForm clients={clients} onSave={addService} onCancel={()=>setShowNew(false)}/>}
+      {showNew&&<NewAssignmentForm clients={clients} onSave={addAssignment} onCancel={()=>setShowNew(false)}/>}
       {rows.length===0
-        ?<div style={{...hint,padding:'0.5rem 0'}}>No services logged yet.</div>
+        ?<div style={{...hint,padding:'0.5rem 0'}}>No assignments recorded yet.</div>
         :rows.map(r=>{
-          const client=clients.find(c=>c.id===r.beneficiary_client_id)
+          const servesIds=servedIdsOf(r.id,served)
           return(
-            <div key={r.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.75rem',flexWrap:'wrap',padding:'0.6rem 0.75rem',border:`1px solid ${C.border}`,borderRadius:5,marginBottom:'0.45rem'}}>
-              <div>
-                <div style={{fontWeight:600,fontSize:'1.07rem',color:C.navy}}>{SERVICE_TYPE_LABELS[r.service_type]||r.service_type}</div>
-                <div style={{fontSize:'0.93rem',color:C.slate}}>{client?`for ${client.name}`:'no specific client'}{r.fee?` · ${fmtGlance(r.fee,r.fee_currency)}`:''}</div>
+            <div key={r.id} style={{border:`1px solid ${C.border}`,borderRadius:7,marginBottom:'0.6rem',padding:'0.7rem 0.85rem'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'0.75rem',flexWrap:'wrap'}}>
+                <div style={{flex:'1 1 240px'}}>
+                  <input aria-label="What this assignment is called" placeholder={assignmentLabel(r,SERVICE_TYPE_LABELS)} style={{...inp,fontWeight:600,fontSize:'1.07rem',border:`1px dashed ${C.border}`}} value={r.name||''} onChange={e=>updateAssignment(r.id,{name:e.target.value})}/>
+                  <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginTop:'0.5rem'}}>
+                    {Object.entries(SERVICE_TYPE_LABELS).map(([k,l])=>{
+                      const on=servicesOf(r).includes(k)
+                      return <button key={k} onClick={()=>toggleService(r,k)} style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.78rem',border:`1px solid ${on?C.teal:C.border}`,background:on?C.teal:'transparent',color:on?'var(--cv-on-accent)':C.slate,borderRadius:999,padding:'0.15rem 0.6rem',cursor:'pointer'}}>{l}</button>
+                    })}
+                  </div>
+                </div>
+                <div style={{display:'flex',gap:'0.4rem',alignItems:'center',flexWrap:'wrap'}}>
+                  <div><label style={{...lbl,marginBottom:'0.15rem'}}>Fee</label>
+                    <div style={{display:'flex',gap:'0.25rem'}}>
+                      <input type="number" placeholder="0" style={{...inp,width:110,padding:'0.3rem 0.5rem'}} value={r.fee??''} onChange={e=>updateAssignment(r.id,{fee:e.target.value===''?null:Number(e.target.value)})}/>
+                      <CurrencyField hideLabel label="Fee currency" value={r.fee_currency||''} onChange={v=>updateAssignment(r.id,{fee_currency:v})} style={{...inp,width:84,padding:'0.3rem 0.3rem'}}/>
+                    </div>
+                  </div>
+                  <div><label style={{...lbl,marginBottom:'0.15rem'}}>Fee status</label>
+                    <select style={{...inp,width:'auto',padding:'0.3rem 0.5rem'}} value={r.fee_status||''} onChange={e=>updateAssignment(r.id,{fee_status:e.target.value||null})}>
+                      <option value="">Not set</option>
+                      <option value="unpaid">Agreed, not invoiced</option>
+                      <option value="invoiced">Invoiced</option>
+                      <option value="paid">Paid</option>
+                    </select>
+                  </div>
+                  <div><label style={{...lbl,marginBottom:'0.15rem'}}>Invoiced on</label>
+                    <input type="date" style={{...inp,width:'auto',padding:'0.3rem 0.5rem'}} value={r.fee_invoiced_at||''} onChange={e=>updateAssignment(r.id,{fee_invoiced_at:e.target.value||null})}/>
+                  </div>
+                  <div><label style={{...lbl,marginBottom:'0.15rem'}}>Paid on</label>
+                    <input type="date" style={{...inp,width:'auto',padding:'0.3rem 0.5rem'}} value={r.fee_paid_at||''} onChange={e=>updateAssignment(r.id,{fee_paid_at:e.target.value||null})}/>
+                  </div>
+                  <div><label style={{...lbl,marginBottom:'0.15rem'}}>Status</label>
+                    <select style={{...inp,width:'auto',padding:'0.3rem 0.5rem'}} value={r.status||'active'} onChange={e=>updateAssignment(r.id,{status:e.target.value})}>
+                      <option value="active">Active</option>
+                      <option value="paused">Paused</option>
+                      <option value="complete">Complete</option>
+                    </select>
+                  </div>
+                  <button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem',alignSelf:'flex-end'}} onClick={()=>removeAssignment(r.id)} title="Remove this assignment">{'\u00D7'}</button>
+                </div>
               </div>
-              <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}>
-                <select style={{...inp,width:'auto',padding:'0.25rem 0.4rem',fontSize:'0.93rem'}} value={r.status} onChange={e=>updateService(r.id,{status:e.target.value})}>
-                  <option value="active">Active</option>
-                  <option value="paused">Paused</option>
-                  <option value="complete">Complete</option>
-                </select>
-                <button style={{background:'transparent',border:'none',color:C.red,cursor:'pointer',fontSize:'1.1rem'}} onClick={()=>removeService(r.id)} title="Remove">×</button>
+              <div style={{marginTop:'0.6rem',borderTop:`1px solid var(--cv-border-soft)`,paddingTop:'0.5rem'}}>
+                <div style={{...lbl,marginBottom:'0.3rem'}}>Organisations this serves{servesIds.length===0&&<span style={{fontWeight:400,color:C.slate}}> — nobody yet, which is fine. The fee still counts.</span>}</div>
+                <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap'}}>
+                  {clients.length===0
+                    ?<span style={hint}>No organisations on the books yet.</span>
+                    :clients.map(c=>{
+                      const on=servesIds.includes(c.id)
+                      return <button key={c.id} disabled={linkTableMissing} onClick={()=>setServes(r.id,c.id,!on)} style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.78rem',border:`1px solid ${on?C.purple:C.border}`,background:on?C.purple:'transparent',color:on?'var(--cv-on-accent)':C.slate,borderRadius:999,padding:'0.15rem 0.6rem',cursor:linkTableMissing?'not-allowed':'pointer',opacity:linkTableMissing?0.5:1}}>{c.name}</button>
+                    })}
+                </div>
               </div>
             </div>
           )
@@ -3575,18 +3723,44 @@ function ServicesSection({payerType,payerId,clients}){
     </div>
   )
 }
-function NewServiceForm({clients,onSave,onCancel}){
-  const [f,setF]=useState({service_type:'advisory',beneficiary_client_id:'',fee:'',fee_currency:'',notes:''})
+function NewAssignmentForm({clients,onSave,onCancel}){
+  const [f,setF]=useState({name:'',service_types:['advisory'],client_ids:[],fee:'',fee_currency:'',fee_status:'',fee_invoiced_at:'',fee_paid_at:''})
+  const flip=(list,key)=>list.includes(key)?list.filter(k=>k!==key):[...list,key]
   return(
     <div style={{...card,border:`1px solid ${C.cyan}`,marginBottom:'0.75rem'}}>
       <div style={fGrid}>
-        <div><label style={lbl}>Service</label><select style={inp} value={f.service_type} onChange={e=>setF(x=>({...x,service_type:e.target.value}))}>{Object.entries(SERVICE_TYPE_LABELS).map(([k,l])=><option key={k} value={k}>{l}</option>)}</select></div>
-        <div><label style={lbl}>Client (optional)</label><select style={inp} value={f.beneficiary_client_id} onChange={e=>setF(x=>({...x,beneficiary_client_id:e.target.value}))}><option value="">No specific client</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-        <div><label style={lbl}>Fee</label><input type="number" style={inp} value={f.fee} onChange={e=>setF(x=>({...x,fee:e.target.value}))}/></div>
+        <div style={{gridColumn:'1/-1'}}><label style={lbl}>What is this assignment called?</label><input style={inp} placeholder="Advisory and financial model" value={f.name} onChange={e=>setF(x=>({...x,name:e.target.value}))}/></div>
+        <div style={{gridColumn:'1/-1'}}><label style={lbl}>Services it includes *</label>
+          <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginTop:'0.3rem'}}>
+            {Object.entries(SERVICE_TYPE_LABELS).map(([k,l])=>{
+              const on=f.service_types.includes(k)
+              return <button key={k} onClick={()=>setF(x=>({...x,service_types:flip(x.service_types,k)}))} style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.85rem',border:`1px solid ${on?C.teal:C.border}`,background:on?C.teal:'transparent',color:on?'var(--cv-on-accent)':C.slate,borderRadius:999,padding:'0.25rem 0.7rem',cursor:'pointer'}}>{l}</button>
+            })}
+          </div>
+        </div>
+        <div style={{gridColumn:'1/-1'}}><label style={lbl}>Organisations it serves (leave empty if nobody yet)</label>
+          <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginTop:'0.3rem'}}>
+            {clients.map(c=>{
+              const on=f.client_ids.includes(c.id)
+              return <button key={c.id} onClick={()=>setF(x=>({...x,client_ids:flip(x.client_ids,c.id)}))} style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.85rem',border:`1px solid ${on?C.purple:C.border}`,background:on?C.purple:'transparent',color:on?'var(--cv-on-accent)':C.slate,borderRadius:999,padding:'0.25rem 0.7rem',cursor:'pointer'}}>{c.name}</button>
+            })}
+          </div>
+        </div>
+        <div><label style={lbl}>Fee you invoiced</label><input type="number" style={inp} value={f.fee} onChange={e=>setF(x=>({...x,fee:e.target.value}))}/></div>
         <div><label style={lbl}>Currency</label><CurrencyField hideLabel value={f.fee_currency} onChange={v=>setF(x=>({...x,fee_currency:v}))} style={inp}/></div>
+        <div><label style={lbl}>Fee status</label>
+          <select style={inp} value={f.fee_status} onChange={e=>setF(x=>({...x,fee_status:e.target.value}))}>
+            <option value="">Not set</option>
+            <option value="unpaid">Agreed, not invoiced</option>
+            <option value="invoiced">Invoiced</option>
+            <option value="paid">Paid</option>
+          </select>
+        </div>
+        <div><label style={lbl}>Invoiced on</label><input type="date" style={inp} value={f.fee_invoiced_at} onChange={e=>setF(x=>({...x,fee_invoiced_at:e.target.value}))}/></div>
+        <div><label style={lbl}>Paid on</label><input type="date" style={inp} value={f.fee_paid_at} onChange={e=>setF(x=>({...x,fee_paid_at:e.target.value}))}/></div>
       </div>
       <div style={{display:'flex',gap:'0.6rem',marginTop:'0.85rem'}}>
-        <button style={solidBtn()} onClick={()=>{if(!f.service_type)return;onSave(f)}}>Add Service</button>
+        <button style={solidBtn()} onClick={()=>{if(f.service_types.length===0)return;onSave(f)}}>Add Assignment</button>
         <button style={{...addBtn(),borderColor:C.border,color:C.slate}} onClick={onCancel}>Cancel</button>
       </div>
     </div>

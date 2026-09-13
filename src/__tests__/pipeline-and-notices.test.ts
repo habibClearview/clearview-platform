@@ -29,6 +29,7 @@ const DASH = readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
 const DEALS = readFileSync('src/components/coach/DealsAndFees.tsx', 'utf8')
 const MIGRATION = readFileSync('supabase/migrations/2026_09_14_coach_notice_dismissals.sql', 'utf8')
 const DISMISS_SQL = readFileSync('supabase/migrations/2026_09_14_notice_dismissed_ids.sql', 'utf8')
+const ASSIGN_SQL = readFileSync('supabase/migrations/2026_09_14_assignments.sql', 'utf8')
 
 const deal = (id: string, stage: string | null) => ({ id, name: id, deal_stage: stage })
 
@@ -268,24 +269,88 @@ describe('dismissing records, as opposed to setting the notice aside', () => {
   })
 })
 
-describe('the My Business client numbers count clients', () => {
-  it('All Clients reads the real client total, and the donor tile says how many sit under it', () => {
-    expect(DASH).toContain('ctb.total.count')
-    expect(DASH).toContain('ctb.donorProgrammes.clientCount')
+// WHO PAYS, WHAT THEY BOUGHT, AND WHO IT IS FOR. 14 September 2026. Habib:
+// "maybe we need to separate paying clients from served clients... You have
+// the finance for each of this but it is not showing in the dashboard."
+// The three counts used to be one, and the money hung off the served
+// organisation, so an assignment serving nobody yet had nowhere to keep its
+// fee. See src/lib/assignments.ts.
+describe('My Business counts payers, assignments and organisations apart', () => {
+  it('the three counts are side by side and named for what they are', () => {
+    expect(DASH).toContain('practiceShape(assignments,servedRows)')
+    expect(DASH).toContain('Paying Clients')
+    expect(DASH).toContain('Assignments')
+    expect(DASH).toContain('Organisations Served')
   })
 
-  it('a client nothing else describes is shown rather than counted nowhere', () => {
-    expect(DASH).toContain('ctb.other.count>0')
-    expect(DASH).toContain('stb.other.count>0')
+  it('the money comes from the assignments, which is what was invoiced', () => {
+    expect(DASH).toContain('moneyByPayer(assignments,servedRows,period,now)')
+    expect(DASH).toContain('assignmentMoney(assignments,period,now)')
+    expect(DASH).toContain('monthlyAssignmentRevenue(assignments,trendPeriods)')
+    // And no longer from the fee on a served organisation, which is how the
+    // same money used to be counted twice.
+    expect(DASH).not.toContain('clientTypeBreakdown(')
+    expect(DASH).not.toContain('monthlyFeeRevenue(clients')
   })
 
-  it('the tile says how many are still running, so it agrees with the page header', () => {
-    expect(DASH).toContain('ctb.running')
-    expect(DASH).toContain('ctb.closed')
+  it('an assignment serving nobody yet is counted and said out loud', () => {
+    expect(DASH).toContain('shape.assignmentsWithNobodyYet')
+    expect(DASH).toContain('not yet serving anybody')
   })
 
-  it('a service that could not be read says so rather than printing a confident zero', () => {
+  it('a fee covering more than one service is never split between them', () => {
+    expect(DASH).toContain('serviceSplit.combinedAssignments')
+    expect(DASH).toContain('A fee covering more than one service is never divided between them')
+  })
+
+  it('a figure that could not be read says so rather than printing a confident zero', () => {
     expect(DASH).toContain('const [servicesUnread,setServicesUnread]=useState(null)')
-    expect(DASH).toContain('could not be read just now, so those two are showing nothing rather than a real count')
+    expect(DASH).toContain('showing nothing rather than a real number')
+  })
+
+  it('the tables it reads exist, and the fee sits with the payer', () => {
+    expect(ASSIGN_SQL).toContain('create table if not exists service_engagement_clients')
+    expect(ASSIGN_SQL).toContain('add column if not exists service_types text[]')
+    expect(ASSIGN_SQL).toContain('add column if not exists fee_paid_at date')
+    expect(ASSIGN_SQL).toContain("my_role() = 'super_coach'")
+  })
+
+  it('every fee already entered is carried onto an assignment, not retyped', () => {
+    expect(ASSIGN_SQL).toContain('insert into service_engagements')
+    expect(ASSIGN_SQL).toContain('from engagement_clients c')
+    expect(ASSIGN_SQL).toContain('on conflict (id) do nothing')
+  })
+})
+
+describe('an assignment can be written down the way Habib described it', () => {
+  it('it holds several services at once, not one', () => {
+    expect(DASH).toContain('function NewAssignmentForm(')
+    expect(DASH).toContain('Services it includes')
+    expect(DASH).toContain('service_types:next,service_type:next[0]')
+  })
+
+  it('it serves several organisations, or none yet', () => {
+    expect(DASH).toContain('Organisations it serves (leave empty if nobody yet)')
+    expect(DASH).toContain('async function setServes(id,clientId,on)')
+    expect(DASH).toContain('nobody yet, which is fine. The fee still counts.')
+  })
+
+  it('the fee, its status and its dates are on the assignment', () => {
+    expect(DASH).toContain('Fee you invoiced')
+    expect(DASH).toContain("updateAssignment(r.id,{fee_status:e.target.value||null})")
+    expect(DASH).toContain("updateAssignment(r.id,{fee_paid_at:e.target.value||null})")
+  })
+
+  it('an assignment always includes at least one service', () => {
+    expect(DASH).toContain('An assignment has to include at least one service.')
+  })
+
+  it('removing one asks first, because the fee goes with it', () => {
+    const start = DASH.indexOf('async function removeAssignment')
+    expect(DASH.slice(start, start + 500)).toContain('window.confirm(')
+  })
+
+  it('it says so when the fee saved but who it serves did not', () => {
+    expect(DASH).toContain('The assignment was saved, but who it serves was not')
   })
 })
