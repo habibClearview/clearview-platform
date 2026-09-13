@@ -33,6 +33,7 @@ import { sendEmail, emailAvailable, brandedEmail, escapeHtml, raw } from '@/lib/
 import { cleanEmail, emailLooksSendable, salutation } from '@/lib/engagement-brief'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { getBearerToken } from '@/lib/auth/api-authz'
+import { canManageTeam } from '@/lib/coach-types'
 
 export const dynamic = 'force-dynamic'
 
@@ -68,8 +69,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'That letter has been asked for too many times recently.' }, { status: 429 })
     }
 
+    // The same rule the screen itself uses, read from the same place, so the
+    // two cannot drift apart if what "manages the team" means ever changes.
     const { data: profile } = await admin.from('user_profiles').select('role').eq('id', user.id).maybeSingle()
-    if (!profile || profile.role !== 'super_coach') {
+    if (!profile || !canManageTeam(profile.role)) {
       return NextResponse.json({ error: 'Only the coach who manages the team can send this letter.' }, { status: 403 })
     }
 
@@ -145,21 +148,48 @@ export async function POST(req: NextRequest) {
       footNote: 'Reply to this email with any question at all. There is no question too small in the first week.',
     })
 
+    // CLAIMED BEFORE IT IS SENT, NOT AFTER. The AI review on #260: reading
+    // welcome_sent_at and writing it back after the send are two steps, so two
+    // presses landing together both read null, both sent, and the person got
+    // the letter twice. The claim is one conditional write instead: only the
+    // request that turns the column from null to a time may send, which the
+    // database decides rather than this code.
+    //
+    // Where the column is not there yet the write fails, nothing is claimed,
+    // and the letter still goes. That is the honest degradation: a letter that
+    // can be sent twice until the migration is applied, rather than a button
+    // that stops working.
+    let claimed = false
+    const claimedAt = new Date().toISOString()
+    const { data: claim, error: claimErr } = await admin.from('co_implementers')
+      .update({ welcome_sent_at: claimedAt })
+      .eq('id', ci.id)
+      .is('welcome_sent_at', null)
+      .select('id')
+    if (!claimErr) {
+      if (!claim || claim.length === 0) {
+        // Somebody else claimed it between the read above and here.
+        return NextResponse.json({ ok: true, alreadySent: true })
+      }
+      claimed = true
+    }
+
     const sent = await sendEmail({
       to: [to],
       subject: 'Welcome to the Canvas Coach team: your role and the platform',
       html,
     })
     if (!sent.sent) {
+      // Give the claim back, so a letter that never went can be sent again.
+      if (claimed) {
+        await admin.from('co_implementers')
+          .update({ welcome_sent_at: null })
+          .eq('id', ci.id)
+          .eq('welcome_sent_at', claimedAt)
+          .then(undefined, () => undefined)
+      }
       return NextResponse.json({ ok: false, reason: sent.reason || 'The letter did not send' }, { status: 502 })
     }
-
-    // Best effort. If the column is not there yet the letter has still gone,
-    // and reporting a failure for a letter that was delivered would be a lie.
-    await admin.from('co_implementers')
-      .update({ welcome_sent_at: new Date().toISOString() })
-      .eq('id', ci.id)
-      .then(undefined, () => undefined)
 
     return NextResponse.json({ ok: true, sentTo: to })
   } catch (e) {

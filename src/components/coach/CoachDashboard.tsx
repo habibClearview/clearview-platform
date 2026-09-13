@@ -1838,7 +1838,6 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // records rather than guessed at, and a failure leaves the tab with no
   // number instead of a wrong one.
   const [subscriberCount,setSubscriberCount]=useState(null)
-  const [healthByClient,setHealthByClient]=useState({})
   useEffect(()=>{
     let cancelled=false
     supabase.from('service_engagements').select('id',{count:'exact',head:true})
@@ -1847,32 +1846,49 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       .catch(()=>{})
     return ()=>{cancelled=true}
   },[])
+  // ONE READING OF THE HEALTH CHECKS, NOT TWO. The AI review on #260: the dot
+  // on the Clients tab and the flags on the client cards were two separate
+  // fetches of the same table, which is two answers to one question and a way
+  // for the dot to disagree with the cards it points at. Read once here, and
+  // every screen below works off the same reading.
+  //
+  // Financial Model clients only. That is the one service with an automated
+  // weekly health check today; a real flag for GtCV, Advisory or Subscription
+  // would need a genuine signal for each, which does not exist yet.
+  const [reportByClient,setReportByClient]=useState({})
+  const [hasActuals,setHasActuals]=useState(new Set())
   useEffect(()=>{
     let cancelled=false
     const ids=clients.filter(c=>c.engagement_mode==='financial').map(c=>c.id)
-    if(ids.length===0){setHealthByClient({});return}
-    supabase.from('ai_health_checks').select('client_id,period,report_text,generated_at')
-      .in('client_id',ids).order('period',{ascending:false})
-      .then(({data,error})=>{
-        if(cancelled||error)return
-        const latest={}
-        ;(data||[]).forEach(r=>{if(!latest[r.client_id])latest[r.client_id]=r})
-        const byId=Object.fromEntries(clients.map(c=>[c.id,c]))
-        const flagged={}
-        Object.entries(latest).forEach(([id,r])=>{
-          const label=healthStatusFromReportText(r.report_text).label
-          if(label!=='Needs attention'&&label!=='Watch')return
-          // Dismissed stays dismissed until a newer check is generated, the
-          // same rule the client cards use, so the dot and the cards agree.
-          const at=Date.parse(byId[id]?.health_flag_dismissed_at||'')
-          const gen=Date.parse(r.generated_at||'')
-          const aside=Number.isFinite(at)&&(!Number.isFinite(gen)||at>=gen)
-          if(!aside)flagged[id]=true
-        })
-        setHealthByClient(flagged)
-      }).catch(()=>{})
+    if(ids.length===0){setReportByClient({});setHasActuals(new Set());return}
+    Promise.all([
+      supabase.from('ai_health_checks').select('client_id,period,report_text,generated_at').in('client_id',ids).order('period',{ascending:false}),
+      supabase.from('generic_actuals').select('client_id').in('client_id',ids),
+    ]).then(([{data:reports},{data:actuals}])=>{
+      if(cancelled)return
+      const latest={}
+      ;(reports||[]).forEach(r=>{if(!latest[r.client_id])latest[r.client_id]=r})
+      setReportByClient(latest)
+      setHasActuals(new Set((actuals||[]).map(a=>a.client_id)))
+    }).catch(()=>{})
     return ()=>{cancelled=true}
   },[clients])
+  // Dismissed stays dismissed until a newer check is generated. Every screen
+  // reads this one rule, so a dot never outlives the flag behind it.
+  const flagIsSetAside=(c)=>{
+    const at=Date.parse(c?.health_flag_dismissed_at||'')
+    if(!Number.isFinite(at))return false
+    const generated=Date.parse(reportByClient[c.id]?.generated_at||'')
+    return !Number.isFinite(generated)||at>=generated
+  }
+  const liveFlagFor=(c)=>{
+    const report=reportByClient[c.id]
+    if(!report)return null
+    const status=healthStatusFromReportText(report.report_text)
+    if(status.label!=='Needs attention'&&status.label!=='Watch')return null
+    const text=report.report_text||''
+    return {status,aside:flagIsSetAside(c),why:text?(text.length>120?text.slice(0,120)+'…':text):'No health check generated yet.'}
+  }
   // Set when a Pipeline deal is marked Won, so the Clients tab opens
   // straight into "+ New Client" pre-filled with the programme and a
   // note of what was won -- lifted to the top level (not local to
@@ -2208,25 +2224,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     // GtCV/Advisory/Subscription would need a genuine signal for each (a
     // stalled-canvas rule, etc.) that doesn't exist yet -- deferred rather
     // than faked.
-    const [reportByClient,setReportByClient]=useState({})
-    const [hasActuals,setHasActuals]=useState(new Set())
-    const financialClients=clients.filter(c=>c.engagement_mode==='financial')
-    useEffect(()=>{
-      let cancelled=false
-      const financialIds=financialClients.map(c=>c.id)
-      if(financialIds.length===0)return
-      Promise.all([
-        supabase.from('ai_health_checks').select('client_id,period,report_text,generated_at').in('client_id',financialIds).order('period',{ascending:false}),
-        supabase.from('generic_actuals').select('client_id').in('client_id',financialIds),
-      ]).then(([{data:reports},{data:actuals}])=>{
-        if(cancelled)return
-        const latestByClient={}
-        ;(reports||[]).forEach(r=>{if(!latestByClient[r.client_id])latestByClient[r.client_id]=r})
-        setReportByClient(latestByClient)
-        setHasActuals(new Set((actuals||[]).map(a=>a.client_id)))
-      }).catch(()=>{})
-      return ()=>{cancelled=true}
-    },[clients])
+    // reportByClient, hasActuals, flagIsSetAside and the flag itself are read
+    // once above and used here, so this screen and the tab strip can never
+    // disagree about who is flagged.
     // SET ASIDE UNTIL THE NEXT HEALTH CHECK. 8 September 2026. There was no
     // way to acknowledge a flag, so a client who is amber for a reason the
     // coach already knows about sat at the top of this screen indefinitely,
@@ -2237,13 +2237,6 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     // check being shown. A new check brings the client straight back, because
     // the coach acknowledged what they had read and not everything that would
     // ever be written.
-    const flagIsSetAside=(c)=>{
-      const at=Date.parse(c.health_flag_dismissed_at||'')
-      if(!Number.isFinite(at))return false
-      const report=reportByClient[c.id]
-      const generated=Date.parse(report?.generated_at||'')
-      return !Number.isFinite(generated)||at>=generated
-    }
     async function setFlagAside(client,aside){
       const value=aside?new Date().toISOString():null
       setClients(prev=>prev.map(c=>c.id!==client.id?c:{...c,health_flag_dismissed_at:value}))
@@ -2315,14 +2308,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       ownMode.filter(c=>!listed.has(c.id)).forEach(c=>rows.push({client:c,seStatus:null,payer:'Nothing logged under Services yet'}))
       return rows
     }
-    const flagFor=(c)=>{
-      const report=reportByClient[c.id]
-      if(!report)return null
-      const status=healthStatusFromReportText(report.report_text)
-      if(status.label!=='Needs attention'&&status.label!=='Watch')return null
-      const text=report.report_text||''
-      return {status,aside:flagIsSetAside(c),why:text?(text.length>120?text.slice(0,120)+'…':text):'No health check generated yet.'}
-    }
+    const flagFor=liveFlagFor
     const rowsByService=Object.fromEntries(CLIENT_SERVICE_TABS.map(t=>[t.key,rowsForService(t.key)]))
     const liveFlagsIn=(rows)=>rows.filter(r=>{const f=flagFor(r.client);return !!f&&!f.aside}).length
     // Whoever needs attention is read first, then whoever is on watch, then
@@ -3257,7 +3243,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // of anything.
   const openDeals=programmes.filter(p=>p.deal_stage&&p.deal_stage!=='won'&&p.deal_stage!=='lost').length
   const awaitingApproval=timesheets.filter(t=>t.status==='submitted').length
-  const flaggedClients=Object.values(healthByClient).filter(Boolean).length
+  const flaggedClients=clients.filter(c=>{const f=liveFlagFor(c);return !!f&&!f.aside}).length
   const mainNavTabs=isSuperCoach
     ?[['overview','My Business',null,false],
       ['clients','Clients',clients.length,flaggedClients>0],

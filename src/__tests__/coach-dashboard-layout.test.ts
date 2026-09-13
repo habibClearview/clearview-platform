@@ -85,11 +85,22 @@ describe('the tabs say what is behind them', () => {
     expect(DASH).toContain('{count!==null&&count!==undefined&&')
   })
 
-  it('the dot on Clients obeys the same dismissal rule as the cards', () => {
-    // A dot that stays lit after the flag behind it was dismissed teaches
-    // people to stop looking at the dot.
-    expect(DASH).toContain('const aside=Number.isFinite(at)&&(!Number.isFinite(gen)||at>=gen)')
-    expect(DASH).toContain('if(!aside)flagged[id]=true')
+  it('the dot on Clients and the cards read one answer, not two', () => {
+    // The AI review on #260: the dot and the cards were two separate fetches
+    // of ai_health_checks, which is two answers to one question and a way for
+    // a dot to stay lit over a flag that was dismissed. One reading now, and
+    // every screen works off it.
+    expect(DASH).toContain('const flaggedClients=clients.filter(c=>{const f=liveFlagFor(c);return !!f&&!f.aside}).length')
+    expect(DASH).toContain('const flagFor=liveFlagFor')
+    // One bulk read of the health checks for the whole client list. (The
+    // Client Health tab still reads one client's own latest check, which is a
+    // different question about a different client.)
+    expect(DASH.match(/from\('ai_health_checks'\)\.select\('client_id/g) || []).toHaveLength(1)
+  })
+
+  it('the one dismissal rule is the one every screen uses', () => {
+    expect(DASH.match(/const flagIsSetAside=\(c\)=>\{/g) || []).toHaveLength(1)
+    expect(DASH).toContain('return !Number.isFinite(generated)||at>=generated')
   })
 })
 
@@ -147,7 +158,10 @@ describe('the welcome letter to a co-implementer', () => {
   })
 
   it('only the coach who manages the team may send it', () => {
-    expect(LETTER).toContain("profile.role !== 'super_coach'")
+    // The same rule the screen uses, read from the same place, so the two
+    // cannot drift apart.
+    expect(LETTER).toContain('!canManageTeam(profile.role)')
+    expect(LETTER).toContain("from '@/lib/coach-types'")
     expect(LETTER).toContain('checkRateLimit(admin, `co-implementer-welcome:${user.id}`')
   })
 
@@ -156,7 +170,14 @@ describe('the welcome letter to a co-implementer', () => {
     expect(LETTER).not.toContain('body.email')
   })
 
-  it('goes once', () => {
+  it('goes once, and the database is what decides that', () => {
+    // Reading the column and writing it back after the send are two steps, so
+    // two presses landing together both read null and both sent. The claim is
+    // one conditional write: only the request that turns null into a time may
+    // send, and a letter that then fails to go gives its claim back.
+    expect(LETTER).toContain(".is('welcome_sent_at', null)")
+    expect(LETTER).toContain('if (!claim || claim.length === 0)')
+    expect(LETTER).toContain("update({ welcome_sent_at: null })")
     expect(LETTER).toContain('alreadySent: true')
     const sql = readFileSync('supabase/migrations/2026_09_13_co_implementer_welcome_sent.sql', 'utf8')
     expect(sql).toContain('ADD COLUMN IF NOT EXISTS welcome_sent_at timestamptz')
@@ -166,7 +187,7 @@ describe('the welcome letter to a co-implementer', () => {
     // The column is read off a select('*') and the write is best effort, so a
     // letter that was delivered is never reported as a failure.
     expect(LETTER).toContain("select('*')")
-    expect(LETTER).toContain('.then(undefined, () => undefined)')
+    expect(LETTER).toContain('if (!claimErr) {')
   })
 
   it('is sendable from the co-implementer’s own page', () => {
