@@ -29,7 +29,11 @@
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { sendEmail, emailAvailable, brandedEmail, escapeHtml, raw } from '@/lib/email'
+import { sendEmail, emailAvailable, brandedEmail } from '@/lib/email'
+import { textToEmail } from '@/lib/letter'
+import {
+  CO_IMPLEMENTER_LETTER_KEY, CO_IMPLEMENTER_LETTER_SUBJECT, DEFAULT_CO_IMPLEMENTER_LETTER,
+} from '@/lib/co-implementer-letter'
 import { cleanEmail, emailLooksSendable, salutation } from '@/lib/engagement-brief'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { getBearerToken } from '@/lib/auth/api-authz'
@@ -45,15 +49,172 @@ function getAdminClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
-/** A bullet in the house style: the teal marker, then escaped text. */
-function point(text: string) {
-  return raw(`<span style="color:#00767A;">&#9656;</span>&nbsp;&nbsp;${escapeHtml(text)}`)
+/**
+ * ONE RULE FOR "THE TABLE IS NOT THERE YET", STATED ONCE. The AI review found
+ * the reading and the writing deciding this with two slightly different lists,
+ * so one of them would have called a missing table a plain failure and said the
+ * wrong thing about it. A rule written twice is a rule that drifts.
+ */
+function tableNotThereYet(error: { code?: string; message?: string } | null): boolean {
+  const why = `${error?.code || ''} ${error?.message || ''}`
+  return /coach_letters/i.test(why) && /(does not exist|schema cache|relation|42p01)/i.test(why)
+}
+
+/** What was read: the letter to use, and what was actually saved (if anything). */
+type LetterRead =
+  | { ok: true; body: string; saved: string; updatedAt: string | null }
+  | { ok: false }
+
+/**
+ * The letter as it will be sent: whatever a super coach saved, or the generated
+ * one when they have saved nothing.
+ *
+ * ONLY A MISSING TABLE COUNTS AS NOTHING SAVED. CodeRabbit: any database error
+ * at all used to select the generated letter, so a timeout or a permission
+ * problem would have posted the generated words to somebody in place of
+ * Habib's own, and then claimed the one send that is allowed, leaving no way to
+ * correct it. The table genuinely not existing yet is the one case where the
+ * generated letter is the right answer. Everything else stops the request.
+ */
+async function readLetter(admin: ReturnType<typeof getAdminClient>): Promise<LetterRead> {
+  const { data, error } = await admin.from('coach_letters')
+    .select('body,updated_at').eq('key', CO_IMPLEMENTER_LETTER_KEY).maybeSingle()
+
+  if (error) {
+    if (!tableNotThereYet(error)) {
+      console.error('co-implementer-welcome: could not read the letter', error)
+      return { ok: false }
+    }
+    return { ok: true, body: DEFAULT_CO_IMPLEMENTER_LETTER, saved: '', updatedAt: null }
+  }
+
+  const saved = typeof data?.body === 'string' ? data.body.trim() : ''
+  return { ok: true, body: saved || DEFAULT_CO_IMPLEMENTER_LETTER, saved, updatedAt: data?.updated_at || null }
+}
+
+const LETTER_UNREADABLE = NextResponse.json(
+  { ok: false, reason: 'The letter could not be read just now, so nothing was sent. Please try again in a moment.' },
+  { status: 503 },
+)
+
+/**
+ * Authenticate, refuse anybody who may not manage the team, and hold the door
+ * to a sensible number of knocks. Reading and editing are cheap, but an
+ * unlimited endpoint is an unlimited endpoint, and this one is behind the same
+ * service-role client the send is.
+ */
+async function requireSuperCoach(
+  req: NextRequest,
+  admin: ReturnType<typeof getAdminClient>,
+  what: string,
+) {
+  const token = getBearerToken(req)
+  if (!token) return { ok: false as const, res: NextResponse.json({ error: 'Not authenticated' }, { status: 401 }) }
+  const { data: { user }, error } = await admin.auth.getUser(token)
+  if (error || !user) return { ok: false as const, res: NextResponse.json({ error: 'Not authenticated' }, { status: 401 }) }
+
+  const rl = await checkRateLimit(admin, `${what}:${user.id}`, 120, 3600)
+  if (!rl.allowed) {
+    return {
+      ok: false as const,
+      res: NextResponse.json({ error: 'That has been asked for too many times recently.' }, {
+        status: 429, headers: { 'Retry-After': String(rl.retryAfter ?? 60) },
+      }),
+    }
+  }
+
+  const { data: profile } = await admin.from('user_profiles').select('role').eq('id', user.id).maybeSingle()
+  if (!profile || !canManageTeam(profile.role)) {
+    return { ok: false as const, res: NextResponse.json({ error: 'Only the coach who manages the team can do that.' }, { status: 403 }) }
+  }
+  return { ok: true as const, user }
+}
+
+/**
+ * READ IT BEFORE IT GOES, AND CHANGE IT. The same three controls the engagement
+ * welcome letters have: read it as it will arrive, edit the words, and start
+ * again from the generated letter.
+ *
+ * GET returns the letter's text and the letter as it will look. No address is
+ * touched and nothing is sent.
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const admin = getAdminClient()
+    const gate = await requireSuperCoach(req, admin, 'co-implementer-letter:read')
+    if (!gate.ok) return gate.res
+
+    const read = await readLetter(admin)
+    if (!read.ok) return LETTER_UNREADABLE
+    const { body, saved } = read
+    const html = brandedEmail({
+      brand: 'canvas',
+      preheader: 'What your role is, who you report to, and how the platform works.',
+      heading: 'Welcome to the team',
+      // A name nobody is addressed by, so the preview reads as a letter rather
+      // than as a fragment. The real one carries the person's own name.
+      paragraphs: [salutation('Your Name') || '', ...textToEmail(body)].filter(Boolean),
+      footNote: 'Reply to this email with any question at all. There is no question too small in the first week.',
+    })
+    return NextResponse.json({
+      ok: true,
+      subject: CO_IMPLEMENTER_LETTER_SUBJECT,
+      text: body,
+      edited: !!saved,
+      updatedAt: read.updatedAt,
+      html,
+    })
+  } catch (e) {
+    console.error('co-implementer-welcome GET failed', e)
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
+  }
+}
+
+/**
+ * PATCH saves the edited letter, or clears it back to the generated one when
+ * the text sent is empty. The words are stored as text and rendered as text:
+ * what a person typed is never markup.
+ */
+export async function PATCH(req: NextRequest) {
+  try {
+    const admin = getAdminClient()
+    const gate = await requireSuperCoach(req, admin, 'co-implementer-letter:save')
+    if (!gate.ok) return gate.res
+
+    const sent = (await req.json().catch(() => ({}))) as Record<string, unknown>
+    const text = typeof sent.text === 'string' ? sent.text : ''
+    // Long enough for a letter, short enough that this cannot become a store.
+    if (text.length > 20000) {
+      return NextResponse.json({ error: 'That letter is too long to save.' }, { status: 400 })
+    }
+
+    const { error } = await admin.from('coach_letters').upsert({
+      key: CO_IMPLEMENTER_LETTER_KEY,
+      body: text.trim(),
+      updated_at: new Date().toISOString(),
+      updated_by: gate.user.email || null,
+    }, { onConflict: 'key' })
+
+    if (error) {
+      console.error('co-implementer-welcome PATCH failed', error)
+      const missing = tableNotThereYet(error)
+      return NextResponse.json({
+        error: missing
+          ? 'The letters table is not in the database yet, so this could not be saved. Apply supabase/migrations/2026_09_13_coach_letters.sql and try again.'
+          : 'That did not save. Please try again.',
+      }, { status: missing ? 409 : 500 })
+    }
+    return NextResponse.json({ ok: true, cleared: !text.trim() })
+  } catch (e) {
+    console.error('co-implementer-welcome PATCH failed', e)
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
+  }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
-    const coImplementerId = String(body.coImplementerId || '')
+    const asked = (await req.json().catch(() => ({}))) as Record<string, unknown>
+    const coImplementerId = String(asked.coImplementerId || '')
     if (!coImplementerId) return NextResponse.json({ error: 'Which co-implementer?' }, { status: 400 })
 
     const admin = getAdminClient()
@@ -99,53 +260,15 @@ export async function POST(req: NextRequest) {
     }
 
     const hello = salutation(ci.name || undefined)
+    const read = await readLetter(admin)
+    if (!read.ok) return LETTER_UNREADABLE
+    const letter = read.body
 
     const html = brandedEmail({
       brand: 'canvas',
-      preheader: 'Your role as co-implementer, who you report to, and how the platform works.',
-      heading: 'Welcome to the Canvas Coach team',
-      paragraphs: [
-        ...(hello ? [hello] : []),
-        'Welcome. You are joining as a co-implementer on Grant-to-Commercial Viability engagements. This note sets out what the role is, who you report to, and how to use the platform, so that your first week is spent on the work rather than on finding your way around.',
-
-        raw('<b>What the role is.</b>'),
-        point('You run the engagement day to day with the lead coach: preparing each decision point, gathering the commercial evidence it calls for, and keeping the record as the work proceeds.'),
-        point('The method is the Grant-to-Commercial Viability Canvas. It has nine sequential decision points, and the engagement moves to the next one once the evidence, internal and external, has been collected and judged to support that decision.'),
-        point('Every decision belongs to the client. Your work is to put the evidence in front of them in a form they can decide on, and to record what they decided and why.'),
-        point('You are assigned to named clients. You see those clients and no others, which is a rule held by the database itself rather than by the screen.'),
-
-        raw('<b>Who you report to.</b>'),
-        point('You report to the lead coach on the engagement, who is the super coach on the platform.'),
-        point('Your time and your expenses are submitted by you and approved by the lead coach. Nothing counts towards an invoice until it has been approved.'),
-        point('Anything that changes the shape of an engagement, its scope, its timing, or what a client is promised, goes to the lead coach before it goes to the client.'),
-
-        raw('<b>Signing in.</b>'),
-        point('Your sign-in arrives in a separate email from the platform, with a button that invites you to set your own password.'),
-        point('After that the platform is at clearview.habibonifade.com whenever you return to it. There is nothing to install.'),
-
-        raw('<b>What you will see when you sign in.</b> Two sections, and no others.'),
-        point('Clients. Every client assigned to you, as a card. Opening one takes you into that engagement at the decision point it has reached.'),
-        point('My Timesheet and Expenses. Your own record: Timesheets, Expenses, Advances, and Invoice.'),
-
-        raw('<b>Inside a client.</b>'),
-        point('The Cover holds who is on the engagement, the Charter, and the documents that govern it. Start here on a client you have not opened before.'),
-        point('Each decision point holds the question being decided, the evidence gathered for it, and the decision once it is taken.'),
-        point('The client and their own team see the same engagement from their side, so what you record is what they read.'),
-
-        raw('<b>Your time, your expenses, and getting paid.</b>'),
-        point('Record your time as you work rather than at the end of the month. Each entry names the client, the date, the hours, and what was done.'),
-        point('Expenses are entered against a client with the amount and the date, and are reclaimed once approved.'),
-        point('An advance drawn against work not yet invoiced appears under Advances and is set against your next invoice, so nothing is claimed twice.'),
-        point('Your invoice for a month is compiled from your approved time and approved expenses, less any advance. You do not write it yourself.'),
-
-        raw('<b>In your first week.</b>'),
-        point('Sign in and set your password.'),
-        point('Check the details held on you: your name, your email, your phone, your country, and your specialisation. Tell the lead coach if any of it is wrong.'),
-        point('Open each client assigned to you and read the Cover and the Charter before anything else.'),
-        point('Enter your first timesheet on the day you do the work, so the habit is set from the start.'),
-
-        'If anything on the platform does not do what this letter says it does, say so rather than working around it. That is how it gets fixed.',
-      ],
+      preheader: 'What your role is, who you report to, and how the platform works.',
+      heading: 'Welcome to the team',
+      paragraphs: [...(hello ? [hello] : []), ...textToEmail(letter)],
       footNote: 'Reply to this email with any question at all. There is no question too small in the first week.',
     })
 
@@ -199,7 +322,7 @@ export async function POST(req: NextRequest) {
 
     const sent = await sendEmail({
       to: [to],
-      subject: 'Welcome to the Canvas Coach team: your role and the platform',
+      subject: CO_IMPLEMENTER_LETTER_SUBJECT,
       html,
     })
     if (!sent.sent) {

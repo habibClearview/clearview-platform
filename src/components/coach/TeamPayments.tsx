@@ -346,17 +346,14 @@ export default function TeamPayments({coImplementers=[],setCoImplementers,client
         </div>
       </div>
 
-      {/* Summary bar -- the whole team at a glance for the selected period. */}
-      {canApprove&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'0.85rem',marginBottom:'1.25rem'}}>
-        <KPI label="Team" value={activeCount} sub={`active co-implementer${activeCount===1?'':'s'}`}/>
-        <KPI label="Outstanding invoices" value={outstandingTotal?fmtMoney(outstandingTotal,sumCur):'—'} sub={outstandingInvoices.length?`${outstandingInvoices.length} issued, not yet paid`:'none outstanding'} color={outstandingInvoices.length?C.amber:C.green}/>
-        <KPI label="Invoiced this period" value={invoicedThisPeriod?fmtMoney(invoicedThisPeriod,sumCur):'—'} sub={periodLabel(period)} color={C.teal}/>
-        <KPI label="Advances to retire" value={unclearedAdvTotal?fmtMoney(unclearedAdvTotal,sumCur):'—'} sub={openAdvancesAll.length?`${openAdvancesAll.length} still open`:'none open'} color={openAdvancesAll.length?C.red:C.green}/>
-      </div>}
+      {/* THE PEOPLE FIRST. 13 September 2026. Habib opened Team and saw four
+          money boxes and a six month chart, with the one person on his team
+          below all of it and off the bottom of the screen. He reported the
+          change as not having arrived at all, and he was right to: a screen
+          called Team that opens on a chart is a screen about money.
 
-      {canApprove&&<CostOfDeliveryChart coImplementers={coImplementers} entries={entries} expenses={expenses}/>}
-      {canApprove&&accessMsg&&<div style={{fontSize:'1.01rem',color:C.slate,marginBottom:'0.6rem'}}>{accessMsg}</div>}
-
+          Whoever is on the team comes first now. The figures follow, because
+          they summarise the people rather than the other way round. */}
       {coImplementers.length===0
         ? <div style={{...card,color:C.slate,textAlign:'center',padding:'2.5rem'}}>{canApprove?'No co-implementers yet. Add one with the button above.':'Your co-implementer profile could not be found. Contact your coach.'}</div>
         : openPerson
@@ -381,6 +378,18 @@ export default function TeamPayments({coImplementers=[],setCoImplementers,client
               ))}
             </div>
           )}
+
+      {/* Summary bar -- the whole team at a glance for the selected period. */}
+      {canApprove&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'0.85rem',marginBottom:'1.25rem'}}>
+        <KPI label="Team" value={activeCount} sub={`active co-implementer${activeCount===1?'':'s'}`}/>
+        <KPI label="Outstanding invoices" value={outstandingTotal?fmtMoney(outstandingTotal,sumCur):'—'} sub={outstandingInvoices.length?`${outstandingInvoices.length} issued, not yet paid`:'none outstanding'} color={outstandingInvoices.length?C.amber:C.green}/>
+        <KPI label="Invoiced this period" value={invoicedThisPeriod?fmtMoney(invoicedThisPeriod,sumCur):'—'} sub={periodLabel(period)} color={C.teal}/>
+        <KPI label="Advances to retire" value={unclearedAdvTotal?fmtMoney(unclearedAdvTotal,sumCur):'—'} sub={openAdvancesAll.length?`${openAdvancesAll.length} still open`:'none open'} color={openAdvancesAll.length?C.red:C.green}/>
+      </div>}
+
+      {canApprove&&<CostOfDeliveryChart coImplementers={coImplementers} entries={entries} expenses={expenses}/>}
+      {canApprove&&accessMsg&&<div style={{fontSize:'1.01rem',color:C.slate,marginBottom:'0.6rem'}}>{accessMsg}</div>}
+
     </div>
   )
 }
