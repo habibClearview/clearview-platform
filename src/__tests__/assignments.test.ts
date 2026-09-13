@@ -417,3 +417,50 @@ describe('what a service is worth, as opposed to what has cleared', () => {
     expect(inCur(r.totalFee, 'GBP')).toBe(5_000)
   })
 })
+
+// THE ORGANISATIONS MAY SIT UNDER A DIFFERENT ROW OF THE SAME PAYER.
+// 14 September 2026. Habib: "Under client there is still no client under
+// advisory." Every Pipeline deal is its own row in programmes, so the Climate
+// Smart Jobs advisory he won is one row while Bweyale Vet Centre and Viester
+// Farm sit under another row carrying the same payer.
+describe('attaching a deal to the organisations it serves', () => {
+  const NAMED: Record<string, string> = {
+    csjDeal: 'Climate Smart Jobs', csjProgramme: 'Climate Smart Jobs', tanager: 'Tanager',
+  }
+  const nameOf = (id: string) => NAMED[id] || id
+  const clients = [
+    { id: 'bweyale', programme_id: 'csjProgramme' },
+    { id: 'viester', programme_id: 'csjProgramme' },
+    { id: 'ikore', programme_id: 'tanager' },
+    { id: 'loner', programme_id: null },
+  ]
+
+  it('finds the organisations under another row of the same payer', () => {
+    const deal: Assignment[] = [{ id: 'd1', payer_programme_id: 'csjDeal' }]
+    const served = servedFromProgrammes(deal, clients, nameOf)
+    expect(servedIdsOf('d1', served)).toEqual(['bweyale', 'viester'])
+  })
+
+  it('prefers the organisations under its own row where it has any', () => {
+    const deal: Assignment[] = [{ id: 'd2', payer_programme_id: 'tanager' }]
+    const served = servedFromProgrammes(deal, clients, nameOf)
+    expect(servedIdsOf('d2', served)).toEqual(['ikore'])
+  })
+
+  it('never reaches across to a different payer', () => {
+    const deal: Assignment[] = [{ id: 'd3', payer_programme_id: 'tanager' }]
+    const served = servedFromProgrammes(deal, clients, nameOf)
+    expect(servedIdsOf('d3', served)).not.toContain('bweyale')
+  })
+
+  it('leaves an organisation with no programme out of it entirely', () => {
+    const deal: Assignment[] = [{ id: 'd4', payer_programme_id: 'csjDeal' }]
+    const served = servedFromProgrammes(deal, clients, nameOf)
+    expect(servedIdsOf('d4', served)).not.toContain('loner')
+  })
+
+  it('without a name resolver it still matches its own row exactly', () => {
+    const deal: Assignment[] = [{ id: 'd5', payer_programme_id: 'csjProgramme' }]
+    expect(servedIdsOf('d5', servedFromProgrammes(deal, clients))).toEqual(['bweyale', 'viester'])
+  })
+})

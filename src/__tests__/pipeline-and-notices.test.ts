@@ -356,7 +356,11 @@ describe('My Business counts payers, assignments and organisations apart', () =>
   it('the Clients tab reads the same assignments My Business reads', () => {
     expect(DASH).toContain('const assignmentsHere=[...recordedHere,...dealsHere]')
     expect(DASH).toContain('assignmentsHere.filter(a=>servicesOf(a).includes(key))')
-    expect(DASH).toContain('servedFromProgrammes(dealsHere,clients)')
+    expect(DASH).toContain('servedFromProgrammes(dealsHere,clients,payerOfProgramme)')
+    // And a service that has work on it but nobody attached says so, instead
+    // of printing a blank "no clients yet" over a client who paid.
+    expect(DASH).toContain('with no organisation attached yet')
+    expect(DASH).toContain('Open that paying client and use Assignments to say which organisations it serves')
   })
 
   // Habib: "There should be nothing in pipeline because I have not added
@@ -380,7 +384,7 @@ describe('My Business counts payers, assignments and organisations apart', () =>
     // And a served organisation recorded as paying for its own work is put
     // right on reading, so the screen stops calling it a paying client.
     expect(DASH).toContain('withCorrectedPayer(recordedAssignments,clients)')
-    expect(DASH).toContain('servedFromProgrammes(fromDeals,clients)')
+    expect(DASH).toContain('servedFromProgrammes(fromDeals,clients,payerName)')
   })
 
   it('the tables it reads exist, and the fee sits with the payer', () => {

@@ -451,16 +451,40 @@ export function assignmentsFromDeals(
     })
 }
 
-/** Who a deal's stand-in assignment serves: the organisations already sitting
- *  under that programme. */
+/**
+ * Who a deal's stand-in assignment serves.
+ *
+ * THE ORGANISATIONS MAY SIT UNDER A DIFFERENT ROW OF THE SAME PAYER.
+ * 14 September 2026. Habib: "Under client there is still no client under
+ * advisory." Every Pipeline deal is its own row in programmes, so the Climate
+ * Smart Jobs advisory he won is one row while Bweyale Vet Centre and Viester
+ * Farm sit under another row carrying the same payer. Matching on that one row
+ * alone found nobody, so a service with two organisations on it listed none.
+ *
+ * The organisations under the deal's own programme come first, because that is
+ * the most exact answer there is. Only where that row has none of its own does
+ * it fall back to the organisations under the same payer's other programmes,
+ * which cannot take organisations away from a programme that has its own.
+ */
 export function servedFromProgrammes(
-  stood: Assignment[], clients: { id: string; programme_id?: string | null }[],
+  stood: Assignment[],
+  clients: { id: string; programme_id?: string | null }[],
+  payerOfProgramme: PayerName = id => id,
 ): AssignmentServed[] {
   const out: AssignmentServed[] = []
   for (const a of stood) {
     if (!a.payer_programme_id) continue
+    const own = clients.filter(c => c.programme_id === a.payer_programme_id)
+    if (own.length) {
+      own.forEach(c => out.push({ engagement_id: a.id, client_id: c.id }))
+      continue
+    }
+    const payer = payerKey(a.payer_programme_id, payerOfProgramme)
     for (const c of clients) {
-      if (c.programme_id === a.payer_programme_id) out.push({ engagement_id: a.id, client_id: c.id })
+      if (!c.programme_id) continue
+      if (payerKey(c.programme_id, payerOfProgramme) === payer) {
+        out.push({ engagement_id: a.id, client_id: c.id })
+      }
     }
   }
   return out

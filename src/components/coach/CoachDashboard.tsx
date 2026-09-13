@@ -623,7 +623,7 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
   const recorded=withCorrectedPayer(recordedAssignments,clients)
   const fromDeals=assignmentsFromDeals(programmes,recorded)
   const assignments=[...recorded,...fromDeals]
-  const servedRows=[...recordedServed,...servedFromProgrammes(fromDeals,clients)]
+  const servedRows=[...recordedServed,...servedFromProgrammes(fromDeals,clients,payerName)]
 
   // A paying client is an organisation, not a database row. Every Pipeline
   // deal is its own row in programmes, so a second piece of work from the same
@@ -2692,13 +2692,14 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     // The same list My Business reads: what is recorded, with a served
     // organisation never counted as its own payer, plus the Pipeline deals
     // that are assignments in everything but name.
+    const payerOfProgramme=(id)=>{const p=programmesById[id];return p?((p.funder||'').trim()||p.name):id}
     const recordedHere=withCorrectedPayer(serviceEngagements,clients)
     const dealsHere=assignmentsFromDeals(programmes,recordedHere)
     const assignmentsHere=[...recordedHere,...dealsHere]
     // A deal's organisations are the ones already sitting under its
     // programme, which is how the Climate Smart Jobs advisory reaches Bweyale
     // Vet Centre and Viester Farm without anybody linking them by hand.
-    const servedAll=[...servedHere,...servedFromProgrammes(dealsHere,clients)]
+    const servedAll=[...servedHere,...servedFromProgrammes(dealsHere,clients,payerOfProgramme)]
 
     async function updateSubscription(seId,patch){
       setServiceEngagements(prev=>prev.map(se=>se.id!==seId?se:{...se,...patch}))
@@ -2765,6 +2766,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       return (a.client.name||'').localeCompare(b.client.name||'')
     })
     const flaggedNow=liveFlagsIn(rowsByService[service]||[])
+    const assignmentsForService=assignmentsHere.filter(a=>servicesOf(a).includes(service))
 
     // The subscription table keeps its own shape: level, paid-up-to date and
     // billing term are editable here and are not on a card.
@@ -2864,7 +2866,25 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           {service==='financial'?' · flags come from the weekly health check':' · no automated health check on this service yet'}
         </div>
 
-        {rows.length===0?(
+        {/* A SERVICE WITH WORK ON IT AND NOBODY ATTACHED SAYS SO. 14 September
+            2026. Habib: "Under client there is still no client under
+            advisory." A blank "No clients yet" is a lie when a paying client
+            has bought the service and the organisations simply have not been
+            attached to it. This names who is paying and where to attach them. */}
+        {rows.length===0&&assignmentsForService.length>0?(
+          <div style={{...card,border:`1px solid ${C.amber}`,background:'var(--cv-tint-amber)'}}>
+            <div style={{fontWeight:700,color:C.navy,marginBottom:'0.35rem'}}>
+              {assignmentsForService.length===1?'One assignment':`${assignmentsForService.length} assignments`} on {serviceLabel}, with no organisation attached yet
+            </div>
+            <div style={{...hint,marginBottom:'0.5rem'}}>
+              Paid for by {Array.from(new Set(assignmentsForService.map(a=>{
+                const prog=a.payer_programme_id?programmesById[a.payer_programme_id]:null
+                const pc=a.payer_client_id?clientsById[a.payer_client_id]:null
+                return prog?((prog.funder||'').trim()||prog.name):(pc?pc.name:'somebody')
+              }))).join(', ')}. Open that paying client and use Assignments to say which organisations it serves.
+            </div>
+          </div>
+        ):rows.length===0?(
           <div style={{...card,color:C.slate}}>No clients on {serviceLabel} yet.</div>
         ):(
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:'0.85rem',marginBottom:'1.25rem',alignItems:'start'}}>
