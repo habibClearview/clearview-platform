@@ -229,11 +229,11 @@ function CoImplementerPerfCard({ci,clients,canvasByClient}){
 // back, and a notice that vanished without trace would be a notice nobody
 // could trust themselves to dismiss.
 const quietNoticeBtn={fontFamily:'var(--cv-font-mono)',fontSize:'0.8rem',fontWeight:600,padding:'0.25rem 0.65rem',borderRadius:6,border:'1px solid var(--cv-border)',background:'transparent',color:'var(--cv-slate)',cursor:'pointer'}
-function SetAsideLine({label,onBringBack}){
+function SetAsideLine({label,onBringBack,busy}){
   return(
     <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',fontSize:'0.9rem',color:C.slate,border:'1px dashed var(--cv-border)',borderRadius:8,padding:'0.45rem 0.8rem',marginBottom:'1rem'}}>
       <span>{label}</span>
-      <button style={{...quietNoticeBtn,marginLeft:'auto'}} onClick={onBringBack}>Bring it back</button>
+      <button style={{...quietNoticeBtn,marginLeft:'auto'}} disabled={!!busy} onClick={onBringBack}>Bring it back</button>
     </div>
   )
 }
@@ -1993,11 +1993,22 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // back when the set changes. See src/lib/notice-dismissal.ts.
   const [noticeDismissals,setNoticeDismissals]=useState({})
   const [noticeError,setNoticeError]=useState(null)
+  // Which notices have a write in flight. A notice being written to is not
+  // pressable, so Set aside and Bring it back cannot race each other and leave
+  // the record older than the screen. CodeRabbit on #262.
+  const [noticeBusy,setNoticeBusy]=useState({})
+  // The first load must never land on top of a press that happened while it
+  // was still in the air, so it fills in only the notices nobody has touched.
+  const noticeTouched=useRef(new Set())
   useEffect(()=>{
     let cancelled=false
     supabase.from('coach_notice_dismissals').select('notice_key,covers').then(({data,error})=>{
       if(cancelled||error)return
-      setNoticeDismissals(Object.fromEntries((data||[]).map(r=>[r.notice_key,r])))
+      setNoticeDismissals(prev=>{
+        const next={...prev}
+        ;(data||[]).forEach(r=>{if(!noticeTouched.current.has(r.notice_key))next[r.notice_key]=r})
+        return next
+      })
     }).catch(()=>{})
     return ()=>{cancelled=true}
   },[])
@@ -2005,8 +2016,11 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // back clears it. Either way the screen is put back if the write does not
   // land, rather than showing a page that disagrees with the record.
   async function setNoticeAside(key,ids){
+    if(noticeBusy[key])return
     const covers=ids.length===0?null:noticeFingerprint(ids)
     const previous=noticeDismissals[key]||null
+    noticeTouched.current.add(key)
+    setNoticeBusy(prev=>({...prev,[key]:true}))
     setNoticeDismissals(prev=>({...prev,[key]:{notice_key:key,covers}}))
     setNoticeError(null)
     const {error}=await supabase.from('coach_notice_dismissals')
@@ -2015,6 +2029,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       setNoticeDismissals(prev=>({...prev,[key]:previous}))
       setNoticeError('That could not be set aside: '+error.message)
     }
+    setNoticeBusy(prev=>({...prev,[key]:false}))
   }
   const noticeAside=(key,ids)=>noticeIsSetAside(noticeDismissals[key],ids)
   // Set when a Pipeline deal is marked Won, so the Clients tab opens
@@ -2269,13 +2284,13 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         </div>
         {noticeError&&<div style={{fontSize:'1.01rem',color:C.red,marginBottom:'0.6rem'}}>{noticeError}</div>}
         {newSubmissions.length>0&&submissionsAside&&(
-          <SetAsideLine label={`${newSubmissions.length} data capture submission${newSubmissions.length>1?'s':''} set aside`} onBringBack={()=>setNoticeAside(NOTICE_NEW_SUBMISSIONS,[])}/>
+          <SetAsideLine busy={!!noticeBusy[NOTICE_NEW_SUBMISSIONS]} label={`${newSubmissions.length} data capture submission${newSubmissions.length>1?'s':''} set aside`} onBringBack={()=>setNoticeAside(NOTICE_NEW_SUBMISSIONS,[])}/>
         )}
         {newSubmissions.length>0&&!submissionsAside&&(
           <div style={{background:'var(--cv-tint-cyan)',border:`1px solid ${C.teal}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.6rem',marginBottom:'0.6rem'}}>
               <div style={{fontWeight:700,color:C.teal}}>New Clearview data capture submissions ({newSubmissions.length})</div>
-              <button style={quietNoticeBtn} onClick={()=>setNoticeAside(NOTICE_NEW_SUBMISSIONS,newSubmissions.map(c=>c.id))}>Set aside</button>
+              <button style={quietNoticeBtn} disabled={!!noticeBusy[NOTICE_NEW_SUBMISSIONS]} onClick={()=>setNoticeAside(NOTICE_NEW_SUBMISSIONS,newSubmissions.map(c=>c.id))}>Set aside</button>
             </div>
             {newSubmissions.map(c=>(
               <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.5rem 0.75rem',background:C.white,borderRadius:5,marginBottom:'0.4rem',border:`1px solid ${C.border}`}}>
@@ -2289,13 +2304,13 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           </div>
         )}
         {pending>0&&timesheetsAside&&(
-          <SetAsideLine label={`${pending} timesheet${pending>1?'s':''} awaiting approval, set aside`} onBringBack={()=>setNoticeAside(NOTICE_TIMESHEETS_AWAITING,[])}/>
+          <SetAsideLine busy={!!noticeBusy[NOTICE_TIMESHEETS_AWAITING]} label={`${pending} timesheet${pending>1?'s':''} awaiting approval, set aside`} onBringBack={()=>setNoticeAside(NOTICE_TIMESHEETS_AWAITING,[])}/>
         )}
         {pending>0&&!timesheetsAside&&(
           <div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.6rem',flexWrap:'wrap'}}>
             <span style={{fontWeight:600,color:C.amber}}>⏳ {pending} timesheet{pending>1?'s':''} awaiting approval</span>
             <span style={{display:'flex',gap:'0.5rem',alignItems:'center',marginLeft:'auto'}}>
-              <button style={quietNoticeBtn} onClick={()=>setNoticeAside(NOTICE_TIMESHEETS_AWAITING,pendingTimesheets.map(t=>t.id))}>Set aside</button>
+              <button style={quietNoticeBtn} disabled={!!noticeBusy[NOTICE_TIMESHEETS_AWAITING]} onClick={()=>setNoticeAside(NOTICE_TIMESHEETS_AWAITING,pendingTimesheets.map(t=>t.id))}>Set aside</button>
               <button style={addBtn(true,C.amber)} onClick={()=>setView('team')}>Review →</button>
             </span>
           </div>
