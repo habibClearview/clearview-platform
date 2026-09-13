@@ -14,6 +14,7 @@ import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import fs from 'fs'
+import { execFileSync } from 'node:child_process'
 import { run, describeTables, orderColumnFor, verify, fileNameFor } from '../../scripts/backup-database.mjs'
 
 const WORKFLOW = fs.readFileSync('.github/workflows/backup-database.yml', 'utf8')
@@ -379,6 +380,47 @@ describe('nothing waits for ever, and one blip is not a failure', () => {
     const asked = server.mock.calls.filter((c: any[]) => String(c[0]).includes('locked'))
     expect(asked.length).toBe(1)
   })
+
+  it('waits and asks again when the database says not now', async () => {
+    // 13 September 2026, the AI review. A 429 is the one answer that means
+    // come back shortly, and my first version treated it as a refusal, so the
+    // first rate limit failed the whole night. Forty odd tables read in quick
+    // succession is exactly the traffic that earns one.
+    let calls = 0
+    const rows = [{ id: 1 }]
+    globalThis.fetch = vi.fn(async (url: string, init: any) => {
+      const u = String(url)
+      if (u.endsWith('/rest/v1/')) {
+        return { ok: true, json: async () => ({ definitions: { t: { properties: { id: {} } } } }) }
+      }
+      calls += 1
+      if (calls === 1) return { ok: false, status: 429, text: async () => 'slow down' }
+      if (init.headers?.Prefer === 'count=exact') {
+        return { ok: true, headers: { get: () => '0-0/1' }, json: async () => rows }
+      }
+      const [from, to] = String(init.headers.Range).split('-').map(Number)
+      return { ok: true, headers: { get: () => null }, json: async () => rows.slice(from, to + 1) }
+    }) as any
+    await run()
+    const manifest = JSON.parse(await readFile(path.join(await onlyRun(), '_manifest.json'), 'utf8'))
+    expect(manifest.counts.t).toBe(1)
+  })
+
+  it('still treats a plain refusal as an answer', async () => {
+    // The other half of the same rule. Widening the retry must not turn every
+    // permission problem into three attempts at every table.
+    let asked = 0
+    globalThis.fetch = vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.endsWith('/rest/v1/')) {
+        return { ok: true, json: async () => ({ definitions: { t: { properties: { id: {} } } } }) }
+      }
+      asked += 1
+      return { ok: false, status: 403, text: async () => 'no' }
+    }) as any
+    await expect(run()).rejects.toThrow(/could not be copied/)
+    expect(asked).toBe(1)
+  })
 })
 
 describe('a table too big to hold in memory', () => {
@@ -444,8 +486,56 @@ describe('the records never leave in the clear', () => {
     // The review caught that my first attempt overclaimed. A plain sha256
     // beside the file catches a corrupted download and nothing else, because
     // anybody who can change the file can write a new sha256 next to it.
-    expect(WORKFLOW).toContain('openssl dgst -sha256 -hmac "$BACKUP_PASSPHRASE"')
+    expect(WORKFLOW).toContain('openssl dgst -sha256 -hmac')
     expect(WORKFLOW).not.toContain('sha256sum out/records.tar.gz.enc')
+  })
+
+  it('does not use the encryption passphrase as the fingerprint key', () => {
+    // 13 September 2026, the AI review: one secret doing both jobs is a smell
+    // even where it is not yet a hole. This runs the derivation the workflow
+    // runs rather than reading it, so a change to the recipe has to keep
+    // working rather than merely keep looking right.
+    const pass = 'a passphrase with spaces and a $dollar'
+    const derived = execFileSync('sh', ['-c',
+      `printf '%s' "clearview-backup-hmac-v1:$P" | openssl dgst -sha256 | awk '{print $NF}'`,
+    ], { env: { ...process.env, P: pass } }).toString().trim()
+
+    expect(derived).toMatch(/^[0-9a-f]{64}$/)
+    expect(derived).not.toContain(pass)
+    // And the workflow really does derive under that label rather than
+    // handing the passphrase straight to the fingerprint.
+    expect(WORKFLOW).toContain('clearview-backup-hmac-v1:')
+    expect(WORKFLOW).not.toContain('openssl dgst -sha256 -hmac "$BACKUP_PASSPHRASE"')
+  })
+
+  it('a changed backup does not match its fingerprint', () => {
+    // The whole claim, held by running it. Somebody who swaps the encrypted
+    // file cannot produce a fingerprint that matches without the passphrase.
+    const dir = fs.mkdtempSync(path.join(tmpdir(), 'hmac-'))
+    const file = path.join(dir, 'records.tar.gz.enc')
+    const fingerprint = (key: string) => execFileSync('sh', ['-c',
+      `openssl dgst -sha256 -hmac "$K" "$F" | awk '{print $NF}'`,
+    ], { env: { ...process.env, K: key, F: file } }).toString().trim()
+
+    fs.writeFileSync(file, 'the real backup')
+    const real = fingerprint('the key')
+
+    fs.writeFileSync(file, 'a substituted backup')
+    expect(fingerprint('the key')).not.toBe(real)
+    // And without the key, the right content still gives the wrong answer.
+    fs.writeFileSync(file, 'the real backup')
+    expect(fingerprint('a guess')).not.toBe(real)
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('removes the plain records even if the step dies partway', () => {
+    // set -e means a failing openssl exits before the cleanup line at the
+    // bottom is ever reached. The runner is thrown away either way, so this
+    // is depth rather than a hole, but the step whose job is that records
+    // never travel in the clear should not depend on its own last line.
+    const step = WORKFLOW.slice(WORKFLOW.indexOf('Lock the records, or discard them'))
+    expect(step).toContain("trap 'rm -rf backup records.tar.gz' EXIT")
+    expect(step.indexOf('trap ')).toBeLessThan(step.indexOf('openssl enc'))
   })
 
   it('keeps it for thirty days rather than ninety', () => {

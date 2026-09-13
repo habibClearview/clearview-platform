@@ -97,6 +97,21 @@ function settings() {
  * timeout, or the server saying it is having trouble. A refusal is an answer,
  * and asking a second time will not change it.
  */
+/**
+ * Whether an answer is the database saying "not now" rather than "no".
+ *
+ * 13 September 2026, the AI review. My first version asked again only on a
+ * 500, so a 429 failed the whole night on the first hit. A 429 is the one
+ * status that literally means come back shortly, and a backup of forty odd
+ * tables in quick succession is exactly the shape of traffic that earns one.
+ * Treating it as a refusal turned a two second wait into no backup at all.
+ *
+ * A 4xx that is not 429 stays an answer and is not asked twice.
+ */
+function worthAskingAgain(status) {
+  return status === 429 || status >= 500
+}
+
 async function ask(target, headers) {
   let last
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -105,7 +120,7 @@ async function ask(target, headers) {
       const res = await fetch(target, { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
       // Only an explicit "I am having trouble" is worth asking again about.
       // Anything else, a refusal included, is an answer.
-      if (!(res.status >= 500) || attempt === 2) return res
+      if (!worthAskingAgain(res.status) || attempt === 2) return res
       last = new Error(`the database answered ${res.status}`)
     } catch (e) {
       last = e

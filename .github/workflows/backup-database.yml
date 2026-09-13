@@ -89,6 +89,16 @@ jobs:
           BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
           set -euo pipefail
+
+          # THE PLAIN RECORDS GO EVEN IF THIS STEP DIES. 13 September 2026,
+          # the AI review: set -e means a failing openssl exits before the
+          # cleanup line at the bottom is ever reached, leaving every client
+          # record sitting in the clear on the runner. The runner is thrown
+          # away either way, so this is depth rather than a hole, but a step
+          # whose whole job is that the records never travel in the clear
+          # should not depend on its own last line running.
+          trap 'rm -rf backup records.tar.gz' EXIT
+
           dir=$(find backup -mindepth 1 -maxdepth 1 -type d | head -1)
           mkdir -p out
 
@@ -126,8 +136,17 @@ jobs:
             # holding the passphrase can produce this one, and the passphrase
             # never appears in the artifact, so a backup that has been changed
             # by anybody else will not match.
-            openssl dgst -sha256 -hmac "$BACKUP_PASSPHRASE" out/records.tar.gz.enc \
+            #
+            # NOT THE SAME KEY AS THE ENCRYPTION. The review's second point:
+            # one secret doing both jobs is a smell even where it is not yet a
+            # hole. The fingerprint key is derived from the passphrase under a
+            # label of its own, so the two uses can never be the same bytes.
+            # Anybody rehearsing a restore reproduces it the same way.
+            hmac_key=$(printf '%s' "clearview-backup-hmac-v1:$BACKUP_PASSPHRASE" \
+              | openssl dgst -sha256 | awk '{print $NF}')
+            openssl dgst -sha256 -hmac "$hmac_key" out/records.tar.gz.enc \
               | awk '{print $NF}' > out/records.tar.gz.enc.hmac
+            unset hmac_key
             echo "Records kept, encrypted, with a keyed fingerprint."
           else
             echo "::warning::No BACKUP_PASSPHRASE secret is set, so the records were read and"
@@ -136,6 +155,8 @@ jobs:
           fi
 
           # The plain records go, always, before anything leaves this job.
+          # The trap above repeats this for the paths where the step dies
+          # early; this line is the one that runs when all is well.
           rm -rf backup
           ls -la out
 
