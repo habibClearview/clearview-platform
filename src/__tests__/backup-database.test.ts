@@ -574,6 +574,22 @@ describe('the records never leave in the clear', () => {
     expect(WORKFLOW).toContain('NOT kept. Only the manifest is stored')
   })
 
+  it('goes red when no copy was kept, rather than green with only counts', () => {
+    // 13 September 2026, the AI review, and the sharpest business point made
+    // on this change. Reading every record and keeping only the counts is
+    // worth having and is not a backup. A warning in a log nobody opens is how
+    // somebody ends up believing they have months of backups and holding none.
+    expect(WORKFLOW).toContain('The records must actually be kept')
+    expect(WORKFLOW).toContain('NO COPY WAS KEPT')
+    // After the upload, so the proof is still kept and the red is about the
+    // missing copy rather than a missing run.
+    expect(WORKFLOW.indexOf('The records must actually be kept'))
+      .toBeGreaterThan(WORKFLOW.indexOf('upload-artifact'))
+    // And it says where to set it, because the person reading this will not
+    // know where that is.
+    expect(WORKFLOW).toContain('New repository secret')
+  })
+
   it('deletes the plain files inside the job, before anything is uploaded', () => {
     expect(WORKFLOW).toContain('rm -rf backup')
     expect(WORKFLOW.indexOf('rm -rf backup')).toBeLessThan(WORKFLOW.indexOf('upload-artifact'))

@@ -186,3 +186,28 @@ jobs:
           # window is a smaller thing to explain to a funder.
           retention-days: 30
           if-no-files-found: error
+
+      # A GREEN TICK THAT MEANS "NO RECORDS WERE KEPT" IS THE WORST TICK HERE.
+      # 13 September 2026, the AI review, and the sharpest business point made
+      # on this change. Without the passphrase this job reads every record,
+      # proves it can be parsed, and then keeps only the counts. That is worth
+      # having, and it is NOT a backup. A warning in a log nobody opens is how
+      # somebody ends up believing they have months of backups and holding
+      # none, which is precisely the failure this whole job exists to prevent.
+      #
+      # So the run is honestly red until the secret is set. The summary above
+      # is still uploaded first, so the proof is kept either way and the red
+      # is about the missing copy rather than a missing run.
+      - name: The records must actually be kept
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "${BACKUP_PASSPHRASE:-}" ]; then
+            echo "::error::Every record was read and checked, but NO COPY WAS KEPT."
+            echo "::error::Set the BACKUP_PASSPHRASE secret at Settings, Secrets and variables,"
+            echo "::error::Actions, New repository secret. Use a long phrase and keep it"
+            echo "::error::somewhere that is not this repository: without it a backup cannot"
+            echo "::error::be opened again by anybody, including you."
+            exit 1
+          fi
+          echo "An encrypted copy of every record was kept."
