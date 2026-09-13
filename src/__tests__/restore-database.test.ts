@@ -14,7 +14,7 @@
 // year.
 // ============================================================
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtemp, writeFile, readFile, mkdir, rm, readdir } from 'node:fs/promises'
+import { mkdtemp, writeFile, readFile, mkdir, rm, readdir, symlink } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -143,6 +143,39 @@ describe('a backup nobody has opened is a belief', () => {
     await expect(restore(artifact, downloads, PASSPHRASE)).rejects.toThrow(/would be deleted/)
     expect(await readdir(downloads)).toEqual(expect.arrayContaining(['artifact', 'something-else-of-mine.txt']))
     expect(await readdir(artifact)).toContain('records.tar.gz.enc')
+  }, 30_000)
+
+  it('refuses when the backup is reached through a link, not just by name', async () => {
+    // CodeRabbit again, on my own fix. Resolving a path only tidies up the
+    // text of it; it does not follow a link. A link outside the output folder
+    // pointing at an artifact inside it would have passed the name comparison
+    // and then been deleted through the link.
+    const downloads = path.join(work, 'downloads')
+    const artifact = path.join(downloads, 'artifact')
+    await recordsFolder(path.join(work, 'records'))
+    lock(path.join(work, 'records'), artifact)
+    await writeFile(path.join(downloads, 'something-else-of-mine.txt'), 'not yours to delete')
+
+    const link = path.join(work, 'artifact-link')
+    await symlink(artifact, link)
+
+    await expect(restore(link, downloads, PASSPHRASE)).rejects.toThrow(/would be deleted/)
+    // Both the backup and the innocent file beside it are still there.
+    expect(await readdir(artifact)).toContain('records.tar.gz.enc')
+    expect(await readdir(downloads)).toEqual(expect.arrayContaining(['artifact', 'something-else-of-mine.txt']))
+  }, 30_000)
+
+  it('still opens a backup reached through a link when the output is somewhere else', async () => {
+    // Following links must not turn into refusing them. A link is a perfectly
+    // ordinary way to point at a folder.
+    const artifact = path.join(work, 'artifact')
+    await recordsFolder(path.join(work, 'records'))
+    lock(path.join(work, 'records'), artifact)
+    const link = path.join(work, 'artifact-link')
+    await symlink(artifact, link)
+
+    const found = await restore(link, path.join(work, 'restored'), PASSPHRASE)
+    expect(found.rows).toBe(3)
   }, 30_000)
 
   it('still accepts the folder it makes alongside the backup by default', async () => {

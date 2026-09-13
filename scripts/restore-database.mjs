@@ -32,7 +32,7 @@
 // without something going red.
 // ============================================================
 import { createHmac, pbkdf2Sync, timingSafeEqual, createDecipheriv } from 'node:crypto'
-import { readFile, writeFile, mkdir, rm } from 'node:fs/promises'
+import { readFile, writeFile, mkdir, rm, realpath } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { verify } from './backup-database.mjs'
@@ -93,6 +93,29 @@ export function decrypt(blob, passphrase) {
 }
 
 /**
+ * Where a path actually is on disk, following any links.
+ *
+ * The output folder need not exist yet, so this walks up to the deepest part
+ * that does exist, asks the filesystem where that is, and puts the rest back
+ * on the end. A path with nothing real in it at all is simply tidied, which is
+ * all that can be said about it.
+ */
+async function canonical(target) {
+  let head = path.resolve(target)
+  const tail = []
+  for (;;) {
+    try {
+      return path.join(await realpath(head), ...tail)
+    } catch {
+      const parent = path.dirname(head)
+      if (parent === head) return path.resolve(target)
+      tail.unshift(path.basename(head))
+      head = parent
+    }
+  }
+}
+
+/**
  * Open a downloaded artifact and read every record in it back.
  *
  * `from` is the folder the artifact was unzipped into. `into` is where the
@@ -114,8 +137,16 @@ export async function restore(from, into, passphrase) {
   // the folder the artifact sits in and it takes everything else in there too.
   // Somebody doing this is having the worst day of their year and is typing
   // paths in a hurry. It refuses instead.
-  const src = path.resolve(from)
-  const dest = path.resolve(into)
+  //
+  // AND THE NAME IS NOT THE PLACE. CodeRabbit again, on my own fix. Resolving
+  // a path only tidies up the text of it: it does not follow a link. If
+  // ./artifact-link points at ./downloads/artifact, then comparing the two
+  // names says ./downloads does not hold ./artifact-link, the check passes,
+  // and deleting ./downloads takes the real artifact with it through the link.
+  // Both sides are asked where they actually are on disk now, so the
+  // comparison is between places rather than between names.
+  const src = await canonical(from)
+  const dest = await canonical(into)
   const rel = path.relative(dest, src)
   const destHoldsSrc = rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
   if (destHoldsSrc) {
