@@ -49,8 +49,9 @@ import { sendEmail, emailAvailable, brandedEmail } from '@/lib/email'
 import { textToEmail } from '@/lib/letter'
 import {
   CO_IMPLEMENTER_LETTER_KEY, CO_IMPLEMENTER_LETTER_SUBJECT, DEFAULT_CO_IMPLEMENTER_LETTER,
+  fillLetterName, NAME_TOKEN,
 } from '@/lib/co-implementer-letter'
-import { cleanEmail, emailLooksSendable, salutation } from '@/lib/engagement-brief'
+import { cleanEmail, emailLooksSendable } from '@/lib/engagement-brief'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { getBearerToken } from '@/lib/auth/api-authz'
 import { canManageTeam } from '@/lib/coach-types'
@@ -264,7 +265,11 @@ export async function GET(req: NextRequest) {
       heading: 'Welcome to the team',
       // A name nobody is addressed by, so the preview reads as a letter rather
       // than as a fragment. The real one carries the person's own name.
-      paragraphs: [salutation('Your Name') || '', ...textToEmail(body)].filter(Boolean),
+      // A REAL NAME IN THE PREVIEW, NOT A PLACEHOLDER. It used to read "Dear
+      // Your Name," which looks like the name is never going to arrive. The
+      // preview fills the tokens exactly as a send does, with an obviously
+      // made-up person, so what is on screen is the shape of what goes out.
+      paragraphs: textToEmail(fillLetterName(body, 'Amina Bello')),
       // The preview shows the button in its place. The real letter carries a
       // one-time link minted for one person; this one goes to the page that
       // link opens, so nothing that signs anybody in is produced by a preview.
@@ -276,6 +281,8 @@ export async function GET(req: NextRequest) {
       ok: true,
       subject: CO_IMPLEMENTER_LETTER_SUBJECT,
       text: body,
+      nameToken: NAME_TOKEN,
+      previewName: 'Amina Bello',
       edited: !!saved,
       updatedAt: read.updatedAt,
       html,
@@ -380,7 +387,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, notConfigured: true, reason: 'Email is not switched on' })
     }
 
-    const hello = salutation(ci.name || undefined)
     const read = await readLetter(admin)
     if (!read.ok) return LETTER_UNREADABLE
     const letter = read.body
@@ -397,7 +403,7 @@ export async function POST(req: NextRequest) {
       brand: 'canvas',
       preheader: 'What your role is, who you report to, and how the platform works.',
       heading: 'Welcome to the team',
-      paragraphs: [...(hello ? [hello] : []), ...textToEmail(letter)],
+      paragraphs: textToEmail(fillLetterName(letter, ci.name)),
       ctaLabel: SIGN_IN_LABEL,
       ctaUrl: wayIn.url,
       footNote: 'Reply to this email with any question at all. There is no question too small in the first week.',
