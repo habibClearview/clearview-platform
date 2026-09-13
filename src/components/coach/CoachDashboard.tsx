@@ -2185,9 +2185,14 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     const live=!!flag&&!flag.aside
     const edge=live?HEALTH_COLOR[flag.status.label]:null
     const smallBtn={fontFamily:'var(--cv-font-mono)',fontSize:'0.82rem',padding:'0.22rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,background:'transparent',color:C.slate,cursor:'pointer',whiteSpace:'nowrap'}
+    // A card is a way in, so it has to be one for somebody using a keyboard
+    // too. CodeRabbit.
+    const open=()=>{setSelClientId(client.id);setActiveTab(openingTabFor(client));setView('client')}
     return(
-      <div style={{border:'1px solid var(--cv-border-soft)',borderLeft:edge?`4px solid ${edge}`:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.75rem 0.85rem',cursor:'pointer',background:C.white,display:'flex',flexDirection:'column',gap:'0.4rem'}}
-        onClick={()=>{setSelClientId(client.id);setActiveTab(openingTabFor(client));setView('client')}}>
+      <div role="button" tabIndex={0} aria-label={`Open ${client.name}`}
+        onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}}
+        style={{border:'1px solid var(--cv-border-soft)',borderLeft:edge?`4px solid ${edge}`:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.75rem 0.85rem',cursor:'pointer',background:C.white,display:'flex',flexDirection:'column',gap:'0.4rem'}}
+        onClick={open}>
         <div style={{display:'flex',alignItems:'flex-start',gap:'0.5rem'}}>
           <div style={{fontWeight:700,fontSize:'0.95rem',flex:1,minWidth:0}}>{client.name}</div>
           {live&&<span title={`${flag.status.label} — from the latest health check`} style={{width:10,height:10,borderRadius:'50%',background:edge,flexShrink:0,marginTop:'0.3rem'}}/>}
@@ -2209,6 +2214,30 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         )}
         {hasActuals&&<div onClick={e=>e.stopPropagation()}><ClientDocumentActions clientId={client.id} clientName={client.name} clients={clients} programmes={programmes}/></div>}
       </div>
+    )
+  }
+
+  // A TEXT BOX IS NOT A SWITCH. 13 September 2026. CodeRabbit: every keystroke
+  // in the subscription level started its own write, so typing "Standard" sent
+  // eight of them and, if the answers came back out of order, an earlier
+  // letter could land on top of the finished word while the screen went on
+  // showing the word. It is held here while it is being typed and written once
+  // when the person moves on.
+  function SubscriptionLevel({se,clientName,onSave}){
+    const saved=se.subscription_level||''
+    const [draft,setDraft]=useState(saved)
+    const [typing,setTyping]=useState(false)
+    const commit=()=>{setTyping(false);if(draft!==saved)onSave(draft)}
+    return(
+      <input
+        aria-label={`Subscription level, ${clientName}`}
+        style={{...inp,width:120,padding:'0.3rem 0.5rem'}}
+        placeholder="e.g. Standard"
+        value={typing?draft:saved}
+        onChange={e=>{setTyping(true);setDraft(e.target.value)}}
+        onBlur={commit}
+        onKeyDown={e=>{if(e.key==='Enter'){e.currentTarget.blur()}}}
+      />
     )
   }
 
@@ -2450,9 +2479,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
                     return(
                       <tr key={se.id} style={{borderBottom:'1px solid var(--cv-border-soft)'}}>
                         <td style={{padding:'10px 12px',fontWeight:700,cursor:'pointer'}} onClick={()=>{setSelClientId(c.id);setActiveTab(openingTabFor(c));setView('client')}}>{c.name}</td>
-                        <td style={{padding:'10px 12px'}}><input style={{...inp,width:120,padding:'0.3rem 0.5rem'}} placeholder="e.g. Standard" value={se.subscription_level||''} onChange={e=>updateSubscription(se.id,{subscription_level:e.target.value})}/></td>
-                        <td style={{padding:'10px 12px'}}><input type="date" style={{...inp,width:150,padding:'0.3rem 0.5rem'}} value={se.paid_through_date||''} onChange={e=>updateSubscription(se.id,{paid_through_date:e.target.value||null})}/></td>
-                        <td style={{padding:'10px 12px'}}><select style={{...inp,width:110,padding:'0.3rem 0.5rem'}} value={se.billing_term||''} onChange={e=>updateSubscription(se.id,{billing_term:e.target.value||null})}><option value="">—</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select></td>
+                        <td style={{padding:'10px 12px'}}><SubscriptionLevel se={se} clientName={c.name} onSave={v=>updateSubscription(se.id,{subscription_level:v})}/></td>
+                        <td style={{padding:'10px 12px'}}><input type="date" aria-label={`Paid up to, ${c.name}`} style={{...inp,width:150,padding:'0.3rem 0.5rem'}} value={se.paid_through_date||''} onChange={e=>updateSubscription(se.id,{paid_through_date:e.target.value||null})}/></td>
+                        <td style={{padding:'10px 12px'}}><select aria-label={`Billing term, ${c.name}`} style={{...inp,width:110,padding:'0.3rem 0.5rem'}} value={se.billing_term||''} onChange={e=>updateSubscription(se.id,{billing_term:e.target.value||null})}><option value="">—</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select></td>
                         <td style={{padding:'10px 12px'}}>{se.paid_through_date?<Badge text={dueSoon?'Renewal due':'Paid up'} color={dueSoon?C.amber:C.green}/>:<Badge text="No date set" color={C.slate}/>}</td>
                       </tr>
                     )
@@ -2949,194 +2978,15 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     )
   }
 
-  // ── TEAM VIEW ──────────────────────────────────────────────
-  function TeamView(){
-    const [showNew,setShowNew]=useState(false)
-    const [addingClientFor,setAddingClientFor]=useState(null)
-    const [editingCiId,setEditingCiId]=useState(null)
-    const [editForm,setEditForm]=useState(null)
-    const [teamMsg,setTeamMsg]=useState(null)
-    const [openCiId,setOpenCiId]=useState(null)
-    const openCi=coImplementers.find(c=>c.id===openCiId)||null
-    // Real profile edit -- name/email/phone/country/specialisation were
-    // only ever set once at creation (NewCIForm) with no way to change any
-    // of them again anywhere in the app, not even here where rate already
-    // was editable.
-    function startEditCi(ci){setEditForm({name:ci.name||'',email:ci.email||'',phone:ci.phone||'',country:ci.country||'',specialisation:ci.specialisation||''});setEditingCiId(ci.id)}
-    async function saveCiProfile(ciId){
-      const {error}=await supabase.from('co_implementers').update(editForm).eq('id',ciId)
-      if(error)return setTeamMsg('Could not save profile: '+error.message)
-      setCoImplementers(prev=>prev.map(x=>x.id!==ciId?x:{...x,...editForm}))
-      setEditingCiId(null);setEditForm(null)
-    }
-    const pendingTs=timesheets.filter(t=>t.status==='submitted')
-    async function approveTs(id){await supabase.from('timesheets').update({status:'approved',approved_by:userName,approved_at:new Date().toISOString()}).eq('id',id);setTimesheets(prev=>prev.map(t=>t.id!==id?t:{...t,status:'approved'}))}
-    async function rejectTs(id){await supabase.from('timesheets').update({status:'rejected'}).eq('id',id);setTimesheets(prev=>prev.map(t=>t.id!==id?t:{...t,status:'rejected'}))}
-    // Suspend/reactivate -- previously ci.active was set once at creation
-    // and never editable again anywhere in the app (the roster badge was
-    // read-only text). This is the real fix: a co-implementer moving off a
-    // closed engagement can be marked Inactive without deleting their
-    // record or history.
-    async function toggleActive(ci){
-      const next=!ci.active
-      const {error}=await supabase.from('co_implementers').update({active:next}).eq('id',ci.id)
-      if(error)return setTeamMsg('Could not update status: '+error.message)
-      setCoImplementers(prev=>prev.map(x=>x.id!==ci.id?x:{...x,active:next}))
-    }
-    // Reassign clients directly from the roster -- previously this was only
-    // reachable from Team → Payments → a different sub-tab, which is why
-    // "where do I move them to another client when the one they're on
-    // closes" had no obvious answer. Same underlying client_ids array
-    // AccessSection (TeamPayments.tsx) writes to, just surfaced here too.
-    async function assignClient(ci,clientId){
-      if(!clientId||(ci.client_ids||[]).includes(clientId))return
-      const next=[...(ci.client_ids||[]),clientId]
-      const {error}=await supabase.from('co_implementers').update({client_ids:next}).eq('id',ci.id)
-      if(error)return setTeamMsg('Could not assign client: '+error.message)
-      setCoImplementers(prev=>prev.map(x=>x.id!==ci.id?x:{...x,client_ids:next}))
-      setAddingClientFor(null)
-    }
-    async function unassignClient(ci,clientId){
-      const next=(ci.client_ids||[]).filter(id=>id!==clientId)
-      const {error}=await supabase.from('co_implementers').update({client_ids:next}).eq('id',ci.id)
-      if(error)return setTeamMsg('Could not remove client: '+error.message)
-      setCoImplementers(prev=>prev.map(x=>x.id!==ci.id?x:{...x,client_ids:next}))
-    }
-    // A PAGE PER CO-IMPLEMENTER. 13 September 2026. Habib: it would be good
-    // to have team member cards, so every co-implementer has a page.
-    //
-    // The roster used to print every person's full record one under the
-    // other -- profile, clients, and ten rows of timesheet each -- so five
-    // people was a page nobody could take in. The roster is cards now, and
-    // everything that was on the long list is on the person's own page,
-    // one click in and one click back. Nothing was removed.
-    function CiDetail({ci}){
-    const ciTs=timesheets.filter(t=>t.co_implementer_id===ci.id)
-    const approvedHours=ciTs.filter(t=>t.status==='approved').reduce((s,t)=>s+(Number(t.hours)||0),0)
-    const pendingHours=ciTs.filter(t=>t.status==='submitted').reduce((s,t)=>s+(Number(t.hours)||0),0)
-    return(<div style={{...card,marginBottom:0}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.65rem'}}>
-        <div><div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy}}>{ci.name}</div><div style={{fontSize:'1.01rem',color:C.slate}}>{ci.email} · {ci.country}</div>{ci.specialisation&&<div style={{fontSize:'1.01rem',color:C.slate}}>{ci.specialisation}</div>}</div>
-        <div style={{textAlign:'right'}}>
-          {canManageTeam(userRole)
-            ?<button onClick={()=>toggleActive(ci)} title="Click to toggle" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem',background:'transparent',border:`1px solid ${ci.active?C.green:C.red}`,borderRadius:4,padding:'0.1rem 0.5rem',cursor:'pointer'}}>{ci.active?'Active':'Inactive'} · click to {ci.active?'suspend':'reactivate'}</button>
-            :<div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem'}}>{ci.active?'Active':'Inactive'}</div>}
-          {ci.rate_per_day>0&&<div style={{fontSize:'0.93rem',color:C.slate,marginBottom:'0.4rem',marginTop:'0.3rem'}}>{ci.currency} {Number(ci.rate_per_day).toLocaleString()}/day</div>}
-          {canManageTeam(userRole)&&<button style={{...addBtn(true),marginBottom:'0.4rem'}} onClick={()=>editingCiId===ci.id?setEditingCiId(null):startEditCi(ci)}>{editingCiId===ci.id?'Cancel':'Edit profile'}</button>}
-          <InviteLoginButton email={ci.email} fullName={ci.name} role="coach" coImplementerId={ci.id} funderProgrammeId={null}/>
-          <div style={{marginTop:'0.4rem'}}><WelcomeLetterButton coImplementerId={ci.id}/></div>
-        </div>
-      </div>
-      {editingCiId===ci.id&&editForm&&(
-        <div style={{...card,border:`1px solid ${C.cyan}`,marginBottom:'0.75rem'}}>
-          <div style={fGrid}>
-            <div><label style={lbl}>Name</label><input style={inp} value={editForm.name} onChange={e=>setEditForm(f=>({...f,name:e.target.value}))}/></div>
-            <div><label style={lbl}>Email</label><input type="email" style={inp} value={editForm.email} onChange={e=>setEditForm(f=>({...f,email:e.target.value}))}/></div>
-            <div><label style={lbl}>Phone</label><input style={inp} value={editForm.phone} onChange={e=>setEditForm(f=>({...f,phone:e.target.value}))}/></div>
-            <div><label style={lbl}>Country</label><input style={inp} value={editForm.country} onChange={e=>setEditForm(f=>({...f,country:e.target.value}))}/></div>
-            <div><label style={lbl}>Specialisation</label><input style={inp} value={editForm.specialisation} onChange={e=>setEditForm(f=>({...f,specialisation:e.target.value}))}/></div>
-          </div>
-          <button style={{...solidBtn(),marginTop:'0.75rem'}} onClick={()=>saveCiProfile(ci.id)}>Save profile</button>
-        </div>
-      )}
-      <div style={{display:'flex',gap:'1.5rem',fontSize:'1.01rem',color:C.slate,marginBottom:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
-        <span style={{display:'flex',alignItems:'center',gap:'0.4rem',flexWrap:'wrap'}}>Clients:{(ci.client_ids||[]).length===0?<strong style={{color:C.slate}}>None</strong>:(ci.client_ids||[]).map(id=><span key={id} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.12rem 0.55rem',borderRadius:20,background:'var(--cv-cyan-dim)',color:C.teal,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:'0.3rem'}}>{clients.find(c=>c.id===id)?.name||id}{canManageTeam(userRole)&&<span style={{cursor:'pointer',fontWeight:700}} onClick={()=>unassignClient(ci,id)} title="Remove this client">×</span>}</span>)}</span>
-        {canManageTeam(userRole)&&(addingClientFor===ci.id?(
-          <select autoFocus style={{...inp,width:'auto',fontSize:'0.93rem',padding:'0.15rem 0.4rem'}} value="" onChange={e=>assignClient(ci,e.target.value)} onBlur={()=>setAddingClientFor(null)}>
-            <option value="">Select a client…</option>
-            {clients.filter(c=>!(ci.client_ids||[]).includes(c.id)).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        ):(
-          <button style={addBtn(true)} onClick={()=>setAddingClientFor(ci.id)}>+ Assign client</button>
-        ))}
-        <span>Approved: <strong style={{color:C.green}}>{approvedHours}h</strong></span>
-        <span>Pending: <strong style={{color:C.amber}}>{pendingHours}h</strong></span>
-      </div>
-      {/* Timesheet table */}
-      {ciTs.length>0&&<div style={{overflowX:'auto'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem',fontFamily:"var(--cv-font)"}}>
-          <thead><tr style={{background:C.lightBg}}>{['Date','Client','DP','Hours','Description','Status'].map(h=><th key={h} style={{padding:'0.4rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`}}>{h}</th>)}</tr></thead>
-          <tbody>{ciTs.slice(0,10).map((ts,i)=><tr key={ts.id} style={{background:i%2===0?C.cream:C.white}}>
-            <td style={{padding:'0.4rem 0.6rem'}}>{ts.date}</td>
-            <td style={{padding:'0.4rem 0.6rem'}}>{clients.find(c=>c.id===ts.client_id)?.name||'—'}</td>
-            <td style={{padding:'0.4rem 0.6rem',fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem'}}>{ts.dp_id||'—'}</td>
-            <td style={{padding:'0.4rem 0.6rem'}}>{ts.hours}</td>
-            <td style={{padding:'0.4rem 0.6rem',maxWidth:180}}>{ts.description}</td>
-            <td style={{padding:'0.4rem 0.6rem'}}><Badge text={ts.status} color={ts.status==='approved'?C.green:ts.status==='submitted'?C.amber:ts.status==='rejected'?C.red:C.slate}/></td>
-          </tr>)}</tbody>
-        </table>
-      </div>}
-    </div>)
-    }
-
-    function CiRosterCard({ci}){
-      const initials=(ci.name||'?').split(' ').filter(Boolean).map(w=>w[0]).slice(0,2).join('').toUpperCase()
-      const ciTs=timesheets.filter(t=>t.co_implementer_id===ci.id)
-      const pendingHours=ciTs.filter(t=>t.status==='submitted').reduce((s,t)=>s+(Number(t.hours)||0),0)
-      const approvedHours=ciTs.filter(t=>t.status==='approved').reduce((s,t)=>s+(Number(t.hours)||0),0)
-      const served=(ci.client_ids||[]).map(id=>clients.find(c=>c.id===id)).filter(Boolean)
-      return(
-        <div onClick={()=>setOpenCiId(ci.id)}
-          style={{...card,marginBottom:0,padding:'1rem 1.1rem',cursor:'pointer',borderLeft:`4px solid ${ci.active?C.green:C.border}`}}>
-          <div style={{display:'flex',alignItems:'center',gap:'0.7rem',marginBottom:'0.6rem'}}>
-            <div style={{width:38,height:38,borderRadius:10,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'var(--cv-font-mono)',fontSize:'0.99rem',fontWeight:700,flexShrink:0}}>{initials}</div>
-            <div style={{minWidth:0,flex:1}}>
-              <div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ci.name}</div>
-              <div style={{fontSize:'0.93rem',color:C.slate,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{[ci.country,ci.specialisation].filter(Boolean).join(' · ')||ci.email}</div>
-            </div>
-          </div>
-          <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginBottom:'0.55rem'}}>
-            <Badge text={ci.active?'Active':'Inactive'} color={ci.active?C.green:C.red}/>
-            <Badge text={`${served.length} client${served.length===1?'':'s'}`} color={C.teal}/>
-            {pendingHours>0&&<Badge text={`${pendingHours}h awaiting approval`} color={C.amber}/>}
-          </div>
-          <div style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.4,minHeight:'1.2rem'}}>
-            {served.length===0?'No clients assigned yet.':served.map(c=>c.name).join(', ')}
-          </div>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'0.7rem',fontSize:'0.85rem',color:C.slate}}>
-            <span>{approvedHours}h approved</span>
-            <span style={{fontFamily:'var(--cv-font-mono)',color:C.teal,fontWeight:700}}>Open page →</span>
-          </div>
-        </div>
-      )
-    }
-
-    return(
-      <div>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem'}}><div style={secH}>Canvas Coach Team</div>{canManageTeam(userRole)&&<button style={addBtn()} onClick={()=>setShowNew(!showNew)}>+ Add Co-Implementer</button>}</div>
-        {teamMsg&&<div style={{fontSize:'1.01rem',color:C.red,marginBottom:'0.75rem'}}>{teamMsg}</div>}
-        {pendingTs.length>0&&canApproveTimesheets(userRole)&&(
-          <div style={{...card,background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`}}>
-            <div style={secH}>⏳ Pending Timesheet Approvals ({pendingTs.length})</div>
-            {pendingTs.map(ts=>{
-              const ci=coImplementers.find(c=>c.id===ts.co_implementer_id)
-              const cl=clients.find(c=>c.id===ts.client_id)
-              return(<div key={ts.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.75rem',border:`1px solid ${C.amber}`,borderRadius:5,marginBottom:'0.45rem',background:C.white}}>
-                <div><div style={{fontWeight:600,fontSize:'1.07rem'}}>{ci?.name||'Unknown'} — {ts.date}</div><div style={{fontSize:'1.01rem',color:C.slate}}>{cl?.name||'Unknown'} · {ts.hours}h · {ts.dp_id||''} · {ts.description}</div></div>
-                <div style={{display:'flex',gap:'0.4rem'}}>
-                  <button style={solidBtn(C.green,true)} onClick={()=>approveTs(ts.id)}>Approve</button>
-                  <button style={solidBtn(C.red,true)} onClick={()=>rejectTs(ts.id)}>Reject</button>
-                </div>
-              </div>)
-            })}
-          </div>
-        )}
-        {showNew&&<NewCIForm clients={clients} onSave={async ci=>{const {data,error}=await supabase.from('co_implementers').insert([ci]).select().single();if(!error&&data){setCoImplementers(prev=>[...prev,data]);setShowNew(false)}}} onCancel={()=>setShowNew(false)}/>}
-        {openCi?(
-          <div>
-            <button style={{...addBtn(true,C.teal),marginBottom:'0.9rem'}} onClick={()=>setOpenCiId(null)}>← All co-implementers</button>
-            <CiDetail ci={openCi}/>
-          </div>
-        ):coImplementers.length===0?(
-          <div style={{...card,color:C.slate,textAlign:'center',padding:'2.5rem'}}>No co-implementers yet.</div>
-        ):(
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(270px,1fr))',gap:'1rem',alignItems:'start'}}>
-            {coImplementers.map(ci=><CiRosterCard key={ci.id} ci={ci}/>)}
-          </div>
-        )}
-      </div>
-    )
-  }
+  // A SECOND TEAM SCREEN NOBODY COULD REACH. 13 September 2026. CodeRabbit
+  // on #260: TeamView was not rendered by anything. The Team tab renders
+  // TeamHub, which renders TeamPayments, and has done for some time. So the
+  // roster here, and the co-implementer cards and welcome letter I had just
+  // built into it, were invisible: the work was real and the screen was not.
+  //
+  // Rather than wire a second Team screen up beside the one in use, the cards,
+  // the page per person and the welcome letter now live in TeamPayments, which
+  // is what a coach actually opens, and this copy is gone.
 
   // ── HEADER + SHELL ─────────────────────────────────────────
   // Previously 4 separate top-level entries covered the same ground as
@@ -3220,6 +3070,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           canApprove={canApproveTimesheets(userRole)} canManage={canManageTeam(userRole)}
           updateCI={updateCI}
           renderInvite={ci=><InviteLoginButton email={ci.email} fullName={ci.name} role="coach" coImplementerId={ci.id} funderProgrammeId={null}/>}
+          renderWelcome={canManageTeam(userRole)?(ci=><WelcomeLetterButton coImplementerId={ci.id}/>):null}
           addMemberNode={canManageTeam(userRole)?addMemberNode:null}
         />
       </div>

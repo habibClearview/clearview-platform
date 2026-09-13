@@ -20,6 +20,7 @@ import { readFileSync } from 'node:fs'
 
 const DASH = readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
 const LETTER = readFileSync('app/api/co-implementer-welcome/route.ts', 'utf8')
+const TEAM = readFileSync('src/components/coach/TeamPayments.tsx', 'utf8')
 
 describe('the flag sits on the client, not above the page', () => {
   it('the banner at the top of the Clients screen is gone', () => {
@@ -42,6 +43,22 @@ describe('the flag sits on the client, not above the page', () => {
   it('whoever needs attention is read first', () => {
     expect(DASH).toContain("const rank={'Needs attention':0,'Watch':1}")
     expect(DASH).toContain('if(ra!==rb)return ra-rb')
+  })
+})
+
+describe('the subscription table is usable and safe to type in', () => {
+  it('the level is written once, when the person moves on', () => {
+    // Every keystroke used to start its own write, so answers coming back out
+    // of order could land an earlier letter on top of the finished word.
+    expect(DASH).toContain('function SubscriptionLevel({se,clientName,onSave})')
+    expect(DASH).toContain('const commit=()=>{setTyping(false);if(draft!==saved)onSave(draft)}')
+    expect(DASH).toContain('onBlur={commit}')
+  })
+
+  it('every control in it says which client and which field it belongs to', () => {
+    expect(DASH).toContain('aria-label={`Subscription level, ${clientName}`}')
+    expect(DASH).toContain('aria-label={`Paid up to, ${c.name}`}')
+    expect(DASH).toContain('aria-label={`Billing term, ${c.name}`}')
   })
 })
 
@@ -105,26 +122,44 @@ describe('the tabs say what is behind them', () => {
 })
 
 describe('every co-implementer has a page', () => {
+  it('is built on the Team screen that is actually rendered', () => {
+    // CodeRabbit on #260 caught this: the first version of these cards went
+    // into TeamView, which nothing renders. The Team tab renders TeamHub,
+    // which renders TeamPayments. A screen nobody can reach is not a screen.
+    expect(DASH).toContain("{view==='team'&&<TeamHub/>}")
+    expect(DASH).toContain('<TeamPayments')
+    expect(DASH).not.toContain('function TeamView()')
+  })
+
   it('the roster is cards, one per person', () => {
-    expect(DASH).toContain('function CiRosterCard({ci})')
-    expect(DASH).toContain('{coImplementers.map(ci=><CiRosterCard key={ci.id} ci={ci}/>)}')
+    expect(TEAM).toContain('function CiRosterCard({ci,period,entries,expenses,advances,clients,onOpen})')
+    expect(TEAM).toContain('<CiRosterCard key={ci.id}')
   })
 
   it('the card says the state of that person at a glance', () => {
-    expect(DASH).toContain("<Badge text={ci.active?'Active':'Inactive'}")
-    expect(DASH).toContain('{pendingHours>0&&<Badge text={`${pendingHours}h awaiting approval`}')
+    expect(TEAM).toContain("<Badge text={active?'Active':'Inactive'}")
+    expect(TEAM).toContain('{awaiting>0&&<Badge text={`${awaiting} awaiting approval`}')
   })
 
   it('opening one opens their page, and there is a way back', () => {
-    expect(DASH).toContain('function CiDetail({ci})')
-    expect(DASH).toContain('← All co-implementers')
+    expect(TEAM).toContain('← All co-implementers')
+    expect(TEAM).toContain('const openPerson=showRoster?')
+  })
+
+  it('a co-implementer seeing only themselves lands on their own page', () => {
+    // There is no roster to choose from, so a roster would be one click for
+    // nothing on every visit.
+    expect(TEAM).toContain('const showRoster=coImplementers.length>1||canApprove')
+  })
+
+  it('a card can be opened from the keyboard', () => {
+    expect(TEAM).toContain("onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}}")
+    expect(DASH).toContain("onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}}")
   })
 
   it('nothing that was on the long list was dropped', () => {
-    // Profile editing, assigning clients, the invite, and the timesheets all
-    // moved onto the person's page rather than going away.
-    for (const kept of ['Edit profile', '+ Assign client', '<InviteLoginButton', 'Save profile']) {
-      expect(DASH).toContain(kept)
+    for (const kept of ['Edit profile', '+ Assign client', 'renderInvite(ci)', 'Timesheets']) {
+      expect(TEAM).toContain(kept)
     }
   })
 })
@@ -190,8 +225,15 @@ describe('the welcome letter to a co-implementer', () => {
     expect(LETTER).toContain('if (!claimErr) {')
   })
 
-  it('is sendable from the co-implementer’s own page', () => {
+  it('is sendable from the co-implementer’s own page, on the screen in use', () => {
     expect(DASH).toContain('function WelcomeLetterButton({coImplementerId})')
-    expect(DASH).toContain('<WelcomeLetterButton coImplementerId={ci.id}/>')
+    expect(DASH).toContain('renderWelcome={canManageTeam(userRole)?(ci=><WelcomeLetterButton coImplementerId={ci.id}/>):null}')
+    expect(TEAM).toContain('{renderWelcome&&renderWelcome(ci)}')
+  })
+
+  it('says nothing about the database when something breaks', () => {
+    // An exception's own text carries configuration and column names with it.
+    expect(LETTER).toContain("console.error('co-implementer-welcome failed', e)")
+    expect(LETTER).not.toContain('e instanceof Error ? e.message')
   })
 })

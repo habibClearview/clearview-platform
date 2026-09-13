@@ -193,6 +193,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, sentTo: to })
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Something went wrong' }, { status: 500 })
+    // The real fault goes to the server log. What comes back says nothing
+    // about the configuration or the database behind it.
+    console.error('co-implementer-welcome failed', e)
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
 }

@@ -50,7 +50,13 @@ describe('a client can be onboarded into any of the four services', () => {
     // client carrying one with no service row yet would show under no service
     // at all and read as deleted.
     expect(DASH).toContain('const ownMode=clients.filter(c=>c.engagement_mode===key)')
-    expect(DASH).toContain("payer:'Nothing logged under Services yet'")
+    // And it is not enough that ownMode is computed: it has to reach the rows
+    // the grid draws. CodeRabbit. For the two services held on the client's
+    // own record, ownMode IS the list; for the other two, whoever is not
+    // already listed from a service engagement is pushed onto it.
+    expect(DASH).toContain('return ownMode.map(c=>{')
+    expect(DASH).toContain("ownMode.filter(c=>!listed.has(c.id)).forEach(c=>rows.push({client:c,seStatus:null,payer:'Nothing logged under Services yet'}))")
+    expect(DASH).toContain('{rows.map(r=>(')
   })
 })
 

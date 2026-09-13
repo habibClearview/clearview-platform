@@ -339,9 +339,22 @@ export async function writeTable(table, orderBy, dest, cfg) {
       // this request has already passed. Every other refusal is still a
       // refusal, and a table this key cannot read is still reported rather
       // than silently skipped.
+      //
+      // AND THE REFUSAL DOES NOT ALWAYS CARRY A NUMBER. CodeRabbit: these page
+      // requests do not ask for a count, and PostgREST answers an unasked
+      // count with an asterisk, so the 416 that ends a table can arrive as
+      // `*/*` with no total in it at all. Read as a failure, that is the same
+      // nightly backup lost to the same empty table, one step further along.
+      // Where the header names no total, the count taken before the copy
+      // began is the boundary instead. Where there is no count either, the
+      // refusal stands: guessing that a table has ended is how rows go
+      // missing quietly.
       if (!res.ok) {
         const total = Number(String(res.headers?.get?.('content-range') || '').split('/')[1])
-        if (res.status === 416 && Number.isFinite(total) && from >= total) break
+        const atEnd = Number.isFinite(total)
+          ? from >= total
+          : Number.isFinite(expected) && from >= expected
+        if (res.status === 416 && atEnd) break
         // The status and nothing else: the server's own error text ends up in
         // the manifest, which always travels in the clear, and a database
         // error body can carry column names and fragments of rows with it.

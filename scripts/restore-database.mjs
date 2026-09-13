@@ -237,6 +237,10 @@ export async function restore(from, into, passphrase, { force = false } = {}) {
   // creates the folder as part of choosing the name and fails if it cannot,
   // which is the difference between improbable and impossible. It is still a
   // sibling of the destination, so the final rename stays on one filesystem.
+  // mkdtemp does not make the folder it is asked to sit in, so a destination
+  // two levels down a path that does not exist yet failed here with a message
+  // about a temporary name rather than about the folder. CodeRabbit.
+  await mkdir(path.dirname(path.resolve(dest)), { recursive: true })
   const staging = await mkdtemp(`${dest}.restoring-`)
 
   let found
