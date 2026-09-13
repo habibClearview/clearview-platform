@@ -790,6 +790,113 @@ function WelcomeLetterButton({coImplementerId}){
   )
 }
 
+// READ IT BEFORE IT GOES, AND CHANGE THE WORDS. 13 September 2026. Habib: I
+// need to read the welcome email to the co-implementer and would need to be
+// able to make the same sort of edit as the other welcome emails.
+//
+// The same three controls the engagement welcome letters have, in the same
+// order and the same markup: read it as it will arrive, edit the words, save,
+// and start again from the generated letter if the edit was a mistake.
+//
+// One letter for the whole practice, not one per person, because it says the
+// same thing to everybody. The person's own name is put on it when it is sent.
+function CoImplementerLetterPanel(){
+  const [open,setOpen]=useState(false)
+  const [busy,setBusy]=useState(null)
+  const [msg,setMsg]=useState(null)
+  const [err,setErr]=useState(null)
+  const [preview,setPreview]=useState(null)
+  const [draft,setDraft]=useState(null)
+  const [edited,setEdited]=useState(false)
+
+  async function call(method,body){
+    const {data:{session}}=await supabase.auth.getSession()
+    const res=await fetch('/api/co-implementer-welcome',{
+      method,
+      headers:{'Content-Type':'application/json',...(session?.access_token?{Authorization:`Bearer ${session.access_token}`}:{})},
+      ...(body?{body:JSON.stringify(body)}:{}),
+    })
+    const data=await res.json().catch(()=>({}))
+    if(!res.ok)throw new Error(data.error||'That did not work')
+    return data
+  }
+
+  async function read(){
+    setBusy('read');setErr(null);setMsg(null)
+    try{
+      const data=await call('GET')
+      setPreview(data.html);setDraft(data.text);setEdited(!!data.edited);setOpen(true)
+    }catch(e){setErr(e.message)}
+    setBusy(null)
+  }
+  async function save(text){
+    setBusy('save');setErr(null);setMsg(null)
+    try{
+      const out=await call('PATCH',{text})
+      setMsg(out.cleared?'Back to the generated letter.':'The letter is saved.')
+      const data=await call('GET')
+      setPreview(data.html);setDraft(data.text);setEdited(!!data.edited)
+    }catch(e){setErr(e.message)}
+    setBusy(null)
+  }
+
+  return(
+    <div style={{...card,marginBottom:'1.25rem'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.6rem'}}>
+        <div>
+          <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>The welcome letter for a new co-implementer</div>
+          <div style={{fontSize:'0.93rem',color:C.slate}}>
+            What their role is, who they report to, how they are paid, and how to use the platform.
+            {edited?' Your edited version is in use.':' The generated letter is in use.'}
+          </div>
+        </div>
+        <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
+          <button style={addBtn(true,C.teal)} disabled={busy==='read'} onClick={()=>{if(open){setOpen(false)}else{read()}}}>
+            {busy==='read'?'Opening…':open?'Close':'Read the letter'}
+          </button>
+        </div>
+      </div>
+
+      {err&&<div style={{fontSize:'0.95rem',color:C.red,marginTop:'0.6rem'}}>{err}</div>}
+      {msg&&<div style={{fontSize:'0.95rem',color:C.teal,marginTop:'0.6rem'}}>{msg}</div>}
+
+      {open&&preview&&(
+        <div style={{marginTop:'0.9rem'}}>
+          <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.82rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate,marginBottom:'0.35rem'}}>As it will arrive</div>
+          {/* The letter is the words somebody typed, escaped on the way in by
+              blocksToEmail, so this renders text and never their markup. */}
+          <div style={{background:'#fff',border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 0',maxHeight:520,overflowY:'auto'}}
+            dangerouslySetInnerHTML={{__html:preview}}/>
+        </div>
+      )}
+
+      {open&&draft!==null&&(
+        <div style={{marginTop:'0.9rem'}}>
+          <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.82rem',letterSpacing:'0.05em',textTransform:'uppercase',color:C.slate,marginBottom:'0.35rem'}}>Edit the letter</div>
+          <p style={{fontSize:'0.9rem',color:C.slate,margin:'0 0 0.45rem',lineHeight:1.45}}>
+            Your words, sent over your name. A line starting with <strong>#</strong> is a heading,
+            a line starting with <strong>-</strong> is a bullet, and a blank line separates paragraphs.
+            Save, then read it again to see it as it will arrive.
+          </p>
+          <textarea
+            style={{...inp,minHeight:340,fontFamily:'var(--cv-font-mono)',fontSize:'0.86rem',lineHeight:1.55}}
+            value={draft}
+            onChange={e=>setDraft(e.target.value)}
+          />
+          <div style={{display:'flex',gap:'0.5rem',marginTop:'0.5rem',flexWrap:'wrap'}}>
+            <button style={solidBtn(C.teal,true)} disabled={busy==='save'} onClick={()=>save(draft)}>
+              {busy==='save'?'Saving…':'Save the letter'}
+            </button>
+            <button style={addBtn(true,C.slate)} disabled={busy==='save'} onClick={()=>save('')}>
+              Start again from the generated letter
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Coach-side team management for a specific client. Lets the coach (super_coach)
 // create the client's own logins -- CEO(s), Finance Manager, Unit Heads,
 // Accounts Assistants -- and see who already has one. This fills the gap where a
@@ -925,74 +1032,18 @@ function DeleteClientConfirm({client,onCancel,onDeleted}){
   )
 }
 
-function ClearviewHealthSummary({clients}){
-  const [summaries,setSummaries]=useState({})
-  const [loading,setLoading]=useState(true)
-  const financialClients = clients.filter(c=>c.engagement_mode==='financial')
-
-  useEffect(()=>{
-    if(financialClients.length===0){setLoading(false);return}
-    Promise.all(financialClients.map(c=>
-      supabase.from('ai_health_checks').select('period,report_text,generated_at').eq('client_id',c.id).order('period',{ascending:false}).limit(1)
-        .then(({data})=>({clientId:c.id,latest:data?.[0]||null}))
-    )).then(results=>{
-      const map={}
-      results.forEach(r=>{map[r.clientId]=r.latest})
-      setSummaries(map)
-      setLoading(false)
-    })
-  },[clients.length])
-
-  function statusFromReport(text){
-    if(!text)return{label:'No data',color:C.slate,dot:'⚪'}
-    const lower=text.toLowerCase()
-    if(lower.includes('red')||lower.includes('at risk')||lower.includes('concern'))return{label:'Needs attention',color:C.red,dot:'🔴'}
-    if(lower.includes('amber')||lower.includes('caution'))return{label:'Watch',color:C.amber,dot:'🟡'}
-    if(lower.includes('green')||lower.includes('healthy')||lower.includes('strong'))return{label:'Healthy',color:C.green,dot:'🟢'}
-    return{label:'Reviewed',color:C.teal,dot:'🔵'}
-  }
-
-  if(financialClients.length===0)return null
-  if(loading)return<div style={{...card,textAlign:'center',padding:'1.5rem',color:C.slate,fontSize:'1.07rem'}}>Loading Clearview health summary...</div>
-
-  const flagged = financialClients.filter(c=>{
-    const r=summaries[c.id]
-    const s=statusFromReport(r?.report_text)
-    return s.label==='Needs attention'||s.label==='Watch'
-  })
-  const sorted = [...financialClients].sort((a,b)=>{
-    const sa=statusFromReport(summaries[a.id]?.report_text)
-    const sb=statusFromReport(summaries[b.id]?.report_text)
-    const rank={'Needs attention':0,'Watch':1,'Reviewed':2,'Healthy':3,'No data':4}
-    return rank[sa.label]-rank[sb.label]
-  })
-
-  return(
-    <div style={card}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
-        <div style={secH}>Clearview Business Intelligence — All Clients</div>
-        {flagged.length>0&&<Badge text={`${flagged.length} need attention`} color={C.red}/>}
-      </div>
-      {sorted.map(c=>{
-        const report=summaries[c.id]
-        const status=statusFromReport(report?.report_text)
-        return(
-          <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.6rem 0.85rem',borderRadius:6,marginBottom:'0.45rem',background:status.label==='Needs attention'?'var(--cv-tint-red)':status.label==='Watch'?'var(--cv-tint-amber)':C.lightBg,cursor:'pointer'}}
-            onClick={()=>window.open(`/dashboard/${c.slug}`,'_blank')}>
-            <div style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
-              <span style={{fontSize:'1rem'}}>{status.dot}</span>
-              <div>
-                <div style={{fontWeight:600,fontSize:'1.07rem',color:C.navy}}>{c.name}</div>
-                <div style={{fontSize:'0.93rem',color:C.slate}}>{report?`Last reviewed ${new Date(report.generated_at).toLocaleDateString('en-GB')}`:'No health check generated yet'}</div>
-              </div>
-            </div>
-            <Badge text={status.label} color={status.color}/>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
+// A THIRD READING OF THE HEALTH CHECKS, DRAWN BY NOTHING. 13 September 2026.
+// Habib: my business tab still has the flags there, it should not, or at least
+// I should be able to dismiss it.
+//
+// ClearviewHealthSummary sat here with its own fetch of ai_health_checks and
+// its own rule for what counts as a flag, different from the one the rest of
+// the platform uses, and it took no notice of a flag being dismissed. It was
+// also rendered by nothing at all, so what Habib was looking at was an old
+// copy of the page held in his browser.
+//
+// Dead code that disagrees with the live rule is worse than no code: it is
+// what somebody finds and revives a year later. Gone.
 
 function CopyIntakeLink({client}){
   const [link,setLink]=useState(null)
@@ -3069,6 +3120,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     )
     return(
       <div>
+        {canManageTeam(userRole)&&<CoImplementerLetterPanel/>}
         {showNewCI&&<NewCIForm clients={clients} onSave={async ci=>{const {data,error}=await supabase.from('co_implementers').insert([ci]).select().single();if(!error&&data){setCoImplementers(prev=>[...prev,data]);setShowNewCI(false)}}} onCancel={()=>setShowNewCI(false)}/>}
         <TeamPayments
           coImplementers={coImplementers} setCoImplementers={setCoImplementers}

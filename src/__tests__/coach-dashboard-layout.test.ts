@@ -21,6 +21,7 @@ import { readFileSync } from 'node:fs'
 const DASH = readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
 const LETTER = readFileSync('app/api/co-implementer-welcome/route.ts', 'utf8')
 const TEAM = readFileSync('src/components/coach/TeamPayments.tsx', 'utf8')
+const WORDS = readFileSync('src/lib/co-implementer-letter.ts', 'utf8')
 
 describe('the flag sits on the client, not above the page', () => {
   it('the banner at the top of the Clients screen is gone', () => {
@@ -166,18 +167,49 @@ describe('every co-implementer has a page', () => {
 
 describe('the welcome letter to a co-implementer', () => {
   it('says what the role is, who they report to, and what the platform holds', () => {
-    expect(LETTER).toContain('What the role is.')
-    expect(LETTER).toContain('Who you report to.')
-    expect(LETTER).toContain('What you will see when you sign in.')
-    expect(LETTER).toContain('In your first week.')
+    expect(WORDS).toContain('# What your part in it is')
+    expect(WORDS).toContain('# Who you report to')
+    expect(WORDS).toContain('# The platform')
+    expect(WORDS).toContain('# In your first week')
+  })
+
+  it('explains itself to somebody who has never heard of any of this', () => {
+    // Habib: write for an audience that does not know anything about Clearview
+    // or any of the service. Naming the method without saying what it is tells
+    // a new person nothing at all.
+    expect(WORDS).toContain('# What this practice does')
+    expect(WORDS).toContain('In plain terms it is nine steps')
+    expect(WORDS).toMatch(/living on grant money/)
   })
 
   it('describes the platform the co-implementer actually gets', () => {
     // Two sections, and the four parts of the pay record. A letter that
     // describes a screen they do not have is worse than no letter.
-    expect(LETTER).toContain('My Timesheet and Expenses')
-    expect(LETTER).toContain('Timesheets, Expenses, Advances, and Invoice')
+    expect(WORDS).toContain('My Timesheet and Expenses')
+    expect(WORDS).toContain('Timesheets, Expenses, Advances and Invoice')
     expect(DASH).toContain("['mypayments','My Timesheet & Expenses',null,false]")
+  })
+
+  it('can be read, edited, saved and put back the way the other letters can', () => {
+    expect(DASH).toContain('function CoImplementerLetterPanel()')
+    expect(DASH).toContain('Read the letter')
+    expect(DASH).toContain('Save the letter')
+    expect(DASH).toContain('Start again from the generated letter')
+    expect(DASH).toContain('{canManageTeam(userRole)&&<CoImplementerLetterPanel/>}')
+    expect(LETTER).toContain('export async function GET(')
+    expect(LETTER).toContain('export async function PATCH(')
+  })
+
+  it('the words a person types are sent as words, never as markup', () => {
+    // textToEmail escapes everything on the way in, the same path the
+    // engagement welcome letters use.
+    expect(LETTER).toContain("import { textToEmail } from '@/lib/letter'")
+    expect(LETTER).toContain('...textToEmail(letter)')
+  })
+
+  it('reading it and saving it are for the coach who manages the team only', () => {
+    expect(LETTER).toContain('async function requireSuperCoach(')
+    expect(LETTER).toContain('!canManageTeam(profile.role)')
   })
 
   it('carries no sign-in link of its own', () => {
@@ -189,7 +221,7 @@ describe('the welcome letter to a co-implementer', () => {
 
   it('names no rate and no fee', () => {
     expect(LETTER).not.toContain('rate_per_day')
-    expect(LETTER).not.toContain('currency')
+    expect(WORDS).not.toMatch(/day rate|per day|\bfee\b/i)
   })
 
   it('only the coach who manages the team may send it', () => {
@@ -214,8 +246,16 @@ describe('the welcome letter to a co-implementer', () => {
     expect(LETTER).toContain('if (!claim || claim.length === 0)')
     expect(LETTER).toContain("update({ welcome_sent_at: null })")
     expect(LETTER).toContain('alreadySent: true')
-    const sql = readFileSync('supabase/migrations/2026_09_13_co_implementer_welcome_sent.sql', 'utf8')
-    expect(sql).toContain('ADD COLUMN IF NOT EXISTS welcome_sent_at timestamptz')
+    const sql = readFileSync('supabase/migrations/2026_09_13_coach_letters.sql', 'utf8')
+    expect(sql).toContain('add column if not exists welcome_sent_at timestamptz')
+  })
+
+  it('the edited letter has a home of its own, for the whole practice', () => {
+    // The engagement letters are edited per client and stored on the
+    // engagement. This one belongs to the practice, not to any one client.
+    const sql = readFileSync('supabase/migrations/2026_09_13_coach_letters.sql', 'utf8')
+    expect(sql).toContain('create table if not exists coach_letters')
+    expect(sql).toContain("create policy super_coach_only on coach_letters for all using (my_role() = 'super_coach')")
   })
 
   it('works before that migration is applied, and reports the truth either way', () => {
