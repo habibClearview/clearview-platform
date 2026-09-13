@@ -299,6 +299,41 @@ describe('a table that moves while it is being copied', () => {
     expect(orderColumnFor({ properties: { name: {}, created_at: {} } })).toBe('created_at')
     expect(orderColumnFor({ properties: { colour: {} } })).toBe(null)
   })
+
+  it('refuses to page a table whose order can repeat', async () => {
+    // 13 September 2026, CodeRabbit, and the sharpest finding on this change.
+    // Ordering by a column is not the same as ordering by a column that is
+    // different on every row. Two rows created in the same second are tied
+    // under created_at, and the database may hand tied rows back in a
+    // different order each time. A tie straddling the boundary between page
+    // one and page two copies one row twice and the other not at all, and the
+    // counts still match, so every other check here waves it through.
+    const many = Array.from({ length: 1500 }, () => ({ created_at: 'the same second' }))
+    globalThis.fetch = serverWith({ tied: many }, { columns: { tied: ['created_at'] } }) as any
+    await expect(run()).rejects.toThrow(/could not be copied/)
+  })
+
+  it('still pages a table that is ordered by something unique', async () => {
+    // The other half. The rule has to refuse the unsafe case without refusing
+    // the ordinary one, which is every table in this database.
+    const many = Array.from({ length: 2350 }, (_, i) => ({ id: i }))
+    globalThis.fetch = serverWith({ clients: many }) as any
+    await run()
+    const manifest = JSON.parse(await readFile(path.join(await onlyRun(), '_manifest.json'), 'utf8'))
+    expect(manifest.counts.clients).toBe(2350)
+    expect(manifest.readWithoutAStableOrder).toEqual([])
+  })
+
+  it('names a small table read under an order that could repeat', async () => {
+    // Under one page there is only one question, so nothing can shift and the
+    // copy is sound. It is still named, because somebody restoring from this
+    // deserves to know which tables have no key to sort them by.
+    globalThis.fetch = serverWith({ notes: [{ created_at: 'x' }] }, { columns: { notes: ['created_at'] } }) as any
+    await run()
+    const manifest = JSON.parse(await readFile(path.join(await onlyRun(), '_manifest.json'), 'utf8'))
+    expect(manifest.readWithoutAStableOrder).toEqual(['notes'])
+    expect(manifest.counts.notes).toBe(1)
+  })
 })
 
 describe('a table name can never build a path', () => {

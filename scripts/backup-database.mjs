@@ -148,6 +148,27 @@ export function orderColumnFor(definition) {
 }
 
 /**
+ * Whether an order is one that can be paged through safely.
+ *
+ * 13 September 2026, CodeRabbit, and it was right. Ordering by a column is not
+ * the same as ordering by a column that is DIFFERENT ON EVERY ROW. Two rows
+ * created in the same second are tied under `created_at`, and Postgres is free
+ * to hand tied rows back in a different order each time it is asked. If that
+ * tie straddles the boundary between page one and page two, one of the rows is
+ * copied twice and the other is not copied at all. The counts still match, so
+ * every check in this file would wave it through.
+ *
+ * `id` is the one name here that carries the promise of being unique, being
+ * the convention this database follows for its primary key. Anything else is
+ * treated as no order at all for the purpose of paging: fine for a table that
+ * fits in one request, where there is no second page to disagree with the
+ * first, and refused beyond that.
+ */
+export function orderIsUnique(column) {
+  return column === 'id'
+}
+
+/**
  * A filename that cannot be anything but a filename.
  *
  * 13 September 2026, CodeRabbit. Table names came out of the database's own
@@ -241,13 +262,17 @@ export async function writeTable(table, orderBy, dest, cfg) {
         written += 1
       }
       if (page.length < PAGE) break
-      // A table with no column worth ordering by cannot be paged safely: page
-      // two of an unordered read is a different question from page one, and a
-      // row written between them shifts everything. Under one page that
-      // cannot happen. Over one page, refuse rather than write something that
+      // A table without a unique order cannot be paged safely: page two is a
+      // different question from page one, and either a row written between
+      // them or two rows tied on the ordering column can shift what lands
+      // where. Under one page neither can happen, because there is only one
+      // question. Over one page, refuse rather than write something that
       // looks complete and is not.
-      if (!orderBy) {
-        throw new Error(`${table}: more than ${PAGE} rows and no column to order by, so it cannot be copied safely`)
+      if (!orderIsUnique(orderBy)) {
+        throw new Error(
+          `${table}: more than ${PAGE} rows and no unique column to order by` +
+          `${orderBy ? ` (${orderBy} may repeat)` : ''}, so it cannot be copied safely`,
+        )
       }
     }
     await put('\n]\n')
@@ -354,7 +379,7 @@ export const run = async () => {
       counts[name] = written
       files[name] = file
       rowTotal += written
-      if (!orderBy) unordered.push(name)
+      if (!orderIsUnique(orderBy)) unordered.push(name)
     } catch (e) {
       failed.push(`${name}: ${e.message}`)
       await unlink(dest).catch(() => {})
