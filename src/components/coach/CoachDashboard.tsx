@@ -745,6 +745,45 @@ function InviteLoginButton({email,fullName,role,coImplementerId,funderProgrammeI
   )
 }
 
+// THE LETTER THAT SAYS WHAT THE JOB IS. 13 September 2026. Habib: we need a
+// welcome email for the GtCV co-implementer, one that tells them exactly what
+// their role is, reporting, and how to use the platform.
+//
+// Separate from "Invite login" on purpose. That button makes an account; this
+// one explains the work. A person who has both has a way in and a reason to
+// use it. The wording lives on the server in app/api/co-implementer-welcome,
+// so it cannot be edited from a browser, and the address is read from the
+// roster record rather than sent up from this screen.
+function WelcomeLetterButton({coImplementerId}){
+  const [busy,setBusy]=useState(false)
+  const [msg,setMsg]=useState(null)
+  async function send(){
+    setBusy(true);setMsg(null)
+    try{
+      const {data:{session}}=await supabase.auth.getSession()
+      const res=await fetch('/api/co-implementer-welcome',{
+        method:'POST',
+        headers:{'Content-Type':'application/json',...(session?.access_token?{Authorization:`Bearer ${session.access_token}`}:{})},
+        body:JSON.stringify({coImplementerId}),
+      })
+      const data=await res.json()
+      if(!res.ok)setMsg(data.error||'The letter did not send.')
+      else if(data.alreadySent)setMsg('Already sent on '+new Date(data.sentAt).toLocaleDateString()+'.')
+      else if(data.ok)setMsg('Sent to '+data.sentTo+'.')
+      else setMsg(data.reason||'The letter did not send.')
+    }catch(e){setMsg('The letter did not send: '+e.message)}
+    setBusy(false)
+  }
+  return(
+    <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexWrap:'wrap'}}>
+      <button style={addBtn(true,C.teal)} disabled={busy} onClick={send}
+        title="Sends the welcome letter: what the role is, who they report to, and how to use the platform. It goes once.">
+        {busy?'Sending…':'Send welcome letter'}</button>
+      {msg&&<span style={{fontSize:'0.93rem',color:C.slate}}>{msg}</span>}
+    </div>
+  )
+}
+
 // Coach-side team management for a specific client. Lets the coach (super_coach)
 // create the client's own logins -- CEO(s), Finance Manager, Unit Heads,
 // Accounts Assistants -- and see who already has one. This fills the gap where a
@@ -1794,6 +1833,46 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // that without a full rewrite of every nested view into a top-level
   // component.
   const [clientsService,setClientsService]=useState('financial')
+  // Counted once, for the tab strip: how many subscribers there are, and which
+  // clients a health check has flagged. Both are read straight from the
+  // records rather than guessed at, and a failure leaves the tab with no
+  // number instead of a wrong one.
+  const [subscriberCount,setSubscriberCount]=useState(null)
+  const [healthByClient,setHealthByClient]=useState({})
+  useEffect(()=>{
+    let cancelled=false
+    supabase.from('service_engagements').select('id',{count:'exact',head:true})
+      .eq('service_type','portfolio_intelligence')
+      .then(({count,error})=>{if(!cancelled&&!error&&typeof count==='number')setSubscriberCount(count)})
+      .catch(()=>{})
+    return ()=>{cancelled=true}
+  },[])
+  useEffect(()=>{
+    let cancelled=false
+    const ids=clients.filter(c=>c.engagement_mode==='financial').map(c=>c.id)
+    if(ids.length===0){setHealthByClient({});return}
+    supabase.from('ai_health_checks').select('client_id,period,report_text,generated_at')
+      .in('client_id',ids).order('period',{ascending:false})
+      .then(({data,error})=>{
+        if(cancelled||error)return
+        const latest={}
+        ;(data||[]).forEach(r=>{if(!latest[r.client_id])latest[r.client_id]=r})
+        const byId=Object.fromEntries(clients.map(c=>[c.id,c]))
+        const flagged={}
+        Object.entries(latest).forEach(([id,r])=>{
+          const label=healthStatusFromReportText(r.report_text).label
+          if(label!=='Needs attention'&&label!=='Watch')return
+          // Dismissed stays dismissed until a newer check is generated, the
+          // same rule the client cards use, so the dot and the cards agree.
+          const at=Date.parse(byId[id]?.health_flag_dismissed_at||'')
+          const gen=Date.parse(r.generated_at||'')
+          const aside=Number.isFinite(at)&&(!Number.isFinite(gen)||at>=gen)
+          if(!aside)flagged[id]=true
+        })
+        setHealthByClient(flagged)
+      }).catch(()=>{})
+    return ()=>{cancelled=true}
+  },[clients])
   // Set when a Pipeline deal is marked Won, so the Clients tab opens
   // straight into "+ New Client" pre-filled with the programme and a
   // note of what was won -- lifted to the top level (not local to
@@ -2072,14 +2151,46 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // 2026_07_14_service_engagements.sql) -- an independent, error-tolerant
   // fetch, so a missing migration just means those two panels are empty,
   // not a broken page.
-  function ServedClientCard({client,seStatus,hasActuals}){
+  // THE FLAG BELONGS ON THE CLIENT, NOT ABOVE THE PAGE. 13 September 2026.
+  // Habib: the client tab should be in cards in a grid, with a red dot or
+  // border indicating that there is a flag to that client but not one at the
+  // top of the page.
+  //
+  // The flag used to be a banner above everything, which meant reading a name
+  // in the banner, finding the same name again in the list below, and holding
+  // the two together in your head. It now travels with the client: a coloured
+  // left edge, a dot, the health label, the first line of what the health
+  // check actually said, and the button that sets it aside -- all on the one
+  // card. Dismissing is still exactly the old behaviour: hidden until a newer
+  // health check is generated, never hidden for good.
+  function ServedClientCard({client,seStatus,hasActuals,payer,flag,onDismiss,onRestore}){
     const label=seStatus?({active:'Active',paused:'Paused',complete:'Complete'}[seStatus]||seStatus):statusLabel(client.status)
     const color=seStatus?({active:C.green,paused:C.amber,complete:C.slate}[seStatus]||C.slate):statusColor(client.status)
+    const live=!!flag&&!flag.aside
+    const edge=live?HEALTH_COLOR[flag.status.label]:null
+    const smallBtn={fontFamily:'var(--cv-font-mono)',fontSize:'0.82rem',padding:'0.22rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,background:'transparent',color:C.slate,cursor:'pointer',whiteSpace:'nowrap'}
     return(
-      <div style={{border:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.75rem 0.85rem',cursor:'pointer',background:C.white}}
+      <div style={{border:'1px solid var(--cv-border-soft)',borderLeft:edge?`4px solid ${edge}`:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.75rem 0.85rem',cursor:'pointer',background:C.white,display:'flex',flexDirection:'column',gap:'0.4rem'}}
         onClick={()=>{setSelClientId(client.id);setActiveTab(openingTabFor(client));setView('client')}}>
-        <div style={{fontWeight:700,fontSize:'0.95rem',marginBottom:'0.4rem'}}>{client.name}</div>
-        <Badge text={label} color={color}/>
+        <div style={{display:'flex',alignItems:'flex-start',gap:'0.5rem'}}>
+          <div style={{fontWeight:700,fontSize:'0.95rem',flex:1,minWidth:0}}>{client.name}</div>
+          {live&&<span title={`${flag.status.label} — from the latest health check`} style={{width:10,height:10,borderRadius:'50%',background:edge,flexShrink:0,marginTop:'0.3rem'}}/>}
+        </div>
+        {payer&&<div style={{fontSize:'0.8rem',color:C.slate,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{payer}</div>}
+        <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',alignItems:'center'}}>
+          <Badge text={label} color={color}/>
+          {live&&<Badge text={flag.status.label} color={edge}/>}
+        </div>
+        {live&&<div style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.35}}>{flag.why}</div>}
+        {live&&<button type="button" onClick={e=>{e.stopPropagation();onDismiss&&onDismiss()}}
+          title="Dismiss this flag. It comes back by itself as soon as a newer health check is generated."
+          style={{...smallBtn,alignSelf:'flex-start'}}>Dismiss flag</button>}
+        {!!flag&&flag.aside&&(
+          <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexWrap:'wrap'}}>
+            <span style={{fontSize:'0.8rem',color:C.slate}}>Flag dismissed</span>
+            <button type="button" onClick={e=>{e.stopPropagation();onRestore&&onRestore()}} style={{...smallBtn,color:C.teal}}>Bring it back</button>
+          </div>
+        )}
         {hasActuals&&<div onClick={e=>e.stopPropagation()}><ClientDocumentActions clientId={client.id} clientName={client.name} clients={clients} programmes={programmes}/></div>}
       </div>
     )
@@ -2087,6 +2198,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 
   function ClientsView(){
     const service=clientsService, setService=setClientsService
+    const serviceLabel=CLIENT_SERVICE_TABS.find(t=>t.key===service)?.label||'this service'
     const [showNew,setShowNew]=useState(false)
     const [showUpload,setShowUpload]=useState(false)
     const [refreshing,setRefreshing]=useState(false)
@@ -2144,17 +2256,6 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         setSaveError('That flag could not be set aside: '+error.message)
       }
     }
-    const flaggedAll=financialClients.filter(c=>{
-      const label=healthStatusFromReportText(reportByClient[c.id]?.report_text).label
-      return label==='Needs attention'||label==='Watch'
-    })
-    const setAsideFlags=flaggedAll.filter(flagIsSetAside)
-    const flagged=flaggedAll.filter(c=>!flagIsSetAside(c)).sort((a,b)=>{
-      const rank={'Needs attention':0,'Watch':1}
-      const la=healthStatusFromReportText(reportByClient[a.id]?.report_text).label
-      const lb=healthStatusFromReportText(reportByClient[b.id]?.report_text).label
-      return (rank[la]??2)-(rank[lb]??2)
-    })
 
     const [serviceEngagements,setServiceEngagements]=useState([])
     useEffect(()=>{
@@ -2174,61 +2275,75 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       await supabase.from('service_engagements').update(patch).eq('id',seId)
     }
 
-    let blocks=[]
-    let subscriptionRows=[]
-    // A CLIENT WHOSE SERVICE IS ON THEIR OWN RECORD. 8 September 2026.
-    // Advisory and Market Intelligence used to be readable only from
-    // service_engagements, because they were not offerable when a client was
-    // created. They are now, so a client can carry either as their own
-    // service, and one carrying it with no service row yet would otherwise
-    // appear under no service at all and look deleted.
-    const ownMode=clients.filter(c=>c.engagement_mode===service)
-    if(service==='financial'||service==='canvas'){
-      const inService=ownMode
-      const byPayer=new Map()
-      inService.forEach(c=>{
-        const prog=c.programme_id?programmesById[c.programme_id]:null
-        const key=prog?`prog:${prog.id}`:`client:${c.id}`
-        if(!byPayer.has(key))byPayer.set(key,{title:prog?prog.name:c.name,meta:prog?([prog.funder,prog.country].filter(Boolean).join(' · ')||'Donor programme'):'Independent',clients:[]})
-        byPayer.get(key).clients.push(c)
-      })
-      blocks=Array.from(byPayer.values())
-    }else if(service==='portfolio_intelligence'){
-      // Subscription health needs more than a status pill -- level, paid-up-to
-      // date, and billing term (see supabase/migrations/2026_07_14_pipeline_and_subscriptions.sql).
-      subscriptionRows=serviceEngagements.filter(se=>se.service_type==='portfolio_intelligence').map(se=>{
+    // EVERY CLIENT OF THIS SERVICE, IN ONE GRID. 13 September 2026.
+    // Habib: the services should be in a horizontal list and the clients
+    // vertical cards underneath them, in a way that doesn't have as many
+    // clicks as it currently has.
+    //
+    // These four lists used to be drawn as a card per paying client with a
+    // grid inside each one, so ten clients across seven funders was seven
+    // boxes to scroll past and no way to see them all at once. One row per
+    // client now, with the funder printed on the card itself, so nothing is
+    // lost and the whole service fits on a screen.
+    //
+    // Where a service lives differs and always has: the Financial Model and
+    // GtCV Canvas are on the client's own record (engagement_mode), while
+    // Advisory and Subscription are rows in service_engagements. Both are
+    // read here, and a client carrying one of the latter as their own service
+    // with no row logged yet still appears, marked as not yet recorded,
+    // rather than vanishing.
+    function rowsForService(key){
+      const ownMode=clients.filter(c=>c.engagement_mode===key)
+      if(key==='financial'||key==='canvas'){
+        return ownMode.map(c=>{
+          const prog=c.programme_id?programmesById[c.programme_id]:null
+          return {client:c,seStatus:null,payer:prog?([prog.name,prog.funder].filter(Boolean).join(' · ')):'Independent'}
+        })
+      }
+      const rows=serviceEngagements.filter(se=>se.service_type===key).map(se=>{
+        const prog=se.payer_programme_id?programmesById[se.payer_programme_id]:null
         const payerClient=se.payer_client_id?clientsById[se.payer_client_id]:null
         // beneficiary_client_id is the COLUMN name, which the database still
         // uses; supabase/migrations/2026_09_02_client_not_beneficiary.sql
-        // renames it to served_client_id and has not been applied yet. Every
-        // word a person reads says client already. Do not rename this here
-        // without applying that migration in the same change.
-        const ben=se.beneficiary_client_id?clientsById[se.beneficiary_client_id]:payerClient
-        return {se,client:ben}
-      }).filter(r=>r.client)
-      // Anybody whose own record says Market Intelligence and who has no
-      // subscription row yet, so adding the client is enough to see them.
-      const listed=new Set(subscriptionRows.map(r=>r.client.id))
-      const orphans=ownMode.filter(c=>!listed.has(c.id))
-      if(orphans.length)blocks=[{title:'No subscription recorded yet',meta:'Added as a client, nothing logged under Services',clients:orphans}]
-    }else{
-      const inService=serviceEngagements.filter(se=>se.service_type===service)
-      const byPayer=new Map()
-      inService.forEach(se=>{
-        const prog=se.payer_programme_id?programmesById[se.payer_programme_id]:null
-        const payerClient=se.payer_client_id?clientsById[se.payer_client_id]:null
-        const key=prog?`prog:${prog.id}`:`client:${se.payer_client_id}`
-        const title=prog?prog.name:(payerClient?.name||'Unknown client')
-        const meta=prog?([prog.funder,prog.country].filter(Boolean).join(' · ')||'Donor programme'):'Independent'
-        if(!byPayer.has(key))byPayer.set(key,{title,meta,clients:[]})
-        const ben=se.beneficiary_client_id?clientsById[se.beneficiary_client_id]:payerClient
-        if(ben)byPayer.get(key).clients.push({...ben,__seStatus:se.status})
-      })
-      blocks=Array.from(byPayer.values())
-      const listed=new Set(blocks.flatMap(b=>b.clients.map(c=>c.id)))
-      const orphans=ownMode.filter(c=>!listed.has(c.id))
-      if(orphans.length)blocks=[...blocks,{title:'No service engagement recorded yet',meta:'Added as a client, nothing logged under Services',clients:orphans}]
+        // renames it to served_client_id and has not been applied yet.
+        const served=se.beneficiary_client_id?clientsById[se.beneficiary_client_id]:payerClient
+        if(!served)return null
+        const payer=prog?([prog.name,prog.funder].filter(Boolean).join(' · ')):(payerClient&&payerClient.id!==served.id?payerClient.name:'Independent')
+        return {client:served,seStatus:se.status,payer}
+      }).filter(Boolean)
+      const listed=new Set(rows.map(r=>r.client.id))
+      ownMode.filter(c=>!listed.has(c.id)).forEach(c=>rows.push({client:c,seStatus:null,payer:'Nothing logged under Services yet'}))
+      return rows
     }
+    const flagFor=(c)=>{
+      const report=reportByClient[c.id]
+      if(!report)return null
+      const status=healthStatusFromReportText(report.report_text)
+      if(status.label!=='Needs attention'&&status.label!=='Watch')return null
+      const text=report.report_text||''
+      return {status,aside:flagIsSetAside(c),why:text?(text.length>120?text.slice(0,120)+'…':text):'No health check generated yet.'}
+    }
+    const rowsByService=Object.fromEntries(CLIENT_SERVICE_TABS.map(t=>[t.key,rowsForService(t.key)]))
+    const liveFlagsIn=(rows)=>rows.filter(r=>{const f=flagFor(r.client);return !!f&&!f.aside}).length
+    // Whoever needs attention is read first, then whoever is on watch, then
+    // everybody else by name.
+    const rank={'Needs attention':0,'Watch':1}
+    const rows=[...(rowsByService[service]||[])].sort((a,b)=>{
+      const fa=flagFor(a.client), fb=flagFor(b.client)
+      const ra=fa&&!fa.aside?(rank[fa.status.label]??2):3
+      const rb=fb&&!fb.aside?(rank[fb.status.label]??2):3
+      if(ra!==rb)return ra-rb
+      return (a.client.name||'').localeCompare(b.client.name||'')
+    })
+    const flaggedNow=liveFlagsIn(rowsByService[service]||[])
+
+    // The subscription table keeps its own shape: level, paid-up-to date and
+    // billing term are editable here and are not on a card.
+    const subscriptionRows=serviceEngagements.filter(se=>se.service_type==='portfolio_intelligence').map(se=>{
+      const payerClient=se.payer_client_id?clientsById[se.payer_client_id]:null
+      const served=se.beneficiary_client_id?clientsById[se.beneficiary_client_id]:payerClient
+      return {se,client:served}
+    }).filter(r=>r.client)
 
     async function refreshClients(){
       setRefreshing(true)
@@ -2295,116 +2410,72 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         }} onCancel={()=>{setShowNew(false);setNewClientPrefill(null)}}/>}
         {newClientPrefill&&<div style={{fontSize:'0.85rem',color:C.teal,marginTop:'-0.9rem',marginBottom:'1rem'}}>Pre-filled from the Pipeline deal you just marked Won.</div>}
 
-        {(flagged.length>0||setAsideFlags.length>0)&&(
-          <div style={{...card,border:`1px solid ${flagged.length?'#F1C9C2':C.border}`,borderLeft:`4px solid ${flagged.length?C.red:C.border}`}}>
-            <div style={{fontWeight:700,fontSize:'1.02rem',color:flagged.length?C.red:C.slate,marginBottom:'0.7rem'}}>
-              {flagged.length?<>⚠ {flagged.length} flagged this week</>:<>Nothing flagged this week</>}
-              <span style={{fontWeight:400,fontSize:'0.85rem',color:C.slate}}> · Financial Model clients only for now</span>
-            </div>
-            {flagged.map(c=>{
-              const report=reportByClient[c.id]
-              const status=healthStatusFromReportText(report?.report_text)
-              const why=report?.report_text?(report.report_text.length>140?report.report_text.slice(0,140)+'…':report.report_text):'No health check generated yet.'
-              return(
-                <div key={c.id} style={{display:'flex',alignItems:'center',gap:'0.9rem',padding:'0.7rem 0',borderTop:'1px solid #F4F1F0',cursor:'pointer'}} onClick={()=>window.open(`/dashboard/${c.slug}`,'_blank')}>
-                  <Badge text={status.label} color={HEALTH_COLOR[status.label]}/>
-                  <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700}}>{c.name}</div><div style={{fontSize:'1.07rem',color:C.slate}}>{why}</div></div>
-                  <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.01rem',fontWeight:700,color:C.red,flexShrink:0}}>Open →</span>
-                  <button
-                    type="button"
-                    onClick={e=>{e.stopPropagation();setFlagAside(c,true)}}
-                    title="Set this aside. It comes back as soon as a newer health check is generated."
-                    style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.85rem',padding:'0.25rem 0.65rem',border:`1px solid ${C.border}`,borderRadius:6,background:'transparent',color:C.slate,cursor:'pointer',flexShrink:0,whiteSpace:'nowrap'}}
-                  >Set aside</button>
-                </div>
-              )
-            })}
-            {/* NOTHING IS HIDDEN FOR GOOD. What has been set aside is named
-                here and can be brought back, and it returns by itself the
-                moment a newer health check is generated. */}
-            {setAsideFlags.length>0&&(
-              <div style={{borderTop:'1px solid #F4F1F0',paddingTop:'0.6rem',marginTop:'0.4rem'}}>
-                <div style={{fontSize:'0.85rem',color:C.slate,marginBottom:'0.35rem'}}>Set aside until the next health check</div>
-                {setAsideFlags.map(c=>(
-                  <div key={c.id} style={{display:'flex',alignItems:'center',gap:'0.9rem',padding:'0.35rem 0'}}>
-                    <div style={{flex:1,minWidth:0,fontSize:'0.95rem',color:C.slate}}>{c.name}</div>
-                    <button
-                      type="button"
-                      onClick={()=>setFlagAside(c,false)}
-                      style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.85rem',padding:'0.22rem 0.65rem',border:`1px solid ${C.border}`,borderRadius:6,background:'transparent',color:C.teal,cursor:'pointer',flexShrink:0,whiteSpace:'nowrap'}}
-                    >Bring it back</button>
-                  </div>
-                ))}
-              </div>
-            )}
+        {/* SERVICES ACROSS THE TOP, WITH THE REAL NUMBERS ON THEM. 13 September
+            2026. Each service says how many clients are on it and carries a red
+            dot when one of them is flagged, so the shape of the whole book of
+            business is readable without opening each service in turn. */}
+        <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',marginBottom:'0.85rem'}}>
+          {CLIENT_SERVICE_TABS.map(t=>{
+            const on=service===t.key
+            const n=(rowsByService[t.key]||[]).length
+            const f=liveFlagsIn(rowsByService[t.key]||[])
+            return(
+              <button key={t.key} onClick={()=>setService(t.key)}
+                style={{...subPill(on),display:'inline-flex',alignItems:'center',gap:'0.45rem'}}>
+                <span>{t.label}</span>
+                <span style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.85rem',opacity:on?1:0.7}}>{n}</span>
+                {f>0&&<span title={`${f} flagged`} style={{width:8,height:8,borderRadius:'50%',background:C.red,flexShrink:0}}/>}
+              </button>
+            )
+          })}
+        </div>
+        <div style={{fontSize:'0.85rem',color:C.slate,marginBottom:'1rem'}}>
+          {rows.length} client{rows.length===1?'':'s'} on {serviceLabel}
+          {flaggedNow>0&&<> · <strong style={{color:C.red}}>{flaggedNow} flagged</strong>, shown first</>}
+          {service==='financial'?' · flags come from the weekly health check':' · no automated health check on this service yet'}
+        </div>
+
+        {rows.length===0?(
+          <div style={{...card,color:C.slate}}>No clients on {serviceLabel} yet.</div>
+        ):(
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:'0.85rem',marginBottom:'1.25rem',alignItems:'start'}}>
+            {rows.map(r=>(
+              <ServedClientCard key={r.client.id+(r.seStatus||'')}
+                client={r.client} seStatus={r.seStatus} payer={r.payer}
+                hasActuals={hasActuals.has(r.client.id)}
+                flag={flagFor(r.client)}
+                onDismiss={()=>setFlagAside(r.client,true)}
+                onRestore={()=>setFlagAside(r.client,false)}/>
+            ))}
           </div>
         )}
 
-        <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',marginBottom:'1.5rem'}}>
-          {CLIENT_SERVICE_TABS.map(t=><button key={t.key} style={subPill(service===t.key)} onClick={()=>setService(t.key)}>{t.label}</button>)}
-        </div>
-
-        {/* THE CLIENT WAS ADDED AND DID NOT APPEAR. 8 September 2026. This
-            branch drew the subscription table and nothing else, so a client
-            whose own record says Market Intelligence, with no subscription
-            logged under Services yet, was calculated into a block that was
-            never rendered. Habib added one and it was simply not there. The
-            blocks are drawn under the table now, whether or not there is a
-            table. */}
-        {service==='portfolio_intelligence'?(
-          subscriptionRows.length===0&&blocks.length===0?(
-            <div style={{...card,color:C.slate}}>No subscribers yet.</div>
-          ):(<>{subscriptionRows.length>0&&(
-            <div style={{...card,padding:0,overflow:'hidden'}}>
-              <div style={{overflowX:'auto'}}>
-                <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
-                  <thead><tr style={{background:C.navy}}>{['Client','Level','Paid Up To','Term','Status'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left',fontWeight:400,fontSize:'0.93rem',color:'var(--cv-on-accent)',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
-                  <tbody>
-                    {subscriptionRows.map(({se,client:c})=>{
-                      const dueSoon=se.paid_through_date&&new Date(se.paid_through_date)<new Date(Date.now()+14*86400000)
-                      return(
-                        <tr key={se.id} style={{borderBottom:'1px solid var(--cv-border-soft)'}}>
-                          <td style={{padding:'10px 12px',fontWeight:700,cursor:'pointer'}} onClick={()=>{setSelClientId(c.id);setActiveTab(openingTabFor(c));setView('client')}}>{c.name}</td>
-                          <td style={{padding:'10px 12px'}}><input style={{...inp,width:120,padding:'0.3rem 0.5rem'}} placeholder="e.g. Standard" value={se.subscription_level||''} onChange={e=>updateSubscription(se.id,{subscription_level:e.target.value})}/></td>
-                          <td style={{padding:'10px 12px'}}><input type="date" style={{...inp,width:150,padding:'0.3rem 0.5rem'}} value={se.paid_through_date||''} onChange={e=>updateSubscription(se.id,{paid_through_date:e.target.value||null})}/></td>
-                          <td style={{padding:'10px 12px'}}><select style={{...inp,width:110,padding:'0.3rem 0.5rem'}} value={se.billing_term||''} onChange={e=>updateSubscription(se.id,{billing_term:e.target.value||null})}><option value="">—</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select></td>
-                          <td style={{padding:'10px 12px'}}>{se.paid_through_date?<Badge text={dueSoon?'Renewal due':'Paid up'} color={dueSoon?C.amber:C.green}/>:<Badge text="No date set" color={C.slate}/>}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-          {blocks.map((b,i)=>(
-            <div key={i} style={{...card,padding:0,overflow:'hidden'}}>
-              <div style={{background:'var(--cv-alt)',padding:'0.85rem 1.1rem',borderBottom:'1px solid var(--cv-border-soft)'}}>
-                <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>{b.title}</div>
-                <div style={{fontSize:'0.86rem',color:C.slate}}>{b.meta}</div>
-              </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))',gap:'0.75rem',padding:'1rem 1.1rem'}}>
-                {b.clients.map(c=><ServedClientCard key={c.id} client={c} seStatus={c.__seStatus} hasActuals={hasActuals.has(c.id)}/>)}
-              </div>
-            </div>
-          ))}</>
-          )
-        ):blocks.length===0?(
-          <div style={{...card,color:C.slate}}>No clients on {CLIENT_SERVICE_TABS.find(t=>t.key===service)?.label} yet.</div>
-        ):blocks.map((b,i)=>(
-          <div key={i} style={{...card,padding:0,overflow:'hidden'}}>
-            <div style={{background:'var(--cv-alt)',padding:'0.85rem 1.1rem',borderBottom:'1px solid var(--cv-border-soft)',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.5rem'}}>
-              <div>
-                <div style={{fontFamily:'var(--cv-font)',fontSize:'1.15rem',fontWeight:700,color:C.navy}}>{b.title}</div>
-                <div style={{fontSize:'0.86rem',color:C.slate}}>{b.meta}</div>
-              </div>
-              <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.82rem',color:C.slate}}>{b.clients.length} client{b.clients.length===1?'':'s'}</div>
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))',gap:'0.75rem',padding:'1rem 1.1rem'}}>
-              {b.clients.map(c=><ServedClientCard key={c.id+(c.__seStatus||'')} client={c} seStatus={c.__seStatus} hasActuals={hasActuals.has(c.id)}/>)}
+        {/* Subscription is the one service with figures that are edited rather
+            than read: level, paid-up-to date and billing term. They stay in a
+            table underneath the cards. */}
+        {service==='portfolio_intelligence'&&subscriptionRows.length>0&&(
+          <div style={{...card,padding:0,overflow:'hidden'}}>
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
+                <thead><tr style={{background:C.navy}}>{['Client','Level','Paid Up To','Term','Status'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left',fontWeight:400,fontSize:'0.93rem',color:'var(--cv-on-accent)',whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {subscriptionRows.map(({se,client:c})=>{
+                    const dueSoon=se.paid_through_date&&new Date(se.paid_through_date)<new Date(Date.now()+14*86400000)
+                    return(
+                      <tr key={se.id} style={{borderBottom:'1px solid var(--cv-border-soft)'}}>
+                        <td style={{padding:'10px 12px',fontWeight:700,cursor:'pointer'}} onClick={()=>{setSelClientId(c.id);setActiveTab(openingTabFor(c));setView('client')}}>{c.name}</td>
+                        <td style={{padding:'10px 12px'}}><input style={{...inp,width:120,padding:'0.3rem 0.5rem'}} placeholder="e.g. Standard" value={se.subscription_level||''} onChange={e=>updateSubscription(se.id,{subscription_level:e.target.value})}/></td>
+                        <td style={{padding:'10px 12px'}}><input type="date" style={{...inp,width:150,padding:'0.3rem 0.5rem'}} value={se.paid_through_date||''} onChange={e=>updateSubscription(se.id,{paid_through_date:e.target.value||null})}/></td>
+                        <td style={{padding:'10px 12px'}}><select style={{...inp,width:110,padding:'0.3rem 0.5rem'}} value={se.billing_term||''} onChange={e=>updateSubscription(se.id,{billing_term:e.target.value||null})}><option value="">—</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select></td>
+                        <td style={{padding:'10px 12px'}}>{se.paid_through_date?<Badge text={dueSoon?'Renewal due':'Paid up'} color={dueSoon?C.amber:C.green}/>:<Badge text="No date set" color={C.slate}/>}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
-        ))}
+        )}
       </div>
     )
   }
@@ -2899,6 +2970,8 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     const [editingCiId,setEditingCiId]=useState(null)
     const [editForm,setEditForm]=useState(null)
     const [teamMsg,setTeamMsg]=useState(null)
+    const [openCiId,setOpenCiId]=useState(null)
+    const openCi=coImplementers.find(c=>c.id===openCiId)||null
     // Real profile edit -- name/email/phone/country/specialisation were
     // only ever set once at creation (NewCIForm) with no way to change any
     // of them again anywhere in the app, not even here where rate already
@@ -2943,6 +3016,105 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       if(error)return setTeamMsg('Could not remove client: '+error.message)
       setCoImplementers(prev=>prev.map(x=>x.id!==ci.id?x:{...x,client_ids:next}))
     }
+    // A PAGE PER CO-IMPLEMENTER. 13 September 2026. Habib: it would be good
+    // to have team member cards, so every co-implementer has a page.
+    //
+    // The roster used to print every person's full record one under the
+    // other -- profile, clients, and ten rows of timesheet each -- so five
+    // people was a page nobody could take in. The roster is cards now, and
+    // everything that was on the long list is on the person's own page,
+    // one click in and one click back. Nothing was removed.
+    function CiDetail({ci}){
+    const ciTs=timesheets.filter(t=>t.co_implementer_id===ci.id)
+    const approvedHours=ciTs.filter(t=>t.status==='approved').reduce((s,t)=>s+(Number(t.hours)||0),0)
+    const pendingHours=ciTs.filter(t=>t.status==='submitted').reduce((s,t)=>s+(Number(t.hours)||0),0)
+    return(<div style={{...card,marginBottom:0}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.65rem'}}>
+        <div><div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy}}>{ci.name}</div><div style={{fontSize:'1.01rem',color:C.slate}}>{ci.email} · {ci.country}</div>{ci.specialisation&&<div style={{fontSize:'1.01rem',color:C.slate}}>{ci.specialisation}</div>}</div>
+        <div style={{textAlign:'right'}}>
+          {canManageTeam(userRole)
+            ?<button onClick={()=>toggleActive(ci)} title="Click to toggle" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem',background:'transparent',border:`1px solid ${ci.active?C.green:C.red}`,borderRadius:4,padding:'0.1rem 0.5rem',cursor:'pointer'}}>{ci.active?'Active':'Inactive'} · click to {ci.active?'suspend':'reactivate'}</button>
+            :<div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem'}}>{ci.active?'Active':'Inactive'}</div>}
+          {ci.rate_per_day>0&&<div style={{fontSize:'0.93rem',color:C.slate,marginBottom:'0.4rem',marginTop:'0.3rem'}}>{ci.currency} {Number(ci.rate_per_day).toLocaleString()}/day</div>}
+          {canManageTeam(userRole)&&<button style={{...addBtn(true),marginBottom:'0.4rem'}} onClick={()=>editingCiId===ci.id?setEditingCiId(null):startEditCi(ci)}>{editingCiId===ci.id?'Cancel':'Edit profile'}</button>}
+          <InviteLoginButton email={ci.email} fullName={ci.name} role="coach" coImplementerId={ci.id} funderProgrammeId={null}/>
+          <div style={{marginTop:'0.4rem'}}><WelcomeLetterButton coImplementerId={ci.id}/></div>
+        </div>
+      </div>
+      {editingCiId===ci.id&&editForm&&(
+        <div style={{...card,border:`1px solid ${C.cyan}`,marginBottom:'0.75rem'}}>
+          <div style={fGrid}>
+            <div><label style={lbl}>Name</label><input style={inp} value={editForm.name} onChange={e=>setEditForm(f=>({...f,name:e.target.value}))}/></div>
+            <div><label style={lbl}>Email</label><input type="email" style={inp} value={editForm.email} onChange={e=>setEditForm(f=>({...f,email:e.target.value}))}/></div>
+            <div><label style={lbl}>Phone</label><input style={inp} value={editForm.phone} onChange={e=>setEditForm(f=>({...f,phone:e.target.value}))}/></div>
+            <div><label style={lbl}>Country</label><input style={inp} value={editForm.country} onChange={e=>setEditForm(f=>({...f,country:e.target.value}))}/></div>
+            <div><label style={lbl}>Specialisation</label><input style={inp} value={editForm.specialisation} onChange={e=>setEditForm(f=>({...f,specialisation:e.target.value}))}/></div>
+          </div>
+          <button style={{...solidBtn(),marginTop:'0.75rem'}} onClick={()=>saveCiProfile(ci.id)}>Save profile</button>
+        </div>
+      )}
+      <div style={{display:'flex',gap:'1.5rem',fontSize:'1.01rem',color:C.slate,marginBottom:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
+        <span style={{display:'flex',alignItems:'center',gap:'0.4rem',flexWrap:'wrap'}}>Clients:{(ci.client_ids||[]).length===0?<strong style={{color:C.slate}}>None</strong>:(ci.client_ids||[]).map(id=><span key={id} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.12rem 0.55rem',borderRadius:20,background:'var(--cv-cyan-dim)',color:C.teal,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:'0.3rem'}}>{clients.find(c=>c.id===id)?.name||id}{canManageTeam(userRole)&&<span style={{cursor:'pointer',fontWeight:700}} onClick={()=>unassignClient(ci,id)} title="Remove this client">×</span>}</span>)}</span>
+        {canManageTeam(userRole)&&(addingClientFor===ci.id?(
+          <select autoFocus style={{...inp,width:'auto',fontSize:'0.93rem',padding:'0.15rem 0.4rem'}} value="" onChange={e=>assignClient(ci,e.target.value)} onBlur={()=>setAddingClientFor(null)}>
+            <option value="">Select a client…</option>
+            {clients.filter(c=>!(ci.client_ids||[]).includes(c.id)).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        ):(
+          <button style={addBtn(true)} onClick={()=>setAddingClientFor(ci.id)}>+ Assign client</button>
+        ))}
+        <span>Approved: <strong style={{color:C.green}}>{approvedHours}h</strong></span>
+        <span>Pending: <strong style={{color:C.amber}}>{pendingHours}h</strong></span>
+      </div>
+      {/* Timesheet table */}
+      {ciTs.length>0&&<div style={{overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem',fontFamily:"var(--cv-font)"}}>
+          <thead><tr style={{background:C.lightBg}}>{['Date','Client','DP','Hours','Description','Status'].map(h=><th key={h} style={{padding:'0.4rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`}}>{h}</th>)}</tr></thead>
+          <tbody>{ciTs.slice(0,10).map((ts,i)=><tr key={ts.id} style={{background:i%2===0?C.cream:C.white}}>
+            <td style={{padding:'0.4rem 0.6rem'}}>{ts.date}</td>
+            <td style={{padding:'0.4rem 0.6rem'}}>{clients.find(c=>c.id===ts.client_id)?.name||'—'}</td>
+            <td style={{padding:'0.4rem 0.6rem',fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem'}}>{ts.dp_id||'—'}</td>
+            <td style={{padding:'0.4rem 0.6rem'}}>{ts.hours}</td>
+            <td style={{padding:'0.4rem 0.6rem',maxWidth:180}}>{ts.description}</td>
+            <td style={{padding:'0.4rem 0.6rem'}}><Badge text={ts.status} color={ts.status==='approved'?C.green:ts.status==='submitted'?C.amber:ts.status==='rejected'?C.red:C.slate}/></td>
+          </tr>)}</tbody>
+        </table>
+      </div>}
+    </div>)
+    }
+
+    function CiRosterCard({ci}){
+      const initials=(ci.name||'?').split(' ').filter(Boolean).map(w=>w[0]).slice(0,2).join('').toUpperCase()
+      const ciTs=timesheets.filter(t=>t.co_implementer_id===ci.id)
+      const pendingHours=ciTs.filter(t=>t.status==='submitted').reduce((s,t)=>s+(Number(t.hours)||0),0)
+      const approvedHours=ciTs.filter(t=>t.status==='approved').reduce((s,t)=>s+(Number(t.hours)||0),0)
+      const served=(ci.client_ids||[]).map(id=>clients.find(c=>c.id===id)).filter(Boolean)
+      return(
+        <div onClick={()=>setOpenCiId(ci.id)}
+          style={{...card,marginBottom:0,padding:'1rem 1.1rem',cursor:'pointer',borderLeft:`4px solid ${ci.active?C.green:C.border}`}}>
+          <div style={{display:'flex',alignItems:'center',gap:'0.7rem',marginBottom:'0.6rem'}}>
+            <div style={{width:38,height:38,borderRadius:10,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'var(--cv-font-mono)',fontSize:'0.99rem',fontWeight:700,flexShrink:0}}>{initials}</div>
+            <div style={{minWidth:0,flex:1}}>
+              <div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ci.name}</div>
+              <div style={{fontSize:'0.93rem',color:C.slate,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{[ci.country,ci.specialisation].filter(Boolean).join(' · ')||ci.email}</div>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginBottom:'0.55rem'}}>
+            <Badge text={ci.active?'Active':'Inactive'} color={ci.active?C.green:C.red}/>
+            <Badge text={`${served.length} client${served.length===1?'':'s'}`} color={C.teal}/>
+            {pendingHours>0&&<Badge text={`${pendingHours}h awaiting approval`} color={C.amber}/>}
+          </div>
+          <div style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.4,minHeight:'1.2rem'}}>
+            {served.length===0?'No clients assigned yet.':served.map(c=>c.name).join(', ')}
+          </div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'0.7rem',fontSize:'0.85rem',color:C.slate}}>
+            <span>{approvedHours}h approved</span>
+            <span style={{fontFamily:'var(--cv-font-mono)',color:C.teal,fontWeight:700}}>Open page →</span>
+          </div>
+        </div>
+      )
+    }
+
     return(
       <div>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem'}}><div style={secH}>Canvas Coach Team</div>{canManageTeam(userRole)&&<button style={addBtn()} onClick={()=>setShowNew(!showNew)}>+ Add Co-Implementer</button>}</div>
@@ -2964,63 +3136,18 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           </div>
         )}
         {showNew&&<NewCIForm clients={clients} onSave={async ci=>{const {data,error}=await supabase.from('co_implementers').insert([ci]).select().single();if(!error&&data){setCoImplementers(prev=>[...prev,data]);setShowNew(false)}}} onCancel={()=>setShowNew(false)}/>}
-        {coImplementers.length===0?<div style={{...card,color:C.slate,textAlign:'center',padding:'2.5rem'}}>No co-implementers yet.</div>:coImplementers.map(ci=>{
-          const ciTs=timesheets.filter(t=>t.co_implementer_id===ci.id)
-          const approvedHours=ciTs.filter(t=>t.status==='approved').reduce((s,t)=>s+(Number(t.hours)||0),0)
-          const pendingHours=ciTs.filter(t=>t.status==='submitted').reduce((s,t)=>s+(Number(t.hours)||0),0)
-          return(<div key={ci.id} style={card}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.65rem'}}>
-              <div><div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy}}>{ci.name}</div><div style={{fontSize:'1.01rem',color:C.slate}}>{ci.email} · {ci.country}</div>{ci.specialisation&&<div style={{fontSize:'1.01rem',color:C.slate}}>{ci.specialisation}</div>}</div>
-              <div style={{textAlign:'right'}}>
-                {canManageTeam(userRole)
-                  ?<button onClick={()=>toggleActive(ci)} title="Click to toggle" style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem',background:'transparent',border:`1px solid ${ci.active?C.green:C.red}`,borderRadius:4,padding:'0.1rem 0.5rem',cursor:'pointer'}}>{ci.active?'Active':'Inactive'} · click to {ci.active?'suspend':'reactivate'}</button>
-                  :<div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',color:ci.active?C.green:C.red,marginBottom:'0.2rem'}}>{ci.active?'Active':'Inactive'}</div>}
-                {ci.rate_per_day>0&&<div style={{fontSize:'0.93rem',color:C.slate,marginBottom:'0.4rem',marginTop:'0.3rem'}}>{ci.currency} {Number(ci.rate_per_day).toLocaleString()}/day</div>}
-                {canManageTeam(userRole)&&<button style={{...addBtn(true),marginBottom:'0.4rem'}} onClick={()=>editingCiId===ci.id?setEditingCiId(null):startEditCi(ci)}>{editingCiId===ci.id?'Cancel':'Edit profile'}</button>}
-                <InviteLoginButton email={ci.email} fullName={ci.name} role="coach" coImplementerId={ci.id} funderProgrammeId={null}/>
-              </div>
-            </div>
-            {editingCiId===ci.id&&editForm&&(
-              <div style={{...card,border:`1px solid ${C.cyan}`,marginBottom:'0.75rem'}}>
-                <div style={fGrid}>
-                  <div><label style={lbl}>Name</label><input style={inp} value={editForm.name} onChange={e=>setEditForm(f=>({...f,name:e.target.value}))}/></div>
-                  <div><label style={lbl}>Email</label><input type="email" style={inp} value={editForm.email} onChange={e=>setEditForm(f=>({...f,email:e.target.value}))}/></div>
-                  <div><label style={lbl}>Phone</label><input style={inp} value={editForm.phone} onChange={e=>setEditForm(f=>({...f,phone:e.target.value}))}/></div>
-                  <div><label style={lbl}>Country</label><input style={inp} value={editForm.country} onChange={e=>setEditForm(f=>({...f,country:e.target.value}))}/></div>
-                  <div><label style={lbl}>Specialisation</label><input style={inp} value={editForm.specialisation} onChange={e=>setEditForm(f=>({...f,specialisation:e.target.value}))}/></div>
-                </div>
-                <button style={{...solidBtn(),marginTop:'0.75rem'}} onClick={()=>saveCiProfile(ci.id)}>Save profile</button>
-              </div>
-            )}
-            <div style={{display:'flex',gap:'1.5rem',fontSize:'1.01rem',color:C.slate,marginBottom:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
-              <span style={{display:'flex',alignItems:'center',gap:'0.4rem',flexWrap:'wrap'}}>Clients:{(ci.client_ids||[]).length===0?<strong style={{color:C.slate}}>None</strong>:(ci.client_ids||[]).map(id=><span key={id} style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.12rem 0.55rem',borderRadius:20,background:'var(--cv-cyan-dim)',color:C.teal,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:'0.3rem'}}>{clients.find(c=>c.id===id)?.name||id}{canManageTeam(userRole)&&<span style={{cursor:'pointer',fontWeight:700}} onClick={()=>unassignClient(ci,id)} title="Remove this client">×</span>}</span>)}</span>
-              {canManageTeam(userRole)&&(addingClientFor===ci.id?(
-                <select autoFocus style={{...inp,width:'auto',fontSize:'0.93rem',padding:'0.15rem 0.4rem'}} value="" onChange={e=>assignClient(ci,e.target.value)} onBlur={()=>setAddingClientFor(null)}>
-                  <option value="">Select a client…</option>
-                  {clients.filter(c=>!(ci.client_ids||[]).includes(c.id)).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              ):(
-                <button style={addBtn(true)} onClick={()=>setAddingClientFor(ci.id)}>+ Assign client</button>
-              ))}
-              <span>Approved: <strong style={{color:C.green}}>{approvedHours}h</strong></span>
-              <span>Pending: <strong style={{color:C.amber}}>{pendingHours}h</strong></span>
-            </div>
-            {/* Timesheet table */}
-            {ciTs.length>0&&<div style={{overflowX:'auto'}}>
-              <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem',fontFamily:"var(--cv-font)"}}>
-                <thead><tr style={{background:C.lightBg}}>{['Date','Client','DP','Hours','Description','Status'].map(h=><th key={h} style={{padding:'0.4rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`}}>{h}</th>)}</tr></thead>
-                <tbody>{ciTs.slice(0,10).map((ts,i)=><tr key={ts.id} style={{background:i%2===0?C.cream:C.white}}>
-                  <td style={{padding:'0.4rem 0.6rem'}}>{ts.date}</td>
-                  <td style={{padding:'0.4rem 0.6rem'}}>{clients.find(c=>c.id===ts.client_id)?.name||'—'}</td>
-                  <td style={{padding:'0.4rem 0.6rem',fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem'}}>{ts.dp_id||'—'}</td>
-                  <td style={{padding:'0.4rem 0.6rem'}}>{ts.hours}</td>
-                  <td style={{padding:'0.4rem 0.6rem',maxWidth:180}}>{ts.description}</td>
-                  <td style={{padding:'0.4rem 0.6rem'}}><Badge text={ts.status} color={ts.status==='approved'?C.green:ts.status==='submitted'?C.amber:ts.status==='rejected'?C.red:C.slate}/></td>
-                </tr>)}</tbody>
-              </table>
-            </div>}
-          </div>)
-        })}
+        {openCi?(
+          <div>
+            <button style={{...addBtn(true,C.teal),marginBottom:'0.9rem'}} onClick={()=>setOpenCiId(null)}>← All co-implementers</button>
+            <CiDetail ci={openCi}/>
+          </div>
+        ):coImplementers.length===0?(
+          <div style={{...card,color:C.slate,textAlign:'center',padding:'2.5rem'}}>No co-implementers yet.</div>
+        ):(
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(270px,1fr))',gap:'1rem',alignItems:'start'}}>
+            {coImplementers.map(ci=><CiRosterCard key={ci.id} ci={ci}/>)}
+          </div>
+        )}
       </div>
     )
   }
@@ -3118,11 +3245,28 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // funder to see. Both land straight on Clients, already scoped by RLS
   // to just what they're allowed to see (their assigned clients, or the
   // clients under their programme).
+  // THE TABS SHOULD SAY WHAT IS BEHIND THEM. 13 September 2026. Habib: the
+  // tabs are not well presented and are not reflecting the true state of
+  // things.
+  //
+  // Five words in a row told you nothing about where the work was. Each one
+  // now carries its own count, taken from the same records the page itself
+  // draws from, and a red dot where something is actually waiting: a client
+  // flagged by a health check, or a timesheet sitting unapproved. My Business
+  // carries no number because it is a summary of everything rather than a list
+  // of anything.
+  const openDeals=programmes.filter(p=>p.deal_stage&&p.deal_stage!=='won'&&p.deal_stage!=='lost').length
+  const awaitingApproval=timesheets.filter(t=>t.status==='submitted').length
+  const flaggedClients=Object.values(healthByClient).filter(Boolean).length
   const mainNavTabs=isSuperCoach
-    ?[['overview','My Business'],['clients','Clients'],['programmes','Pipeline'],['team','Team'],['portfolio','Market Intelligence']]
+    ?[['overview','My Business',null,false],
+      ['clients','Clients',clients.length,flaggedClients>0],
+      ['programmes','Pipeline',openDeals,false],
+      ['team','Team',coImplementers.length,awaitingApproval>0],
+      ['portfolio','Market Intelligence',subscriberCount,false]]
     :isCoImplementer
-    ?[['clients','Clients'],['mypayments','My Timesheet & Expenses']]
-    :[['clients','Clients']]
+    ?[['clients','Clients',clients.length,false],['mypayments','My Timesheet & Expenses',null,false]]
+    :[['clients','Clients',clients.length,false]]
   const roleBadgeLabel=isSuperCoach?'Super Coach':isFunder?'Funder':isClient?(canSignOff(userRole)?'Client':'Client team'):'Co-Implementer'
   // A client has one engagement and no other section to move between, so the
   // navigation strip is nothing but a row they cannot use.
@@ -3181,7 +3325,14 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       {showMainNav?(
       <nav style={{background:'var(--cv-nav)',borderBottom:`1px solid var(--cv-cyan-dim)`}}>
         <div style={{maxWidth:1320,margin:'0 auto',padding:'0 1.5rem',display:'flex',flexWrap:'wrap'}}>
-          {mainNavTabs.map(([id,label])=><button key={id} style={navBtn(view===id||(view==='client'&&id==='clients'))} onClick={()=>{if(id!=='client')setSelClientId(null);setView(id)}}>{label}</button>)}
+          {mainNavTabs.map(([id,label,count,alert])=>(
+            <button key={id} style={{...navBtn(view===id||(view==='client'&&id==='clients')),display:'inline-flex',alignItems:'center',gap:'0.4rem'}}
+              onClick={()=>{if(id!=='client')setSelClientId(null);setView(id)}}>
+              <span>{label}</span>
+              {count!==null&&count!==undefined&&<span style={{fontSize:'0.85rem',opacity:0.8}}>{count}</span>}
+              {alert&&<span title="Something here is waiting" style={{width:7,height:7,borderRadius:'50%',background:C.red,flexShrink:0}}/>}
+            </button>
+          ))}
         </div>
       </nav>
       ):null}

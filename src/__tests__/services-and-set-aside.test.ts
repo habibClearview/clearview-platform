@@ -49,9 +49,8 @@ describe('a client can be onboarded into any of the four services', () => {
     // Advisory and Intelligence were read only from service_engagements, so a
     // client carrying one with no service row yet would show under no service
     // at all and read as deleted.
-    expect(DASH).toContain('const ownMode=clients.filter(c=>c.engagement_mode===service)')
-    expect(DASH).toContain('No subscription recorded yet')
-    expect(DASH).toContain('No service engagement recorded yet')
+    expect(DASH).toContain('const ownMode=clients.filter(c=>c.engagement_mode===key)')
+    expect(DASH).toContain("payer:'Nothing logged under Services yet'")
   })
 })
 
@@ -116,10 +115,9 @@ describe('a flag can be set aside and brought back', () => {
 // it was done is worse than not fixing it.
 // ============================================================
 describe('a flagged client can be set aside on the Clients screen', () => {
-  it('offers to set aside, and to bring back', () => {
-    expect(DASH).toContain('Set aside')
+  it('offers to dismiss, and to bring back', () => {
+    expect(DASH).toContain('Dismiss flag')
     expect(DASH).toContain('Bring it back')
-    expect(DASH).toContain('Set aside until the next health check')
   })
 
   it('comes back by itself when a newer health check is generated', () => {
@@ -129,10 +127,11 @@ describe('a flagged client can be set aside on the Clients screen', () => {
     expect(DASH).toContain('return !Number.isFinite(generated)||at>=generated')
   })
 
-  it('keeps the panel visible when everything in it has been set aside', () => {
-    // A panel that disappears entirely leaves no way to bring anything back.
-    expect(DASH).toContain('{(flagged.length>0||setAsideFlags.length>0)&&(')
-    expect(DASH).toContain('Nothing flagged this week')
+  it('a dismissed flag is still shown on the client, with the way back', () => {
+    // Nothing is hidden for good. The banner that used to hold the dismissed
+    // list is gone, so the client's own card is what has to say it.
+    expect(DASH).toContain('Flag dismissed')
+    expect(DASH).toContain('onRestore&&onRestore()')
   })
 
   it('puts the screen back if the write does not land', () => {
@@ -147,7 +146,7 @@ describe('a flagged client can be set aside on the Clients screen', () => {
   it('setting one aside does not also open the client', () => {
     // The whole row is a link to the client's dashboard, so the button has to
     // stop the press reaching it.
-    expect(DASH).toContain('onClick={e=>{e.stopPropagation();setFlagAside(c,true)}}')
+    expect(DASH).toContain('onClick={e=>{e.stopPropagation();onDismiss&&onDismiss()}}')
   })
 
   it('the column it needs is recorded as a migration', () => {
@@ -157,17 +156,18 @@ describe('a flagged client can be set aside on the Clients screen', () => {
 })
 
 describe('a Market Intelligence client appears the moment it is added', () => {
-  it('the subscription branch draws the client blocks as well as the table', () => {
+  it('the grid draws every client of the service, and the table as well', () => {
     // It drew the subscription table and nothing else, so a client whose own
     // record says Market Intelligence, with nothing logged under Services yet,
     // was calculated into a block that was never rendered. Habib added one and
-    // it was simply not there.
-    expect(DASH).toContain('subscriptionRows.length===0&&blocks.length===0?(')
-    expect(DASH).toContain('):(<>{subscriptionRows.length>0&&(')
+    // it was simply not there. One grid draws every service now, so there is
+    // no branch left that can leave a client uncalculated and undrawn.
+    expect(DASH).toContain('{rows.map(r=>(')
+    expect(DASH).toContain("{service==='portfolio_intelligence'&&subscriptionRows.length>0&&(")
   })
 
   it('still says so when there is genuinely nobody', () => {
-    expect(DASH).toContain('No subscribers yet.')
+    expect(DASH).toContain('No clients on {serviceLabel} yet.')
   })
 })
 
