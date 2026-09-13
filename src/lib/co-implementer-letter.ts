@@ -34,11 +34,53 @@
 // somebody in if it were read by the wrong person.
 // ============================================================
 
+// THE SALUTATION IS PART OF THE LETTER. 14 September 2026. Habib: "In the team
+// email there is no way I can edit the salutation, because the salutation you
+// designed in there doesn't pick the name of the co-implementer."
+//
+// It was bolted on by the server, above the text, so it was the one line of
+// the letter he could not change: not the greeting, not a title, not the
+// punctuation. And the preview showed "Dear Your Name," which reads as though
+// the name were never going to arrive.
+//
+// The greeting is now the first line of the editable letter, with {name} where
+// the person's name goes. He can write "Dear Ms {name}," or "Hello {first
+// name}," or anything else, and what he writes is what is sent.
+export const NAME_TOKEN = '{name}'
+export const FIRST_NAME_TOKEN = '{first name}'
+
+/**
+ * Puts the person's name into the letter wherever it was asked for.
+ *
+ * A letter with no token anywhere is left exactly as written: somebody who
+ * deliberately removed the greeting meant to remove it, and quietly putting
+ * one back would overrule them.
+ *
+ * With no name on file the tokens are removed rather than left showing, and
+ * the stray punctuation a missing name leaves behind goes with them, so
+ * nobody is ever sent "Dear ,".
+ */
+export function fillLetterName(text: string, fullName?: string | null): string {
+  const name = (fullName || '').trim().replace(/\s+/g, ' ')
+  const first = name.split(' ')[0] || ''
+  // The longer token is replaced first, so {first name} is never left as a
+  // stray " name" by {name} matching part of it.
+  let out = (text || '').split(FIRST_NAME_TOKEN).join(first).split(NAME_TOKEN).join(name)
+  if (!name) {
+    // "Dear ," and "Hello ," are worse than no greeting at all.
+    out = out.replace(/^[^\S\n]*(dear|hi|hello)[^\S\n]*[,:]?[^\S\n]*$/gim, '')
+      .replace(/^\n+/, '')
+  }
+  return out
+}
+
 export const CO_IMPLEMENTER_LETTER_KEY = 'co_implementer_welcome'
 
 export const CO_IMPLEMENTER_LETTER_SUBJECT = 'Welcome to the team: your role, and how the platform works'
 
-export const DEFAULT_CO_IMPLEMENTER_LETTER = `Welcome. You are joining our practice as a co-implementer.
+export const DEFAULT_CO_IMPLEMENTER_LETTER = `Dear {name},
+
+Welcome. You are joining our practice as a co-implementer.
 
 This letter sets out what the work is, who you report to, how you are paid, and how to use the platform. Read it once now and keep it. If anything in it is unclear, ask. There is no question too small in the first week.
 

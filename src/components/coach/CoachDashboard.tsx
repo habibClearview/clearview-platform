@@ -1032,6 +1032,15 @@ function CoImplementerLetterPanel(){
             a line starting with <strong>-</strong> is a bullet, and a blank line separates paragraphs.
             Save, then read it again to see it as it will arrive.
           </p>
+          {/* THE GREETING IS YOURS TO WRITE. 14 September 2026. Habib: there
+              was no way to edit the salutation, because it was added by the
+              server above the text rather than being part of it. */}
+          <p style={{fontSize:'0.9rem',color:C.navy,margin:'0 0 0.45rem',lineHeight:1.45,background:'var(--cv-tint-cyan)',border:`1px solid ${C.teal}`,borderRadius:6,padding:'0.5rem 0.7rem'}}>
+            The greeting is the first line and it is yours to change. Write <code>{'{name}'}</code> where
+            their full name should go, or <code>{'{first name}'}</code> for just the first.
+            So <code>Dear Ms {'{name}'},</code> reaches Ganiyat Ettu as <strong>Dear Ms Ganiyat Ettu,</strong>.
+            The preview below uses a made-up name; the real letter uses theirs.
+          </p>
           <textarea
             aria-label="The welcome letter sent to a new co-implementer"
             disabled={busy==='save'}

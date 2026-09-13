@@ -20,6 +20,7 @@ import { readFileSync } from 'node:fs'
 import { textToEmail } from '@/lib/letter'
 import { canManageTeam } from '@/lib/coach-types'
 import { GUIDANCE_CATEGORIES } from '@/lib/guidance'
+import { fillLetterName } from '@/lib/co-implementer-letter'
 
 const DASH = readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
 const LETTER = readFileSync('app/api/co-implementer-welcome/route.ts', 'utf8')
@@ -229,7 +230,7 @@ describe('the welcome letter to a co-implementer', () => {
     // that has to be proved rather than asserted about. Anything that looks
     // like markup comes back escaped, in a paragraph, a heading and a bullet.
     expect(LETTER).toContain("import { textToEmail } from '@/lib/letter'")
-    expect(LETTER).toContain('...textToEmail(letter)')
+    expect(LETTER).toContain('textToEmail(fillLetterName(letter, ci.name))')
 
     const nasty = '<script>alert(1)</script>'
     const out = textToEmail(`${nasty}\n\n# ${nasty}\n\n- ${nasty}`)
@@ -493,5 +494,49 @@ describe('a team member with test records can be cleared out', () => {
     for (const setter of ['setEntries', 'setExpenses', 'setAdvances', 'setInvoices']) {
       expect(TEAM).toContain(`${setter}(prev=>prev.filter(mine))`)
     }
+  })
+})
+
+// THE SALUTATION IS PART OF THE LETTER. 14 September 2026. Habib: "In the team
+// email there is no way I can edit the salutation, because the salutation you
+// designed in there doesn't pick the name of the co-implementer."
+//
+// It was added by the server above the editable text, so it was the one line
+// he could not change, and the preview showed "Dear Your Name,".
+describe('the greeting on the welcome letter', () => {
+  it('is the first line of the letter he edits, not something bolted on', () => {
+    expect(WORDS).toContain('Dear {name},')
+    expect(LETTER).not.toContain("salutation('Your Name')")
+    expect(LETTER).not.toContain('const hello = salutation(')
+  })
+
+  it('puts the real person into it when it is sent', () => {
+    expect(fillLetterName('Dear {name},', 'Ganiyat Ettu')).toBe('Dear Ganiyat Ettu,')
+    expect(fillLetterName('Hello {first name},', 'Ganiyat Ettu')).toBe('Hello Ganiyat,')
+    expect(fillLetterName('Dear Ms {name},', 'Ganiyat Ettu')).toBe('Dear Ms Ganiyat Ettu,')
+  })
+
+  it('replaces the longer token first, so {first name} never leaves " name" behind', () => {
+    expect(fillLetterName('{first name} and {name}', 'Ganiyat Ettu')).toBe('Ganiyat and Ganiyat Ettu')
+  })
+
+  it('never sends "Dear ," when there is no name on file', () => {
+    expect(fillLetterName('Dear {name},\n\nWelcome.', '')).toBe('Welcome.')
+    expect(fillLetterName('Hello {first name},\n\nWelcome.', null)).toBe('Welcome.')
+  })
+
+  it('leaves a letter alone when its author removed the greeting on purpose', () => {
+    expect(fillLetterName('Welcome. You are joining us.', 'Ganiyat Ettu'))
+      .toBe('Welcome. You are joining us.')
+  })
+
+  it('the preview fills the tokens the same way a send does', () => {
+    expect(LETTER).toContain("fillLetterName(body, 'Amina Bello')")
+    expect(LETTER).toContain('fillLetterName(letter, ci.name)')
+  })
+
+  it('the screen says how to write the greeting', () => {
+    expect(DASH).toContain('The greeting is the first line and it is yours to change')
+    expect(DASH).toContain("{'{first name}'}")
   })
 })
