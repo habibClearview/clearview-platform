@@ -1,0 +1,213 @@
+name: A second copy of every record
+
+# 13 September 2026. Supabase takes its own backup every night, inside
+# Supabase. Restoring one puts it back over the top of the live project, so
+# there is no way to open one and check it is right without destroying what is
+# there, and nobody had ever read one. An untested backup is a belief.
+#
+# THE RECORDS NEVER LEAVE THIS JOB IN THE CLEAR.
+#
+# The first version of this uploaded every client record as a plain build
+# artifact. The AI review refused it and was right: anybody with read access to
+# this repository, or any leaked token carrying actions:read, could have
+# downloaded the whole customer database and it would have sat there for ninety
+# days. That is a worse front door than the database it was copying.
+#
+# So there are two things this job can produce, and which one depends on
+# whether a passphrase has been set.
+#
+#   WITHOUT a passphrase, which is the default and needs no setup: only the
+#   manifest is kept. Table names and row counts, no records. That still proves
+#   every night that every record can be read and parsed, which is the failure
+#   that is otherwise invisible until the day you need the data.
+#
+#   WITH the BACKUP_PASSPHRASE secret set: the records are also kept, encrypted
+#   with AES-256 before they go anywhere. Somebody who downloads the artifact
+#   has a file they cannot open. Thirty days rather than ninety, because a
+#   record somebody has asked to have deleted should not outlive that request
+#   by a season.
+#
+# The plain files are deleted inside the job before anything is uploaded, so
+# there is no window in which they could be picked up.
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-database
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Copy every record, and read it back
+    runs-on: ubuntu-latest
+    # NO SECRET IS SET ON THE JOB. 13 September 2026, CodeRabbit: a job level
+    # env is inherited by every step, so checkout, the Node setup and the
+    # upload action could all read the service role key while none of them
+    # needs a database at all. Each key is now set on the one step that uses
+    # it, so a compromised action in any other step has nothing to take.
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: '20'
+
+      # Where the credentials are absent this FAILS rather than passing
+      # quietly, for the same reason the row level security gate does. A green
+      # tick that means "did not look" is worse than no tick at all, and on a
+      # backup it is the worst of the lot, because the day you find out is the
+      # day you needed it.
+      - name: Check the credentials are here
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::No backup was taken. Set the SUPABASE_URL repository variable and"
+            echo "::error::the SUPABASE_SERVICE_ROLE_KEY secret."
+            exit 1
+          fi
+
+      - name: Take the copy and read every line of it back
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/backup-database.mjs
+
+      # Encrypted before it can be uploaded, or not kept at all. There is no
+      # third path: the plain files are removed either way, in this same step,
+      # so they cannot be picked up by anything that runs later.
+      - name: Lock the records, or discard them
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+
+          # THE PLAIN RECORDS GO EVEN IF THIS STEP DIES. 13 September 2026,
+          # the AI review: set -e means a failing openssl exits before the
+          # cleanup line at the bottom is ever reached, leaving every client
+          # record sitting in the clear on the runner. The runner is thrown
+          # away either way, so this is depth rather than a hole, but a step
+          # whose whole job is that the records never travel in the clear
+          # should not depend on its own last line running.
+          trap 'rm -rf backup records.tar.gz' EXIT
+
+          dir=$(find backup -mindepth 1 -maxdepth 1 -type d | head -1)
+          mkdir -p out
+
+          # ONLY A SUMMARY TRAVELS IN THE CLEAR. The full manifest names every
+          # table and how many rows each holds, and "how many clients" is a
+          # business figure even though it is not a client record. The summary
+          # is enough to prove the job ran and to raise the alarm if it did
+          # not; the detail rides inside the encrypted bundle with the records.
+          node -e '
+            const m = require("fs").readFileSync(process.argv[1] + "/_manifest.json", "utf8")
+            const d = JSON.parse(m)
+            require("fs").writeFileSync("out/_summary.json", JSON.stringify({
+              takenAt: d.takenAt,
+              tablesWithRows: d.tablesWithRows,
+              rows: d.rows,
+              changedWhileBeingCopied: d.changedWhileBeingCopied?.length || 0,
+              readWithoutAStableOrder: d.readWithoutAStableOrder?.length || 0,
+              recordsKept: !!process.env.BACKUP_PASSPHRASE,
+            }, null, 2))
+          ' "$dir"
+
+          if [ -n "${BACKUP_PASSPHRASE:-}" ]; then
+            tar -czf records.tar.gz -C "$dir" .
+            # AES-256 with a derived key. Somebody holding the artifact and not
+            # the passphrase has a file they cannot open.
+            openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
+              -in records.tar.gz -out out/records.tar.gz.enc \
+              -pass env:BACKUP_PASSPHRASE
+            rm -f records.tar.gz
+            # A KEYED FINGERPRINT, NOT A BARE CHECKSUM. 13 September 2026: the
+            # review caught that my first attempt at this overclaimed, and it
+            # was right. A plain sha256 sitting beside the file catches a
+            # corrupted download and nothing else, because anybody who can
+            # change the file can write a new sha256 next to it. Only somebody
+            # holding the passphrase can produce this one, and the passphrase
+            # never appears in the artifact, so a backup that has been changed
+            # by anybody else will not match.
+            #
+            # NOT THE SAME KEY, AND NOT A FAST ONE EITHER. Two rounds of
+            # review on this line, and the second caught a hole I had opened
+            # myself. My first fix derived the fingerprint key with a single
+            # SHA-256 of the passphrase. That is domain separation, which was
+            # the first point, but it handed somebody holding the artifact a
+            # way to test a guessed passphrase for the price of one SHA-256:
+            # derive, fingerprint, compare. The whole purpose of 600,000
+            # PBKDF2 rounds on the encryption is to make each guess expensive,
+            # and a fast published check beside it gave that cost away.
+            #
+            # The fingerprint key now costs the same 600,000 rounds, under a
+            # salt of its own so it can never be the encryption key. A guess is
+            # as expensive to test against the fingerprint as against the
+            # ciphertext. The salt is fixed and written here in the open on
+            # purpose: a salt is not a secret, and anybody rehearsing a restore
+            # has to be able to reproduce this exactly.
+            mac_key=$(openssl enc -aes-256-cbc -pbkdf2 -iter 600000 \
+              -S 4d41435f4b455930 -P -pass env:BACKUP_PASSPHRASE \
+              | awk -F= '/^key=/{print $2}')
+            if [ -z "$mac_key" ]; then
+              echo "::error::The fingerprint key could not be derived, so the backup was not kept."
+              exit 1
+            fi
+            openssl dgst -sha256 -hmac "$mac_key" out/records.tar.gz.enc \
+              | awk '{print $NF}' > out/records.tar.gz.enc.hmac
+            unset mac_key
+            echo "Records kept, encrypted, with a keyed fingerprint."
+          else
+            echo "::warning::No BACKUP_PASSPHRASE secret is set, so the records were read and"
+            echo "::warning::checked but NOT kept. Only the manifest is stored. Set that secret"
+            echo "::warning::to start keeping an encrypted copy."
+          fi
+
+          # The plain records go, always, before anything leaves this job.
+          # The trap above repeats this for the paths where the step dies
+          # early; this line is the one that runs when all is well.
+          rm -rf backup
+          ls -la out
+
+      - name: Keep what is safe to keep
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: clearview-records-${{ github.run_id }}
+          path: out/
+          # Thirty days, not ninety. A record somebody has asked to have
+          # deleted should not outlive that request by a season, and a shorter
+          # window is a smaller thing to explain to a funder.
+          retention-days: 30
+          if-no-files-found: error
+
+      # A GREEN TICK THAT MEANS "NO RECORDS WERE KEPT" IS THE WORST TICK HERE.
+      # 13 September 2026, the AI review, and the sharpest business point made
+      # on this change. Without the passphrase this job reads every record,
+      # proves it can be parsed, and then keeps only the counts. That is worth
+      # having, and it is NOT a backup. A warning in a log nobody opens is how
+      # somebody ends up believing they have months of backups and holding
+      # none, which is precisely the failure this whole job exists to prevent.
+      #
+      # So the run is honestly red until the secret is set. The summary above
+      # is still uploaded first, so the proof is kept either way and the red
+      # is about the missing copy rather than a missing run.
+      - name: The records must actually be kept
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "${BACKUP_PASSPHRASE:-}" ]; then
+            echo "::error::Every record was read and checked, but NO COPY WAS KEPT."
+            echo "::error::Set the BACKUP_PASSPHRASE secret at Settings, Secrets and variables,"
+            echo "::error::Actions, New repository secret. Use a long phrase and keep it"
+            echo "::error::somewhere that is not this repository: without it a backup cannot"
+            echo "::error::be opened again by anybody, including you."
+            exit 1
+          fi
+          echo "An encrypted copy of every record was kept."
