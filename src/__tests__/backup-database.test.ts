@@ -267,6 +267,15 @@ describe('a table that moves while it is being copied', () => {
     expect(manifest.changedWhileBeingCopied.join(' ')).toContain('busy: copied 2, database now says 5')
   })
 
+  it('refuses to page a table it cannot order, rather than writing something that looks complete', async () => {
+    // Page two of an unordered read is a different question from page one. A
+    // table under one page cannot be hurt by that; over one page, refusing
+    // beats writing a file that looks whole and is not.
+    const many = Array.from({ length: 1500 }, (_, i) => ({ colour: `c${i}` }))
+    globalThis.fetch = serverWith({ oddity: many }, { columns: { oddity: ['colour'] } }) as any
+    await expect(run()).rejects.toThrow(/could not be copied/)
+  })
+
   it('picks the steadiest column available', () => {
     expect(orderColumnFor({ properties: { name: {}, created_at: {}, id: {} } })).toBe('id')
     expect(orderColumnFor({ properties: { name: {}, created_at: {} } })).toBe('created_at')
@@ -331,6 +340,20 @@ describe('the records never leave in the clear', () => {
 
   it('carries no records in the manifest, only names and counts', () => {
     expect(SCRIPT).toContain('THE MANIFEST CARRIES NO RECORDS')
+  })
+
+  it('sends only a summary out in the clear, not the table names and counts', () => {
+    // "How many clients" is a business figure even though it is not a client
+    // record. The detail rides inside the encrypted bundle.
+    expect(WORKFLOW).toContain('ONLY A SUMMARY TRAVELS IN THE CLEAR')
+    expect(WORKFLOW).toContain('out/_summary.json')
+    expect(WORKFLOW).not.toContain('cp "$dir/_manifest.json" out/_manifest.json')
+  })
+
+  it('writes a checksum beside the encrypted file, because encryption is not tamper evidence', () => {
+    // AES in this mode keeps a file private and says nothing about whether it
+    // is the file we wrote.
+    expect(WORKFLOW).toContain('sha256sum out/records.tar.gz.enc')
   })
 
   it('keeps it for thirty days rather than ninety', () => {

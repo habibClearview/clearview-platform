@@ -165,6 +165,14 @@ export async function writeTable(table, orderBy, dest, cfg) {
         written += 1
       }
       if (page.length < PAGE) break
+      // A table with no column worth ordering by cannot be paged safely: page
+      // two of an unordered read is a different question from page one, and a
+      // row written between them shifts everything. Under one page that
+      // cannot happen. Over one page, refuse rather than write something that
+      // looks complete and is not.
+      if (!orderBy) {
+        throw new Error(`${table}: more than ${PAGE} rows and no column to order by, so it cannot be copied safely`)
+      }
     }
     await put('\n]\n')
   } finally {

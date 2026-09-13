@@ -91,7 +91,24 @@ jobs:
           set -euo pipefail
           dir=$(find backup -mindepth 1 -maxdepth 1 -type d | head -1)
           mkdir -p out
-          cp "$dir/_manifest.json" out/_manifest.json
+
+          # ONLY A SUMMARY TRAVELS IN THE CLEAR. The full manifest names every
+          # table and how many rows each holds, and "how many clients" is a
+          # business figure even though it is not a client record. The summary
+          # is enough to prove the job ran and to raise the alarm if it did
+          # not; the detail rides inside the encrypted bundle with the records.
+          node -e '
+            const m = require("fs").readFileSync(process.argv[1] + "/_manifest.json", "utf8")
+            const d = JSON.parse(m)
+            require("fs").writeFileSync("out/_summary.json", JSON.stringify({
+              takenAt: d.takenAt,
+              tablesWithRows: d.tablesWithRows,
+              rows: d.rows,
+              changedWhileBeingCopied: d.changedWhileBeingCopied?.length || 0,
+              readWithoutAStableOrder: d.readWithoutAStableOrder?.length || 0,
+              recordsKept: !!process.env.BACKUP_PASSPHRASE,
+            }, null, 2))
+          ' "$dir"
 
           if [ -n "${BACKUP_PASSPHRASE:-}" ]; then
             tar -czf records.tar.gz -C "$dir" .
@@ -101,7 +118,13 @@ jobs:
               -in records.tar.gz -out out/records.tar.gz.enc \
               -pass env:BACKUP_PASSPHRASE
             rm -f records.tar.gz
-            echo "Records kept, encrypted."
+            # A CHECKSUM, BECAUSE THE ENCRYPTION ALONE PROVES NOTHING ABOUT
+            # TAMPERING. AES in this mode keeps a file private and says nothing
+            # about whether it is the file we wrote. The checksum sits beside
+            # it in the clear, so a changed backup is a changed number rather
+            # than a quiet surprise on the day it is opened.
+            sha256sum out/records.tar.gz.enc | awk '{print $1}' > out/records.tar.gz.enc.sha256
+            echo "Records kept, encrypted, with a checksum."
           else
             echo "::warning::No BACKUP_PASSPHRASE secret is set, so the records were read and"
             echo "::warning::checked but NOT kept. Only the manifest is stored. Set that secret"
