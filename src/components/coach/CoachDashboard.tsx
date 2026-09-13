@@ -607,7 +607,7 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
 
         <PiSectionHeading label="Client types" sub={`number and revenue per type, this ${periodLabel.toLowerCase()} -- to edit who's in which group, use the Clients tab`}/>
         <PiKpiRow cols={ctb.other.count>0?5:4}>
-          <PiKpiCard total label="All Clients" value={String(ctb.total.count)} rev={fmtGlance(ctb.total.revenue,feeCur)} sub={`${ctb.running} still running${ctb.closed?` · ${ctb.closed} closed`:''} · revenue collected this ${periodLabel.toLowerCase()}`}/>
+          <PiKpiCard total label="All Clients" value={String(ctb.total.count)} rev={fmtGlance(ctb.total.revenue,feeCur)} sub={`${ctb.running} active${ctb.paused?` · ${ctb.paused} paused`:''}${ctb.closed?` · ${ctb.closed} closed`:''} · revenue collected this ${periodLabel.toLowerCase()}`}/>
           <PiKpiCard label="Donor Programmes" value={String(ctb.donorProgrammes.count)} rev={fmtGlance(ctb.donorProgrammes.revenue,feeCur)} sub={`${ctb.donorProgrammes.clientCount} client${ctb.donorProgrammes.clientCount===1?'':'s'} under them`}/>
           <PiKpiCard label="Independent Clients" value={String(ctb.independentClients.count)} rev={fmtGlance(ctb.independentClients.revenue,feeCur)} sub="self-funded GtCV"/>
           <PiKpiCard label="Subscribers" value={String(ctb.subscribers.count)} rev={fmtGlance(ctb.subscribers.revenue,feeCur)} sub="independent Clearview"/>
@@ -2033,11 +2033,15 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // the database actually said. Nothing is ever discarded.
   const noticeStored=useRef({})
   const noticeTouched=useRef(new Set())
+  // Notices whose write has already landed. The load below is a snapshot taken
+  // before it, so if it arrives afterwards it is older than what is stored and
+  // must not replace it. CodeRabbit on #265.
+  const noticeWritten=useRef(new Set())
   useEffect(()=>{
     let cancelled=false
     supabase.from('coach_notice_dismissals').select('notice_key,covers,dismissed_ids').then(({data,error})=>{
       if(cancelled||error)return
-      ;(data||[]).forEach(r=>{noticeStored.current[r.notice_key]=r})
+      ;(data||[]).forEach(r=>{if(!noticeWritten.current.has(r.notice_key))noticeStored.current[r.notice_key]=r})
       setNoticeDismissals(prev=>{
         const next={...prev}
         ;(data||[]).forEach(r=>{if(!noticeTouched.current.has(r.notice_key))next[r.notice_key]=r})
@@ -2073,6 +2077,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       setNoticeError('That could not be set aside: '+error.message)
     } else {
       noticeStored.current[key]=next
+      noticeWritten.current.add(key)
     }
     setNoticeBusy(prev=>({...prev,[key]:false}))
   }
@@ -2107,6 +2112,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         :'That could not be dismissed: '+error.message)
     } else {
       noticeStored.current[key]=next
+      noticeWritten.current.add(key)
     }
     setNoticeBusy(prev=>({...prev,[key]:false}))
   }

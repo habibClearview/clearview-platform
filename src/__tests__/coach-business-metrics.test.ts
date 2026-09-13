@@ -187,15 +187,25 @@ describe('clientTypeBreakdown', () => {
     expect(r.total.count).toBe(3)
   })
 
-  it('says how many engagements are still running, so it agrees with the page header', () => {
+  it('says how many engagements are running, paused and closed, by the page header rule', () => {
     const clients = [
       client({ id: 'a', programme_id: null, engagement_mode: 'canvas' }),
       client({ id: 'b', programme_id: null, engagement_mode: 'financial', status: 'complete' }),
+      client({ id: 'c', programme_id: null, engagement_mode: 'financial', status: 'paused' }),
     ]
     const r = clientTypeBreakdown(clients, programmesById, 'year', now)
-    expect(r.total.count).toBe(2)
+    expect(r.total.count).toBe(3)
+    // The header counts a paused engagement as neither active nor gone, and so
+    // does this, so the tile and the line above it cannot disagree.
     expect(r.running).toBe(1)
+    expect(r.paused).toBe(1)
     expect(r.closed).toBe(1)
+    expect(r.running + r.paused + r.closed).toBe(r.total.count)
+  })
+
+  it('a client with no status recorded is running, the same as every other screen treats it', () => {
+    const r = clientTypeBreakdown([client({ id: 'a', programme_id: null, engagement_mode: 'canvas' })], programmesById, 'year', now)
+    expect(r.running).toBe(1)
   })
 
   it('handles an empty client list without crashing', () => {

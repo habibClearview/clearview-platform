@@ -108,11 +108,14 @@ export interface ClientTypeBreakdown {
   subscribers: ClientTypeBucket
   other: ClientTypeBucket
   total: ClientTypeBucket
-  /** Of total.count, how many engagements are still running, and how many
-   *  have been closed. The page header counts only the running ones, so a
-   *  tile that counts every client had to be able to say so rather than
-   *  quietly disagree with the line above it. */
+  /** Of total.count: how many engagements are running, how many are paused,
+   *  and how many are closed. The page header's "active" count is the running
+   *  one, and it counts a paused engagement as neither active nor gone, so
+   *  these three use exactly its rule and add back up to total.count. A tile
+   *  that counts every client had to be able to say this rather than quietly
+   *  disagree with the line above it. */
   running: number
+  paused: number
   closed: number
 }
 /**
@@ -177,11 +180,21 @@ export function clientTypeBreakdown(
     count: clients.length,
     revenue: donorProgrammes.revenue + independentClients.revenue + subscribers.revenue + other.revenue,
   }
-  // Closed engagements are counted, never dropped: money they paid inside the
-  // period is real and is in the revenue above, so removing them from the
-  // count would leave a figure with no clients behind it.
+  // Closed and paused engagements are counted, never dropped: money they paid
+  // inside the period is real and is in the revenue above, so removing them
+  // from the count would leave a figure with no clients behind it.
+  //
+  // 'complete' and 'paused' are the two values engagement_clients actually
+  // holds for an engagement that is not running, and this uses the same rule
+  // the page header uses (activeClients in CoachDashboard) so the two cannot
+  // disagree. Anything else, including a status never recorded, is running,
+  // which is what every other screen already treats it as.
   const closed = clients.filter(c => c.status === 'complete').length
-  return { donorProgrammes, independentClients, subscribers, other, total, running: clients.length - closed, closed }
+  const paused = clients.filter(c => c.status === 'paused').length
+  return {
+    donorProgrammes, independentClients, subscribers, other, total,
+    running: clients.length - closed - paused, paused, closed,
+  }
 }
 
 export interface ServiceTypeBucket { count: number; revenue: number }

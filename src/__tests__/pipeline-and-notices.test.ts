@@ -181,6 +181,14 @@ describe('the notices on My Business can be set aside, and it is stored in the d
     expect(DASH).toContain('noticeStored.current[key]=next')
   })
 
+  it('a load that arrives after a write has landed cannot put the old row back', () => {
+    // The load is a snapshot taken before the press, so once a write has
+    // landed it is older than what is stored. CodeRabbit on #265.
+    expect(DASH).toContain('const noticeWritten=useRef(new Set())')
+    expect(DASH).toContain('if(!noticeWritten.current.has(r.notice_key))noticeStored.current[r.notice_key]=r')
+    expect(DASH.match(/noticeWritten\.current\.add\(key\)/g) || []).toHaveLength(2)
+  })
+
   it('setting aside never forgets what was dismissed', () => {
     expect(DASH).toContain("dismissed_ids:current?.dismissed_ids||[]")
   })
