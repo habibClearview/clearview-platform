@@ -2767,6 +2767,33 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     })
     const flaggedNow=liveFlagsIn(rowsByService[service]||[])
     const assignmentsForService=assignmentsHere.filter(a=>servicesOf(a).includes(service))
+    const [attaching,setAttaching]=useState(null)
+    const [attachMsg,setAttachMsg]=useState(null)
+    // Saying which organisation an assignment serves, from the screen that
+    // shows it is missing. A Pipeline deal has no row of its own until now, so
+    // it is written down first, with exactly what the deal already said, and
+    // then the organisation is attached to it.
+    async function attachOrganisation(a,clientId){
+      setAttaching(a.id+clientId);setAttachMsg(null)
+      if(!serviceEngagements.some(se=>se.id===a.id)){
+        const row={
+          id:a.id,name:a.name||null,
+          payer_programme_id:a.payer_programme_id||null,payer_client_id:a.payer_client_id||null,
+          service_type:servicesOf(a)[0]||null,service_types:servicesOf(a),
+          status:a.status||'active',
+          fee:a.fee??null,fee_currency:a.fee_currency||null,fee_status:a.fee_status||null,
+        }
+        const {data,error}=await supabase.from('service_engagements').insert([row]).select().single()
+        // A duplicate key means somebody else wrote it first, which is fine.
+        if(error&&error.code!=='23505'){setAttaching(null);return setAttachMsg('That could not be recorded: '+error.message)}
+        if(data)setServiceEngagements(prev=>[...prev,data])
+      }
+      const {error}=await supabase.from('service_engagement_clients')
+        .insert([{engagement_id:a.id,client_id:clientId}])
+      if(error&&error.code!=='23505'){setAttaching(null);return setAttachMsg('That organisation could not be attached: '+error.message)}
+      setServedHere(prev=>[...prev,{engagement_id:a.id,client_id:clientId}])
+      setAttaching(null)
+    }
 
     // The subscription table keeps its own shape: level, paid-up-to date and
     // billing term are editable here and are not on a card.
@@ -2876,13 +2903,39 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             <div style={{fontWeight:700,color:C.navy,marginBottom:'0.35rem'}}>
               {assignmentsForService.length===1?'One assignment':`${assignmentsForService.length} assignments`} on {serviceLabel}, with no organisation attached yet
             </div>
-            <div style={{...hint,marginBottom:'0.5rem'}}>
-              Paid for by {Array.from(new Set(assignmentsForService.map(a=>{
-                const prog=a.payer_programme_id?programmesById[a.payer_programme_id]:null
-                const pc=a.payer_client_id?clientsById[a.payer_client_id]:null
-                return prog?((prog.funder||'').trim()||prog.name):(pc?pc.name:'somebody')
-              }))).join(', ')}. Open that paying client and use Assignments to say which organisations it serves.
+            {/* ATTACH THEM HERE, IN ONE PRESS. 14 September 2026. Habib:
+                "Palladium Group is paying for an advisory service, which is
+                what the £5k fee is for, so how can it be 0 on the advisory
+                client?" Because nothing in the record joined that fee to
+                Bweyale Vet Centre and Viester Farm, and the only way to say so
+                was on another screen. It is said here, where the zero is. */}
+            <div style={{...hint,marginBottom:'0.6rem'}}>
+              The fee is recorded. What is missing is which organisations the work is for. Press a name to attach it.
             </div>
+            {attachMsg&&<div style={{...hint,color:C.red,marginBottom:'0.5rem'}}>{attachMsg}</div>}
+            {assignmentsForService.map(a=>{
+              const prog=a.payer_programme_id?programmesById[a.payer_programme_id]:null
+              const pc=a.payer_client_id?clientsById[a.payer_client_id]:null
+              const payer=prog?((prog.funder||'').trim()||prog.name):(pc?pc.name:'somebody')
+              const already=new Set(servedIdsOf(a.id,servedAll))
+              return(
+                <div key={a.id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:'0.6rem 0.75rem',marginBottom:'0.5rem'}}>
+                  <div style={{fontWeight:600,color:C.navy,marginBottom:'0.15rem'}}>{assignmentLabel(a,SERVICE_TYPE_LABELS)}</div>
+                  <div style={{...hint,marginBottom:'0.45rem'}}>Paid for by {payer}{a.fee?` · ${fmtGlance(a.fee,a.fee_currency)}`:''}</div>
+                  <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap'}}>
+                    {clients.length===0
+                      ?<span style={hint}>No organisations on the books yet.</span>
+                      :clients.map(c=>(
+                        <button key={c.id} disabled={already.has(c.id)||attaching===a.id+c.id}
+                          onClick={()=>attachOrganisation(a,c.id)}
+                          style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.82rem',border:`1px solid ${already.has(c.id)?C.purple:C.border}`,background:already.has(c.id)?C.purple:'transparent',color:already.has(c.id)?'var(--cv-on-accent)':C.slate,borderRadius:999,padding:'0.2rem 0.65rem',cursor:already.has(c.id)?'default':'pointer'}}>
+                          {attaching===a.id+c.id?'…':c.name}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         ):rows.length===0?(
           <div style={{...card,color:C.slate}}>No clients on {serviceLabel} yet.</div>
