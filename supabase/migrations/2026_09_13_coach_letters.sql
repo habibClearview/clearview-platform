@@ -21,6 +21,19 @@ alter table coach_letters enable row level security;
 
 -- The same boundary every other coach-team row uses: this is the super coach's
 -- own correspondence, and nobody else may read or change it.
+--
+-- ONE PRACTICE, AND THIS TABLE IS SCOPED EXACTLY AS THE ROSTER IT DESCRIBES IS.
+-- CodeRabbit asked for a per-practice scope on this table. There is no
+-- practice, tenant or organisation column anywhere in this schema: co_implementers
+-- itself is a single super_coach-scoped table with no owner column, and so are
+-- the timesheets, expenses and invoices hanging off it. A second super coach
+-- would already share the whole roster, every client and every figure, so
+-- scoping this one table and nothing else would give an impression of
+-- separation that does not exist.
+--
+-- If this platform ever serves more than one practice, every coach-team table
+-- needs scoping in the same change. Doing it here alone would be worse than
+-- not doing it, because it would read as though the job were done.
 drop policy if exists super_coach_only on coach_letters;
 create policy super_coach_only on coach_letters for all using (my_role() = 'super_coach');
 
