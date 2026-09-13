@@ -271,7 +271,11 @@ export async function restore(from, into, passphrase, { force = false } = {}) {
       `Nothing was lost: the new records are in ${staging}.`,
     )
   }
-  await rm(rollback, { recursive: true, force: true })
+  // Best effort, and deliberately silent. By here the records are in place
+  // and read back; failing the whole restore because a spare copy would not
+  // clear up would tell an operator their restore failed when it did not, and
+  // a false alarm on a day like that is worse than a folder left behind.
+  await rm(rollback, { recursive: true, force: true }).catch(() => {})
   return { ...found, into: dest }
 }
 
