@@ -686,17 +686,18 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
           <PiKpiCard label="Organisations Served" value={String(shape.organisationsServed)} color={C.purple} sub="who the work is done with"/>
         </PiKpiRow>
 
-        <PiSectionHeading label="Money by paying client" sub={`what each payer bought and where their money stands. Collected is this ${periodLabel.toLowerCase()}; the other two are where things stand today.`}/>
+        <PiSectionHeading label="Paying clients" sub={`what each one bought, and where their money stands. Agreed is the fee whatever its state; collected is what cleared this ${periodLabel.toLowerCase()}.`}/>
         {payerLines.length===0
           ?<div style={{...hint,padding:'0.6rem 0'}}>No assignments recorded yet. Open a paying client on the Clients tab and add one, and its fee appears here.</div>
           :<div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:'1.01rem'}}>
-              <thead><tr style={{background:C.lightBg}}>{['Paying client','Assignments','Organisations','Collected','Invoiced, not paid','Awaiting issue'].map(h=><th key={h} style={{padding:'0.45rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
+              <thead><tr style={{background:C.lightBg}}>{['Paying client','Assignments','Organisations','Agreed','Collected','Invoiced, not paid','Awaiting issue'].map(h=><th key={h} style={{padding:'0.45rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
               <tbody>{payerLines.map(l=>(
                 <tr key={l.payerId} style={{borderBottom:`1px solid var(--cv-border-soft)`}}>
                   <td style={{padding:'0.45rem 0.6rem',fontWeight:600,color:C.navy}}>{l.payer}</td>
                   <td style={{padding:'0.45rem 0.6rem'}}>{l.assignments}</td>
                   <td style={{padding:'0.45rem 0.6rem'}}>{l.organisationsServed}</td>
+                  <td style={{padding:'0.45rem 0.6rem',color:C.navy,fontWeight:600}}>{fmtAmounts(l.fee,feeCur)}</td>
                   <td style={{padding:'0.45rem 0.6rem',color:C.green,fontWeight:600}}>{fmtAmounts(l.collected,feeCur)}</td>
                   <td style={{padding:'0.45rem 0.6rem',color:C.amber}}>{fmtAmounts(l.invoicedNotPaid,feeCur)}</td>
                   <td style={{padding:'0.45rem 0.6rem',color:C.red}}>{fmtAmounts(l.awaitingIssue,feeCur)}</td>
@@ -705,19 +706,24 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
             </table>
           </div>}
 
-        <PiSectionHeading label="Services" sub={`paying clients per service, and what they paid this ${periodLabel.toLowerCase()}`}/>
+        {/* THE FEE, NOT THE CASH. 14 September 2026. Habib: "How can you have
+            1 advisory and 0 USD?" The figure was cash collected inside the
+            period, and a fee agreed but not yet invoiced has collected
+            nothing, so a real £5,000 piece of work printed as zero beside the
+            client who bought it. */}
+        <PiSectionHeading label="Services" sub="paying clients per service, and the fee agreed for it. Whether that fee has been invoiced or paid is in Finance below."/>
         <PiKpiRow cols={serviceSplit.combinedAssignments>0?5:4}>
           {serviceSplit.services.map(l=>(
-            <PiKpiCard key={l.service} label={SERVICE_TYPE_LABELS[l.service]||l.service} value={String(l.payingClients)} rev={fmtAmounts(l.ownRevenue,feeCur)}
+            <PiKpiCard key={l.service} label={SERVICE_TYPE_LABELS[l.service]||l.service} value={String(l.payingClients)} rev={fmtAmounts(l.fee,feeCur)}
               color={l.service==='canvas'?C.purple:l.service==='financial'?C.teal:l.service==='portfolio_intelligence'?C.cyan:C.slate}
               sub={l.payingClients===1?'1 paying client':`${l.payingClients} paying clients`}/>
           ))}
           {serviceSplit.combinedAssignments>0&&(
-            <PiKpiCard label="Covering more than one" value={String(serviceSplit.combinedAssignments)} rev={fmtAmounts(serviceSplit.combinedRevenue,feeCur)} color={C.navy} sub="one fee across several services, not split"/>
+            <PiKpiCard label="Covering more than one" value={String(serviceSplit.combinedAssignments)} rev={fmtAmounts(serviceSplit.combinedFee,feeCur)} color={C.navy} sub="one fee across several services, not split"/>
           )}
         </PiKpiRow>
         <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',color:C.slate,textAlign:'center',margin:'0.9rem 0 0'}}>
-          Collected this {periodLabel.toLowerCase()}: <b style={{color:C.cyan}}>{fmtAmounts(serviceSplit.total,feeCur)}</b>. Currencies are never added together, and a fee covering more than one service is never divided between them.
+          Agreed across every service: <b style={{color:C.cyan}}>{fmtAmounts(serviceSplit.totalFee,feeCur)}</b>. Collected this {periodLabel.toLowerCase()}: <b style={{color:C.cyan}}>{fmtAmounts(serviceSplit.total,feeCur)}</b>. Currencies are never added together, and a fee covering more than one service is never divided between them.
         </div>
 
         <PiSectionHeading label="Finance" sub="where the money actually stands, plus the trend behind it. Every figure is a fee on an assignment, which is a fee you invoiced."/>
@@ -2667,17 +2673,32 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     }
 
     const [serviceEngagements,setServiceEngagements]=useState([])
+    const [servedHere,setServedHere]=useState([])
     useEffect(()=>{
       let cancelled=false
-      supabase.from('service_engagements').select('*').then(({data,error})=>{
-        if(cancelled||error)return
-        setServiceEngagements(data||[])
+      Promise.all([
+        supabase.from('service_engagements').select('*'),
+        supabase.from('service_engagement_clients').select('engagement_id,client_id'),
+      ]).then(([asg,srv])=>{
+        if(cancelled||asg.error)return
+        setServiceEngagements(asg.data||[])
+        setServedHere(srv.error?[]:(srv.data||[]))
       }).catch(()=>{})
       return ()=>{cancelled=true}
     },[])
 
     const programmesById=Object.fromEntries(programmes.map(p=>[p.id,p]))
     const clientsById=Object.fromEntries(clients.map(c=>[c.id,c]))
+    // The same list My Business reads: what is recorded, with a served
+    // organisation never counted as its own payer, plus the Pipeline deals
+    // that are assignments in everything but name.
+    const recordedHere=withCorrectedPayer(serviceEngagements,clients)
+    const dealsHere=assignmentsFromDeals(programmes,recordedHere)
+    const assignmentsHere=[...recordedHere,...dealsHere]
+    // A deal's organisations are the ones already sitting under its
+    // programme, which is how the Climate Smart Jobs advisory reaches Bweyale
+    // Vet Centre and Viester Farm without anybody linking them by hand.
+    const servedAll=[...servedHere,...servedFromProgrammes(dealsHere,clients)]
 
     async function updateSubscription(seId,patch){
       setServiceEngagements(prev=>prev.map(se=>se.id!==seId?se:{...se,...patch}))
@@ -2709,17 +2730,23 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
           return {client:c,seStatus:null,payer:prog?([prog.name,prog.funder].filter(Boolean).join(' · ')):'Independent'}
         })
       }
-      const rows=serviceEngagements.filter(se=>se.service_type===key).map(se=>{
-        const prog=se.payer_programme_id?programmesById[se.payer_programme_id]:null
-        const payerClient=se.payer_client_id?clientsById[se.payer_client_id]:null
-        // beneficiary_client_id is the COLUMN name, which the database still
-        // uses; supabase/migrations/2026_09_02_client_not_beneficiary.sql
-        // renames it to served_client_id and has not been applied yet.
-        const served=se.beneficiary_client_id?clientsById[se.beneficiary_client_id]:payerClient
-        if(!served)return null
-        const payer=prog?([prog.name,prog.funder].filter(Boolean).join(' · ')):(payerClient&&payerClient.id!==served.id?payerClient.name:'Independent')
-        return {client:served,seStatus:se.status,payer}
-      }).filter(Boolean)
+      // THE CLIENTS TAB AND MY BUSINESS READ THE SAME ASSIGNMENTS. 14 September
+      // 2026. Habib: "Go to Client tab and advisory is 0." My Business counted
+      // one advisory client and this screen counted none, because this one
+      // read only rows in service_engagements while his advisory was entered
+      // as a Pipeline deal. Both now read the same list, so the two screens
+      // cannot disagree about the same work.
+      const rows=assignmentsHere.filter(a=>servicesOf(a).includes(key)).flatMap(a=>{
+        const prog=a.payer_programme_id?programmesById[a.payer_programme_id]:null
+        const payerClient=a.payer_client_id?clientsById[a.payer_client_id]:null
+        const payer=prog?((prog.funder||'').trim()||prog.name):(payerClient?payerClient.name:'Independent')
+        // Who this assignment serves: the organisations linked to it, or the
+        // one named on the row, or the payer where it pays for its own work.
+        const linked=servedIdsOf(a.id,servedAll).map(id=>clientsById[id]).filter(Boolean)
+        const named=a.beneficiary_client_id?clientsById[a.beneficiary_client_id]:null
+        const served=linked.length?linked:(named?[named]:(payerClient?[payerClient]:[]))
+        return served.map(c=>({client:c,seStatus:a.status,payer:payerClient&&payerClient.id===c.id&&!prog?'Independent':payer}))
+      })
       const listed=new Set(rows.map(r=>r.client.id))
       ownMode.filter(c=>!listed.has(c.id)).forEach(c=>rows.push({client:c,seStatus:null,payer:'Nothing logged under Services yet'}))
       return rows

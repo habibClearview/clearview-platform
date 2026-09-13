@@ -369,3 +369,51 @@ describe('who is recorded as paying', () => {
     expect(payerIdOf(withCorrectedPayer(wrong, clients)[0])).toBe('tanager')
   })
 })
+
+// A FEE AGREED IS STILL MONEY. 14 September 2026. Habib: "How can you have 1
+// advisory and 0 USD and under GtCV there is 1 client and 0 USD, but look at
+// the finance section?" The Services tiles showed cash collected inside the
+// period. A fee agreed but not yet invoiced has collected nothing, so a real
+// £5,000 piece of work printed as zero beside the client who bought it, while
+// Finance showed the same money as awaiting issue.
+describe('what a service is worth, as opposed to what has cleared', () => {
+  const agreed: Assignment[] = [
+    { id: 'adv', payer_programme_id: 'csj', service_types: ['advisory'], fee: 5_000, fee_currency: 'GBP', fee_status: 'unpaid' },
+    { id: 'gtcv', payer_programme_id: 'tanager', service_types: ['canvas'], fee: 35_000, fee_currency: 'USD', fee_status: 'unpaid' },
+  ]
+
+  it('shows the fee even though nothing has been collected yet', () => {
+    const r = moneyByService(agreed, 'month', now, undefined, payerName)
+    const l = (s: string) => r.services.find(x => x.service === s)
+    expect(inCur(l('advisory')?.fee || [], 'GBP')).toBe(5_000)
+    expect(inCur(l('canvas')?.fee || [], 'USD')).toBe(35_000)
+    // And is still honest that none of it has cleared.
+    expect(l('advisory')?.ownRevenue).toEqual([])
+    expect(r.total).toEqual([])
+  })
+
+  it('the two currencies stay apart in the agreed total', () => {
+    const r = moneyByService(agreed, 'month', now, undefined, payerName)
+    expect(inCur(r.totalFee, 'GBP')).toBe(5_000)
+    expect(inCur(r.totalFee, 'USD')).toBe(35_000)
+    expect(r.totalFee).toHaveLength(2)
+  })
+
+  it('a payer line carries what was agreed as well as what cleared', () => {
+    const lines = moneyByPayer(agreed, [], 'month', now, payerName)
+    const csj = lines.find(l => l.payer === 'Climate Smart Jobs')
+    expect(inCur(csj?.fee || [], 'GBP')).toBe(5_000)
+    expect(csj?.collected).toEqual([])
+    expect(inCur(csj?.awaitingIssue || [], 'GBP')).toBe(5_000)
+  })
+
+  it('a fee covering more than one service is agreed but never divided', () => {
+    const both: Assignment[] = [
+      { id: 'x', payer_programme_id: 'csj', service_types: ['advisory', 'financial'], fee: 5_000, fee_currency: 'GBP', fee_status: 'unpaid' },
+    ]
+    const r = moneyByService(both, 'month', now, undefined, payerName)
+    expect(r.services.find(x => x.service === 'advisory')?.fee).toEqual([])
+    expect(inCur(r.combinedFee, 'GBP')).toBe(5_000)
+    expect(inCur(r.totalFee, 'GBP')).toBe(5_000)
+  })
+})
