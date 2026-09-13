@@ -62,7 +62,8 @@ import {
   awaitingInvoice, clientTypeBreakdown, serviceTypeBreakdown, splitPipeline,
 } from '@/lib/coach-business-metrics'
 import {
-  noticeFingerprint, noticeIsSetAside, NOTICE_NEW_SUBMISSIONS, NOTICE_TIMESHEETS_AWAITING,
+  noticeFingerprint, noticeIsSetAside, noticeLiveIds, noticeDismissedIds, noticeWithDismissed,
+  NOTICE_NEW_SUBMISSIONS, NOTICE_TIMESHEETS_AWAITING,
 } from '@/lib/notice-dismissal'
 import { GRANT_TYPE_LABELS, GRANT_SCOPE_LABELS, grantStatus, generateAccessToken, expiryFromDays } from '@/lib/access-grants'
 import { READINESS_STAGE_LABELS } from '@/lib/portfolio-intelligence'
@@ -229,6 +230,18 @@ function CoImplementerPerfCard({ci,clients,canvasByClient}){
 // back, and a notice that vanished without trace would be a notice nobody
 // could trust themselves to dismiss.
 const quietNoticeBtn={fontFamily:'var(--cv-font-mono)',fontSize:'0.8rem',fontWeight:600,padding:'0.25rem 0.65rem',borderRadius:6,border:'1px solid var(--cv-border)',background:'transparent',color:'var(--cv-slate)',cursor:'pointer'}
+// Nothing is hidden without a way back. A dismissed record is off the notice
+// for good, so the one line that says how many there are, and offers them
+// back, is what keeps that honest.
+function DismissedLine({label,onRestore,busy}){
+  return(
+    <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',fontSize:'0.9rem',color:C.slate,border:'1px dashed var(--cv-border)',borderRadius:8,padding:'0.45rem 0.8rem',marginBottom:'1rem'}}>
+      <span>{label}</span>
+      <button style={{...quietNoticeBtn,marginLeft:'auto'}} disabled={!!busy} onClick={onRestore}>Show them again</button>
+    </div>
+  )
+}
+
 function SetAsideLine({label,onBringBack,busy}){
   return(
     <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',fontSize:'0.9rem',color:C.slate,border:'1px dashed var(--cv-border)',borderRadius:8,padding:'0.45rem 0.8rem',marginBottom:'1rem'}}>
@@ -558,17 +571,23 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
   // Advisory and Portfolio Intelligence subscriptions have no home on
   // engagement_clients (only canvas/financial do, via engagement_mode) --
   // those two come from the service_engagements table (see ServicesSection
-  // below and supabase/migrations/2026_07_14_service_engagements.sql). Own,
-  // independent, error-tolerant fetch -- if the migration hasn't been
-  // applied yet, this quietly shows 0 for those two rather than blocking
-  // the rest of the tab from loading.
+  // below and supabase/migrations/2026_07_14_service_engagements.sql).
+  //
+  // A ZERO THAT MEANS "COULD NOT READ" IS A LIE. 14 September 2026. Habib:
+  // there is one advisory service, it is not showing. This fetch used to
+  // swallow every error, so a table that was not there, a permission problem
+  // or a dropped connection all printed a confident 0 with nothing to say
+  // that the number had not been read at all. It says so now.
   const [serviceEngagements,setServiceEngagements]=useState([])
+  const [servicesUnread,setServicesUnread]=useState(null)
   useEffect(()=>{
     let cancelled=false
     supabase.from('service_engagements').select('service_type,fee,status').then(({data,error})=>{
-      if(cancelled||error)return
+      if(cancelled)return
+      if(error){setServicesUnread(error.message);return}
+      setServicesUnread(null)
       setServiceEngagements(data||[])
-    }).catch(()=>{})
+    }).catch(e=>{if(!cancelled)setServicesUnread(e.message||String(e))})
     return ()=>{cancelled=true}
   },[])
   const stb=serviceTypeBreakdown(clients,serviceEngagements,period,now)
@@ -588,14 +607,15 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
 
         <PiSectionHeading label="Client types" sub={`number and revenue per type, this ${periodLabel.toLowerCase()} -- to edit who's in which group, use the Clients tab`}/>
         <PiKpiRow cols={ctb.other.count>0?5:4}>
-          <PiKpiCard total label="All Clients" value={String(ctb.total.count)} rev={fmtGlance(ctb.total.revenue,feeCur)} sub={`every client on the books · revenue collected this ${periodLabel.toLowerCase()}`}/>
+          <PiKpiCard total label="All Clients" value={String(ctb.total.count)} rev={fmtGlance(ctb.total.revenue,feeCur)} sub={`${ctb.running} still running${ctb.closed?` · ${ctb.closed} closed`:''} · revenue collected this ${periodLabel.toLowerCase()}`}/>
           <PiKpiCard label="Donor Programmes" value={String(ctb.donorProgrammes.count)} rev={fmtGlance(ctb.donorProgrammes.revenue,feeCur)} sub={`${ctb.donorProgrammes.clientCount} client${ctb.donorProgrammes.clientCount===1?'':'s'} under them`}/>
           <PiKpiCard label="Independent Clients" value={String(ctb.independentClients.count)} rev={fmtGlance(ctb.independentClients.revenue,feeCur)} sub="self-funded GtCV"/>
           <PiKpiCard label="Subscribers" value={String(ctb.subscribers.count)} rev={fmtGlance(ctb.subscribers.revenue,feeCur)} sub="independent Clearview"/>
           {ctb.other.count>0&&<PiKpiCard label="Everyone else" value={String(ctb.other.count)} rev={fmtGlance(ctb.other.revenue,feeCur)} color={C.slate} sub="on a programme that is not donor funded, or no service recorded yet"/>}
         </PiKpiRow>
 
-        <PiSectionHeading label="Services" sub="number and revenue per service -- a client can hold more than one"/>
+        <PiSectionHeading label="Services" sub="number and revenue per service -- a client can hold more than one. The count is every service on record; the revenue is only what is live, because a paused service is not earning."/>
+        {servicesUnread&&<div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.6rem 0.9rem',marginBottom:'0.7rem',fontSize:'0.95rem',color:C.navy}}>Advisory and Market Intelligence could not be read just now, so those two are showing nothing rather than a real count: {servicesUnread}</div>}
         <PiKpiRow cols={stb.other.count>0?6:5}>
           <PiKpiCard total label="All Services" value={String(stb.total.count)} rev={fmtGlance(stb.total.revenue,feeCur)} sub={`service instances, this ${periodLabel.toLowerCase()}`}/>
           <PiKpiCard label="Clearview Advisory" value={String(stb.advisory.count)} rev={fmtGlance(stb.advisory.revenue,feeCur)} color={C.slate}/>
@@ -2002,7 +2022,7 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   const noticeTouched=useRef(new Set())
   useEffect(()=>{
     let cancelled=false
-    supabase.from('coach_notice_dismissals').select('notice_key,covers').then(({data,error})=>{
+    supabase.from('coach_notice_dismissals').select('notice_key,covers,dismissed_ids').then(({data,error})=>{
       if(cancelled||error)return
       setNoticeDismissals(prev=>{
         const next={...prev}
@@ -2037,6 +2057,39 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     setNoticeBusy(prev=>({...prev,[key]:false}))
   }
   const noticeAside=(key,ids)=>noticeIsSetAside(noticeDismissals[key],ids)
+  // Dismiss is a different act from set aside, and it is about the records
+  // rather than the notice. See src/lib/notice-dismissal.ts for why both
+  // exist. Dismissed records are named one by one and do not come back; a
+  // record that arrives afterwards raises the notice again.
+  const noticeLive=(key,ids)=>noticeLiveIds(noticeDismissals[key],ids)
+  const noticeGone=(key,ids)=>noticeDismissedIds(noticeDismissals[key],ids)
+  async function dismissNoticeRecords(key,ids,restore){
+    if(noticeBusy[key])return
+    const current=noticeDismissals[key]||null
+    const dismissed_ids=restore
+      ?(current?.dismissed_ids||[]).filter(id=>!ids.includes(id))
+      :noticeWithDismissed(current,ids)
+    // Dismissing what is on screen also clears any set-aside, because the
+    // notice it was set aside for is not the notice that is left.
+    const next={notice_key:key,covers:null,dismissed_ids}
+    noticeTouched.current.add(key)
+    setNoticeBusy(prev=>({...prev,[key]:true}))
+    setNoticeDismissals(prev=>({...prev,[key]:next}))
+    setNoticeError(null)
+    const {error}=await supabase.from('coach_notice_dismissals')
+      .upsert({notice_key:key,covers:null,dismissed_ids,dismissed_at:new Date().toISOString()},{onConflict:'notice_key'})
+    if(error){
+      noticeTouched.current.delete(key)
+      const truth=key in noticeStored.current?noticeStored.current[key]:current
+      setNoticeDismissals(prev=>({...prev,[key]:truth}))
+      setNoticeError(restore
+        ?'Those could not be brought back: '+error.message
+        :'That could not be dismissed: '+error.message)
+    } else {
+      noticeStored.current[key]=next
+    }
+    setNoticeBusy(prev=>({...prev,[key]:false}))
+  }
   // Set when a Pipeline deal is marked Won, so the Clients tab opens
   // straight into "+ New Client" pre-filled with the programme and a
   // note of what was won -- lifted to the top level (not local to
@@ -2269,8 +2322,17 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   const selClientFullData=clientData[selClientId]||{}
 
   // ── OVERVIEW ───────────────────────────────────────────────
-  const newSubmissions = clients.filter(c => c.status === 'setup' && (c.notes || '').includes('Self-submitted intake'))
-  const pendingTimesheets = timesheets.filter(t => t.status === 'submitted')
+  // What is really waiting, then what is left after the dismissed ones are
+  // taken out. The notice is about the second list; the first is only kept so
+  // the screen can offer the dismissed ones back.
+  const allNewSubmissions = clients.filter(c => c.status === 'setup' && (c.notes || '').includes('Self-submitted intake'))
+  const allPendingTimesheets = timesheets.filter(t => t.status === 'submitted')
+  const liveSubmissionIds = noticeLive(NOTICE_NEW_SUBMISSIONS, allNewSubmissions.map(c => c.id))
+  const livePendingIds = noticeLive(NOTICE_TIMESHEETS_AWAITING, allPendingTimesheets.map(t => t.id))
+  const newSubmissions = allNewSubmissions.filter(c => liveSubmissionIds.includes(c.id))
+  const pendingTimesheets = allPendingTimesheets.filter(t => livePendingIds.includes(t.id))
+  const dismissedSubmissionIds = noticeGone(NOTICE_NEW_SUBMISSIONS, allNewSubmissions.map(c => c.id))
+  const dismissedPendingIds = noticeGone(NOTICE_TIMESHEETS_AWAITING, allPendingTimesheets.map(t => t.id))
   const submissionsAside = noticeAside(NOTICE_NEW_SUBMISSIONS, newSubmissions.map(c => c.id))
   const timesheetsAside = noticeAside(NOTICE_TIMESHEETS_AWAITING, pendingTimesheets.map(t => t.id))
 
@@ -2293,32 +2355,53 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         )}
         {newSubmissions.length>0&&!submissionsAside&&(
           <div style={{background:'var(--cv-tint-cyan)',border:`1px solid ${C.teal}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.6rem',marginBottom:'0.6rem'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.6rem',marginBottom:'0.6rem',flexWrap:'wrap'}}>
               <div style={{fontWeight:700,color:C.teal}}>New Clearview data capture submissions ({newSubmissions.length})</div>
-              <button style={quietNoticeBtn} disabled={!!noticeBusy[NOTICE_NEW_SUBMISSIONS]} onClick={()=>setNoticeAside(NOTICE_NEW_SUBMISSIONS,newSubmissions.map(c=>c.id))}>Set aside</button>
+              <span style={{display:'flex',gap:'0.4rem',marginLeft:'auto'}}>
+                {/* Two different acts, side by side and labelled as such.
+                    Set aside goes quiet until the list changes. Dismiss
+                    takes these ones off the notice for good, and a new
+                    submission still raises it again. */}
+                <button style={quietNoticeBtn} disabled={!!noticeBusy[NOTICE_NEW_SUBMISSIONS]} onClick={()=>setNoticeAside(NOTICE_NEW_SUBMISSIONS,newSubmissions.map(c=>c.id))} title="Goes quiet until a new submission arrives.">Set aside</button>
+                <button style={quietNoticeBtn} disabled={!!noticeBusy[NOTICE_NEW_SUBMISSIONS]} onClick={()=>dismissNoticeRecords(NOTICE_NEW_SUBMISSIONS,newSubmissions.map(c=>c.id),false)} title="Takes these off the notice for good. A new submission still shows.">Dismiss all</button>
+              </span>
             </div>
             {newSubmissions.map(c=>(
-              <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.5rem 0.75rem',background:C.white,borderRadius:5,marginBottom:'0.4rem',border:`1px solid ${C.border}`}}>
+              <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.5rem',flexWrap:'wrap',padding:'0.5rem 0.75rem',background:C.white,borderRadius:5,marginBottom:'0.4rem',border:`1px solid ${C.border}`}}>
                 <div>
                   <div style={{fontWeight:600,fontSize:'1.07rem',color:C.navy}}>{c.name}</div>
                   <div style={{fontSize:'0.93rem',color:C.slate}}>{c.contact_name}{c.created_at?(' · submitted '+new Date(c.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})):''}</div>
                 </div>
-                <button style={addBtn(true,C.teal)} onClick={()=>{setSelClientId(c.id);setActiveTab(openingTabFor(c));setView('client')}}>Review {'→'}</button>
+                <span style={{display:'flex',gap:'0.4rem',marginLeft:'auto',alignItems:'center'}}>
+                  <button style={quietNoticeBtn} disabled={!!noticeBusy[NOTICE_NEW_SUBMISSIONS]} onClick={()=>dismissNoticeRecords(NOTICE_NEW_SUBMISSIONS,[c.id],false)} title="Takes this one off the notice for good.">Dismiss</button>
+                  <button style={addBtn(true,C.teal)} onClick={()=>{setSelClientId(c.id);setActiveTab(openingTabFor(c));setView('client')}}>Review {'\u2192'}</button>
+                </span>
               </div>
             ))}
           </div>
         )}
-        {pending>0&&timesheetsAside&&(
-          <SetAsideLine busy={!!noticeBusy[NOTICE_TIMESHEETS_AWAITING]} label={`${pending} timesheet${pending>1?'s':''} awaiting approval, set aside`} onBringBack={()=>setNoticeAside(NOTICE_TIMESHEETS_AWAITING,[])}/>
+        {dismissedSubmissionIds.length>0&&(
+          <DismissedLine busy={!!noticeBusy[NOTICE_NEW_SUBMISSIONS]}
+            label={`${dismissedSubmissionIds.length} data capture submission${dismissedSubmissionIds.length>1?'s':''} dismissed`}
+            onRestore={()=>dismissNoticeRecords(NOTICE_NEW_SUBMISSIONS,dismissedSubmissionIds,true)}/>
         )}
-        {pending>0&&!timesheetsAside&&(
+        {pendingTimesheets.length>0&&timesheetsAside&&(
+          <SetAsideLine busy={!!noticeBusy[NOTICE_TIMESHEETS_AWAITING]} label={`${pendingTimesheets.length} timesheet${pendingTimesheets.length>1?'s':''} awaiting approval, set aside`} onBringBack={()=>setNoticeAside(NOTICE_TIMESHEETS_AWAITING,[])}/>
+        )}
+        {pendingTimesheets.length>0&&!timesheetsAside&&(
           <div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.6rem',flexWrap:'wrap'}}>
-            <span style={{fontWeight:600,color:C.amber}}>⏳ {pending} timesheet{pending>1?'s':''} awaiting approval</span>
-            <span style={{display:'flex',gap:'0.5rem',alignItems:'center',marginLeft:'auto'}}>
-              <button style={quietNoticeBtn} disabled={!!noticeBusy[NOTICE_TIMESHEETS_AWAITING]} onClick={()=>setNoticeAside(NOTICE_TIMESHEETS_AWAITING,pendingTimesheets.map(t=>t.id))}>Set aside</button>
-              <button style={addBtn(true,C.amber)} onClick={()=>setView('team')}>Review →</button>
+            <span style={{fontWeight:600,color:C.amber}}>{'\u23F3'} {pendingTimesheets.length} timesheet{pendingTimesheets.length>1?'s':''} awaiting approval</span>
+            <span style={{display:'flex',gap:'0.4rem',alignItems:'center',marginLeft:'auto',flexWrap:'wrap'}}>
+              <button style={quietNoticeBtn} disabled={!!noticeBusy[NOTICE_TIMESHEETS_AWAITING]} onClick={()=>setNoticeAside(NOTICE_TIMESHEETS_AWAITING,pendingTimesheets.map(t=>t.id))} title="Goes quiet until another timesheet is submitted.">Set aside</button>
+              <button style={quietNoticeBtn} disabled={!!noticeBusy[NOTICE_TIMESHEETS_AWAITING]} onClick={()=>dismissNoticeRecords(NOTICE_TIMESHEETS_AWAITING,pendingTimesheets.map(t=>t.id),false)} title="Takes these off the notice for good. They still wait for approval on the Team screen.">Dismiss</button>
+              <button style={addBtn(true,C.amber)} onClick={()=>setView('team')}>Review {'\u2192'}</button>
             </span>
           </div>
+        )}
+        {dismissedPendingIds.length>0&&(
+          <DismissedLine busy={!!noticeBusy[NOTICE_TIMESHEETS_AWAITING]}
+            label={`${dismissedPendingIds.length} timesheet${dismissedPendingIds.length>1?'s':''} dismissed from this notice, still waiting for approval on Team`}
+            onRestore={()=>dismissNoticeRecords(NOTICE_TIMESHEETS_AWAITING,dismissedPendingIds,true)}/>
         )}
         <MyBusinessGlance clients={clients} programmes={programmes} coImplementers={coImplementers}/>
       </div>
