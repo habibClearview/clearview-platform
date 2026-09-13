@@ -97,21 +97,42 @@ export function feesReceivedInPeriod(clients: FeeClient[], periodType: PeriodTyp
 }
 
 export interface ClientTypeBucket { count: number; revenue: number }
+/** A donor programme is one paying relationship covering any number of
+ *  clients, so it carries both figures: count is programmes, clientCount is
+ *  the clients sitting under them. */
+export interface DonorProgrammeBucket extends ClientTypeBucket { clientCount: number }
 export interface ClientTypeBreakdown {
-  donorProgrammes: ClientTypeBucket
+  donorProgrammes: DonorProgrammeBucket
   independentClients: ClientTypeBucket
   subscribers: ClientTypeBucket
+  other: ClientTypeBucket
   total: ClientTypeBucket
 }
 /**
- * The coach's three real payer types (docs/gtcv/README.md's who-pays
- * model): a donor programme (the funder is the paying relationship,
- * regardless of how many clients it covers), an independent canvas
- * client (self-funded GtCV, no programme), or a subscriber (self-funded
- * Clearview, no programme). Revenue is cash collected within the given
- * period -- the same cash-basis definition feesReceivedInPeriod uses, so
- * this breakdown's total always ties out to "Fees Paid Up" for the same
+ * The coach's real payer types (docs/gtcv/README.md's who-pays model): a
+ * donor programme (the funder is the paying relationship, regardless of
+ * how many clients it covers), an independent canvas client (self-funded
+ * GtCV, no programme), or a subscriber (self-funded Clearview, no
+ * programme). Revenue is cash collected within the given period -- the
+ * same cash-basis definition feesReceivedInPeriod uses, so this
+ * breakdown's total always ties out to "Fees Paid Up" for the same
  * period.
+ *
+ * EVERY CLIENT LANDS SOMEWHERE, AND THE TOTAL COUNTS CLIENTS. 14 September
+ * 2026. Habib: the number of clients in My Business should reflect this
+ * update. Two counting faults sat behind that. The total added the three
+ * bucket counts together, and the donor bucket counts PROGRAMMES, so a
+ * programme covering four clients added one to a tile labelled "All
+ * Clients" -- the tile read 6 while the page header read 8 active. And a
+ * client attached to a programme that is not a donor programme (a direct
+ * client, a blended programme) matched no branch at all, so it was
+ * counted nowhere and nothing on the screen said so.
+ *
+ * total.count is now the real number of clients passed in. Every client
+ * falls in exactly one bucket, `other` catching the ones the three named
+ * types do not describe, so the buckets always add back up to the total.
+ * The donor bucket keeps its programme count and gains clientCount, since
+ * both figures are true and the screen needs to say which it is showing.
  */
 export function clientTypeBreakdown(
   clients: FeeClient[],
@@ -122,14 +143,16 @@ export function clientTypeBreakdown(
   const { start, end } = periodRange(periodType, now)
   const paidInPeriod = (c: FeeClient) =>
     c.fee_status === 'paid' && c.fee_paid_at && new Date(c.fee_paid_at) >= start && new Date(c.fee_paid_at) < end ? fee(c) : 0
-  const donorProgrammes: ClientTypeBucket = { count: 0, revenue: 0 }
+  const donorProgrammes: DonorProgrammeBucket = { count: 0, clientCount: 0, revenue: 0 }
   const independentClients: ClientTypeBucket = { count: 0, revenue: 0 }
   const subscribers: ClientTypeBucket = { count: 0, revenue: 0 }
+  const other: ClientTypeBucket = { count: 0, revenue: 0 }
   const donorProgrammeIds = new Set<string>()
   clients.forEach(c => {
     const programme = c.programme_id ? programmesById[c.programme_id] : undefined
     if (programme && programme.type === 'donor_programme') {
       donorProgrammeIds.add(programme.id)
+      donorProgrammes.clientCount++
       donorProgrammes.revenue += paidInPeriod(c)
     } else if (isIndependent(c) && c.engagement_mode === 'canvas') {
       independentClients.count++
@@ -137,14 +160,17 @@ export function clientTypeBreakdown(
     } else if (isIndependent(c) && c.engagement_mode === 'financial') {
       subscribers.count++
       subscribers.revenue += paidInPeriod(c)
+    } else {
+      other.count++
+      other.revenue += paidInPeriod(c)
     }
   })
   donorProgrammes.count = donorProgrammeIds.size
   const total: ClientTypeBucket = {
-    count: donorProgrammes.count + independentClients.count + subscribers.count,
-    revenue: donorProgrammes.revenue + independentClients.revenue + subscribers.revenue,
+    count: clients.length,
+    revenue: donorProgrammes.revenue + independentClients.revenue + subscribers.revenue + other.revenue,
   }
-  return { donorProgrammes, independentClients, subscribers, total }
+  return { donorProgrammes, independentClients, subscribers, other, total }
 }
 
 export interface ServiceTypeBucket { count: number; revenue: number }
@@ -154,6 +180,7 @@ export interface ServiceTypeBreakdown {
   canvas: ServiceTypeBucket
   financial: ServiceTypeBucket
   portfolioIntelligence: ServiceTypeBucket
+  other: ServiceTypeBucket
   total: ServiceTypeBucket
 }
 /**
@@ -182,9 +209,15 @@ export function serviceTypeBreakdown(
   const financial: ServiceTypeBucket = { count: 0, revenue: 0 }
   const advisory: ServiceTypeBucket = { count: 0, revenue: 0 }
   const portfolioIntelligence: ServiceTypeBucket = { count: 0, revenue: 0 }
+  // A client whose engagement_mode is neither canvas nor financial used to be
+  // counted by no service at all, and its money vanished from this total while
+  // the line underneath still claimed the two totals were the same money. It
+  // is counted here instead, so the claim stays true.
+  const other: ServiceTypeBucket = { count: 0, revenue: 0 }
   clients.forEach(c => {
     if (c.engagement_mode === 'canvas') { canvas.count++; canvas.revenue += paidInPeriod(c) }
     else if (c.engagement_mode === 'financial') { financial.count++; financial.revenue += paidInPeriod(c) }
+    else { other.count++; other.revenue += paidInPeriod(c) }
   })
   serviceEngagements.forEach(se => {
     if (se.status !== 'active') return
@@ -192,10 +225,10 @@ export function serviceTypeBreakdown(
     else if (se.service_type === 'portfolio_intelligence') { portfolioIntelligence.count++; portfolioIntelligence.revenue += Number(se.fee) || 0 }
   })
   const total: ServiceTypeBucket = {
-    count: canvas.count + financial.count + advisory.count + portfolioIntelligence.count,
-    revenue: canvas.revenue + financial.revenue + advisory.revenue + portfolioIntelligence.revenue,
+    count: canvas.count + financial.count + advisory.count + portfolioIntelligence.count + other.count,
+    revenue: canvas.revenue + financial.revenue + advisory.revenue + portfolioIntelligence.revenue + other.revenue,
   }
-  return { advisory, canvas, financial, portfolioIntelligence, total }
+  return { advisory, canvas, financial, portfolioIntelligence, other, total }
 }
 
 /** Sum of fees marked paid whose fee_paid_at falls within the given calendar
@@ -239,7 +272,9 @@ export function monthlyTeamCost(invoices: CoachInvoiceForCost[], periods: string
   const out: Record<string, number> = {}
   periods.forEach(p => { out[p] = 0 })
   invoices.forEach(inv => {
-    if (inv.status === 'draft') return
+    // A withdrawn invoice is not a cost. See the 2026_09_14_invoice_cancel
+    // migration: a cancelled invoice is ignored wherever a live one counts.
+    if (inv.status === 'draft' || inv.status === 'cancelled') return
     if (!(inv.period in out)) return
     out[inv.period] += (Number(inv.time_amount) || 0) + (Number(inv.expenses_amount) || 0)
   })
@@ -533,6 +568,40 @@ export function dealFunnel(programmes: DealProgramme[]): DealFunnel {
 /** Real count of engagement_clients under this programme -- the mockup's "LSPs" figure. */
 export function clientCountForProgramme(programmeId: string, clients: { programme_id?: string | null }[]): number {
   return clients.filter(c => c.programme_id === programmeId).length
+}
+
+export interface PipelineSplit<P> { open: P[]; wonAwaitingSetup: P[]; notTakenForward: P[] }
+/**
+ * The pipeline, in the three states a deal can actually be in before it
+ * becomes a client.
+ *
+ * A WON DEAL LEAVES THE PIPELINE THE MOMENT IT IS WON. 14 September 2026.
+ * Habib: when a pipeline client status is won it should move straight out
+ * of the pipeline even if it is labelled as not set up yet. It used to
+ * stay in the open list until somebody created the client record, so a
+ * deal that was already closed sat among the ones still being chased and
+ * the count on the Pipeline tab described a different set of deals from
+ * the list underneath it.
+ *
+ * Won deals are not hidden, which would lose the only route to setting the
+ * client up. They move to their own short list, and they leave that list
+ * too as soon as a client is attached. Deals not taken forward keep a home
+ * of their own for the same reason: a deal marked lost by mistake has to
+ * be reachable to be put back.
+ *
+ * A deal with no stage recorded yet is open -- that is what the stage
+ * selector shows it as, and a count must never describe a deal
+ * differently from the row next to it.
+ */
+export function splitPipeline<P extends { id: string; deal_stage?: string | null }>(
+  programmes: P[], clients: { programme_id?: string | null }[],
+): PipelineSplit<P> {
+  const waiting = programmes.filter(p => clientCountForProgramme(p.id, clients) === 0)
+  return {
+    open: waiting.filter(p => p.deal_stage !== 'won' && p.deal_stage !== 'lost'),
+    wonAwaitingSetup: waiting.filter(p => p.deal_stage === 'won'),
+    notTakenForward: waiting.filter(p => p.deal_stage === 'lost'),
+  }
 }
 
 export interface CanvasSpread { furthestLabel: string; nearestLabel: string; startedCount: number }

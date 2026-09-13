@@ -59,8 +59,11 @@ import DeliverablesBusinessView from '@/components/coach/DeliverablesBusinessVie
 import {
   outstandingInvoiced, dealWinRate, canvasProgress, healthStatusFromReportText,
   pipelineSnapshot, recentMonthPeriods, monthlyFeeRevenue, monthlyTeamCost,
-  awaitingInvoice, clientTypeBreakdown, serviceTypeBreakdown,
+  awaitingInvoice, clientTypeBreakdown, serviceTypeBreakdown, splitPipeline,
 } from '@/lib/coach-business-metrics'
+import {
+  noticeFingerprint, noticeIsSetAside, NOTICE_NEW_SUBMISSIONS, NOTICE_TIMESHEETS_AWAITING,
+} from '@/lib/notice-dismissal'
 import { GRANT_TYPE_LABELS, GRANT_SCOPE_LABELS, grantStatus, generateAccessToken, expiryFromDays } from '@/lib/access-grants'
 import { READINESS_STAGE_LABELS } from '@/lib/portfolio-intelligence'
 
@@ -221,6 +224,20 @@ function CoImplementerPerfCard({ci,clients,canvasByClient}){
 // the health status that's already live (ai_health_checks). Canvas clients
 // show real canvas progress instead of a health status, since ai_health_checks
 // only ever covers Clearview/financial clients (never GtCV).
+// A notice that has been put down leaves one quiet line behind it, never
+// nothing at all. The coach can always see what they set aside and put it
+// back, and a notice that vanished without trace would be a notice nobody
+// could trust themselves to dismiss.
+const quietNoticeBtn={fontFamily:'var(--cv-font-mono)',fontSize:'0.8rem',fontWeight:600,padding:'0.25rem 0.65rem',borderRadius:6,border:'1px solid var(--cv-border)',background:'transparent',color:'var(--cv-slate)',cursor:'pointer'}
+function SetAsideLine({label,onBringBack}){
+  return(
+    <div style={{display:'flex',alignItems:'center',gap:'0.6rem',flexWrap:'wrap',fontSize:'0.9rem',color:C.slate,border:'1px dashed var(--cv-border)',borderRadius:8,padding:'0.45rem 0.8rem',marginBottom:'1rem'}}>
+      <span>{label}</span>
+      <button style={{...quietNoticeBtn,marginLeft:'auto'}} onClick={onBringBack}>Bring it back</button>
+    </div>
+  )
+}
+
 const HEALTH_COLOR={'Needs attention':C.red,'Watch':C.amber,'Healthy':C.green,'Reviewed':C.teal,'No data':C.slate,'Not yet reviewed':C.cyan,'No financial data yet':C.slate}
 
 // Generates and downloads a client's Investment Readiness Brief from the
@@ -570,20 +587,22 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
       <PiBody>
 
         <PiSectionHeading label="Client types" sub={`number and revenue per type, this ${periodLabel.toLowerCase()} -- to edit who's in which group, use the Clients tab`}/>
-        <PiKpiRow cols={4}>
-          <PiKpiCard total label="All Clients" value={String(ctb.total.count)} rev={fmtGlance(ctb.total.revenue,feeCur)} sub={`every paying client, this ${periodLabel.toLowerCase()}`}/>
-          <PiKpiCard label="Donor Programmes" value={String(ctb.donorProgrammes.count)} rev={fmtGlance(ctb.donorProgrammes.revenue,feeCur)} sub="e.g. Climate Smart Job"/>
+        <PiKpiRow cols={ctb.other.count>0?5:4}>
+          <PiKpiCard total label="All Clients" value={String(ctb.total.count)} rev={fmtGlance(ctb.total.revenue,feeCur)} sub={`every client on the books · revenue collected this ${periodLabel.toLowerCase()}`}/>
+          <PiKpiCard label="Donor Programmes" value={String(ctb.donorProgrammes.count)} rev={fmtGlance(ctb.donorProgrammes.revenue,feeCur)} sub={`${ctb.donorProgrammes.clientCount} client${ctb.donorProgrammes.clientCount===1?'':'s'} under them`}/>
           <PiKpiCard label="Independent Clients" value={String(ctb.independentClients.count)} rev={fmtGlance(ctb.independentClients.revenue,feeCur)} sub="self-funded GtCV"/>
           <PiKpiCard label="Subscribers" value={String(ctb.subscribers.count)} rev={fmtGlance(ctb.subscribers.revenue,feeCur)} sub="independent Clearview"/>
+          {ctb.other.count>0&&<PiKpiCard label="Everyone else" value={String(ctb.other.count)} rev={fmtGlance(ctb.other.revenue,feeCur)} color={C.slate} sub="on a programme that is not donor funded, or no service recorded yet"/>}
         </PiKpiRow>
 
         <PiSectionHeading label="Services" sub="number and revenue per service -- a client can hold more than one"/>
-        <PiKpiRow cols={5}>
+        <PiKpiRow cols={stb.other.count>0?6:5}>
           <PiKpiCard total label="All Services" value={String(stb.total.count)} rev={fmtGlance(stb.total.revenue,feeCur)} sub={`service instances, this ${periodLabel.toLowerCase()}`}/>
           <PiKpiCard label="Clearview Advisory" value={String(stb.advisory.count)} rev={fmtGlance(stb.advisory.revenue,feeCur)} color={C.slate}/>
           <PiKpiCard label="Canvas Client (GtCV)" value={String(stb.canvas.count)} rev={fmtGlance(stb.canvas.revenue,feeCur)} color={C.purple}/>
           <PiKpiCard label="Financial Model" value={String(stb.financial.count)} rev={fmtGlance(stb.financial.revenue,feeCur)} color={C.teal}/>
           <PiKpiCard label="Market Intelligence Sub." value={String(stb.portfolioIntelligence.count)} rev={fmtGlance(stb.portfolioIntelligence.revenue,feeCur)} color={C.cyan}/>
+          {stb.other.count>0&&<PiKpiCard label="No service recorded" value={String(stb.other.count)} rev={fmtGlance(stb.other.revenue,feeCur)} color={C.slate}/>}
         </PiKpiRow>
         <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',color:C.slate,textAlign:'center',margin:'0.9rem 0 0'}}>
           Services total always equals Client types total <b style={{color:C.cyan}}>&middot; {fmtGlance(stb.total.revenue,feeCur)} = {fmtGlance(ctb.total.revenue,feeCur)}</b> &mdash; same money, counted two ways
@@ -757,14 +776,19 @@ function InviteLoginButton({email,fullName,role,coImplementerId,funderProgrammeI
 function WelcomeLetterButton({coImplementerId}){
   const [busy,setBusy]=useState(false)
   const [msg,setMsg]=useState(null)
-  async function send(){
+  const [sentAlready,setSentAlready]=useState(false)
+  async function send(resend){
+    // A sign-in link expires. Sending again is how somebody whose link went
+    // stale gets back in, and it is behind its own question so it can never
+    // happen by a stray press.
+    if(resend&&typeof window!=='undefined'&&!window.confirm('Send the welcome letter again?\n\nThey get the same letter with a new sign-in link. Use this when their first link has expired.'))return
     setBusy(true);setMsg(null)
     try{
       const {data:{session}}=await supabase.auth.getSession()
       const res=await fetch('/api/co-implementer-welcome',{
         method:'POST',
         headers:{'Content-Type':'application/json',...(session?.access_token?{Authorization:`Bearer ${session.access_token}`}:{})},
-        body:JSON.stringify({coImplementerId}),
+        body:JSON.stringify({coImplementerId,...(resend?{resend:true}:{})}),
       })
       const data=await res.json()
       if(!res.ok)setMsg(data.error||'The letter did not send.')
@@ -773,18 +797,22 @@ function WelcomeLetterButton({coImplementerId}){
       // truth beats "Invalid Date".
       else if(data.alreadySent){
         const when=data.sentAt?new Date(data.sentAt):null
+        setSentAlready(true)
         setMsg(when&&!Number.isNaN(when.getTime())?('Already sent on '+when.toLocaleDateString()+'.'):'Already sent.')
       }
-      else if(data.ok)setMsg('Sent to '+data.sentTo+'.')
+      else if(data.ok){setSentAlready(true);setMsg('Sent to '+data.sentTo+', with their sign-in link.')}
       else setMsg(data.reason||'The letter did not send.')
     }catch(e){setMsg('The letter did not send: '+e.message)}
     setBusy(false)
   }
   return(
     <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexWrap:'wrap'}}>
-      <button style={addBtn(true,C.teal)} disabled={busy} onClick={send}
-        title="Sends the welcome letter: what the role is, who they report to, and how to use the platform. It goes once.">
-        {busy?'Sending…':'Send welcome letter'}</button>
+      <button style={addBtn(true,C.teal)} disabled={busy} onClick={()=>send(false)}
+        title="Sends the one letter: what the role is, who they report to, how to use the platform, and the button that signs them in and sets their password. It goes once.">
+        {busy?'Sending…':'Send welcome letter and sign-in'}</button>
+      {sentAlready&&<button style={addBtn(true,C.slate)} disabled={busy} onClick={()=>send(true)}
+        title="Sends the same letter again with a fresh sign-in link. Use this when their first link has expired.">
+        Send again with a new link</button>}
       {msg&&<span style={{fontSize:'0.93rem',color:C.slate}}>{msg}</span>}
     </div>
   )
@@ -1956,6 +1984,39 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     const text=report.report_text||''
     return {status,aside:flagIsSetAside(c),why:text?(text.length>120?text.slice(0,120)+'…':text):'No health check generated yet.'}
   }
+
+  // SETTING A NOTICE ASIDE, THE SAME WAY A FLAG IS SET ASIDE. 14 September
+  // 2026. Habib: I should be able to dismiss or set aside any flag. The two
+  // notices at the top of My Business could not be put down at all, so they
+  // sat there through every visit. They are set aside per set of records,
+  // held in the database rather than the browser, and they come straight
+  // back when the set changes. See src/lib/notice-dismissal.ts.
+  const [noticeDismissals,setNoticeDismissals]=useState({})
+  const [noticeError,setNoticeError]=useState(null)
+  useEffect(()=>{
+    let cancelled=false
+    supabase.from('coach_notice_dismissals').select('notice_key,covers').then(({data,error})=>{
+      if(cancelled||error)return
+      setNoticeDismissals(Object.fromEntries((data||[]).map(r=>[r.notice_key,r])))
+    }).catch(()=>{})
+    return ()=>{cancelled=true}
+  },[])
+  // Set aside writes the fingerprint of what is on screen right now; bring it
+  // back clears it. Either way the screen is put back if the write does not
+  // land, rather than showing a page that disagrees with the record.
+  async function setNoticeAside(key,ids){
+    const covers=ids.length===0?null:noticeFingerprint(ids)
+    const previous=noticeDismissals[key]||null
+    setNoticeDismissals(prev=>({...prev,[key]:{notice_key:key,covers}}))
+    setNoticeError(null)
+    const {error}=await supabase.from('coach_notice_dismissals')
+      .upsert({notice_key:key,covers,dismissed_at:new Date().toISOString()},{onConflict:'notice_key'})
+    if(error){
+      setNoticeDismissals(prev=>({...prev,[key]:previous}))
+      setNoticeError('That could not be set aside: '+error.message)
+    }
+  }
+  const noticeAside=(key,ids)=>noticeIsSetAside(noticeDismissals[key],ids)
   // Set when a Pipeline deal is marked Won, so the Clients tab opens
   // straight into "+ New Client" pre-filled with the programme and a
   // note of what was won -- lifted to the top level (not local to
@@ -2189,6 +2250,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 
   // ── OVERVIEW ───────────────────────────────────────────────
   const newSubmissions = clients.filter(c => c.status === 'setup' && (c.notes || '').includes('Self-submitted intake'))
+  const pendingTimesheets = timesheets.filter(t => t.status === 'submitted')
+  const submissionsAside = noticeAside(NOTICE_NEW_SUBMISSIONS, newSubmissions.map(c => c.id))
+  const timesheetsAside = noticeAside(NOTICE_TIMESHEETS_AWAITING, pendingTimesheets.map(t => t.id))
 
   function OverviewTab(){
     const [refreshingOv,setRefreshingOv]=useState(false)
@@ -2203,9 +2267,16 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'0.75rem'}}>
           <button style={addBtn(true,C.teal)} onClick={refreshOverview} disabled={refreshingOv}>{refreshingOv?'Refreshing...':'↻ Refresh client list'}</button>
         </div>
-        {newSubmissions.length>0&&(
+        {noticeError&&<div style={{fontSize:'1.01rem',color:C.red,marginBottom:'0.6rem'}}>{noticeError}</div>}
+        {newSubmissions.length>0&&submissionsAside&&(
+          <SetAsideLine label={`${newSubmissions.length} data capture submission${newSubmissions.length>1?'s':''} set aside`} onBringBack={()=>setNoticeAside(NOTICE_NEW_SUBMISSIONS,[])}/>
+        )}
+        {newSubmissions.length>0&&!submissionsAside&&(
           <div style={{background:'var(--cv-tint-cyan)',border:`1px solid ${C.teal}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem'}}>
-            <div style={{fontWeight:700,color:C.teal,marginBottom:'0.6rem'}}>New Clearview data capture submissions ({newSubmissions.length})</div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.6rem',marginBottom:'0.6rem'}}>
+              <div style={{fontWeight:700,color:C.teal}}>New Clearview data capture submissions ({newSubmissions.length})</div>
+              <button style={quietNoticeBtn} onClick={()=>setNoticeAside(NOTICE_NEW_SUBMISSIONS,newSubmissions.map(c=>c.id))}>Set aside</button>
+            </div>
             {newSubmissions.map(c=>(
               <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.5rem 0.75rem',background:C.white,borderRadius:5,marginBottom:'0.4rem',border:`1px solid ${C.border}`}}>
                 <div>
@@ -2217,7 +2288,18 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
             ))}
           </div>
         )}
-        {pending>0&&<div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontWeight:600,color:C.amber}}>⏳ {pending} timesheet{pending>1?'s':''} awaiting approval</span><button style={addBtn(true,C.amber)} onClick={()=>setView('team')}>Review →</button></div>}
+        {pending>0&&timesheetsAside&&(
+          <SetAsideLine label={`${pending} timesheet${pending>1?'s':''} awaiting approval, set aside`} onBringBack={()=>setNoticeAside(NOTICE_TIMESHEETS_AWAITING,[])}/>
+        )}
+        {pending>0&&!timesheetsAside&&(
+          <div style={{background:'var(--cv-tint-amber)',border:`1px solid ${C.amber}`,borderRadius:8,padding:'0.85rem 1.1rem',marginBottom:'1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'0.6rem',flexWrap:'wrap'}}>
+            <span style={{fontWeight:600,color:C.amber}}>⏳ {pending} timesheet{pending>1?'s':''} awaiting approval</span>
+            <span style={{display:'flex',gap:'0.5rem',alignItems:'center',marginLeft:'auto'}}>
+              <button style={quietNoticeBtn} onClick={()=>setNoticeAside(NOTICE_TIMESHEETS_AWAITING,pendingTimesheets.map(t=>t.id))}>Set aside</button>
+              <button style={addBtn(true,C.amber)} onClick={()=>setView('team')}>Review →</button>
+            </span>
+          </div>
+        )}
         <MyBusinessGlance clients={clients} programmes={programmes} coImplementers={coImplementers}/>
       </div>
     )
@@ -3132,12 +3214,19 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       <div>
         {canManageTeam(userRole)&&<CoImplementerLetterPanel/>}
         {showNewCI&&<NewCIForm clients={clients} onSave={async ci=>{const {data,error}=await supabase.from('co_implementers').insert([ci]).select().single();if(!error&&data){setCoImplementers(prev=>[...prev,data]);setShowNewCI(false)}}} onCancel={()=>setShowNewCI(false)}/>}
+        {/* ONE LETTER, NOT TWO. 14 September 2026. Habib: I do not want to
+            send another email to the co-implementer, they should have the link
+            to register and sign on to the platform. "Invite login" sent a
+            second, separate Supabase message, so a new person received two
+            emails from two senders and the one that explained anything could
+            not be acted on. The welcome letter now carries the sign-in itself,
+            so that button is gone from here. It stays on the funder card,
+            which has no letter of its own. */}
         <TeamPayments
           coImplementers={coImplementers} setCoImplementers={setCoImplementers}
           clients={clients} userName={userName}
           canApprove={canApproveTimesheets(userRole)} canManage={canManageTeam(userRole)}
           updateCI={updateCI}
-          renderInvite={ci=><InviteLoginButton email={ci.email} fullName={ci.name} role="coach" coImplementerId={ci.id} funderProgrammeId={null}/>}
           renderWelcome={canManageTeam(userRole)?(ci=><WelcomeLetterButton coImplementerId={ci.id}/>):null}
           addMemberNode={canManageTeam(userRole)?addMemberNode:null}
         />
@@ -3160,7 +3249,12 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // flagged by a health check, or a timesheet sitting unapproved. My Business
   // carries no number because it is a summary of everything rather than a list
   // of anything.
-  const openDeals=programmes.filter(p=>p.deal_stage&&p.deal_stage!=='won'&&p.deal_stage!=='lost').length
+  // The same split the Pipeline screen itself draws, so the number on the tab
+  // and the list behind it can never describe different deals. A won deal is
+  // off the pipeline whether or not the client has been created yet, and a
+  // deal with no stage recorded is open, which is what its stage selector
+  // says it is.
+  const openDeals=splitPipeline(programmes,clients).open.length
   const awaitingApproval=timesheets.filter(t=>t.status==='submitted').length
   const flaggedClients=clients.filter(c=>{const f=liveFlagFor(c);return !!f&&!f.aside}).length
   const mainNavTabs=isSuperCoach

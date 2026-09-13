@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { writeAuditLog, auditIp } from '@/lib/audit-log'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { supabaseServiceKey, supabaseUrl } from '@/lib/supabase-env'
+import { appBaseUrl } from '@/lib/app-url'
 
 // This route runs on Vercel's server — the service key is safe here
 function getAdminClient() {
@@ -17,23 +18,12 @@ function getAdminClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
-// Base URL the invitation email link points at. Order:
-//   1. NEXT_PUBLIC_APP_URL — set explicitly per environment (the live domain on
-//      Production; optionally the staging URL on Preview).
-//   2. On a NON-production Vercel deploy with no explicit URL, the deploy's own
-//      preview URL (VERCEL_URL) — so a staging invite links back to STAGING.
-//   3. Live domain — only as the final default, and only when nothing above
-//      applies (i.e. on production, where NEXT_PUBLIC_APP_URL is set anyway).
-// The point: a preview/staging deploy must NEVER silently email a link to the
-// live production site.
-function inviteBaseUrl(): string {
-  const explicit = process.env.NEXT_PUBLIC_APP_URL
-  if (explicit) return explicit.replace(/\/+$/, '')
-  const vercelEnv = process.env.VERCEL_ENV
-  const vercelUrl = process.env.VERCEL_URL // host only, no scheme
-  if (vercelEnv && vercelEnv !== 'production' && vercelUrl) return `https://${vercelUrl}`
-  return 'https://clearview.habibonifade.com'
-}
+// Base URL the invitation email link points at. The rule is in
+// src/lib/app-url.ts, shared with the co-implementer welcome letter, which
+// carries a sign-in link of its own. A preview or staging deploy must never
+// silently email a link to the live production site, and one rule in one place
+// is the only way that stays true in both letters.
+const inviteBaseUrl = appBaseUrl
 
 // Find an existing Supabase Auth user by email. The admin API has no
 // get-by-email, so page through listUsers (tiny user base; capped so a runaway

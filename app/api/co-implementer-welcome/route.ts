@@ -14,12 +14,28 @@
 // joined, who they answer to, or what the two sections in front of them are
 // for. The first day was spent guessing.
 //
-// WHAT IT DELIBERATELY DOES NOT SAY. It does not carry a sign-in link of its
-// own. The sign-in comes from /api/invite-user, which is a different act by a
-// different button, and a second link in a second letter is how somebody ends
-// up with two half-made accounts. It names no day rate and no fee. Those are
-// on the person's record and are between them and the practice, not something
-// to post into an inbox that may be read over a shoulder.
+// ONE LETTER, WITH THE WAY IN. 14 September 2026. Habib: I do not want to send
+// another email to the co-implementer, they should have the link to register
+// and sign on to the platform. Until now this letter explained the platform
+// and a separate button sent a separate Supabase invitation, so a new person
+// received two messages from two senders and the one that explained anything
+// could not be acted on.
+//
+// The letter now carries the sign-in itself. The link is minted at the moment
+// of sending with generateLink, which creates the account without Supabase
+// sending an email of its own, so exactly one message goes out. It is wrapped
+// through /welcome so a mail scanner's GET cannot spend it.
+//
+// A LETTER IS NOT HOW ACCESS IS GRANTED; THE ROSTER IS. This route refuses
+// anybody who is not the coach who manages the team, and the address is read
+// from the co_implementers record rather than from the request. Putting
+// somebody on that roster is the act of giving them access, and this letter
+// follows it. The profile it creates is the same 'coach' role, scoped to the
+// same co_implementer_id, that the invite button created.
+//
+// WHAT IT STILL DELIBERATELY DOES NOT SAY. It names no day rate and no fee.
+// Those are on the person's record and are between them and the practice, not
+// something to post into an inbox that may be read over a shoulder.
 //
 // WHO MAY ASK FOR IT. A signed-in super coach, which is the only role that may
 // manage the team at all (canManageTeam in src/lib/coach-types.ts). The
@@ -39,8 +55,14 @@ import { checkRateLimit } from '@/lib/rate-limit'
 import { getBearerToken } from '@/lib/auth/api-authz'
 import { canManageTeam } from '@/lib/coach-types'
 import { supabaseServiceKey, supabaseUrl } from '@/lib/supabase-env'
+import { signInLinkFor } from '@/lib/signin-link'
+import { appBaseUrl, scannerSafeSignIn } from '@/lib/app-url'
 
 export const dynamic = 'force-dynamic'
+
+// The one place the button's words are written, so the preview and the letter
+// that goes cannot say two different things.
+const SIGN_IN_LABEL = 'Set your password and sign in'
 
 function getAdminClient() {
   const url = supabaseUrl()
@@ -90,6 +112,78 @@ async function readLetter(admin: ReturnType<typeof getAdminClient>): Promise<Let
 
   const saved = typeof data?.body === 'string' ? data.body.trim() : ''
   return { ok: true, body: saved || DEFAULT_CO_IMPLEMENTER_LETTER, saved, updatedAt: data?.updated_at || null }
+}
+
+/**
+ * The sign-in this letter carries, and the profile behind it.
+ *
+ * generateLink creates the account when there is not one and returns a
+ * one-time link WITHOUT Supabase emailing anything, so the only message the
+ * co-implementer receives is this letter.
+ *
+ * A LINK WITHOUT A PROFILE IS A DOOR INTO AN EMPTY ROOM. The link signs them
+ * in; without a user_profiles row saying who they are they arrive scoped to
+ * nothing, see no clients, and a first impression is spent. The row written
+ * here is exactly the one the invite button used to write: role 'coach',
+ * scoped to this co_implementer_id, every other scope column explicitly null.
+ *
+ * An existing profile is never touched. Somebody who already has a login keeps
+ * the role they have, so sending this letter can never change what a person
+ * can reach.
+ */
+type SignInMade = { ok: true; url: string } | { ok: false; why: string }
+
+async function signInForCoImplementer(
+  admin: ReturnType<typeof getAdminClient>,
+  ci: Record<string, unknown>,
+  to: string,
+): Promise<SignInMade> {
+  const base = appBaseUrl()
+  // NOTHING A DATABASE OR AN AUTH SERVICE SAID EVER REACHES THE ANSWER. Every
+  // reason below is a fixed sentence written here. The real fault goes to the
+  // server log, where configuration and column names belong.
+  let linked
+  try {
+    linked = await signInLinkFor(admin, to, `${base}/coach`, { full_name: (ci.name as string) || null })
+  } catch (e) {
+    console.error('co-implementer-welcome: could not make the sign-in link', e)
+    return { ok: false, why: 'their sign-in link could not be made, so nothing was sent' }
+  }
+  if (linked.userId) {
+    const { data: already, error: lookErr } = await admin
+      .from('user_profiles').select('id').eq('id', linked.userId).maybeSingle()
+    // A lookup that failed is not proof there is no profile. Writing one on a
+    // failed read could overwrite a live account's scope, so it stops instead.
+    if (lookErr) {
+      console.error('co-implementer-welcome: could not check the account', lookErr)
+      return { ok: false, why: 'their account could not be checked, so nothing was sent' }
+    }
+    if (!already) {
+      const profileRow: Record<string, unknown> = {
+        id: linked.userId,
+        role: 'coach',
+        full_name: (ci.name as string) || null,
+        email: to,
+        engagement_client_id: null,
+        assigned_unit_ids: [],
+        co_implementer_id: ci.id,
+        funder_programme_id: null,
+      }
+      // 'invited' is the accurate status for somebody who has not signed in
+      // yet. Where the older CHECK constraint still rejects it (migration
+      // 2026_07_22_user_profiles_allow_invited_status.sql not applied), the
+      // column takes its own default rather than a made-up stand-in.
+      let { error } = await admin.from('user_profiles').upsert({ ...profileRow, status: 'invited' })
+      if (error && error.code === '23514' && /status/i.test(error.message || '')) {
+        ;({ error } = await admin.from('user_profiles').upsert(profileRow))
+      }
+      if (error) {
+        console.error('co-implementer-welcome: could not create the profile', error)
+        return { ok: false, why: 'their login could not be set up, so nothing was sent' }
+      }
+    }
+  }
+  return { ok: true, url: scannerSafeSignIn(linked.link, base) }
 }
 
 const LETTER_UNREADABLE = NextResponse.json(
@@ -154,6 +248,11 @@ export async function GET(req: NextRequest) {
       // A name nobody is addressed by, so the preview reads as a letter rather
       // than as a fragment. The real one carries the person's own name.
       paragraphs: [salutation('Your Name') || '', ...textToEmail(body)].filter(Boolean),
+      // The preview shows the button in its place. The real letter carries a
+      // one-time link minted for one person; this one goes to the page that
+      // link opens, so nothing that signs anybody in is produced by a preview.
+      ctaLabel: SIGN_IN_LABEL,
+      ctaUrl: `${appBaseUrl()}/welcome`,
       footNote: 'Reply to this email with any question at all. There is no question too small in the first week.',
     })
     return NextResponse.json({
@@ -216,6 +315,11 @@ export async function POST(req: NextRequest) {
     const asked = (await req.json().catch(() => ({}))) as Record<string, unknown>
     const coImplementerId = String(asked.coImplementerId || '')
     if (!coImplementerId) return NextResponse.json({ error: 'Which co-implementer?' }, { status: 400 })
+    // SENDING IT AGAIN IS DELIBERATE, NEVER ACCIDENTAL. A sign-in link expires,
+    // and a letter that can only ever go once left a co-implementer whose link
+    // had gone stale with no way back in. Asking again is a separate press
+    // behind its own confirmation on the screen, and it mints a fresh link.
+    const resend = asked.resend === true
 
     const admin = getAdminClient()
 
@@ -247,7 +351,7 @@ export async function POST(req: NextRequest) {
     // smaller fault than a button that fails outright, so it is read as
     // whatever is there and no more.
     const alreadyAt = (ci as Record<string, unknown>).welcome_sent_at
-    if (typeof alreadyAt === 'string' && alreadyAt) {
+    if (typeof alreadyAt === 'string' && alreadyAt && !resend) {
       return NextResponse.json({ ok: true, alreadySent: true, sentAt: alreadyAt })
     }
 
@@ -264,11 +368,21 @@ export async function POST(req: NextRequest) {
     if (!read.ok) return LETTER_UNREADABLE
     const letter = read.body
 
+    // The way in, minted before anything is claimed or sent. If the account or
+    // the profile cannot be set up, the letter does not go at all: a welcome
+    // whose button does not work is worse than one that arrives a minute later.
+    const wayIn = await signInForCoImplementer(admin, ci as Record<string, unknown>, to)
+    if (!wayIn.ok) {
+      return NextResponse.json({ ok: false, reason: `Nothing was sent: ${wayIn.why}.` }, { status: 502 })
+    }
+
     const html = brandedEmail({
       brand: 'canvas',
       preheader: 'What your role is, who you report to, and how the platform works.',
       heading: 'Welcome to the team',
       paragraphs: [...(hello ? [hello] : []), ...textToEmail(letter)],
+      ctaLabel: SIGN_IN_LABEL,
+      ctaUrl: wayIn.url,
       footNote: 'Reply to this email with any question at all. There is no question too small in the first week.',
     })
 
@@ -285,10 +399,12 @@ export async function POST(req: NextRequest) {
     // that stops working.
     let claimed = false
     const claimedAt = new Date().toISOString()
-    const { data: claim, error: claimErr } = await admin.from('co_implementers')
+    // A deliberate resend is not racing anybody for the one send, so it writes
+    // the new date outright. Everything else still has to win the claim.
+    const claimQuery = admin.from('co_implementers')
       .update({ welcome_sent_at: claimedAt })
       .eq('id', ci.id)
-      .is('welcome_sent_at', null)
+    const { data: claim, error: claimErr } = await (resend ? claimQuery : claimQuery.is('welcome_sent_at', null))
       .select('id')
 
     if (claimErr) {
@@ -329,7 +445,9 @@ export async function POST(req: NextRequest) {
       // Give the claim back, so a letter that never went can be sent again.
       if (claimed) {
         await admin.from('co_implementers')
-          .update({ welcome_sent_at: null })
+          // A resend puts back the date the earlier send wrote, so a failed
+          // second attempt cannot erase the record of the first.
+          .update({ welcome_sent_at: resend && typeof alreadyAt === 'string' ? alreadyAt : null })
           .eq('id', ci.id)
           .eq('welcome_sent_at', claimedAt)
           .then(undefined, () => undefined)
@@ -337,7 +455,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, reason: sent.reason || 'The letter did not send' }, { status: 502 })
     }
 
-    return NextResponse.json({ ok: true, sentTo: to })
+    return NextResponse.json({ ok: true, sentTo: to, resent: resend })
   } catch (e) {
     // The real fault goes to the server log. What comes back says nothing
     // about the configuration or the database behind it.

@@ -239,7 +239,10 @@ function AccessSection({coImplementers,setCoImplementers,clients,setMsg}){
   )
 }
 
-export default function TeamPayments({coImplementers=[],setCoImplementers,clients=[],userName='Coach',canApprove=true,canManage=false,updateCI,renderInvite,renderWelcome,addMemberNode}){
+// renderInvite is gone on purpose. 14 September 2026: the welcome letter now
+// carries the sign-in link, so there is no second invitation to send and no
+// second button to press. See the note beside TeamPayments in CoachDashboard.
+export default function TeamPayments({coImplementers=[],setCoImplementers,clients=[],userName='Coach',canApprove=true,canManage=false,updateCI,renderWelcome,addMemberNode}){
   // A PAGE PER CO-IMPLEMENTER. 13 September 2026. Habib: under Team this needs
   // to be tidied, it would be good to have team member cards so every
   // co-implementer has a page.
@@ -312,7 +315,7 @@ export default function TeamPayments({coImplementers=[],setCoImplementers,client
   const outstandingInvoices=invoices.filter(i=>i.status==='issued')
   const outstandingTotal=outstandingInvoices.reduce((s,i)=>s+num(i.net_amount),0)
   // Invoiced this period = net of every non-draft invoice dated to it.
-  const invoicedThisPeriod=invoices.filter(i=>i.period===period&&i.status!=='draft').reduce((s,i)=>s+num(i.net_amount),0)
+  const invoicedThisPeriod=invoices.filter(i=>i.period===period&&i.status!=='draft'&&i.status!=='cancelled').reduce((s,i)=>s+num(i.net_amount),0)
   // Advances still to retire = every advance not yet reconciled (not
   // period-scoped -- an open advance stays open across months).
   const openAdvancesAll=advances.filter(a=>!a.reconciled)
@@ -362,7 +365,7 @@ export default function TeamPayments({coImplementers=[],setCoImplementers,client
               {showRoster&&<button style={{...addBtn(true,C.teal),marginBottom:'0.9rem'}} onClick={()=>setOpenCiId(null)}>← All co-implementers</button>}
               <CoImplementerPayments
                 ci={openPerson} period={period} userName={userName} clientName={clientName} clients={clients} canApprove={canApprove}
-                canManage={canManage} updateCI={updateCI} removeCI={removeCI} renderInvite={renderInvite} renderWelcome={renderWelcome}
+                canManage={canManage} updateCI={updateCI} removeCI={removeCI} renderWelcome={renderWelcome}
                 entries={entries} setEntries={setEntries}
                 expenses={expenses} setExpenses={setExpenses}
                 advances={advances} setAdvances={setAdvances}
@@ -454,7 +457,7 @@ function computeDraft(ci,period,entries,expenses,advances){
   return {approvedHours,days,rate,timeAmount,expApproved,openAdvances,openAdvanceTotal,gross,advanceApplied,net,blocked}
 }
 
-function CoImplementerPayments({ci,period,userName,clientName,clients,entries,setEntries,expenses,setExpenses,advances,setAdvances,invoices,setInvoices,canApprove,canManage,updateCI,removeCI,renderInvite,renderWelcome}){
+function CoImplementerPayments({ci,period,userName,clientName,clients,entries,setEntries,expenses,setExpenses,advances,setAdvances,invoices,setInvoices,canApprove,canManage,updateCI,removeCI,renderWelcome}){
   const [tab,setTab]=useState('timesheets')
   const [busy,setBusy]=useState(false)
   const [msg,setMsg]=useState(null)
@@ -465,8 +468,15 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
   const assignedClients=clients.filter(c=>(ci.client_ids||[]).includes(c.id))
   const d=computeDraft(ci,period,entries,expenses,advances)
   const ciInvoices=invoices.filter(i=>i.co_implementer_id===ci.id).sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''))
-  const alreadyIssued=ciInvoices.find(i=>i.period===period&&i.status!=='draft')
-  const issuedByCi=ciInvoices.filter(i=>i.period===period&&i.status!=='draft')
+  // A CANCELLED INVOICE IS NOT AN INVOICE. 14 September 2026. Habib: I cannot
+  // remove the test invoice I put on there which is showing as outstanding. An
+  // issued invoice was final, so a test run or a mistake sat on the account
+  // permanently, counted as money owed and blocking the real invoice for that
+  // period from ever being issued. Cancelling is now possible while it is
+  // unpaid, and a cancelled one is ignored everywhere a live one is counted.
+  const liveInvoice=i=>i.status!=='draft'&&i.status!=='cancelled'
+  const alreadyIssued=ciInvoices.find(i=>i.period===period&&liveInvoice(i))
+  const issuedByCi=ciInvoices.filter(i=>i.period===period&&liveInvoice(i))
 
   // Profile edit now also carries the day rate -- one form to edit a
   // person, instead of a separate inline rate widget cluttering the header.
@@ -519,7 +529,6 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
         <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexWrap:'wrap'}}>
           <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',background:d.rate>0?'var(--cv-tint-cyan)':'var(--cv-tint-amber)',color:d.rate>0?C.cyan:C.amber,borderRadius:999,padding:'0.25rem 0.7rem'}}>{d.rate>0?`${fmtMoney(d.rate,curOf(ci))} / day`:'no day rate set'}</span>
           {canManage&&<button style={addBtn(true)} onClick={()=>editingProfile?setEditingProfile(false):startEditProfile()}>{editingProfile?'Cancel':'Edit profile'}</button>}
-          {renderInvite&&renderInvite(ci)}
           {renderWelcome&&renderWelcome(ci)}
           {canManage&&removeCI&&<button style={addBtn(true,C.red)} disabled={busy} title="Remove this team member from the system"
             onClick={async()=>{setBusy(true);setMsg(null);const {error}=await removeCI(ci);if(error&&error.message!=='cancelled')setMsg('Could not remove: '+error.message);setBusy(false)}}>{busy?'Removing…':'Remove'}</button>}
@@ -746,7 +755,14 @@ function AdvanceSection({ci,advances,setAdvances,setMsg,canApprove}){
 function InvoiceSection({ci,period,draft,clientName,entries,expenses,advances,setAdvances,invoices,setInvoices,alreadyIssued,busy,setBusy,setMsg,canApprove}){
   const d=draft
   const cur=curOf(ci)
-  const invoiceNumber=`INV-${String(ci.id).replace(/[^a-zA-Z0-9]/g,'').slice(-6)}-${period}`
+  // The number a cancelled invoice used is not reused: invoice_number is
+  // unique, and the withdrawn row stays in the history. The next one for the
+  // same period takes the next free suffix, so re-issuing after a cancel
+  // works instead of failing on a duplicate key.
+  const baseInvoiceNumber=`INV-${String(ci.id).replace(/[^a-zA-Z0-9]/g,'').slice(-6)}-${period}`
+  const takenNumbers=new Set(invoices.map(i=>i.invoice_number))
+  let invoiceNumber=baseInvoiceNumber
+  for(let n=2;takenNumbers.has(invoiceNumber)&&n<100;n++)invoiceNumber=`${baseInvoiceNumber}-${n}`
   const nothingToBill=d.days<=0&&d.expApproved<=0
   const dueDate=addDays(today(),14)
 
@@ -801,6 +817,50 @@ td,th{padding:.5rem .6rem;border-bottom:1px solid #ddd} .tot{font-weight:700;fon
     download(data)
   }
 
+  // CANCELLING PUTS BACK EVERYTHING ISSUING TOOK. 14 September 2026. Habib: I
+  // should be able to reject an invoice or remove it from the account until
+  // accepted.
+  //
+  // Issuing does two things: it writes the invoice, and it retires every open
+  // advance against it. Cancelling has to undo both, or an advance stays
+  // retired against an invoice that no longer counts and the money quietly
+  // goes missing. The advances are found by the invoice they were applied to,
+  // which is the only record of which ones it took.
+  //
+  // A paid invoice is not cancelled here. Money has moved; that is a credit
+  // note and a conversation, not a button.
+  async function cancelInvoice(inv){
+    if(inv.status==='paid')return setMsg('That invoice is already marked paid. It cannot be cancelled here.')
+    if(typeof window!=='undefined'&&!window.confirm(`Cancel invoice ${inv.invoice_number}?\n\nIt stops counting as money owed, and any advance it netted off goes back to open. The record stays in the history.`))return
+    setBusy(true)
+    const patch={status:'cancelled',cancelled_at:new Date().toISOString()}
+    const {error}=await supabase.from('coach_invoices').update(patch).eq('id',inv.id)
+    if(error){setBusy(false);return setMsg('Could not cancel that invoice: '+error.message)}
+    const {data:putBack,error:advErr}=await supabase.from('coach_advances')
+      .update({reconciled:false,reconciled_at:null,applied_invoice_id:null})
+      .eq('applied_invoice_id',inv.id).select('id')
+    if(advErr){setBusy(false);return setMsg('The invoice was cancelled, but the advances it netted off were not put back: '+advErr.message)}
+    const putBackIds=(putBack||[]).map(a=>a.id)
+    if(putBackIds.length)setAdvances(prev=>prev.map(a=>putBackIds.includes(a.id)?{...a,reconciled:false,reconciled_at:null,applied_invoice_id:null}:a))
+    setInvoices(prev=>prev.map(i=>i.id!==inv.id?i:{...i,...patch}))
+    setBusy(false)
+    setMsg(`Invoice ${inv.invoice_number} cancelled.${putBackIds.length?` ${putBackIds.length} advance${putBackIds.length>1?'s':''} back to open.`:''}`)
+  }
+
+  // Removing it from the account altogether, for the test run that should
+  // never have been there. Only once it is cancelled, so nothing live can be
+  // deleted by one press, and the cancel above has already put back whatever
+  // the invoice took.
+  async function deleteInvoice(inv){
+    if(inv.status!=='cancelled'&&inv.status!=='draft')return setMsg('Cancel that invoice first, then it can be removed.')
+    if(typeof window!=='undefined'&&!window.confirm(`Remove invoice ${inv.invoice_number} from the account permanently?\n\nThis cannot be undone.`))return
+    setBusy(true)
+    const {error}=await supabase.from('coach_invoices').delete().eq('id',inv.id)
+    if(error){setBusy(false);return setMsg('Could not remove that invoice: '+error.message)}
+    setInvoices(prev=>prev.filter(i=>i.id!==inv.id))
+    setBusy(false);setMsg(`Invoice ${inv.invoice_number} removed.`)
+  }
+
   const previewInv={invoice_number:invoiceNumber,period,days:d.days,day_rate:d.rate,time_amount:d.timeAmount,expenses_amount:d.expApproved,advance_applied:d.advanceApplied,net_amount:d.net,currency:cur,due_date:dueDate}
 
   return(
@@ -811,6 +871,7 @@ td,th{padding:.5rem .6rem;border-bottom:1px solid #ddd} .tot{font-weight:700;fon
               <div><Badge text={alreadyIssued.status} color={alreadyIssued.status==='paid'?C.green:C.teal}/> <strong style={{marginLeft:6}}>{alreadyIssued.invoice_number}</strong> · {fmtMoney(alreadyIssued.net_amount,alreadyIssued.currency)} · due {alreadyIssued.due_date||'—'}</div>
               <div style={{display:'flex',gap:'0.4rem'}}>
                 <button style={addBtn(true)} onClick={()=>download(alreadyIssued)}>Download</button>
+                {canApprove&&alreadyIssued.status!=='paid'&&<button style={addBtn(true,C.red)} disabled={busy} onClick={()=>cancelInvoice(alreadyIssued)}>Cancel invoice</button>}
                 {canApprove&&alreadyIssued.status!=='paid'&&<button style={solidBtn(C.green,true)} onClick={async()=>{const patch={status:'paid',paid_at:new Date().toISOString()};const {error}=await supabase.from('coach_invoices').update(patch).eq('id',alreadyIssued.id);if(error)return setMsg('Could not mark paid: '+error.message);setInvoices(prev=>prev.map(i=>i.id!==alreadyIssued.id?i:{...i,...patch}))}}>Mark paid</button>}
               </div>
             </div>
@@ -842,8 +903,12 @@ td,th{padding:.5rem .6rem;border-bottom:1px solid #ddd} .tot{font-weight:700;fon
             <tbody>{invoices.map((iv,i)=><tr key={iv.id} style={{background:i%2?C.white:C.cream}}>
               <td style={td}>{iv.invoice_number}</td><td style={td}>{iv.period}</td><td style={td}>{fmtDays(iv.days)}</td>
               <td style={td}>{fmtMoney(iv.net_amount,iv.currency)}</td><td style={td}>{iv.due_date||'—'}</td>
-              <td style={td}><Badge text={iv.status} color={iv.status==='paid'?C.green:iv.status==='issued'?C.teal:C.slate}/></td>
-              <td style={td}><button style={addBtn(true)} onClick={()=>download(iv)}>Download</button></td>
+              <td style={td}><Badge text={iv.status} color={iv.status==='paid'?C.green:iv.status==='issued'?C.teal:iv.status==='cancelled'?C.red:C.slate}/></td>
+              <td style={td}><div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap'}}>
+                <button style={addBtn(true)} onClick={()=>download(iv)}>Download</button>
+                {canApprove&&iv.status!=='paid'&&iv.status!=='cancelled'&&<button style={addBtn(true,C.red)} disabled={busy} onClick={()=>cancelInvoice(iv)}>Cancel</button>}
+                {canApprove&&(iv.status==='cancelled'||iv.status==='draft')&&<button style={addBtn(true,C.red)} disabled={busy} onClick={()=>deleteInvoice(iv)}>Remove</button>}
+              </div></td>
             </tr>)}</tbody>
           </table>
         </div>

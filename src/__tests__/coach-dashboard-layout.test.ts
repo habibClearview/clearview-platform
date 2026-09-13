@@ -19,11 +19,15 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { textToEmail } from '@/lib/letter'
 import { canManageTeam } from '@/lib/coach-types'
+import { GUIDANCE_CATEGORIES } from '@/lib/guidance'
 
 const DASH = readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
 const LETTER = readFileSync('app/api/co-implementer-welcome/route.ts', 'utf8')
 const TEAM = readFileSync('src/components/coach/TeamPayments.tsx', 'utf8')
 const WORDS = readFileSync('src/lib/co-implementer-letter.ts', 'utf8')
+const SIGNIN = readFileSync('src/lib/signin-link.ts', 'utf8')
+const APPURL = readFileSync('src/lib/app-url.ts', 'utf8')
+const INVITE = readFileSync('app/api/invite-user/route.ts', 'utf8')
 
 describe('the flag sits on the client, not above the page', () => {
   it('the banner at the top of the Clients screen is gone', () => {
@@ -95,7 +99,10 @@ describe('the tabs say what is behind them', () => {
   })
 
   it('the counts come from the records, not from a guess', () => {
-    expect(DASH).toContain("const openDeals=programmes.filter(p=>p.deal_stage&&p.deal_stage!=='won'&&p.deal_stage!=='lost').length")
+    // The Pipeline count is the same split the Pipeline screen draws, so the
+    // number on the tab and the list behind it can never disagree. See
+    // pipeline-and-notices.test.ts.
+    expect(DASH).toContain("const openDeals=splitPipeline(programmes,clients).open.length")
     expect(DASH).toContain("const awaitingApproval=timesheets.filter(t=>t.status==='submitted').length")
     expect(DASH).toContain("supabase.from('service_engagements').select('id',{count:'exact',head:true})")
   })
@@ -173,7 +180,10 @@ describe('every co-implementer has a page', () => {
   })
 
   it('nothing that was on the long list was dropped', () => {
-    for (const kept of ['Edit profile', '+ Assign client', 'renderInvite(ci)', 'Timesheets']) {
+    // 'Invite login' is deliberately not on this list any more: 14 September
+    // 2026, the welcome letter carries the sign-in, so there is no second
+    // invitation to send. See "one letter, not two" below.
+    for (const kept of ['Edit profile', '+ Assign client', 'renderWelcome(ci)', 'Timesheets']) {
       expect(TEAM).toContain(kept)
     }
   })
@@ -254,7 +264,7 @@ describe('the welcome letter to a co-implementer', () => {
     expect(LETTER).toContain('if (!read.ok) return LETTER_UNREADABLE')
     // And the refusal comes before anything is claimed or sent.
     expect(LETTER.indexOf('if (!read.ok) return LETTER_UNREADABLE'))
-      .toBeLessThan(LETTER.indexOf('.is(\'welcome_sent_at\', null)'))
+      .toBeLessThan(LETTER.indexOf('claimQuery.is(\'welcome_sent_at\', null)'))
   })
 
   it('what is typed while it saves is still there afterwards', () => {
@@ -278,11 +288,75 @@ describe('the welcome letter to a co-implementer', () => {
     expect(LETTER).toContain('!canManageTeam(profile.role)')
   })
 
-  it('carries no sign-in link of its own', () => {
-    // The account is made by /api/invite-user. Two links in two letters is how
-    // somebody ends up with two half-made accounts.
-    expect(LETTER).not.toContain('ctaUrl')
-    expect(LETTER).not.toContain('generateLink')
+  // ONE LETTER, NOT TWO. 14 September 2026. Habib: I do not want to send
+  // another email to the co-implementer, they should have the link to register
+  // and sign on to the platform. This used to assert the opposite, because the
+  // sign-in came from a separate invite button. That button sent a second,
+  // separate message, so a new person got two emails from two senders and the
+  // one that explained anything could not be acted on.
+  it('carries the sign-in itself, so exactly one message goes out', () => {
+    expect(LETTER).toContain('ctaUrl: wayIn.url')
+    expect(LETTER).toContain('signInLinkFor')
+    // generateLink, which signInLinkFor uses, creates the account WITHOUT
+    // Supabase sending an email of its own. That is what makes it one letter.
+    expect(SIGNIN).toContain('admin.auth.admin.generateLink')
+    // And the second button is gone from the screen.
+    expect(DASH).not.toContain('renderInvite={ci=><InviteLoginButton')
+    expect(TEAM).not.toContain('renderInvite&&renderInvite(ci)')
+  })
+
+  it('the link is wrapped so a mail scanner cannot spend it', () => {
+    expect(LETTER).toContain('scannerSafeSignIn')
+    expect(APPURL).toContain("/welcome#to=")
+  })
+
+  it('a link without a profile is a door into an empty room, so the profile is made too', () => {
+    expect(LETTER).toContain("role: 'coach'")
+    expect(LETTER).toContain('co_implementer_id: ci.id')
+    // Never touched if one already exists: sending a letter cannot change what
+    // somebody can reach.
+    expect(LETTER).toContain('if (!already) {')
+    // A failed lookup is not proof there is no profile.
+    expect(LETTER).toContain('if (lookErr) {')
+  })
+
+  it('nothing is sent when the way in could not be made', () => {
+    expect(LETTER).toContain('if (!wayIn.ok) {')
+    expect(LETTER).toContain('Nothing was sent:')
+  })
+
+  it('one rule decides which site a link points at, shared with the invite', () => {
+    // A preview or staging deploy must never email a link to the live site,
+    // and a rule written twice is a rule that drifts.
+    expect(APPURL).toContain('NEXT_PUBLIC_APP_URL')
+    expect(INVITE).toContain("from '@/lib/app-url'")
+    expect(LETTER).toContain("from '@/lib/app-url'")
+  })
+
+  it('the letter text itself never holds a link, only the button does', () => {
+    expect(WORDS).not.toMatch(/https?:\/\//)
+  })
+
+  it('says how to use the platform, and where each service’s session guide is', () => {
+    expect(WORDS).toContain('# How to use it, in the order you will need it')
+    expect(WORDS).toContain('# Where the guide for each session is')
+    expect(WORDS).toContain('Coach Quick Reference')
+    for (const service of ['Grant-to-Commercial Viability Canvas', 'Clearview financial model', 'Clearview Advisory', 'Market Intelligence']) {
+      expect(WORDS).toContain(service)
+    }
+    // The shelves named in the letter are the shelves that exist.
+    for (const shelf of GUIDANCE_CATEGORIES.filter(c => c.id !== 'commercial')) {
+      expect(WORDS).toContain(shelf.label)
+    }
+    // Commercial is the coaching team's pricing shelf and is not named to a
+    // person who has just joined.
+    expect(WORDS).not.toContain('# Commercial')
+  })
+
+  it('it can be sent again when a link has expired, behind its own question', () => {
+    expect(LETTER).toContain('const resend = asked.resend === true')
+    expect(DASH).toContain('Send again with a new link')
+    expect(DASH).toContain('window.confirm(')
   })
 
   it('names no rate and no fee', () => {
@@ -308,9 +382,9 @@ describe('the welcome letter to a co-implementer', () => {
     // two presses landing together both read null and both sent. The claim is
     // one conditional write: only the request that turns null into a time may
     // send, and a letter that then fails to go gives its claim back.
-    expect(LETTER).toContain(".is('welcome_sent_at', null)")
+    expect(LETTER).toContain("claimQuery.is('welcome_sent_at', null)")
     expect(LETTER).toContain('if (!claim || claim.length === 0)')
-    expect(LETTER).toContain("update({ welcome_sent_at: null })")
+    expect(LETTER).toContain('update({ welcome_sent_at: resend && typeof alreadyAt')
     expect(LETTER).toContain('alreadySent: true')
     const sql = readFileSync('supabase/migrations/2026_09_13_coach_letters.sql', 'utf8')
     expect(sql).toContain('add column if not exists welcome_sent_at timestamptz')

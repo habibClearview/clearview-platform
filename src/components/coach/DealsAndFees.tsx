@@ -20,7 +20,7 @@ import { useState } from 'react'
 import CurrencyField from '@/components/common/CurrencyField'
 import { formatMoney } from '@/lib/currency'
 import { supabase } from '@/lib/supabase'
-import { clientCountForProgramme } from '@/lib/coach-business-metrics'
+import { splitPipeline } from '@/lib/coach-business-metrics'
 
 const C = {
   navy:'var(--cv-navy)', cyan:'var(--cv-cyan)', cream:'var(--cv-cream)', white:'var(--cv-card)',
@@ -46,6 +46,10 @@ function onSolid(col){
   return 'var(--cv-on-accent)'
 }
 function solidBtn(col=C.cyan,sm=false){return{fontFamily: 'var(--cv-font-mono)',fontSize:sm?'0.95rem':'1.01rem',fontWeight:600,padding:sm?'0.35rem 0.8rem':'0.5rem 1.1rem',border:'none',borderRadius:6,background:col,color:onSolid(col),cursor:'pointer'}}
+// A quiet button for the reversible moves -- putting a deal back on the
+// pipeline is not the action anyone came to this screen for, so it does not
+// compete with the one that is.
+function quietBtn(col=C.slate){return{fontFamily:'var(--cv-font-mono)',fontSize:'0.95rem',fontWeight:600,padding:'0.35rem 0.8rem',borderRadius:6,border:`1px solid ${C.border}`,background:'transparent',color:col,cursor:'pointer'}}
 function subPill(active,col=C.cyan){return{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.4rem 0.8rem',borderRadius:8,border:`1px solid ${active?col:C.border}`,background:active?col:C.white,color:active?'var(--cv-on-cyan)':C.slate,cursor:'pointer',fontWeight:active?700:400,whiteSpace:'nowrap'}}
 function KPI({label,value,sub,color}){const accent=color||C.cyan;return(<div style={{background:C.white,borderRadius:14,padding:'0.95rem 1.1rem',borderTop:`3px solid ${accent}`,boxShadow:'0 1px 2px var(--cv-shadow-1), 0 12px 32px var(--cv-shadow-2)'}}><div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'1.13rem',letterSpacing:'0.1em',color:C.slate,textTransform:'uppercase',marginBottom:'0.35rem'}}>{label}</div><div style={{fontFamily:'var(--cv-font)',fontSize:'1.5rem',fontWeight:700,color:color||C.navy,lineHeight:1.05}}>{value}</div>{sub&&<div style={{fontSize:'1.07rem',color:C.slate,marginTop:'0.2rem'}}>{sub}</div>}</div>)}
 function Badge({text,color}){return<span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.93rem',padding:'0.1rem 0.42rem',borderRadius:4,background:color||C.slate,color:'var(--cv-on-accent)',display:'inline-block'}}>{text}</span>}
@@ -152,7 +156,8 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
     if(error)setMsg('Could not save: '+error.message)
   }
 
-  const pipelineProspects=programmes.filter(p=>clientCountForProgramme(p.id,clients)===0)
+  const {open:pipelineProspects,wonAwaitingSetup,notTakenForward}=splitPipeline(programmes,clients)
+  const [showLost,setShowLost]=useState(false)
 
   return(
     <div>
@@ -165,11 +170,12 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
       {msg&&<div style={{fontSize:'1.01rem',color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
 
       {/* A prospect drops off the pipeline the moment it becomes a client --
-          i.e. once any client client is attached to it. A Won deal with
-          no client created yet still shows (with the "+ Add client
-          client" CTA), so nothing falls through the gap between winning and
-          setting the client up. A prospect can't be a prospect and a client
-          at the same time. */}
+          i.e. once any client is attached to it -- and the moment it is won,
+          whichever comes first. A won deal is not being chased any more, so
+          it does not belong among the ones that are. It moves to its own
+          short list underneath, where the button to set the client up lives,
+          and leaves that list as soon as the client exists. Nothing falls
+          through the gap between winning and setting the client up. */}
       {pipelineProspects.length===0
         ? <div style={{...hint,padding:'0.5rem 0'}}>No open prospects.</div>
         : pipelineProspects.map(p=>{
@@ -224,15 +230,43 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
               <div style={{marginTop:'0.6rem'}}>
                 <input placeholder="Next step / note..." style={{...inp,fontSize:'0.95rem',padding:'0.35rem 0.55rem',border:`1px dashed ${C.border}`}} value={p.deal_notes||''} onChange={e=>updateDeal(p.id,{deal_notes:e.target.value})}/>
               </div>
-              {p.deal_stage==='won'&&(
-                <div style={{marginTop:'0.6rem',display:'flex',alignItems:'center',gap:'0.6rem',background:'var(--cv-tint-green)',border:`1px solid ${C.green}`,borderRadius:8,padding:'0.5rem 0.7rem'}}>
-                  <span style={{fontSize:'0.9rem',color:C.green,fontWeight:600}}>✓ Won</span>
-                  <button style={{...solidBtn(C.green,true),marginLeft:'auto'}} onClick={()=>onWinDeal&&onWinDeal(p)}>+ Set this client up →</button>
-                </div>
-              )}
             </div>
           )
         })}
+
+      {wonAwaitingSetup.length>0&&(
+        <div style={{marginTop:'1.4rem'}}>
+          <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.8rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.green,marginBottom:'0.5rem'}}>Won &middot; waiting to be set up as a client</div>
+          <div style={{...hint,marginBottom:'0.6rem'}}>These are off the pipeline and already counted as won. Press the button to create the client record.</div>
+          {wonAwaitingSetup.map(p=>(
+            <div key={p.id} style={{...card,borderLeft:`4px solid ${C.green}`,marginBottom:'0.6rem',display:'flex',alignItems:'center',gap:'0.75rem',flexWrap:'wrap'}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy}}>{p.name}</div>
+                <div style={{fontSize:'0.93rem',color:C.slate,marginTop:'0.15rem'}}>{p.type==='donor_programme'?'Donor programme':'Direct client'}{p.deal_value?` · ${p.deal_currency||cur||''} ${p.deal_value}`:''}</div>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginLeft:'auto',flexWrap:'wrap'}}>
+                <button style={quietBtn(C.slate)} onClick={()=>updateDeal(p.id,{deal_stage:'proposal'})}>Put back on the pipeline</button>
+                <button style={solidBtn(C.green,true)} onClick={()=>onWinDeal&&onWinDeal(p)}>+ Set this client up →</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {notTakenForward.length>0&&(
+        <div style={{marginTop:'1.4rem'}}>
+          <button onClick={()=>setShowLost(!showLost)} style={{...quietBtn(C.slate),fontFamily:'var(--cv-font-mono)',fontSize:'0.8rem'}} aria-expanded={showLost}>{showLost?'▾':'▸'} Not taken forward ({notTakenForward.length})</button>
+          {showLost&&notTakenForward.map(p=>(
+            <div key={p.id} style={{...card,borderLeft:`4px solid ${C.border}`,marginTop:'0.6rem',display:'flex',alignItems:'center',gap:'0.75rem',flexWrap:'wrap'}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:'1.05rem',color:C.slate}}>{p.name}</div>
+                <div style={{fontSize:'0.93rem',color:C.slate,marginTop:'0.15rem'}}>{p.type==='donor_programme'?'Donor programme':'Direct client'}</div>
+              </div>
+              <button style={{...quietBtn(C.slate),marginLeft:'auto'}} onClick={()=>updateDeal(p.id,{deal_stage:'conversation'})}>Put back on the pipeline</button>
+            </div>
+          ))}
+        </div>
+      )}
       </div>
     </div>
   )
