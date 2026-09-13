@@ -46,6 +46,38 @@ describe('the row level security gate', () => {
   })
 })
 
+describe('a value pasted with a line break still works', () => {
+  // 13 September 2026. Habib set both repository values correctly, and both
+  // the backup and this very gate failed with "Failed to parse URL", because
+  // the address had been copied out of a web page and carried a carriage
+  // return and a newline with it. Everything was right and nothing worked.
+  // Every script that reads these values trims them.
+  const SCRIPTS = [
+    'scripts/rls-check.mjs',
+    'scripts/preflight-schema.mjs',
+    'scripts/check-push-channel.mjs',
+    'scripts/smoke-write-paths.mjs',
+    'scripts/backup-database.mjs',
+  ]
+
+  it('every script that reads the address trims it', () => {
+    for (const file of SCRIPTS) {
+      const src = readFileSync(file, 'utf8')
+      const reads = src.match(/process\.env\.(NEXT_PUBLIC_)?SUPABASE_URL[^\n]*/g) || []
+      expect(reads.length).toBeGreaterThan(0)
+      for (const line of reads) expect(line).toContain('.trim()')
+    }
+  })
+
+  it('and trims the keys with it', () => {
+    for (const file of SCRIPTS) {
+      const src = readFileSync(file, 'utf8')
+      const reads = src.match(/process\.env\.SUPABASE_SERVICE_ROLE_KEY[^\n]*/g) || []
+      for (const line of reads) expect(line).toContain('.trim()')
+    }
+  })
+})
+
 describe('restoring a backup tells absent apart from unreadable', () => {
   const RESTORE = readFileSync('scripts/restore-database.mjs', 'utf8')
 

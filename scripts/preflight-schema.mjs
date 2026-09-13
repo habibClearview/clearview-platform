@@ -78,8 +78,13 @@ const OWNED = [
   'gtcv_fixed_costs',
 ]
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+// A PASTED VALUE BRINGS WHITESPACE WITH IT. 13 September 2026. The first real
+// run of these scripts failed with "Failed to parse URL", because the address
+// had been copied out of a web page and arrived carrying a carriage return and
+// a newline. Everything was set correctly and nothing worked. No address and
+// no key has meaningful whitespace at either end.
+const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim().replace(/\/+$/, '')
+const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
 
 if (!url || !key) {
   console.error('Schema preflight: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.')

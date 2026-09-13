@@ -47,10 +47,15 @@ const args = Object.fromEntries(
   }),
 )
 
-const BASE = (args.base || process.env.SMOKE_BASE_URL || '').replace(/\/$/, '')
-const SB = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '')
-const ANON = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+// A PASTED VALUE BRINGS WHITESPACE WITH IT. 13 September 2026. The first real
+// run of these scripts failed with "Failed to parse URL", because the address
+// had been copied out of a web page and arrived carrying a carriage return and
+// a newline. Everything was set correctly and nothing worked. No address and
+// no key has meaningful whitespace at either end.
+const BASE = (args.base || process.env.SMOKE_BASE_URL || '').trim().replace(/\/+$/, '')
+const SB = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim().replace(/\/+$/, '')
+const ANON = (process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim()
+const SERVICE = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
 
 if (!BASE || !SB || !ANON || !SERVICE) {
   console.error('smoke: needs --base plus SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY.')
