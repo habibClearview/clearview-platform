@@ -34,29 +34,32 @@ const ASSIGN_SQL = readFileSync('supabase/migrations/2026_09_14_assignments.sql'
 const deal = (id: string, stage: string | null) => ({ id, name: id, deal_stage: stage })
 
 describe('splitPipeline', () => {
-  it('takes a won deal off the pipeline even though no client exists yet', () => {
+  // NOTHING WON IS ON THE PIPELINE, AND NOTHING THAT WAS NEVER A DEAL EITHER.
+  // 14 September 2026. Habib: "Pipeline tab still have numbers even though I
+  // already told you that when a proposal is won it should move to Client,
+  // there should be nothing in pipeline as we don't have anything in pipeline
+  // at the moment."
+  it('a won deal leaves the pipeline the moment it is won', () => {
     const programmes = [deal('won1', 'won'), deal('live1', 'proposal')]
     const r = splitPipeline(programmes, [])
     expect(r.open.map(p => p.id)).toEqual(['live1'])
-    expect(r.wonAwaitingSetup.map(p => p.id)).toEqual(['won1'])
+    expect(r.notTakenForward).toHaveLength(0)
   })
 
-  it('keeps the won deal reachable, so the route to setting the client up is not lost', () => {
-    const r = splitPipeline([deal('won1', 'won')], [])
-    expect(r.wonAwaitingSetup).toHaveLength(1)
+  it('a programme that was never a deal is not a deal', () => {
+    // Climate Smart Jobs and Tanager are payers, not prospects. They carry no
+    // stage, and treating no stage as "open" put them on the pipeline and in
+    // its count, which is why the tab showed numbers for an empty pipeline.
+    const r = splitPipeline([deal('csj', null), deal('tanager', null)], [])
+    expect(r.open).toHaveLength(0)
+    expect(r.notTakenForward).toHaveLength(0)
   })
 
-  it('drops a won deal out of every list once its client exists', () => {
+  it('drops a deal out of every list once its client exists', () => {
     const r = splitPipeline([deal('won1', 'won')], [{ programme_id: 'won1' }])
     expect(r.open).toHaveLength(0)
-    expect(r.wonAwaitingSetup).toHaveLength(0)
     expect(r.notTakenForward).toHaveLength(0)
     expect(clientCountForProgramme('won1', [{ programme_id: 'won1' }])).toBe(1)
-  })
-
-  it('treats a deal with no stage recorded as open, the same as its stage selector does', () => {
-    const r = splitPipeline([deal('new1', null)], [])
-    expect(r.open.map(p => p.id)).toEqual(['new1'])
   })
 
   it('gives a lost deal a home of its own, so one marked lost by mistake can be put back', () => {
@@ -65,18 +68,21 @@ describe('splitPipeline', () => {
     expect(r.notTakenForward.map(p => p.id)).toEqual(['lost1'])
   })
 
-  it('puts every waiting deal in exactly one of the three lists', () => {
+  it('shows only what is still being chased, plus the lost ones tucked away', () => {
     const programmes = [deal('a', 'conversation'), deal('b', 'won'), deal('c', 'lost'), deal('d', null)]
     const r = splitPipeline(programmes, [])
-    expect(r.open.length + r.wonAwaitingSetup.length + r.notTakenForward.length).toBe(4)
+    expect(r.open.map(p => p.id)).toEqual(['a'])
+    expect(r.notTakenForward.map(p => p.id)).toEqual(['c'])
   })
 })
 
 describe('the Pipeline screen and the Pipeline tab count describe the same deals', () => {
   it('the screen draws its lists from splitPipeline', () => {
     expect(DEALS).toContain('splitPipeline(programmes,clients)')
-    expect(DEALS).toContain('wonAwaitingSetup')
     expect(DEALS).toContain('notTakenForward')
+    // The "won, waiting to be set up" list is gone: winning takes a deal off
+    // this screen, and the assignment it creates is where its money lives.
+    expect(DEALS).not.toContain('wonAwaitingSetup')
   })
 
   it('the tab count is that same split, not a second rule of its own', () => {
@@ -88,8 +94,8 @@ describe('the Pipeline screen and the Pipeline tab count describe the same deals
     expect(DEALS).not.toContain("{p.deal_stage==='won'&&(")
   })
 
-  it('setting the client up is still one press away from a won deal', () => {
-    expect(DEALS).toContain('+ Set this client up')
+  it('marking a deal won still creates the client', () => {
+    expect(DEALS).toContain("if(newStage==='won'&&!wasWon)onWinDeal&&onWinDeal(p)")
   })
 })
 
@@ -277,14 +283,14 @@ describe('dismissing records, as opposed to setting the notice aside', () => {
 // fee. See src/lib/assignments.ts.
 describe('My Business counts payers, assignments and organisations apart', () => {
   it('the three counts are side by side and named for what they are', () => {
-    expect(DASH).toContain('practiceShape(assignments,servedRows)')
+    expect(DASH).toContain('practiceShape(assignments,servedRows,payerName)')
     expect(DASH).toContain('Paying Clients')
     expect(DASH).toContain('Assignments')
     expect(DASH).toContain('Organisations Served')
   })
 
   it('the money comes from the assignments, which is what was invoiced', () => {
-    expect(DASH).toContain('moneyByPayer(assignments,servedRows,period,now)')
+    expect(DASH).toContain('moneyByPayer(assignments,servedRows,period,now,payerName)')
     expect(DASH).toContain('assignmentMoney(assignments,period,now)')
     expect(DASH).toContain('monthlyAssignmentRevenue(assignments,trendPeriods)')
     // And no longer from the fee on a served organisation, which is how the
@@ -306,6 +312,14 @@ describe('My Business counts payers, assignments and organisations apart', () =>
   it('a figure that could not be read says so rather than printing a confident zero', () => {
     expect(DASH).toContain('const [servicesUnread,setServicesUnread]=useState(null)')
     expect(DASH).toContain('showing nothing rather than a real number')
+  })
+
+  it('the figures already on the Pipeline are read as assignments, with nothing copied first', () => {
+    // Habib entered his fees as deal values and nothing read that table for
+    // money. A deal only stands in where nothing has been recorded for that
+    // programme, so an edited assignment always wins.
+    expect(DASH).toContain('assignmentsFromDeals(programmes,recordedAssignments)')
+    expect(DASH).toContain('servedFromProgrammes(fromDeals,clients)')
   })
 
   it('the tables it reads exist, and the fee sits with the payer', () => {

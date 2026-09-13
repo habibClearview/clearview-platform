@@ -156,7 +156,7 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
     if(error)setMsg('Could not save: '+error.message)
   }
 
-  const {open:pipelineProspects,wonAwaitingSetup,notTakenForward}=splitPipeline(programmes,clients)
+  const {open:pipelineProspects,notTakenForward}=splitPipeline(programmes,clients)
   const [showLost,setShowLost]=useState(false)
 
   return(
@@ -169,13 +169,10 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
       {showNew&&<NewProgrammeForm onSave={createProgramme} onCancel={()=>setShowNew(false)}/>}
       {msg&&<div style={{fontSize:'1.01rem',color:C.red,marginBottom:'0.6rem'}}>{msg}</div>}
 
-      {/* A prospect drops off the pipeline the moment it becomes a client --
-          i.e. once any client is attached to it -- and the moment it is won,
-          whichever comes first. A won deal is not being chased any more, so
-          it does not belong among the ones that are. It moves to its own
-          short list underneath, where the button to set the client up lives,
-          and leaves that list as soon as the client exists. Nothing falls
-          through the gap between winning and setting the client up. */}
+      {/* Only what is still being chased. A programme reaches this list when
+          somebody sets a deal stage on it, and leaves it the moment it is won
+          or a client is attached. Winning is what creates the assignment and
+          its fee, so a won deal has somewhere better to be than here. */}
       {pipelineProspects.length===0
         ? <div style={{...hint,padding:'0.5rem 0'}}>No open prospects.</div>
         : pipelineProspects.map(p=>{
@@ -233,25 +230,6 @@ function DealsPipeline({programmes,setProgrammes,clients,onWinDeal}){
             </div>
           )
         })}
-
-      {wonAwaitingSetup.length>0&&(
-        <div style={{marginTop:'1.4rem'}}>
-          <div style={{fontFamily:'var(--cv-font-mono)',fontSize:'0.8rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.green,marginBottom:'0.5rem'}}>Won &middot; waiting to be set up as a client</div>
-          <div style={{...hint,marginBottom:'0.6rem'}}>These are off the pipeline and already counted as won. Press the button to create the client record.</div>
-          {wonAwaitingSetup.map(p=>(
-            <div key={p.id} style={{...card,borderLeft:`4px solid ${C.green}`,marginBottom:'0.6rem',display:'flex',alignItems:'center',gap:'0.75rem',flexWrap:'wrap'}}>
-              <div>
-                <div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy}}>{p.name}</div>
-                <div style={{fontSize:'0.93rem',color:C.slate,marginTop:'0.15rem'}}>{p.type==='donor_programme'?'Donor programme':'Direct client'}{p.deal_value?` · ${p.deal_currency||cur||''} ${p.deal_value}`:''}</div>
-              </div>
-              <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginLeft:'auto',flexWrap:'wrap'}}>
-                <button style={quietBtn(C.slate)} onClick={()=>updateDeal(p.id,{deal_stage:'proposal'})}>Put back on the pipeline</button>
-                <button style={solidBtn(C.green,true)} onClick={()=>onWinDeal&&onWinDeal(p)}>+ Set this client up →</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
 
       {notTakenForward.length>0&&(
         <div style={{marginTop:'1.4rem'}}>

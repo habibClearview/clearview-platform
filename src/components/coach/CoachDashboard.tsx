@@ -62,7 +62,7 @@ import {
 } from '@/lib/coach-business-metrics'
 import {
   practiceShape, moneyByPayer, moneyByService, assignmentMoney, monthlyAssignmentRevenue,
-  servicesOf, servedIdsOf, assignmentLabel,
+  servicesOf, servedIdsOf, assignmentLabel, assignmentsFromDeals, servedFromProgrammes,
 } from '@/lib/assignments'
 import {
   noticeFingerprint, noticeIsSetAside, noticeLiveIds, noticeDismissedIds, noticeWithDismissed,
@@ -580,8 +580,8 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
   // src/lib/assignments.ts for why the money lives here and not on a served
   // organisation. Both reads are needed before any figure can be shown, so a
   // failure in either one says so rather than printing a confident zero.
-  const [assignments,setAssignments]=useState([])
-  const [servedRows,setServedRows]=useState([])
+  const [recordedAssignments,setRecordedAssignments]=useState([])
+  const [recordedServed,setRecordedServed]=useState([])
   const [servicesUnread,setServicesUnread]=useState(null)
   useEffect(()=>{
     let cancelled=false
@@ -595,21 +595,36 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
       // applied an assignment simply serves nobody, which is honest and does
       // not stop the money being shown.
       setServicesUnread(null)
-      setAssignments(asg.data||[])
-      setServedRows(srv.error?[]:(srv.data||[]))
+      setRecordedAssignments(asg.data||[])
+      setRecordedServed(srv.error?[]:(srv.data||[]))
     }).catch(e=>{if(!cancelled)setServicesUnread(e.message||String(e))})
     return ()=>{cancelled=true}
   },[])
-  const shape=practiceShape(assignments,servedRows)
-  const payerLines=moneyByPayer(assignments,servedRows,period,now)
-  const serviceSplit=moneyByService(assignments,period,now)
-  const asgMoney=assignmentMoney(assignments,period,now)
+  // THE FIGURES ON THE PIPELINE ARE READ AS ASSIGNMENTS, WITHOUT BEING COPIED
+  // ANYWHERE FIRST. 14 September 2026. Habib entered his fees as deal values
+  // on the programmes, and nothing on this platform ever read that table for
+  // money, so every figure showed nothing and he was asked to type it all
+  // again. A deal only stands in where nothing has been recorded for that
+  // programme yet, so an assignment edited on the Assignments screen always
+  // wins. See src/lib/assignments.ts.
+  const fromDeals=assignmentsFromDeals(programmes,recordedAssignments)
+  const assignments=[...recordedAssignments,...fromDeals]
+  const servedRows=[...recordedServed,...servedFromProgrammes(fromDeals,clients)]
+
+  // A paying client is an organisation, not a database row. Every Pipeline
+  // deal is its own row in programmes, so a second piece of work from the same
+  // payer carries the same name on a different id. The name is what is on the
+  // invoice, so the name is what identifies them.
   const payerName=(id)=>{
     const prog=programmes.find(p=>p.id===id)
-    if(prog)return [prog.name,prog.funder].filter(Boolean).join(' · ')
+    if(prog)return prog.name
     const c=clients.find(x=>x.id===id)
     return c?c.name:id
   }
+  const shape=practiceShape(assignments,servedRows,payerName)
+  const payerLines=moneyByPayer(assignments,servedRows,period,now,payerName)
+  const serviceSplit=moneyByService(assignments,period,now)
+  const asgMoney=assignmentMoney(assignments,period,now)
 
   const trendPeriods=recentMonthPeriods(6)
   const revenueByPeriod=monthlyAssignmentRevenue(assignments,trendPeriods)
@@ -640,7 +655,7 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
               <thead><tr style={{background:C.lightBg}}>{['Paying client','Assignments','Organisations','Collected','Invoiced, not paid','Awaiting issue'].map(h=><th key={h} style={{padding:'0.45rem 0.6rem',textAlign:'left',fontWeight:600,color:C.navy,borderBottom:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>{h}</th>)}</tr></thead>
               <tbody>{payerLines.map(l=>(
                 <tr key={l.payerId} style={{borderBottom:`1px solid var(--cv-border-soft)`}}>
-                  <td style={{padding:'0.45rem 0.6rem',fontWeight:600,color:C.navy}}>{payerName(l.payerId)}</td>
+                  <td style={{padding:'0.45rem 0.6rem',fontWeight:600,color:C.navy}}>{l.payer}</td>
                   <td style={{padding:'0.45rem 0.6rem'}}>{l.assignments}</td>
                   <td style={{padding:'0.45rem 0.6rem'}}>{l.organisationsServed}</td>
                   <td style={{padding:'0.45rem 0.6rem',color:C.green,fontWeight:600}}>{fmtGlance(l.collected,l.currency||feeCur)}</td>

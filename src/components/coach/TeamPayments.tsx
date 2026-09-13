@@ -271,14 +271,35 @@ export default function TeamPayments({coImplementers=[],setCoImplementers,client
   // authenticated server route. Owner-only; the button is already gated by
   // canManage (super_coach), and the route re-checks it server-side.
   const removeCI=useCallback(async(ci)=>{
-    if(typeof window!=='undefined' && !window.confirm(`Remove ${ci.name||'this team member'} from your team permanently?\n\nThis also removes any login they were given. It cannot be undone. (If they have timesheets or invoices on record, set them Inactive instead.)`)) return {error:{message:'cancelled'}}
-    try{
+    if(typeof window!=='undefined' && !window.confirm(`Remove ${ci.name||'this team member'} from your team permanently?\n\nThis also removes any login they were given. It cannot be undone.`)) return {error:{message:'cancelled'}}
+    async function ask(withRecords){
       const {data:{session}}=await supabase.auth.getSession()
       const res=await fetch('/api/remove-co-implementer',{
         method:'POST',headers:{'Content-Type':'application/json',...(session?.access_token?{Authorization:`Bearer ${session.access_token}`}:{})},
-        body:JSON.stringify({coImplementerId:ci.id}),
+        body:JSON.stringify({coImplementerId:ci.id,...(withRecords?{withRecords:true}:{})}),
       })
-      const data=await res.json().catch(()=>({}))
+      return {res,data:await res.json().catch(()=>({}))}
+    }
+    try{
+      let {res,data}=await ask(false)
+      // A REFUSAL THAT NAMES A WAY FORWARD. 14 September 2026. Habib could not
+      // clear the test data he had entered, because anybody with a timesheet
+      // or an invoice was simply refused. The money records are still not
+      // deleted by accident: this is a second question, naming exactly what
+      // would go, and it only appears because the first answer said there was
+      // something there.
+      if(res.status===409&&data?.hasRecords){
+        const c=data.counts||{}
+        const bits=[
+          c.timesheets?`${c.timesheets} timesheet${c.timesheets>1?'s':''}`:null,
+          c.expenses?`${c.expenses} expense${c.expenses>1?'s':''}`:null,
+          c.advances?`${c.advances} advance${c.advances>1?'s':''}`:null,
+          c.invoices?`${c.invoices} invoice${c.invoices>1?'s':''}`:null,
+        ].filter(Boolean).join(', ')
+        const go=typeof window==='undefined'||window.confirm(`${ci.name||'This team member'} has ${bits} on record.\n\nDelete the person AND all of those records permanently?\n\nUse this to clear out test data. It cannot be undone.`)
+        if(!go)return {error:{message:'cancelled'}}
+        ;({res,data}=await ask(true))
+      }
       if(!res.ok) return {error:{message:data?.error||'Could not remove this team member.'}}
       setCoImplementers&&setCoImplementers(prev=>prev.filter(x=>x.id!==ci.id))
       return {}

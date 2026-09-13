@@ -23,8 +23,22 @@ function getAdminClient() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { coImplementerId } = (await req.json()) as { coImplementerId?: string }
+    const { coImplementerId, withRecords } = (await req.json()) as { coImplementerId?: string; withRecords?: boolean }
     if (!coImplementerId) return NextResponse.json({ error: 'Missing coImplementerId' }, { status: 400 })
+    // CLEARING OUT THE TEST DATA IS A REAL THING SOMEBODY NEEDS TO DO. 14
+    // September 2026. Habib: "I still can't do the one thing I want to do
+    // today, which is send a welcome email to a new co-implementer, but I
+    // can't because you have not cleaned out the data on there."
+    //
+    // Refusing to remove anybody who has a timesheet or an invoice is right by
+    // default: those are money records and deleting them silently would be
+    // indefensible. But it left a practice that had been testing with no way
+    // to clear the test rows, and the refusal named no route forward.
+    //
+    // withRecords is that route. It is never the default, it is a second,
+    // separate press behind its own question on the screen, and it says
+    // exactly how many records it is about to destroy before it does.
+    const alsoDeleteRecords = withRecords === true
 
     const token = getBearerToken(req)
     if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
@@ -50,14 +64,40 @@ export async function POST(req: NextRequest) {
     //    only to hit a foreign-key wall halfway — either the whole removal is
     //    safe to proceed, or nothing is touched at all.
     const financialTables = ['coach_timesheet_entries', 'coach_expenses', 'coach_advances', 'coach_invoices']
+    const counts: Record<string, number> = {}
+    let recordCount = 0
     for (const table of financialTables) {
       const { count, error: countErr } = await admin
         .from(table).select('id', { count: 'exact', head: true }).eq('co_implementer_id', coImplementerId)
       if (countErr) { console.error(`remove-co-implementer: ${table} check failed`, countErr.message); return NextResponse.json({ error: 'Could not verify this team member’s records — please try again.' }, { status: 500 }) }
-      if ((count || 0) > 0) {
-        return NextResponse.json({
-          error: 'This team member has timesheets, expenses, advances or invoices on record, so they can’t be permanently removed. Set them to Inactive instead.',
-        }, { status: 409 })
+      counts[table] = count || 0
+      recordCount += count || 0
+    }
+    if (recordCount > 0 && !alsoDeleteRecords) {
+      // The refusal now names a way forward instead of only saying no, and
+      // hands back the counts so the screen can say what would be destroyed.
+      return NextResponse.json({
+        error: 'This team member has timesheets, expenses, advances or invoices on record.',
+        hasRecords: true,
+        counts: {
+          timesheets: counts.coach_timesheet_entries,
+          expenses: counts.coach_expenses,
+          advances: counts.coach_advances,
+          invoices: counts.coach_invoices,
+        },
+      }, { status: 409 })
+    }
+
+    // Asked for on purpose: the money records go first, so the delete below
+    // cannot hit a foreign key halfway through.
+    if (recordCount > 0 && alsoDeleteRecords) {
+      for (const table of financialTables) {
+        if (!counts[table]) continue
+        const { error: wipeErr } = await admin.from(table).delete().eq('co_implementer_id', coImplementerId)
+        if (wipeErr) {
+          console.error(`remove-co-implementer: ${table} delete failed`, wipeErr.message)
+          return NextResponse.json({ error: 'Could not clear this team member’s records. Some may have been removed — please try again.' }, { status: 500 })
+        }
       }
     }
 

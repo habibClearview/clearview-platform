@@ -79,6 +79,18 @@ export function servedIdsOf(id: string, served: AssignmentServed[]): string[] {
   return served.filter(s => s.engagement_id === id).map(s => s.client_id)
 }
 
+// A PAYING CLIENT IS AN ORGANISATION, NOT A DATABASE ROW. Every Pipeline deal
+// is its own row in programmes, so the second piece of work Climate Smart Jobs
+// commissioned is a second row carrying the same name. Counting rows would
+// report three paying clients where there are two, and split one
+// organisation's money across two lines of the same table. The name is what is
+// on the invoice, so the name identifies the payer.
+export type PayerName = (id: string) => string
+function payerKey(id: string, payerName: PayerName): string {
+  const name = (payerName(id) || '').trim()
+  return name ? name.toLowerCase() : id
+}
+
 export interface PracticeShape {
   payers: number
   assignments: number
@@ -92,14 +104,16 @@ export interface PracticeShape {
  * payer is counted once however many assignments it holds; an organisation is
  * counted once however many assignments serve it.
  */
-export function practiceShape(assignments: Assignment[], served: AssignmentServed[]): PracticeShape {
+export function practiceShape(
+  assignments: Assignment[], served: AssignmentServed[], payerName: PayerName = id => id,
+): PracticeShape {
   const payers = new Set<string>()
   const organisations = new Set<string>()
   const ids = new Set(assignments.map(a => a.id))
   let nobodyYet = 0
   for (const a of assignments) {
     const payer = payerIdOf(a)
-    if (payer) payers.add(payer)
+    if (payer) payers.add(payerKey(payer, payerName))
     if (servedIdsOf(a.id, served).length === 0) nobodyYet++
   }
   for (const s of served) if (ids.has(s.engagement_id)) organisations.add(s.client_id)
@@ -120,7 +134,10 @@ function collectedInPeriod(a: Assignment, periodType: PeriodType, now: Date): nu
 }
 
 export interface PayerLine {
+  /** One of the payer's row ids, so a screen can still open the record. */
   payerId: string
+  /** What the payer is called, which is what identifies them. */
+  payer: string
   assignments: number
   organisationsServed: number
   collected: number
@@ -134,16 +151,18 @@ export interface PayerLine {
  */
 export function moneyByPayer(
   assignments: Assignment[], served: AssignmentServed[],
-  periodType: PeriodType, now: Date = new Date(),
+  periodType: PeriodType, now: Date = new Date(), payerName: PayerName = id => id,
 ): PayerLine[] {
   const byPayer = new Map<string, PayerLine>()
   const orgsByPayer = new Map<string, Set<string>>()
   for (const a of assignments) {
-    const payerId = payerIdOf(a)
-    if (!payerId) continue
+    const rowId = payerIdOf(a)
+    if (!rowId) continue
+    const payerId = payerKey(rowId, payerName)
     if (!byPayer.has(payerId)) {
       byPayer.set(payerId, {
-        payerId, assignments: 0, organisationsServed: 0,
+        payerId: rowId, payer: payerName(rowId) || rowId,
+        assignments: 0, organisationsServed: 0,
         collected: 0, invoicedNotPaid: 0, awaitingIssue: 0, currency: null,
       })
       orgsByPayer.set(payerId, new Set())
@@ -241,6 +260,80 @@ export function monthlyAssignmentRevenue(assignments: Assignment[], periods: str
     if (a.fee_status !== 'paid' || !a.fee_paid_at) continue
     const period = a.fee_paid_at.slice(0, 7)
     if (period in out) out[period] += money(a)
+  }
+  return out
+}
+
+// THE FIGURES WERE ALWAYS THERE, ON THE PIPELINE. 14 September 2026. Habib
+// entered his fees as deal values on the programmes, and nothing on the
+// platform ever read that table for money, so every screen showed nothing and
+// asked him to type it all again.
+//
+// A deal is already an assignment in everything but name: a programme row
+// carries deal_value, deal_currency and deal_services, and deal_services holds
+// exactly the same four service keys an assignment does. So a deal is read AS
+// an assignment, here, in the code. Nothing has to be copied anywhere first
+// and nothing has to be typed twice.
+//
+// An assignment recorded properly always wins. A deal only stands in where
+// nothing has been recorded for that programme yet, so the moment Habib edits
+// one on the Assignments screen his own words replace the deal's.
+
+export interface DealProgrammeLike {
+  id: string
+  name?: string | null
+  deal_stage?: string | null
+  deal_value?: number | null
+  deal_currency?: string | null
+  deal_services?: string[] | null
+}
+
+/** The id a deal's stand-in assignment takes, matching what the migration
+ *  writes, so applying the migration later cannot produce a second copy. */
+export const dealAssignmentId = (programmeId: string) => `asg_deal_${programmeId}`
+
+/**
+ * Every deal with money on it, read as the assignment it already is. A deal
+ * not taken forward is not an assignment and is left out. A programme that
+ * already has an assignment of its own is left out too, because what was
+ * recorded on purpose beats what is being inferred.
+ */
+export function assignmentsFromDeals(
+  programmes: DealProgrammeLike[], recorded: Assignment[],
+): Assignment[] {
+  const spokenFor = new Set(recorded.map(a => a.payer_programme_id).filter(Boolean) as string[])
+  return programmes
+    .filter(p => Number(p.deal_value) > 0 && p.deal_stage !== 'lost' && !spokenFor.has(p.id))
+    .map(p => {
+      const services = (p.deal_services || []).filter(Boolean)
+      return {
+        id: dealAssignmentId(p.id),
+        name: p.name || null,
+        payer_programme_id: p.id,
+        service_types: services.length ? services : ['advisory'],
+        service_type: services[0] || 'advisory',
+        status: 'active',
+        fee: Number(p.deal_value),
+        fee_currency: p.deal_currency || null,
+        // The least that is true of a deal with a value: the amount is
+        // agreed. Nothing on a deal records an invoice or a payment, so
+        // neither is claimed.
+        fee_status: 'unpaid' as const,
+      }
+    })
+}
+
+/** Who a deal's stand-in assignment serves: the organisations already sitting
+ *  under that programme. */
+export function servedFromProgrammes(
+  stood: Assignment[], clients: { id: string; programme_id?: string | null }[],
+): AssignmentServed[] {
+  const out: AssignmentServed[] = []
+  for (const a of stood) {
+    if (!a.payer_programme_id) continue
+    for (const c of clients) {
+      if (c.programme_id === a.payer_programme_id) out.push({ engagement_id: a.id, client_id: c.id })
+    }
   }
   return out
 }
