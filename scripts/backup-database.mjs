@@ -277,7 +277,23 @@ export async function writeTable(table, orderBy, dest, cfg) {
   let written = 0
   try {
     await put('[\n')
-    for (let from = 0; ; from += PAGE) {
+    // A SHORT PAGE IS NOT THE END OF THE TABLE. 13 September 2026, CodeRabbit,
+    // and the most dangerous fault it found on this job, because it ends in a
+    // green backup with records missing from it.
+    //
+    // Asking for a thousand rows does not oblige the database to send a
+    // thousand. PostgREST can be configured with a ceiling of its own, and a
+    // ceiling lower than a page turned "I sent you fewer than you asked for"
+    // into "there is no more", which stopped the copy on the first page. The
+    // count taken afterwards would have noticed the shortfall and only NAMED
+    // it, the manifest would have recorded the short number, and reading it
+    // back would have agreed with the manifest. Every check would have passed
+    // on a table that had lost most of itself.
+    //
+    // So the next page starts where this one actually ended, and only nothing
+    // at all means the end.
+    let pages = 0
+    for (let from = 0; ;) {
       const order = orderBy ? `&order=${encodeURIComponent(orderBy)}.asc` : ''
       const res = await ask(`${url}/rest/v1/${encodeURIComponent(table)}?select=*${order}`, {
         ...headers, Range: `${from}-${from + PAGE - 1}`,
@@ -288,23 +304,29 @@ export async function writeTable(table, orderBy, dest, cfg) {
       // body can carry column names and fragments of rows with it.
       if (!res.ok) throw new Error(`${table}: the database answered ${res.status}`)
       const page = await res.json()
+      if (!page.length) break
+
+      // A table without a unique order cannot be paged safely: the second
+      // question is a different question from the first, and either a row
+      // written between them or two rows tied on the ordering column can
+      // shift what lands where. One page cannot be hurt by that, because
+      // there is only one question, and asking whether a SECOND page exists
+      // is what tells us which case this is. Judging it by the first page
+      // being full was also wrong in the other direction: a table of exactly
+      // a thousand rows was refused for no reason.
+      if (pages && !orderIsUnique(orderBy)) {
+        throw new Error(
+          `${table}: more than one page of rows and no unique column to order by` +
+          `${orderBy ? ` (${orderBy} may repeat)` : ''}, so it cannot be copied safely`,
+        )
+      }
+
       for (const row of page) {
         await put(`${written ? ',\n' : ''}${JSON.stringify(row)}`)
         written += 1
       }
-      if (page.length < PAGE) break
-      // A table without a unique order cannot be paged safely: page two is a
-      // different question from page one, and either a row written between
-      // them or two rows tied on the ordering column can shift what lands
-      // where. Under one page neither can happen, because there is only one
-      // question. Over one page, refuse rather than write something that
-      // looks complete and is not.
-      if (!orderIsUnique(orderBy)) {
-        throw new Error(
-          `${table}: more than ${PAGE} rows and no unique column to order by` +
-          `${orderBy ? ` (${orderBy} may repeat)` : ''}, so it cannot be copied safely`,
-        )
-      }
+      from += page.length
+      pages += 1
     }
     await put('\n]\n')
   } finally {

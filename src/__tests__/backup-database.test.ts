@@ -326,7 +326,10 @@ describe('a table that moves while it is being copied', () => {
         if (empty) return { ok: false, status: 416, headers: { get: () => '*/0' }, text: async () => '' }
         return { ok: true, headers: { get: () => '0-0/1' }, json: async () => [] }
       }
-      return { ok: true, headers: { get: () => null }, json: async () => (empty ? [] : [{ id: 1 }]) }
+      // Honour the range, as a real database does: page two of a one row
+      // table is empty, and that is what ends the copy.
+      const [at] = String(init.headers.Range).split('-').map(Number)
+      return { ok: true, headers: { get: () => null }, json: async () => (empty || at > 0 ? [] : [{ id: 1 }]) }
     }) as any
 
     await run()
@@ -350,7 +353,8 @@ describe('a table that moves while it is being copied', () => {
       }
       // The count is refused; the rows themselves read perfectly well.
       if (init.headers?.Prefer === 'count=exact') return { ok: false, status: 404, text: async () => 'no' }
-      return { ok: true, headers: { get: () => null }, json: async () => [{ id: 1 }] }
+      const [at] = String(init.headers.Range).split('-').map(Number)
+      return { ok: true, headers: { get: () => null }, json: async () => (at > 0 ? [] : [{ id: 1 }]) }
     }) as any
     await expect(run()).rejects.toThrow(/could not be copied/)
   })
@@ -377,6 +381,49 @@ describe('a table that moves while it is being copied', () => {
     expect(orderColumnFor({ properties: { name: {}, created_at: {}, id: {} } })).toBe('id')
     expect(orderColumnFor({ properties: { name: {}, created_at: {} } })).toBe('created_at')
     expect(orderColumnFor({ properties: { colour: {} } })).toBe(null)
+  })
+
+  it('keeps asking when the database sends fewer rows than were asked for', async () => {
+    // 13 September 2026, CodeRabbit, and the most dangerous fault on this job,
+    // because it ends in a green backup with records missing. Asking for a
+    // thousand rows does not oblige the database to send a thousand: PostgREST
+    // can carry a ceiling of its own. A short page was read as the end of the
+    // table, so the copy stopped on the first one, the manifest recorded the
+    // short number, and reading it back agreed with the manifest.
+    const rows = Array.from({ length: 2300 }, (_, i) => ({ id: i }))
+    const SERVER_LIMIT = 400
+    globalThis.fetch = vi.fn(async (url: string, init: any) => {
+      const u = String(url)
+      if (u.endsWith('/rest/v1/')) {
+        return { ok: true, json: async () => ({ definitions: { clients: { properties: { id: {} } } } }) }
+      }
+      if (init.headers?.Prefer === 'count=exact') {
+        return { ok: true, headers: { get: () => `0-0/${rows.length}` }, json: async () => [] }
+      }
+      const [from] = String(init.headers.Range).split('-').map(Number)
+      // The database sends what it is willing to send, not what was asked for.
+      return { ok: true, headers: { get: () => null }, json: async () => rows.slice(from, from + SERVER_LIMIT) }
+    }) as any
+
+    await run()
+    const dir = await onlyRun()
+    const manifest = JSON.parse(await readFile(path.join(dir, '_manifest.json'), 'utf8'))
+    expect(manifest.counts.clients).toBe(2300)
+    expect(manifest.changedWhileBeingCopied).toEqual([])
+    const written = JSON.parse(await readFile(path.join(dir, 'clients.json'), 'utf8'))
+    expect(written).toHaveLength(2300)
+    expect(written[2299].id).toBe(2299)
+  })
+
+  it('does not refuse a table of exactly one full page', async () => {
+    // The other direction of the same mistake. Judging by the first page being
+    // full refused a table of exactly a thousand rows for no reason, and a
+    // false alarm on a backup is how people learn to ignore the real ones.
+    const rows = Array.from({ length: 1000 }, (_, i) => ({ created_at: `t${i}` }))
+    globalThis.fetch = serverWith({ notes: rows }, { columns: { notes: ['created_at'] } }) as any
+    await run()
+    const manifest = JSON.parse(await readFile(path.join(await onlyRun(), '_manifest.json'), 'utf8'))
+    expect(manifest.counts.notes).toBe(1000)
   })
 
   it('refuses to page a table whose order can repeat', async () => {

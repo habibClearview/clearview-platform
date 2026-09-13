@@ -35,7 +35,7 @@
 // without something going red.
 // ============================================================
 import { createHmac, pbkdf2Sync, timingSafeEqual, createDecipheriv } from 'node:crypto'
-import { readFile, writeFile, mkdir, rm, realpath, readdir } from 'node:fs/promises'
+import { readFile, writeFile, mkdir, rm, realpath, readdir, rename } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { verify } from './backup-database.mjs'
@@ -202,17 +202,43 @@ export async function restore(from, into, passphrase, { force = false } = {}) {
     )
   }
 
+  // NOTHING IS DESTROYED UNTIL THERE IS SOMETHING TO PUT THERE. CodeRabbit:
+  // emptying the folder and then decrypting meant that a bundle which would
+  // not open, or would not parse, left the operator with neither their old
+  // restore nor a new one. On the day somebody runs this, a half finished
+  // restore that ate the previous attempt is close to the worst outcome
+  // available.
+  //
+  // So it is built beside the folder, read back there, and only swapped in
+  // once it has been proved sound. A failure anywhere before that leaves
+  // everything exactly as it was.
+  const staging = `${dest}.restoring`
+  await rm(staging, { recursive: true, force: true })
+  await mkdir(staging, { recursive: true })
+
+  let found
+  try {
+    const tarball = path.join(staging, 'records.tar.gz')
+    await writeFile(tarball, decrypt(blob, passphrase))
+    execFileSync('tar', ['-xzf', tarball, '-C', staging])
+    await rm(tarball, { force: true })
+
+    // The same reading back the nightly job does. A bundle that opens but will
+    // not parse is the failure this whole thing exists to catch.
+    found = await verify(staging)
+  } catch (e) {
+    await rm(staging, { recursive: true, force: true })
+    throw e
+  }
+
   await rm(dest, { recursive: true, force: true })
-  await mkdir(dest, { recursive: true })
-
-  const tarball = path.join(dest, 'records.tar.gz')
-  await writeFile(tarball, decrypt(blob, passphrase))
-  execFileSync('tar', ['-xzf', tarball, '-C', dest])
-  await rm(tarball, { force: true })
-
-  // The same reading back the nightly job does. A bundle that opens but will
-  // not parse is the failure this whole thing exists to catch.
-  const found = await verify(dest)
+  try {
+    await rename(staging, dest)
+  } catch {
+    // Everything is intact and readable; it is simply not where it was asked
+    // to go. Say where it is rather than leaving somebody to find it.
+    throw new Error(`The records were read back in full but could not be moved to ${dest}. They are in ${staging}.`)
+  }
   return { ...found, into: dest }
 }
 
