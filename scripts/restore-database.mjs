@@ -193,9 +193,23 @@ export async function restore(from, into, passphrase, { force = false } = {}) {
   // with anything else in it would have taken that too, silently. An empty
   // folder, or one that does not exist yet, is the ordinary case and needs no
   // ceremony; anything else has to be said out loud with --force.
+  //
+  // "NOT THERE" AND "THERE BUT UNREADABLE" ARE NOT THE SAME ANSWER. The AI
+  // review, twice, on the backup pull request. Any failure at all was read as
+  // an absent folder, so a destination that exists and cannot be listed -- a
+  // permission it does not have, a broken mount -- was treated as free ground.
+  // The restore would then leave that folder exactly where it was, move
+  // nothing aside, and fail on the rename with a message about the wrong
+  // thing. Only ENOENT means the folder is not there. Everything else is a
+  // condition to report, not a condition to assume past.
   let occupants = []
   let destExists = true
-  try { occupants = await readdir(dest) } catch { destExists = false }
+  try {
+    occupants = await readdir(dest)
+  } catch (e) {
+    if (e && e.code === 'ENOENT') destExists = false
+    else throw new Error(`${dest} cannot be read, so it is not safe to restore into it: ${e && e.message ? e.message : e}`)
+  }
   if (occupants.length && !force) {
     throw new Error(
       `${dest} is not empty, and everything in it would be deleted. Choose an empty folder, or add --force ` +
