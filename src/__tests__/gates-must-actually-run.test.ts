@@ -14,6 +14,7 @@
 // ============================================================
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { execSync } from 'node:child_process'
 
 const RLS = readFileSync('.github/workflows/rls-check.yml', 'utf8')
 
@@ -75,6 +76,39 @@ describe('a value pasted with a line break still works', () => {
       const reads = src.match(/process\.env\.SUPABASE_SERVICE_ROLE_KEY[^\n]*/g) || []
       for (const line of reads) expect(line).toContain('.trim()')
     }
+  })
+})
+
+describe('the site itself reads the address through one place', () => {
+  // 13 September 2026. The moment the SUPABASE_URL repository variable existed
+  // with a line break on the end, EVERY PAGE of the site failed to build:
+  // creating a Supabase client with an unparseable address throws where the
+  // module loads. Three separate things broke on one pasted value and none of
+  // them said why.
+  //
+  // Every read now goes through src/lib/supabase-env.ts, which trims. This
+  // test fails if a new one goes round it.
+  it('nothing outside the helper reads these values raw', () => {
+    const offenders = execSync(
+      "grep -rln 'process\\.env\\.\\(NEXT_PUBLIC_\\)\\?SUPABASE_\\(URL\\|SERVICE_ROLE_KEY\\|ANON_KEY\\)' src app --include=*.ts --include=*.tsx || true",
+      { encoding: 'utf8' },
+    )
+      .split('\n')
+      .filter(Boolean)
+      .filter((f) => f !== 'src/lib/supabase-env.ts' && !f.includes('__tests__'))
+    expect(offenders).toEqual([])
+  })
+
+  it('the helper trims the address and both keys', () => {
+    const ENV = readFileSync('src/lib/supabase-env.ts', 'utf8')
+    expect(ENV).toContain("(process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim().replace(/\\/+$/, '')")
+    expect(ENV).toContain("(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim()")
+    expect(ENV).toContain("(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()")
+  })
+
+  it('the browser client is built from it', () => {
+    const SB = readFileSync('src/lib/supabase.ts', 'utf8')
+    expect(SB).toContain('createClient(supabaseUrl(), supabaseAnonKey())')
   })
 })
 

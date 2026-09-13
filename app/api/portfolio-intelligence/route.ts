@@ -15,10 +15,11 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadAllClientSnapshots, buildPortfolioViewData } from '@/lib/portfolio-snapshot-loader'
 import { computePortfolioOverview, type SegmentFilter } from '@/lib/portfolio-intelligence'
+import { supabaseServiceKey, supabaseUrl } from '@/lib/supabase-env'
 
 function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const url = supabaseUrl()
+  const key = supabaseServiceKey()
   if (!url || !key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel environment variables.')
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }

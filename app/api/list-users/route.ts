@@ -5,11 +5,12 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { supabaseServiceKey, supabaseUrl } from '@/lib/supabase-env'
 
 function getAdminClient() {
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    supabaseUrl(),
+    supabaseServiceKey(),
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 }

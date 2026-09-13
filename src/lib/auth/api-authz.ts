@@ -12,6 +12,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { resolveClientAccess } from './engagement-access'
 import { checkRateLimit } from '../rate-limit'
+import { supabaseAnonKey, supabaseServiceKey, supabaseUrl } from '@/lib/supabase-env'
 
 export function getBearerToken(req: NextRequest): string {
   const h = req.headers.get('authorization') || ''
@@ -21,8 +22,8 @@ export function getBearerToken(req: NextRequest): string {
 // A supabase client acting AS the requester (their JWT), so RLS applies.
 function requesterClient(token: string): SupabaseClient {
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl(),
+    supabaseAnonKey(),
     { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { autoRefreshToken: false, persistSession: false } },
   )
 }
@@ -54,8 +55,8 @@ export async function requesterCanViewClient(token: string, clientId: string): P
  * the caller themselves, which is what requireAccess below is for.
  */
 export function getAdminClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const url = supabaseUrl()
+  const key = supabaseServiceKey()
   if (!url || !key) throw new Error('Supabase admin credentials not configured')
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }

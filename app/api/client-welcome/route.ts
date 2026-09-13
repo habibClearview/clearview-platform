@@ -48,12 +48,13 @@ import { sendEmail, emailAvailable, brandedEmail, escapeHtml, raw } from '@/lib/
 import { cleanEmail, emailLooksSendable, salutation } from '@/lib/engagement-brief'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { requireAccess } from '@/lib/auth/api-authz'
+import { supabaseServiceKey, supabaseUrl } from '@/lib/supabase-env'
 
 export const dynamic = 'force-dynamic'
 
 function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const url = supabaseUrl()
+  const key = supabaseServiceKey()
   if (!url || !key) throw new Error('Supabase admin credentials not configured')
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }

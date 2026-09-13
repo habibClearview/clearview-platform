@@ -24,6 +24,7 @@ import { getBearerToken } from '@/lib/auth/api-authz'
 import { resolveClientAccess } from '@/lib/auth/engagement-access'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { parseTor } from '@/lib/tor-parse'
+import { supabaseServiceKey, supabaseUrl } from '@/lib/supabase-env'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -31,8 +32,8 @@ export const maxDuration = 30
 const MAX_BYTES = 12 * 1024 * 1024
 
 function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const url = supabaseUrl()
+  const key = supabaseServiceKey()
   if (!url || !key) throw new Error('Supabase admin credentials not configured')
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }
