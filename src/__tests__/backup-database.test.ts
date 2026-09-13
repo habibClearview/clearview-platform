@@ -14,27 +14,41 @@ import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import fs from 'fs'
-import { run, tableNames, rowsOf } from '../../scripts/backup-database.mjs'
+import { run, describeTables, orderColumnFor, verify } from '../../scripts/backup-database.mjs'
 
 const WORKFLOW = fs.readFileSync('.github/workflows/backup-database.yml', 'utf8')
 const SCRIPT = fs.readFileSync('scripts/backup-database.mjs', 'utf8')
 
 /** A stand-in for the database: a table list, and rows for each table. */
-function serverWith(tables: Record<string, unknown[]>, opts: { refuse?: string[] } = {}) {
+function serverWith(
+  tables: Record<string, unknown[]>,
+  opts: { refuse?: string[]; columns?: Record<string, string[]>; countSays?: Record<string, number> } = {},
+) {
   return vi.fn(async (url: string, init: any) => {
     const u = String(url)
     if (u.endsWith('/rest/v1/')) {
       return {
         ok: true,
-        json: async () => ({ definitions: Object.fromEntries(Object.keys(tables).map((t) => [t, {}])) }),
+        json: async () => ({
+          definitions: Object.fromEntries(Object.keys(tables).map((t) => [
+            t,
+            { properties: Object.fromEntries((opts.columns?.[t] ?? ['id']).map((c) => [c, {}])) },
+          ])),
+        }),
       }
     }
     const name = decodeURIComponent(u.split('/rest/v1/')[1].split('?')[0])
     if (opts.refuse?.includes(name)) {
       return { ok: false, status: 403, text: async () => 'permission denied' }
     }
+    const rows = tables[name] || []
+    // A count request: Range 0-0 with the count preference.
+    if (init.headers?.Prefer === 'count=exact') {
+      const total = opts.countSays?.[name] ?? rows.length
+      return { ok: true, headers: { get: () => `0-0/${total}` }, json: async () => rows.slice(0, 1) }
+    }
     const [from, to] = String(init.headers.Range).split('-').map(Number)
-    return { ok: true, json: async () => (tables[name] || []).slice(from, to + 1) }
+    return { ok: true, headers: { get: () => null }, json: async () => rows.slice(from, to + 1) }
   })
 }
 
@@ -109,7 +123,8 @@ describe('it actually copies the records', () => {
     // A list in a file is a list that goes stale, and the table it forgets is
     // the one somebody needed back.
     globalThis.fetch = serverWith({ one: [{ a: 1 }], two: [{ b: 2 }] }) as any
-    expect(await tableNames({ url: 'https://example.test', headers: {} } as any)).toEqual(['one', 'two'])
+    const seen = await describeTables({ url: 'https://example.test', headers: {} } as any)
+    expect(seen.map((t: any) => t.name)).toEqual(['one', 'two'])
   })
 })
 
@@ -131,17 +146,54 @@ describe('it never claims to have worked when it has not', () => {
     expect(manifest.rows).toBe(1)
   })
 
-  it('reads the copy back before saying it is a copy', async () => {
-    expect(SCRIPT).toContain('READ IT BACK BEFORE CLAIMING IT WORKED')
-    expect(SCRIPT).toContain('The copy is not trustworthy')
+  it('reads the copy back as part of taking it, not as an optional extra', async () => {
+    // Driven rather than asserted on source text: a run whose files disagree
+    // with its manifest must not report success.
+    globalThis.fetch = serverWith({ clients: [{ id: 1 }, { id: 2 }] }) as any
+    await run()
+    const out = await onlyRun()
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(path.join(out, 'clients.json'), '[{"id":1}]')  // a row goes missing
+    await expect(verify(out)).rejects.toThrow(/not trustworthy/)
   })
 
-  it('checks every table on its own, not just the grand total', () => {
-    // The review caught that comparing only the total would pass a bug that
-    // lost ten rows from one table and gained ten in another, which is the
-    // shape a real bug here would take.
-    expect(SCRIPT).toContain('TABLE BY TABLE, NOT JUST THE TOTAL')
-    expect(SCRIPT).toContain('got !== counts[table]')
+  // The review was right that a test reading the source proves nothing about
+  // behaviour, so the verification is its own function and these hand it
+  // broken folders and watch it refuse.
+
+  it('refuses a file that will not parse, however right its size looks', async () => {
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(path.join(dir, '_manifest.json'), JSON.stringify({ counts: { clients: 2 }, rows: 2 }))
+    await writeFile(path.join(dir, 'clients.json'), '[{"id":1},{"id":2')  // truncated
+    await expect(verify(dir)).rejects.toThrow(/clients: recorded 2, read back nothing readable/)
+  })
+
+  it('refuses a table that lost rows even when another gained the same number', async () => {
+    // The exact fault a grand-total check would wave through.
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(path.join(dir, '_manifest.json'), JSON.stringify({ counts: { a: 10, b: 10 }, rows: 20 }))
+    await writeFile(path.join(dir, 'a.json'), JSON.stringify(Array.from({ length: 8 }, (_, i) => ({ i }))))
+    await writeFile(path.join(dir, 'b.json'), JSON.stringify(Array.from({ length: 12 }, (_, i) => ({ i }))))
+    await expect(verify(dir)).rejects.toThrow(/a: recorded 10, read back 8/)
+  })
+
+  it('refuses a table the manifest promised and nothing wrote', async () => {
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(path.join(dir, '_manifest.json'), JSON.stringify({ counts: { missing: 3 }, rows: 3 }))
+    await expect(verify(dir)).rejects.toThrow(/missing: in the manifest, but no file was written/)
+  })
+
+  it('refuses a manifest that will not parse at all', async () => {
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(path.join(dir, '_manifest.json'), 'not json')
+    await expect(verify(dir)).rejects.toThrow(/manifest is missing or unreadable/)
+  })
+
+  it('accepts a folder that is actually sound', async () => {
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(path.join(dir, '_manifest.json'), JSON.stringify({ counts: { a: 2 }, rows: 2 }))
+    await writeFile(path.join(dir, 'a.json'), JSON.stringify([{ i: 1 }, { i: 2 }]))
+    await expect(verify(dir)).resolves.toEqual({ tables: 1, rows: 2 })
   })
 
   it('refuses a database that names no tables at all', async () => {
@@ -159,7 +211,67 @@ describe('it never claims to have worked when it has not', () => {
   })
 })
 
+describe('a table that moves while it is being copied', () => {
+  it('reads each table in a fixed order where it has a column to order by', async () => {
+    // Without one, two pages of the same table are two unrelated questions,
+    // and a row written between them shifts everything after it.
+    const server = serverWith({ clients: [{ id: 1 }] }, { columns: { clients: ['id', 'name'] } })
+    globalThis.fetch = server as any
+    await run()
+    const asked = server.mock.calls.map((c: any[]) => String(c[0])).filter((u) => u.includes('clients'))
+    expect(asked.some((u) => u.includes('order=id.asc'))).toBe(true)
+  })
+
+  it('names a table it had to read without an order, rather than passing it off as sound', async () => {
+    globalThis.fetch = serverWith({ oddity: [{ colour: 'red' }] }, { columns: { oddity: ['colour'] } }) as any
+    await run()
+    const manifest = JSON.parse(await readFile(path.join(await onlyRun(), '_manifest.json'), 'utf8'))
+    expect(manifest.readWithoutAStableOrder).toEqual(['oddity'])
+  })
+
+  it('names a table whose count changed underneath the copy', async () => {
+    // Asking again afterwards cannot prevent it, but it turns an invisible
+    // corruption into a named one.
+    globalThis.fetch = serverWith({ busy: [{ id: 1 }, { id: 2 }] }, { countSays: { busy: 5 } }) as any
+    await run()
+    const manifest = JSON.parse(await readFile(path.join(await onlyRun(), '_manifest.json'), 'utf8'))
+    expect(manifest.changedWhileBeingCopied.join(' ')).toContain('busy: copied 2, database now says 5')
+  })
+
+  it('picks the steadiest column available', () => {
+    expect(orderColumnFor({ properties: { name: {}, created_at: {}, id: {} } })).toBe('id')
+    expect(orderColumnFor({ properties: { name: {}, created_at: {} } })).toBe('created_at')
+    expect(orderColumnFor({ properties: { colour: {} } })).toBe(null)
+  })
+})
+
+describe('nothing waits for ever', () => {
+  it('bounds every request, so a database that stops answering cannot hang the job', () => {
+    expect(SCRIPT).toContain('AbortSignal.timeout(REQUEST_TIMEOUT_MS)')
+    // And every request goes through the one helper that applies it.
+    expect(SCRIPT).not.toMatch(/\bawait fetch\(/)
+  })
+})
+
+describe('a table too big to hold in memory', () => {
+  it('streams pages to the file rather than collecting the whole table', () => {
+    // A table large enough would otherwise kill the process before it wrote
+    // anything, which on a backup means no backup.
+    expect(SCRIPT).toContain('createWriteStream')
+    expect(SCRIPT).not.toContain('const all = []')
+    expect(SCRIPT).not.toMatch(/JSON\.stringify\(rows/)
+  })
+})
+
 describe('the records never leave in the clear', () => {
+  it('never puts a secret on the job, only on the step that needs it', () => {
+    // A job level env is inherited by every step, so checkout, the Node setup
+    // and the upload action could all read the service role key.
+    const job = WORKFLOW.slice(WORKFLOW.indexOf('  backup:'), WORKFLOW.indexOf('    steps:'))
+    expect(job).not.toContain('SUPABASE_SERVICE_ROLE_KEY')
+    expect(WORKFLOW).toContain('NO SECRET IS SET ON THE JOB')
+  })
+
   // 13 September 2026. The first version of this uploaded every client record
   // as a plain build artifact. The AI review refused it and was right: anybody
   // with read access to the repository, or any leaked token carrying
