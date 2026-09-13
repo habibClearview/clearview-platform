@@ -2026,6 +2026,11 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     const {error}=await supabase.from('coach_notice_dismissals')
       .upsert({notice_key:key,covers,dismissed_at:new Date().toISOString()},{onConflict:'notice_key'})
     if(error){
+      // The press did not land, so this notice was never touched after all.
+      // CodeRabbit on #263: leaving the marker meant a first load still in
+      // flight would skip this notice, and a set-aside already stored in the
+      // database would be ignored until the page was reloaded.
+      noticeTouched.current.delete(key)
       setNoticeDismissals(prev=>({...prev,[key]:previous}))
       setNoticeError('That could not be set aside: '+error.message)
     }
