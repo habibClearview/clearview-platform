@@ -448,6 +448,49 @@ describe('a table that moves while it is being copied', () => {
     expect(asked).toBeGreaterThan(1)
   }, 60_000)
 
+  it('reads a table whose size is an exact multiple of the page', async () => {
+    // CodeRabbit, and the same fault I fixed in the count and did not carry
+    // across to the copy. PostgREST answers a range it cannot satisfy with
+    // 416, which is exactly what the request after a table's last full page
+    // gets. Treated as a failure it would have failed the backup outright.
+    const rows = Array.from({ length: 2000 }, (_, i) => ({ id: i }))
+    globalThis.fetch = vi.fn(async (url: string, init: any) => {
+      const u = String(url)
+      if (u.endsWith('/rest/v1/')) {
+        return { ok: true, json: async () => ({ definitions: { clients: { properties: { id: {} } } } }) }
+      }
+      if (init.headers?.Prefer === 'count=exact') {
+        return { ok: true, headers: { get: () => `0-0/${rows.length}` }, json: async () => [] }
+      }
+      const [from] = String(init.headers.Range).split('-').map(Number)
+      if (from >= rows.length) {
+        // The real shape: a range past the end is refused, not answered empty.
+        return { ok: false, status: 416, headers: { get: () => `*/${rows.length}` }, text: async () => '' }
+      }
+      return { ok: true, headers: { get: () => null }, json: async () => rows.slice(from, from + 1000) }
+    }) as any
+
+    await run()
+    const manifest = JSON.parse(await readFile(path.join(await onlyRun(), '_manifest.json'), 'utf8'))
+    expect(manifest.counts.clients).toBe(2000)
+  })
+
+  it('still fails on a refusal that is not the end of the table', async () => {
+    // Accepting the end must not become accepting every refusal. A 416 whose
+    // total the request has not yet reached is a real fault.
+    globalThis.fetch = vi.fn(async (url: string, init: any) => {
+      const u = String(url)
+      if (u.endsWith('/rest/v1/')) {
+        return { ok: true, json: async () => ({ definitions: { t: { properties: { id: {} } } } }) }
+      }
+      if (init.headers?.Prefer === 'count=exact') {
+        return { ok: true, headers: { get: () => '0-0/500' }, json: async () => [] }
+      }
+      return { ok: false, status: 416, headers: { get: () => '*/500' }, text: async () => '' }
+    }) as any
+    await expect(run()).rejects.toThrow(/could not be copied/)
+  })
+
   it('does not refuse a table of exactly one full page', async () => {
     // The other direction of the same mistake. Judging by the first page being
     // full refused a table of exactly a thousand rows for no reason, and a

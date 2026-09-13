@@ -326,11 +326,27 @@ export async function writeTable(table, orderBy, dest, cfg) {
       const res = await ask(`${url}/rest/v1/${encodeURIComponent(table)}?select=*${order}`, {
         ...headers, Range: `${from}-${from + PAGE - 1}`,
       })
-      // A table this key cannot read is reported rather than silently skipped.
-      // The status and nothing else: the server's own error text ends up in
-      // the manifest, which always travels in the clear, and a database error
-      // body can carry column names and fragments of rows with it.
-      if (!res.ok) throw new Error(`${table}: the database answered ${res.status}`)
+      // ASKING PAST THE END IS NOT A FAILURE, IT IS THE END. CodeRabbit, and
+      // it is the same fault I fixed in the count and did not carry across to
+      // here. PostgREST answers a range it cannot satisfy with 416, and that
+      // is exactly what a table with nothing left to give returns: an empty
+      // table on the very first request, and any table whose size is an exact
+      // multiple of the page on the request after its last full page. Treated
+      // as a failure, it would have failed the whole nightly backup on the
+      // first empty table, and this database has plenty.
+      //
+      // Only that shape is accepted: a 416 whose content-range names a total
+      // this request has already passed. Every other refusal is still a
+      // refusal, and a table this key cannot read is still reported rather
+      // than silently skipped.
+      if (!res.ok) {
+        const total = Number(String(res.headers?.get?.('content-range') || '').split('/')[1])
+        if (res.status === 416 && Number.isFinite(total) && from >= total) break
+        // The status and nothing else: the server's own error text ends up in
+        // the manifest, which always travels in the clear, and a database
+        // error body can carry column names and fragments of rows with it.
+        throw new Error(`${table}: the database answered ${res.status}`)
+      }
       const page = await res.json()
       if (!page.length) break
 
