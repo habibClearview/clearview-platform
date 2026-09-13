@@ -95,7 +95,10 @@ describe('the tabs say what is behind them', () => {
   })
 
   it('the counts come from the records, not from a guess', () => {
-    expect(DASH).toContain("const openDeals=programmes.filter(p=>p.deal_stage&&p.deal_stage!=='won'&&p.deal_stage!=='lost').length")
+    // The Pipeline count is the same split the Pipeline screen draws, so the
+    // number on the tab and the list behind it can never disagree. See
+    // pipeline-and-notices.test.ts.
+    expect(DASH).toContain("const openDeals=splitPipeline(programmes,clients).open.length")
     expect(DASH).toContain("const awaitingApproval=timesheets.filter(t=>t.status==='submitted').length")
     expect(DASH).toContain("supabase.from('service_engagements').select('id',{count:'exact',head:true})")
   })

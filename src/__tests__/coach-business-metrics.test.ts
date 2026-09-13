@@ -133,7 +133,32 @@ describe('clientTypeBreakdown', () => {
     ]
     const r = clientTypeBreakdown(clients, programmesById, 'year', now)
     expect(r.donorProgrammes.count).toBe(1)
-    expect(r.total.count).toBe(1)
+    // ...and says so alongside the three clients sitting under it, rather
+    // than letting a tile labelled "All Clients" report the programme count.
+    expect(r.donorProgrammes.clientCount).toBe(3)
+    expect(r.total.count).toBe(3)
+  })
+
+  it('counts every client in the total, including one nothing else describes', () => {
+    const withDirect: Record<string, DealProgramme> = {
+      ...programmesById,
+      direct1: { id: 'direct1', name: 'A direct client', type: 'direct_client' },
+    }
+    const clients = [
+      client({ id: 'a', programme_id: 'donor1', engagement_mode: 'financial' }),
+      client({ id: 'b', programme_id: 'donor1', engagement_mode: 'canvas' }),
+      client({ id: 'c', programme_id: null, engagement_mode: 'canvas' }),
+      client({ id: 'd', programme_id: null, engagement_mode: 'financial' }),
+      // On a programme that is not donor funded: this used to fall through
+      // every branch and be counted nowhere at all.
+      client({ id: 'e', programme_id: 'direct1', engagement_mode: 'canvas' }),
+    ]
+    const r = clientTypeBreakdown(clients, withDirect, 'year', now)
+    expect(r.total.count).toBe(5)
+    expect(r.other.count).toBe(1)
+    // Every client lands in exactly one bucket, so the buckets always add
+    // back up to the number of clients.
+    expect(r.donorProgrammes.clientCount + r.independentClients.count + r.subscribers.count + r.other.count).toBe(5)
   })
 
   it('splits independent clients into canvas (independent) vs financial (subscriber)', () => {
@@ -159,11 +184,13 @@ describe('clientTypeBreakdown', () => {
     expect(r.independentClients.revenue).toBe(9_600)
     expect(r.subscribers.revenue).toBe(0) // unpaid -- not collected yet
     expect(r.total.revenue).toBe(39_600)
+    expect(r.total.count).toBe(3)
   })
 
   it('handles an empty client list without crashing', () => {
     const r = clientTypeBreakdown([], {}, 'month', now)
     expect(r.total).toEqual({ count: 0, revenue: 0 })
+    expect(r.other).toEqual({ count: 0, revenue: 0 })
   })
 })
 
@@ -178,6 +205,19 @@ describe('serviceTypeBreakdown', () => {
     ]
     const clientView = clientTypeBreakdown(clients, programmesById, 'year', now)
     const serviceView = serviceTypeBreakdown(clients, [], 'year', now)
+    expect(serviceView.total.revenue).toBe(clientView.total.revenue)
+  })
+
+  it('still ties out when a client has no service recorded, instead of losing its money', () => {
+    const programmesById: Record<string, DealProgramme> = {}
+    const clients = [
+      client({ id: 'a', programme_id: null, engagement_mode: 'canvas', fee_status: 'paid', fee_paid_at: '2026-07-01', engagement_fee: 9_600 }),
+      client({ id: 'b', programme_id: null, engagement_mode: undefined as never, fee_status: 'paid', fee_paid_at: '2026-07-01', engagement_fee: 2_400 }),
+    ]
+    const clientView = clientTypeBreakdown(clients, programmesById, 'year', now)
+    const serviceView = serviceTypeBreakdown(clients, [], 'year', now)
+    expect(serviceView.other).toEqual({ count: 1, revenue: 2_400 })
+    expect(serviceView.total.revenue).toBe(12_000)
     expect(serviceView.total.revenue).toBe(clientView.total.revenue)
   })
 
