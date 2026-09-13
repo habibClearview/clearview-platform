@@ -310,8 +310,13 @@ export function assignmentsFromDeals(
         id: dealAssignmentId(p.id),
         name: p.name || null,
         payer_programme_id: p.id,
-        service_types: services.length ? services : ['advisory'],
-        service_type: services[0] || 'advisory',
+        // A DEAL WITH NO SERVICES TICKED IS NOT AN ADVISORY. CodeRabbit on
+        // #268. Falling back to advisory would have put work on the Services
+        // tiles that nobody ever recorded. It stays unclassified: its money is
+        // still in the total, and it is counted under no service, which is
+        // exactly what is known about it.
+        service_types: services.length ? services : null,
+        service_type: services[0] || null,
         status: 'active',
         fee: Number(p.deal_value),
         fee_currency: p.deal_currency || null,

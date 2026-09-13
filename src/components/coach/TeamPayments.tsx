@@ -301,12 +301,21 @@ export default function TeamPayments({coImplementers=[],setCoImplementers,client
         ;({res,data}=await ask(true))
       }
       if(!res.ok) return {error:{message:data?.error||'Could not remove this team member.'}}
+      // Their money records went with them, so they go from this screen too.
+      // CodeRabbit on #268: only the roster was cleared, so the summary bar,
+      // the cost chart and the payment views kept showing a removed person's
+      // advance and invoice until the page was reloaded.
+      const mine=x=>x.co_implementer_id!==ci.id
+      setEntries(prev=>prev.filter(mine))
+      setExpenses(prev=>prev.filter(mine))
+      setAdvances(prev=>prev.filter(mine))
+      setInvoices(prev=>prev.filter(mine))
       setCoImplementers&&setCoImplementers(prev=>prev.filter(x=>x.id!==ci.id))
       return {}
     }catch(e){
       return {error:{message:'No connection — could not remove this team member. Please try again.'}}
     }
-  },[setCoImplementers])
+  },[setCoImplementers,setEntries,setExpenses,setAdvances,setInvoices])
 
   useEffect(()=>{
     let alive=true

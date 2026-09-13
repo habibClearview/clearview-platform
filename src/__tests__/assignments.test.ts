@@ -251,6 +251,18 @@ describe('a Pipeline deal read as the assignment it already is', () => {
     expect(ids).toEqual(['tanager'])
   })
 
+  it('never invents a service for a deal that has none ticked', () => {
+    // Falling back to advisory would put work on the Services tiles that
+    // nobody ever recorded. CodeRabbit on #268.
+    const bare = [{ id: 'x', name: 'No services ticked', deal_stage: 'won', deal_value: 5_000, deal_services: null }]
+    const made = assignmentsFromDeals(bare, [])
+    expect(servicesOf(made[0])).toEqual([])
+    // Its money is still counted; it is simply under no service.
+    expect(assignmentMoney(made, 'month', now).awaitingIssue).toBe(5_000)
+    const split = moneyByService(made, 'month', now)
+    expect(split.services.every(l => l.assignments === 0)).toBe(true)
+  })
+
   it('takes the id the migration would give it, so applying that later makes no second copy', () => {
     expect(assignmentsFromDeals(deals, [])[0].id).toBe(dealAssignmentId('csj'))
   })
