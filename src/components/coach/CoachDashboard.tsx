@@ -255,6 +255,17 @@ function SetAsideLine({label,onBringBack,busy}){
   )
 }
 
+// Named up here, above everything that reads them. A constant declared below
+// its first use is safe only while that use is inside a function that runs
+// later, and telling those two apart by eye is exactly the judgement that put
+// "This section couldn't load" on My Business. See the lint rule in
+// .eslintrc.hooks.json.
+//
+// What a service is called where somebody is PAYING for it.
+const SERVICE_TYPE_LABELS={advisory:'Advisory',canvas:'GtCV Canvas',financial:'Clearview Financial Model',portfolio_intelligence:'Portfolio Intelligence Subscription'}
+// And what it is called on the screen of the client receiving it.
+const SERVICE_NAME={canvas:'Grant-to-Commercial Viability',financial:'Clearview Financial Model',advisory:'Advisory',portfolio_intelligence:'Market Intelligence'}
+
 const HEALTH_COLOR={'Needs attention':C.red,'Watch':C.amber,'Healthy':C.green,'Reviewed':C.teal,'No data':C.slate,'Not yet reviewed':C.cyan,'No financial data yet':C.slate}
 
 // Generates and downloads a client's Investment Readiness Brief from the
@@ -623,24 +634,24 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
   const recorded=withCorrectedPayer(recordedAssignments,clients)
   const fromDeals=assignmentsFromDeals(programmes,recorded)
   const assignments=[...recorded,...fromDeals]
-  const servedRows=[...recordedServed,...servedFromProgrammes(fromDeals,clients,payerName)]
 
-  // A paying client is an organisation, not a database row. Every Pipeline
-  // deal is its own row in programmes, so a second piece of work from the same
-  // payer carries the same name on a different id. The name is what is on the
-  // invoice, so the name is what identifies them.
-  // THE PAYING CLIENT IS WHO PAYS, NOT THE PROGRAMME THEY FUND. 14 September
-  // 2026. Habib: "Tanager is the funder of Ignite, the programme. They are
-  // paying me to serve Ikore. There is nowhere in anything I have ever written
-  // here that suggests that Ignite is a paying client." The programme's own
-  // name was being printed as the payer, so a funded programme appeared to be
-  // buying its own funding. The funder is who the invoice is made out to.
+  // A paying client is an organisation, not a database row, and the paying
+  // client is who PAYS rather than the programme they fund. Habib: "Tanager is
+  // the funder of Ignite, the programme... there is nowhere in anything I have
+  // ever written here that suggests that Ignite is a paying client."
+  //
+  // DECLARED BEFORE IT IS USED. 14 September 2026. It was written below the
+  // line that calls it, which in JavaScript is not a late definition but a
+  // crash: the whole of My Business failed with "This section couldn't load"
+  // the moment a deal existed to attach anybody to. Every test passed, because
+  // every test reads this file as text rather than running it.
   const payerName=(id)=>{
     const prog=programmes.find(p=>p.id===id)
     if(prog)return (prog.funder||'').trim()||prog.name
     const c=clients.find(x=>x.id===id)
     return c?c.name:id
   }
+  const servedRows=[...recordedServed,...servedFromProgrammes(fromDeals,clients,payerName)]
   const shape=practiceShape(assignments,servedRows,payerName)
   const payerLines=moneyByPayer(assignments,servedRows,period,now,payerName)
   const serviceSplit=moneyByService(assignments,period,now,undefined,payerName)
@@ -2580,17 +2591,20 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     const smallBtn={fontFamily:'var(--cv-font-mono)',fontSize:'0.82rem',padding:'0.22rem 0.6rem',border:`1px solid ${C.border}`,borderRadius:6,background:'transparent',color:C.slate,cursor:'pointer',whiteSpace:'nowrap'}
     // A card is a way in, so it has to be one for somebody using a keyboard
     // too. CodeRabbit.
-    const open=()=>{setSelClientId(client.id);setActiveTab(openingTabFor(client));setView('client')}
+    // A card for the buyer is not a client record, so it does not pretend to
+    // open one. It says what it is instead.
+    const isPayer=!!client.isPayer
+    const open=()=>{if(isPayer)return;setSelClientId(client.id);setActiveTab(openingTabFor(client));setView('client')}
     return(
-      <div role="button" tabIndex={0} aria-label={`Open ${client.name}`}
-        onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}}
-        style={{border:'1px solid var(--cv-border-soft)',borderLeft:edge?`4px solid ${edge}`:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.75rem 0.85rem',cursor:'pointer',background:C.white,display:'flex',flexDirection:'column',gap:'0.4rem'}}
+      <div role={isPayer?undefined:'button'} tabIndex={isPayer?undefined:0} aria-label={isPayer?undefined:`Open ${client.name}`}
+        onKeyDown={isPayer?undefined:(e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}})}
+        style={{border:'1px solid var(--cv-border-soft)',borderLeft:edge?`4px solid ${edge}`:'1px solid var(--cv-border-soft)',borderRadius:8,padding:'0.75rem 0.85rem',cursor:isPayer?'default':'pointer',background:C.white,display:'flex',flexDirection:'column',gap:'0.4rem'}}
         onClick={open}>
         <div style={{display:'flex',alignItems:'flex-start',gap:'0.5rem'}}>
           <div style={{fontWeight:700,fontSize:'0.95rem',flex:1,minWidth:0}}>{client.name}</div>
           {live&&<span title={`${flag.status.label} — from the latest health check`} style={{width:10,height:10,borderRadius:'50%',background:edge,flexShrink:0,marginTop:'0.3rem'}}/>}
         </div>
-        {payer&&<div style={{fontSize:'0.8rem',color:C.slate,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{payer}</div>}
+        {payer&&<div style={{fontSize:'0.8rem',color:C.slate,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{isPayer?'Bought it for themselves':payer}</div>}
         <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',alignItems:'center'}}>
           <Badge text={label} color={color}/>
           {live&&<Badge text={flag.status.label} color={edge}/>}
@@ -2741,11 +2755,21 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
         const prog=a.payer_programme_id?programmesById[a.payer_programme_id]:null
         const payerClient=a.payer_client_id?clientsById[a.payer_client_id]:null
         const payer=prog?((prog.funder||'').trim()||prog.name):(payerClient?payerClient.name:'Independent')
-        // Who this assignment serves: the organisations linked to it, or the
-        // one named on the row, or the payer where it pays for its own work.
+        // WHOEVER BOUGHT IT IS THE RECIPIENT UNTIL SOMEBODY SAYS OTHERWISE.
+        // 14 September 2026. Habib: "Palladium Group paid £5k for the advisory
+        // service, and they are the recipient. Why is this a problem to
+        // understand?" It was not a problem with the record, it was a rule I
+        // had wrong: a service was only ever shown against a separate
+        // organisation, so an assignment somebody bought FOR THEMSELVES showed
+        // against nobody and the tab read zero beside a fee that was right.
+        //
+        // The organisations linked to the assignment come first, then the one
+        // named on the row, and where neither exists the buyer is who the work
+        // is for, because that is what buying a service means.
         const linked=servedIdsOf(a.id,servedAll).map(id=>clientsById[id]).filter(Boolean)
         const named=a.beneficiary_client_id?clientsById[a.beneficiary_client_id]:null
-        const served=linked.length?linked:(named?[named]:(payerClient?[payerClient]:[]))
+        const buyer=payerClient||(prog?{id:`payer:${prog.id}`,name:payer,status:'active',isPayer:true}:null)
+        const served=linked.length?linked:(named?[named]:(buyer?[buyer]:[]))
         return served.map(c=>({client:c,seStatus:a.status,payer:payerClient&&payerClient.id===c.id&&!prog?'Independent':payer}))
       })
       const listed=new Set(rows.map(r=>r.client.id))
@@ -3699,11 +3723,9 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
 // for a different client, direct advisory, or a Portfolio Intelligence
 // subscription. Additive to the single engagement_mode on each client's own
 // record. Loads and fails independently of the rest of the dashboard.
-const SERVICE_TYPE_LABELS={advisory:'Advisory',canvas:'GtCV Canvas',financial:'Clearview Financial Model',portfolio_intelligence:'Portfolio Intelligence Subscription'}
 // What a client's own service is called on their screen. Separate from the
 // labels above, which name a service somebody is PAYING for; this names the
 // one the client in front of you is receiving.
-const SERVICE_NAME={canvas:'Grant-to-Commercial Viability',financial:'Clearview Financial Model',advisory:'Advisory',portfolio_intelligence:'Market Intelligence'}
 
 // THE ASSIGNMENTS A PAYING CLIENT HAS BOUGHT. Rewritten 14 September 2026.
 //
