@@ -108,6 +108,33 @@ export function orderColumnFor(definition) {
 }
 
 /**
+ * A filename that cannot be anything but a filename.
+ *
+ * 13 September 2026, CodeRabbit. Table names came out of the database's own
+ * schema and went straight into a path. That is fine until it is not: a
+ * quoted table name can contain a slash, and a table called "../../package"
+ * would have had this job writing, and on failure deleting, a file outside the
+ * folder it was given. Whether such a table could exist here is beside the
+ * point; a backup should not be the thing that decides.
+ *
+ * Anything outside a small safe set becomes an underscore, and the real name
+ * is kept in the manifest so the mapping stays reversible. _manifest is
+ * reserved, because a table of that name would otherwise be overwritten by the
+ * manifest and then skipped by the check that reads it back.
+ */
+export function fileNameFor(table) {
+  const safe = String(table)
+    .replace(/[^A-Za-z0-9._-]/g, '_')
+    // Two dots in a row never survive, wherever they sit. A filename with no
+    // slash in it cannot climb anywhere, but leaving ".." in the middle of one
+    // invites the next person to assume it is handled somewhere else.
+    .replace(/\.{2,}/g, '_')
+    .replace(/^\.+/, '_')
+    .slice(0, 100)
+  return `${safe === '_manifest' || safe === '_summary' ? `table_${safe}` : safe}.json`
+}
+
+/**
  * Every table the database is willing to talk about, and how to order each.
  *
  * Asked of the database rather than kept as a list in this file, because a
@@ -121,7 +148,16 @@ export async function describeTables({ url, headers }) {
   const defs = spec.definitions || spec.components?.schemas || {}
   const names = Object.keys(defs).sort()
   if (!names.length) throw new Error('The database named no tables at all, which cannot be right.')
-  return names.map((name) => ({ name, orderBy: orderColumnFor(defs[name]) }))
+
+  // Two tables whose names differ only in a character we flatten would land on
+  // one file, and the second would silently overwrite the first.
+  const taken = new Map()
+  return names.map((name) => {
+    let file = fileNameFor(name)
+    if (taken.has(file)) file = `${file.slice(0, -5)}_${taken.get(file)}.json`
+    taken.set(file, (taken.get(file) || 1) + 1)
+    return { name, file, orderBy: orderColumnFor(defs[name]) }
+  })
 }
 
 /** How many rows the database says a table holds, right now. */
@@ -206,11 +242,19 @@ export async function verify(dir) {
   const wrong = []
   let sum = 0
 
+  // The manifest carries the filename each table was written to, so a name
+  // that had to be flattened still maps back to the right table here.
+  const tableOf = Object.fromEntries(Object.entries(recorded.files || {}).map(([t, f]) => [f, t]))
   for (const f of present) {
     if (f === '_manifest.json') continue
-    const table = f.replace(/\.json$/, '')
+    const table = tableOf[f] ?? f.replace(/\.json$/, '')
     let got = null
-    try { got = JSON.parse(await readFile(path.join(dir, f), 'utf8')).length } catch { got = null }
+    try {
+      // It has to BE a list of rows. Anything else with a length, a string of
+      // two characters for instance, would otherwise pass for two records.
+      const rows = JSON.parse(await readFile(path.join(dir, f), 'utf8'))
+      got = Array.isArray(rows) ? rows.length : null
+    } catch { got = null }
     if (got !== recorded.counts?.[table]) {
       wrong.push(`${table}: recorded ${recorded.counts?.[table]}, read back ${got === null ? 'nothing readable' : got}`)
     } else {
@@ -218,7 +262,8 @@ export async function verify(dir) {
     }
   }
   for (const table of Object.keys(recorded.counts || {})) {
-    if (!present.includes(`${table}.json`)) wrong.push(`${table}: in the manifest, but no file was written`)
+    const f = recorded.files?.[table] ?? `${table}.json`
+    if (!present.includes(f)) wrong.push(`${table}: in the manifest, but no file was written`)
   }
   if (sum !== recorded.rows) wrong.push(`the manifest says ${recorded.rows} rows in total, the files hold ${sum}`)
 
@@ -243,10 +288,23 @@ export const run = async () => {
   const shifted = []
   let rowTotal = 0
 
-  for (const { name, orderBy } of tables) {
-    const dest = path.join(dir, `${name}.json`)
+  const files = {}
+  for (const { name, file, orderBy } of tables) {
+    const dest = path.join(dir, file)
     try {
       const written = await writeTable(name, orderBy, dest, cfg)
+
+      // DID IT MOVE WHILE WE READ IT. A row written between two pages shifts
+      // everything after it. Asking again afterwards cannot prevent that, but
+      // it turns an invisible corruption into a named one.
+      //
+      // ASKED FOR AN EMPTY TABLE TOO. 13 September 2026, CodeRabbit: this used
+      // to skip straight past for a table that read as empty, so a table that
+      // was empty when we looked and had rows by the time we finished went
+      // into the backup as nothing at all, with no warning against it.
+      const now = await countOf(name, cfg).catch(() => null)
+      if (now !== null && now !== written) shifted.push(`${name}: copied ${written}, database now says ${now}`)
+
       if (!written) {
         // An empty table is not worth a file. Ninety empty files make a folder
         // nobody opens, and the point of this is that somebody can.
@@ -254,14 +312,9 @@ export const run = async () => {
         continue
       }
       counts[name] = written
+      files[name] = file
       rowTotal += written
       if (!orderBy) unordered.push(name)
-
-      // DID IT MOVE WHILE WE READ IT. A row written between two pages shifts
-      // everything after it. Asking again afterwards cannot prevent that, but
-      // it turns an invisible corruption into a named one.
-      const now = await countOf(name, cfg).catch(() => null)
-      if (now !== null && now !== written) shifted.push(`${name}: copied ${written}, database now says ${now}`)
     } catch (e) {
       failed.push(`${name}: ${e.message}`)
       await unlink(dest).catch(() => {})
@@ -289,6 +342,9 @@ export const run = async () => {
     tablesWithRows: Object.keys(counts).length,
     rows: rowTotal,
     counts,
+    // Which file each table was written to, so a name that had to be flattened
+    // to be safe as a filename still maps back to the table it came from.
+    files,
     // Named rather than buried. Each of these is a way this copy is weaker
     // than it looks, and somebody restoring from it deserves to know which.
     readWithoutAStableOrder: unordered,

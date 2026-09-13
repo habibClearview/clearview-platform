@@ -14,7 +14,7 @@ import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import fs from 'fs'
-import { run, describeTables, orderColumnFor, verify } from '../../scripts/backup-database.mjs'
+import { run, describeTables, orderColumnFor, verify, fileNameFor } from '../../scripts/backup-database.mjs'
 
 const WORKFLOW = fs.readFileSync('.github/workflows/backup-database.yml', 'utf8')
 const SCRIPT = fs.readFileSync('scripts/backup-database.mjs', 'utf8')
@@ -190,6 +190,23 @@ describe('it never claims to have worked when it has not', () => {
     await expect(verify(dir)).rejects.toThrow(/missing: in the manifest, but no file was written/)
   })
 
+  it('refuses a file that is not a list of rows at all', async () => {
+    // A string of two characters has a length of two and is not two records.
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(path.join(dir, '_manifest.json'), JSON.stringify({ counts: { a: 2 }, rows: 2 }))
+    await writeFile(path.join(dir, 'a.json'), '"ab"')
+    await expect(verify(dir)).rejects.toThrow(/a: recorded 2, read back nothing readable/)
+  })
+
+  it('checks a table that read as empty in case it filled up behind us', async () => {
+    // It used to skip straight past, so a table that was empty when we looked
+    // and had rows by the time we finished went in as nothing, unflagged.
+    globalThis.fetch = serverWith({ latecomer: [], other: [{ id: 1 }] }, { countSays: { latecomer: 4 } }) as any
+    await run()
+    const manifest = JSON.parse(await readFile(path.join(await onlyRun(), '_manifest.json'), 'utf8'))
+    expect(manifest.changedWhileBeingCopied.join(' ')).toContain('latecomer: copied 0, database now says 4')
+  })
+
   it('refuses a manifest that will not parse at all', async () => {
     const { writeFile } = await import('node:fs/promises')
     await writeFile(path.join(dir, '_manifest.json'), 'not json')
@@ -280,6 +297,43 @@ describe('a table that moves while it is being copied', () => {
     expect(orderColumnFor({ properties: { name: {}, created_at: {}, id: {} } })).toBe('id')
     expect(orderColumnFor({ properties: { name: {}, created_at: {} } })).toBe('created_at')
     expect(orderColumnFor({ properties: { colour: {} } })).toBe(null)
+  })
+})
+
+describe('a table name can never build a path', () => {
+  // 13 September 2026, CodeRabbit. Table names came out of the database's own
+  // schema and went straight into a file path. A quoted table name can contain
+  // a slash, and a backup should not be the thing that decides whether that
+  // matters.
+
+  it('cannot climb out of the folder it was given', () => {
+    const name = fileNameFor('../../package')
+    expect(name).not.toContain('/')
+    expect(name).not.toContain('..')
+    expect(fileNameFor('..')).not.toContain('..')
+    expect(fileNameFor('.hidden')).not.toMatch(/^\./)
+  })
+
+  it('does not let a table called _manifest overwrite the manifest', () => {
+    // It would have been overwritten by the manifest and then skipped by the
+    // very check that reads the backup back.
+    expect(fileNameFor('_manifest')).toBe('table__manifest.json')
+    expect(fileNameFor('_summary')).toBe('table__summary.json')
+  })
+
+  it('never lets two tables land on one file', async () => {
+    globalThis.fetch = serverWith({ 'a b': [{ id: 1 }], 'a-b': [{ id: 2 }] }) as any
+    const seen = await describeTables({ url: 'https://example.test', headers: {} } as any)
+    const names = seen.map((t: any) => t.file)
+    expect(new Set(names).size).toBe(names.length)
+  })
+
+  it('keeps the real table name in the manifest, so the mapping is reversible', async () => {
+    globalThis.fetch = serverWith({ 'odd name': [{ id: 1 }] }) as any
+    await run()
+    const manifest = JSON.parse(await readFile(path.join(await onlyRun(), '_manifest.json'), 'utf8'))
+    expect(manifest.files['odd name']).toBe('odd_name.json')
+    expect(manifest.counts['odd name']).toBe(1)
   })
 })
 
