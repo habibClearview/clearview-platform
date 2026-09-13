@@ -62,12 +62,32 @@ async function letterBody(admin: ReturnType<typeof getAdminClient>): Promise<str
   return saved || DEFAULT_CO_IMPLEMENTER_LETTER
 }
 
-/** Authenticate, and refuse anybody who may not manage the team. */
-async function requireSuperCoach(req: NextRequest, admin: ReturnType<typeof getAdminClient>) {
+/**
+ * Authenticate, refuse anybody who may not manage the team, and hold the door
+ * to a sensible number of knocks. Reading and editing are cheap, but an
+ * unlimited endpoint is an unlimited endpoint, and this one is behind the same
+ * service-role client the send is.
+ */
+async function requireSuperCoach(
+  req: NextRequest,
+  admin: ReturnType<typeof getAdminClient>,
+  what: string,
+) {
   const token = getBearerToken(req)
   if (!token) return { ok: false as const, res: NextResponse.json({ error: 'Not authenticated' }, { status: 401 }) }
   const { data: { user }, error } = await admin.auth.getUser(token)
   if (error || !user) return { ok: false as const, res: NextResponse.json({ error: 'Not authenticated' }, { status: 401 }) }
+
+  const rl = await checkRateLimit(admin, `${what}:${user.id}`, 120, 3600)
+  if (!rl.allowed) {
+    return {
+      ok: false as const,
+      res: NextResponse.json({ error: 'That has been asked for too many times recently.' }, {
+        status: 429, headers: { 'Retry-After': String(rl.retryAfter ?? 60) },
+      }),
+    }
+  }
+
   const { data: profile } = await admin.from('user_profiles').select('role').eq('id', user.id).maybeSingle()
   if (!profile || !canManageTeam(profile.role)) {
     return { ok: false as const, res: NextResponse.json({ error: 'Only the coach who manages the team can do that.' }, { status: 403 }) }
@@ -86,7 +106,7 @@ async function requireSuperCoach(req: NextRequest, admin: ReturnType<typeof getA
 export async function GET(req: NextRequest) {
   try {
     const admin = getAdminClient()
-    const gate = await requireSuperCoach(req, admin)
+    const gate = await requireSuperCoach(req, admin, 'co-implementer-letter:read')
     if (!gate.ok) return gate.res
 
     const { data } = await admin.from('coach_letters')
@@ -124,7 +144,7 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const admin = getAdminClient()
-    const gate = await requireSuperCoach(req, admin)
+    const gate = await requireSuperCoach(req, admin, 'co-implementer-letter:save')
     if (!gate.ok) return gate.res
 
     const sent = (await req.json().catch(() => ({}))) as Record<string, unknown>

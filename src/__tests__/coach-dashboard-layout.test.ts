@@ -17,6 +17,8 @@
 // ============================================================
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { textToEmail } from '@/lib/letter'
+import { canManageTeam } from '@/lib/coach-types'
 
 const DASH = readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
 const LETTER = readFileSync('app/api/co-implementer-welcome/route.ts', 'utf8')
@@ -201,10 +203,35 @@ describe('the welcome letter to a co-implementer', () => {
   })
 
   it('the words a person types are sent as words, never as markup', () => {
-    // textToEmail escapes everything on the way in, the same path the
-    // engagement welcome letters use.
+    // The preview is rendered with dangerouslySetInnerHTML, so this is the one
+    // that has to be proved rather than asserted about. Anything that looks
+    // like markup comes back escaped, in a paragraph, a heading and a bullet.
     expect(LETTER).toContain("import { textToEmail } from '@/lib/letter'")
     expect(LETTER).toContain('...textToEmail(letter)')
+
+    const nasty = '<script>alert(1)</script>'
+    const out = textToEmail(`${nasty}\n\n# ${nasty}\n\n- ${nasty}`)
+      .map((p) => String((p as { __html?: string }).__html ?? p)).join('')
+    expect(out).not.toContain('<script>')
+    expect(out.match(/&lt;script&gt;/g) || []).toHaveLength(3)
+  })
+
+  it('who may edit the letter and who the database lets in are the same rule', () => {
+    // The AI review: the route gates on canManageTeam and the table's own
+    // policy names super_coach. They agree today, and this fails the day one
+    // of them moves without the other.
+    const sql = readFileSync('supabase/migrations/2026_09_13_coach_letters.sql', 'utf8')
+    expect(sql).toContain("my_role() = 'super_coach'")
+    expect(canManageTeam('super_coach')).toBe(true)
+    for (const role of ['coach', 'ceo', 'finance_manager', 'unit_head', 'accounts_assistant', 'funder']) {
+      expect(canManageTeam(role)).toBe(false)
+    }
+  })
+
+  it('reading and saving it are held to a sensible number of knocks', () => {
+    expect(LETTER).toContain("requireSuperCoach(req, admin, 'co-implementer-letter:read')")
+    expect(LETTER).toContain("requireSuperCoach(req, admin, 'co-implementer-letter:save')")
+    expect(LETTER).toContain('checkRateLimit(admin, `${what}:${user.id}`')
   })
 
   it('reading it and saving it are for the coach who manages the team only', () => {
