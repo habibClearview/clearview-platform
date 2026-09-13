@@ -190,6 +190,37 @@ describe('a backup nobody has opened is a belief', () => {
     expect(await readdir(artifact)).toContain('records.tar.gz.enc')
   }, 30_000)
 
+  it('refuses to empty a folder that has somebody else\'s files in it', async () => {
+    // The AI review, and the same family as the path guard: that one stops it
+    // destroying the backup and said nothing about the operator's own files.
+    const artifact = path.join(work, 'artifact')
+    await recordsFolder(path.join(work, 'records'))
+    lock(path.join(work, 'records'), artifact)
+
+    const out = path.join(work, 'my-working-folder')
+    await mkdir(out, { recursive: true })
+    await writeFile(path.join(out, 'a-year-of-my-notes.txt'), 'please do not')
+
+    await expect(restore(artifact, out, PASSPHRASE)).rejects.toThrow(/is not empty/)
+    expect(await readdir(out)).toContain('a-year-of-my-notes.txt')
+  }, 30_000)
+
+  it('empties it anyway when told to in so many words', async () => {
+    // Refusing has to be overridable, or somebody restoring twice in a row is
+    // stuck, and a tool that cannot be told yes gets worked around.
+    const artifact = path.join(work, 'artifact')
+    await recordsFolder(path.join(work, 'records'))
+    lock(path.join(work, 'records'), artifact)
+
+    const out = path.join(work, 'used-before')
+    await mkdir(out, { recursive: true })
+    await writeFile(path.join(out, 'from-the-last-attempt.txt'), 'stale')
+
+    const found = await restore(artifact, out, PASSPHRASE, { force: true })
+    expect(found.rows).toBe(3)
+    expect(await readdir(out)).not.toContain('from-the-last-attempt.txt')
+  }, 30_000)
+
   it('says plainly when a backup kept no records at all', async () => {
     // The default, with no passphrase set on the repository: the job keeps the
     // summary and nothing else. Somebody reaching for it in an emergency needs

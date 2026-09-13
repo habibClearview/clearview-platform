@@ -14,6 +14,9 @@
 //
 //   BACKUP_PASSPHRASE='...' node scripts/restore-database.mjs ./downloaded-artifact
 //
+// It will not empty a folder that has anything in it unless --force is added,
+// and it will not write into the folder holding the backup at all.
+//
 // It writes the records to a folder and stops there. IT NEVER WRITES TO A
 // DATABASE. Putting records back into a live project is a decision with a
 // person's name against it, not something a script should be able to do by
@@ -32,7 +35,7 @@
 // without something going red.
 // ============================================================
 import { createHmac, pbkdf2Sync, timingSafeEqual, createDecipheriv } from 'node:crypto'
-import { readFile, writeFile, mkdir, rm, realpath } from 'node:fs/promises'
+import { readFile, writeFile, mkdir, rm, realpath, readdir } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { verify } from './backup-database.mjs'
@@ -121,7 +124,7 @@ async function canonical(target) {
  * `from` is the folder the artifact was unzipped into. `into` is where the
  * records are written. Returns what was found, so a caller can print it.
  */
-export async function restore(from, into, passphrase) {
+export async function restore(from, into, passphrase, { force = false } = {}) {
   if (!passphrase) {
     throw new Error('Set BACKUP_PASSPHRASE to the passphrase this backup was locked with.')
   }
@@ -184,6 +187,21 @@ export async function restore(from, into, passphrase) {
     )
   }
 
+  // AND IT DOES NOT EMPTY A FOLDER SOMEBODY IS USING. The AI review, and the
+  // same family as the fault above: the guard stops it destroying the backup,
+  // and said nothing about the operator's own files. Pointing this at a folder
+  // with anything else in it would have taken that too, silently. An empty
+  // folder, or one that does not exist yet, is the ordinary case and needs no
+  // ceremony; anything else has to be said out loud with --force.
+  let occupants = []
+  try { occupants = await readdir(dest) } catch { /* not there, which is fine */ }
+  if (occupants.length && !force) {
+    throw new Error(
+      `${dest} is not empty, and everything in it would be deleted. Choose an empty folder, or add --force ` +
+      'if you are certain there is nothing in there you want.',
+    )
+  }
+
   await rm(dest, { recursive: true, force: true })
   await mkdir(dest, { recursive: true })
 
@@ -200,13 +218,15 @@ export async function restore(from, into, passphrase) {
 
 /* c8 ignore start */
 if (process.argv[1] && process.argv[1].endsWith('restore-database.mjs')) {
-  const from = process.argv[2]
-  const into = process.argv[3] || path.join(from || '.', 'restored')
+  const args = process.argv.slice(2)
+  const force = args.includes('--force')
+  const [from, given] = args.filter((a) => a !== '--force')
+  const into = given || path.join(from || '.', 'restored')
   if (!from) {
-    console.error('Usage: BACKUP_PASSPHRASE=... node scripts/restore-database.mjs <downloaded-artifact-folder> [where-to-put-it]')
+    console.error('Usage: BACKUP_PASSPHRASE=... node scripts/restore-database.mjs <downloaded-artifact-folder> [where-to-put-it] [--force]')
     process.exit(1)
   }
-  restore(from, into, process.env.BACKUP_PASSPHRASE)
+  restore(from, into, process.env.BACKUP_PASSPHRASE, { force })
     .then(({ tables, rows, into: where }) => {
       console.log(`Opened and read back: ${tables} tables, ${rows} rows, written to ${where}`)
       console.log('Nothing has been written to any database. That is a separate decision.')
