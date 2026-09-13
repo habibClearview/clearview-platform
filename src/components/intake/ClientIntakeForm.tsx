@@ -337,7 +337,9 @@ function ClientIntakeFormInner({intakeToken}:{intakeToken:string}) {
       try {
         await fetch('/api/client-welcome', {
           method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ clientId: client.id }),
+          // The link they arrived on is what says they may ask for this. The
+          // route refuses without it. 13 September 2026.
+          body: JSON.stringify({ clientId: client.id, intakeToken }),
         })
       } catch { /* the model is made either way */ }
 

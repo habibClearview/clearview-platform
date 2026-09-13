@@ -1720,6 +1720,19 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   const [error,setError]=useState(null)
   const [view,setView]=useState(()=>isSuperCoach?'overview':isClient?'client':'clients')
   const [selClientId,setSelClientId]=useState(null)
+  // A PHONE IS NOT A NARROW DESKTOP. 10 September 2026. Twenty five tabs in a
+  // column beside the work is right on a laptop and unusable on a phone, where
+  // it is either 170 pixels of work or twenty five rows to scroll past before
+  // reaching any. On a phone the same tabs become one control.
+  //
+  // IT LIVES HERE AND NOT IN ClientDetailView. 13 September 2026. It was called
+  // inside that component, which returns early when the client has not been
+  // found and again while a canvas engagement is loading. A hook after an early
+  // return is called on some renders and not others, which is the one thing
+  // React cannot survive: the hooks are matched up by order, so the moment one
+  // is skipped every hook after it is handed the wrong state. The repository's
+  // own React hooks gate had been failing on this, and I had not looked.
+  const onAPhone=useNarrowScreen()
   const [selProgId,setSelProgId]=useState(null)
   const [showDeleteConfirm,setShowDeleteConfirm]=useState(false)
   const [showEditClient,setShowEditClient]=useState(false)
@@ -2441,11 +2454,6 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     // setup, session planning, the diagnostic (teamOnly). The organisation
     // being coached answers no to both.
     const mayRun=canRunTheEngagement(previewRoleId)
-    // A PHONE IS NOT A NARROW DESKTOP. 10 September 2026. Twenty five tabs in a
-    // column beside the work is right on a laptop and unusable on a phone,
-    // where it is either 170 pixels of work or twenty five rows to scroll past
-    // before reaching any. On a phone the same tabs become one control.
-    const onAPhone=useNarrowScreen()
     const visibleTabs=isCanvas
       ? CANVAS_TABS.filter(t=>(!t.coachOnly||canViewCoachGuidance(previewRoleId))&&(!t.teamOnly||mayRun))
       : []

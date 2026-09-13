@@ -12,6 +12,7 @@
 // An enquiry carries a message, which is not list data. It is emailed to
 // Habib and never written to Kit.
 // ============================================================
+// ROUTE-AUTH-EXEMPT: the public mailing list and enquiry forms. A website visitor has no login to check. Rate limited; the source tag is checked against a fixed list rather than trusted.
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { checkRateLimit, clientIp } from '@/lib/rate-limit'

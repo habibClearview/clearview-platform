@@ -150,3 +150,56 @@ describe('where it is sent from', () => {
     }
   })
 })
+
+// ============================================================
+// THE GATE THAT CAUGHT THIS ONE. 13 September 2026.
+//
+// The first version took a client id and nothing else, and leaned on the
+// letter being fixed text sent to an address read off the record. True, and
+// not enough. The repository's own route-auth gate exists exactly to catch a
+// service-role route with no caller check, it caught this one, and it was
+// right: anybody on the internet could have made the platform post a letter to
+// a client of ours, and could have learned which client ids exist by watching
+// which ones answered differently.
+// ============================================================
+describe('who may ask for the letter', () => {
+  it('accepts the intake link the person actually arrived on', () => {
+    expect(ROUTE).toContain("from('client_intake_links')")
+    expect(ROUTE).toContain("eq('token', intakeToken)")
+  })
+
+  it('refuses an intake token that belongs to a different engagement', () => {
+    expect(ROUTE).toContain('!link.client_id || link.client_id === clientId')
+  })
+
+  it('refuses an expired one', () => {
+    expect(ROUTE).toContain('Date.parse(link.expires_at) > Date.now()')
+  })
+
+  it('otherwise takes a signed-in member of the coaching team', () => {
+    expect(ROUTE).toContain("requireAccess(req, admin, clientId, 'manage'")
+  })
+
+  it('refuses everybody else', () => {
+    expect(ROUTE).toContain('This letter can only be asked for from the intake link, or by the coaching team.')
+  })
+
+  it('rate limits before either check, so neither can be knocked on in turn', () => {
+    const rl = ROUTE.indexOf('checkRateLimit')
+    expect(rl).toBeGreaterThan(-1)
+    expect(rl).toBeLessThan(ROUTE.indexOf('const intakeToken'))
+    expect(rl).toBeLessThan(ROUTE.indexOf('requireAccess('))
+  })
+
+  it('passes the repository own route-auth gate rather than being excused from it', () => {
+    expect(ROUTE).not.toContain('ROUTE-AUTH-EXEMPT')
+  })
+
+  it('is actually sent what it now demands, from both callers', () => {
+    // Tightening the route without tightening its callers would have left the
+    // letter silently refused rather than sent.
+    expect(FORM).toContain('clientId: client.id, intakeToken')
+    expect(SHEET).toContain('clientId, intakeToken')
+    expect(SHEET).toContain('Authorization: `Bearer ${session.access_token}`')
+  })
+})

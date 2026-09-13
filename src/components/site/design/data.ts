@@ -42,22 +42,11 @@ export const AUDIENCES = [
 ];
 
 
-async function kitSubscribe(form, payload) {
-  const id = KIT.forms[form];
-  if (!id) return { ok: false, skipped: true };
-  const fd = new FormData();
-  fd.append('email_address', payload.email);
-  if (payload.firstName) fd.append('first_name', payload.firstName);
-  if (payload.band) fd.append('fields[' + KIT.fields.band + ']', payload.band);
-  if (payload.score != null) fd.append('fields[' + KIT.fields.score + ']', String(payload.score));
-  if (payload.organisation) fd.append('fields[' + KIT.fields.org + ']', payload.organisation);
-  if (payload.interest) fd.append('fields[' + KIT.fields.interest + ']', payload.interest);
-  fd.append('fields[' + KIT.fields.source + ']', payload.source || 'website');
-  try {
-    await fetch('https://app.kit.com/forms/' + id + '/subscriptions', { method: 'POST', body: fd, mode: 'no-cors' });
-    return { ok: true };
-  } catch (e) { return { ok: false, error: true }; }
-}
+// kitSubscribe used to sit here. It read a KIT constant that does not exist in
+// this file or anywhere else, so it would have thrown on its first line, and
+// nothing called it. Removed 13 September 2026 rather than left as code that
+// looks like a working mailing list sign up. The repository's own lint gate had
+// been reporting it since 4 September.
 
 export const SERVICES = [
   {

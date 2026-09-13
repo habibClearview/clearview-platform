@@ -175,9 +175,16 @@ export default function SpreadsheetUpload({intakeToken,programmeId,existingClien
       // sends once per client and refuses afterwards, so loading a sheet into
       // a client who already has their letter changes nothing.
       try {
+        // Two ways this screen is reached and the route accepts either: an
+        // anonymous intake link, or a signed-in coach. 13 September 2026.
+        const { data: { session } } = await supabase.auth.getSession()
         await fetch('/api/client-welcome', {
-          method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ clientId }),
+          method: 'POST',
+          headers: {
+            'Content-Type':'application/json',
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          },
+          body: JSON.stringify({ clientId, intakeToken }),
         })
       } catch { /* the model is saved either way */ }
 

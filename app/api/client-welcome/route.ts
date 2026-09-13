@@ -20,19 +20,34 @@
 // Telling somebody to sign in when they cannot is worse than telling them
 // nothing.
 //
-// WHY AN UNAUTHENTICATED CALLER IS SAFE HERE. The intake form is a public page
-// and the person filling it in is, by definition, not signed in. So this route
-// takes a client id and nothing else. The address is read from the client
-// record, never from the request, so the caller cannot aim the letter
-// anywhere. The wording is fixed, so the caller cannot put words in it. It
-// sends once per client and refuses afterwards, so it cannot be used to post
-// the same letter at somebody repeatedly, and it is rate limited on top.
+// WHO MAY ASK FOR IT. The intake form is a public page and the person filling
+// it in is, by definition, not signed in, so this cannot require a login. What
+// it requires instead is the intake link they arrived on: a token the coach
+// generated and sent to them, which names the client it belongs to.
+//
+// The first version of this took a client id and nothing else, and leaned on
+// the letter being fixed text sent to an address read off the record. That is
+// true and it is not enough. The repository's own route-auth gate exists
+// exactly to catch a service-role route with no caller check, it caught this
+// one, and it was right: anybody on the internet could have made the platform
+// post a letter to a client of ours, and could have learned which client ids
+// exist by watching which ones answered.
+//
+// So there are two ways in and no third. A signed-in member of the coaching
+// team who may manage that engagement, which is the coach loading a
+// spreadsheet. Or an unexpired intake token for that same client, which is the
+// business filling the form in. Everything else is refused.
+//
+// The older protections all stay on top: the address is read from the client
+// record and never from the request, the wording is fixed in this file, it
+// sends once per client and refuses afterwards, and it is rate limited.
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail, emailAvailable, brandedEmail, escapeHtml, raw } from '@/lib/email'
 import { cleanEmail, emailLooksSendable, salutation } from '@/lib/engagement-brief'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { requireAccess } from '@/lib/auth/api-authz'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,9 +66,38 @@ export async function POST(req: NextRequest) {
 
     const admin = getAdminClient()
 
+    // Rate limited before either check, so neither can be used to knock on
+    // every client id in turn and see which ones answer differently.
     const rl = await checkRateLimit(admin, `client-welcome:${clientId}`, 3, 3600)
     if (!rl.allowed) {
       return NextResponse.json({ error: 'That letter has been asked for too many times recently.' }, { status: 429 })
+    }
+
+    const intakeToken = String(body.intakeToken || '')
+    let allowed = false
+
+    if (intakeToken) {
+      // The link the coach generated and sent. It names its own client, so a
+      // token for one engagement cannot ask for another one's letter.
+      const { data: link } = await admin.from('client_intake_links')
+        .select('client_id,expires_at').eq('token', intakeToken).maybeSingle()
+      const live = link && (!link.expires_at || Date.parse(link.expires_at) > Date.now())
+      // A standalone link carries no client until the form creates one, so it
+      // is accepted for the client it just made as well as for its own.
+      if (live && (!link.client_id || link.client_id === clientId)) allowed = true
+    }
+
+    if (!allowed) {
+      // The other way in: a signed-in member of the coaching team, which is
+      // the coach loading a spreadsheet for a client they already manage.
+      const access = await requireAccess(req, admin, clientId, 'manage', {
+        deniedMessage: 'Only the coaching team can send this letter',
+      })
+      if (!access.ok) {
+        return NextResponse.json({
+          error: 'This letter can only be asked for from the intake link, or by the coaching team.',
+        }, { status: 403 })
+      }
     }
 
     const { data: client } = await admin.from('engagement_clients')

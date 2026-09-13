@@ -21,6 +21,7 @@
 // an address a stranger types, which is the shape of thing that gets used to
 // send mail to somebody else. Both limits are deliberately low.
 // ============================================================
+// ROUTE-AUTH-EXEMPT: the ten questions on the public website. The person answering has never heard of us and has no login to check. Rate limited per address and per caller; writes only the answerer own row.
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { checkRateLimit, clientIp } from '@/lib/rate-limit'

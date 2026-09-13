@@ -35,6 +35,25 @@ ROOT = Path("app/api")
 # looked at, which is the failure mode a gate exists to prevent.
 SERVICE_CLIENT = re.compile(r"SUPABASE_SERVICE_ROLE_KEY|getFieldSupabase|getAdminClient")
 
+# A NARROW, STATED EXCEPTION. 13 September 2026.
+#
+# Two routes on this platform serve people who cannot possibly be signed in: a
+# stranger on the public website answering ten questions, and a visitor joining
+# the mailing list. There is no caller to authenticate, so this gate could
+# never go green, and it had been failing since 4 September. A gate that is
+# always red is not a gate, it is a thing people learn to scroll past, and the
+# next genuine hole would have scrolled past with it.
+#
+# So a route may declare itself public, in one line, saying why. The exemption
+# is deliberately awkward: an exact marker, on its own, with a reason after it,
+# and every exempt route is printed on every run so the list stays visible and
+# has to be argued for rather than accumulated.
+#
+# It exempts a route from THIS check only. Rate limiting, input validation and
+# writing nothing outside the caller's own row are still required, and are
+# still the reviewer's job to confirm.
+PUBLIC_BY_DESIGN = re.compile(r"^//\s*ROUTE-AUTH-EXEMPT:\s*(\S.*)$", re.MULTILINE)
+
 # Recognised ways a route authenticates/authorizes the caller:
 #   getUser (Supabase JWT) · requesterCanViewClient / resolveFieldAdminActor
 #   (role+tenant helpers) · validateFieldToken (field operator token) ·
@@ -97,10 +116,28 @@ def main() -> int:
         return 0
 
     offenders = []
+    exempt = []
     for path in sorted(ROOT.rglob("route.ts")):
-        code = strip_comments_and_strings(path.read_text(encoding="utf-8"))
-        if SERVICE_CLIENT.search(code) and not AUTH.search(code):
-            offenders.append(str(path))
+        raw = path.read_text(encoding="utf-8")
+        code = strip_comments_and_strings(raw)
+        if not SERVICE_CLIENT.search(code):
+            continue
+        if AUTH.search(code):
+            continue
+        claim = PUBLIC_BY_DESIGN.search(raw)
+        if claim:
+            exempt.append((str(path), claim.group(1).strip()))
+            continue
+        offenders.append(str(path))
+
+    # Named every run, never silent. A gate that has been red for a fortnight
+    # is a gate everybody has learned to scroll past, and an exemption nobody
+    # ever reads again is the same thing more quietly.
+    if exempt:
+        print("Deliberately public service-role routes, each with its stated reason:")
+        for f, why in exempt:
+            print(f"  - {f}: {why}")
+        print("")
 
     if offenders:
         print("::error::Service-role API route(s) with NO authentication marker found.")

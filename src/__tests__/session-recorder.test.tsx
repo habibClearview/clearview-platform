@@ -198,7 +198,7 @@ describe('the recording is taken raw, not through the call processing', () => {
     // silence, which is the failure that recorded a whole session of nothing.
     render(<SessionRecorder clientId="c1" sessionId="s1" canManage clientName="Test" />)
     await tick(100)
-    const audio = started[0].audio as MediaTrackConstraints
+    const audio = started[0].audio as Record<string, unknown>
     expect(audio.echoCancellation).toBe(false)
     expect(audio.noiseSuppression).toBe(false)
     expect(audio.autoGainControl).toBe(false)
