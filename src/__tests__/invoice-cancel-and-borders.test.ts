@@ -44,6 +44,15 @@ describe('an issued invoice can be withdrawn', () => {
     expect(remove.slice(0, 900)).toContain('window.confirm(')
   })
 
+  it('the database decides, not a screen that may be out of date', () => {
+    // CodeRabbit on #262: the status check reads whatever this browser last
+    // loaded, so an invoice marked paid in another session could still be
+    // cancelled or deleted here.
+    expect(TEAM).toContain(".eq('id',inv.id).neq('status','paid').select('id')")
+    expect(TEAM).toContain(".eq('id',inv.id).in('status',['draft','cancelled']).select('id')")
+    expect(TEAM).toContain('It has been marked paid since this page was loaded.')
+  })
+
   it('cancelling puts back every advance the invoice retired', () => {
     // Issuing retires the open advances against the invoice. Undoing one
     // without the other is how money quietly goes missing.

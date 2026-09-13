@@ -833,9 +833,16 @@ td,th{padding:.5rem .6rem;border-bottom:1px solid #ddd} .tot{font-weight:700;fon
     if(inv.status==='paid')return setMsg('That invoice is already marked paid. It cannot be cancelled here.')
     if(typeof window!=='undefined'&&!window.confirm(`Cancel invoice ${inv.invoice_number}?\n\nIt stops counting as money owed, and any advance it netted off goes back to open. The record stays in the history.`))return
     setBusy(true)
+    // The status is checked again by the database, not only by the screen.
+    // CodeRabbit on #262: the check above reads whatever this browser last
+    // loaded, so an invoice marked paid in another session could still be
+    // cancelled here. The write itself refuses a paid one, and coming back
+    // with no row is how we know that happened.
     const patch={status:'cancelled',cancelled_at:new Date().toISOString()}
-    const {error}=await supabase.from('coach_invoices').update(patch).eq('id',inv.id)
+    const {data:changed,error}=await supabase.from('coach_invoices').update(patch)
+      .eq('id',inv.id).neq('status','paid').select('id')
     if(error){setBusy(false);return setMsg('Could not cancel that invoice: '+error.message)}
+    if(!changed||changed.length===0){setBusy(false);return setMsg('That invoice was not cancelled. It has been marked paid since this page was loaded.')}
     const {data:putBack,error:advErr}=await supabase.from('coach_advances')
       .update({reconciled:false,reconciled_at:null,applied_invoice_id:null})
       .eq('applied_invoice_id',inv.id).select('id')
@@ -855,8 +862,12 @@ td,th{padding:.5rem .6rem;border-bottom:1px solid #ddd} .tot{font-weight:700;fon
     if(inv.status!=='cancelled'&&inv.status!=='draft')return setMsg('Cancel that invoice first, then it can be removed.')
     if(typeof window!=='undefined'&&!window.confirm(`Remove invoice ${inv.invoice_number} from the account permanently?\n\nThis cannot be undone.`))return
     setBusy(true)
-    const {error}=await supabase.from('coach_invoices').delete().eq('id',inv.id)
+    // Same rule: the database decides, so an invoice that became live in
+    // another session cannot be deleted by a stale screen.
+    const {data:gone,error}=await supabase.from('coach_invoices').delete()
+      .eq('id',inv.id).in('status',['draft','cancelled']).select('id')
     if(error){setBusy(false);return setMsg('Could not remove that invoice: '+error.message)}
+    if(!gone||gone.length===0){setBusy(false);return setMsg('That invoice was not removed. It is no longer cancelled, so something changed it since this page was loaded.')}
     setInvoices(prev=>prev.filter(i=>i.id!==inv.id))
     setBusy(false);setMsg(`Invoice ${inv.invoice_number} removed.`)
   }

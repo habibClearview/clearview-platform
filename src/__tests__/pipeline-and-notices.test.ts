@@ -151,6 +151,20 @@ describe('the notices on My Business can be set aside, and it is stored in the d
     expect(body).not.toContain('sessionStorage')
   })
 
+  it('two presses on one notice cannot race each other', () => {
+    // Set aside and Bring it back wrote independently, so the two could commit
+    // out of order and leave the record older than the screen. CodeRabbit
+    // on #262.
+    expect(DASH).toContain('if(noticeBusy[key])return')
+    expect(DASH).toContain('disabled={!!noticeBusy[NOTICE_NEW_SUBMISSIONS]}')
+    expect(DASH).toContain('disabled={!!noticeBusy[NOTICE_TIMESHEETS_AWAITING]}')
+  })
+
+  it('the first load never lands on top of a press made while it was loading', () => {
+    expect(DASH).toContain('noticeTouched.current.add(key)')
+    expect(DASH).toContain('if(!noticeTouched.current.has(r.notice_key))')
+  })
+
   it('a failed write puts the screen back rather than showing it as set aside', () => {
     const start = DASH.indexOf('async function setNoticeAside')
     const body = DASH.slice(start, start + 900)

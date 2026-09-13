@@ -149,38 +149,55 @@ async function signInForCoImplementer(
     console.error('co-implementer-welcome: could not make the sign-in link', e)
     return { ok: false, why: 'their sign-in link could not be made, so nothing was sent' }
   }
-  if (linked.userId) {
-    const { data: already, error: lookErr } = await admin
-      .from('user_profiles').select('id').eq('id', linked.userId).maybeSingle()
-    // A lookup that failed is not proof there is no profile. Writing one on a
-    // failed read could overwrite a live account's scope, so it stops instead.
-    if (lookErr) {
-      console.error('co-implementer-welcome: could not check the account', lookErr)
-      return { ok: false, why: 'their account could not be checked, so nothing was sent' }
+  // A LINK WITH NOBODY BEHIND IT IS NOT A WAY IN. CodeRabbit on #262: where
+  // no user id came back, the profile step was skipped and the letter still
+  // went, so the person could sign in scoped to nothing and see an empty
+  // dashboard. There is nothing to attach a role to, so nothing is sent.
+  if (!linked.userId) {
+    console.error('co-implementer-welcome: no user id came back for the sign-in link')
+    return { ok: false, why: 'their account could not be set up, so nothing was sent' }
+  }
+
+  const { data: already, error: lookErr } = await admin
+    .from('user_profiles').select('id').eq('id', linked.userId).maybeSingle()
+  // A lookup that failed is not proof there is no profile. Writing one on a
+  // failed read could overwrite a live account's scope, so it stops instead.
+  if (lookErr) {
+    console.error('co-implementer-welcome: could not check the account', lookErr)
+    return { ok: false, why: 'their account could not be checked, so nothing was sent' }
+  }
+  if (!already) {
+    const profileRow: Record<string, unknown> = {
+      id: linked.userId,
+      role: 'coach',
+      full_name: (ci.name as string) || null,
+      email: to,
+      engagement_client_id: null,
+      assigned_unit_ids: [],
+      co_implementer_id: ci.id,
+      funder_programme_id: null,
     }
-    if (!already) {
-      const profileRow: Record<string, unknown> = {
-        id: linked.userId,
-        role: 'coach',
-        full_name: (ci.name as string) || null,
-        email: to,
-        engagement_client_id: null,
-        assigned_unit_ids: [],
-        co_implementer_id: ci.id,
-        funder_programme_id: null,
-      }
-      // 'invited' is the accurate status for somebody who has not signed in
-      // yet. Where the older CHECK constraint still rejects it (migration
-      // 2026_07_22_user_profiles_allow_invited_status.sql not applied), the
-      // column takes its own default rather than a made-up stand-in.
-      let { error } = await admin.from('user_profiles').upsert({ ...profileRow, status: 'invited' })
-      if (error && error.code === '23514' && /status/i.test(error.message || '')) {
-        ;({ error } = await admin.from('user_profiles').upsert(profileRow))
-      }
-      if (error) {
-        console.error('co-implementer-welcome: could not create the profile', error)
-        return { ok: false, why: 'their login could not be set up, so nothing was sent' }
-      }
+    // INSERT, NEVER UPSERT. CodeRabbit on #262, rated critical, and it is
+    // right. The check above and this write are two steps. If anything creates
+    // the profile in between, an upsert REPLACES it, so a real account's role
+    // and scope would be overwritten with this co-implementer's. An insert
+    // cannot do that: the duplicate key is refused, which means somebody else
+    // wrote the profile first, and the rule everywhere on this route is that
+    // an existing profile is left exactly as it is.
+    //
+    // 'invited' is the accurate status for somebody who has not signed in yet.
+    // Where the older CHECK constraint still rejects it (migration
+    // 2026_07_22_user_profiles_allow_invited_status.sql not applied), the
+    // column takes its own default rather than a made-up stand-in. The
+    // fallback is an insert too, for the same reason.
+    const alreadyThere = (e: { code?: string } | null) => e?.code === '23505'
+    let { error } = await admin.from('user_profiles').insert({ ...profileRow, status: 'invited' })
+    if (error && error.code === '23514' && /status/i.test(error.message || '')) {
+      ;({ error } = await admin.from('user_profiles').insert(profileRow))
+    }
+    if (error && !alreadyThere(error)) {
+      console.error('co-implementer-welcome: could not create the profile', error)
+      return { ok: false, why: 'their login could not be set up, so nothing was sent' }
     }
   }
   return { ok: true, url: scannerSafeSignIn(linked.link, base) }
@@ -399,13 +416,19 @@ export async function POST(req: NextRequest) {
     // that stops working.
     let claimed = false
     const claimedAt = new Date().toISOString()
-    // A deliberate resend is not racing anybody for the one send, so it writes
-    // the new date outright. Everything else still has to win the claim.
+    // A RESEND IS CLAIMED TOO. CodeRabbit on #262: writing the new date
+    // outright meant two resends landing together both won and both sent, so a
+    // double press put two letters with two different one-time links through
+    // somebody's door. A resend now claims against the exact date it read, so
+    // only one of them can win, the same way a first send claims against null.
     const claimQuery = admin.from('co_implementers')
       .update({ welcome_sent_at: claimedAt })
       .eq('id', ci.id)
-    const { data: claim, error: claimErr } = await (resend ? claimQuery : claimQuery.is('welcome_sent_at', null))
-      .select('id')
+    const { data: claim, error: claimErr } = await (
+      resend && typeof alreadyAt === 'string' && alreadyAt
+        ? claimQuery.eq('welcome_sent_at', alreadyAt)
+        : claimQuery.is('welcome_sent_at', null)
+    ).select('id')
 
     if (claimErr) {
       // ONLY THE MISSING COLUMN IS FORGIVEN. The AI review: falling through on

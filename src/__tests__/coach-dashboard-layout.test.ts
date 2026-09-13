@@ -310,6 +310,23 @@ describe('the welcome letter to a co-implementer', () => {
     expect(APPURL).toContain("/welcome#to=")
   })
 
+  it('nothing is sent when no account came back to attach a role to', () => {
+    expect(LETTER).toContain('if (!linked.userId) {')
+  })
+
+  it('the profile is inserted, never upserted, so a live account cannot be overwritten', () => {
+    // CodeRabbit on #262, rated critical: the existence check and the write
+    // are two steps, and an upsert between them replaces a real account's role
+    // and scope with this co-implementer's.
+    expect(LETTER).toContain("from('user_profiles').insert({ ...profileRow, status: 'invited' })")
+    expect(LETTER).not.toContain("from('user_profiles').upsert")
+    expect(LETTER).toContain("e?.code === '23505'")
+  })
+
+  it('a resend is claimed against the date it read, so two presses cannot both send', () => {
+    expect(LETTER).toContain("claimQuery.eq('welcome_sent_at', alreadyAt)")
+  })
+
   it('a link without a profile is a door into an empty room, so the profile is made too', () => {
     expect(LETTER).toContain("role: 'coach'")
     expect(LETTER).toContain('co_implementer_id: ci.id')
