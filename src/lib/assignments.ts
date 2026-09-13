@@ -163,6 +163,8 @@ export interface PayerLine {
   payer: string
   assignments: number
   organisationsServed: number
+  /** What was agreed, whatever its state. The figure Habib reads first. */
+  fee: CurrencyAmount[]
   collected: CurrencyAmount[]
   invoicedNotPaid: CurrencyAmount[]
   awaitingIssue: CurrencyAmount[]
@@ -185,12 +187,13 @@ export function moneyByPayer(
       byPayer.set(payerId, {
         payerId: rowId, payer: payerName(rowId) || rowId,
         assignments: 0, organisationsServed: 0,
-        collected: [], invoicedNotPaid: [], awaitingIssue: [],
+        fee: [], collected: [], invoicedNotPaid: [], awaitingIssue: [],
       })
       orgsByPayer.set(payerId, new Set())
     }
     const line = byPayer.get(payerId) as PayerLine
     line.assignments++
+    addAmount(line.fee, a.fee_currency || null, money(a))
     addAmount(line.collected, a.fee_currency || null, collectedInPeriod(a, periodType, now))
     if (a.fee_status === 'invoiced') addAmount(line.invoicedNotPaid, a.fee_currency || null, money(a))
     if (a.fee_status === 'unpaid') addAmount(line.awaitingIssue, a.fee_currency || null, money(a))
@@ -198,6 +201,7 @@ export function moneyByPayer(
   }
   byPayer.forEach((line, payerId) => {
     line.organisationsServed = (orgsByPayer.get(payerId) as Set<string>).size
+    line.fee = tidy(line.fee)
     line.collected = tidy(line.collected)
     line.invoicedNotPaid = tidy(line.invoicedNotPaid)
     line.awaitingIssue = tidy(line.awaitingIssue)
@@ -212,6 +216,15 @@ export interface ServiceLine {
    *  Smart Jobs, however many pieces of paper that took. */
   payingClients: number
   assignments: number
+  /** THE FEE AGREED FOR THIS SERVICE, WHICH IS THE MONEY HE MEANS.
+   *  14 September 2026. Habib: "How can you have 1 advisory and 0 USD?" The
+   *  figure shown was cash collected inside the period, and a fee that has
+   *  been agreed but not yet invoiced has collected nothing, so a real £5,000
+   *  piece of work printed as zero next to the client who bought it. The fee
+   *  is what the service is worth; whether it has been invoiced or paid is
+   *  the Finance section's job to say. Only from assignments covering this
+   *  one service, because a fee covering several is never divided. */
+  fee: CurrencyAmount[]
   ownRevenue: CurrencyAmount[]
 }
 export interface ServiceSplit {
@@ -219,7 +232,11 @@ export interface ServiceSplit {
   /** Money on assignments covering more than one service. Shown on its own
    *  line rather than divided between them. */
   combinedRevenue: CurrencyAmount[]
+  combinedFee: CurrencyAmount[]
   combinedAssignments: number
+  /** Every fee on every assignment, whatever its state. */
+  totalFee: CurrencyAmount[]
+  /** Cash actually collected inside the period. */
   total: CurrencyAmount[]
 }
 /**
@@ -247,19 +264,22 @@ export function moneyByService(
   const payersOf = new Map<string, Set<string>>()
   const line = (s: string) => {
     if (!counts.has(s)) {
-      counts.set(s, { service: s, payingClients: 0, assignments: 0, ownRevenue: [] })
+      counts.set(s, { service: s, payingClients: 0, assignments: 0, fee: [], ownRevenue: [] })
       payersOf.set(s, new Set())
     }
     return counts.get(s) as ServiceLine
   }
   serviceOrder.forEach(s => line(s))
   const combinedRevenue: CurrencyAmount[] = []
+  const combinedFee: CurrencyAmount[] = []
   let combinedAssignments = 0
   const total: CurrencyAmount[] = []
+  const totalFee: CurrencyAmount[] = []
   for (const a of assignments) {
     const services = servicesOf(a)
     const collected = collectedInPeriod(a, periodType, now)
     addAmount(total, a.fee_currency || null, collected)
+    addAmount(totalFee, a.fee_currency || null, money(a))
     const payer = payerIdOf(a)
     for (const s of services) {
       line(s).assignments++
@@ -267,9 +287,11 @@ export function moneyByService(
     }
     if (services.length === 1) {
       addAmount(line(services[0]).ownRevenue, a.fee_currency || null, collected)
+      addAmount(line(services[0]).fee, a.fee_currency || null, money(a))
     } else if (services.length > 1) {
       combinedAssignments++
       addAmount(combinedRevenue, a.fee_currency || null, collected)
+      addAmount(combinedFee, a.fee_currency || null, money(a))
     }
     // An assignment with no service recorded contributes its money to the
     // total and to nothing else, which is exactly what is known about it.
@@ -277,11 +299,14 @@ export function moneyByService(
   counts.forEach((l, s) => {
     l.payingClients = (payersOf.get(s) as Set<string>).size
     l.ownRevenue = tidy(l.ownRevenue)
+    l.fee = tidy(l.fee)
   })
   return {
     services: Array.from(counts.values()),
     combinedRevenue: tidy(combinedRevenue),
+    combinedFee: tidy(combinedFee),
     combinedAssignments,
+    totalFee: tidy(totalFee),
     total: tidy(total),
   }
 }

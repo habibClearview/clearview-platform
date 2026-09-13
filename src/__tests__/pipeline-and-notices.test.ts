@@ -338,6 +338,27 @@ describe('My Business counts payers, assignments and organisations apart', () =>
     expect(DASH).toContain('moneyByService(assignments,period,now,undefined,payerName)')
   })
 
+  // Habib: "How can you have 1 advisory and 0 USD... but look at the finance
+  // section?" The tile showed cash collected in the period, and a fee agreed
+  // but not yet invoiced has collected nothing.
+  it('a service tile shows the fee agreed, not only what has cleared', () => {
+    expect(DASH).toContain('rev={fmtAmounts(l.fee,feeCur)}')
+    expect(DASH).toContain('Whether that fee has been invoiced or paid is in Finance below')
+  })
+
+  it('the paying clients table leads with what was agreed', () => {
+    expect(DASH).toContain('fmtAmounts(l.fee,feeCur)')
+    expect(DASH).toContain("'Agreed','Collected'")
+    expect(DASH).not.toContain('label="Money by paying client"')
+  })
+
+  // Habib: "Go to Client tab and advisory is 0."
+  it('the Clients tab reads the same assignments My Business reads', () => {
+    expect(DASH).toContain('const assignmentsHere=[...recordedHere,...dealsHere]')
+    expect(DASH).toContain('assignmentsHere.filter(a=>servicesOf(a).includes(key))')
+    expect(DASH).toContain('servedFromProgrammes(dealsHere,clients)')
+  })
+
   // Habib: "There should be nothing in pipeline because I have not added
   // anything to the pipeline since the 2 I won and is currently running."
   it('the Pipeline panel on My Business shows only what is still being chased', () => {
