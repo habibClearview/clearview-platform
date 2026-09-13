@@ -601,37 +601,34 @@ export function clientCountForProgramme(programmeId: string, clients: { programm
   return clients.filter(c => c.programme_id === programmeId).length
 }
 
-export interface PipelineSplit<P> { open: P[]; wonAwaitingSetup: P[]; notTakenForward: P[] }
+export interface PipelineSplit<P> { open: P[]; notTakenForward: P[] }
 /**
- * The pipeline, in the three states a deal can actually be in before it
- * becomes a client.
+ * The pipeline, which is only ever the deals still being chased.
  *
- * A WON DEAL LEAVES THE PIPELINE THE MOMENT IT IS WON. 14 September 2026.
- * Habib: when a pipeline client status is won it should move straight out
- * of the pipeline even if it is labelled as not set up yet. It used to
- * stay in the open list until somebody created the client record, so a
- * deal that was already closed sat among the ones still being chased and
- * the count on the Pipeline tab described a different set of deals from
- * the list underneath it.
+ * A PROGRAMME IS NOT A DEAL UNTIL SOMEBODY SAYS IT IS. 14 September 2026.
+ * Habib: "Pipeline tab still have numbers even though I already told you that
+ * when a proposal is won it should move to Client, there should be nothing in
+ * pipeline as we don't have anything in pipeline at the moment."
  *
- * Won deals are not hidden, which would lose the only route to setting the
- * client up. They move to their own short list, and they leave that list
- * too as soon as a client is attached. Deals not taken forward keep a home
- * of their own for the same reason: a deal marked lost by mistake has to
- * be reachable to be put back.
+ * Two faults put numbers there. A deal with no stage recorded was treated as
+ * open, so Climate Smart Jobs and Tanager -- payers that were never prospects
+ * and have no stage on them at all -- were counted as deals being chased. And
+ * a won deal was kept in a list of its own until somebody created a client,
+ * so winning did not take it off the screen.
  *
- * A deal with no stage recorded yet is open -- that is what the stage
- * selector shows it as, and a count must never describe a deal
- * differently from the row next to it.
+ * Both are gone. A programme reaches the pipeline only when it carries a deal
+ * stage, which is something a person set on purpose, and it leaves the moment
+ * it is won. Won deals are not lost: winning is what creates the assignment
+ * and its fee, which is where the money now lives.
  */
 export function splitPipeline<P extends { id: string; deal_stage?: string | null }>(
   programmes: P[], clients: { programme_id?: string | null }[],
 ): PipelineSplit<P> {
   const waiting = programmes.filter(p => clientCountForProgramme(p.id, clients) === 0)
+  const staged = waiting.filter(p => !!p.deal_stage)
   return {
-    open: waiting.filter(p => p.deal_stage !== 'won' && p.deal_stage !== 'lost'),
-    wonAwaitingSetup: waiting.filter(p => p.deal_stage === 'won'),
-    notTakenForward: waiting.filter(p => p.deal_stage === 'lost'),
+    open: staged.filter(p => p.deal_stage !== 'won' && p.deal_stage !== 'lost'),
+    notTakenForward: staged.filter(p => p.deal_stage === 'lost'),
   }
 }
 

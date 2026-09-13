@@ -17,6 +17,7 @@ import { describe, it, expect } from 'vitest'
 import {
   practiceShape, moneyByPayer, moneyByService, assignmentMoney,
   monthlyAssignmentRevenue, servicesOf, payerIdOf, servedIdsOf, assignmentLabel,
+  assignmentsFromDeals, servedFromProgrammes, dealAssignmentId,
   type Assignment, type AssignmentServed,
 } from '@/lib/assignments'
 
@@ -211,5 +212,64 @@ describe('reading an assignment however it was written', () => {
     expect(assignmentLabel({ id: 'x', service_types: ['advisory', 'financial'] }, labels))
       .toBe('Advisory + Clearview Financial Model')
     expect(assignmentLabel({ id: 'x' })).toBe('Assignment')
+  })
+})
+
+// THE FIGURES WERE ALWAYS THERE, ON THE PIPELINE. 14 September 2026. Habib
+// entered his fees as deal values on the programmes, and nothing on the
+// platform ever read that table for money, so every screen showed nothing and
+// asked him to type it all again.
+describe('a Pipeline deal read as the assignment it already is', () => {
+  const deals = [
+    { id: 'csj', name: 'Climate Smart Jobs', deal_stage: 'won', deal_value: 30_000, deal_currency: 'USD', deal_services: ['advisory', 'financial'] },
+    { id: 'tanager', name: 'Tanager', deal_stage: 'won', deal_value: 18_000, deal_currency: 'USD', deal_services: ['canvas'] },
+    { id: 'gone', name: 'Not taken forward', deal_stage: 'lost', deal_value: 9_000, deal_currency: 'USD', deal_services: ['advisory'] },
+    { id: 'nomoney', name: 'No value yet', deal_stage: 'proposal', deal_value: null, deal_currency: null, deal_services: ['advisory'] },
+  ]
+
+  it('carries the fee, the currency and the services straight off the deal', () => {
+    const made = assignmentsFromDeals(deals, [])
+    const csj = made.find(a => a.payer_programme_id === 'csj')
+    expect(csj?.fee).toBe(30_000)
+    expect(csj?.fee_currency).toBe('USD')
+    expect(csj?.service_types).toEqual(['advisory', 'financial'])
+    expect(csj?.name).toBe('Climate Smart Jobs')
+  })
+
+  it('claims only that the amount is agreed, never that it was invoiced or paid', () => {
+    expect(assignmentsFromDeals(deals, [])[0].fee_status).toBe('unpaid')
+  })
+
+  it('leaves out a deal not taken forward, and one with no money on it', () => {
+    const ids = assignmentsFromDeals(deals, []).map(a => a.payer_programme_id)
+    expect(ids).toEqual(['csj', 'tanager'])
+  })
+
+  it('stands aside the moment a real assignment exists for that payer', () => {
+    const recorded: Assignment[] = [{ id: 'real', payer_programme_id: 'csj', fee: 31_000 }]
+    const ids = assignmentsFromDeals(deals, recorded).map(a => a.payer_programme_id)
+    expect(ids).toEqual(['tanager'])
+  })
+
+  it('takes the id the migration would give it, so applying that later makes no second copy', () => {
+    expect(assignmentsFromDeals(deals, [])[0].id).toBe(dealAssignmentId('csj'))
+  })
+
+  it('serves the organisations already sitting under that programme', () => {
+    const made = assignmentsFromDeals(deals, [])
+    const served = servedFromProgrammes(made, [
+      { id: 'bwaeyale', programme_id: 'csj' },
+      { id: 'viester', programme_id: 'csj' },
+      { id: 'ikore', programme_id: 'tanager' },
+      { id: 'nobody', programme_id: null },
+    ])
+    expect(servedIdsOf(dealAssignmentId('csj'), served)).toEqual(['bwaeyale', 'viester'])
+    expect(servedIdsOf(dealAssignmentId('tanager'), served)).toEqual(['ikore'])
+  })
+
+  it('puts the money on screen without anything being copied anywhere first', () => {
+    const made = assignmentsFromDeals(deals, [])
+    const m = assignmentMoney(made, 'month', now)
+    expect(m.awaitingIssue).toBe(48_000)
   })
 })

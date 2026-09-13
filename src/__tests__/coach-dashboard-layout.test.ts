@@ -446,3 +446,42 @@ describe('the welcome letter to a co-implementer', () => {
     expect(LETTER).not.toContain('e instanceof Error ? e.message')
   })
 })
+
+// CLEARING OUT THE TEST DATA IS A REAL THING SOMEBODY NEEDS TO DO.
+// 14 September 2026. Habib: "I still can't do the one thing I want to do
+// today, which is send a welcome email to a new co-implementer, but I can't
+// because you have not cleaned out the data on there."
+//
+// Removal refused anybody with a timesheet or an invoice and named no way
+// forward, so a practice that had been testing could never clear its test
+// rows.
+describe('a team member with test records can be cleared out', () => {
+  const REMOVE = readFileSync('app/api/remove-co-implementer/route.ts', 'utf8')
+
+  it('the money records are still never deleted by default', () => {
+    expect(REMOVE).toContain('const alsoDeleteRecords = withRecords === true')
+    expect(REMOVE).toContain('if (recordCount > 0 && !alsoDeleteRecords)')
+  })
+
+  it('the refusal says what is there rather than only saying no', () => {
+    expect(REMOVE).toContain('hasRecords: true')
+    expect(REMOVE).toContain('timesheets: counts.coach_timesheet_entries')
+  })
+
+  it('asked for on purpose, the records go first so nothing stops halfway', () => {
+    const wipe = REMOVE.indexOf('if (recordCount > 0 && alsoDeleteRecords)')
+    const person = REMOVE.indexOf("from('co_implementers').delete()")
+    expect(wipe).toBeGreaterThan(0)
+    expect(wipe).toBeLessThan(person)
+  })
+
+  it('only a super coach may do it, and the role is read from the database', () => {
+    expect(REMOVE).toContain("actor.role !== 'super_coach'")
+  })
+
+  it('the screen asks a second time, naming exactly what would go', () => {
+    expect(TEAM).toContain('res.status===409&&data?.hasRecords')
+    expect(TEAM).toContain('Delete the person AND all of those records permanently?')
+    expect(TEAM).toContain('Use this to clear out test data. It cannot be undone.')
+  })
+})
