@@ -234,13 +234,19 @@ export async function restore(from, into, passphrase, { force = false } = {}) {
     throw e
   }
 
-  await rm(dest, { recursive: true, force: true })
+  // BOTH HALVES OF THE SWAP, OR NEITHER, AND NEVER IN SILENCE. Removing the
+  // old folder sat outside every guard, so a failure there threw a bare
+  // filesystem error and left the good records in a folder nobody had been
+  // told about. By this point the records are read back and proved, so the
+  // one thing that must not happen is losing track of them.
   try {
+    await rm(dest, { recursive: true, force: true })
     await rename(staging, dest)
-  } catch {
-    // Everything is intact and readable; it is simply not where it was asked
-    // to go. Say where it is rather than leaving somebody to find it.
-    throw new Error(`The records were read back in full but could not be moved to ${dest}. They are in ${staging}.`)
+  } catch (e) {
+    throw new Error(
+      `The records were read back in full but could not be put in ${dest} (${e.message}). ` +
+      `They are safe, and they are in ${staging}.`,
+    )
   }
   return { ...found, into: dest }
 }

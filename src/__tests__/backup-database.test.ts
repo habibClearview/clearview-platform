@@ -431,12 +431,10 @@ describe('a table that moves while it is being copied', () => {
         return { ok: true, headers: { get: () => '0-0/5' }, json: async () => [] }
       }
       asked += 1
-      // Never runs out, whatever range it is given.
-      return {
-        ok: true,
-        headers: { get: () => null },
-        json: async () => Array.from({ length: 1000 }, (_, i) => ({ id: i })),
-      }
+      // Never runs out, whatever range it is given. One row a page, because
+      // the point is the number of pages: a full page each time would have
+      // this test writing ten million rows to disk to prove an off switch.
+      return { ok: true, headers: { get: () => null }, json: async () => [{ id: asked }] }
     }) as any
 
     await expect(run()).rejects.toThrow(/could not be copied/)
