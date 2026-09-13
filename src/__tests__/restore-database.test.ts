@@ -221,6 +221,66 @@ describe('a backup nobody has opened is a belief', () => {
     expect(await readdir(out)).not.toContain('from-the-last-attempt.txt')
   }, 30_000)
 
+  it('leaves the previous restore alone when the new one cannot be read', async () => {
+    // CodeRabbit: emptying the folder and then decrypting meant a bundle that
+    // would not open left the operator with neither their old restore nor a
+    // new one. On the day somebody runs this, that is close to the worst
+    // outcome available.
+    const artifact = path.join(work, 'artifact')
+    await recordsFolder(path.join(work, 'records'))
+    lock(path.join(work, 'records'), artifact)
+
+    // A folder holding a good earlier restore.
+    const out = path.join(work, 'restored')
+    await mkdir(out, { recursive: true })
+    await writeFile(path.join(out, 'clients.json'), '[{"id":1}]')
+
+    // The bundle carries a matching fingerprint but will not open: the
+    // fingerprint is recomputed over the damaged bytes, so it passes the gate
+    // and fails at the decryption, which is the case that matters here.
+    const enc = path.join(artifact, 'records.tar.gz.enc')
+    const blob = await readFile(enc)
+    blob[blob.length - 1] ^= 0xff
+    await writeFile(enc, blob)
+    const mac = execFileSync('sh', ['-c',
+      `mac_key=$(openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -S 4d41435f4b455930 -P -pass env:P` +
+      ` | awk -F= '/^key=/{print $2}'); openssl dgst -sha256 -hmac "$mac_key" "$F" | awk '{print $NF}'`,
+    ], { env: { ...process.env, P: PASSPHRASE, F: enc } }).toString().trim()
+    await writeFile(path.join(artifact, 'records.tar.gz.enc.hmac'), mac)
+
+    await expect(restore(artifact, out, PASSPHRASE, { force: true })).rejects.toThrow()
+    // The earlier restore is untouched, and no half finished one is left.
+    expect(await readdir(out)).toEqual(['clients.json'])
+    // By prefix, not by exact name: the staging folder carries a suffix, so
+    // an exact match would pass while a leftover sat right beside it.
+    expect((await readdir(work)).filter((n) => n.startsWith('restored.restoring'))).toEqual([])
+  }, 30_000)
+
+  it('leaves nothing behind it when it replaces an earlier restore', async () => {
+    // The swap now steps the old folder aside rather than deleting it, so a
+    // failed move can be undone. That only helps if the stepped-aside copy is
+    // cleared up when the move succeeds, or every restore leaves a full second
+    // copy of the records on the disk for ever.
+    const artifact = path.join(work, 'artifact')
+    await recordsFolder(path.join(work, 'records'))
+    lock(path.join(work, 'records'), artifact)
+
+    const out = path.join(work, 'restored')
+    await mkdir(out, { recursive: true })
+    await writeFile(path.join(out, 'from-last-time.json'), '[]')
+
+    const found = await restore(artifact, out, PASSPHRASE, { force: true })
+    expect(found.rows).toBe(3)
+
+    // The new records are there and the old ones are gone.
+    const left = await readdir(out)
+    expect(left).toContain('clients.json')
+    expect(left).not.toContain('from-last-time.json')
+    // And no working folders survive alongside it.
+    const beside = await readdir(work)
+    expect(beside.filter((n) => n.includes('.restoring-') || n.includes('.previous'))).toEqual([])
+  }, 30_000)
+
   it('says plainly when a backup kept no records at all', async () => {
     // The default, with no passphrase set on the repository: the job keeps the
     // summary and nothing else. Somebody reaching for it in an emergency needs

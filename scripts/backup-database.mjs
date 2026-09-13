@@ -74,6 +74,29 @@ import path from 'node:path'
 /** Nothing waits for ever. Supabase answers in milliseconds or it is broken. */
 const REQUEST_TIMEOUT_MS = 30_000
 const PAGE = 1000
+/**
+ * How far past a table's own size the copy may go before it is clearly not
+ * reading a table any more.
+ *
+ * Reading until a page comes back EMPTY is correct, and it removes the bound
+ * the old short-page test gave by accident: a server that ignores the range
+ * and hands back the same rows every time would be asked again and again
+ * until the disk filled or GitHub killed the job six hours later.
+ *
+ * My first ceiling was a flat ten thousand pages, and CodeRabbit was right
+ * that it is the wrong shape. It cannot tell a broken server from a large
+ * table, and with a server sending four hundred rows a page it would have
+ * refused a perfectly good table of four million rows. A number picked out of
+ * the air always rejects somebody eventually.
+ *
+ * So the ceiling is the table's own count, asked for before the copy starts,
+ * with room to spare for rows arriving while it runs. A table cannot yield
+ * several times more rows than it holds; a server ignoring the range will sail
+ * past that and be caught for what it is. Where the count cannot be had, the
+ * flat bound is the fallback, because some bound is better than none.
+ */
+const ROOM_TO_SPARE = 2
+const NO_COUNT_FALLBACK = 10_000_000
 
 // Read when the job runs rather than when the file loads, so the suite can
 // drive this against a stand-in server without setting the real ones.
@@ -277,32 +300,81 @@ export async function writeTable(table, orderBy, dest, cfg) {
   let written = 0
   try {
     await put('[\n')
-    for (let from = 0; ; from += PAGE) {
+    // A SHORT PAGE IS NOT THE END OF THE TABLE. 13 September 2026, CodeRabbit,
+    // and the most dangerous fault it found on this job, because it ends in a
+    // green backup with records missing from it.
+    //
+    // Asking for a thousand rows does not oblige the database to send a
+    // thousand. PostgREST can be configured with a ceiling of its own, and a
+    // ceiling lower than a page turned "I sent you fewer than you asked for"
+    // into "there is no more", which stopped the copy on the first page. The
+    // count taken afterwards would have noticed the shortfall and only NAMED
+    // it, the manifest would have recorded the short number, and reading it
+    // back would have agreed with the manifest. Every check would have passed
+    // on a table that had lost most of itself.
+    //
+    // So the next page starts where this one actually ended, and only nothing
+    // at all means the end.
+    // Asked BEFORE the copy, so the ceiling is about this table rather than a
+    // guess. It is asked again afterwards to catch a table that moved, and
+    // the two questions are worth the two requests on a nightly job.
+    const expected = await countOf(table, cfg)
+    const ceiling = expected === null ? NO_COUNT_FALLBACK : expected * ROOM_TO_SPARE + PAGE
+
+    for (let from = 0, pages = 0; ;) {
       const order = orderBy ? `&order=${encodeURIComponent(orderBy)}.asc` : ''
       const res = await ask(`${url}/rest/v1/${encodeURIComponent(table)}?select=*${order}`, {
         ...headers, Range: `${from}-${from + PAGE - 1}`,
       })
-      // A table this key cannot read is reported rather than silently skipped.
-      // The status and nothing else: the server's own error text ends up in
-      // the manifest, which always travels in the clear, and a database error
-      // body can carry column names and fragments of rows with it.
-      if (!res.ok) throw new Error(`${table}: the database answered ${res.status}`)
+      // ASKING PAST THE END IS NOT A FAILURE, IT IS THE END. CodeRabbit, and
+      // it is the same fault I fixed in the count and did not carry across to
+      // here. PostgREST answers a range it cannot satisfy with 416, and that
+      // is exactly what a table with nothing left to give returns: an empty
+      // table on the very first request, and any table whose size is an exact
+      // multiple of the page on the request after its last full page. Treated
+      // as a failure, it would have failed the whole nightly backup on the
+      // first empty table, and this database has plenty.
+      //
+      // Only that shape is accepted: a 416 whose content-range names a total
+      // this request has already passed. Every other refusal is still a
+      // refusal, and a table this key cannot read is still reported rather
+      // than silently skipped.
+      if (!res.ok) {
+        const total = Number(String(res.headers?.get?.('content-range') || '').split('/')[1])
+        if (res.status === 416 && Number.isFinite(total) && from >= total) break
+        // The status and nothing else: the server's own error text ends up in
+        // the manifest, which always travels in the clear, and a database
+        // error body can carry column names and fragments of rows with it.
+        throw new Error(`${table}: the database answered ${res.status}`)
+      }
       const page = await res.json()
+      if (!page.length) break
+
+      // A table without a unique order cannot be paged safely: the second
+      // question is a different question from the first, and either a row
+      // written between them or two rows tied on the ordering column can
+      // shift what lands where. One page cannot be hurt by that, because
+      // there is only one question, and asking whether a SECOND page exists
+      // is what tells us which case this is. Judging it by the first page
+      // being full was also wrong in the other direction: a table of exactly
+      // a thousand rows was refused for no reason.
+      if (pages && !orderIsUnique(orderBy)) {
+        throw new Error(
+          `${table}: more than one page of rows and no unique column to order by` +
+          `${orderBy ? ` (${orderBy} may repeat)` : ''}, so it cannot be copied safely`,
+        )
+      }
+
       for (const row of page) {
         await put(`${written ? ',\n' : ''}${JSON.stringify(row)}`)
         written += 1
       }
-      if (page.length < PAGE) break
-      // A table without a unique order cannot be paged safely: page two is a
-      // different question from page one, and either a row written between
-      // them or two rows tied on the ordering column can shift what lands
-      // where. Under one page neither can happen, because there is only one
-      // question. Over one page, refuse rather than write something that
-      // looks complete and is not.
-      if (!orderIsUnique(orderBy)) {
+      from += page.length
+      pages += 1
+      if (written > ceiling) {
         throw new Error(
-          `${table}: more than ${PAGE} rows and no unique column to order by` +
-          `${orderBy ? ` (${orderBy} may repeat)` : ''}, so it cannot be copied safely`,
+          `${table}: has handed back ${written} rows when it holds about ${expected === null ? 'unknown' : expected}, ` +
+          'so the database is not honouring the range it was asked for and this copy cannot be trusted',
         )
       }
     }

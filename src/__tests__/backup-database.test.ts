@@ -326,7 +326,10 @@ describe('a table that moves while it is being copied', () => {
         if (empty) return { ok: false, status: 416, headers: { get: () => '*/0' }, text: async () => '' }
         return { ok: true, headers: { get: () => '0-0/1' }, json: async () => [] }
       }
-      return { ok: true, headers: { get: () => null }, json: async () => (empty ? [] : [{ id: 1 }]) }
+      // Honour the range, as a real database does: page two of a one row
+      // table is empty, and that is what ends the copy.
+      const [at] = String(init.headers.Range).split('-').map(Number)
+      return { ok: true, headers: { get: () => null }, json: async () => (empty || at > 0 ? [] : [{ id: 1 }]) }
     }) as any
 
     await run()
@@ -350,7 +353,8 @@ describe('a table that moves while it is being copied', () => {
       }
       // The count is refused; the rows themselves read perfectly well.
       if (init.headers?.Prefer === 'count=exact') return { ok: false, status: 404, text: async () => 'no' }
-      return { ok: true, headers: { get: () => null }, json: async () => [{ id: 1 }] }
+      const [at] = String(init.headers.Range).split('-').map(Number)
+      return { ok: true, headers: { get: () => null }, json: async () => (at > 0 ? [] : [{ id: 1 }]) }
     }) as any
     await expect(run()).rejects.toThrow(/could not be copied/)
   })
@@ -377,6 +381,125 @@ describe('a table that moves while it is being copied', () => {
     expect(orderColumnFor({ properties: { name: {}, created_at: {}, id: {} } })).toBe('id')
     expect(orderColumnFor({ properties: { name: {}, created_at: {} } })).toBe('created_at')
     expect(orderColumnFor({ properties: { colour: {} } })).toBe(null)
+  })
+
+  it('keeps asking when the database sends fewer rows than were asked for', async () => {
+    // 13 September 2026, CodeRabbit, and the most dangerous fault on this job,
+    // because it ends in a green backup with records missing. Asking for a
+    // thousand rows does not oblige the database to send a thousand: PostgREST
+    // can carry a ceiling of its own. A short page was read as the end of the
+    // table, so the copy stopped on the first one, the manifest recorded the
+    // short number, and reading it back agreed with the manifest.
+    const rows = Array.from({ length: 2300 }, (_, i) => ({ id: i }))
+    const SERVER_LIMIT = 400
+    globalThis.fetch = vi.fn(async (url: string, init: any) => {
+      const u = String(url)
+      if (u.endsWith('/rest/v1/')) {
+        return { ok: true, json: async () => ({ definitions: { clients: { properties: { id: {} } } } }) }
+      }
+      if (init.headers?.Prefer === 'count=exact') {
+        return { ok: true, headers: { get: () => `0-0/${rows.length}` }, json: async () => [] }
+      }
+      const [from] = String(init.headers.Range).split('-').map(Number)
+      // The database sends what it is willing to send, not what was asked for.
+      return { ok: true, headers: { get: () => null }, json: async () => rows.slice(from, from + SERVER_LIMIT) }
+    }) as any
+
+    await run()
+    const dir = await onlyRun()
+    const manifest = JSON.parse(await readFile(path.join(dir, '_manifest.json'), 'utf8'))
+    expect(manifest.counts.clients).toBe(2300)
+    expect(manifest.changedWhileBeingCopied).toEqual([])
+    const written = JSON.parse(await readFile(path.join(dir, 'clients.json'), 'utf8'))
+    expect(written).toHaveLength(2300)
+    expect(written[2299].id).toBe(2299)
+  })
+
+  it('gives up on a database that ignores the range rather than reading for ever', async () => {
+    // My own fix introduced this. Reading until a page comes back empty is
+    // right, and it removed the accidental bound the old short-page test gave.
+    // A server that hands back the same rows whatever is asked of it would
+    // have been asked again and again until the disk filled or GitHub killed
+    // the job six hours later.
+    let asked = 0
+    globalThis.fetch = vi.fn(async (url: string, init: any) => {
+      const u = String(url)
+      if (u.endsWith('/rest/v1/')) {
+        return { ok: true, json: async () => ({ definitions: { stuck: { properties: { id: {} } } } }) }
+      }
+      if (init.headers?.Prefer === 'count=exact') {
+        return { ok: true, headers: { get: () => '0-0/5' }, json: async () => [] }
+      }
+      asked += 1
+      // Never runs out, whatever range it is given. One row a page, because
+      // the point is the number of pages: a full page each time would have
+      // this test writing ten million rows to disk to prove an off switch.
+      return { ok: true, headers: { get: () => null }, json: async () => [{ id: asked }] }
+    }) as any
+
+    await expect(run()).rejects.toThrow(/could not be copied/)
+    // And bounded by what the table SAYS IT HOLDS, not by a number picked out
+    // of the air. CodeRabbit was right that a flat page count cannot tell a
+    // broken server from a large table: with a server sending four hundred
+    // rows a page, ten thousand pages would have refused a good table of four
+    // million rows. The database here claims five rows, so a few thousand is
+    // already proof enough that it is not answering the question asked.
+    expect(asked).toBeLessThan(2_000)
+    expect(asked).toBeGreaterThan(1)
+  }, 60_000)
+
+  it('reads a table whose size is an exact multiple of the page', async () => {
+    // CodeRabbit, and the same fault I fixed in the count and did not carry
+    // across to the copy. PostgREST answers a range it cannot satisfy with
+    // 416, which is exactly what the request after a table's last full page
+    // gets. Treated as a failure it would have failed the backup outright.
+    const rows = Array.from({ length: 2000 }, (_, i) => ({ id: i }))
+    globalThis.fetch = vi.fn(async (url: string, init: any) => {
+      const u = String(url)
+      if (u.endsWith('/rest/v1/')) {
+        return { ok: true, json: async () => ({ definitions: { clients: { properties: { id: {} } } } }) }
+      }
+      if (init.headers?.Prefer === 'count=exact') {
+        return { ok: true, headers: { get: () => `0-0/${rows.length}` }, json: async () => [] }
+      }
+      const [from] = String(init.headers.Range).split('-').map(Number)
+      if (from >= rows.length) {
+        // The real shape: a range past the end is refused, not answered empty.
+        return { ok: false, status: 416, headers: { get: () => `*/${rows.length}` }, text: async () => '' }
+      }
+      return { ok: true, headers: { get: () => null }, json: async () => rows.slice(from, from + 1000) }
+    }) as any
+
+    await run()
+    const manifest = JSON.parse(await readFile(path.join(await onlyRun(), '_manifest.json'), 'utf8'))
+    expect(manifest.counts.clients).toBe(2000)
+  })
+
+  it('still fails on a refusal that is not the end of the table', async () => {
+    // Accepting the end must not become accepting every refusal. A 416 whose
+    // total the request has not yet reached is a real fault.
+    globalThis.fetch = vi.fn(async (url: string, init: any) => {
+      const u = String(url)
+      if (u.endsWith('/rest/v1/')) {
+        return { ok: true, json: async () => ({ definitions: { t: { properties: { id: {} } } } }) }
+      }
+      if (init.headers?.Prefer === 'count=exact') {
+        return { ok: true, headers: { get: () => '0-0/500' }, json: async () => [] }
+      }
+      return { ok: false, status: 416, headers: { get: () => '*/500' }, text: async () => '' }
+    }) as any
+    await expect(run()).rejects.toThrow(/could not be copied/)
+  })
+
+  it('does not refuse a table of exactly one full page', async () => {
+    // The other direction of the same mistake. Judging by the first page being
+    // full refused a table of exactly a thousand rows for no reason, and a
+    // false alarm on a backup is how people learn to ignore the real ones.
+    const rows = Array.from({ length: 1000 }, (_, i) => ({ created_at: `t${i}` }))
+    globalThis.fetch = serverWith({ notes: rows }, { columns: { notes: ['created_at'] } }) as any
+    await run()
+    const manifest = JSON.parse(await readFile(path.join(await onlyRun(), '_manifest.json'), 'utf8'))
+    expect(manifest.counts.notes).toBe(1000)
   })
 
   it('refuses to page a table whose order can repeat', async () => {
@@ -491,8 +614,12 @@ describe('nothing waits for ever, and one blip is not a failure', () => {
     const server = serverWith({ locked: [{ id: 1 }] }, { refuse: ['locked'] })
     globalThis.fetch = server as any
     await expect(run()).rejects.toThrow(/could not be copied/)
-    const asked = server.mock.calls.filter((c: any[]) => String(c[0]).includes('locked'))
-    expect(asked.length).toBe(1)
+    // The count and the rows are two different questions, and each is asked
+    // once. What must not happen is the same question asked three times.
+    const askedForRows = server.mock.calls.filter(
+      (c: any[]) => String(c[0]).includes('locked') && c[1]?.headers?.Prefer !== 'count=exact',
+    )
+    expect(askedForRows.length).toBe(1)
   })
 
   it('waits and asks again when the database says not now', async () => {
@@ -524,12 +651,13 @@ describe('nothing waits for ever, and one blip is not a failure', () => {
     // The other half of the same rule. Widening the retry must not turn every
     // permission problem into three attempts at every table.
     let asked = 0
-    globalThis.fetch = vi.fn(async (url: string) => {
+    globalThis.fetch = vi.fn(async (url: string, init: any) => {
       const u = String(url)
       if (u.endsWith('/rest/v1/')) {
         return { ok: true, json: async () => ({ definitions: { t: { properties: { id: {} } } } }) }
       }
-      asked += 1
+      // Only the request for rows is counted: the count is its own question.
+      if (init?.headers?.Prefer !== 'count=exact') asked += 1
       return { ok: false, status: 403, text: async () => 'no' }
     }) as any
     await expect(run()).rejects.toThrow(/could not be copied/)
