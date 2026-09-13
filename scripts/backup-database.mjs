@@ -16,10 +16,21 @@
 //
 //   Nobody had ever read one. An untested backup is a belief.
 //
-// WHAT IT DELIBERATELY DOES NOT DO. It does not copy the recordings, the
-// receipts or the signed documents: those are large files in storage rather
-// than records, and quietly writing somebody's voice to a second place is a
-// decision that belongs to a person, not to a nightly job.
+// WHAT IT COPIES, SAID EXACTLY. The review read an earlier version of this
+// paragraph as a promise to leave the recordings out, and the code did not
+// keep it. The paragraph was wrong, not the code, and the difference matters
+// enough to spell out.
+//
+//   The FILES are never copied. No audio, no receipt image, no signed
+//   document leaves storage. Quietly writing somebody's voice to a second
+//   place is a decision that belongs to a person, not to a nightly job, and
+//   nothing here so much as asks the storage API a question.
+//
+//   The RECORDS about them are copied, and must be. A signed transcript is
+//   the evidence a gate decision rests on; losing the record of who signed
+//   what, and when, would be worse than losing the audio. Those records hold
+//   people's words, so they only ever travel encrypted, and the manifest that
+//   always travels holds table names and counts alone.
 //
 // THE RECORDS NEVER LEAVE HERE IN THE CLEAR. The first version wrote every
 // client record into a GitHub build artifact. I had been pleased with myself
@@ -144,7 +155,10 @@ export async function writeTable(table, orderBy, dest, cfg) {
         ...headers, Range: `${from}-${from + PAGE - 1}`,
       })
       // A table this key cannot read is reported rather than silently skipped.
-      if (!res.ok) throw new Error(`${table}: ${res.status} ${await res.text().catch(() => '')}`.slice(0, 200))
+      // The status and nothing else: the server's own error text ends up in
+      // the manifest, which always travels in the clear, and a database error
+      // body can carry column names and fragments of rows with it.
+      if (!res.ok) throw new Error(`${table}: the database answered ${res.status}`)
       const page = await res.json()
       for (const row of page) {
         await put(`${written ? ',\n' : ''}${JSON.stringify(row)}`)
@@ -246,6 +260,17 @@ export const run = async () => {
     }
   }
 
+  // A TABLE THAT COULD NOT BE COPIED FAILS THE WHOLE THING. 13 September 2026,
+  // CodeRabbit, and it is the most important of the findings. A refused table,
+  // a dropped connection or a full disk only added a line to a list, and the
+  // job went on to upload a cheerful green artifact with records missing from
+  // it. A backup that is quietly incomplete is worse than no backup, because
+  // it is the one you rely on.
+  if (failed.length) {
+    for (const f of failed) console.error(`::error::Not copied. ${f}`)
+    throw new Error(`${failed.length} table${failed.length === 1 ? '' : 's'} could not be copied, so this backup is incomplete and has not been kept.`)
+  }
+
   // THE MANIFEST CARRIES NO RECORDS. Table names and counts only, so it is the
   // one thing safe to hand to anybody who can see the build, and it is what
   // proves the job ran and what it found.
@@ -256,7 +281,6 @@ export const run = async () => {
     tablesWithRows: Object.keys(counts).length,
     rows: rowTotal,
     counts,
-    failed,
     // Named rather than buried. Each of these is a way this copy is weaker
     // than it looks, and somebody restoring from it deserves to know which.
     readWithoutAStableOrder: unordered,
@@ -274,11 +298,11 @@ export const run = async () => {
   console.log(`Backed up ${rowTotal} rows across ${Object.keys(counts).length} tables, and read every one back.`)
   for (const [t, n] of Object.entries(counts).sort((a, b) => b[1] - a[1])) console.log(`  ${t}: ${n}`)
 
-  // A table that could not be read, or that moved underneath the copy, is a
-  // warning rather than a silent gap. The backup still stands for everything
-  // else, and what is weaker about it is named.
-  if (failed.length || shifted.length || unordered.length) console.log('')
-  for (const f of failed) console.log(`::warning::Not copied. ${f}`)
+  // A table that moved underneath the copy is a warning rather than a silent
+  // gap. The backup still stands, and what is weaker about it is named. (A
+  // table that could not be read at all is not a warning; it has already
+  // failed the whole job above.)
+  if (shifted.length || unordered.length) console.log('')
   for (const s of shifted) console.log(`::warning::Changed while being copied. ${s}`)
   if (unordered.length) {
     console.log(`::warning::Read without a stable order, so a change during the copy could shift rows: ${unordered.join(', ')}`)

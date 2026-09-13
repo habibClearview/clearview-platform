@@ -97,7 +97,6 @@ describe('it actually copies the records', () => {
     const manifest = JSON.parse(await readFile(path.join(out, '_manifest.json'), 'utf8'))
     expect(manifest.rows).toBe(3)
     expect(manifest.tablesWithRows).toBe(2)
-    expect(manifest.failed).toEqual([])
   })
 
   it('does not write a file for a table with nothing in it', async () => {
@@ -134,16 +133,24 @@ describe('it never claims to have worked when it has not', () => {
     await expect(run()).rejects.toThrow(/SUPABASE_SERVICE_ROLE_KEY/)
   })
 
-  it('names a table it could not read instead of skipping it quietly', async () => {
+  it('fails the whole backup when one table could not be copied', async () => {
+    // The most important of the review's findings. A refused table, a dropped
+    // connection or a full disk used to add a line to a list and let the job
+    // upload a cheerful green artifact with records missing from it. A backup
+    // that is quietly incomplete is worse than no backup, because it is the
+    // one you rely on.
     globalThis.fetch = serverWith(
       { readable: [{ id: 1 }], locked: [{ id: 2 }] },
       { refuse: ['locked'] },
     ) as any
-    await run()
-    const manifest = JSON.parse(await readFile(path.join(await onlyRun(), '_manifest.json'), 'utf8'))
-    expect(manifest.failed.join(' ')).toContain('locked')
-    // And the rest of the backup still stands.
-    expect(manifest.rows).toBe(1)
+    await expect(run()).rejects.toThrow(/1 table could not be copied/)
+  })
+
+  it('never puts the database own error text where it travels in the clear', async () => {
+    // The manifest always travels, encrypted or not, and a database error body
+    // can carry column names and fragments of rows with it.
+    expect(SCRIPT).toContain('the database answered ${res.status}')
+    expect(SCRIPT).not.toContain('await res.text()')
   })
 
   it('reads the copy back as part of taking it, not as an optional extra', async () => {
@@ -208,6 +215,28 @@ describe('it never claims to have worked when it has not', () => {
     expect(WORKFLOW).toContain('No backup was taken')
     expect(WORKFLOW).toContain('exit 1')
     expect(WORKFLOW).toContain('if-no-files-found: error')
+  })
+})
+
+describe('the files never move, only the records about them', () => {
+  it('never asks the storage API anything at all', async () => {
+    // No audio, no receipt image, no signed document leaves storage. The
+    // records about them are copied and must be, because losing the record of
+    // who signed what would be worse than losing the audio, but the files
+    // themselves are a decision for a person rather than a nightly job.
+    const server = serverWith({ session_recordings: [{ id: 1 }], recording_tracks: [{ id: 2 }] })
+    globalThis.fetch = server as any
+    await run()
+    const asked = server.mock.calls.map((c: any[]) => String(c[0]))
+    expect(asked.some((u) => u.includes('/storage/'))).toBe(false)
+    expect(SCRIPT).not.toContain('storage/v1')
+  })
+
+  it('says exactly that, rather than promising to leave the recordings out', () => {
+    // The review read the old wording as a promise the code did not keep. The
+    // wording was wrong, not the code.
+    expect(SCRIPT).toContain('The FILES are never copied')
+    expect(SCRIPT).toContain('The RECORDS about them are copied, and must be')
   })
 })
 
@@ -319,13 +348,6 @@ describe('the records never leave in the clear', () => {
   it('runs on its own every night, and can be run by hand', () => {
     expect(WORKFLOW).toContain("cron: '30 2 * * *'")
     expect(WORKFLOW).toContain('workflow_dispatch')
-  })
-
-  it('leaves the recordings alone', () => {
-    // Quietly writing somebody's voice to a second place is a decision that
-    // belongs to a person, not to a nightly job.
-    expect(SCRIPT).toContain('It does not copy the recordings')
-    expect(SCRIPT).not.toContain('storage/v1')
   })
 
   it('does not start copying a database just because something imported it', () => {
