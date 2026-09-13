@@ -101,8 +101,15 @@ const NO_COUNT_FALLBACK = 10_000_000
 // Read when the job runs rather than when the file loads, so the suite can
 // drive this against a stand-in server without setting the real ones.
 function settings() {
-  const url = (process.env.SUPABASE_URL || '').replace(/\/+$/, '')
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  // A PASTED VALUE BRINGS WHITESPACE WITH IT. 13 September 2026. The first
+  // real run failed with "Failed to parse URL", because the address had been
+  // copied out of a web page and arrived carrying a carriage return and a
+  // newline. Everything was set correctly and nothing worked, and the message
+  // said nothing about a line break. Trimming is not papering over a mistake:
+  // no address, and no key, has meaningful whitespace at either end, so there
+  // is nothing to lose by removing it and a night of records to lose by not.
+  const url = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '')
+  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
   if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are needed. Nothing was backed up.')
   return { url, key, outDir: process.env.BACKUP_DIR || 'backup', headers: { apikey: key, Authorization: `Bearer ${key}` } }
 }

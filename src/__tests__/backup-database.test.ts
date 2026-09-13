@@ -475,6 +475,35 @@ describe('a table that moves while it is being copied', () => {
     expect(manifest.counts.clients).toBe(2000)
   })
 
+  it('survives an address pasted with a line break on the end of it', async () => {
+    // 13 September 2026, the first real run. Habib set both values correctly
+    // and the backup failed with "Failed to parse URL", because the address
+    // had been copied out of a web page and arrived carrying a carriage
+    // return and a newline. Everything looked right and nothing worked, and
+    // the message said nothing about a line break. No address has meaningful
+    // whitespace at either end.
+    process.env.SUPABASE_URL = 'https://example.test/\r\n'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = ' a-key-with-spaces \n'
+    globalThis.fetch = vi.fn(async (url: string, init: any) => {
+      // A real fetch refuses an address like that, so the stand-in has to as
+      // well, or this test would pass on the broken code.
+      new URL(String(url))
+      expect(init.headers.apikey).toBe('a-key-with-spaces')
+      const u = String(url)
+      if (u.endsWith('/rest/v1/')) {
+        return { ok: true, json: async () => ({ definitions: { t: { properties: { id: {} } } } }) }
+      }
+      if (init.headers?.Prefer === 'count=exact') {
+        return { ok: true, headers: { get: () => '0-0/1' }, json: async () => [] }
+      }
+      const [from] = String(init.headers.Range).split('-').map(Number)
+      return { ok: true, headers: { get: () => null }, json: async () => (from > 0 ? [] : [{ id: 1 }]) }
+    }) as any
+    await run()
+    const manifest = JSON.parse(await readFile(path.join(await onlyRun(), '_manifest.json'), 'utf8'))
+    expect(manifest.counts.t).toBe(1)
+  })
+
   it('accepts the end of a table when the refusal carries no total at all', async () => {
     // CodeRabbit, 13 September 2026. The page requests do not ask for a count,
     // and PostgREST answers an unasked count with an asterisk, so the 416 that
