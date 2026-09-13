@@ -137,7 +137,15 @@ export function practiceShape(
   for (const a of assignments) {
     const payer = payerIdOf(a)
     if (payer) payers.add(payerKey(payer, payerName))
-    if (servedIdsOf(a.id, served).length === 0) nobodyYet++
+    // WHOEVER BOUGHT IT IS THE RECIPIENT UNTIL SOMEBODY SAYS OTHERWISE.
+    // 14 September 2026. Habib: "Palladium Group paid £5k for the advisory
+    // service, and they are the recipient." An assignment somebody bought for
+    // themselves was counted as serving nobody, so a real piece of work read
+    // as an organisation short and as an assignment left hanging.
+    if (servedIdsOf(a.id, served).length === 0) {
+      if (payer) organisations.add(`payer:${payerKey(payer, payerName)}`)
+      else nobodyYet++
+    }
   }
   for (const s of served) if (ids.has(s.engagement_id)) organisations.add(s.client_id)
   return {

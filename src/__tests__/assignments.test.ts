@@ -67,14 +67,26 @@ const SERVED: AssignmentServed[] = [
 
 describe('the shape of the practice', () => {
   it('is two payers, three assignments and three organisations served', () => {
-    const s = practiceShape(ASSIGNMENTS, SERVED)
+    const s = practiceShape(ASSIGNMENTS, SERVED, payerName)
     expect(s.payers).toBe(2)
     expect(s.assignments).toBe(3)
-    expect(s.organisationsServed).toBe(3)
+    // Three organisations named, plus Climate Smart Jobs itself on the
+    // assignment it bought for itself.
+    expect(s.organisationsServed).toBe(4)
   })
 
-  it('names the assignment that serves nobody yet rather than hiding it', () => {
-    expect(practiceShape(ASSIGNMENTS, SERVED).assignmentsWithNobodyYet).toBe(1)
+  it('counts the buyer as the organisation served when nobody else is named', () => {
+    // Habib: "Palladium Group paid £5k for the advisory service, and they are
+    // the recipient." An assignment bought for oneself serves somebody: the
+    // buyer. a2 has nobody attached, so Climate Smart Jobs is counted.
+    const s = practiceShape(ASSIGNMENTS, SERVED, payerName)
+    expect(s.assignmentsWithNobodyYet).toBe(0)
+    expect(s.organisationsServed).toBe(4)
+  })
+
+  it('still names an assignment with no payer and nobody attached', () => {
+    const stray: Assignment[] = [{ id: 'x', fee: 100 }]
+    expect(practiceShape(stray, []).assignmentsWithNobodyYet).toBe(1)
   })
 
   it('counts a payer once however many assignments it holds', () => {
@@ -92,7 +104,7 @@ describe('the shape of the practice', () => {
 
   it('never counts an organisation attached to an assignment that is gone', () => {
     const orphan: AssignmentServed[] = [{ engagement_id: 'deleted', client_id: 'someone' }]
-    expect(practiceShape(ASSIGNMENTS, [...SERVED, ...orphan]).organisationsServed).toBe(3)
+    expect(practiceShape(ASSIGNMENTS, [...SERVED, ...orphan], payerName).organisationsServed).toBe(4)
   })
 
   it('is all zeroes before anything is recorded, and does not crash', () => {

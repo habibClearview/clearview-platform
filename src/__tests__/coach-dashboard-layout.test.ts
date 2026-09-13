@@ -177,7 +177,11 @@ describe('every co-implementer has a page', () => {
 
   it('a card can be opened from the keyboard', () => {
     expect(TEAM).toContain("onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}}")
-    expect(DASH).toContain("onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}}")
+    // A card for a client opens it from the keyboard. A card standing for the
+    // buyer of an assignment is not a client record, so it is not announced as
+    // a button at all rather than being one that does nothing.
+    expect(DASH).toContain("onKeyDown={isPayer?undefined:(e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}})}")
+    expect(DASH).toContain("role={isPayer?undefined:'button'}")
   })
 
   it('nothing that was on the long list was dropped', () => {
