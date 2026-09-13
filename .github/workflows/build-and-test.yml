@@ -1,0 +1,61 @@
+name: The tests and the build must pass
+
+# THE HOLE THIS FILLS. 13 September 2026.
+#
+# Habib asked whether the safeguards we built were being used. Working through
+# that turned up something worse than the answer: nothing in this repository
+# ran the test suite or the production build on a push.
+#
+# npm test ran in two places only. On a pull request, inside the AI review, and
+# on a schedule at six in the morning. So a change pushed straight to main or
+# staging went live having had 1,900 tests and the build run on a laptop, on
+# trust, and nowhere else. If one of those had been broken, the first thing to
+# notice would have been a client.
+#
+# This is the cheapest gate in the repository and the one that catches the most:
+# no credentials, no external service, about two minutes, and it runs on every
+# push to main and staging and on every pull request.
+#
+# It deliberately runs the BUILD as well as the tests. A type error, a bad
+# import or a page that cannot be rendered at build time will pass every unit
+# test in the suite and still take the site down.
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-and-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Every test passes and the site builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+
+      - name: Every test
+        run: npm test
+
+      # The build needs the two public Supabase values to construct a client at
+      # module load. They are public by definition (they ship to every browser
+      # that opens the site), and the placeholders below are only ever used
+      # when the repository variables are not set, so a fork can still build.
+      - name: The production build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+        run: npm run build

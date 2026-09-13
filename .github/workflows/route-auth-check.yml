@@ -14,9 +14,15 @@ name: Route auth gate
 # remain the judge of correctness; but it makes the zero-auth case impossible to
 # merge.
 
+# WIDENED 13 September 2026. This ran on pull requests into main or staging
+# only. Every change this week went straight to main, so it never ran at all,
+# and a gate that only guards a door nobody uses is not guarding anything. It
+# now runs on a push to main and staging as well, and on every pull request
+# whatever it is aimed at.
 on:
-  pull_request:
+  push:
     branches: [main, staging]
+  pull_request:
 
 permissions:
   contents: read

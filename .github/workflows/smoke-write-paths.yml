@@ -28,11 +28,21 @@ name: The write paths must actually work
 # Where the credentials are absent it says so loudly rather than passing
 # quietly, for the same reason the row level security gate does.
 
+# THE PUSH TRIGGER STAYS ON STAGING. 13 September 2026. I added main to it in
+# the same sweep that widened the other gates, and CodeRabbit caught that this
+# one is different: it waits for STAGING_BASE_URL to serve the commit that was
+# just pushed. A commit pushed to main deploys to the live site, not to
+# staging, so staging would never serve it, and the job would poll sixty times
+# and then fail. A gate that fails on every push to main teaches people to
+# ignore it, which is the fault I spent this morning fixing.
+#
+# It still runs on every pull request, which is where it earns its keep for a
+# change heading to main.
+
 on:
   push:
     branches: [staging]
   pull_request:
-    branches: [main, staging]
   workflow_dispatch:
 
 permissions:

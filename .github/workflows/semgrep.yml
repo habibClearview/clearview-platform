@@ -11,9 +11,15 @@ name: Semgrep SAST
 # below suppresses only Semgrep's documented "findings" exit code and lets real
 # errors fail the job. Once triaged, add `--error` to make findings a hard gate.
 
+# WIDENED 13 September 2026. This ran on pull requests into main or staging
+# only. Every change this week went straight to main, so it never ran at all,
+# and a gate that only guards a door nobody uses is not guarding anything. It
+# now runs on a push to main and staging as well, and on every pull request
+# whatever it is aimed at.
 on:
-  pull_request:
+  push:
     branches: [main, staging]
+  pull_request:
   schedule:
     - cron: "0 6 * * 1"
 

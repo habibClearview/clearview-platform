@@ -14,11 +14,15 @@ name: React hooks gate
 # else, so it can be a hard gate today rather than waiting on a repository wide
 # lint cleanup that would have to happen first.
 
+# WIDENED 13 September 2026. This ran on pull requests into main or staging
+# only. Every change this week went straight to main, so it never ran at all,
+# and a gate that only guards a door nobody uses is not guarding anything. It
+# now runs on a push to main and staging as well, and on every pull request
+# whatever it is aimed at.
 on:
   pull_request:
-    branches: [main, staging]
   push:
-    branches: [staging]
+    branches: [main, staging]
 
 permissions:
   contents: read
