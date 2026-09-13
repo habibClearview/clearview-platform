@@ -233,14 +233,33 @@ export async function describeTables({ url, headers }) {
   })
 }
 
-/** How many rows the database says a table holds, right now. */
+/**
+ * How many rows the database says a table holds, right now.
+ *
+ * THE ANSWER IS IN THE HEADER, NOT IN THE STATUS. 13 September 2026, the AI
+ * review, and it caught a fault I had created half an hour earlier. Asking for
+ * rows 0 to 0 of a table that holds none is a range the table cannot satisfy,
+ * and PostgREST may answer 416 rather than 200. That was harmless while an
+ * unreadable count was shrugged off; the moment I made an unreadable count
+ * fail the whole backup, it became a nightly failure on any empty table, and
+ * this database has plenty. A fix for one fault that quietly creates another
+ * is not a fix.
+ *
+ * So the status is not what is read. PostgREST states the total in
+ * content-range either way, as `* / 0` when there is nothing to give back, and
+ * that is the only thing this needs. Nothing here has to know which status the
+ * database picks, which is the point: it was my depending on that that broke
+ * it.
+ */
 export async function countOf(table, { url, headers }) {
   const res = await ask(`${url}/rest/v1/${encodeURIComponent(table)}?select=*`, {
     ...headers, Prefer: 'count=exact', Range: '0-0',
   })
-  if (!res.ok) return null
   const total = Number(String(res.headers?.get?.('content-range') || '').split('/')[1])
-  return Number.isFinite(total) ? total : null
+  if (Number.isFinite(total)) return total
+  // No usable count, whatever the status said. The caller treats that as a
+  // failure, because a check that cannot run is not a check.
+  return null
 }
 
 /**

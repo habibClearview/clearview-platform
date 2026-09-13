@@ -302,6 +302,41 @@ describe('a table that moves while it is being copied', () => {
     expect(manifest.readWithoutAStableOrder).toEqual(['oddity'])
   })
 
+  it('accepts the count of an empty table even when the database refuses the range', async () => {
+    // 13 September 2026, the AI review, catching a fault I had made half an
+    // hour earlier. Asking for rows 0 to 0 of a table holding none is a range
+    // the table cannot satisfy, and PostgREST may answer 416. Harmless while
+    // an unreadable count was shrugged off; the moment an unreadable count
+    // failed the whole backup, it became a nightly failure on every empty
+    // table, and this database has plenty of those. The total is in the
+    // header either way, so the status is no longer read.
+    globalThis.fetch = vi.fn(async (url: string, init: any) => {
+      const u = String(url)
+      if (u.endsWith('/rest/v1/')) {
+        return {
+          ok: true,
+          json: async () => ({
+            definitions: { empty: { properties: { id: {} } }, full: { properties: { id: {} } } },
+          }),
+        }
+      }
+      const empty = u.includes('empty')
+      if (init.headers?.Prefer === 'count=exact') {
+        // The shape PostgREST gives for a range nothing can satisfy.
+        if (empty) return { ok: false, status: 416, headers: { get: () => '*/0' }, text: async () => '' }
+        return { ok: true, headers: { get: () => '0-0/1' }, json: async () => [] }
+      }
+      return { ok: true, headers: { get: () => null }, json: async () => (empty ? [] : [{ id: 1 }]) }
+    }) as any
+
+    await run()
+    const manifest = JSON.parse(await readFile(path.join(await onlyRun(), '_manifest.json'), 'utf8'))
+    // The empty one is not a failure and not a file; the other is copied.
+    expect(manifest.counts.empty).toBeUndefined()
+    expect(manifest.counts.full).toBe(1)
+    expect(manifest.changedWhileBeingCopied).toEqual([])
+  })
+
   it('fails a table whose count the database will not give, rather than skipping the check', async () => {
     // 13 September 2026, CodeRabbit, second round. This used to shrug at a
     // count it could not get, which quietly turned off the one check meant to
