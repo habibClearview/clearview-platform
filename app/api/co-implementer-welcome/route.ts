@@ -167,10 +167,32 @@ export async function POST(req: NextRequest) {
       .eq('id', ci.id)
       .is('welcome_sent_at', null)
       .select('id')
-    if (!claimErr) {
+
+    if (claimErr) {
+      // ONLY THE MISSING COLUMN IS FORGIVEN. The AI review: falling through on
+      // ANY claim error meant a network blip or a permission problem also sent
+      // the letter unclaimed, which is a second copy through somebody's door.
+      // A letter held back can be sent again in a moment. A letter sent twice
+      // cannot be taken back, so the doubt resolves the other way.
+      const why = `${claimErr.code || ''} ${claimErr.message || ''}`
+      const columnNotThereYet = /welcome_sent_at/i.test(why) && /(does not exist|schema cache|undefined column|42703)/i.test(why)
+      if (!columnNotThereYet) {
+        console.error('co-implementer-welcome: could not claim the send', claimErr)
+        return NextResponse.json(
+          { ok: false, reason: 'That letter could not be claimed for sending. Nothing was sent. Please try again.' },
+          { status: 503 },
+        )
+      }
+      // The migration is not applied yet, so there is nothing to claim with.
+      // The letter still goes; it can go twice until the column exists.
+    } else {
       if (!claim || claim.length === 0) {
-        // Somebody else claimed it between the read above and here.
-        return NextResponse.json({ ok: true, alreadySent: true })
+        // Somebody else claimed it between the read above and here. Say when,
+        // so the screen can name a date instead of showing "Invalid Date".
+        const { data: current } = await admin.from('co_implementers')
+          .select('welcome_sent_at').eq('id', ci.id).maybeSingle()
+        const sentAt = (current as Record<string, unknown> | null)?.welcome_sent_at
+        return NextResponse.json({ ok: true, alreadySent: true, sentAt: typeof sentAt === 'string' ? sentAt : null })
       }
       claimed = true
     }

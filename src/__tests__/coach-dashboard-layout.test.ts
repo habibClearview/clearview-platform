@@ -219,10 +219,20 @@ describe('the welcome letter to a co-implementer', () => {
   })
 
   it('works before that migration is applied, and reports the truth either way', () => {
-    // The column is read off a select('*') and the write is best effort, so a
-    // letter that was delivered is never reported as a failure.
+    // The column is read off a select('*'), and only its absence is forgiven:
+    // a claim that fails for any other reason holds the letter back rather
+    // than sending an unclaimed second copy through somebody's door.
     expect(LETTER).toContain("select('*')")
-    expect(LETTER).toContain('if (!claimErr) {')
+    expect(LETTER).toContain('const columnNotThereYet =')
+    expect(LETTER).toContain('if (!columnNotThereYet) {')
+    expect(LETTER).toContain('Nothing was sent. Please try again.')
+  })
+
+  it('names the date it already went, or says nothing rather than nonsense', () => {
+    // The request that loses the claim used to answer with no date at all, and
+    // the screen turned that into "Invalid Date".
+    expect(LETTER).toContain("select('welcome_sent_at').eq('id', ci.id)")
+    expect(DASH).toContain("setMsg(when&&!Number.isNaN(when.getTime())?('Already sent on '+when.toLocaleDateString()+'.'):'Already sent.')")
   })
 
   it('is sendable from the co-implementer’s own page, on the screen in use', () => {

@@ -74,6 +74,9 @@ describe('a value pasted with a line break still works', () => {
     for (const file of SCRIPTS) {
       const src = readFileSync(file, 'utf8')
       const reads = src.match(/process\.env\.SUPABASE_SERVICE_ROLE_KEY[^\n]*/g) || []
+      // An empty list would pass this loop without checking anything, which is
+      // how a script that quietly stops reading the key takes its rule with it.
+      expect(reads.length).toBeGreaterThan(0)
       for (const line of reads) expect(line).toContain('.trim()')
     }
   })

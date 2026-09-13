@@ -768,7 +768,13 @@ function WelcomeLetterButton({coImplementerId}){
       })
       const data=await res.json()
       if(!res.ok)setMsg(data.error||'The letter did not send.')
-      else if(data.alreadySent)setMsg('Already sent on '+new Date(data.sentAt).toLocaleDateString()+'.')
+      // A date is shown when there is one. Where the claim was lost to another
+      // press and no date came back, "Already sent." is the whole truth, and a
+      // truth beats "Invalid Date".
+      else if(data.alreadySent){
+        const when=data.sentAt?new Date(data.sentAt):null
+        setMsg(when&&!Number.isNaN(when.getTime())?('Already sent on '+when.toLocaleDateString()+'.'):'Already sent.')
+      }
       else if(data.ok)setMsg('Sent to '+data.sentTo+'.')
       else setMsg(data.reason||'The letter did not send.')
     }catch(e){setMsg('The letter did not send: '+e.message)}
