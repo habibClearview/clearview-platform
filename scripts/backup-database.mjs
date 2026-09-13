@@ -75,19 +75,28 @@ import path from 'node:path'
 const REQUEST_TIMEOUT_MS = 30_000
 const PAGE = 1000
 /**
- * A ceiling on how many pages one table may take, so the copy cannot run for
- * ever.
+ * How far past a table's own size the copy may go before it is clearly not
+ * reading a table any more.
  *
- * The old loop stopped when a page came back short, which bounded it by
- * accident. Reading until a page comes back EMPTY is correct, and it removes
- * that accidental bound: a server that ignores the range and hands back the
- * same rows every time would be asked again and again until the disk filled
- * or GitHub killed the job six hours later, and the manifest would be
- * nonsense either way. Ten thousand pages is ten million rows, far past
- * anything this platform will hold, and hitting it means the database is not
- * doing what it was asked rather than that the table is large.
+ * Reading until a page comes back EMPTY is correct, and it removes the bound
+ * the old short-page test gave by accident: a server that ignores the range
+ * and hands back the same rows every time would be asked again and again
+ * until the disk filled or GitHub killed the job six hours later.
+ *
+ * My first ceiling was a flat ten thousand pages, and CodeRabbit was right
+ * that it is the wrong shape. It cannot tell a broken server from a large
+ * table, and with a server sending four hundred rows a page it would have
+ * refused a perfectly good table of four million rows. A number picked out of
+ * the air always rejects somebody eventually.
+ *
+ * So the ceiling is the table's own count, asked for before the copy starts,
+ * with room to spare for rows arriving while it runs. A table cannot yield
+ * several times more rows than it holds; a server ignoring the range will sail
+ * past that and be caught for what it is. Where the count cannot be had, the
+ * flat bound is the fallback, because some bound is better than none.
  */
-const MAX_PAGES = 10_000
+const ROOM_TO_SPARE = 2
+const NO_COUNT_FALLBACK = 10_000_000
 
 // Read when the job runs rather than when the file loads, so the suite can
 // drive this against a stand-in server without setting the real ones.
@@ -306,8 +315,13 @@ export async function writeTable(table, orderBy, dest, cfg) {
     //
     // So the next page starts where this one actually ended, and only nothing
     // at all means the end.
-    let pages = 0
-    for (let from = 0; ;) {
+    // Asked BEFORE the copy, so the ceiling is about this table rather than a
+    // guess. It is asked again afterwards to catch a table that moved, and
+    // the two questions are worth the two requests on a nightly job.
+    const expected = await countOf(table, cfg)
+    const ceiling = expected === null ? NO_COUNT_FALLBACK : expected * ROOM_TO_SPARE + PAGE
+
+    for (let from = 0, pages = 0; ;) {
       const order = orderBy ? `&order=${encodeURIComponent(orderBy)}.asc` : ''
       const res = await ask(`${url}/rest/v1/${encodeURIComponent(table)}?select=*${order}`, {
         ...headers, Range: `${from}-${from + PAGE - 1}`,
@@ -341,10 +355,10 @@ export async function writeTable(table, orderBy, dest, cfg) {
       }
       from += page.length
       pages += 1
-      if (pages >= MAX_PAGES) {
+      if (written > ceiling) {
         throw new Error(
-          `${table}: still sending rows after ${MAX_PAGES} pages, which means the database is not honouring ` +
-          'the range it was asked for, so this copy cannot be trusted',
+          `${table}: has handed back ${written} rows when it holds about ${expected === null ? 'unknown' : expected}, ` +
+          'so the database is not honouring the range it was asked for and this copy cannot be trusted',
         )
       }
     }

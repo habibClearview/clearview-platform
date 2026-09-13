@@ -35,7 +35,7 @@
 // without something going red.
 // ============================================================
 import { createHmac, pbkdf2Sync, timingSafeEqual, createDecipheriv } from 'node:crypto'
-import { readFile, writeFile, mkdir, rm, realpath, readdir, rename } from 'node:fs/promises'
+import { readFile, writeFile, mkdir, mkdtemp, rm, realpath, readdir, rename } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { verify } from './backup-database.mjs'
@@ -194,7 +194,8 @@ export async function restore(from, into, passphrase, { force = false } = {}) {
   // folder, or one that does not exist yet, is the ordinary case and needs no
   // ceremony; anything else has to be said out loud with --force.
   let occupants = []
-  try { occupants = await readdir(dest) } catch { /* not there, which is fine */ }
+  let destExists = true
+  try { occupants = await readdir(dest) } catch { destExists = false }
   if (occupants.length && !force) {
     throw new Error(
       `${dest} is not empty, and everything in it would be deleted. Choose an empty folder, or add --force ` +
@@ -212,12 +213,17 @@ export async function restore(from, into, passphrase, { force = false } = {}) {
   // So it is built beside the folder, read back there, and only swapped in
   // once it has been proved sound. A failure anywhere before that leaves
   // everything exactly as it was.
-  // A NAME NOBODY ELSE WILL HAVE CHOSEN. A fixed name beside the destination
+  // A NAME NOBODY ELSE CAN ALREADY HAVE. A fixed name beside the destination
   // would be emptied without asking, and somebody could reasonably have a
-  // folder of their own called that. This one carries the process number and
-  // the moment, so it can only be ours, and it is removed on every path out.
-  const staging = `${dest}.restoring-${process.pid}-${Date.now()}`
-  await mkdir(staging, { recursive: true })
+  // folder of their own called that. My next attempt, the process number and
+  // the moment, was still only unlikely to collide rather than unable to:
+  // mkdir with recursive accepts a folder that is already there, so two
+  // restores in the same process in the same millisecond, or a leftover from
+  // a previous crash, would have been written into and then moved. mkdtemp
+  // creates the folder as part of choosing the name and fails if it cannot,
+  // which is the difference between improbable and impossible. It is still a
+  // sibling of the destination, so the final rename stays on one filesystem.
+  const staging = await mkdtemp(`${dest}.restoring-`)
 
   let found
   try {
@@ -234,20 +240,38 @@ export async function restore(from, into, passphrase, { force = false } = {}) {
     throw e
   }
 
-  // BOTH HALVES OF THE SWAP, OR NEITHER, AND NEVER IN SILENCE. Removing the
-  // old folder sat outside every guard, so a failure there threw a bare
-  // filesystem error and left the good records in a folder nobody had been
-  // told about. By this point the records are read back and proved, so the
-  // one thing that must not happen is losing track of them.
+  // THE OLD ONE IS STEPPED ASIDE, NOT DESTROYED. Guarding the two halves of
+  // the swap together was not enough: deleting the destination and then
+  // failing to move the new records in still left somebody with no restore
+  // where they expected one. Moving the old one out of the way first means a
+  // failure at any point can be undone, so the worst case is that nothing
+  // happened rather than that something was lost.
+  const rollback = `${staging}.previous`
+  let steppedAside = false
   try {
-    await rm(dest, { recursive: true, force: true })
+    if (destExists) {
+      await rename(dest, rollback)
+      steppedAside = true
+    }
     await rename(staging, dest)
   } catch (e) {
+    if (steppedAside) {
+      // Put it back exactly as it was. If even this fails, say both places.
+      try {
+        await rename(rollback, dest)
+      } catch {
+        throw new Error(
+          `The records were read back in full but could not be put in ${dest} (${e.message}). ` +
+          `The new records are in ${staging} and what was there before is in ${rollback}.`,
+        )
+      }
+    }
     throw new Error(
       `The records were read back in full but could not be put in ${dest} (${e.message}). ` +
-      `They are safe, and they are in ${staging}.`,
+      `Nothing was lost: the new records are in ${staging}.`,
     )
   }
+  await rm(rollback, { recursive: true, force: true })
   return { ...found, into: dest }
 }
 

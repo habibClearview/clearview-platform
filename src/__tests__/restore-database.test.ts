@@ -254,6 +254,31 @@ describe('a backup nobody has opened is a belief', () => {
     expect(await readdir(work)).not.toContain('restored.restoring')
   }, 30_000)
 
+  it('leaves nothing behind it when it replaces an earlier restore', async () => {
+    // The swap now steps the old folder aside rather than deleting it, so a
+    // failed move can be undone. That only helps if the stepped-aside copy is
+    // cleared up when the move succeeds, or every restore leaves a full second
+    // copy of the records on the disk for ever.
+    const artifact = path.join(work, 'artifact')
+    await recordsFolder(path.join(work, 'records'))
+    lock(path.join(work, 'records'), artifact)
+
+    const out = path.join(work, 'restored')
+    await mkdir(out, { recursive: true })
+    await writeFile(path.join(out, 'from-last-time.json'), '[]')
+
+    const found = await restore(artifact, out, PASSPHRASE, { force: true })
+    expect(found.rows).toBe(3)
+
+    // The new records are there and the old ones are gone.
+    const left = await readdir(out)
+    expect(left).toContain('clients.json')
+    expect(left).not.toContain('from-last-time.json')
+    // And no working folders survive alongside it.
+    const beside = await readdir(work)
+    expect(beside.filter((n) => n.includes('.restoring-') || n.includes('.previous'))).toEqual([])
+  }, 30_000)
+
   it('says plainly when a backup kept no records at all', async () => {
     // The default, with no passphrase set on the repository: the job keeps the
     // summary and nothing else. Somebody reaching for it in an emergency needs

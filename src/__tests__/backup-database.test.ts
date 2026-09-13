@@ -438,8 +438,13 @@ describe('a table that moves while it is being copied', () => {
     }) as any
 
     await expect(run()).rejects.toThrow(/could not be copied/)
-    // Bounded, not for ever.
-    expect(asked).toBeLessThanOrEqual(10_000)
+    // And bounded by what the table SAYS IT HOLDS, not by a number picked out
+    // of the air. CodeRabbit was right that a flat page count cannot tell a
+    // broken server from a large table: with a server sending four hundred
+    // rows a page, ten thousand pages would have refused a good table of four
+    // million rows. The database here claims five rows, so a few thousand is
+    // already proof enough that it is not answering the question asked.
+    expect(asked).toBeLessThan(2_000)
     expect(asked).toBeGreaterThan(1)
   }, 60_000)
 
@@ -566,8 +571,12 @@ describe('nothing waits for ever, and one blip is not a failure', () => {
     const server = serverWith({ locked: [{ id: 1 }] }, { refuse: ['locked'] })
     globalThis.fetch = server as any
     await expect(run()).rejects.toThrow(/could not be copied/)
-    const asked = server.mock.calls.filter((c: any[]) => String(c[0]).includes('locked'))
-    expect(asked.length).toBe(1)
+    // The count and the rows are two different questions, and each is asked
+    // once. What must not happen is the same question asked three times.
+    const askedForRows = server.mock.calls.filter(
+      (c: any[]) => String(c[0]).includes('locked') && c[1]?.headers?.Prefer !== 'count=exact',
+    )
+    expect(askedForRows.length).toBe(1)
   })
 
   it('waits and asks again when the database says not now', async () => {
@@ -599,12 +608,13 @@ describe('nothing waits for ever, and one blip is not a failure', () => {
     // The other half of the same rule. Widening the retry must not turn every
     // permission problem into three attempts at every table.
     let asked = 0
-    globalThis.fetch = vi.fn(async (url: string) => {
+    globalThis.fetch = vi.fn(async (url: string, init: any) => {
       const u = String(url)
       if (u.endsWith('/rest/v1/')) {
         return { ok: true, json: async () => ({ definitions: { t: { properties: { id: {} } } } }) }
       }
-      asked += 1
+      // Only the request for rows is counted: the count is its own question.
+      if (init?.headers?.Prefer !== 'count=exact') asked += 1
       return { ok: false, status: 403, text: async () => 'no' }
     }) as any
     await expect(run()).rejects.toThrow(/could not be copied/)
