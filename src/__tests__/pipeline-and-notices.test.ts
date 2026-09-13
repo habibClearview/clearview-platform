@@ -170,6 +170,21 @@ describe('the notices on My Business can be set aside, and it is stored in the d
     expect(DASH).toContain('noticeTouched.current.delete(key)')
   })
 
+  it('a failed press falls back to what the database last said, never to nothing', () => {
+    // What the database said is kept separately from what the screen shows, so
+    // a load that arrives while a press is in flight is remembered rather than
+    // thrown away, and a press that then fails has something truthful to fall
+    // back to. CodeRabbit on #264.
+    expect(DASH).toContain('const noticeStored=useRef({})')
+    expect(DASH).toContain('noticeStored.current[r.notice_key]=r')
+    expect(DASH).toContain('const truth=key in noticeStored.current?noticeStored.current[key]:onScreenBefore')
+    expect(DASH).toContain('noticeStored.current[key]=next')
+  })
+
+  it('setting aside never forgets what was dismissed', () => {
+    expect(DASH).toContain("dismissed_ids:current?.dismissed_ids||[]")
+  })
+
   it('a failed write puts the screen back rather than showing it as set aside', () => {
     const start = DASH.indexOf('async function setNoticeAside')
     const body = DASH.slice(start, start + 900)

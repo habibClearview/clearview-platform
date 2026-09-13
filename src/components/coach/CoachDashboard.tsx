@@ -2017,13 +2017,27 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   // pressable, so Set aside and Bring it back cannot race each other and leave
   // the record older than the screen. CodeRabbit on #262.
   const [noticeBusy,setNoticeBusy]=useState({})
-  // The first load must never land on top of a press that happened while it
-  // was still in the air, so it fills in only the notices nobody has touched.
+  // WHAT THE DATABASE LAST SAID, KEPT SEPARATELY FROM WHAT THE SCREEN SHOWS.
+  //
+  // Three rounds of review circled this one small thing, so it is written once
+  // and plainly. Two things can change a notice: the first load arriving from
+  // the database, and a press. They can overlap, and an earlier attempt kept
+  // only a set of "notices somebody has touched", which threw the loaded row
+  // away rather than remembering it. A press that then failed had nothing
+  // truthful to fall back to, so a set-aside already stored in the database
+  // was ignored until the page was reloaded.
+  //
+  // noticeStored is every row the database has told us about, whether or not
+  // anybody has pressed anything. A press wins on screen while it is in
+  // flight, and a press that fails falls back to this, which is the last thing
+  // the database actually said. Nothing is ever discarded.
+  const noticeStored=useRef({})
   const noticeTouched=useRef(new Set())
   useEffect(()=>{
     let cancelled=false
     supabase.from('coach_notice_dismissals').select('notice_key,covers,dismissed_ids').then(({data,error})=>{
       if(cancelled||error)return
+      ;(data||[]).forEach(r=>{noticeStored.current[r.notice_key]=r})
       setNoticeDismissals(prev=>{
         const next={...prev}
         ;(data||[]).forEach(r=>{if(!noticeTouched.current.has(r.notice_key))next[r.notice_key]=r})
@@ -2038,21 +2052,27 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
   async function setNoticeAside(key,ids){
     if(noticeBusy[key])return
     const covers=ids.length===0?null:noticeFingerprint(ids)
-    const previous=noticeDismissals[key]||null
+    const current=noticeDismissals[key]||null
+    const onScreenBefore=current
+    // Setting aside never changes what has been dismissed, so it is carried
+    // through rather than dropped.
+    const next={notice_key:key,covers,dismissed_ids:current?.dismissed_ids||[]}
     noticeTouched.current.add(key)
     setNoticeBusy(prev=>({...prev,[key]:true}))
-    setNoticeDismissals(prev=>({...prev,[key]:{notice_key:key,covers}}))
+    setNoticeDismissals(prev=>({...prev,[key]:next}))
     setNoticeError(null)
     const {error}=await supabase.from('coach_notice_dismissals')
       .upsert({notice_key:key,covers,dismissed_at:new Date().toISOString()},{onConflict:'notice_key'})
     if(error){
-      // The press did not land, so this notice was never touched after all.
-      // CodeRabbit on #263: leaving the marker meant a first load still in
-      // flight would skip this notice, and a set-aside already stored in the
-      // database would be ignored until the page was reloaded.
+      // Nothing was stored, so put the screen back to what the database last
+      // said. That is the loaded row when one has arrived, even if it arrived
+      // while this write was in the air, and otherwise what was on screen.
       noticeTouched.current.delete(key)
-      setNoticeDismissals(prev=>({...prev,[key]:previous}))
+      const truth=key in noticeStored.current?noticeStored.current[key]:onScreenBefore
+      setNoticeDismissals(prev=>({...prev,[key]:truth}))
       setNoticeError('That could not be set aside: '+error.message)
+    } else {
+      noticeStored.current[key]=next
     }
     setNoticeBusy(prev=>({...prev,[key]:false}))
   }
