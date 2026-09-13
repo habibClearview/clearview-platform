@@ -292,7 +292,7 @@ describe('My Business counts payers, assignments and organisations apart', () =>
   it('the money comes from the assignments, which is what was invoiced', () => {
     expect(DASH).toContain('moneyByPayer(assignments,servedRows,period,now,payerName)')
     expect(DASH).toContain('assignmentMoney(assignments,period,now)')
-    expect(DASH).toContain('monthlyAssignmentRevenue(assignments,trendPeriods)')
+    expect(DASH).toContain('monthlyAssignmentRevenue(assignments,trendPeriods,chartCurrency)')
     // And no longer from the fee on a served organisation, which is how the
     // same money used to be counted twice.
     expect(DASH).not.toContain('clientTypeBreakdown(')
@@ -306,7 +306,44 @@ describe('My Business counts payers, assignments and organisations apart', () =>
 
   it('a fee covering more than one service is never split between them', () => {
     expect(DASH).toContain('serviceSplit.combinedAssignments')
-    expect(DASH).toContain('A fee covering more than one service is never divided between them')
+    expect(DASH).toContain('a fee covering more than one service is never divided between them')
+  })
+
+  // POUNDS AND DOLLARS ARE NEVER ADDED TOGETHER. Habib: "I do not know how
+  // £5k and $35000 add up to £40k."
+  it('two currencies print as two figures, never as one total', () => {
+    expect(DASH).toContain('function fmtAmounts(')
+    expect(DASH).toContain('fmtAmounts(asgMoney.collected,feeCur)')
+    expect(DASH).toContain('fmtAmounts(l.collected,feeCur)')
+    expect(DASH).toContain('Currencies are never added together')
+  })
+
+  it('the trend chart is drawn in one currency and says which', () => {
+    expect(DASH).toContain('const chartCurrency=leadingCurrency(assignments)')
+    expect(DASH).toContain('${chartCurrency} only')
+  })
+
+  // THE PAYING CLIENT IS WHO PAYS, NOT THE PROGRAMME THEY FUND. Habib:
+  // "Tanager is the funder of Ignite, the programme... there is nowhere in
+  // anything I have ever written here that suggests that Ignite is a paying
+  // client."
+  it('the payer is the funder, not the programme they fund', () => {
+    expect(DASH).toContain("if(prog)return (prog.funder||'').trim()||prog.name")
+  })
+
+  // Habib: "Under GtCV is $35000 and it is 1 client for GtCV. I don't know
+  // where you got GtCV client 2."
+  it('a service is counted in paying clients, not in pieces of paper', () => {
+    expect(DASH).toContain('String(l.payingClients)')
+    expect(DASH).toContain('moneyByService(assignments,period,now,undefined,payerName)')
+  })
+
+  // Habib: "There should be nothing in pipeline because I have not added
+  // anything to the pipeline since the 2 I won and is currently running."
+  it('the Pipeline panel on My Business shows only what is still being chased', () => {
+    expect(DASH).toContain('const openDeals=splitPipeline(programmes,clients).open')
+    expect(DASH).toContain('Nothing in the pipeline.')
+    expect(DASH).not.toContain('pipelineSnapshot(programmes)')
   })
 
   it('a figure that could not be read says so rather than printing a confident zero', () => {

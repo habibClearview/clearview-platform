@@ -58,12 +58,12 @@ import DealsAndFees from '@/components/coach/DealsAndFees'
 import DeliverablesBusinessView from '@/components/coach/DeliverablesBusinessView'
 import {
   dealWinRate, canvasProgress, healthStatusFromReportText,
-  pipelineSnapshot, recentMonthPeriods, monthlyTeamCost, splitPipeline,
+  recentMonthPeriods, monthlyTeamCost, splitPipeline,
 } from '@/lib/coach-business-metrics'
 import {
   practiceShape, moneyByPayer, moneyByService, assignmentMoney, monthlyAssignmentRevenue,
   servicesOf, servedIdsOf, assignmentLabel, assignmentsFromDeals, servedFromProgrammes,
-  withCorrectedPayer,
+  withCorrectedPayer, leadingCurrency,
 } from '@/lib/assignments'
 import {
   noticeFingerprint, noticeIsSetAside, noticeLiveIds, noticeDismissedIds, noticeWithDismissed,
@@ -532,6 +532,14 @@ function RevenueCostTrendChart({periods,revenueByPeriod,costByPeriod,cur}){
   )
 }
 
+// Money in more than one currency is printed as more than one figure, never
+// added together. Habib: "I do not know how £5k and $35000 add up to £40k."
+function fmtAmounts(list,fallbackCur){
+  const entries=(list||[]).filter(e=>e.amount)
+  if(entries.length===0)return fmtGlance(0,fallbackCur)
+  return entries.map(e=>fmtGlance(e.amount,e.currency||fallbackCur)).join(' · ')
+}
+
 const MB_PERIOD_LABELS={month:'Month',quarter:'Quarter',ytd:'Year to date',year:'Year'}
 function MyBusinessGlance({clients,programmes,coImplementers}){
   // No invented fallback. When no client has a fee currency set, the total
@@ -621,21 +629,46 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
   // deal is its own row in programmes, so a second piece of work from the same
   // payer carries the same name on a different id. The name is what is on the
   // invoice, so the name is what identifies them.
+  // THE PAYING CLIENT IS WHO PAYS, NOT THE PROGRAMME THEY FUND. 14 September
+  // 2026. Habib: "Tanager is the funder of Ignite, the programme. They are
+  // paying me to serve Ikore. There is nowhere in anything I have ever written
+  // here that suggests that Ignite is a paying client." The programme's own
+  // name was being printed as the payer, so a funded programme appeared to be
+  // buying its own funding. The funder is who the invoice is made out to.
   const payerName=(id)=>{
     const prog=programmes.find(p=>p.id===id)
-    if(prog)return prog.name
+    if(prog)return (prog.funder||'').trim()||prog.name
     const c=clients.find(x=>x.id===id)
     return c?c.name:id
   }
   const shape=practiceShape(assignments,servedRows,payerName)
   const payerLines=moneyByPayer(assignments,servedRows,period,now,payerName)
-  const serviceSplit=moneyByService(assignments,period,now)
+  const serviceSplit=moneyByService(assignments,period,now,undefined,payerName)
   const asgMoney=assignmentMoney(assignments,period,now)
 
   const trendPeriods=recentMonthPeriods(6)
-  const revenueByPeriod=monthlyAssignmentRevenue(assignments,trendPeriods)
+  // A bar chart adding pounds to dollars draws a shape that means nothing, so
+  // it is drawn in one currency and says which.
+  const chartCurrency=leadingCurrency(assignments)
+  const revenueByPeriod=monthlyAssignmentRevenue(assignments,trendPeriods,chartCurrency)
   const costByPeriod=monthlyTeamCost(invoices,trendPeriods)
-  const pipeline=pipelineSnapshot(programmes)
+  // The same split the Pipeline tab draws, grouped by stage, so this screen
+  // and that one can never describe different deals. Money is kept per
+  // currency here too.
+  const openDeals=splitPipeline(programmes,clients).open
+  const openDealsByStage=Object.values(openDeals.reduce((acc,p)=>{
+    const stage=p.deal_stage||'conversation'
+    if(!acc[stage])acc[stage]={stage,count:0,amounts:[]}
+    acc[stage].count++
+    const amount=Number(p.deal_value)||0
+    if(amount){
+      const cur=p.deal_currency||null
+      const hit=acc[stage].amounts.find(e=>e.currency===cur)
+      if(hit)hit.amount+=amount
+      else acc[stage].amounts.push({currency:cur,amount})
+    }
+    return acc
+  },{}))
   const periodLabel=MB_PERIOD_LABELS[period]
 
   return(
@@ -664,48 +697,57 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
                   <td style={{padding:'0.45rem 0.6rem',fontWeight:600,color:C.navy}}>{l.payer}</td>
                   <td style={{padding:'0.45rem 0.6rem'}}>{l.assignments}</td>
                   <td style={{padding:'0.45rem 0.6rem'}}>{l.organisationsServed}</td>
-                  <td style={{padding:'0.45rem 0.6rem',color:C.green,fontWeight:600}}>{fmtGlance(l.collected,l.currency||feeCur)}</td>
-                  <td style={{padding:'0.45rem 0.6rem',color:C.amber}}>{fmtGlance(l.invoicedNotPaid,l.currency||feeCur)}</td>
-                  <td style={{padding:'0.45rem 0.6rem',color:C.red}}>{fmtGlance(l.awaitingIssue,l.currency||feeCur)}</td>
+                  <td style={{padding:'0.45rem 0.6rem',color:C.green,fontWeight:600}}>{fmtAmounts(l.collected,feeCur)}</td>
+                  <td style={{padding:'0.45rem 0.6rem',color:C.amber}}>{fmtAmounts(l.invoicedNotPaid,feeCur)}</td>
+                  <td style={{padding:'0.45rem 0.6rem',color:C.red}}>{fmtAmounts(l.awaitingIssue,feeCur)}</td>
                 </tr>
               ))}</tbody>
             </table>
           </div>}
 
-        <PiSectionHeading label="Services" sub="how many assignments include each service, and the money on the ones that cover only that service"/>
+        <PiSectionHeading label="Services" sub={`paying clients per service, and what they paid this ${periodLabel.toLowerCase()}`}/>
         <PiKpiRow cols={serviceSplit.combinedAssignments>0?5:4}>
           {serviceSplit.services.map(l=>(
-            <PiKpiCard key={l.service} label={SERVICE_TYPE_LABELS[l.service]||l.service} value={String(l.assignments)} rev={fmtGlance(l.ownRevenue,feeCur)}
+            <PiKpiCard key={l.service} label={SERVICE_TYPE_LABELS[l.service]||l.service} value={String(l.payingClients)} rev={fmtAmounts(l.ownRevenue,feeCur)}
               color={l.service==='canvas'?C.purple:l.service==='financial'?C.teal:l.service==='portfolio_intelligence'?C.cyan:C.slate}
-              sub={l.assignments===1?'1 assignment':`${l.assignments} assignments`}/>
+              sub={l.payingClients===1?'1 paying client':`${l.payingClients} paying clients`}/>
           ))}
           {serviceSplit.combinedAssignments>0&&(
-            <PiKpiCard label="Covering more than one" value={String(serviceSplit.combinedAssignments)} rev={fmtGlance(serviceSplit.combinedRevenue,feeCur)} color={C.navy} sub="one fee across several services, not split"/>
+            <PiKpiCard label="Covering more than one" value={String(serviceSplit.combinedAssignments)} rev={fmtAmounts(serviceSplit.combinedRevenue,feeCur)} color={C.navy} sub="one fee across several services, not split"/>
           )}
         </PiKpiRow>
         <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',color:C.slate,textAlign:'center',margin:'0.9rem 0 0'}}>
-          A fee covering more than one service is never divided between them &mdash; no record says how it splits, so it sits on its own line and the figures still add up to <b style={{color:C.cyan}}>{fmtGlance(serviceSplit.total,feeCur)}</b>.
+          Collected this {periodLabel.toLowerCase()}: <b style={{color:C.cyan}}>{fmtAmounts(serviceSplit.total,feeCur)}</b>. Currencies are never added together, and a fee covering more than one service is never divided between them.
         </div>
 
         <PiSectionHeading label="Finance" sub="where the money actually stands, plus the trend behind it. Every figure is a fee on an assignment, which is a fee you invoiced."/>
         <PiKpiRow cols={4}>
-          <PiKpiCard label="Invoice Paid Up" value={fmtGlance(asgMoney.collected,asgMoney.currency||feeCur)} color={C.green} sub={`cleared this ${periodLabel.toLowerCase()}`}/>
-          <PiKpiCard label="Invoiced &middot; Not Paid" value={fmtGlance(asgMoney.invoicedNotPaid,asgMoney.currency||feeCur)} color={C.amber} sub="sent, awaiting payment (current)"/>
-          <PiKpiCard label="Awaiting Issue" value={fmtGlance(asgMoney.awaitingIssue,asgMoney.currency||feeCur)} color={C.red} sub="fee agreed, not yet invoiced (current)"/>
+          <PiKpiCard label="Invoice Paid Up" value={fmtAmounts(asgMoney.collected,feeCur)} color={C.green} sub={`cleared this ${periodLabel.toLowerCase()}`}/>
+          <PiKpiCard label="Invoiced &middot; Not Paid" value={fmtAmounts(asgMoney.invoicedNotPaid,feeCur)} color={C.amber} sub="sent, awaiting payment (current)"/>
+          <PiKpiCard label="Awaiting Issue" value={fmtAmounts(asgMoney.awaitingIssue,feeCur)} color={C.red} sub="fee agreed, not yet invoiced (current)"/>
           <div style={{border:'1px solid var(--cv-border-soft)',borderRadius:10,padding:'0.9rem 1rem',background:'var(--cv-bg-2)'}}>
-            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate,marginBottom:'0.5rem'}}>Revenue vs. delivery cost &middot; last 6 months</div>
-            <RevenueCostTrendChart periods={trendPeriods} revenueByPeriod={revenueByPeriod} costByPeriod={costByPeriod} cur={feeCur}/>
+            <div style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.78rem',letterSpacing:'0.06em',textTransform:'uppercase',color:C.slate,marginBottom:'0.5rem'}}>Revenue vs. delivery cost &middot; last 6 months{chartCurrency?` · ${chartCurrency} only`:''}</div>
+            <RevenueCostTrendChart periods={trendPeriods} revenueByPeriod={revenueByPeriod} costByPeriod={costByPeriod} cur={chartCurrency||feeCur}/>
           </div>
         </PiKpiRow>
         <div style={{fontSize:'0.82rem',color:C.slate,margin:'0.6rem 0 0'}}>Pipeline conversion isn&#39;t shown as a trend line here -- deal-stage changes aren&#39;t logged with a date, so there&#39;s no honest history to chart. The current win rate is {Math.round(winRate.pct*100)}% ({winRate.wonCount} of {winRate.totalCount} deals with a stage set).</div>
 
-        <PiSectionHeading label="Pipeline" sub="open deals by stage &mdash; a current snapshot, not period-filtered: stage changes aren't logged with a date yet, so this can't honestly be shown for &quot;this month&quot; vs &quot;this year&quot;"/>
-        <PiKpiRow cols={4}>
-          {pipeline.stages.map(s=>{
-            const meta=DEAL_STAGE_META[s.stage]||{label:s.stage,color:C.slate}
-            return <PiKpiCard key={s.stage} label={meta.label} value={String(s.count)} color={meta.color} sub={`${fmtGlance(s.value,s.currency)} combined`}/>
-          })}
-        </PiKpiRow>
+        {/* NOTHING WON IS ON THE PIPELINE. 14 September 2026. Habib: "There
+            should be nothing in pipeline because I have not added anything to
+            the pipeline since the 2 I won and is currently running." This
+            section counted every programme by stage, so the two won deals and
+            the payers that were never prospects all showed up here, on the
+            one screen he reads first. It is the same list the Pipeline tab
+            draws, which is only what is still being chased. */}
+        <PiSectionHeading label="Pipeline" sub="deals still being chased. A deal leaves the moment it is won, and a programme that was never a prospect was never on it."/>
+        {openDealsByStage.length===0
+          ?<div style={{...hint,padding:'0.6rem 0'}}>Nothing in the pipeline.</div>
+          :<PiKpiRow cols={openDealsByStage.length}>
+            {openDealsByStage.map(s=>{
+              const meta=DEAL_STAGE_META[s.stage]||{label:s.stage,color:C.slate}
+              return <PiKpiCard key={s.stage} label={meta.label} value={String(s.count)} color={meta.color} sub={fmtAmounts(s.amounts,feeCur)}/>
+            })}
+          </PiKpiRow>}
 
       </PiBody>
 
