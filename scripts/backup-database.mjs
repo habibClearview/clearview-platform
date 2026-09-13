@@ -74,6 +74,20 @@ import path from 'node:path'
 /** Nothing waits for ever. Supabase answers in milliseconds or it is broken. */
 const REQUEST_TIMEOUT_MS = 30_000
 const PAGE = 1000
+/**
+ * A ceiling on how many pages one table may take, so the copy cannot run for
+ * ever.
+ *
+ * The old loop stopped when a page came back short, which bounded it by
+ * accident. Reading until a page comes back EMPTY is correct, and it removes
+ * that accidental bound: a server that ignores the range and hands back the
+ * same rows every time would be asked again and again until the disk filled
+ * or GitHub killed the job six hours later, and the manifest would be
+ * nonsense either way. Ten thousand pages is ten million rows, far past
+ * anything this platform will hold, and hitting it means the database is not
+ * doing what it was asked rather than that the table is large.
+ */
+const MAX_PAGES = 10_000
 
 // Read when the job runs rather than when the file loads, so the suite can
 // drive this against a stand-in server without setting the real ones.
@@ -327,6 +341,12 @@ export async function writeTable(table, orderBy, dest, cfg) {
       }
       from += page.length
       pages += 1
+      if (pages >= MAX_PAGES) {
+        throw new Error(
+          `${table}: still sending rows after ${MAX_PAGES} pages, which means the database is not honouring ` +
+          'the range it was asked for, so this copy cannot be trusted',
+        )
+      }
     }
     await put('\n]\n')
   } finally {

@@ -212,8 +212,11 @@ export async function restore(from, into, passphrase, { force = false } = {}) {
   // So it is built beside the folder, read back there, and only swapped in
   // once it has been proved sound. A failure anywhere before that leaves
   // everything exactly as it was.
-  const staging = `${dest}.restoring`
-  await rm(staging, { recursive: true, force: true })
+  // A NAME NOBODY ELSE WILL HAVE CHOSEN. A fixed name beside the destination
+  // would be emptied without asking, and somebody could reasonably have a
+  // folder of their own called that. This one carries the process number and
+  // the moment, so it can only be ours, and it is removed on every path out.
+  const staging = `${dest}.restoring-${process.pid}-${Date.now()}`
   await mkdir(staging, { recursive: true })
 
   let found

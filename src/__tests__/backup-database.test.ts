@@ -415,6 +415,36 @@ describe('a table that moves while it is being copied', () => {
     expect(written[2299].id).toBe(2299)
   })
 
+  it('gives up on a database that ignores the range rather than reading for ever', async () => {
+    // My own fix introduced this. Reading until a page comes back empty is
+    // right, and it removed the accidental bound the old short-page test gave.
+    // A server that hands back the same rows whatever is asked of it would
+    // have been asked again and again until the disk filled or GitHub killed
+    // the job six hours later.
+    let asked = 0
+    globalThis.fetch = vi.fn(async (url: string, init: any) => {
+      const u = String(url)
+      if (u.endsWith('/rest/v1/')) {
+        return { ok: true, json: async () => ({ definitions: { stuck: { properties: { id: {} } } } }) }
+      }
+      if (init.headers?.Prefer === 'count=exact') {
+        return { ok: true, headers: { get: () => '0-0/5' }, json: async () => [] }
+      }
+      asked += 1
+      // Never runs out, whatever range it is given.
+      return {
+        ok: true,
+        headers: { get: () => null },
+        json: async () => Array.from({ length: 1000 }, (_, i) => ({ id: i })),
+      }
+    }) as any
+
+    await expect(run()).rejects.toThrow(/could not be copied/)
+    // Bounded, not for ever.
+    expect(asked).toBeLessThanOrEqual(10_000)
+    expect(asked).toBeGreaterThan(1)
+  }, 60_000)
+
   it('does not refuse a table of exactly one full page', async () => {
     // The other direction of the same mistake. Judging by the first page being
     // full refused a table of exactly a thousand rows for no reason, and a
