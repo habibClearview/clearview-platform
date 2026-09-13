@@ -113,6 +113,50 @@ describe('a backup nobody has opened is a belief', () => {
       .rejects.toThrow(/does not match its fingerprint/)
   }, 30_000)
 
+  it('refuses to write the records over the backup itself', async () => {
+    // 13 September 2026, CodeRabbit, and the worst fault on this change
+    // because of WHEN it would have happened. The output folder is emptied
+    // before the records are written, and nothing checked what that folder
+    // was. Somebody running this is having the worst day of their year and is
+    // typing paths in a hurry.
+    const artifact = path.join(work, 'artifact')
+    await recordsFolder(path.join(work, 'records'))
+    lock(path.join(work, 'records'), artifact)
+
+    await expect(restore(artifact, artifact, PASSPHRASE)).rejects.toThrow(/would be deleted/)
+    // And the backup is still there, which is the whole point.
+    const left = await readdir(artifact)
+    expect(left).toContain('records.tar.gz.enc')
+    expect(left).toContain('records.tar.gz.enc.hmac')
+  }, 30_000)
+
+  it('refuses a folder that holds the backup, not just the backup folder itself', async () => {
+    // The sharper version: point it at the downloads folder while the artifact
+    // sits inside it, and it would have taken the artifact and everything else
+    // in there with it.
+    const downloads = path.join(work, 'downloads')
+    const artifact = path.join(downloads, 'artifact')
+    await recordsFolder(path.join(work, 'records'))
+    lock(path.join(work, 'records'), artifact)
+    await writeFile(path.join(downloads, 'something-else-of-mine.txt'), 'not yours to delete')
+
+    await expect(restore(artifact, downloads, PASSPHRASE)).rejects.toThrow(/would be deleted/)
+    expect(await readdir(downloads)).toEqual(expect.arrayContaining(['artifact', 'something-else-of-mine.txt']))
+    expect(await readdir(artifact)).toContain('records.tar.gz.enc')
+  }, 30_000)
+
+  it('still accepts the folder it makes alongside the backup by default', async () => {
+    // The guard must refuse the dangerous shape without refusing the ordinary
+    // one, which is the default the script itself picks.
+    const artifact = path.join(work, 'artifact')
+    await recordsFolder(path.join(work, 'records'))
+    lock(path.join(work, 'records'), artifact)
+
+    const found = await restore(artifact, path.join(artifact, 'restored'), PASSPHRASE)
+    expect(found.rows).toBe(3)
+    expect(await readdir(artifact)).toContain('records.tar.gz.enc')
+  }, 30_000)
+
   it('says plainly when a backup kept no records at all', async () => {
     // The default, with no passphrase set on the repository: the job keeps the
     // summary and nothing else. Somebody reaching for it in an emergency needs

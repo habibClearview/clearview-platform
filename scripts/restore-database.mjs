@@ -103,15 +103,37 @@ export async function restore(from, into, passphrase) {
     throw new Error('Set BACKUP_PASSPHRASE to the passphrase this backup was locked with.')
   }
 
-  const enc = path.join(from, 'records.tar.gz.enc')
-  const mac = path.join(from, 'records.tar.gz.enc.hmac')
+  // IT MUST NOT DESTROY THE THING IT IS RECOVERING. 13 September 2026,
+  // CodeRabbit, and the worst fault it has found on this change, because of
+  // when it would have happened. The records are written into a folder this
+  // empties first, and nothing checked what that folder was. Run it as
+  //
+  //   node scripts/restore-database.mjs ./artifact ./artifact
+  //
+  // and it deletes the backup it just read, then reports success. Point it at
+  // the folder the artifact sits in and it takes everything else in there too.
+  // Somebody doing this is having the worst day of their year and is typing
+  // paths in a hurry. It refuses instead.
+  const src = path.resolve(from)
+  const dest = path.resolve(into)
+  const rel = path.relative(dest, src)
+  const destHoldsSrc = rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
+  if (destHoldsSrc) {
+    throw new Error(
+      `Refusing to write the records into ${dest}, because the backup itself is in there and would be deleted. ` +
+      'Give a folder somewhere else, or leave the second argument off and one will be made alongside it.',
+    )
+  }
+
+  const enc = path.join(src, 'records.tar.gz.enc')
+  const mac = path.join(src, 'records.tar.gz.enc.hmac')
 
   let blob
   try {
     blob = await readFile(enc)
   } catch {
     throw new Error(
-      `No records were found in ${from}. A backup taken without BACKUP_PASSPHRASE set keeps only the summary, ` +
+      `No records were found in ${src}. A backup taken without BACKUP_PASSPHRASE set keeps only the summary, ` +
       'not the records themselves.',
     )
   }
@@ -131,18 +153,18 @@ export async function restore(from, into, passphrase) {
     )
   }
 
-  await rm(into, { recursive: true, force: true })
-  await mkdir(into, { recursive: true })
+  await rm(dest, { recursive: true, force: true })
+  await mkdir(dest, { recursive: true })
 
-  const tarball = path.join(into, 'records.tar.gz')
+  const tarball = path.join(dest, 'records.tar.gz')
   await writeFile(tarball, decrypt(blob, passphrase))
-  execFileSync('tar', ['-xzf', tarball, '-C', into])
+  execFileSync('tar', ['-xzf', tarball, '-C', dest])
   await rm(tarball, { force: true })
 
   // The same reading back the nightly job does. A bundle that opens but will
   // not parse is the failure this whole thing exists to catch.
-  const found = await verify(into)
-  return { ...found, into }
+  const found = await verify(dest)
+  return { ...found, into: dest }
 }
 
 /* c8 ignore start */
