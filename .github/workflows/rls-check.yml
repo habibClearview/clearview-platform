@@ -10,9 +10,16 @@ name: Row level security gate
 # until somebody asked the database directly. So this asks on every change.
 #
 # The check needs credentials, because the only honest answer comes from the
-# database itself. Where they are absent the job says so loudly rather than
-# passing quietly: a green tick that means "did not look" is worse than no tick
-# at all, since it is the tick a reviewer trusts.
+# database itself. Where they are absent the job FAILS. It used to warn and
+# then pass, which meant this gate had never once run: its check step took zero
+# seconds and showed a green tick on every pull request, and the tick meant
+# "did not look". That is worse than no tick at all, because it is the tick a
+# reviewer trusts. A gate that cannot look must say so in the only way anybody
+# reads, which is red.
+#
+# So until SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set on the
+# repository, this check is red on every pull request. That is the honest
+# state, and it is the point.
 #
 # The secret is read into the job environment first and the condition tests the
 # environment, because the secrets context is not dependable inside a step
@@ -45,9 +52,14 @@ jobs:
       - name: Check row level security
         run: |
           if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
-            echo "::warning::Row level security was not checked. Set the SUPABASE_URL repository"
-            echo "::warning::variable and the SUPABASE_SERVICE_ROLE_KEY secret to turn this gate on."
-            echo "Skipped. Without credentials this cannot tell a safe schema from an unchecked one."
-            exit 0
+            echo "::error::Row level security was NOT checked, and this gate has been passing"
+            echo "::error::green without ever running. Set the SUPABASE_URL repository variable and"
+            echo "::error::the SUPABASE_SERVICE_ROLE_KEY repository secret, under Settings, then"
+            echo "::error::Secrets and variables, then Actions."
+            echo ""
+            echo "Nothing was checked. The only honest answer about row level security comes"
+            echo "from the database itself, and this job could not reach it. A red check that"
+            echo "says so is the truth; the green one it used to show was not."
+            exit 1
           fi
           node scripts/rls-check.mjs

@@ -101,8 +101,15 @@ const NO_COUNT_FALLBACK = 10_000_000
 // Read when the job runs rather than when the file loads, so the suite can
 // drive this against a stand-in server without setting the real ones.
 function settings() {
-  const url = (process.env.SUPABASE_URL || '').replace(/\/+$/, '')
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  // A PASTED VALUE BRINGS WHITESPACE WITH IT. 13 September 2026. The first
+  // real run failed with "Failed to parse URL", because the address had been
+  // copied out of a web page and arrived carrying a carriage return and a
+  // newline. Everything was set correctly and nothing worked, and the message
+  // said nothing about a line break. Trimming is not papering over a mistake:
+  // no address, and no key, has meaningful whitespace at either end, so there
+  // is nothing to lose by removing it and a night of records to lose by not.
+  const url = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '')
+  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
   if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are needed. Nothing was backed up.')
   return { url, key, outDir: process.env.BACKUP_DIR || 'backup', headers: { apikey: key, Authorization: `Bearer ${key}` } }
 }
@@ -339,9 +346,22 @@ export async function writeTable(table, orderBy, dest, cfg) {
       // this request has already passed. Every other refusal is still a
       // refusal, and a table this key cannot read is still reported rather
       // than silently skipped.
+      //
+      // AND THE REFUSAL DOES NOT ALWAYS CARRY A NUMBER. CodeRabbit: these page
+      // requests do not ask for a count, and PostgREST answers an unasked
+      // count with an asterisk, so the 416 that ends a table can arrive as
+      // `*/*` with no total in it at all. Read as a failure, that is the same
+      // nightly backup lost to the same empty table, one step further along.
+      // Where the header names no total, the count taken before the copy
+      // began is the boundary instead. Where there is no count either, the
+      // refusal stands: guessing that a table has ended is how rows go
+      // missing quietly.
       if (!res.ok) {
         const total = Number(String(res.headers?.get?.('content-range') || '').split('/')[1])
-        if (res.status === 416 && Number.isFinite(total) && from >= total) break
+        const atEnd = Number.isFinite(total)
+          ? from >= total
+          : Number.isFinite(expected) && from >= expected
+        if (res.status === 416 && atEnd) break
         // The status and nothing else: the server's own error text ends up in
         // the manifest, which always travels in the clear, and a database
         // error body can carry column names and fragments of rows with it.

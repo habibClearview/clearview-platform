@@ -23,9 +23,14 @@
 // ============================================================
 import { createClient } from '@supabase/supabase-js'
 
-const URL = process.env.SUPABASE_URL
-const ANON = process.env.SUPABASE_ANON_KEY
-const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY
+// A PASTED VALUE BRINGS WHITESPACE WITH IT. 13 September 2026. The first real
+// run of these scripts failed with "Failed to parse URL", because the address
+// had been copied out of a web page and arrived carrying a carriage return and
+// a newline. Everything was set correctly and nothing worked. No address and
+// no key has meaningful whitespace at either end.
+const URL = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '')
+const ANON = (process.env.SUPABASE_ANON_KEY || '').trim()
+const SERVICE = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
 if (!URL || !ANON || !SERVICE) {
   console.error('Need SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY')
   process.exit(2)

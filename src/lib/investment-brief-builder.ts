@@ -25,10 +25,11 @@ import { assessConfidence } from '@/lib/confidence'
 import { buildPeriodSignals, partitionBadges, CONFIDENCE_DISPLAY, BADGE_DISPLAY, READINESS_DISPLAY, type ReadinessStatus } from '@/lib/verification-display'
 import { computeSeasonalCashProjection } from '@/lib/seasonal-cash-projection'
 import { computeFundAbsorptionCapacity, type FACTypeResult } from '@/lib/fund-absorption-capacity'
+import { supabaseServiceKey, supabaseUrl } from '@/lib/supabase-env'
 
 function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const url = supabaseUrl()
+  const key = supabaseServiceKey()
   if (!url || !key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel environment variables.')
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }

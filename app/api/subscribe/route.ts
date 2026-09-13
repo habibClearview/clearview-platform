@@ -18,6 +18,7 @@ import { createClient } from '@supabase/supabase-js'
 import { checkRateLimit, clientIp } from '@/lib/rate-limit'
 import { capture, validEmail, clean, SOURCE_TAGS, CaptureSource } from '@/lib/kit'
 import { sendEmail, brandedEmail, emailAvailable } from '@/lib/email'
+import { supabaseServiceKey, supabaseUrl } from '@/lib/supabase-env'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,8 +26,8 @@ const PER_CALLER_PER_HOUR = 15
 const PER_ADDRESS_PER_DAY = 5
 
 function limiterClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const url = supabaseUrl()
+  const key = supabaseServiceKey()
   if (!url || !key) return null
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }

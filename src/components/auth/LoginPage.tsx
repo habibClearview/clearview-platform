@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useAuth } from '@/lib/auth/context'
+import { supabaseAnonKey, supabaseUrl } from '@/lib/supabase-env'
 
 const C = {
   navy: '#1B2A4A', cyan: '#00B4D8', cream: '#F8F4EE',
@@ -41,8 +42,8 @@ export default function LoginPage({ clientName = 'Clearview', onSuccess }: Login
     setLoading(true)
     const { createClient } = await import('@supabase/supabase-js')
     const sb = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      supabaseUrl(),
+      supabaseAnonKey()
     )
     await sb.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,

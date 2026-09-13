@@ -25,6 +25,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getBearerToken, requesterCanViewClient } from '@/lib/auth/api-authz'
 import { listProviders, getProvider } from '@/lib/providers/registry'
 import type { LinkStatus } from '@/lib/providers/types'
+import { supabaseServiceKey, supabaseUrl } from '@/lib/supabase-env'
 
 // Human-facing label per provider id. Falls back to the raw id for any
 // provider registered without an entry here, so a new adapter never
@@ -34,8 +35,8 @@ const PROVIDER_LABELS: Record<string, string> = {
 }
 
 function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const url = supabaseUrl()
+  const key = supabaseServiceKey()
   if (!url || !key) throw new Error('Supabase admin credentials not configured')
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }

@@ -31,6 +31,7 @@ import {
   TEST_SLUG, TEST_CLIENT_NAME, TEST_PROGRAMME_NAME, TEST_LOGINS,
   isTestLogin, refuseUnlessTestEngagement, testPassword,
 } from '@/lib/test-engagement'
+import { supabaseAnonKey, supabaseUrl } from '@/lib/supabase-env'
 
 export const dynamic = 'force-dynamic'
 
@@ -180,8 +181,8 @@ async function create(admin: ReturnType<typeof getAdminClient>) {
 interface Attempt { what: string; safe: boolean; detail: string }
 
 async function check(admin: ReturnType<typeof getAdminClient>) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const url = supabaseUrl()
+  const anon = supabaseAnonKey()
   if (!url || !anon) throw new Error('The public keys are not configured, so a real sign-in cannot be made')
 
   const { data: client } = await admin

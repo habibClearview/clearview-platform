@@ -25,6 +25,7 @@
 // pretending otherwise would be theatre.
 // ============================================================
 import { createHmac, timingSafeEqual, randomUUID } from 'crypto'
+import { supabaseServiceKey } from '@/lib/supabase-env'
 
 export const ROOM_COOKIE = 'gtcv_room'
 
@@ -47,7 +48,7 @@ function secret(): string {
   // The same secret the rest of the server already holds. A room cookie is not
   // worth its own secret, and one more environment variable is one more thing
   // to be missing in production at the worst moment.
-  const s = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXTAUTH_SECRET
+  const s = supabaseServiceKey() || process.env.NEXTAUTH_SECRET
   if (!s) throw new Error('No server secret available to sign the room cookie')
   return s
 }

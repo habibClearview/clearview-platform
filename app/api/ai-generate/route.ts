@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { CLEARVIEW_STYLE } from '@/lib/ai-style'
 import { getBearerToken } from '@/lib/auth/api-authz'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { supabaseServiceKey, supabaseUrl } from '@/lib/supabase-env'
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
     // needed — it generates narrative text, not another client's data.)
     const token = getBearerToken(req)
     if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } })
+    const admin = createClient(supabaseUrl(), supabaseServiceKey(), { auth: { autoRefreshToken: false, persistSession: false } })
     const { data: { user }, error: authErr } = await admin.auth.getUser(token)
     if (authErr || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 

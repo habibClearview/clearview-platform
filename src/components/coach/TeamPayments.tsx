@@ -239,7 +239,21 @@ function AccessSection({coImplementers,setCoImplementers,clients,setMsg}){
   )
 }
 
-export default function TeamPayments({coImplementers=[],setCoImplementers,clients=[],userName='Coach',canApprove=true,canManage=false,updateCI,renderInvite,addMemberNode}){
+export default function TeamPayments({coImplementers=[],setCoImplementers,clients=[],userName='Coach',canApprove=true,canManage=false,updateCI,renderInvite,renderWelcome,addMemberNode}){
+  // A PAGE PER CO-IMPLEMENTER. 13 September 2026. Habib: under Team this needs
+  // to be tidied, it would be good to have team member cards so every
+  // co-implementer has a page.
+  //
+  // This screen printed every person's whole record one under the other --
+  // profile, assigned clients, four headline figures and a table of
+  // timesheets each -- so five people was a page nobody could take in, and
+  // finding one person meant scrolling past everyone else's money. The roster
+  // is cards now, and one click opens that person, with everything that was on
+  // the long list still on it and one click back.
+  //
+  // A co-implementer signing in sees only themselves, so they are taken
+  // straight to their own page with no roster to click through.
+  const [openCiId,setOpenCiId]=useState(null)
   const [entries,setEntries]=useState([])
   const [expenses,setExpenses]=useState([])
   const [advances,setAdvances]=useState([])
@@ -305,6 +319,11 @@ export default function TeamPayments({coImplementers=[],setCoImplementers,client
   const unclearedAdvTotal=openAdvancesAll.reduce((s,a)=>s+num(a.amount),0)
   const sumCur=curOf(coImplementers[0])
 
+  // A person seeing only themselves has no roster to choose from, so their own
+  // page IS the screen.
+  const showRoster=coImplementers.length>1||canApprove
+  const openPerson=showRoster?(coImplementers.find(c=>c.id===openCiId)||null):(coImplementers[0]||null)
+
   if(loading)return<div style={{padding:'2.5rem',color:C.slate}}>Loading Team &amp; Payments…</div>
   if(error)return(
     <div style={{...card,border:`1px solid ${C.amber}`,background:'var(--cv-tint-amber)'}}>
@@ -340,16 +359,67 @@ export default function TeamPayments({coImplementers=[],setCoImplementers,client
 
       {coImplementers.length===0
         ? <div style={{...card,color:C.slate,textAlign:'center',padding:'2.5rem'}}>{canApprove?'No co-implementers yet. Add one with the button above.':'Your co-implementer profile could not be found. Contact your coach.'}</div>
-        : coImplementers.map(ci=>(
-            <CoImplementerPayments
-              key={ci.id} ci={ci} period={period} userName={userName} clientName={clientName} clients={clients} canApprove={canApprove}
-              canManage={canManage} updateCI={updateCI} removeCI={removeCI} renderInvite={renderInvite}
-              entries={entries} setEntries={setEntries}
-              expenses={expenses} setExpenses={setExpenses}
-              advances={advances} setAdvances={setAdvances}
-              invoices={invoices} setInvoices={setInvoices}
-            />
-          ))}
+        : openPerson
+        ? (
+            <div>
+              {showRoster&&<button style={{...addBtn(true,C.teal),marginBottom:'0.9rem'}} onClick={()=>setOpenCiId(null)}>← All co-implementers</button>}
+              <CoImplementerPayments
+                ci={openPerson} period={period} userName={userName} clientName={clientName} clients={clients} canApprove={canApprove}
+                canManage={canManage} updateCI={updateCI} removeCI={removeCI} renderInvite={renderInvite} renderWelcome={renderWelcome}
+                entries={entries} setEntries={setEntries}
+                expenses={expenses} setExpenses={setExpenses}
+                advances={advances} setAdvances={setAdvances}
+                invoices={invoices} setInvoices={setInvoices}
+              />
+            </div>
+          )
+        : (
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(270px,1fr))',gap:'1rem',alignItems:'start'}}>
+              {coImplementers.map(ci=>(
+                <CiRosterCard key={ci.id} ci={ci} period={period} entries={entries} expenses={expenses} advances={advances}
+                  clients={clients} onOpen={()=>setOpenCiId(ci.id)}/>
+              ))}
+            </div>
+          )}
+    </div>
+  )
+}
+
+// One person, as a card: who they are, whether they are working, how many
+// clients they hold, and what this period owes them. Everything else is on
+// their own page, one click away.
+function CiRosterCard({ci,period,entries,expenses,advances,clients,onOpen}){
+  const initials=(ci.name||'?').split(' ').filter(Boolean).map(w=>w[0]).slice(0,2).join('').toUpperCase()
+  const d=computeDraft(ci,period,entries,expenses,advances)
+  const served=clients.filter(c=>(ci.client_ids||[]).includes(c.id))
+  const awaiting=entries.filter(e=>e.co_implementer_id===ci.id&&e.period===period&&e.status==='submitted').length
+  const active=ci.active!==false
+  const open=()=>onOpen&&onOpen()
+  return(
+    <div role="button" tabIndex={0} onClick={open}
+      onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}}
+      aria-label={`Open ${ci.name||'this co-implementer'}`}
+      style={{...card,marginBottom:0,padding:'1rem 1.1rem',cursor:'pointer',borderLeft:`4px solid ${active?C.green:C.border}`}}>
+      <div style={{display:'flex',alignItems:'center',gap:'0.7rem',marginBottom:'0.6rem'}}>
+        <div style={{width:38,height:38,borderRadius:10,background:C.navy,color:'var(--cv-on-accent)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'var(--cv-font-mono)',fontSize:'0.99rem',fontWeight:700,flexShrink:0}}>{initials}</div>
+        <div style={{minWidth:0,flex:1}}>
+          <div style={{fontWeight:700,fontSize:'1.11rem',color:C.navy,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ci.name}</div>
+          <div style={{fontSize:'0.93rem',color:C.slate,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{[ci.country,ci.specialisation].filter(Boolean).join(' · ')||ci.email}</div>
+        </div>
+      </div>
+      <div style={{display:'flex',gap:'0.35rem',flexWrap:'wrap',marginBottom:'0.55rem'}}>
+        <Badge text={active?'Active':'Inactive'} color={active?C.green:C.red}/>
+        <Badge text={`${served.length} client${served.length===1?'':'s'}`} color={C.teal}/>
+        {awaiting>0&&<Badge text={`${awaiting} awaiting approval`} color={C.amber}/>}
+        {d.openAdvanceTotal>0&&<Badge text="Advance open" color={C.red}/>}
+      </div>
+      <div style={{fontSize:'0.85rem',color:C.slate,lineHeight:1.4,minHeight:'1.2rem'}}>
+        {served.length===0?'No clients assigned yet.':served.map(c=>c.name).join(', ')}
+      </div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'0.7rem',fontSize:'0.85rem',color:C.slate}}>
+        <span>{fmtDays(d.days)} approved · {fmtMoney(d.net,curOf(ci))} draft</span>
+        <span style={{fontFamily:'var(--cv-font-mono)',color:C.teal,fontWeight:700}}>Open page →</span>
+      </div>
     </div>
   )
 }
@@ -375,7 +445,7 @@ function computeDraft(ci,period,entries,expenses,advances){
   return {approvedHours,days,rate,timeAmount,expApproved,openAdvances,openAdvanceTotal,gross,advanceApplied,net,blocked}
 }
 
-function CoImplementerPayments({ci,period,userName,clientName,clients,entries,setEntries,expenses,setExpenses,advances,setAdvances,invoices,setInvoices,canApprove,canManage,updateCI,removeCI,renderInvite}){
+function CoImplementerPayments({ci,period,userName,clientName,clients,entries,setEntries,expenses,setExpenses,advances,setAdvances,invoices,setInvoices,canApprove,canManage,updateCI,removeCI,renderInvite,renderWelcome}){
   const [tab,setTab]=useState('timesheets')
   const [busy,setBusy]=useState(false)
   const [msg,setMsg]=useState(null)
@@ -441,6 +511,7 @@ function CoImplementerPayments({ci,period,userName,clientName,clients,entries,se
           <span style={{fontFamily: 'var(--cv-font-mono)',fontSize:'0.85rem',background:d.rate>0?'var(--cv-tint-cyan)':'var(--cv-tint-amber)',color:d.rate>0?C.cyan:C.amber,borderRadius:999,padding:'0.25rem 0.7rem'}}>{d.rate>0?`${fmtMoney(d.rate,curOf(ci))} / day`:'no day rate set'}</span>
           {canManage&&<button style={addBtn(true)} onClick={()=>editingProfile?setEditingProfile(false):startEditProfile()}>{editingProfile?'Cancel':'Edit profile'}</button>}
           {renderInvite&&renderInvite(ci)}
+          {renderWelcome&&renderWelcome(ci)}
           {canManage&&removeCI&&<button style={addBtn(true,C.red)} disabled={busy} title="Remove this team member from the system"
             onClick={async()=>{setBusy(true);setMsg(null);const {error}=await removeCI(ci);if(error&&error.message!=='cancelled')setMsg('Could not remove: '+error.message);setBusy(false)}}>{busy?'Removing…':'Remove'}</button>}
         </div>

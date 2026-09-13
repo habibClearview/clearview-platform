@@ -41,10 +41,11 @@ import {
 } from '@/lib/access-grants'
 import type { SegmentFilter } from '@/lib/portfolio-intelligence'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { supabaseServiceKey, supabaseUrl } from '@/lib/supabase-env'
 
 function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const url = supabaseUrl()
+  const key = supabaseServiceKey()
   if (!url || !key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel environment variables.')
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }

@@ -23,6 +23,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { readdirSync, readFileSync } from 'fs'
 import path from 'path'
 import { parsePlaybookMarkdown, type PlaybookEntry } from './support-playbook'
+import { supabaseServiceKey, supabaseUrl } from '@/lib/supabase-env'
 
 // Resolved from the running app's working directory. On Vercel the markdown
 // files are bundled into the serverless function via outputFileTracingIncludes
@@ -59,8 +60,8 @@ export function readAllPlaybookEntries(): PlaybookEntry[] {
 
 /** Build the Supabase service-role client used to write the playbook table. */
 export function getPlaybookAdminClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const url = supabaseUrl()
+  const key = supabaseServiceKey()
   if (!url || !key) {
     throw new Error('Playbook sync: NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are not configured.')
   }
