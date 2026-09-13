@@ -484,4 +484,14 @@ describe('a team member with test records can be cleared out', () => {
     expect(TEAM).toContain('Delete the person AND all of those records permanently?')
     expect(TEAM).toContain('Use this to clear out test data. It cannot be undone.')
   })
+
+  it('their money records leave the screen with them, not on the next reload', () => {
+    // CodeRabbit on #268: only the roster was cleared, so the summary bar, the
+    // cost chart and the payment views kept showing a removed person's advance
+    // and invoice until the page was reloaded.
+    expect(TEAM).toContain('const mine=x=>x.co_implementer_id!==ci.id')
+    for (const setter of ['setEntries', 'setExpenses', 'setAdvances', 'setInvoices']) {
+      expect(TEAM).toContain(`${setter}(prev=>prev.filter(mine))`)
+    }
+  })
 })
