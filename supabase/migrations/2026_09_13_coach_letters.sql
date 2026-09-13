@@ -35,7 +35,11 @@ alter table coach_letters enable row level security;
 -- needs scoping in the same change. Doing it here alone would be worse than
 -- not doing it, because it would read as though the job were done.
 drop policy if exists super_coach_only on coach_letters;
-create policy super_coach_only on coach_letters for all using (my_role() = 'super_coach');
+-- with check is spelled out rather than left to Postgres reusing using, so the
+-- rule for writing is as plain to read as the rule for reading.
+create policy super_coach_only on coach_letters for all
+  using (my_role() = 'super_coach')
+  with check (my_role() = 'super_coach');
 
 -- The welcome letter goes once per co-implementer. Carried here so a single
 -- run applies everything this change needs.

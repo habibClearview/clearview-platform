@@ -149,6 +149,18 @@ describe('every co-implementer has a page', () => {
     expect(TEAM).toContain('const openPerson=showRoster?')
   })
 
+  it('the people come before the money on the Team screen', () => {
+    // 13 September 2026. Habib opened Team and saw four money boxes and a six
+    // month chart, with the one person on his team below all of it and off the
+    // bottom of the screen. He reported the change as not having arrived.
+    const roster = TEAM.indexOf('<CiRosterCard key={ci.id}')
+    const money = TEAM.indexOf('{/* Summary bar -- the whole team at a glance')
+    const chart = TEAM.indexOf('<CostOfDeliveryChart coImplementers=')
+    expect(roster).toBeGreaterThan(0)
+    expect(roster).toBeLessThan(money)
+    expect(roster).toBeLessThan(chart)
+  })
+
   it('a co-implementer seeing only themselves lands on their own page', () => {
     // There is no roster to choose from, so a roster would be one click for
     // nothing on every visit.
@@ -233,8 +245,11 @@ describe('the welcome letter to a co-implementer', () => {
     // timeout would post the generated words in place of the coach's own AND
     // claim the one send that is allowed. Only the table genuinely not
     // existing yet is forgiven.
-    expect(LETTER).toContain('const tableNotThereYet =')
-    expect(LETTER).toContain('if (!tableNotThereYet) {')
+    expect(LETTER).toContain('function tableNotThereYet(')
+    expect(LETTER).toContain('if (!tableNotThereYet(error)) {')
+    // One rule, stated once: reading and writing must not decide this two
+    // different ways.
+    expect(LETTER.match(/tableNotThereYet\(error\)/g) || []).toHaveLength(2)
     expect(LETTER).toContain('return { ok: false }')
     expect(LETTER).toContain('if (!read.ok) return LETTER_UNREADABLE')
     // And the refusal comes before anything is claimed or sent.
@@ -306,7 +321,9 @@ describe('the welcome letter to a co-implementer', () => {
     // engagement. This one belongs to the practice, not to any one client.
     const sql = readFileSync('supabase/migrations/2026_09_13_coach_letters.sql', 'utf8')
     expect(sql).toContain('create table if not exists coach_letters')
-    expect(sql).toContain("create policy super_coach_only on coach_letters for all using (my_role() = 'super_coach')")
+    expect(sql).toContain("create policy super_coach_only on coach_letters for all")
+    expect(sql).toContain("using (my_role() = 'super_coach')")
+    expect(sql).toContain("with check (my_role() = 'super_coach')")
   })
 
   it('works before that migration is applied, and reports the truth either way', () => {

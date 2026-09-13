@@ -49,6 +49,17 @@ function getAdminClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
+/**
+ * ONE RULE FOR "THE TABLE IS NOT THERE YET", STATED ONCE. The AI review found
+ * the reading and the writing deciding this with two slightly different lists,
+ * so one of them would have called a missing table a plain failure and said the
+ * wrong thing about it. A rule written twice is a rule that drifts.
+ */
+function tableNotThereYet(error: { code?: string; message?: string } | null): boolean {
+  const why = `${error?.code || ''} ${error?.message || ''}`
+  return /coach_letters/i.test(why) && /(does not exist|schema cache|relation|42p01)/i.test(why)
+}
+
 /** What was read: the letter to use, and what was actually saved (if anything). */
 type LetterRead =
   | { ok: true; body: string; saved: string; updatedAt: string | null }
@@ -70,10 +81,7 @@ async function readLetter(admin: ReturnType<typeof getAdminClient>): Promise<Let
     .select('body,updated_at').eq('key', CO_IMPLEMENTER_LETTER_KEY).maybeSingle()
 
   if (error) {
-    const why = `${error.code || ''} ${error.message || ''}`
-    const tableNotThereYet = /coach_letters/i.test(why)
-      && /(does not exist|schema cache|relation|42p01)/i.test(why)
-    if (!tableNotThereYet) {
+    if (!tableNotThereYet(error)) {
       console.error('co-implementer-welcome: could not read the letter', error)
       return { ok: false }
     }
@@ -189,8 +197,7 @@ export async function PATCH(req: NextRequest) {
 
     if (error) {
       console.error('co-implementer-welcome PATCH failed', error)
-      const missing = /coach_letters/i.test(`${error.code || ''} ${error.message || ''}`)
-        && /(does not exist|schema cache|relation)/i.test(`${error.code || ''} ${error.message || ''}`)
+      const missing = tableNotThereYet(error)
       return NextResponse.json({
         error: missing
           ? 'The letters table is not in the database yet, so this could not be saved. Apply supabase/migrations/2026_09_13_coach_letters.sql and try again.'
