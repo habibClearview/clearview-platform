@@ -21,12 +21,14 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { splitPipeline, clientCountForProgramme } from '@/lib/coach-business-metrics'
 import {
-  noticeFingerprint, noticeIsSetAside, NOTICE_NEW_SUBMISSIONS, NOTICE_TIMESHEETS_AWAITING,
+  noticeFingerprint, noticeIsSetAside, noticeLiveIds, noticeDismissedIds, noticeWithDismissed,
+  NOTICE_NEW_SUBMISSIONS, NOTICE_TIMESHEETS_AWAITING,
 } from '@/lib/notice-dismissal'
 
 const DASH = readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
 const DEALS = readFileSync('src/components/coach/DealsAndFees.tsx', 'utf8')
 const MIGRATION = readFileSync('supabase/migrations/2026_09_14_coach_notice_dismissals.sql', 'utf8')
+const DISMISS_SQL = readFileSync('supabase/migrations/2026_09_14_notice_dismissed_ids.sql', 'utf8')
 
 const deal = (id: string, stage: string | null) => ({ id, name: id, deal_stage: stage })
 
@@ -168,6 +170,21 @@ describe('the notices on My Business can be set aside, and it is stored in the d
     expect(DASH).toContain('noticeTouched.current.delete(key)')
   })
 
+  it('a failed press falls back to what the database last said, never to nothing', () => {
+    // What the database said is kept separately from what the screen shows, so
+    // a load that arrives while a press is in flight is remembered rather than
+    // thrown away, and a press that then fails has something truthful to fall
+    // back to. CodeRabbit on #264.
+    expect(DASH).toContain('const noticeStored=useRef({})')
+    expect(DASH).toContain('noticeStored.current[r.notice_key]=r')
+    expect(DASH).toContain('const truth=key in noticeStored.current?noticeStored.current[key]:onScreenBefore')
+    expect(DASH).toContain('noticeStored.current[key]=next')
+  })
+
+  it('setting aside never forgets what was dismissed', () => {
+    expect(DASH).toContain("dismissed_ids:current?.dismissed_ids||[]")
+  })
+
   it('a failed write puts the screen back rather than showing it as set aside', () => {
     const start = DASH.indexOf('async function setNoticeAside')
     const body = DASH.slice(start, start + 900)
@@ -188,6 +205,61 @@ describe('the notices on My Business can be set aside, and it is stored in the d
   })
 })
 
+// DISMISS IS NOT SET ASIDE. 14 September 2026. Habib: I need to be able to
+// dismiss flags from My Business, not just set them aside. Set aside is about
+// the whole notice and comes back as soon as the set changes. Dismiss is about
+// the records, named one by one, and they do not come back.
+describe('dismissing records, as opposed to setting the notice aside', () => {
+  const stored = (ids: string[]) => ({ notice_key: 'k', covers: null, dismissed_ids: ids })
+
+  it('a dismissed record leaves the notice', () => {
+    expect(noticeLiveIds(stored(['a']), ['a', 'b'])).toEqual(['b'])
+  })
+
+  it('a record that arrives afterwards still raises the notice', () => {
+    // This is what makes dismissing safe: today's dismissal cannot hide
+    // tomorrow's work.
+    expect(noticeLiveIds(stored(['a', 'b']), ['a', 'b', 'c'])).toEqual(['c'])
+  })
+
+  it('nothing dismissed means nothing hidden', () => {
+    expect(noticeLiveIds(null, ['a', 'b'])).toEqual(['a', 'b'])
+    expect(noticeDismissedIds(null, ['a', 'b'])).toEqual([])
+  })
+
+  it('the dismissed ones can still be named, so they can be offered back', () => {
+    expect(noticeDismissedIds(stored(['a']), ['a', 'b'])).toEqual(['a'])
+  })
+
+  it('dismissing adds to what is already dismissed, without repeating anything', () => {
+    expect(noticeWithDismissed(stored(['a']), ['a', 'b'])).toEqual(['a', 'b'])
+    expect(noticeWithDismissed(null, ['b', 'a'])).toEqual(['a', 'b'])
+  })
+
+  it('both notices offer Dismiss beside Set aside, and one record at a time', () => {
+    expect(DASH).toContain('Dismiss all')
+    expect(DASH).toContain('dismissNoticeRecords(NOTICE_NEW_SUBMISSIONS,[c.id],false)')
+    expect(DASH).toContain('dismissNoticeRecords(NOTICE_TIMESHEETS_AWAITING,pendingTimesheets.map(t=>t.id),false)')
+  })
+
+  it('nothing is hidden without a line saying so and a way back', () => {
+    expect(DASH).toContain('function DismissedLine(')
+    expect(DASH).toContain('Show them again')
+    expect(DASH).toContain('dismissedSubmissionIds.length>0')
+    expect(DASH).toContain('dismissedPendingIds.length>0')
+  })
+
+  it('a dismissed timesheet still waits for approval, and the line says so', () => {
+    // Dismissing is about this notice, never about the work behind it.
+    expect(DASH).toContain('still waiting for approval on Team')
+  })
+
+  it('it is stored in the database, with a column that exists', () => {
+    expect(DASH).toContain("select('notice_key,covers,dismissed_ids')")
+    expect(DISMISS_SQL).toContain('add column if not exists dismissed_ids text[]')
+  })
+})
+
 describe('the My Business client numbers count clients', () => {
   it('All Clients reads the real client total, and the donor tile says how many sit under it', () => {
     expect(DASH).toContain('ctb.total.count')
@@ -197,5 +269,15 @@ describe('the My Business client numbers count clients', () => {
   it('a client nothing else describes is shown rather than counted nowhere', () => {
     expect(DASH).toContain('ctb.other.count>0')
     expect(DASH).toContain('stb.other.count>0')
+  })
+
+  it('the tile says how many are still running, so it agrees with the page header', () => {
+    expect(DASH).toContain('ctb.running')
+    expect(DASH).toContain('ctb.closed')
+  })
+
+  it('a service that could not be read says so rather than printing a confident zero', () => {
+    expect(DASH).toContain('const [servicesUnread,setServicesUnread]=useState(null)')
+    expect(DASH).toContain('could not be read just now, so those two are showing nothing rather than a real count')
   })
 })

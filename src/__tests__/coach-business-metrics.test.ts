@@ -187,6 +187,17 @@ describe('clientTypeBreakdown', () => {
     expect(r.total.count).toBe(3)
   })
 
+  it('says how many engagements are still running, so it agrees with the page header', () => {
+    const clients = [
+      client({ id: 'a', programme_id: null, engagement_mode: 'canvas' }),
+      client({ id: 'b', programme_id: null, engagement_mode: 'financial', status: 'complete' }),
+    ]
+    const r = clientTypeBreakdown(clients, programmesById, 'year', now)
+    expect(r.total.count).toBe(2)
+    expect(r.running).toBe(1)
+    expect(r.closed).toBe(1)
+  })
+
   it('handles an empty client list without crashing', () => {
     const r = clientTypeBreakdown([], {}, 'month', now)
     expect(r.total).toEqual({ count: 0, revenue: 0 })
@@ -221,15 +232,25 @@ describe('serviceTypeBreakdown', () => {
     expect(serviceView.total.revenue).toBe(clientView.total.revenue)
   })
 
-  it('counts only active service_engagements, ignoring paused/complete ones', () => {
+  // A SERVICE THAT EXISTS IS COUNTED. 14 September 2026. Habib: there is one
+  // advisory service, it is not showing. This used to assert the opposite, so
+  // a paused or completed advisory read as zero on My Business while the
+  // Clients tab listed it plainly: two screens, two answers, one service.
+  it('counts every service on record, and earns revenue only from the live ones', () => {
     const r = serviceTypeBreakdown([], [
       { service_type: 'advisory', fee: 4_000, status: 'active' },
       { service_type: 'advisory', fee: 9_999, status: 'paused' },
       { service_type: 'portfolio_intelligence', fee: 5_000, status: 'active' },
     ], 'year', now)
-    expect(r.advisory).toEqual({ count: 1, revenue: 4_000 })
+    expect(r.advisory).toEqual({ count: 2, revenue: 4_000 })
     expect(r.portfolioIntelligence).toEqual({ count: 1, revenue: 5_000 })
     expect(r.total.revenue).toBe(9_000)
+  })
+
+  it('a service with no status at all is still counted, never silently dropped', () => {
+    const r = serviceTypeBreakdown([], [{ service_type: 'advisory', fee: 4_000 }], 'year', now)
+    expect(r.advisory.count).toBe(1)
+    expect(r.advisory.revenue).toBe(0)
   })
 })
 

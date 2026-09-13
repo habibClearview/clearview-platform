@@ -11,6 +11,7 @@
 
 export interface FeeClient {
   id: string
+  status?: string | null
   engagement_mode: 'canvas' | 'financial'
   programme_id?: string | null
   engagement_fee?: number | null
@@ -107,6 +108,12 @@ export interface ClientTypeBreakdown {
   subscribers: ClientTypeBucket
   other: ClientTypeBucket
   total: ClientTypeBucket
+  /** Of total.count, how many engagements are still running, and how many
+   *  have been closed. The page header counts only the running ones, so a
+   *  tile that counts every client had to be able to say so rather than
+   *  quietly disagree with the line above it. */
+  running: number
+  closed: number
 }
 /**
  * The coach's real payer types (docs/gtcv/README.md's who-pays model): a
@@ -170,7 +177,11 @@ export function clientTypeBreakdown(
     count: clients.length,
     revenue: donorProgrammes.revenue + independentClients.revenue + subscribers.revenue + other.revenue,
   }
-  return { donorProgrammes, independentClients, subscribers, other, total }
+  // Closed engagements are counted, never dropped: money they paid inside the
+  // period is real and is in the revenue above, so removing them from the
+  // count would leave a figure with no clients behind it.
+  const closed = clients.filter(c => c.status === 'complete').length
+  return { donorProgrammes, independentClients, subscribers, other, total, running: clients.length - closed, closed }
 }
 
 export interface ServiceTypeBucket { count: number; revenue: number }
@@ -219,10 +230,17 @@ export function serviceTypeBreakdown(
     else if (c.engagement_mode === 'financial') { financial.count++; financial.revenue += paidInPeriod(c) }
     else { other.count++; other.revenue += paidInPeriod(c) }
   })
+  // A SERVICE THAT EXISTS IS COUNTED. 14 September 2026. Habib: there is one
+  // advisory service, it is not showing. Only 'active' rows were counted, so
+  // an advisory or market intelligence service that had been paused, or
+  // completed, or recorded with any other status, read as zero on this screen
+  // while the Clients tab listed it plainly. Two screens, two answers, one
+  // service. The count is now every service on record. Revenue still counts
+  // only what is live, because a paused service is not earning.
   serviceEngagements.forEach(se => {
-    if (se.status !== 'active') return
-    if (se.service_type === 'advisory') { advisory.count++; advisory.revenue += Number(se.fee) || 0 }
-    else if (se.service_type === 'portfolio_intelligence') { portfolioIntelligence.count++; portfolioIntelligence.revenue += Number(se.fee) || 0 }
+    const live = se.status === 'active'
+    if (se.service_type === 'advisory') { advisory.count++; if (live) advisory.revenue += Number(se.fee) || 0 }
+    else if (se.service_type === 'portfolio_intelligence') { portfolioIntelligence.count++; if (live) portfolioIntelligence.revenue += Number(se.fee) || 0 }
   })
   const total: ServiceTypeBucket = {
     count: canvas.count + financial.count + advisory.count + portfolioIntelligence.count + other.count,
