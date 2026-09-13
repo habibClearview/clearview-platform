@@ -212,11 +212,23 @@ export async function describeTables({ url, headers }) {
 
   // Two tables whose names differ only in a character we flatten would land on
   // one file, and the second would silently overwrite the first.
-  const taken = new Map()
+  //
+  // 13 September 2026, CodeRabbit, second round: my first attempt at this only
+  // worked for two. Three names flattening to the same thing gave a_b.json,
+  // a_b_2.json and a_b_2.json again, so the third quietly overwrote the
+  // second. Counting attempts per name was the wrong thing to count. What
+  // matters is whether the file itself is spoken for, so that is what is
+  // remembered, and the number climbs until it finds one that is not.
+  const taken = new Set()
   return names.map((name) => {
     let file = fileNameFor(name)
-    if (taken.has(file)) file = `${file.slice(0, -5)}_${taken.get(file)}.json`
-    taken.set(file, (taken.get(file) || 1) + 1)
+    if (taken.has(file)) {
+      const stem = file.slice(0, -5)
+      let suffix = 2
+      while (taken.has(`${stem}_${suffix}.json`)) suffix += 1
+      file = `${stem}_${suffix}.json`
+    }
+    taken.add(file)
     return { name, file, orderBy: orderColumnFor(defs[name]) }
   })
 }
@@ -367,8 +379,18 @@ export const run = async () => {
       // to skip straight past for a table that read as empty, so a table that
       // was empty when we looked and had rows by the time we finished went
       // into the backup as nothing at all, with no warning against it.
-      const now = await countOf(name, cfg).catch(() => null)
-      if (now !== null && now !== written) shifted.push(`${name}: copied ${written}, database now says ${now}`)
+      //
+      // AND A COUNT THAT COULD NOT BE ASKED FOR IS A FAILURE. 13 September
+      // 2026, CodeRabbit, second round. This used to shrug at a count it could
+      // not get, which quietly turned the check off for that table: the copy
+      // was kept and nothing said the one thing meant to catch a shifting
+      // table had not run. A check that can silently not happen is not a
+      // check. It has already been asked three times by the time it gives up.
+      const now = await countOf(name, cfg)
+      if (now === null) {
+        throw new Error(`${name}: copied, but the database would not say how many rows it holds, so the copy could not be checked`)
+      }
+      if (now !== written) shifted.push(`${name}: copied ${written}, database now says ${now}`)
 
       if (!written) {
         // An empty table is not worth a file. Ninety empty files make a folder

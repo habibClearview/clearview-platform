@@ -137,16 +137,32 @@ jobs:
             # never appears in the artifact, so a backup that has been changed
             # by anybody else will not match.
             #
-            # NOT THE SAME KEY AS THE ENCRYPTION. The review's second point:
-            # one secret doing both jobs is a smell even where it is not yet a
-            # hole. The fingerprint key is derived from the passphrase under a
-            # label of its own, so the two uses can never be the same bytes.
-            # Anybody rehearsing a restore reproduces it the same way.
-            hmac_key=$(printf '%s' "clearview-backup-hmac-v1:$BACKUP_PASSPHRASE" \
-              | openssl dgst -sha256 | awk '{print $NF}')
-            openssl dgst -sha256 -hmac "$hmac_key" out/records.tar.gz.enc \
+            # NOT THE SAME KEY, AND NOT A FAST ONE EITHER. Two rounds of
+            # review on this line, and the second caught a hole I had opened
+            # myself. My first fix derived the fingerprint key with a single
+            # SHA-256 of the passphrase. That is domain separation, which was
+            # the first point, but it handed somebody holding the artifact a
+            # way to test a guessed passphrase for the price of one SHA-256:
+            # derive, fingerprint, compare. The whole purpose of 600,000
+            # PBKDF2 rounds on the encryption is to make each guess expensive,
+            # and a fast published check beside it gave that cost away.
+            #
+            # The fingerprint key now costs the same 600,000 rounds, under a
+            # salt of its own so it can never be the encryption key. A guess is
+            # as expensive to test against the fingerprint as against the
+            # ciphertext. The salt is fixed and written here in the open on
+            # purpose: a salt is not a secret, and anybody rehearsing a restore
+            # has to be able to reproduce this exactly.
+            mac_key=$(openssl enc -aes-256-cbc -pbkdf2 -iter 600000 \
+              -S 4d41435f4b455930 -P -pass env:BACKUP_PASSPHRASE \
+              | awk -F= '/^key=/{print $2}')
+            if [ -z "$mac_key" ]; then
+              echo "::error::The fingerprint key could not be derived, so the backup was not kept."
+              exit 1
+            fi
+            openssl dgst -sha256 -hmac "$mac_key" out/records.tar.gz.enc \
               | awk '{print $NF}' > out/records.tar.gz.enc.hmac
-            unset hmac_key
+            unset mac_key
             echo "Records kept, encrypted, with a keyed fingerprint."
           else
             echo "::warning::No BACKUP_PASSPHRASE secret is set, so the records were read and"

@@ -258,6 +258,32 @@ describe('the files never move, only the records about them', () => {
   })
 })
 
+describe('two tables can never land on one file', () => {
+  it('gives a unique file to every table, even when three names flatten to one', async () => {
+    // 13 September 2026, CodeRabbit, second round. My first attempt counted
+    // attempts per name rather than asking whether the file was spoken for, so
+    // three names flattening to the same thing gave a_b.json, a_b_2.json and
+    // a_b_2.json again, and the third quietly overwrote the second. Two tables
+    // sharing a file is a table missing from the backup.
+    globalThis.fetch = serverWith({
+      'a/b': [{ id: 1 }],
+      'a:b': [{ id: 2 }],
+      'a b': [{ id: 3 }],
+    }) as any
+    await run()
+    const dir = await onlyRun()
+    const manifest = JSON.parse(await readFile(path.join(dir, '_manifest.json'), 'utf8'))
+    const files = Object.values(manifest.files) as string[]
+    expect(files).toHaveLength(3)
+    expect(new Set(files).size).toBe(3)
+    // And every one of them holds the row it was supposed to hold.
+    for (const [table, file] of Object.entries(manifest.files)) {
+      const rows = JSON.parse(await readFile(path.join(dir, file as string), 'utf8'))
+      expect(rows).toHaveLength(manifest.counts[table])
+    }
+  })
+})
+
 describe('a table that moves while it is being copied', () => {
   it('reads each table in a fixed order where it has a column to order by', async () => {
     // Without one, two pages of the same table are two unrelated questions,
@@ -274,6 +300,24 @@ describe('a table that moves while it is being copied', () => {
     await run()
     const manifest = JSON.parse(await readFile(path.join(await onlyRun(), '_manifest.json'), 'utf8'))
     expect(manifest.readWithoutAStableOrder).toEqual(['oddity'])
+  })
+
+  it('fails a table whose count the database will not give, rather than skipping the check', async () => {
+    // 13 September 2026, CodeRabbit, second round. This used to shrug at a
+    // count it could not get, which quietly turned off the one check meant to
+    // catch a table shifting underneath the copy. The copy was kept and
+    // nothing said the check had not run. A check that can silently not happen
+    // is not a check.
+    globalThis.fetch = vi.fn(async (url: string, init: any) => {
+      const u = String(url)
+      if (u.endsWith('/rest/v1/')) {
+        return { ok: true, json: async () => ({ definitions: { t: { properties: { id: {} } } } }) }
+      }
+      // The count is refused; the rows themselves read perfectly well.
+      if (init.headers?.Prefer === 'count=exact') return { ok: false, status: 404, text: async () => 'no' }
+      return { ok: true, headers: { get: () => null }, json: async () => [{ id: 1 }] }
+    }) as any
+    await expect(run()).rejects.toThrow(/could not be copied/)
   })
 
   it('names a table whose count changed underneath the copy', async () => {
@@ -525,22 +569,35 @@ describe('the records never leave in the clear', () => {
     expect(WORKFLOW).not.toContain('sha256sum out/records.tar.gz.enc')
   })
 
-  it('does not use the encryption passphrase as the fingerprint key', () => {
-    // 13 September 2026, the AI review: one secret doing both jobs is a smell
-    // even where it is not yet a hole. This runs the derivation the workflow
-    // runs rather than reading it, so a change to the recipe has to keep
-    // working rather than merely keep looking right.
-    const pass = 'a passphrase with spaces and a $dollar'
-    const derived = execFileSync('sh', ['-c',
-      `printf '%s' "clearview-backup-hmac-v1:$P" | openssl dgst -sha256 | awk '{print $NF}'`,
+  it('derives the fingerprint key slowly, so the published fingerprint is not a fast way to guess the passphrase', () => {
+    // Two rounds of review on this one line, and the second caught a hole I
+    // opened myself. My first fix separated the two keys with a single
+    // SHA-256, which handed somebody holding the artifact a way to test a
+    // guessed passphrase for the price of one hash: derive, fingerprint,
+    // compare. The whole point of 600,000 rounds on the encryption is that
+    // each guess is expensive, and a fast published check gave that away.
+    //
+    // This runs the real derivation rather than reading the file, so the
+    // recipe has to keep working rather than merely keep looking right.
+    const derive = (pass: string) => execFileSync('sh', ['-c',
+      `openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -S 4d41435f4b455930 -P -pass env:P` +
+      ` | awk -F= '/^key=/{print $2}'`,
     ], { env: { ...process.env, P: pass } }).toString().trim()
 
-    expect(derived).toMatch(/^[0-9a-f]{64}$/)
-    expect(derived).not.toContain(pass)
-    // And the workflow really does derive under that label rather than
-    // handing the passphrase straight to the fingerprint.
-    expect(WORKFLOW).toContain('clearview-backup-hmac-v1:')
+    const pass = 'a passphrase with spaces and a $dollar'
+    const key = derive(pass)
+    expect(key).toMatch(/^[0-9A-F]{64}$/)
+    expect(key).not.toContain(pass)
+    // Same passphrase, same key, or nobody can ever check an old backup.
+    expect(derive(pass)).toBe(key)
+    // A different passphrase cannot land on it.
+    expect(derive('a different passphrase')).not.toBe(key)
+
+    // And the workflow really does pay the same cost rather than handing the
+    // passphrase straight to the fingerprint.
+    expect(WORKFLOW).toContain('-pbkdf2 -iter 600000')
     expect(WORKFLOW).not.toContain('openssl dgst -sha256 -hmac "$BACKUP_PASSPHRASE"')
+    expect(WORKFLOW).toContain('openssl dgst -sha256 -hmac "$mac_key"')
   })
 
   it('a changed backup does not match its fingerprint', () => {
