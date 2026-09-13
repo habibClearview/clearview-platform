@@ -163,6 +163,9 @@ describe('the notices on My Business can be set aside, and it is stored in the d
   it('the first load never lands on top of a press made while it was loading', () => {
     expect(DASH).toContain('noticeTouched.current.add(key)')
     expect(DASH).toContain('if(!noticeTouched.current.has(r.notice_key))')
+    // And a press that did not land is not treated as a press. CodeRabbit
+    // on #263.
+    expect(DASH).toContain('noticeTouched.current.delete(key)')
   })
 
   it('a failed write puts the screen back rather than showing it as set aside', () => {

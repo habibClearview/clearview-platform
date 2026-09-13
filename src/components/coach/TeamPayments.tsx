@@ -840,9 +840,9 @@ td,th{padding:.5rem .6rem;border-bottom:1px solid #ddd} .tot{font-weight:700;fon
     // with no row is how we know that happened.
     const patch={status:'cancelled',cancelled_at:new Date().toISOString()}
     const {data:changed,error}=await supabase.from('coach_invoices').update(patch)
-      .eq('id',inv.id).neq('status','paid').select('id')
+      .eq('id',inv.id).eq('status','issued').select('id')
     if(error){setBusy(false);return setMsg('Could not cancel that invoice: '+error.message)}
-    if(!changed||changed.length===0){setBusy(false);return setMsg('That invoice was not cancelled. It has been marked paid since this page was loaded.')}
+    if(!changed||changed.length===0){setBusy(false);return setMsg('That invoice was not cancelled. Something changed it since this page was loaded, so nothing here was altered. Refresh and look again.')}
     const {data:putBack,error:advErr}=await supabase.from('coach_advances')
       .update({reconciled:false,reconciled_at:null,applied_invoice_id:null})
       .eq('applied_invoice_id',inv.id).select('id')
@@ -852,6 +852,20 @@ td,th{padding:.5rem .6rem;border-bottom:1px solid #ddd} .tot{font-weight:700;fon
     setInvoices(prev=>prev.map(i=>i.id!==inv.id?i:{...i,...patch}))
     setBusy(false)
     setMsg(`Invoice ${inv.invoice_number} cancelled.${putBackIds.length?` ${putBackIds.length} advance${putBackIds.length>1?'s':''} back to open.`:''}`)
+  }
+
+  // BOTH SIDES OF THE SAME DOOR. CodeRabbit on #263: cancelling refuses an
+  // invoice that is not issued, but marking one paid updated by id alone, so a
+  // screen loaded before a cancellation could still mark that cancelled
+  // invoice paid, and its advances would stay open against money recorded as
+  // received. Marking paid now requires the invoice to still be issued.
+  async function markPaid(inv){
+    const patch={status:'paid',paid_at:new Date().toISOString()}
+    const {data:changed,error}=await supabase.from('coach_invoices').update(patch)
+      .eq('id',inv.id).eq('status','issued').select('id')
+    if(error)return setMsg('Could not mark paid: '+error.message)
+    if(!changed||changed.length===0)return setMsg('That invoice was not marked paid. It is no longer issued, so something changed it since this page was loaded. Refresh and look again.')
+    setInvoices(prev=>prev.map(i=>i.id!==inv.id?i:{...i,...patch}))
   }
 
   // Removing it from the account altogether, for the test run that should
@@ -883,7 +897,7 @@ td,th{padding:.5rem .6rem;border-bottom:1px solid #ddd} .tot{font-weight:700;fon
               <div style={{display:'flex',gap:'0.4rem'}}>
                 <button style={addBtn(true)} onClick={()=>download(alreadyIssued)}>Download</button>
                 {canApprove&&alreadyIssued.status!=='paid'&&<button style={addBtn(true,C.red)} disabled={busy} onClick={()=>cancelInvoice(alreadyIssued)}>Cancel invoice</button>}
-                {canApprove&&alreadyIssued.status!=='paid'&&<button style={solidBtn(C.green,true)} onClick={async()=>{const patch={status:'paid',paid_at:new Date().toISOString()};const {error}=await supabase.from('coach_invoices').update(patch).eq('id',alreadyIssued.id);if(error)return setMsg('Could not mark paid: '+error.message);setInvoices(prev=>prev.map(i=>i.id!==alreadyIssued.id?i:{...i,...patch}))}}>Mark paid</button>}
+                {canApprove&&alreadyIssued.status!=='paid'&&<button style={solidBtn(C.green,true)} onClick={()=>markPaid(alreadyIssued)}>Mark paid</button>}
               </div>
             </div>
           </div>

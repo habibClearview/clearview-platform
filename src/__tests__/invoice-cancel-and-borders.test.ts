@@ -48,9 +48,14 @@ describe('an issued invoice can be withdrawn', () => {
     // CodeRabbit on #262: the status check reads whatever this browser last
     // loaded, so an invoice marked paid in another session could still be
     // cancelled or deleted here.
-    expect(TEAM).toContain(".eq('id',inv.id).neq('status','paid').select('id')")
+    expect(TEAM).toContain(".eq('id',inv.id).eq('status','issued').select('id')")
     expect(TEAM).toContain(".eq('id',inv.id).in('status',['draft','cancelled']).select('id')")
-    expect(TEAM).toContain('It has been marked paid since this page was loaded.')
+    expect(TEAM).toContain('Something changed it since this page was loaded')
+    // And the other side of the same door: marking one paid requires it to
+    // still be issued, so a screen loaded before a cancellation cannot mark a
+    // cancelled invoice paid and leave its advances open. CodeRabbit on #263.
+    expect(TEAM).toContain('async function markPaid(inv)')
+    expect(TEAM).toContain('It is no longer issued, so something changed it since this page was loaded.')
   })
 
   it('cancelling puts back every advance the invoice retired', () => {
