@@ -133,8 +133,21 @@ describe('it never claims to have worked when it has not', () => {
 
   it('reads the copy back before saying it is a copy', async () => {
     expect(SCRIPT).toContain('READ IT BACK BEFORE CLAIMING IT WORKED')
-    expect(SCRIPT).toContain('if (reread !== rowTotal)')
     expect(SCRIPT).toContain('The copy is not trustworthy')
+  })
+
+  it('checks every table on its own, not just the grand total', () => {
+    // The review caught that comparing only the total would pass a bug that
+    // lost ten rows from one table and gained ten in another, which is the
+    // shape a real bug here would take.
+    expect(SCRIPT).toContain('TABLE BY TABLE, NOT JUST THE TOTAL')
+    expect(SCRIPT).toContain('got !== counts[table]')
+  })
+
+  it('refuses a database that names no tables at all', async () => {
+    // An empty table list would otherwise produce a cheerful backup of nothing.
+    globalThis.fetch = serverWith({}) as any
+    await expect(run()).rejects.toThrow(/named no tables/)
   })
 
   it('fails the job when the credentials are missing, rather than passing quietly', () => {
@@ -146,12 +159,48 @@ describe('it never claims to have worked when it has not', () => {
   })
 })
 
-describe('where the copy is kept', () => {
+describe('the records never leave in the clear', () => {
+  // 13 September 2026. The first version of this uploaded every client record
+  // as a plain build artifact. The AI review refused it and was right: anybody
+  // with read access to the repository, or any leaked token carrying
+  // actions:read, could have downloaded the whole customer database, and it
+  // would have sat there for ninety days. A worse front door than the database
+  // it was copying. These tests hold the fix.
+
+  it('encrypts the records before anything is uploaded', () => {
+    expect(WORKFLOW).toContain('openssl enc -aes-256-cbc -pbkdf2')
+    expect(WORKFLOW).toContain('-pass env:BACKUP_PASSPHRASE')
+  })
+
+  it('keeps nothing but the manifest when there is no passphrase', () => {
+    // Safe by default: no setup, no records stored, and the nightly proof that
+    // every record can still be read is kept either way.
+    expect(WORKFLOW).toContain('NOT kept. Only the manifest is stored')
+  })
+
+  it('deletes the plain files inside the job, before anything is uploaded', () => {
+    expect(WORKFLOW).toContain('rm -rf backup')
+    expect(WORKFLOW.indexOf('rm -rf backup')).toBeLessThan(WORKFLOW.indexOf('upload-artifact'))
+  })
+
+  it('uploads only the folder it built deliberately, never the raw one', () => {
+    expect(WORKFLOW).toContain('path: out/')
+    expect(WORKFLOW).not.toContain('path: backup/')
+  })
+
+  it('carries no records in the manifest, only names and counts', () => {
+    expect(SCRIPT).toContain('THE MANIFEST CARRIES NO RECORDS')
+  })
+
+  it('keeps it for thirty days rather than ninety', () => {
+    // A record somebody has asked to have deleted should not outlive that
+    // request by a season.
+    expect(WORKFLOW).toContain('retention-days: 30')
+    expect(WORKFLOW).not.toContain('retention-days: 90')
+  })
+
   it('is kept off the repository, because a git history cannot be unpicked', () => {
-    // A record deleted at somebody's request has to actually go, and it cannot
-    // if it is also a commit nobody can remove.
     expect(WORKFLOW).toContain('upload-artifact')
-    expect(WORKFLOW).toContain('retention-days: 90')
     expect(WORKFLOW).not.toContain('git commit')
   })
 

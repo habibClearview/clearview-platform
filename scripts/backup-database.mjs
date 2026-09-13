@@ -25,6 +25,22 @@
 // receipts or the signed documents: those are large files in storage rather
 // than records, and quietly writing somebody's voice to a second place is a
 // decision that belongs to a person, not to a nightly job.
+//
+// THE RECORDS NEVER LEAVE HERE IN THE CLEAR. 13 September 2026, after the AI
+// review refused the first version of this and was right to.
+//
+// The first version wrote every client record into a GitHub build artifact.
+// I had been pleased with myself for keeping them out of the git history, and
+// missed that an artifact is barely better: anybody with read access to the
+// repository, or any leaked token carrying actions:read, could have downloaded
+// the whole customer database, and it would have sat there for ninety days.
+// For a platform holding people's names, addresses and money, that is a worse
+// front door than the database it was copying.
+//
+// So this script writes the records to a folder and stops. What happens to
+// that folder is the workflow's business, and the workflow will not let it
+// leave unencrypted. The one thing that always travels is the manifest, which
+// is table names and counts and nothing else.
 // ============================================================
 import { writeFile, mkdir } from 'node:fs/promises'
 import path from 'node:path'
@@ -49,7 +65,9 @@ export async function tableNames({ url, headers }) {
   const res = await fetch(`${url}/rest/v1/`, { headers })
   if (!res.ok) throw new Error(`Could not read the table list (${res.status})`)
   const spec = await res.json()
-  return Object.keys(spec.definitions || spec.components?.schemas || {}).sort()
+  const names = Object.keys(spec.definitions || spec.components?.schemas || {}).sort()
+  if (!names.length) throw new Error('The database named no tables at all, which cannot be right.')
+  return names
 }
 
 /** Every row of one table, in pages, so a large one cannot be half copied. */
@@ -58,7 +76,7 @@ export async function rowsOf(table, { url, headers }) {
   const all = []
   for (let from = 0; ; from += PAGE) {
     const res = await fetch(`${url}/rest/v1/${encodeURIComponent(table)}?select=*`, {
-      headers: { ...headers, Range: `${from}-${from + PAGE - 1}`, Prefer: 'count=exact' },
+      headers: { ...headers, Range: `${from}-${from + PAGE - 1}` },
     })
     // A table this key cannot read is reported rather than silently skipped.
     if (!res.ok) throw new Error(`${table}: ${res.status} ${await res.text().catch(() => '')}`.slice(0, 200))
@@ -92,6 +110,9 @@ export const run = async () => {
     }
   }
 
+  // THE MANIFEST CARRIES NO RECORDS. Table names and counts only, so it is the
+  // one thing safe to hand to anybody who can see the build, and it is what
+  // proves the job ran and what it found.
   const manifest = {
     takenAt: new Date().toISOString(),
     project: cfg.url,
@@ -100,21 +121,32 @@ export const run = async () => {
     rows: rowTotal,
     counts,
     failed,
+    // The list comes from what the API is willing to describe. A table the API
+    // does not expose is not in it, and would otherwise be absent without
+    // anybody noticing, so the limit is written down rather than assumed away.
+    scope: 'Every table the REST API exposes. A table hidden from the API is not copied.',
   }
   await writeFile(path.join(dir, '_manifest.json'), JSON.stringify(manifest, null, 2))
 
   // READ IT BACK BEFORE CLAIMING IT WORKED. A file of the right size that
   // cannot be parsed is the failure this whole job exists to prevent, and it
   // is invisible unless something opens it.
+  //
+  // TABLE BY TABLE, NOT JUST THE TOTAL. The review caught that comparing only
+  // the grand total would pass a bug that lost ten rows from one table and
+  // gained ten in another, which is the shape a real bug here would take.
   const { readFile, readdir } = await import('node:fs/promises')
-  let reread = 0
+  const wrong = []
   for (const f of await readdir(dir)) {
     if (f === '_manifest.json') continue
-    const parsed = JSON.parse(await readFile(path.join(dir, f), 'utf8'))
-    reread += parsed.length
+    const table = f.replace(/\.json$/, '')
+    let got = null
+    try { got = JSON.parse(await readFile(path.join(dir, f), 'utf8')).length } catch { got = null }
+    if (got !== counts[table]) wrong.push(`${table}: wrote ${counts[table]}, read back ${got === null ? 'nothing readable' : got}`)
   }
-  if (reread !== rowTotal) {
-    console.error(`::error::Wrote ${rowTotal} rows but could only read back ${reread}. The copy is not trustworthy.`)
+  if (wrong.length) {
+    for (const w of wrong) console.error(`::error::${w}`)
+    console.error('::error::The copy is not trustworthy. Nothing has been kept.')
     process.exit(1)
   }
 

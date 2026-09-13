@@ -5,13 +5,30 @@ name: A second copy of every record
 # there is no way to open one and check it is right without destroying what is
 # there, and nobody had ever read one. An untested backup is a belief.
 #
-# This takes a plain, readable copy of every record, reads every line of it
-# back before it claims to have worked, and keeps it somewhere that is not
-# Supabase. Kept for 90 days, which is a good deal longer than the seven days
-# of snapshots the project itself holds.
+# THE RECORDS NEVER LEAVE THIS JOB IN THE CLEAR.
 #
-# It runs every night at half past two in the morning UTC, which is half past
-# three in Lagos: after the day's work and before anybody starts.
+# The first version of this uploaded every client record as a plain build
+# artifact. The AI review refused it and was right: anybody with read access to
+# this repository, or any leaked token carrying actions:read, could have
+# downloaded the whole customer database and it would have sat there for ninety
+# days. That is a worse front door than the database it was copying.
+#
+# So there are two things this job can produce, and which one depends on
+# whether a passphrase has been set.
+#
+#   WITHOUT a passphrase, which is the default and needs no setup: only the
+#   manifest is kept. Table names and row counts, no records. That still proves
+#   every night that every record can be read and parsed, which is the failure
+#   that is otherwise invisible until the day you need the data.
+#
+#   WITH the BACKUP_PASSPHRASE secret set: the records are also kept, encrypted
+#   with AES-256 before they go anywhere. Somebody who downloads the artifact
+#   has a file they cannot open. Thirty days rather than ninety, because a
+#   record somebody has asked to have deleted should not outlive that request
+#   by a season.
+#
+# The plain files are deleted inside the job before anything is uploaded, so
+# there is no window in which they could be picked up.
 
 on:
   schedule:
@@ -32,6 +49,7 @@ jobs:
     env:
       SUPABASE_URL: ${{ vars.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -41,7 +59,7 @@ jobs:
           node-version: '20'
 
       # Where the credentials are absent this FAILS rather than passing
-      # quietly, for the same reason the row level security gate does: a green
+      # quietly, for the same reason the row level security gate does. A green
       # tick that means "did not look" is worse than no tick at all, and on a
       # backup it is the worst of the lot, because the day you find out is the
       # day you needed it.
@@ -53,17 +71,45 @@ jobs:
             exit 1
           fi
 
-      - name: Take the copy
+      - name: Take the copy and read every line of it back
         run: node scripts/backup-database.mjs
 
-      # The copy is kept as a build artifact rather than committed to the
-      # repository, because it holds client records and a git history is for
-      # ever: a record deleted at somebody's request has to actually go, and it
-      # cannot if it is also a commit nobody can remove.
-      - name: Keep it for 90 days
+      # Encrypted before it can be uploaded, or not kept at all. There is no
+      # third path: the plain files are removed either way, in this same step,
+      # so they cannot be picked up by anything that runs later.
+      - name: Lock the records, or discard them
+        run: |
+          set -euo pipefail
+          dir=$(find backup -mindepth 1 -maxdepth 1 -type d | head -1)
+          mkdir -p out
+          cp "$dir/_manifest.json" out/_manifest.json
+
+          if [ -n "${BACKUP_PASSPHRASE:-}" ]; then
+            tar -czf records.tar.gz -C "$dir" .
+            # AES-256 with a derived key. Somebody holding the artifact and not
+            # the passphrase has a file they cannot open.
+            openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
+              -in records.tar.gz -out out/records.tar.gz.enc \
+              -pass env:BACKUP_PASSPHRASE
+            rm -f records.tar.gz
+            echo "Records kept, encrypted."
+          else
+            echo "::warning::No BACKUP_PASSPHRASE secret is set, so the records were read and"
+            echo "::warning::checked but NOT kept. Only the manifest is stored. Set that secret"
+            echo "::warning::to start keeping an encrypted copy."
+          fi
+
+          # The plain records go, always, before anything leaves this job.
+          rm -rf backup
+          ls -la out
+
+      - name: Keep what is safe to keep
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
           name: clearview-records-${{ github.run_id }}
-          path: backup/
-          retention-days: 90
+          path: out/
+          # Thirty days, not ninety. A record somebody has asked to have
+          # deleted should not outlive that request by a season, and a shorter
+          # window is a smaller thing to explain to a funder.
+          retention-days: 30
           if-no-files-found: error
