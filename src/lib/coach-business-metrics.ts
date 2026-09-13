@@ -272,7 +272,9 @@ export function monthlyTeamCost(invoices: CoachInvoiceForCost[], periods: string
   const out: Record<string, number> = {}
   periods.forEach(p => { out[p] = 0 })
   invoices.forEach(inv => {
-    if (inv.status === 'draft') return
+    // A withdrawn invoice is not a cost. See the 2026_09_14_invoice_cancel
+    // migration: a cancelled invoice is ignored wherever a live one counts.
+    if (inv.status === 'draft' || inv.status === 'cancelled') return
     if (!(inv.period in out)) return
     out[inv.period] += (Number(inv.time_amount) || 0) + (Number(inv.expenses_amount) || 0)
   })

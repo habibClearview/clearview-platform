@@ -776,14 +776,19 @@ function InviteLoginButton({email,fullName,role,coImplementerId,funderProgrammeI
 function WelcomeLetterButton({coImplementerId}){
   const [busy,setBusy]=useState(false)
   const [msg,setMsg]=useState(null)
-  async function send(){
+  const [sentAlready,setSentAlready]=useState(false)
+  async function send(resend){
+    // A sign-in link expires. Sending again is how somebody whose link went
+    // stale gets back in, and it is behind its own question so it can never
+    // happen by a stray press.
+    if(resend&&typeof window!=='undefined'&&!window.confirm('Send the welcome letter again?\n\nThey get the same letter with a new sign-in link. Use this when their first link has expired.'))return
     setBusy(true);setMsg(null)
     try{
       const {data:{session}}=await supabase.auth.getSession()
       const res=await fetch('/api/co-implementer-welcome',{
         method:'POST',
         headers:{'Content-Type':'application/json',...(session?.access_token?{Authorization:`Bearer ${session.access_token}`}:{})},
-        body:JSON.stringify({coImplementerId}),
+        body:JSON.stringify({coImplementerId,...(resend?{resend:true}:{})}),
       })
       const data=await res.json()
       if(!res.ok)setMsg(data.error||'The letter did not send.')
@@ -792,18 +797,22 @@ function WelcomeLetterButton({coImplementerId}){
       // truth beats "Invalid Date".
       else if(data.alreadySent){
         const when=data.sentAt?new Date(data.sentAt):null
+        setSentAlready(true)
         setMsg(when&&!Number.isNaN(when.getTime())?('Already sent on '+when.toLocaleDateString()+'.'):'Already sent.')
       }
-      else if(data.ok)setMsg('Sent to '+data.sentTo+'.')
+      else if(data.ok){setSentAlready(true);setMsg('Sent to '+data.sentTo+', with their sign-in link.')}
       else setMsg(data.reason||'The letter did not send.')
     }catch(e){setMsg('The letter did not send: '+e.message)}
     setBusy(false)
   }
   return(
     <div style={{display:'flex',alignItems:'center',gap:'0.5rem',flexWrap:'wrap'}}>
-      <button style={addBtn(true,C.teal)} disabled={busy} onClick={send}
-        title="Sends the welcome letter: what the role is, who they report to, and how to use the platform. It goes once.">
-        {busy?'Sending…':'Send welcome letter'}</button>
+      <button style={addBtn(true,C.teal)} disabled={busy} onClick={()=>send(false)}
+        title="Sends the one letter: what the role is, who they report to, how to use the platform, and the button that signs them in and sets their password. It goes once.">
+        {busy?'Sending…':'Send welcome letter and sign-in'}</button>
+      {sentAlready&&<button style={addBtn(true,C.slate)} disabled={busy} onClick={()=>send(true)}
+        title="Sends the same letter again with a fresh sign-in link. Use this when their first link has expired.">
+        Send again with a new link</button>}
       {msg&&<span style={{fontSize:'0.93rem',color:C.slate}}>{msg}</span>}
     </div>
   )
@@ -3205,12 +3214,19 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
       <div>
         {canManageTeam(userRole)&&<CoImplementerLetterPanel/>}
         {showNewCI&&<NewCIForm clients={clients} onSave={async ci=>{const {data,error}=await supabase.from('co_implementers').insert([ci]).select().single();if(!error&&data){setCoImplementers(prev=>[...prev,data]);setShowNewCI(false)}}} onCancel={()=>setShowNewCI(false)}/>}
+        {/* ONE LETTER, NOT TWO. 14 September 2026. Habib: I do not want to
+            send another email to the co-implementer, they should have the link
+            to register and sign on to the platform. "Invite login" sent a
+            second, separate Supabase message, so a new person received two
+            emails from two senders and the one that explained anything could
+            not be acted on. The welcome letter now carries the sign-in itself,
+            so that button is gone from here. It stays on the funder card,
+            which has no letter of its own. */}
         <TeamPayments
           coImplementers={coImplementers} setCoImplementers={setCoImplementers}
           clients={clients} userName={userName}
           canApprove={canApproveTimesheets(userRole)} canManage={canManageTeam(userRole)}
           updateCI={updateCI}
-          renderInvite={ci=><InviteLoginButton email={ci.email} fullName={ci.name} role="coach" coImplementerId={ci.id} funderProgrammeId={null}/>}
           renderWelcome={canManageTeam(userRole)?(ci=><WelcomeLetterButton coImplementerId={ci.id}/>):null}
           addMemberNode={canManageTeam(userRole)?addMemberNode:null}
         />

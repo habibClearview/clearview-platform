@@ -9,11 +9,29 @@
 // person joining the team knows none of that. Every term is now explained the
 // first time it is used, in the words somebody would use out loud.
 //
+// ONE LETTER, NOT TWO. 14 September 2026. Habib: I do not want to send another
+// email to the co-implementer, they should have the link to register and sign
+// on to the platform. The letter used to say the sign-in would arrive
+// separately, which left a new person holding an explanation of a platform
+// they could not open, waiting on a second message. The sign-in link is now
+// generated and put in this letter, and the separate invite button is gone
+// from the Team screen. See app/api/co-implementer-welcome/route.ts.
+//
+// It also now says how to use the platform in the order the work is actually
+// done, and where the guide for each session is kept for each of the four
+// services, which is the Guidance Library on the Coach Quick Reference tab.
+//
 // The text below is the letter as generated. A super coach can edit it on the
 // Team screen and the edit is saved; "Start again" brings this back. The
 // markup is the same as the other welcome letters: a line starting with # is a
 // heading, a line starting with - is a bullet, and a blank line separates
 // paragraphs. See src/lib/letter.ts.
+//
+// The sign-in link is NOT part of this text and must never be pasted into it.
+// It is a one-time link minted for one person at the moment of sending, and it
+// arrives as the button under the letter. That way an edited letter cannot
+// carry a stale link, and a saved letter holds nothing that would sign
+// somebody in if it were read by the wrong person.
 // ============================================================
 
 export const CO_IMPLEMENTER_LETTER_KEY = 'co_implementer_welcome'
@@ -44,14 +62,42 @@ The method is called the Grant-to-Commercial Viability Canvas. In plain terms it
 - Anything that changes what a client has been promised, what the work covers, or when it will be finished, goes to the lead coach before it goes to the client.
 - If you think we are about to write down something that is not true, say so. That matters more than being agreeable.
 
-# The platform
+# The platform, and how to get in
 
-Everything is kept in one place, on a website. Your sign in arrives in a separate email, with a button that signs you in and asks you to choose your own password. There is nothing to install.
+Everything is kept in one place, on a website. There is nothing to install and there is no second email coming. The button at the end of this letter is your way in: press it, choose your own password, and you are signed in. Use the same email address this letter arrived at every time you sign in afterwards.
+
+If the button has stopped working by the time you press it, which happens when a link has sat in an inbox for several days, reply to this email and a fresh one will be sent.
 
 When you sign in you will see two sections and no others.
 
 - Clients. Every business assigned to you, shown as a card. Opening one takes you into that engagement at the step it has reached.
 - My Timesheet and Expenses. Your own record, in four parts: Timesheets, Expenses, Advances and Invoice.
+
+# How to use it, in the order you will need it
+
+Work through it in this order and nothing will be a surprise. Sign in and set your password. Open Clients and press the card for the business you have been asked to work on. Read its Cover, which is the front page and says who is on the engagement and what was agreed. Move to the step the engagement has reached and read the question it is deciding. Do the work. Write what you found where the step asks for it, and record the decision the business made, in their words. At the end of the day, open My Timesheet and Expenses and enter the hours you spent and anything you paid for on the client's behalf. That is the whole loop, and it is the same loop every day.
+
+Two things are worth knowing early. Nothing you type is hidden from the business: they open the same pages from their side. And nothing saves itself into an invoice until the lead coach has approved it, so entering your time promptly is what gets you paid promptly.
+
+# Where the guide for each session is
+
+You are never expected to remember how a session runs. Every guide is on the platform itself, inside the business you are working on, on the tab called Coach Quick Reference. A client and a funder never see that tab.
+
+It holds a library with these shelves, and the guide you want for a session is nearly always on the second one.
+
+- The method. The canvas itself, the nine decision points and the gates.
+- Running a session. How each session is run, who must be in the room, and what it has to produce.
+- Templates and forms. What is filled in during the work: tables, capture forms and checklists.
+- Reference. Background reading, worked examples and anything that does not belong above.
+
+We offer four services, and the guide for each is in that same library.
+
+- Grant-to-Commercial Viability Canvas, which we shorten to GtCV. The nine-step method described above. Its session guides are under Running a session, one per decision point.
+- Clearview financial model. The business's own numbers: what it earns, what it spends, and what that means for whether it can carry itself. Its guides cover how to collect a business's real figures and how to talk them through what the model shows.
+- Clearview Advisory. Shorter pieces of advice outside a full canvas engagement. The guides cover what is in scope and what is not.
+- Market Intelligence. A subscription to what is happening in the markets a client sells into. The guides cover what a client gets and how often.
+
+If a business is not on a service, you will not see that part of their engagement. That is the system deciding, not something to work around.
 
 # Inside a business
 
@@ -69,7 +115,7 @@ When you sign in you will see two sections and no others.
 
 # In your first week
 
-- Sign in and set your password.
+- Press the button at the end of this letter, set your password, and sign in.
 - Check the details held about you: your name, email, phone, country and specialisation. Tell the lead coach if any of it is wrong.
 - Open each business assigned to you and read its Cover before anything else.
 - Enter your first timesheet on the day you do the work, so the habit starts straight away.

@@ -27,9 +27,16 @@
   --cv-header:      #1B2A41;  /* navy header + table head background */
   --cv-nav:         #142038;  /* sub-nav bar background */
 
-  /* Borders & shadow */
-  --cv-border:      #D8E0E8;
-  --cv-border-soft: #E6ECF2;
+  /* Borders & shadow
+     A BORDER NOBODY CAN SEE IS NOT A BORDER. 14 September 2026. Habib: the
+     borders around the card, the chart and the other section are not visible
+     on the Team tab. They were not visible anywhere. --cv-border-soft was
+     #E6ECF2 against a #FDFBF7 card sitting on a #F5F0E8 page, which is three
+     shades of the same near-white, so every card edge on the platform
+     disappeared and the sections ran into one another. Both are darkened
+     here, keeping soft the lighter of the two, so a card reads as a card. */
+  --cv-border:      #C9D4DF;
+  --cv-border-soft: #D8E1EA;
   --cv-shadow-1:    rgba(16,42,67,0.05);
   --cv-shadow-2:    rgba(16,42,67,0.06);
 
@@ -112,9 +119,9 @@
   --cv-header:      #14243B;
   --cv-nav:         #0C1728;
 
-  /* Borders & shadow */
-  --cv-border:      rgba(255,255,255,0.10);
-  --cv-border-soft: rgba(255,255,255,0.08);
+  /* Borders & shadow -- same fault in the dark theme, same fix. */
+  --cv-border:      rgba(255,255,255,0.20);
+  --cv-border-soft: rgba(255,255,255,0.14);
   --cv-shadow-1:    rgba(0,0,0,0.35);
   --cv-shadow-2:    rgba(0,0,0,0.45);
 
