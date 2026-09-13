@@ -112,6 +112,31 @@ describe('the site itself reads the address through one place', () => {
   })
 })
 
+describe('the build never touches the live database', () => {
+  // 13 September 2026. The build step preferred the real repository variables
+  // and fell back to placeholders. Nobody had set the variables, so every
+  // build had always used the placeholders and nobody knew it mattered. The
+  // hour SUPABASE_URL was set to the real address, the build HUNG: static
+  // generation started making real calls to the live database on every pull
+  // request, and one of them never came back.
+  //
+  // A build proves the code compiles. Reading a client's records is no part of
+  // that, and a pull request from anybody must never reach production data.
+  const BUILD = readFileSync('.github/workflows/build-and-test.yml', 'utf8')
+
+  it('uses fixed placeholders, never the repository variables', () => {
+    expect(BUILD).toContain("NEXT_PUBLIC_SUPABASE_URL: 'https://placeholder.supabase.co'")
+    expect(BUILD).toContain("NEXT_PUBLIC_SUPABASE_ANON_KEY: 'placeholder-anon-key'")
+    expect(BUILD).not.toContain('vars.SUPABASE_URL')
+    expect(BUILD).not.toContain('vars.SUPABASE_ANON_KEY')
+  })
+
+  it('and carries no service role key at all', () => {
+    // The build has never needed it, and a key that is not there cannot leak.
+    expect(BUILD).not.toContain('SUPABASE_SERVICE_ROLE_KEY')
+  })
+})
+
 describe('restoring a backup tells absent apart from unreadable', () => {
   const RESTORE = readFileSync('scripts/restore-database.mjs', 'utf8')
 
