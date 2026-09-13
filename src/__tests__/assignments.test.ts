@@ -17,11 +17,16 @@ import { describe, it, expect } from 'vitest'
 import {
   practiceShape, moneyByPayer, moneyByService, assignmentMoney,
   monthlyAssignmentRevenue, servicesOf, payerIdOf, servedIdsOf, assignmentLabel,
-  assignmentsFromDeals, servedFromProgrammes, dealAssignmentId, withCorrectedPayer,
+  assignmentsFromDeals, servedFromProgrammes, dealAssignmentId, withCorrectedPayer, leadingCurrency,
   type Assignment, type AssignmentServed,
 } from '@/lib/assignments'
 
 const now = new Date('2026-09-14T00:00:00Z')
+
+// Every figure is a list, one entry per currency, because pounds and dollars
+// are never added together. This reads one currency out of such a list.
+const inCur = (list: { currency: string | null; amount: number }[], cur: string) =>
+  list.find(e => e.currency === cur)?.amount ?? 0
 
 // Two payers. Three assignments. Three organisations served.
 const CSJ_ADVISORY_AND_MODEL: Assignment = {
@@ -47,6 +52,13 @@ const TANAGER_GTCV: Assignment = {
   fee_status: 'invoiced', fee_invoiced_at: '2026-09-02',
 }
 const ASSIGNMENTS = [CSJ_ADVISORY_AND_MODEL, CSJ_NEW_ADVISORY, TANAGER_GTCV]
+// Every Pipeline deal is its own row in programmes, so the won Climate Smart
+// Jobs advisory sits on a different id under the same payer. The payer's name
+// is what is on the invoice, so the name is what identifies them.
+const NAMES: Record<string, string> = {
+  csj: 'Climate Smart Jobs', csj2: 'Climate Smart Jobs', tanager: 'Tanager',
+}
+const payerName = (id: string) => NAMES[id] || id
 const SERVED: AssignmentServed[] = [
   { engagement_id: 'a1', client_id: 'bwaeyale' },
   { engagement_id: 'a1', client_id: 'viester' },
@@ -102,8 +114,8 @@ describe('the money sits with the payer, once per assignment', () => {
   it('adds up both Climate Smart Jobs assignments under Climate Smart Jobs', () => {
     expect(csj?.assignments).toBe(2)
     expect(csj?.organisationsServed).toBe(2)
-    expect(csj?.collected).toBe(30_000)
-    expect(csj?.awaitingIssue).toBe(12_000)
+    expect(inCur(csj?.collected || [], 'USD')).toBe(30_000)
+    expect(inCur(csj?.awaitingIssue || [], 'USD')).toBe(12_000)
   })
 
   it('shows the won assignment money even though it serves nobody', () => {
@@ -111,20 +123,20 @@ describe('the money sits with the payer, once per assignment', () => {
     // the fee hung off a served organisation, so this 12,000 was invisible.
     const onlyTheWonOne = moneyByPayer([CSJ_NEW_ADVISORY], [], 'month', now)
     expect(onlyTheWonOne).toHaveLength(1)
-    expect(onlyTheWonOne[0].awaitingIssue).toBe(12_000)
+    expect(inCur(onlyTheWonOne[0].awaitingIssue, 'USD')).toBe(12_000)
     expect(onlyTheWonOne[0].organisationsServed).toBe(0)
   })
 
   it('keeps Tanager apart, with its own invoice outstanding', () => {
     expect(tanager?.assignments).toBe(1)
     expect(tanager?.organisationsServed).toBe(1)
-    expect(tanager?.invoicedNotPaid).toBe(18_000)
-    expect(tanager?.collected).toBe(0)
+    expect(inCur(tanager?.invoicedNotPaid || [], 'USD')).toBe(18_000)
+    expect(tanager?.collected).toEqual([])
   })
 
   it('counts collected money only inside the chosen period', () => {
-    const lastYear = moneyByPayer(ASSIGNMENTS, SERVED, 'month', new Date('2026-10-14T00:00:00Z'))
-    expect(lastYear.find(l => l.payerId === 'csj')?.collected).toBe(0)
+    const lastYear = moneyByPayer(ASSIGNMENTS, SERVED, 'month', new Date('2026-10-14T00:00:00Z'), payerName)
+    expect(lastYear.find(l => l.payer === 'Climate Smart Jobs')?.collected).toEqual([])
   })
 })
 
@@ -140,19 +152,52 @@ describe('money by service', () => {
     expect(line('canvas')?.assignments).toBe(1)
   })
 
+  it('counts PAYING CLIENTS per service, which is the figure Habib works from', () => {
+    // Climate Smart Jobs bought advisory twice; that is one paying client for
+    // advisory, not two. Recording the same work twice cannot inflate it.
+    const r = moneyByService(ASSIGNMENTS, 'month', now, undefined, payerName)
+    const l = (s: string) => r.services.find(x => x.service === s)
+    expect(l('advisory')?.payingClients).toBe(1)
+    expect(l('canvas')?.payingClients).toBe(1)
+    expect(l('financial')?.payingClients).toBe(1)
+  })
+
   it('never divides a fee that covers more than one service', () => {
     // No record says how 30,000 splits between advisory and the model, so it
     // is not split. It sits on its own line.
-    expect(line('advisory')?.ownRevenue).toBe(0)
-    expect(line('financial')?.ownRevenue).toBe(0)
+    expect(line('advisory')?.ownRevenue).toEqual([])
+    expect(line('financial')?.ownRevenue).toEqual([])
     expect(split.combinedAssignments).toBe(1)
-    expect(split.combinedRevenue).toBe(30_000)
+    expect(inCur(split.combinedRevenue, 'USD')).toBe(30_000)
   })
 
-  it('still adds up to the money collected', () => {
-    const ownSum = split.services.reduce((s, l) => s + l.ownRevenue, 0)
-    expect(ownSum + split.combinedRevenue).toBe(split.total)
-    expect(split.total).toBe(30_000)
+  it('still adds up to the money collected, within each currency', () => {
+    const ownSum = split.services.reduce((s, l) => s + inCur(l.ownRevenue, 'USD'), 0)
+    expect(ownSum + inCur(split.combinedRevenue, 'USD')).toBe(inCur(split.total, 'USD'))
+    expect(inCur(split.total, 'USD')).toBe(30_000)
+  })
+
+  // POUNDS AND DOLLARS ARE NEVER ADDED TOGETHER. Habib: "I do not know how
+  // £5k and $35000 add up to £40k." They do not, and no exchange rate is
+  // recorded anywhere on this platform, so inventing one would turn a wrong
+  // total into a confident wrong total.
+  it('keeps two currencies as two figures', () => {
+    const mixed: Assignment[] = [
+      { id: 'gbp', payer_programme_id: 'csj', service_types: ['advisory'], fee: 5_000, fee_currency: 'GBP', fee_status: 'paid', fee_paid_at: '2026-09-01' },
+      { id: 'usd', payer_programme_id: 'tanager', service_types: ['canvas'], fee: 35_000, fee_currency: 'USD', fee_status: 'paid', fee_paid_at: '2026-09-01' },
+    ]
+    const r = moneyByService(mixed, 'month', now, undefined, payerName)
+    expect(r.total).toHaveLength(2)
+    expect(inCur(r.total, 'GBP')).toBe(5_000)
+    expect(inCur(r.total, 'USD')).toBe(35_000)
+    const m = assignmentMoney(mixed, 'month', now)
+    expect(m.collected).toHaveLength(2)
+    expect(inCur(m.collected, 'GBP')).toBe(5_000)
+    expect(inCur(m.collected, 'USD')).toBe(35_000)
+    // And a chart can only be drawn in one of them.
+    expect(leadingCurrency(mixed)).toBe('USD')
+    expect(monthlyAssignmentRevenue(mixed, ['2026-09'], 'USD')['2026-09']).toBe(35_000)
+    expect(monthlyAssignmentRevenue(mixed, ['2026-09'], 'GBP')['2026-09']).toBe(5_000)
   })
 
   it('shows every service, including the ones with nothing on them yet', () => {
@@ -163,26 +208,26 @@ describe('money by service', () => {
   it('a single-service assignment keeps its money on its own service', () => {
     const paidCanvas: Assignment = { ...TANAGER_GTCV, fee_status: 'paid', fee_paid_at: '2026-09-03' }
     const r = moneyByService([paidCanvas], 'month', now)
-    expect(r.services.find(x => x.service === 'canvas')?.ownRevenue).toBe(18_000)
-    expect(r.combinedRevenue).toBe(0)
+    expect(inCur(r.services.find(x => x.service === 'canvas')?.ownRevenue || [], 'USD')).toBe(18_000)
+    expect(r.combinedRevenue).toEqual([])
   })
 })
 
 describe('the practice total', () => {
   it('is every assignment fee, counted once', () => {
     const m = assignmentMoney(ASSIGNMENTS, 'month', now)
-    expect(m.collected).toBe(30_000)
-    expect(m.invoicedNotPaid).toBe(18_000)
-    expect(m.awaitingIssue).toBe(12_000)
-    expect(m.currency).toBe('USD')
+    expect(inCur(m.collected, 'USD')).toBe(30_000)
+    expect(inCur(m.invoicedNotPaid, 'USD')).toBe(18_000)
+    expect(inCur(m.awaitingIssue, 'USD')).toBe(12_000)
   })
 
   it('claims no currency when nobody has chosen one', () => {
-    expect(assignmentMoney([{ id: 'x', fee: 10 }], 'month', now).currency).toBeNull()
+    const m = assignmentMoney([{ id: 'x', fee: 10, fee_status: 'unpaid' }], 'month', now)
+    expect(m.awaitingIssue).toEqual([{ currency: null, amount: 10 }])
   })
 
   it('buckets collected fees by the month they came in, with a zero for quiet months', () => {
-    const r = monthlyAssignmentRevenue(ASSIGNMENTS, ['2026-08', '2026-09'])
+    const r = monthlyAssignmentRevenue(ASSIGNMENTS, ['2026-08', '2026-09'], 'USD')
     expect(r['2026-08']).toBe(0)
     expect(r['2026-09']).toBe(30_000)
   })
@@ -258,7 +303,8 @@ describe('a Pipeline deal read as the assignment it already is', () => {
     const made = assignmentsFromDeals(bare, [])
     expect(servicesOf(made[0])).toEqual([])
     // Its money is still counted; it is simply under no service.
-    expect(assignmentMoney(made, 'month', now).awaitingIssue).toBe(5_000)
+    expect(inCur(assignmentMoney(made, 'month', now).awaitingIssue, 'USD')).toBe(0)
+    expect(assignmentMoney(made, 'month', now).awaitingIssue[0].amount).toBe(5_000)
     const split = moneyByService(made, 'month', now)
     expect(split.services.every(l => l.assignments === 0)).toBe(true)
   })
@@ -282,7 +328,7 @@ describe('a Pipeline deal read as the assignment it already is', () => {
   it('puts the money on screen without anything being copied anywhere first', () => {
     const made = assignmentsFromDeals(deals, [])
     const m = assignmentMoney(made, 'month', now)
-    expect(m.awaitingIssue).toBe(48_000)
+    expect(inCur(m.awaitingIssue, 'USD')).toBe(48_000)
   })
 })
 

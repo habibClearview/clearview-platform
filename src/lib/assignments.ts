@@ -61,6 +61,29 @@ export interface AssignmentServed { engagement_id: string; client_id: string }
 
 const money = (a: Assignment) => Number(a.fee) || 0
 
+// MONEY IN TWO CURRENCIES IS TWO AMOUNTS. 14 September 2026. Habib: "I do not
+// know how £5k and $35000 add up to £40k." They do not. Every total here used
+// to be one number carrying whichever currency it happened to meet first, so a
+// pound fee and a dollar fee were added together and printed under one sign.
+//
+// Every figure is now a list, one entry per currency, and nothing is ever
+// converted: no exchange rate is recorded anywhere on this platform, and
+// inventing one would turn a wrong total into a confident wrong total.
+export interface CurrencyAmount { currency: string | null; amount: number }
+
+function addAmount(into: CurrencyAmount[], currency: string | null, amount: number): void {
+  if (!amount) return
+  const key = currency || null
+  const hit = into.find(e => e.currency === key)
+  if (hit) hit.amount += amount
+  else into.push({ currency: key, amount })
+}
+
+/** Largest first, so the biggest figure leads wherever a list is printed. */
+function tidy(list: CurrencyAmount[]): CurrencyAmount[] {
+  return list.filter(e => e.amount !== 0).sort((a, b) => b.amount - a.amount)
+}
+
 /** The services an assignment includes, however the row was written. */
 export function servicesOf(a: Assignment): string[] {
   const many = (a.service_types || []).filter(Boolean)
@@ -140,10 +163,9 @@ export interface PayerLine {
   payer: string
   assignments: number
   organisationsServed: number
-  collected: number
-  invoicedNotPaid: number
-  awaitingIssue: number
-  currency: string | null
+  collected: CurrencyAmount[]
+  invoicedNotPaid: CurrencyAmount[]
+  awaitingIssue: CurrencyAmount[]
 }
 /**
  * One line per payer: what they bought, who it serves, and where their money
@@ -163,105 +185,155 @@ export function moneyByPayer(
       byPayer.set(payerId, {
         payerId: rowId, payer: payerName(rowId) || rowId,
         assignments: 0, organisationsServed: 0,
-        collected: 0, invoicedNotPaid: 0, awaitingIssue: 0, currency: null,
+        collected: [], invoicedNotPaid: [], awaitingIssue: [],
       })
       orgsByPayer.set(payerId, new Set())
     }
     const line = byPayer.get(payerId) as PayerLine
     line.assignments++
-    line.collected += collectedInPeriod(a, periodType, now)
-    if (a.fee_status === 'invoiced') line.invoicedNotPaid += money(a)
-    if (a.fee_status === 'unpaid') line.awaitingIssue += money(a)
-    if (!line.currency && a.fee_currency) line.currency = a.fee_currency
+    addAmount(line.collected, a.fee_currency || null, collectedInPeriod(a, periodType, now))
+    if (a.fee_status === 'invoiced') addAmount(line.invoicedNotPaid, a.fee_currency || null, money(a))
+    if (a.fee_status === 'unpaid') addAmount(line.awaitingIssue, a.fee_currency || null, money(a))
     servedIdsOf(a.id, served).forEach(id => (orgsByPayer.get(payerId) as Set<string>).add(id))
   }
-  byPayer.forEach((line, payerId) => { line.organisationsServed = (orgsByPayer.get(payerId) as Set<string>).size })
+  byPayer.forEach((line, payerId) => {
+    line.organisationsServed = (orgsByPayer.get(payerId) as Set<string>).size
+    line.collected = tidy(line.collected)
+    line.invoicedNotPaid = tidy(line.invoicedNotPaid)
+    line.awaitingIssue = tidy(line.awaitingIssue)
+  })
   return Array.from(byPayer.values())
 }
 
-export interface ServiceLine { service: string; assignments: number; ownRevenue: number }
+export interface ServiceLine {
+  service: string
+  /** How many paying clients hold this service. This is the figure Habib
+   *  works from: "under advisory £5k and 1 client" means one payer, Climate
+   *  Smart Jobs, however many pieces of paper that took. */
+  payingClients: number
+  assignments: number
+  ownRevenue: CurrencyAmount[]
+}
 export interface ServiceSplit {
   services: ServiceLine[]
   /** Money on assignments covering more than one service. Shown on its own
    *  line rather than divided between them. */
-  combinedRevenue: number
+  combinedRevenue: CurrencyAmount[]
   combinedAssignments: number
-  total: number
+  total: CurrencyAmount[]
 }
 /**
- * Assignments and money per service.
+ * Paying clients, assignments and money per service.
  *
- * A FEE COVERING TWO SERVICES IS NOT SPLIT BETWEEN THEM. The Climate Smart
- * Jobs advisory includes the financial model under one fee, and no record
- * anywhere says how that fee divides. Halving it, or weighting it, would be
- * inventing a number and then printing it as though it were measured. The
- * count says the assignment includes both services, which is true, and the
- * money sits on its own line that names it as covering more than one, which
- * is also true. The three figures still add up to the total.
+ * A SERVICE IS COUNTED IN PAYING CLIENTS. 14 September 2026. Habib: "Under
+ * GtCV is $35000 and it is 1 client for GtCV. I don't know where you got GtCV
+ * client 2." The count was assignments, and Tanager's GtCV had been recorded
+ * twice, once as a deal and once through the old Services box, so one piece of
+ * work read as two. Counting who is paying for the service cannot do that: one
+ * payer is one client whatever the paperwork looks like.
+ *
+ * A FEE COVERING TWO SERVICES IS NOT SPLIT BETWEEN THEM. No record says how
+ * such a fee divides, and halving it would be inventing a number and printing
+ * it as though it were measured. The count says the assignment includes both
+ * services, which is true, and the money sits on its own line that names it as
+ * covering more than one, which is also true.
  */
 export function moneyByService(
   assignments: Assignment[], periodType: PeriodType, now: Date = new Date(),
   serviceOrder: string[] = ['advisory', 'canvas', 'financial', 'portfolio_intelligence'],
+  payerName: PayerName = id => id,
 ): ServiceSplit {
   const counts = new Map<string, ServiceLine>()
-  serviceOrder.forEach(s => counts.set(s, { service: s, assignments: 0, ownRevenue: 0 }))
-  let combinedRevenue = 0
+  const payersOf = new Map<string, Set<string>>()
+  const line = (s: string) => {
+    if (!counts.has(s)) {
+      counts.set(s, { service: s, payingClients: 0, assignments: 0, ownRevenue: [] })
+      payersOf.set(s, new Set())
+    }
+    return counts.get(s) as ServiceLine
+  }
+  serviceOrder.forEach(s => line(s))
+  const combinedRevenue: CurrencyAmount[] = []
   let combinedAssignments = 0
-  let total = 0
+  const total: CurrencyAmount[] = []
   for (const a of assignments) {
     const services = servicesOf(a)
     const collected = collectedInPeriod(a, periodType, now)
-    total += collected
+    addAmount(total, a.fee_currency || null, collected)
+    const payer = payerIdOf(a)
     for (const s of services) {
-      if (!counts.has(s)) counts.set(s, { service: s, assignments: 0, ownRevenue: 0 })
-      ;(counts.get(s) as ServiceLine).assignments++
+      line(s).assignments++
+      if (payer) (payersOf.get(s) as Set<string>).add(payerKey(payer, payerName))
     }
     if (services.length === 1) {
-      ;(counts.get(services[0]) as ServiceLine).ownRevenue += collected
+      addAmount(line(services[0]).ownRevenue, a.fee_currency || null, collected)
     } else if (services.length > 1) {
       combinedAssignments++
-      combinedRevenue += collected
+      addAmount(combinedRevenue, a.fee_currency || null, collected)
     }
     // An assignment with no service recorded contributes its money to the
     // total and to nothing else, which is exactly what is known about it.
   }
-  return { services: Array.from(counts.values()), combinedRevenue, combinedAssignments, total }
+  counts.forEach((l, s) => {
+    l.payingClients = (payersOf.get(s) as Set<string>).size
+    l.ownRevenue = tidy(l.ownRevenue)
+  })
+  return {
+    services: Array.from(counts.values()),
+    combinedRevenue: tidy(combinedRevenue),
+    combinedAssignments,
+    total: tidy(total),
+  }
 }
 
 export interface AssignmentMoney {
-  collected: number
-  invoicedNotPaid: number
-  awaitingIssue: number
-  currency: string | null
+  collected: CurrencyAmount[]
+  invoicedNotPaid: CurrencyAmount[]
+  awaitingIssue: CurrencyAmount[]
 }
-/** The practice's money, from the assignments alone. The old per-organisation
- *  fee fields are deliberately not read here: once a fee is on the assignment
- *  it is counted once, in one place. */
+/** The practice's money, from the assignments alone, one figure per currency.
+ *  Nothing is converted and nothing is added across currencies. */
 export function assignmentMoney(
   assignments: Assignment[], periodType: PeriodType, now: Date = new Date(),
 ): AssignmentMoney {
-  let collected = 0, invoicedNotPaid = 0, awaitingIssue = 0
-  let currency: string | null = null
+  const collected: CurrencyAmount[] = []
+  const invoicedNotPaid: CurrencyAmount[] = []
+  const awaitingIssue: CurrencyAmount[] = []
   for (const a of assignments) {
-    collected += collectedInPeriod(a, periodType, now)
-    if (a.fee_status === 'invoiced') invoicedNotPaid += money(a)
-    if (a.fee_status === 'unpaid') awaitingIssue += money(a)
-    if (!currency && a.fee_currency) currency = a.fee_currency
+    const cur = a.fee_currency || null
+    addAmount(collected, cur, collectedInPeriod(a, periodType, now))
+    if (a.fee_status === 'invoiced') addAmount(invoicedNotPaid, cur, money(a))
+    if (a.fee_status === 'unpaid') addAmount(awaitingIssue, cur, money(a))
   }
-  return { collected, invoicedNotPaid, awaitingIssue, currency }
+  return { collected: tidy(collected), invoicedNotPaid: tidy(invoicedNotPaid), awaitingIssue: tidy(awaitingIssue) }
 }
 
 /** Fees collected, bucketed by the month they were collected in -- one entry
- *  per requested period, 0 where nothing came in, never omitted. */
-export function monthlyAssignmentRevenue(assignments: Assignment[], periods: string[]): Record<string, number> {
+ *  per requested period, 0 where nothing came in, never omitted.
+ *
+ *  ONE CURRENCY ONLY. A bar chart adding pounds to dollars draws a shape that
+ *  means nothing, so the caller says which currency it is drawing and this
+ *  counts only that one. Everything else is left out and named elsewhere. */
+export function monthlyAssignmentRevenue(
+  assignments: Assignment[], periods: string[], currency: string | null = null,
+): Record<string, number> {
   const out: Record<string, number> = {}
   periods.forEach(p => { out[p] = 0 })
   for (const a of assignments) {
     if (a.fee_status !== 'paid' || !a.fee_paid_at) continue
+    if ((a.fee_currency || null) !== currency) continue
     const period = a.fee_paid_at.slice(0, 7)
     if (period in out) out[period] += money(a)
   }
   return out
+}
+
+/** The currency the practice has most money in, which is the one a single
+ *  chart can honestly be drawn in. Null when there is nothing to draw. */
+export function leadingCurrency(assignments: Assignment[]): string | null {
+  const totals: CurrencyAmount[] = []
+  for (const a of assignments) addAmount(totals, a.fee_currency || null, money(a))
+  return tidy(totals)[0]?.currency ?? null
 }
 
 // THE FIGURES WERE ALWAYS THERE, ON THE PIPELINE. 14 September 2026. Habib
