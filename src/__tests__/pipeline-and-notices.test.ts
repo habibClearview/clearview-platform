@@ -353,6 +353,21 @@ describe('My Business counts payers, assignments and organisations apart', () =>
   })
 
   // Habib: "Go to Client tab and advisory is 0."
+  // ATTACH THEM HERE, IN ONE PRESS. Habib: "Palladium Group is paying for an
+  // advisory service, which is what the £5k fee is for, so how can it be 0 on
+  // the advisory client?" Because nothing joined that fee to the two
+  // organisations, and the only way to say so was on another screen.
+  it('an organisation can be attached from the screen showing it is missing', () => {
+    expect(DASH).toContain('async function attachOrganisation(a,clientId)')
+    // A Pipeline deal has no row of its own, so it is written down first with
+    // exactly what the deal already said.
+    expect(DASH).toContain("if(!serviceEngagements.some(se=>se.id===a.id))")
+    expect(DASH).toContain("supabase.from('service_engagement_clients')")
+    // A duplicate key means somebody else got there first, which is not a
+    // failure to report at somebody.
+    expect(DASH.match(/error\.code!=='23505'/g) || []).toHaveLength(2)
+  })
+
   it('the Clients tab reads the same assignments My Business reads', () => {
     expect(DASH).toContain('const assignmentsHere=[...recordedHere,...dealsHere]')
     expect(DASH).toContain('assignmentsHere.filter(a=>servicesOf(a).includes(key))')
@@ -360,7 +375,7 @@ describe('My Business counts payers, assignments and organisations apart', () =>
     // And a service that has work on it but nobody attached says so, instead
     // of printing a blank "no clients yet" over a client who paid.
     expect(DASH).toContain('with no organisation attached yet')
-    expect(DASH).toContain('Open that paying client and use Assignments to say which organisations it serves')
+    expect(DASH).toContain('What is missing is which organisations the work is for. Press a name to attach it.')
   })
 
   // Habib: "There should be nothing in pipeline because I have not added
