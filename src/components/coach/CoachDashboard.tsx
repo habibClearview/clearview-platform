@@ -63,6 +63,7 @@ import {
 import {
   practiceShape, moneyByPayer, moneyByService, assignmentMoney, monthlyAssignmentRevenue,
   servicesOf, servedIdsOf, assignmentLabel, assignmentsFromDeals, servedFromProgrammes,
+  withCorrectedPayer,
 } from '@/lib/assignments'
 import {
   noticeFingerprint, noticeIsSetAside, noticeLiveIds, noticeDismissedIds, noticeWithDismissed,
@@ -607,8 +608,13 @@ function MyBusinessGlance({clients,programmes,coImplementers}){
   // again. A deal only stands in where nothing has been recorded for that
   // programme yet, so an assignment edited on the Assignments screen always
   // wins. See src/lib/assignments.ts.
-  const fromDeals=assignmentsFromDeals(programmes,recordedAssignments)
-  const assignments=[...recordedAssignments,...fromDeals]
+  // An organisation sitting under a programme does not pay for its own work.
+  // See withCorrectedPayer: the old Services box made whichever page you were
+  // on the payer, so a service recorded from an organisation's own page wrote
+  // that organisation down as paying itself.
+  const recorded=withCorrectedPayer(recordedAssignments,clients)
+  const fromDeals=assignmentsFromDeals(programmes,recorded)
+  const assignments=[...recorded,...fromDeals]
   const servedRows=[...recordedServed,...servedFromProgrammes(fromDeals,clients)]
 
   // A paying client is an organisation, not a database row. Every Pipeline

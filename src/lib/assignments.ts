@@ -279,6 +279,32 @@ export function monthlyAssignmentRevenue(assignments: Assignment[], periods: str
 // nothing has been recorded for that programme yet, so the moment Habib edits
 // one on the Assignments screen his own words replace the deal's.
 
+// AN ORGANISATION DOES NOT PAY FOR ITS OWN WORK WHEN A PROGRAMME PAYS.
+// 14 September 2026. Habib: "At what point did I mention that Ikore is a
+// paying client?" He never did. He said Tanager pays for Ikore.
+//
+// It came from the platform. The old Services box made whichever page you
+// were on the payer, so a service recorded from Ikore's own page wrote Ikore
+// down as paying Ikore, and the Paying Clients count then reported a served
+// organisation as a payer.
+//
+// The record itself says which it is: an organisation that sits under a
+// programme is served by that programme's money. An organisation with no
+// programme genuinely is paying for its own work and is left exactly as it
+// is. This is applied on reading, so nothing has to be run against the
+// database for the screen to stop saying something untrue.
+export function withCorrectedPayer(
+  assignments: Assignment[], clients: { id: string; programme_id?: string | null }[],
+): Assignment[] {
+  const programmeOf = new Map(clients.map(c => [c.id, c.programme_id || null]))
+  return assignments.map(a => {
+    if (!a.payer_client_id) return a
+    const programme = programmeOf.get(a.payer_client_id)
+    if (!programme) return a
+    return { ...a, payer_programme_id: programme, payer_client_id: null }
+  })
+}
+
 export interface DealProgrammeLike {
   id: string
   name?: string | null

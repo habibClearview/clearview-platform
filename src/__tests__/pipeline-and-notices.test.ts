@@ -318,7 +318,10 @@ describe('My Business counts payers, assignments and organisations apart', () =>
     // Habib entered his fees as deal values and nothing read that table for
     // money. A deal only stands in where nothing has been recorded for that
     // programme, so an edited assignment always wins.
-    expect(DASH).toContain('assignmentsFromDeals(programmes,recordedAssignments)')
+    expect(DASH).toContain('assignmentsFromDeals(programmes,recorded)')
+    // And a served organisation recorded as paying for its own work is put
+    // right on reading, so the screen stops calling it a paying client.
+    expect(DASH).toContain('withCorrectedPayer(recordedAssignments,clients)')
     expect(DASH).toContain('servedFromProgrammes(fromDeals,clients)')
   })
 

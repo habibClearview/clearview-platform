@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest'
 import {
   practiceShape, moneyByPayer, moneyByService, assignmentMoney,
   monthlyAssignmentRevenue, servicesOf, payerIdOf, servedIdsOf, assignmentLabel,
-  assignmentsFromDeals, servedFromProgrammes, dealAssignmentId,
+  assignmentsFromDeals, servedFromProgrammes, dealAssignmentId, withCorrectedPayer,
   type Assignment, type AssignmentServed,
 } from '@/lib/assignments'
 
@@ -283,5 +283,43 @@ describe('a Pipeline deal read as the assignment it already is', () => {
     const made = assignmentsFromDeals(deals, [])
     const m = assignmentMoney(made, 'month', now)
     expect(m.awaitingIssue).toBe(48_000)
+  })
+})
+
+// AN ORGANISATION DOES NOT PAY FOR ITS OWN WORK WHEN A PROGRAMME PAYS.
+// 14 September 2026. Habib: "At what point did I mention that Ikore is a
+// paying client?" He never did. Tanager pays for Ikore. The old Services box
+// made whichever page you were on the payer, so a service recorded from
+// Ikore's own page wrote Ikore down as paying Ikore.
+describe('who is recorded as paying', () => {
+  const clients = [
+    { id: 'ikore', programme_id: 'tanager' },
+    { id: 'selffunded', programme_id: null },
+  ]
+
+  it('moves the payer to the programme the organisation sits under', () => {
+    const wrong: Assignment[] = [{ id: 'x', payer_client_id: 'ikore', fee: 18_000 }]
+    const [fixed] = withCorrectedPayer(wrong, clients)
+    expect(fixed.payer_programme_id).toBe('tanager')
+    expect(fixed.payer_client_id).toBeNull()
+  })
+
+  it('leaves an organisation that genuinely pays for its own work alone', () => {
+    const own: Assignment[] = [{ id: 'y', payer_client_id: 'selffunded', fee: 4_000 }]
+    expect(withCorrectedPayer(own, clients)[0].payer_client_id).toBe('selffunded')
+  })
+
+  it('never touches an assignment a programme already pays for', () => {
+    const fine: Assignment[] = [{ id: 'z', payer_programme_id: 'csj', fee: 9_000 }]
+    expect(withCorrectedPayer(fine, clients)[0]).toEqual(fine[0])
+  })
+
+  it('stops a served organisation being counted as a paying client', () => {
+    const wrong: Assignment[] = [{ id: 'x', payer_client_id: 'ikore', fee: 18_000 }]
+    const before = practiceShape(wrong, [], id => id)
+    const after = practiceShape(withCorrectedPayer(wrong, clients), [], id => id)
+    expect(before.payers).toBe(1)   // Ikore, wrongly
+    expect(after.payers).toBe(1)    // Tanager, rightly
+    expect(payerIdOf(withCorrectedPayer(wrong, clients)[0])).toBe('tanager')
   })
 })
