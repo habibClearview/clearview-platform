@@ -16,8 +16,8 @@
   "dependencies": {
     "@livekit/components-react": "^2.9.24",
     "@livekit/components-styles": "^1.2.0",
-    "@supabase/supabase-js": "^2.39.0",
-    "dexie": "^4.4.4",
+    "@supabase/supabase-js": "^2.116.0",
+    "dexie": "^4.4.5",
     "docx": "^9.0.2",
     "livekit-client": "^2.22.3",
     "livekit-server-sdk": "^2.19.0",
@@ -27,7 +27,7 @@
     "react": "^18",
     "react-dom": "^18",
     "recharts": "^2.10.0",
-    "resend": "^6.19.0",
+    "resend": "^6.27.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
@@ -37,7 +37,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "@vitejs/plugin-react": "^6.0.5",
+    "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^4.1.9",
     "autoprefixer": "^10",
     "eslint": "^8",
