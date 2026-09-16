@@ -871,6 +871,15 @@ describe('an unread list is not an empty one', () => {
     expect(STRIP).toContain('The people on this engagement could not be read')
   })
 
+  it('shows nothing until all of it has been read, so half a load is never on screen', () => {
+    // The sessions went up first and the people second, so a failed read of
+    // the people left the sessions rendering against a list of nobody, with
+    // the controls live and "nobody is on this engagement yet" underneath.
+    const fn = STRIP.slice(STRIP.indexOf('const load = useCallback'), STRIP.indexOf('}, [clientId, dpId])'))
+    expect(fn.indexOf('const { data: people, error: peopleErr }')).toBeLessThan(fn.indexOf('setSessions(rows || [])'))
+    expect(fn.indexOf('setErr(null)')).toBeGreaterThan(fn.indexOf('setParties(people || [])'))
+  })
+
   it('will not set up a room from an attendance list it failed to read', () => {
     // Acting on that inserts duplicates and clears requirements that are live.
     expect(STRIP).toContain('const { data: fresh, error: freshErr }')

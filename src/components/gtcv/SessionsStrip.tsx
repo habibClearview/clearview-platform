@@ -146,34 +146,41 @@ export default function SessionsStrip({
   const load = useCallback(async () => {
     if (!clientId || !dpId) return
     setLoading(true)
-    const { data, error } = await supabase.from(SESSIONS_TABLE)
+
+    // NOTHING IS SHOWN UNTIL ALL OF IT IS READ. CodeRabbit on #278: the
+    // sessions were put on screen first and the people second, so a failed
+    // read of the people left the sessions rendering against a list of nobody.
+    // The strip then said "nobody is on this engagement yet" with the controls
+    // still live, and setting a room on one of those sessions would have
+    // written down that the method wants a role no person holds.
+    //
+    // So this reads everything, and only then shows anything. A read that
+    // fails changes nothing at all: whatever was on screen stays, which on a
+    // refresh is the plan the coach already had.
+    const { data: rows, error } = await supabase.from(SESSIONS_TABLE)
       .select('*').eq('client_id', clientId).eq('dp_id', dpId)
       .order('planned_at', { ascending: true })
-    if (error) { setErr(error.message); setLoading(false); return }
-    setErr(null)
-    setSessions(data || [])
+    if (error) {
+      setErr('The sessions could not be read. Nothing has been lost, this is a connection problem.')
+      setLoading(false)
+      return
+    }
 
     // Everybody on the engagement, which is the list a participant is chosen
     // from. engagement_parties is the only place a person exists whether or
     // not they have a login, so a funder representative who never signs in is
     // still nameable.
-    //
-    // AND AN UNREAD LIST IS NOT AN EMPTY ONE. CodeRabbit on #278: a failed
-    // read set the people to none, which makes every role the method wants
-    // look like a role nobody on the engagement holds, and would have let
-    // markRequired write rows saying so.
     const { data: people, error: peopleErr } = await supabase.from(PARTIES_TABLE)
       .select('id,name,party_role,organisation,email')
       .eq('client_id', clientId).order('sort_order', { ascending: true })
     if (peopleErr) {
-      setErr('The people on this engagement could not be read. The sessions below are right, '
-        + 'who is in them may be incomplete until this loads.')
+      setErr('The people on this engagement could not be read. Nothing has been lost, this is a connection problem.')
       setLoading(false)
       return
     }
-    setParties(people || [])
 
-    const ids = (data || []).map(r => r.id)
+    const ids = (rows || []).map(r => r.id)
+    let att = []
     if (ids.length) {
       // party_name arrives with 2026_09_16_session_attendance_name.sql. Asked
       // for by name so that a database without it yet falls back to the
@@ -184,24 +191,27 @@ export default function SessionsStrip({
       // so a dropped connection or a permission problem read as a session
       // nobody is in. Which is the one thing an attendance record must never
       // say by accident.
-      let { data: att, error: attErr } = await supabase.from(ATTENDANCE_TABLE)
+      let { data: first, error: attErr } = await supabase.from(ATTENDANCE_TABLE)
         .select('id,session_id,party_id,party_role,party_name,required,attended')
         .in('session_id', ids)
       if (attErr && missingPartyName(attErr)) {
-        ;({ data: att, error: attErr } = await supabase.from(ATTENDANCE_TABLE)
+        ;({ data: first, error: attErr } = await supabase.from(ATTENDANCE_TABLE)
           .select('id,session_id,party_id,party_role,required,attended')
           .in('session_id', ids))
       }
       if (attErr) {
-        setErr('Who is in each session could not be read. The sessions below are right, '
-          + 'the people in them may be incomplete until this loads.')
+        setErr('Who is in each session could not be read. Nothing has been lost, this is a connection problem.')
         setLoading(false)
         return
       }
-      setAttendance(att || [])
-    } else {
-      setAttendance([])
+      att = first || []
     }
+
+    setSessions(rows || [])
+    setParties(people || [])
+    setAttendance(att)
+    setErr(null)
+
     // The recordings are read through the server route, which is the only
     // thing that can see storage. A failure here never hides the sessions.
     try {
