@@ -586,6 +586,32 @@ describe('sessions on the decision point', () => {
     // A calendar in another country has to show the same moment.
     expect(STRIP).toContain('new Date(form.when).toISOString()')
   })
+
+  // The two parts that can be reasoned about without a browser were pulled out
+  // so they could be run rather than read. See sessions-strip.test.ts, which
+  // exercises them for real. CodeRabbit on #276.
+  it('when a session is, and which is next, are testable on their own', () => {
+    expect(STRIP).toContain("from '@/lib/session-time'")
+  })
+
+  // THE NAME IS WRITTEN DOWN, NOT ONLY POINTED AT. CodeRabbit on #276: the
+  // pointer is set to null when somebody is taken off the engagement, so an
+  // attendance row survived with no identity on it at all and a session could
+  // no longer say who was in the room.
+  it('a participant’s name is stored with the attendance, not only their id', () => {
+    expect(STRIP).toContain('party_name: party?.name || null')
+    expect(STRIP).toContain("a.party_name || 'Somebody no longer on the engagement'")
+    const SQL = fs.readFileSync('supabase/migrations/2026_09_16_session_attendance_name.sql', 'utf8')
+    expect(SQL).toContain('add column if not exists party_name text')
+  })
+
+  it('still records the person where that column is not there yet', () => {
+    expect(STRIP).toContain('// The column is not there yet. The person is still recorded.')
+  })
+
+  it('the engagement’s own list wins, so a corrected spelling reaches old sessions', () => {
+    expect(STRIP).toContain('const name = who?.name || a.party_name')
+  })
 })
 
 // ============================================================
