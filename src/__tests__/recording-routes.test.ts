@@ -832,3 +832,58 @@ describe('a failure never reads as a fact', () => {
     expect(PLAN).toContain('<caption')
   })
 })
+
+// ============================================================
+// THE SECOND PASS ON #278
+// ============================================================
+describe('the invitation route authenticates before it reads anything', () => {
+  const ROUTE = fs.readFileSync('app/api/session-invite/route.ts', 'utf8')
+  const AUTHZ = fs.readFileSync('src/lib/auth/api-authz.ts', 'utf8')
+
+  it('will not tell a stranger whether a session id is real', () => {
+    // It looked the session up with the service role and only then checked who
+    // was asking, so 404 against 401 mapped out the identifier space.
+    expect(AUTHZ).toContain('export async function requireSignedIn(')
+    const before = ROUTE.indexOf('const signedIn = await requireSignedIn(req, admin)')
+    const lookup = ROUTE.indexOf("admin.from('gtcv_sessions')")
+    expect(before).toBeGreaterThan(-1)
+    expect(before).toBeLessThan(lookup)
+  })
+
+  it('still checks the engagement itself, once it knows which one it is', () => {
+    const signedIn = ROUTE.indexOf('requireSignedIn(req, admin)')
+    const access = ROUTE.indexOf("requireAccess(req, admin, session.client_id, 'manage'")
+    expect(signedIn).toBeLessThan(access)
+  })
+
+  it('logs what went wrong and tells the caller nothing about the database', () => {
+    expect(ROUTE).toContain("console.error('Session invitation failed', e)")
+    expect(ROUTE).toContain('The invitation could not be sent. Try again.')
+    expect(ROUTE).not.toContain("e instanceof Error ? e.message")
+  })
+})
+
+describe('an unread list is not an empty one', () => {
+  const STRIP = fs.readFileSync('src/components/gtcv/SessionsStrip.tsx', 'utf8')
+
+  it('will not call the engagement empty because the people could not be read', () => {
+    // Every role the method wants would have looked like a role nobody holds.
+    expect(STRIP).toContain('The people on this engagement could not be read')
+  })
+
+  it('will not set up a room from an attendance list it failed to read', () => {
+    // Acting on that inserts duplicates and clears requirements that are live.
+    expect(STRIP).toContain('const { data: fresh, error: freshErr }')
+    expect(STRIP).toContain('who it requires could not be set just now')
+  })
+
+  it('clears what the old room required when the room is taken off', () => {
+    // markRequired used to return before the cleanup whenever the new room
+    // asked for nobody, so the session went on warning about a room it was no
+    // longer in.
+    expect(STRIP).toContain('if (roomChanged) await markRequired(')
+    const fn = STRIP.slice(STRIP.indexOf('async function markRequired'))
+    // The cleanup runs before the "nothing to insert" exit.
+    expect(fn.indexOf('const noLonger =')).toBeLessThan(fn.indexOf('if (!rows.length) return'))
+  })
+})

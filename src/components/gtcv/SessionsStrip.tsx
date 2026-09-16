@@ -157,9 +157,20 @@ export default function SessionsStrip({
     // from. engagement_parties is the only place a person exists whether or
     // not they have a login, so a funder representative who never signs in is
     // still nameable.
-    const { data: people } = await supabase.from(PARTIES_TABLE)
+    //
+    // AND AN UNREAD LIST IS NOT AN EMPTY ONE. CodeRabbit on #278: a failed
+    // read set the people to none, which makes every role the method wants
+    // look like a role nobody on the engagement holds, and would have let
+    // markRequired write rows saying so.
+    const { data: people, error: peopleErr } = await supabase.from(PARTIES_TABLE)
       .select('id,name,party_role,organisation,email')
       .eq('client_id', clientId).order('sort_order', { ascending: true })
+    if (peopleErr) {
+      setErr('The people on this engagement could not be read. The sessions below are right, '
+        + 'who is in them may be incomplete until this loads.')
+      setLoading(false)
+      return
+    }
     setParties(people || [])
 
     const ids = (data || []).map(r => r.id)
@@ -233,14 +244,22 @@ export default function SessionsStrip({
   async function markRequired(session, kind, extra) {
     const def = kindDef(kind)
     const roles = Array.from(new Set([...(def ? def.required : []), ...(extra || [])]))
-    if (!roles.length) return
 
     // Read what is recorded rather than trusting local state, so two changes
-    // in quick succession cannot both insert the same person.
-    const { data: fresh } = await supabase.from(ATTENDANCE_TABLE)
+    // in quick succession cannot both insert the same person. A read that
+    // failed is not a session with nobody on it: acting on that would insert
+    // duplicates and clear requirements that are still live.
+    const { data: fresh, error: freshErr } = await supabase.from(ATTENDANCE_TABLE)
       .select('id,session_id,party_id,party_role,required,attended').eq('session_id', session.id)
+    if (freshErr) {
+      setNote(prev => ({ ...prev, [session.id]: { text: 'The room changed, and who it requires could not be set just now. Open the room again to retry.', bad: true } }))
+      return
+    }
     const existing = fresh || []
     const rows = []
+    // With no room there is nothing to require, and the block below still
+    // runs, so the requirements the old room left behind are cleared rather
+    // than going on warning about a room the session is no longer in.
     roles.forEach(role => {
       const named = parties.filter(p => p.party_role === role)
       if (!named.length) {
@@ -358,7 +377,9 @@ export default function SessionsStrip({
     setSessions(prev => prev.map(r => (r.id === s.id ? { ...r, ...patch } : r)))
     setEditing(null)
     setNote(prev => ({ ...prev, [s.id]: null }))
-    if (roomChanged && kind) await markRequired({ ...s, ...patch }, kind, [])
+    // Including when the room was taken off altogether: that is exactly when
+    // the requirements it left behind have to stop being requirements.
+    if (roomChanged) await markRequired({ ...s, ...patch }, kind, [])
   }
 
   /**
