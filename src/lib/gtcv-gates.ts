@@ -72,7 +72,28 @@ export function gateBefore(id: string): GateDefinition | null {
  * when it is complete. Anything else, including evidence submitted and awaiting
  * a signature, leaves the next one shut, because the point of the gate is the
  * signature and not the paperwork before it.
+ *
+ * TWO SPELLINGS OF COMPLETE, BOTH REAL. 16 September 2026, from the review on
+ * #279. The CEO sign-off button writes status '✓' and this read only
+ * 'complete', so a block that had genuinely been signed off still counted as
+ * unfinished here. While a shut gate only greyed a button that was a cosmetic
+ * fault; the moment the gate became a real lock it would have shut the
+ * organisation out of a decision point they had already earned, which is worse
+ * than the hole it was closing.
+ *
+ * Both spellings are on the record and both are honoured, which is what the
+ * rest of the platform already does (see DPDot in CoachDashboard). Normalising
+ * here rather than migrating rows means no engagement has to be rewritten to
+ * be read correctly, and a row written by either version of the button is read
+ * the same way.
  */
+const COMPLETE = ['complete', '✓']
+
+/** Is this recorded status a sign-off, in either of the spellings on record? */
+export function statusIsComplete(status: string | null | undefined): boolean {
+  return COMPLETE.includes(String(status ?? '').trim().toLowerCase())
+}
+
 export function gateIsOpen(
   id: string,
   statusOf: (gateId: string) => string | null | undefined,
@@ -82,7 +103,7 @@ export function gateIsOpen(
   const at = GATES.findIndex((g) => g.id === id)
   if (at <= 0) return true
   const before = GATES[at - 1]
-  return statusOf(before.id) === 'complete'
+  return statusIsComplete(statusOf(before.id))
 }
 
 /** Why a gate is shut, in words a person can act on, or null when it is open. */
