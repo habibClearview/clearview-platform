@@ -22,12 +22,23 @@
 //
 // ONE SESSION, TWO WAYS TO RUN IT. Habib: "it could be that it is recorded on
 // my laptop or my phone with all attendees in the same room, or it could be a
-// call." Both, without a setting to choose wrongly. The session page holds the
-// call for when people are apart, and records the microphone of every device
-// that opens it for when they are round a table. Three laptops on a table
-// gives a better record than one microphone in the middle, and the call is
-// simply ignored. Nothing has to be decided in advance and nothing has to be
-// changed on the day.
+// call."
+//
+// ONE ROOM MEANS ONE DEVICE. 16 September 2026. I first wrote that three
+// laptops round a table gives a better record than one microphone in the
+// middle. Habib: "multiple laptops recording in the same room would cause
+// audio feedback and make the recording useless." He is right, and the advice
+// was worse than useless: two devices in one room with the call open on both
+// put each one's speaker into the other's microphone, which howls and ruins
+// the only copy of the conversation. Everyone in one room records on ONE
+// device, and who was present is said by naming them rather than by counting
+// laptops. People in different places each use their own device, where there
+// is no shared air for a loop to travel through.
+//
+// WHO WAS THERE IS A LIST, NOT AN INFERENCE. Habib: "I should be able to
+// select a participant from a dropdown list of people on the assignment." The
+// people on the engagement are picked here and recorded against the session,
+// so a single recording from one laptop still knows the room it was made in.
 //
 // The full room rules, who the method requires in each kind of session and who
 // it keeps out, stay in the planner. This is for doing rather than for
@@ -61,6 +72,18 @@ const field = {
 // The same six rooms the planner and the database both know. Named here only
 // so a session can be given one without leaving the decision point; what each
 // room requires is the planner's job to explain.
+const PARTIES_TABLE = 'engagement_parties'
+
+// What each role is called out loud, so a dropdown reads as people rather
+// than as database values.
+const ROLE_LABEL = {
+  client_funder: 'Funder', funder_rep: 'Funder representative',
+  lsp_ed: 'Executive Director', lsp_leadership: 'Leadership',
+  lsp_finance: 'Finance', lsp_field: 'Field team', lsp_board: 'Board',
+  lead_consultant: 'Lead consultant', co_implementer: 'Co-implementer',
+  licensed_advisor: 'Licensed advisor', other: 'Other',
+}
+
 const KIND_LABEL = {
   plenary: 'Plenary',
   joint_with_funder: 'Joint with funder',
@@ -100,6 +123,8 @@ export default function SessionsStrip({
 }) {
   const [open, setOpen] = useState(openByDefault)
   const [sessions, setSessions] = useState([])
+  const [parties, setParties] = useState([])
+  const [attendance, setAttendance] = useState([])
   const [recordings, setRecordings] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
@@ -117,6 +142,25 @@ export default function SessionsStrip({
     if (error) { setErr(error.message); setLoading(false); return }
     setErr(null)
     setSessions(data || [])
+
+    // Everybody on the engagement, which is the list a participant is chosen
+    // from. engagement_parties is the only place a person exists whether or
+    // not they have a login, so a funder representative who never signs in is
+    // still nameable.
+    const { data: people } = await supabase.from(PARTIES_TABLE)
+      .select('id,name,party_role,organisation,email')
+      .eq('client_id', clientId).order('sort_order', { ascending: true })
+    setParties(people || [])
+
+    const ids = (data || []).map(r => r.id)
+    if (ids.length) {
+      const { data: att } = await supabase.from('gtcv_session_attendance')
+        .select('id,session_id,party_id,party_role,required,attended')
+        .in('session_id', ids)
+      setAttendance(att || [])
+    } else {
+      setAttendance([])
+    }
     // The recordings are read through the server route, which is the only
     // thing that can see storage. A failure here never hides the sessions.
     try {
@@ -157,6 +201,37 @@ export default function SessionsStrip({
     setForm({ title: '', session_kind: 'plenary', when: '', duration_minutes: 60, purpose: '' })
     setAdding(false)
     setNote({})
+  }
+
+  // WHO WAS IN THE ROOM IS SAID, NOT COUNTED. One recording from one laptop
+  // carries a whole room, so the room has to be named. Written against
+  // engagement_parties, so somebody without a login is covered like anybody
+  // else.
+  async function addParticipant(session, partyId) {
+    if (!partyId) return
+    const party = parties.find(p => p.id === partyId)
+    setBusy(session.id + partyId)
+    const row = {
+      client_id: clientId,
+      session_id: session.id,
+      party_id: partyId,
+      party_role: party?.party_role || null,
+      required: false,
+      attended: true,
+    }
+    const { data, error } = await supabase.from('gtcv_session_attendance').insert([row]).select().single()
+    setBusy(null)
+    if (error) { setNote(prev => ({ ...prev, [session.id]: { text: 'That person could not be added: ' + error.message, bad: true } })); return }
+    setAttendance(prev => [...prev, data])
+    setNote(prev => ({ ...prev, [session.id]: null }))
+  }
+
+  async function removeParticipant(row) {
+    setBusy(row.id)
+    const { error } = await supabase.from('gtcv_session_attendance').delete().eq('id', row.id)
+    setBusy(null)
+    if (error) { setNote(prev => ({ ...prev, [row.session_id]: { text: 'That person could not be taken off: ' + error.message, bad: true } })); return }
+    setAttendance(prev => prev.filter(a => a.id !== row.id))
   }
 
   async function sendInvite(session) {
@@ -209,11 +284,18 @@ export default function SessionsStrip({
 
       {open && (
         <div style={{ padding: '0 0.95rem 0.95rem' }}>
-          <p style={{ ...hint, marginBottom: '0.7rem' }}>
-            Everyone in one room? Open the session on each laptop or phone and press Start recording there,
-            and every device records the person in front of it. In different places? The same page holds the call.
-            Nothing to choose in advance.
-          </p>
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '0.55rem 0.7rem', marginBottom: '0.75rem' }}>
+            <div style={{ ...hint, marginBottom: '0.3rem' }}>
+              <strong style={{ color: C.navy }}>Everyone in one room.</strong> Open the session on
+              <strong> one</strong> laptop or phone and press Start recording there. Name who is in the room below.
+              Do not open it on a second device in the same room: two microphones and two speakers in one
+              room feed back and spoil the recording.
+            </div>
+            <div style={hint}>
+              <strong style={{ color: C.navy }}>People in different places.</strong> Send the invitation.
+              Everyone opens the same page, the call is there, and each device records the person in front of it.
+            </div>
+          </div>
 
           {sessions.length === 0 && !loading && (
             <div style={{ ...hint, padding: '0.3rem 0 0.6rem' }}>No sessions on this decision point yet.</div>
@@ -221,6 +303,9 @@ export default function SessionsStrip({
 
           {sessions.map(s => {
             const mine = recordingsFor(s.id)
+            const here = attendance.filter(a => a.session_id === s.id)
+            const taken = new Set(here.map(a => a.party_id))
+            const available = parties.filter(p => !taken.has(p.id))
             return (
               <div key={s.id} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '0.6rem 0.75rem', marginBottom: '0.5rem' }}>
                 <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -251,6 +336,60 @@ export default function SessionsStrip({
                   </div>
                 </div>
                 {s.purpose && <div style={{ ...hint, marginTop: '0.35rem' }}>{s.purpose}</div>}
+
+                {/* WHO IS IN THIS SESSION. Chosen from the people on the
+                    engagement, so one recording made on one laptop still knows
+                    the room it was made in. */}
+                <div style={{ marginTop: '0.45rem', paddingTop: '0.45rem', borderTop: `1px solid var(--cv-border-soft)` }}>
+                  <div style={{ ...mono, fontSize: '0.76rem', letterSpacing: '0.05em', textTransform: 'uppercase', color: C.slate, marginBottom: '0.3rem' }}>
+                    Who is in this session
+                  </div>
+                  {here.length === 0 && <div style={{ ...hint, marginBottom: '0.35rem' }}>Nobody named yet.</div>}
+                  {here.length > 0 && (
+                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
+                      {here.map(a => {
+                        const who = parties.find(p => p.id === a.party_id)
+                        return (
+                          <span key={a.id} style={{ ...mono, fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', border: `1px solid ${C.purple}`, color: C.purple, borderRadius: 999, padding: '0.15rem 0.6rem' }}>
+                            {who?.name || 'Somebody no longer on the engagement'}
+                            {who?.party_role ? ` · ${ROLE_LABEL[who.party_role] || who.party_role}` : ''}
+                            {canManage && (
+                              <button type="button" aria-label={`Take ${who?.name || 'this person'} off the session`}
+                                disabled={busy === a.id} onClick={() => removeParticipant(a)}
+                                style={{ background: 'transparent', border: 'none', color: C.purple, cursor: 'pointer', fontSize: '0.95rem', lineHeight: 1, padding: 0 }}>
+                                {'\u00D7'}
+                              </button>
+                            )}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {canManage && (
+                    available.length > 0 ? (
+                      <select
+                        aria-label="Add somebody to this session"
+                        style={{ ...field, maxWidth: 320 }}
+                        value=""
+                        disabled={!!busy}
+                        onChange={e => addParticipant(s, e.target.value)}
+                      >
+                        <option value="">Add somebody…</option>
+                        {available.map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}{p.party_role ? ` · ${ROLE_LABEL[p.party_role] || p.party_role}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div style={hint}>
+                        {parties.length === 0
+                          ? 'Nobody is on this engagement yet. Add them on "Who is on it, and settings".'
+                          : 'Everybody on the engagement is already in this session.'}
+                      </div>
+                    )
+                  )}
+                </div>
                 {s.invite_sent_at && (
                   <div style={{ ...hint, marginTop: '0.25rem' }}>
                     Invitation sent {new Date(s.invite_sent_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}

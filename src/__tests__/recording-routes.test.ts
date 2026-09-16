@@ -527,13 +527,43 @@ describe('sessions on the decision point', () => {
     expect(STRIP).toContain('`/call/${s.id}`')
   })
 
-  // ONE SESSION, TWO WAYS TO RUN IT. Habib: "it could be that it is recorded
-  // on my laptop or my phone with all attendee in the same room or it could be
-  // a call."
-  it('says plainly that one room and a call are both the same session', () => {
-    expect(STRIP).toContain('Everyone in one room?')
-    expect(STRIP).toContain('In different places? The same page holds the call.')
-    expect(STRIP).toContain('Nothing to choose in advance.')
+  // ONE ROOM MEANS ONE DEVICE. 16 September 2026. I first wrote that three
+  // laptops round a table gives a better record than one microphone in the
+  // middle. Habib: "multiple laptops recording in the same room would cause
+  // audio feedback and make the recording useless." Two devices in one room
+  // with the call open on both put each one's speaker into the other's
+  // microphone, which howls and ruins the only copy of the conversation.
+  it('tells you to record a shared room on one device, and why', () => {
+    expect(STRIP).toContain('Everyone in one room.')
+    expect(STRIP).toContain('Do not open it on a second device in the same room')
+    expect(STRIP).toContain('feed back and spoil the recording')
+  })
+
+  it('still offers the call for people who are apart', () => {
+    expect(STRIP).toContain('People in different places.')
+    expect(STRIP).toContain('each device records the person in front of it')
+  })
+
+  // WHO WAS THERE IS A LIST, NOT AN INFERENCE. Habib: "I should be able to
+  // select a participant from a dropdown list of people on the assignment."
+  it('participants are chosen from the people on the engagement', () => {
+    expect(STRIP).toContain("const PARTIES_TABLE = 'engagement_parties'")
+    expect(STRIP).toContain('Add somebody…')
+    expect(STRIP).toContain('async function addParticipant(session, partyId)')
+    expect(STRIP).toContain('async function removeParticipant(row)')
+  })
+
+  it('a named participant is recorded against the session itself', () => {
+    expect(STRIP).toContain("supabase.from('gtcv_session_attendance').insert")
+    expect(STRIP).toContain('Who is in this session')
+  })
+
+  it('says what to do when there is nobody to choose from', () => {
+    expect(STRIP).toContain('Nobody is on this engagement yet. Add them on "Who is on it, and settings".')
+  })
+
+  it('names somebody taken off the engagement rather than showing a blank chip', () => {
+    expect(STRIP).toContain('Somebody no longer on the engagement')
   })
 
   it('a recording is shown against the session it was made on', () => {
