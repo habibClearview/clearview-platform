@@ -126,8 +126,15 @@ function missingPartyName(error) {
 const BLANK = { title: '', session_kind: '', when: '', duration_minutes: 60, purpose: '', extra: [] }
 
 export default function SessionsStrip({
-  clientId, dpId, canManage = false, heading = 'Sessions', openByDefault = false,
+  clientId, dpId, canManage = false, heading = 'Sessions and planning', openByDefault = true,
 }) {
+  // OPEN, BECAUSE THIS IS THE PLANNING SECTION. Habib, 16 September 2026:
+  // "not all of them can be planned for, each of these should have the
+  // planning section in them." It was on all twelve decision points, and on
+  // eleven of them it was shut: one grey line reading SESSIONS 0, which you
+  // had to know was a button. A planning section you have to discover is not
+  // on the page. It opens by default now, and shuts if you want it out of the
+  // way.
   const [open, setOpen] = useState(openByDefault)
   const [sessions, setSessions] = useState([])
   const [parties, setParties] = useState([])
@@ -565,6 +572,12 @@ export default function SessionsStrip({
         )}
         {!loading && count === 0 && <span style={hint}>nothing planned yet</span>}
         {err && <span style={{ ...hint, color: C.red }}>{err}</span>}
+        {/* A word, not only a triangle. Shut, this was a grey line that read
+            as a label rather than as something to press, and what it hid was
+            the only way to plan a session here. */}
+        <span style={{ ...mono, fontSize: '0.78rem', color: C.teal, marginLeft: 'auto' }}>
+          {open ? 'Hide' : 'Plan a session'}
+        </span>
       </button>
 
       {open && (

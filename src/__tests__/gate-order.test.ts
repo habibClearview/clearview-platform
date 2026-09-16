@@ -8,7 +8,7 @@
 // ============================================================
 
 import { describe, expect, it } from 'vitest'
-import { GATES, gateIsOpen, gateShutBecause } from '@/lib/gtcv-gates'
+import { GATES, gateIsOpen, gateShutBecause, statusIsComplete } from '@/lib/gtcv-gates'
 
 /** Everything complete up to and including the gate named, nothing after. */
 function completeThrough(lastComplete: string) {
@@ -76,5 +76,52 @@ describe('working the zones in order', () => {
         expect(gateIsOpen(GATES[i + 2].id, statusOf, asOrganisation), GATES[i + 2].id).toBe(false)
       }
     }
+  })
+})
+
+// ============================================================
+// THE SIGN-OFF BUTTON AND THE GATE MUST AGREE ON WHAT DONE LOOKS LIKE
+//
+// From the review on #279. The CEO sign-off button writes status '✓'. This
+// gate read only 'complete'. While a shut gate merely greyed a button in the
+// sidebar that was cosmetic; the moment the gate became a real lock, it would
+// have shut an organisation out of a decision point they had already signed
+// off, which is worse than the hole it was closing.
+// ============================================================
+describe('what the platform counts as signed off', () => {
+  it('reads the tick the sign-off button actually writes', () => {
+    // CoachDashboard: onUpdateDP({ceo_signed_off:true, status:'✓', ...})
+    expect(statusIsComplete('✓')).toBe(true)
+  })
+
+  it('reads the word as well, because both are on the record', () => {
+    expect(statusIsComplete('complete')).toBe(true)
+    expect(statusIsComplete('Complete')).toBe(true)
+    expect(statusIsComplete(' complete ')).toBe(true)
+  })
+
+  it('counts nothing else, because the point of the gate is the signature', () => {
+    // Evidence submitted and waiting for a signature is not a signature.
+    for (const s of ['in_progress', '◐', 'blocked', '⚠', 'submitted', '○', '', null, undefined]) {
+      expect(statusIsComplete(s), String(s)).toBe(false)
+    }
+  })
+})
+
+describe('a block signed off with a tick opens the next one', () => {
+  const signedOffWithTick = (id: string) => (id === 'dp01' ? '✓' : null)
+  const signedOffWithWord = (id: string) => (id === 'dp01' ? 'complete' : null)
+
+  it('opens Decision Point 2 for the organisation, however the sign-off was spelled', () => {
+    expect(gateIsOpen('dp02', signedOffWithTick, { isCoachingTeam: false })).toBe(true)
+    expect(gateIsOpen('dp02', signedOffWithWord, { isCoachingTeam: false })).toBe(true)
+  })
+
+  it('still holds Decision Point 3 shut, because Decision Point 2 is not signed off', () => {
+    expect(gateIsOpen('dp03', signedOffWithTick, { isCoachingTeam: false })).toBe(false)
+  })
+
+  it('never holds the coaching team back, whatever is on the record', () => {
+    expect(gateIsOpen('dp09', () => null, { isCoachingTeam: true })).toBe(true)
   })
 })

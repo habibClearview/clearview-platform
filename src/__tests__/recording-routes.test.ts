@@ -14,6 +14,7 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import { callRoomName, callConfigured } from '@/lib/call'
+import { METHOD_SESSIONS } from '@/lib/method-sessions'
 
 const OPEN = fs.readFileSync('app/api/session-recording/route.ts', 'utf8')
 const CHUNK = fs.readFileSync('app/api/session-recording/chunk/route.ts', 'utf8')
@@ -894,5 +895,86 @@ describe('an unread list is not an empty one', () => {
     const fn = STRIP.slice(STRIP.indexOf('async function markRequired'))
     // The cleanup runs before the "nothing to insert" exit.
     expect(fn.indexOf('const noLonger =')).toBeLessThan(fn.indexOf('if (!rows.length) return'))
+  })
+})
+
+// ============================================================
+// EVERY DECISION POINT CAN BE PLANNED FOR
+//
+// Habib, 16 September 2026: "not all of them can be planned for, each of these
+// should have the planning section in them."
+//
+// The strip was on all twelve, and on eleven of them it was shut: one grey
+// line reading SESSIONS 0, which you had to know was a button. A planning
+// section you have to discover is not on the page.
+// ============================================================
+describe('the planning section is on every decision point', () => {
+  const DASH = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
+  const STRIP = fs.readFileSync('src/components/gtcv/SessionsStrip.tsx', 'utf8')
+  const TYPES = fs.readFileSync('src/lib/coach-types.ts', 'utf8')
+
+  it('the method knows a session for every decision point a tab points at', () => {
+    // A tab carrying a dpId that the catalogue has never heard of is a
+    // decision point where "the guide does not specify sessions here".
+    const tabDps = [...TYPES.matchAll(/dpId:\s*'([^']+)'/g)].map(m => m[1])
+    expect(tabDps.length).toBeGreaterThan(9)
+    const unknown = tabDps.filter(d => !METHOD_SESSIONS[d] || !METHOD_SESSIONS[d].length)
+    expect(unknown).toEqual([])
+  })
+
+  it('every tab that is a decision point renders the strip', () => {
+    const tabDps = [...TYPES.matchAll(/dpId:\s*'([^']+)'/g)].map(m => m[1])
+    const missing = tabDps.filter(d => {
+      if (d === 'phase_0') return !DASH.includes('<SessionsStrip clientId={selClient.id} dpId="phase_0"')
+      if (d === 'handover') return !DASH.includes('<SessionsStrip clientId={selClient.id} dpId="handover"')
+      // The nine are rendered from one list, by key.
+      return !DASH.includes('<SessionsStrip clientId={selClient.id} dpId={dpKey}')
+    })
+    expect(missing).toEqual([])
+    // And the pre-engagement conversation, which is dp 'setup'.
+    expect(DASH).toContain('dpId="setup"')
+  })
+
+  it('it is open when you arrive, rather than hidden behind a grey line', () => {
+    expect(STRIP).toContain('openByDefault = true')
+    // And the header says what pressing it does.
+    expect(STRIP).toContain("{open ? 'Hide' : 'Plan a session'}")
+  })
+
+  it('a decision point renders only when its tab is the one being shown', () => {
+    // These nine tested activeTab while every other tab tested shownTab, so a
+    // decision point left over in the address rendered under the cover for
+    // somebody who may not see decision points at all.
+    expect(DASH).toContain('shownTab===dpKey&&<div key={dpKey}>')
+    expect(DASH).not.toContain('activeTab===dpKey')
+  })
+})
+
+// ============================================================
+// A SHUT GATE IS A LOCK, NOT A DISABLED BUTTON
+//
+// From the review on #279. A block stays shut until the one before it is
+// signed off, and that was enforced by greying the button in the sidebar.
+// ?zone=dp05 typed, pasted, or simply remembered by a browser rendered
+// Decision Point 5 in full for somebody the gate was meant to hold back.
+// ============================================================
+describe('a decision point that is not open yet', () => {
+  const DASH = fs.readFileSync('src/components/coach/CoachDashboard.tsx', 'utf8')
+
+  it('is not rendered because the address asked for it', () => {
+    expect(DASH).toContain('const tabIsOpen=(id)=>{')
+    expect(DASH).toContain("const shownTab=tabIsOpen(activeTab)?activeTab:'cover'")
+  })
+
+  it('checks the gate itself, not just whether the tab exists', () => {
+    const fn = DASH.slice(DASH.indexOf('const tabIsOpen=(id)=>{'), DASH.indexOf('const shownTab=tabIsOpen'))
+    expect(fn).toContain('gateIsOpen(tab.dpId')
+    // A tab that is not a decision point has no gate to check.
+    expect(fn).toContain('if(!tab.dpId)return true')
+  })
+
+  it('still lets the coaching team prepare a block before the session that fills it', () => {
+    const fn = DASH.slice(DASH.indexOf('const tabIsOpen=(id)=>{'), DASH.indexOf('const shownTab=tabIsOpen'))
+    expect(fn).toContain('isCoachingTeam:canViewCoachGuidance(previewRoleId)')
   })
 })

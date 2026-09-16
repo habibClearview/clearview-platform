@@ -3056,7 +3056,21 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
     // The zone is in the address now, so a link or a browser's memory can point
     // at a tab this person may not open. Fall back to the cover rather than
     // showing them a blank panel or, worse, the panel itself.
-    const shownTab=visibleTabs.some(t=>t.id===activeTab)?activeTab:'cover'
+    //
+    // AND A SHUT GATE IS ONE OF THE WAYS A TAB IS NOT THEIRS. 16 September
+    // 2026, from the review. A block stays shut until the one before it is
+    // signed off, and that was enforced by disabling the button in the
+    // sidebar. A button is not a lock: ?zone=dp05 typed, pasted or remembered
+    // by a browser rendered Decision Point 5 in full, gate or no gate. The
+    // coaching team is not gated, because the consultant prepares a block
+    // before the session that fills it.
+    const tabIsOpen=(id)=>{
+      const tab=visibleTabs.find(t=>t.id===id)
+      if(!tab)return false
+      if(!tab.dpId)return true
+      return gateIsOpen(tab.dpId,(g)=>canvas.find(d=>d.dp_id===g)?.status,{isCoachingTeam:canViewCoachGuidance(previewRoleId)})
+    }
+    const shownTab=tabIsOpen(activeTab)?activeTab:'cover'
 
     function printSection(){window.print()}
 
@@ -3425,7 +3439,15 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               // One condition per tab. The same nine keys used to be mapped
               // twice with the same test in both, so every render walked the
               // list twice to decide the same thing.
-              activeTab===dpKey&&<div key={dpKey}><SessionsStrip clientId={selClient.id} dpId={dpKey} canManage={canEdit(previewRoleId)}/><TabDP client={selClient} dp={canvas.find(d=>d.dp_id===dpKey)} userRole={previewRoleId} onUpdateDP={u=>updateDP(selClient.id,dpKey,u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,dpKey,cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId={dpKey} clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/></div>
+              //
+              // AND IT TESTS shownTab, LIKE EVERY OTHER TAB. 16 September
+              // 2026. These nine tested activeTab, which is what the menu was
+              // last set to rather than what this viewer may actually open.
+              // shownTab falls back to the cover when the tab is not theirs,
+              // so a decision point read from the address or left over from
+              // another engagement used to render its contents underneath the
+              // cover for somebody who may not see decision points at all.
+              shownTab===dpKey&&<div key={dpKey}><SessionsStrip clientId={selClient.id} dpId={dpKey} canManage={canEdit(previewRoleId)}/><TabDP client={selClient} dp={canvas.find(d=>d.dp_id===dpKey)} userRole={previewRoleId} onUpdateDP={u=>updateDP(selClient.id,dpKey,u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,dpKey,cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId={dpKey} clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/></div>
                 {/* The tools belong to the zone that uses them. Interviewing is
                     how Decision Point 2 gets its evidence and observation is how Decision Point 7 gets
                     its, and both used to sit ten and seven places away in a flat
