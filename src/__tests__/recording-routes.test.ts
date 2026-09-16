@@ -769,3 +769,66 @@ describe('Sessions and rooms is the workplan', () => {
     expect(PLAN).toContain('Your sessions are safe on the record')
   })
 })
+
+// ============================================================
+// WHAT CODERABBIT FOUND ON #278
+//
+// Six of these are the same shape: a failure that reads as a fact. An
+// attendance read that fell over said the session was empty; a load that
+// fell over said nothing was planned; a day with no time on it was written
+// away as no day at all. On an engagement this platform is the record of,
+// a record that quietly says less than the truth is the worst failure it has.
+// ============================================================
+describe('a failure never reads as a fact', () => {
+  const STRIP = fs.readFileSync('src/components/gtcv/SessionsStrip.tsx', 'utf8')
+  const PLAN = fs.readFileSync('src/components/gtcv/SessionWorkplan.tsx', 'utf8')
+
+  it('falls back to the pointer only when the name column is genuinely absent', () => {
+    // It used to fall back on any error at all and throw the fallback's own
+    // error away, so a dropped connection read as a session nobody is in.
+    for (const SRC of [STRIP, PLAN]) {
+      expect(SRC).toContain('function missingPartyName(error)')
+      expect(SRC).toContain("error.code === '42703'")
+      expect(SRC).toContain('if (attErr && missingPartyName(attErr))')
+    }
+  })
+
+  it('says so when it could not read who is in a session, instead of showing nobody', () => {
+    expect(STRIP).toContain('Who is in each session could not be read')
+    // The workplan retries instead, because it has a retry loop to fall into.
+    expect(PLAN).toContain('if (attErr) { last = attErr; continue }')
+  })
+
+  it('never prints "nothing is planned" underneath a connection error', () => {
+    // 10 September 2026, twice over: Habib read an empty plan as his work
+    // having been deleted, and it had not been.
+    expect(PLAN).toContain('total === 0 && err ?')
+  })
+
+  it('keeps every other required attendee when one of them clashes', () => {
+    // One batch is one statement, so a unique violation on any single row
+    // aborted all of them and the session then asked for nobody.
+    expect(STRIP).toContain('for (const row of rows) {')
+    expect(STRIP).toContain('insert([row]).select().single()')
+  })
+
+  it('keeps the day when a session that has only a day is edited', () => {
+    // Changing the name of a session somebody had put in the diary as a date
+    // wrote the date away as null.
+    expect(STRIP).toContain("(s.planned_date ? `${s.planned_date}T00:00` : '')")
+    expect(STRIP).toContain('planned_at: draft.when && !draft.dayOnly')
+    // And typing an actual time turns it into a moment.
+    expect(STRIP).toContain('when: e.target.value, dayOnly: false')
+  })
+
+  it('says why a session cannot be deleted before asking whether to delete it', () => {
+    // Asking "this cannot be undone, are you sure" and then refusing anyway
+    // made the one case where the answer is already no look like a decision.
+    const fn = STRIP.slice(STRIP.indexOf('async function removeSession(s)'))
+    expect(fn.indexOf('Delete the recording first')).toBeLessThan(fn.indexOf('window.confirm'))
+  })
+
+  it('gives every workplan table a name a screen reader can read out', () => {
+    expect(PLAN).toContain('<caption')
+  })
+})

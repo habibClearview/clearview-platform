@@ -110,6 +110,19 @@ function recLength(seconds) {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} hr ${m % 60} min`
 }
 
+/**
+ * Is this the database telling us the party_name column is not there yet,
+ * rather than telling us something is wrong?
+ *
+ * PostgREST answers 42703 for an undefined column. The message is checked too,
+ * because the column is also named in the schema-cache error a fresh database
+ * gives before it has reloaded.
+ */
+function missingPartyName(error) {
+  if (!error) return false
+  return error.code === '42703' || /party_name/i.test(String(error.message || ''))
+}
+
 const BLANK = { title: '', session_kind: '', when: '', duration_minutes: 60, purpose: '', extra: [] }
 
 export default function SessionsStrip({
@@ -152,15 +165,27 @@ export default function SessionsStrip({
     const ids = (data || []).map(r => r.id)
     if (ids.length) {
       // party_name arrives with 2026_09_16_session_attendance_name.sql. Asked
-      // for by name so that a database without it yet fails here and falls
-      // back to the pointer alone, rather than the whole strip going blank.
+      // for by name so that a database without it yet falls back to the
+      // pointer alone rather than the whole strip going blank.
+      //
+      // ONLY FOR THE MISSING COLUMN. CodeRabbit on #278: this used to fall
+      // back on any error at all and then throw the fallback's own error away,
+      // so a dropped connection or a permission problem read as a session
+      // nobody is in. Which is the one thing an attendance record must never
+      // say by accident.
       let { data: att, error: attErr } = await supabase.from(ATTENDANCE_TABLE)
         .select('id,session_id,party_id,party_role,party_name,required,attended')
         .in('session_id', ids)
-      if (attErr) {
-        ;({ data: att } = await supabase.from(ATTENDANCE_TABLE)
+      if (attErr && missingPartyName(attErr)) {
+        ;({ data: att, error: attErr } = await supabase.from(ATTENDANCE_TABLE)
           .select('id,session_id,party_id,party_role,required,attended')
           .in('session_id', ids))
+      }
+      if (attErr) {
+        setErr('Who is in each session could not be read. The sessions below are right, '
+          + 'the people in them may be incomplete until this loads.')
+        setLoading(false)
+        return
       }
       setAttendance(att || [])
     } else {
@@ -238,15 +263,25 @@ export default function SessionsStrip({
       setAttendance(prev => prev.map(a => (noLonger.includes(a.id) ? { ...a, required: false } : a)))
     }
     if (!rows.length) return
-    let { data, error } = await supabase.from(ATTENDANCE_TABLE).insert(rows).select()
-    if (error && /party_name/i.test(`${error.code || ''} ${error.message || ''}`)) {
-      const plain = rows.map(({ party_name, ...rest }) => rest)
-      ;({ data, error } = await supabase.from(ATTENDANCE_TABLE).insert(plain).select())
+    // ONE AT A TIME, BECAUSE ONE BATCH IS ONE STATEMENT. CodeRabbit on #278:
+    // these went in as a single insert, and a unique violation on any one row
+    // aborts the whole statement. So one person who was already required for
+    // this room silently cost every other required person their row, and the
+    // session then looked as though the method asked for nobody.
+    const added = []
+    for (const row of rows) {
+      let { data, error } = await supabase.from(ATTENDANCE_TABLE).insert([row]).select().single()
+      if (error && missingPartyName(error)) {
+        const { party_name, ...plain } = row
+        void party_name
+        ;({ data, error } = await supabase.from(ATTENDANCE_TABLE).insert([plain]).select().single())
+      }
+      // A unique violation means somebody got there first, which is the end
+      // state this wants anyway. Every other row still goes in.
+      if (error) continue
+      if (data) added.push(data)
     }
-    // A unique violation means somebody got there first, which is the end
-    // state this wants anyway.
-    if (error && error.code !== '23505') return
-    if (data) setAttendance(prev => [...prev, ...data])
+    if (added.length) setAttendance(prev => [...prev, ...added])
   }
 
   async function addSession(template) {
@@ -283,7 +318,12 @@ export default function SessionsStrip({
     setDraft({
       title: s.title || '',
       session_kind: s.session_kind || '',
-      when: localInputValue(s.planned_at),
+      // A DAY WITHOUT A TIME IS STILL A DAY. CodeRabbit on #278: a session
+      // somebody put in the diary as a date had nothing in this box, so
+      // changing its name or its room wrote both the date and the time away
+      // as null and the day was simply gone.
+      when: localInputValue(s.planned_at) || (s.planned_date ? `${s.planned_date}T00:00` : ''),
+      dayOnly: !s.planned_at && !!s.planned_date,
       held_date: s.held_date || '',
       duration_minutes: s.duration_minutes ?? '',
       status: s.status || 'planned',
@@ -298,7 +338,8 @@ export default function SessionsStrip({
     const patch = {
       title: draft.title.trim() || 'Untitled session',
       session_kind: kind,
-      planned_at: draft.when ? new Date(draft.when).toISOString() : null,
+      // Still a day and not a moment, unless somebody actually typed a time.
+      planned_at: draft.when && !draft.dayOnly ? new Date(draft.when).toISOString() : null,
       planned_date: draft.when ? draft.when.slice(0, 10) : null,
       held_date: draft.held_date || null,
       duration_minutes: draft.duration_minutes === '' ? null : Number(draft.duration_minutes),
@@ -329,17 +370,18 @@ export default function SessionsStrip({
    * diary entry.
    */
   async function removeSession(s) {
+    // THE REASON COMES BEFORE THE QUESTION. CodeRabbit on #278: this asked
+    // "this cannot be undone, are you sure" and then refused anyway, so the
+    // one case where the answer is already no was the one that looked most
+    // like a decision.
     const mine = recordings.filter(r => r.session_id === s.id)
-    const warning = mine.length
-      ? `\n\nThis session has ${mine.length === 1 ? 'a recording' : `${mine.length} recordings`} on it. Delete the recording first if you want to keep it.`
-      : ''
-    if (typeof window !== 'undefined' && !window.confirm(
-      `Delete ${s.title || 'this session'}?\n\nWho was in it goes with it. This cannot be undone.${warning}`,
-    )) return
     if (mine.length) {
       setNote(prev => ({ ...prev, [s.id]: { text: 'This session has a recording on it. Delete the recording first, then the session.', bad: true } }))
       return
     }
+    if (typeof window !== 'undefined' && !window.confirm(
+      `Delete ${s.title || 'this session'}?\n\nWho was in it goes with it. This cannot be undone.`,
+    )) return
     setBusy(s.id)
     // Kept, so a failed delete puts the session back rather than leaving the
     // screen disagreeing with the record.
@@ -704,7 +746,7 @@ export default function SessionsStrip({
                       <div>
                         <label style={label} htmlFor={`ed-when-${s.id}`}>When it starts</label>
                         <input id={`ed-when-${s.id}`} type="datetime-local" style={field} value={draft.when}
-                          onChange={e => setDraft(d => ({ ...d, when: e.target.value }))} />
+                          onChange={e => setDraft(d => ({ ...d, when: e.target.value, dayOnly: false }))} />
                       </div>
                       <div>
                         <label style={label} htmlFor={`ed-mins-${s.id}`}>Minutes</label>

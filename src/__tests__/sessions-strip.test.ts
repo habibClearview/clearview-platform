@@ -73,10 +73,16 @@ describe('nextSession', () => {
   it('does not call a day missed until that day is over', () => {
     // A session at some point on Wednesday has not been missed at noon on
     // Wednesday.
+    //
+    // BUILT FROM LOCAL PARTS, NOT FROM A Z STAMP. CodeRabbit on #278: the
+    // "day is over" moment was written as 2026-09-17T08:00:00Z, which is still
+    // the local 16th anywhere west of -08:00, so in Honolulu this test failed
+    // and in London it passed. A test that answers to the runner's clock is
+    // not a test.
     const today = planned({ id: 'today', planned_date: '2026-09-16' })
-    expect(nextSession([today], now)?.id).toBe('today')
-    const tomorrowMorning = new Date('2026-09-17T08:00:00.000Z')
-    expect(nextSession([today], tomorrowMorning)).toBeNull()
+    expect(nextSession([today], new Date(2026, 8, 16, 12, 0))).toBe(today)
+    const nextMorning = new Date(2026, 8, 17, 8, 0)
+    expect(nextSession([today], nextMorning)).toBeNull()
   })
 
   it('ignores a session that was held or cancelled, whatever its date says', () => {

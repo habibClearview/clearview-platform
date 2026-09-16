@@ -309,7 +309,7 @@ export function durationLabel(mins) {
 }
 
 /** What a room is called, without needing the whole definition. */
-export const KIND_LABEL = KINDS.reduce((out, k) => { out[k.v] = k.l; return out }, {})
+export const KIND_LABEL = KINDS.reduce((out, k) => { out[k.v] = k.l; return out }, {} as Record<string, string>)
 
 /** The label for one decision point, or the id if it is not one we know. */
 export function dpLabel(dpId) {
@@ -326,7 +326,7 @@ export function methodSessionsFor(dpId) {
  * The roles the method expects in a room: the room's own, plus any the
  * prescribed session adds on top of it.
  */
-export function requiredRoles(kind, extra) {
+export function requiredRoles(kind, extra?) {
   const def = kindDef(kind)
   return Array.from(new Set([...(def ? def.required : []), ...(extra || [])]))
 }
@@ -382,10 +382,26 @@ export function workplanGroups(sessions) {
   return groups
 }
 
+/**
+ * When a session is, as one number to sort by.
+ *
+ * A DATE WITH NO TIME IS A DAY, NOT MIDNIGHT IN GREENWICH. CodeRabbit on #278,
+ * and the same fault CodeRabbit found on #276 in session-time.ts: JavaScript
+ * reads "2026-09-17" as UTC midnight, so west of Greenwich a session put in the
+ * diary as a day sorted before a timed session earlier that morning, and east
+ * of it after one later that evening. The workplan already prints these as
+ * local calendar days, so it sorts them as local calendar days too.
+ */
 function sessionStamp(s) {
-  const raw = s.planned_at || s.held_date || s.planned_date
-  if (!raw) return null
-  const t = new Date(raw).getTime()
+  if (s.planned_at) {
+    const t = new Date(s.planned_at).getTime()
+    if (!Number.isNaN(t)) return t
+  }
+  const day = s.held_date || s.planned_date
+  if (!day) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(day))
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime()
+  const t = new Date(day).getTime()
   return Number.isNaN(t) ? null : t
 }
 
@@ -419,7 +435,7 @@ export const WORKPLAN_COLUMNS = [
  * download: one row per session, in the same order the screen shows them, with
  * the people spelled out rather than counted.
  */
-export function workplanCsv(sessions, whoFor = () => []) {
+export function workplanCsv(sessions, whoFor: (s: any) => string[] = () => []) {
   const lines = [WORKPLAN_COLUMNS.map(csvCell).join(',')]
   workplanGroups(sessions).forEach((g) => {
     g.sessions.forEach((s) => {

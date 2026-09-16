@@ -246,3 +246,42 @@ describe('how long a session runs, in words', () => {
     expect(durationLabel(0)).toBe('')
   })
 })
+
+// ============================================================
+// A DAY WITH NO TIME SORTS AS A DAY, WHEREVER THE READER IS
+//
+// CodeRabbit on #278, and the same fault it found on #276 in session-time.ts:
+// JavaScript reads "2026-09-17" as UTC midnight. So a session put in the diary
+// as a day sorted before a timed session earlier that morning west of
+// Greenwich, and after one later that evening east of it, and the workplan
+// printed the two in a different order from the one it showed them in.
+// ============================================================
+describe('a date-only session in the workplan order', () => {
+  const rows = [
+    { id: 'early', dp_id: 'dp01', title: 'Early', planned_at: '2026-09-17T07:00:00.000Z' },
+    { id: 'day', dp_id: 'dp01', title: 'Some time that day', planned_date: '2026-09-17' },
+    { id: 'late', dp_id: 'dp01', title: 'Late', planned_at: '2026-09-17T21:00:00.000Z' },
+  ]
+
+  it('sits on its own day rather than at midnight in Greenwich', () => {
+    const order = workplanGroups(rows).find(g => g.id === 'dp01')!.sessions.map((s: any) => s.id)
+    // Whatever the runner's clock, the day begins before the evening session.
+    expect(order.indexOf('day')).toBeLessThan(order.indexOf('late'))
+  })
+
+  it('reads the held date the same way as the planned date', () => {
+    const order = workplanGroups([
+      { id: 'b', dp_id: 'dp01', title: 'b', held_date: '2026-09-20' },
+      { id: 'a', dp_id: 'dp01', title: 'a', held_date: '2026-09-18' },
+    ]).find(g => g.id === 'dp01')!.sessions.map((s: any) => s.id)
+    expect(order).toEqual(['a', 'b'])
+  })
+
+  it('treats a date it cannot read as no date, rather than as today', () => {
+    const order = workplanGroups([
+      { id: 'good', dp_id: 'dp01', title: 'good', planned_date: '2026-09-18' },
+      { id: 'junk', dp_id: 'dp01', title: 'junk', planned_date: 'soon' },
+    ]).find(g => g.id === 'dp01')!.sessions.map((s: any) => s.id)
+    expect(order).toEqual(['good', 'junk'])
+  })
+})

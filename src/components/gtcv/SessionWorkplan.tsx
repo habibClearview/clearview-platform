@@ -66,6 +66,17 @@ const btn = (col, solid) => ({
 const th = { ...mono, fontSize: '0.74rem', letterSpacing: '0.06em', textTransform: 'uppercase', color: C.slate, textAlign: 'left', padding: '0.35rem 0.5rem', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }
 const td = { fontSize: '0.92rem', color: C.navy, padding: '0.45rem 0.5rem', borderBottom: '1px solid var(--cv-border-soft)', verticalAlign: 'top' }
 
+/**
+ * Is this the database telling us the party_name column is not there yet,
+ * rather than telling us something is wrong? PostgREST answers 42703 for an
+ * undefined column, and names the column in the schema-cache error a fresh
+ * database gives before it has reloaded.
+ */
+function missingPartyName(error) {
+  if (!error) return false
+  return error.code === '42703' || /party_name/i.test(String(error.message || ''))
+}
+
 /** A date as somebody reads it, not as the database keeps it. */
 function readable(s) {
   if (s.planned_at) {
@@ -125,14 +136,20 @@ export default function SessionWorkplan({ clientId, clientName = '' }) {
           // party_name arrives with 2026_09_16_session_attendance_name.sql, so
           // a database without it yet falls back to the pointer alone rather
           // than leaving the whole workplan blank.
+          //
+          // ONLY FOR THE MISSING COLUMN. CodeRabbit on #278: this fell back on
+          // any error at all and then discarded the fallback's own error, so a
+          // dropped connection produced a workplan that said every session was
+          // empty, and a spreadsheet downloaded from it said so in writing.
           let { data: att, error: attErr } = await supabase.from(ATTENDANCE_TABLE)
             .select('id,session_id,party_id,party_role,party_name,required,attended')
             .eq('client_id', clientId)
-          if (attErr) {
-            ;({ data: att } = await supabase.from(ATTENDANCE_TABLE)
+          if (attErr && missingPartyName(attErr)) {
+            ;({ data: att, error: attErr } = await supabase.from(ATTENDANCE_TABLE)
               .select('id,session_id,party_id,party_role,required,attended')
               .eq('client_id', clientId))
           }
+          if (attErr) { last = attErr; continue }
           setAttendance(att || [])
           setErr(null)
           setLoading(false)
@@ -260,6 +277,12 @@ export default function SessionWorkplan({ clientId, clientName = '' }) {
 
       {loading ? (
         <div style={hint}>Loading the workplan...</div>
+      ) : total === 0 && err ? (
+        // NOT LOADED IS NOT THE SAME AS NOT PLANNED. CodeRabbit on #278: a
+        // failed load showed the connection message and "Nothing is planned"
+        // together, which is the exact confusion the retry above exists to
+        // prevent. The message above says what happened; this says nothing.
+        null
       ) : total === 0 ? (
         <div style={{ ...hint, border: `1px dashed ${C.border}`, borderRadius: 8, padding: '0.9rem 1rem' }}>
           Nothing is planned on this engagement yet. Sessions are added on the decision point they
@@ -291,6 +314,11 @@ export default function SessionWorkplan({ clientId, clientName = '' }) {
               ) : (
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
+                    {/* The heading above is a sibling, so somebody reading this
+                        in table mode had nine unnamed tables. */}
+                    <caption style={{ ...mono, fontSize: '0.74rem', letterSpacing: '0.06em', textTransform: 'uppercase', color: C.slate, textAlign: 'left', paddingBottom: '0.3rem' }}>
+                      {g.label}
+                    </caption>
                     <thead>
                       <tr>
                         <th style={th}>Session</th>
