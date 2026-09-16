@@ -3425,7 +3425,15 @@ export default function CoachDashboard({onSignOut,userRole='super_coach',userNam
               // One condition per tab. The same nine keys used to be mapped
               // twice with the same test in both, so every render walked the
               // list twice to decide the same thing.
-              activeTab===dpKey&&<div key={dpKey}><SessionsStrip clientId={selClient.id} dpId={dpKey} canManage={canEdit(previewRoleId)}/><TabDP client={selClient} dp={canvas.find(d=>d.dp_id===dpKey)} userRole={previewRoleId} onUpdateDP={u=>updateDP(selClient.id,dpKey,u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,dpKey,cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId={dpKey} clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/></div>
+              //
+              // AND IT TESTS shownTab, LIKE EVERY OTHER TAB. 16 September
+              // 2026. These nine tested activeTab, which is what the menu was
+              // last set to rather than what this viewer may actually open.
+              // shownTab falls back to the cover when the tab is not theirs,
+              // so a decision point read from the address or left over from
+              // another engagement used to render its contents underneath the
+              // cover for somebody who may not see decision points at all.
+              shownTab===dpKey&&<div key={dpKey}><SessionsStrip clientId={selClient.id} dpId={dpKey} canManage={canEdit(previewRoleId)}/><TabDP client={selClient} dp={canvas.find(d=>d.dp_id===dpKey)} userRole={previewRoleId} onUpdateDP={u=>updateDP(selClient.id,dpKey,u)} onUpdateComp={(cn,u)=>updateComponent(selClient.id,dpKey,cn,u)}/><div style={{marginTop:26}}><BlockWorkspace dpId={dpKey} clientId={selClient.id} canManage={canEdit(previewRoleId)} currency={engagementCurrency}/></div>
                 {/* The tools belong to the zone that uses them. Interviewing is
                     how Decision Point 2 gets its evidence and observation is how Decision Point 7 gets
                     its, and both used to sit ten and seven places away in a flat
