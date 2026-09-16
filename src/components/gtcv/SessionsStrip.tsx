@@ -50,6 +50,7 @@
 // ============================================================
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { whenText, nextSession } from '@/lib/session-time'
 
 const C = {
   card: 'var(--cv-card)', border: 'var(--cv-border)', slate: 'var(--cv-slate)',
@@ -93,31 +94,6 @@ const KIND_LABEL = {
   one_to_one: 'One to one',
 }
 
-/** When a session is, in the words somebody would say out loud. */
-export function whenText(session) {
-  const at = session?.planned_at ? new Date(session.planned_at) : null
-  if (at && !Number.isNaN(at.getTime())) {
-    return at.toLocaleDateString('en-GB', {
-      weekday: 'short', day: 'numeric', month: 'short',
-      hour: '2-digit', minute: '2-digit',
-    })
-  }
-  if (session?.planned_date) {
-    const d = new Date(session.planned_date)
-    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
-  }
-  return 'No time set'
-}
-
-/** The next session still to come, or null. Held and cancelled ones are
- *  behind us whatever their date says. */
-export function nextSession(sessions, now = new Date()) {
-  const upcoming = (sessions || [])
-    .filter(s => s.status === 'planned' && s.planned_at && new Date(s.planned_at) >= now)
-    .sort((a, b) => new Date(a.planned_at) - new Date(b.planned_at))
-  return upcoming[0] || null
-}
-
 export default function SessionsStrip({
   clientId, dpId, canManage = false, heading = 'Sessions', openByDefault = false,
 }) {
@@ -154,9 +130,17 @@ export default function SessionsStrip({
 
     const ids = (data || []).map(r => r.id)
     if (ids.length) {
-      const { data: att } = await supabase.from('gtcv_session_attendance')
-        .select('id,session_id,party_id,party_role,required,attended')
+      // party_name arrives with 2026_09_16_session_attendance_name.sql. Asked
+      // for by name so that a database without it yet fails here and falls
+      // back to the pointer alone, rather than the whole strip going blank.
+      let { data: att, error: attErr } = await supabase.from('gtcv_session_attendance')
+        .select('id,session_id,party_id,party_role,party_name,required,attended')
         .in('session_id', ids)
+      if (attErr) {
+        ;({ data: att } = await supabase.from('gtcv_session_attendance')
+          .select('id,session_id,party_id,party_role,required,attended')
+          .in('session_id', ids))
+      }
       setAttendance(att || [])
     } else {
       setAttendance([])
@@ -211,15 +195,27 @@ export default function SessionsStrip({
     if (!partyId) return
     const party = parties.find(p => p.id === partyId)
     setBusy(session.id + partyId)
+    // THE NAME IS WRITTEN DOWN, NOT ONLY POINTED AT. CodeRabbit on #276: the
+    // pointer is set to null when somebody is taken off the engagement, so the
+    // attendance row survived with no identity on it and a session could no
+    // longer say who was in the room. The pointer is still preferred while it
+    // resolves, so a corrected spelling reaches old sessions too.
     const row = {
       client_id: clientId,
       session_id: session.id,
       party_id: partyId,
       party_role: party?.party_role || null,
+      party_name: party?.name || null,
       required: false,
       attended: true,
     }
-    const { data, error } = await supabase.from('gtcv_session_attendance').insert([row]).select().single()
+    let { data, error } = await supabase.from('gtcv_session_attendance').insert([row]).select().single()
+    if (error && /party_name/i.test(`${error.code || ''} ${error.message || ''}`)) {
+      // The column is not there yet. The person is still recorded.
+      const { party_name, ...withoutName } = row
+      void party_name
+      ;({ data, error } = await supabase.from('gtcv_session_attendance').insert([withoutName]).select().single())
+    }
     setBusy(null)
     if (error) { setNote(prev => ({ ...prev, [session.id]: { text: 'That person could not be added: ' + error.message, bad: true } })); return }
     setAttendance(prev => [...prev, data])
@@ -349,14 +345,20 @@ export default function SessionsStrip({
                     <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
                       {here.map(a => {
                         const who = parties.find(p => p.id === a.party_id)
+                        // The engagement's own list first, so a corrected
+                        // spelling reaches old sessions; the name written down
+                        // at the time when there is nothing left to point at.
+                        const name = who?.name || a.party_name || 'Somebody no longer on the engagement'
+                        const role = who?.party_role || a.party_role
                         return (
-                          <span key={a.id} style={{ ...mono, fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', border: `1px solid ${C.purple}`, color: C.purple, borderRadius: 999, padding: '0.15rem 0.6rem' }}>
-                            {who?.name || 'Somebody no longer on the engagement'}
-                            {who?.party_role ? ` · ${ROLE_LABEL[who.party_role] || who.party_role}` : ''}
+                          <span key={a.id} title={who ? undefined : 'No longer on the engagement'}
+                            style={{ ...mono, fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', border: `1px solid ${who ? C.purple : C.slate}`, color: who ? C.purple : C.slate, borderRadius: 999, padding: '0.15rem 0.6rem' }}>
+                            {name}
+                            {role ? ` · ${ROLE_LABEL[role] || role}` : ''}
                             {canManage && (
-                              <button type="button" aria-label={`Take ${who?.name || 'this person'} off the session`}
+                              <button type="button" aria-label={`Take ${name} off the session`}
                                 disabled={busy === a.id} onClick={() => removeParticipant(a)}
-                                style={{ background: 'transparent', border: 'none', color: C.purple, cursor: 'pointer', fontSize: '0.95rem', lineHeight: 1, padding: 0 }}>
+                                style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '0.95rem', lineHeight: 1, padding: 0 }}>
                                 {'\u00D7'}
                               </button>
                             )}
